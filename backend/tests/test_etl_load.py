@@ -1,0 +1,176 @@
+"""Tests for catalog.etl.load (TDD: red → green → refactor).
+
+Spec: docs/data-quality-etl.md §4 — load validated records into Django ORM.
+Idempotent via update_or_create; running twice must not duplicate rows.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+FIXTURE = Path(__file__).parent / "fixtures" / "etl_catalog_sample.json"
+
+
+def _load_raw() -> dict:
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+
+@pytest.mark.django_db
+def test_load_categories_creates_rows() -> None:
+    """load_categories creates Category rows from normalized data."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories
+    from catalog.etl.normalize import normalize_category
+    from catalog.models import Category
+
+    raw = _load_raw()
+    norm = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    stats, _cat_map = load_categories(norm)
+    assert stats.created >= 5
+    assert Category.objects.count() == 5
+    # Top-level category present.
+    assert Category.objects.filter(slug="elektroprivod-vozdushnoy-zaslonki").exists()
+
+
+@pytest.mark.django_db
+def test_load_categories_links_parent() -> None:
+    """Subcategories are linked to their parent via FK."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories
+    from catalog.etl.normalize import normalize_category
+    from catalog.models import Category
+
+    raw = _load_raw()
+    norm = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    load_categories(norm)
+
+    sub = Category.objects.get(slug="elektroprivod-protivopozharnogo-klapana")
+    assert sub.parent is not None
+    # ц → "ts" in our translit: "Специальная" → "spetsialnaya".
+    assert sub.parent.slug == "spetsialnaya-protivopozharnaya-seriya"
+
+
+@pytest.mark.django_db
+def test_load_categories_is_idempotent() -> None:
+    """Running load_categories twice does not duplicate rows."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories
+    from catalog.etl.normalize import normalize_category
+    from catalog.models import Category
+
+    raw = _load_raw()
+    norm = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    load_categories(norm)
+    stats, _ = load_categories(norm)
+    assert stats.created == 0
+    assert Category.objects.count() == 5
+
+
+@pytest.mark.django_db
+def test_load_product_creates_product_and_skus() -> None:
+    """load_product creates Product + nested SKUs + AttributeValues."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories, load_product
+    from catalog.etl.normalize import normalize_category, normalize_product
+    from catalog.models import SKU, AttributeValue, Product
+
+    raw = _load_raw()
+    cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    _stats, cat_map = load_categories(cats)
+
+    np = normalize_product(raw["products"][0])
+    stats = load_product(np, category_map=cat_map)
+    assert stats.products_created == 1
+    assert stats.skus_created == 2
+
+    product = Product.objects.get(slug="privod-protivipozharniy-3nm")
+    assert product.category.slug == "elektroprivod-protivopozharnogo-klapana"
+    assert SKU.objects.filter(product=product).count() == 2
+    sku = SKU.objects.get(sku_code="sa3fu24-ds")
+    assert sku.slug == "privod-protivipozharniy-3nm-sa3fu24-ds"
+    attrs = {av.attribute.name: av.value for av in sku.attribute_values.all()}
+    assert attrs["Мощность"] == "3 Нм"
+    assert attrs["Напряжение (В)"] == "24 В"
+    assert AttributeValue.objects.count() >= 4
+
+
+@pytest.mark.django_db
+def test_load_product_is_idempotent() -> None:
+    """Running load_product twice updates, does not duplicate."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories, load_product
+    from catalog.etl.normalize import normalize_category, normalize_product
+    from catalog.models import SKU, Product
+
+    raw = _load_raw()
+    cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    _stats, cat_map = load_categories(cats)
+
+    np = normalize_product(raw["products"][0])
+    load_product(np, category_map=cat_map)
+    stats = load_product(np, category_map=cat_map)
+    assert stats.products_created == 0
+    assert stats.skus_created == 0
+    assert Product.objects.filter(slug=np.slug).count() == 1
+    assert SKU.objects.filter(product__slug=np.slug).count() == 2
+
+
+@pytest.mark.django_db
+def test_load_product_creates_attributes_in_dictionary() -> None:
+    """Attributes are created in the Attribute dictionary on first sight."""
+    from catalog.etl.extract import extract_categories
+    from catalog.etl.load import load_categories, load_product
+    from catalog.etl.normalize import normalize_category, normalize_product
+    from catalog.models import Attribute
+
+    raw = _load_raw()
+    cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
+    _stats, cat_map = load_categories(cats)
+
+    np = normalize_product(raw["products"][0])
+    load_product(np, category_map=cat_map)
+    assert Attribute.objects.filter(name="Мощность").exists()
+    assert Attribute.objects.filter(name="Напряжение (В)").exists()
+    assert Attribute.objects.filter(name="Управление").exists()
+
+
+@pytest.mark.django_db
+def test_load_product_quarantines_when_category_missing() -> None:
+    """If category_id is unknown, load_product raises QuarantineError.
+
+    Product.category is NOT NULL — we cannot load a product without a
+    category. The orchestrator catches this and writes to quarantine CSV.
+    """
+    from decimal import Decimal
+
+    from catalog.etl.load import load_product
+    from catalog.etl.normalize import (
+        NormalizedProduct,
+        NormalizedSKU,
+        QuarantineError,
+    )
+    from catalog.models import Product
+
+    np = NormalizedProduct(
+        tilda_uid="999",
+        name="Orphan Product",
+        slug="orphan-product",
+        description="",
+        category_id=999999,  # not in category_map
+        skus=(
+            NormalizedSKU(
+                sku_code="ORPH-1",
+                slug="orphan-product-orph-1",
+                name="Orphan Product (ORPH-1)",
+                price=Decimal("0"),
+                attributes=(),
+            ),
+        ),
+    )
+    with pytest.raises(QuarantineError) as exc_info:
+        load_product(np, category_map={})
+    assert "category not found" in exc_info.value.reason
+    assert not Product.objects.filter(slug="orphan-product").exists()

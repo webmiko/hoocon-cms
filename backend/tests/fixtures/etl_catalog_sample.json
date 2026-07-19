@@ -1,0 +1,139 @@
+{
+  "partuid": 222729987712,
+  "filter": "y",
+  "filters": {
+    "sort": true,
+    "search": true,
+    "filters": [
+      {
+        "id": 3312934,
+        "label": "Назначение",
+        "control": "checkbox",
+        "type": "product",
+        "name": "storepartuid",
+        "values": [
+          {
+            "id": 431110420892,
+            "value": "Электропривод воздушной заслонки",
+            "path": "Электропривод воздушной заслонки",
+            "count": 2,
+            "subparts": [
+              {"id": 494950843642, "value": "Электропривод воздушный с возвратной пружиной", "count": 1},
+              {"id": 710501710302, "value": "Электропривод воздушный без возвратной пружины", "count": 1}
+            ]
+          },
+          {
+            "id": 826899277672,
+            "value": "Специальная противопожарная серия",
+            "path": "Специальная противопожарная серия",
+            "count": 1,
+            "subparts": [
+              {"id": 368052664042, "value": "Электропривод противопожарного клапана", "count": 1}
+            ]
+          }
+        ]
+      },
+      {"id": 3312938, "label": "Наличие", "control": "checkbox", "type": "product", "name": "available", "values": []},
+      {"id": 3469130, "label": "Мощность", "control": "buttons", "type": "product", "name": "power", "values": []}
+    ]
+  },
+  "total": 3,
+  "isElastic": false,
+  "products": [
+    {
+      "uid": "128211704222",
+      "title": "SA3FU | 3 Нм Привод противопожарного клапана",
+      "sku": "",
+      "text": "Электропривод 3 Нм для противопожарных клапанов",
+      "price": null,
+      "descr": "– Выходной крутящий момент: 3 Нм<br />– Площадь заслонки: 0,3 м²",
+      "buttonlink": "/privod-protivipozharniy-3nm",
+      "url": "https://hoocon.ru/privod-protivipozharniy-3nm",
+      "partuids": [368052664042, 826899277672],
+      "brand": "HOOCON",
+      "characteristics": [
+        {"title": "Крутящий момент", "value": "3 Нм"},
+        {"title": "Площадь заслонки (м²)", "value": "до 0,3"}
+      ],
+      "editions": [
+        {
+          "uid": "309203956202",
+          "sku": "sa3fu24-ds",
+          "price": "",
+          "img": "https://static.tildacdn.com/sa3fu24.jpg",
+          "Мощность": "3 Нм",
+          "Напряжение (В)": "24 В",
+          "Управление": "Открыто/Закрыто",
+          "Датчик температуры": "Без датчика"
+        },
+        {
+          "uid": "309203956203",
+          "sku": "sa3fu24-as",
+          "price": "",
+          "img": "https://static.tildacdn.com/sa3fu24as.jpg",
+          "Мощность": "3 Нм",
+          "Напряжение (В)": "230 В",
+          "Управление": "Открыто/Закрыто",
+          "Датчик температуры": "Без датчика"
+        }
+      ]
+    },
+    {
+      "uid": "128211704223",
+      "title": "DA3FU | 3 Нм Привод воздушный с возвратной пружиной",
+      "sku": "",
+      "text": "Электропривод воздушный с пружинным возвратом",
+      "price": null,
+      "descr": "– Момент: 3 Нм<br />– Напряжение: 24/230 В",
+      "buttonlink": "/privod-vozdushniy-pruzhina-dafu-3nm",
+      "url": "https://hoocon.ru/privod-vozdushniy-pruzhina-dafu-3nm",
+      "partuids": [494950843642, 431110420892],
+      "brand": "HOOCON",
+      "characteristics": [
+        {"title": "Крутящий момент", "value": "3 Нм"}
+      ],
+      "editions": [
+        {
+          "uid": "309203956210",
+          "sku": "da3fu24-ds",
+          "price": "",
+          "img": "https://static.tildacdn.com/da3fu24.jpg",
+          "Мощность": "3 Нм",
+          "Напряжение (В)": "24 В",
+          "Управление": "Открыто/Закрыто",
+          "Датчик температуры": "Без датчика"
+        }
+      ]
+    },
+    {
+      "uid": "128211704224",
+      "title": "BV215 | Шаровой кран 2-ходовый DN 15",
+      "sku": "",
+      "text": "Шаровой кран BV215",
+      "price": null,
+      "descr": "– DN 15<br />– KVS 4.5",
+      "buttonlink": "",
+      "url": "https://hoocon.ru/tproduct/629593806372-bv215-sharovoi-kran-2-hodovii-dn-15",
+      "partuids": [479830129812, 453135699022],
+      "brand": "HOOCON",
+      "characteristics": [
+        {"title": "DN", "value": "15"}
+      ],
+      "editions": [
+        {
+          "uid": "309203956220",
+          "sku": "bv215",
+          "price": "",
+          "img": "https://static.tildacdn.com/bv215.jpg",
+          "DN": "15"
+        }
+      ]
+    }
+  ],
+  "slice": 0,
+  "nextslice": null,
+  "partlinks": {},
+  "header": "",
+  "footer": "",
+  "disablepopup": false
+}
