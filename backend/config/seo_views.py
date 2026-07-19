@@ -11,6 +11,7 @@ from django.http import HttpRequest, HttpResponse
 from django.views import View
 
 from catalog.models import SKU, Category, Product
+from content.models import Article, News
 
 # Sitemap 0.9 namespace.
 _SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -66,6 +67,14 @@ class SitemapXmlView(View):
         # SKU pages (by slug, published only — no /tproduct/, no query filters).
         for sku in SKU.objects.filter(is_published=True).select_related("product__category").order_by("slug"):
             urls.append(f"{base}/{sku.slug}/")
+
+        # Article pages (/statyi/<slug>, published only).
+        for art in Article.objects.filter(is_published=True).order_by("slug"):
+            urls.append(f"{base}/statyi/{art.slug}/")
+
+        # News pages (/novosti/<slug>, published only).
+        for news in News.objects.filter(is_published=True).order_by("slug"):
+            urls.append(f"{base}/novosti/{news.slug}/")
 
         body = self._render_xml(urls)
         return HttpResponse(body, content_type="application/xml; charset=utf-8")

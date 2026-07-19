@@ -173,3 +173,32 @@ def test_sitemap_includes_category_pages(client) -> None:
     body = response.content.decode()
     # Category slugs should appear as canonical paths.
     assert "/vozdushnie-sm" in body or "/protivopozharnie-sm" in body
+
+
+# ── sitemap.xml: Article / News (Iter 3) ──────────────────────────────
+
+
+@pytest.mark.django_db
+def test_sitemap_includes_published_articles(client) -> None:
+    """sitemap.xml includes /statyi/<slug> for published articles."""
+    from content.models import Article
+
+    Article.objects.create(title="A1", slug="article-pub", body="", is_published=True)
+    Article.objects.create(title="A2", slug="article-draft", body="", is_published=False)
+    response = client.get("/sitemap.xml")
+    body = response.content.decode()
+    assert "/statyi/article-pub" in body
+    assert "/statyi/article-draft" not in body
+
+
+@pytest.mark.django_db
+def test_sitemap_includes_published_news(client) -> None:
+    """sitemap.xml includes /novosti/<slug> for published news."""
+    from content.models import News
+
+    News.objects.create(title="N1", slug="news-pub", body="", is_published=True)
+    News.objects.create(title="N2", slug="news-draft", body="", is_published=False)
+    response = client.get("/sitemap.xml")
+    body = response.content.decode()
+    assert "/novosti/news-pub" in body
+    assert "/novosti/news-draft" not in body

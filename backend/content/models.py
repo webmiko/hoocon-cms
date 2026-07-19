@@ -15,6 +15,7 @@ docs/seo-url-migration.md (slug = canonical path, напр. /company, /statyi).
 
 from __future__ import annotations
 
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 
@@ -68,6 +69,9 @@ class Page(_ContentBase):
 
     Канонический путь = /<slug>. Используется для служебных страниц,
     не имеющих даты публикации (статичный контент сайта).
+
+    Note: Page intentionally has no `search_vector` — статичные страницы
+    не участвуют в глобальном поиске (только Article/News, см. ПЛАН Iter 3).
     """
 
     class Meta(_ContentBase.Meta):
@@ -80,8 +84,13 @@ class Article(_ContentBase):
 
     Гайды, экспертные материалы, подборы. `published_at` — обязательная
     семантически для опубликованных статей, но в модели опциональна
-    (черновики без даты). Slice 17 добавит SearchVector по title+body.
+    (черновики без даты). SearchVector (title A + body B) поддерживается
+    Postgres-триггером (см. миграцию 0002).
     """
+
+    # Postgres FTS vector (auto-maintained by DB trigger; see migration).
+    # Spec: ПЛАН §6 Iter 3 — FTS на Article (SearchVector title + body).
+    search_vector = SearchVectorField(null=True, blank=True, editable=False)
 
     class Meta(_ContentBase.Meta):
         verbose_name = "статья"
@@ -91,8 +100,13 @@ class Article(_ContentBase):
 class News(_ContentBase):
     """Company news item (/novosti/<slug>).
 
-    Анонсы продуктов, события, обновления. Slice 17 добавит SearchVector.
+    Анонсы продуктов, события, обновления. SearchVector (title A + body B)
+    поддерживается Postgres-триггером (см. миграцию 0002).
     """
+
+    # Postgres FTS vector (auto-maintained by DB trigger; see migration).
+    # Spec: ПЛАН §6 Iter 3 — FTS на News (SearchVector title + body).
+    search_vector = SearchVectorField(null=True, blank=True, editable=False)
 
     class Meta(_ContentBase.Meta):
         verbose_name = "новость"
