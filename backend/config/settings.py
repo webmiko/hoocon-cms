@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "drf_spectacular",
     "rest_framework",
+    # Project apps (с итерации 1)
+    "redirects",
 ]
 
 MIDDLEWARE = [
