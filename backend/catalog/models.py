@@ -9,7 +9,22 @@ slug = path-сегмент канонического URL (сохраняем и
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
+
 from django.db import models
+
+from catalog.validators import sanitize_upload_filename, validate_pdf_upload
+
+
+def product_file_upload_to(instance: ProductFile, filename: str) -> str:
+    """Store under product_files/<sku_id>/<uuid>_<safe_basename>.
+
+    UUID в имени — не угадывать URL; basename проходит sanitize.
+    """
+    safe = sanitize_upload_filename(filename)
+    sku_part = instance.sku_id if instance.sku_id is not None else "pending"
+    return f"product_files/{sku_part}/{uuid.uuid4().hex}_{safe}"
 
 
 class Category(models.Model):
@@ -224,3 +239,76 @@ class AttributeValue(models.Model):
     def __str__(self) -> str:
         """Return 'sku_code / attribute_name = value' for Admin readability."""
         return f"{self.sku.sku_code} / {self.attribute.name} = {self.value}"
+
+
+class ProductFile(models.Model):
+    """Downloadable PDF (datasheet / certificate) attached to a SKU.
+
+    Download center на PDP (docs/market-analysis.md B3). Публичное чтение;
+    загрузка — staff/ETL. Валидация PDF: MIME + extension + magic + size
+    (catalog.validators). upload_to с UUID — storage вне URL-угадывания.
+
+    Args (fields):
+        sku: FK SKU (CASCADE — удаление SKU удаляет файлы).
+        title: человекочитаемое имя для UI, напр. «Паспорт HVA-5NM».
+        file: FileField (PDF only; validators на поле).
+        file_type: datasheet | certificate | catalog | other.
+        is_published: видимость в публичном API (default True).
+        sort_order: порядок в блоке «Документы» (меньше = выше).
+        created_at / updated_at: авто-таймстампы.
+    """
+
+    class FileType(models.TextChoices):
+        DATASHEET = "datasheet", "Паспорт / datasheet"
+        CERTIFICATE = "certificate", "Сертификат"
+        CATALOG = "catalog", "Каталог"
+        OTHER = "other", "Прочее"
+
+    sku: models.ForeignKey = models.ForeignKey(
+        SKU,
+        on_delete=models.CASCADE,
+        related_name="files",
+        help_text="SKU, к которому привязан документ.",
+    )
+    title: models.CharField = models.CharField(max_length=300)
+    file: models.FileField = models.FileField(
+        upload_to=product_file_upload_to,
+        validators=[validate_pdf_upload],
+        help_text="Только PDF; лимит и magic bytes — catalog.validators.",
+    )
+    file_type: models.CharField = models.CharField(
+        max_length=20,
+        choices=FileType.choices,
+        default=FileType.DATASHEET,
+        db_index=True,
+    )
+    is_published: models.BooleanField = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Видимость файла в публичном каталоге / PDP.",
+    )
+    sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
+        default=0,
+        help_text="Порядок в блоке «Документы» (меньше = выше).",
+    )
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "файл продукта"
+        verbose_name_plural = "файлы продуктов"
+        ordering = ("sort_order", "title")
+
+    def __str__(self) -> str:
+        """Return 'title (sku_code)' for Admin readability."""
+        return f"{self.title} ({self.sku.sku_code})"
+
+    def clean(self) -> None:
+        """Run PDF validators when file is present (Admin / full_clean)."""
+        super().clean()
+        if self.file:
+            # FileField validators run on forms; clean() covers model.full_clean.
+            name = Path(getattr(self.file, "name", "") or "").name
+            if name:
+                sanitize_upload_filename(name)
+            validate_pdf_upload(self.file)
