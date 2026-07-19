@@ -1,0 +1,26 @@
+# KB symlink target content is outside repo; keep link name ignored if needed
+# (symlink itself can be committed as symlink — git stores it; KB not tracked)
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+node_modules/
+frontend/dist/
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+*.log
+.DS_Store
+.idea/
+.vscode/
