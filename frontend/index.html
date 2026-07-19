@@ -1,10 +1,52 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru-RU">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("hoocon-theme");
+          var pref =
+            stored === "light" || stored === "dark" || stored === "system"
+              ? stored
+              : "system";
+          var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var resolved =
+            pref === "dark" || (pref === "system" && systemDark) ? "dark" : "light";
+          var root = document.documentElement;
+          root.dataset.theme = resolved;
+          root.dataset.themePreference = pref;
+          root.style.colorScheme = resolved;
+        } catch (e) {
+          /* private mode / blocked storage */
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="theme-color" content="#dc1313" />
+    <title>Hoocon — электроприводы ОВК</title>
+    <meta
+      name="description"
+      content="Производство электроприводов для вентиляции, кондиционирования и противопожарных систем."
+    />
+    <link rel="canonical" href="https://hoocon.ru/" />
+    <meta property="og:title" content="Hoocon — электроприводы ОВК" />
+    <meta
+      property="og:description"
+      content="Производство электроприводов для вентиляции, кондиционирования и противопожарных систем."
+    />
+    <meta property="og:url" content="https://hoocon.ru/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://hoocon.ru/og-image.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hoocon — электроприводы ОВК" />
+    <meta
+      name="twitter:description"
+      content="Производство электроприводов для вентиляции, кондиционирования и противопожарных систем."
+    />
+    <meta name="twitter:image" content="https://hoocon.ru/og-image.svg" />
+    <meta name="robots" content="index, follow" />
   </head>
   <body>
     <div id="root"></div>

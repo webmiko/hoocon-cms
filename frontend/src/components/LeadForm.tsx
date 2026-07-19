@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
 import styles from "./LeadForm.module.css";
@@ -45,6 +46,7 @@ const INITIAL_STATE: FormState = {
 
 export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
+  const [pdnConsent, setPdnConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,6 +57,12 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!pdnConsent) {
+      setErrors({
+        pdn: "Отметьте согласие на обработку персональных данных",
+      });
+      return;
+    }
     setSubmitting(true);
     setErrors({});
 
@@ -83,6 +91,7 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
       await api.createLead(payload);
       setSuccess(true);
       setForm(INITIAL_STATE);
+      setPdnConsent(false);
     } catch (err) {
       if (err instanceof ApiError) {
         const fieldErrors: Record<string, string> = {};
@@ -105,8 +114,11 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
   if (success) {
     return (
       <div className={styles.success}>
-        <h3>Заявка отправлена!</h3>
-        <p>Менеджер свяжется с вами в ближайшее время.</p>
+        <h3>Заявка отправлена</h3>
+        <p>
+          Ответим до 2 рабочих часов — на email или телефон из заявки. Если нужны
+          уточнения по ТТХ или объёму, напишем в том же ответе.
+        </p>
         <button
           type="button"
           className={styles.resetButton}
@@ -252,13 +264,42 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
 
       {errors.detail && <div className={styles.errorBox}>{errors.detail}</div>}
 
-      <button type="submit" className={styles.submitButton} disabled={submitting}>
+      <label className={styles.consent}>
+        <input
+          type="checkbox"
+          checked={pdnConsent}
+          onChange={(event) => {
+            setPdnConsent(event.target.checked);
+            if (errors.pdn) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.pdn;
+                return next;
+              });
+            }
+          }}
+        />
+        <span>
+          Даю отдельное{" "}
+          <Link to="/terms">согласие на обработку персональных данных</Link>
+          {" "}
+          (152-ФЗ). Cookie настраиваются отдельно в баннере или в подвале сайта.
+        </span>
+      </label>
+      {errors.pdn ? <span className={styles.error}>{errors.pdn}</span> : null}
+
+      <button
+        type="submit"
+        className={styles.submitButton}
+        disabled={submitting || !pdnConsent}
+      >
         {submitting ? "Отправка…" : "Отправить заявку"}
       </button>
 
       <p className={styles.privacy}>
-        Нажимая «Отправить», вы соглашаетесь на обработку персональных данных
-        для связи с вами по заявке.
+        Условия поставки —{" "}
+        <Link to="/oferta">публичная оферта</Link>. Политика обработки ПДн —{" "}
+        <Link to="/privacy-policy">на сайте</Link>.
       </p>
     </form>
   );
