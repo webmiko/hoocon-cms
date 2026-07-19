@@ -1,0 +1,128 @@
+.hero {
+  background: linear-gradient(135deg, #0f62fe 0%, #0094b6 100%);
+  color: white;
+  padding: var(--space-2xl) 0;
+  border-radius: var(--radius);
+  margin-bottom: var(--space-2xl);
+}
+
+.heroContent {
+  max-width: 700px;
+  padding: 0 var(--space-xl);
+}
+
+.heroContent h1 {
+  color: white;
+  margin-bottom: var(--space-md);
+}
+
+.heroSubtitle {
+  font-size: var(--font-size-lg);
+  opacity: 0.95;
+  margin-bottom: var(--space-lg);
+}
+
+.heroActions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.ctaPrimary,
+.ctaSecondary {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.ctaPrimary {
+  background: white;
+  color: var(--color-primary);
+}
+
+.ctaPrimary:hover {
+  background: #f0f0f0;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.ctaSecondary {
+  background: transparent;
+  color: white;
+  border: 2px solid white;
+}
+
+.ctaSecondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  text-decoration: none;
+}
+
+.section {
+  margin-bottom: var(--space-2xl);
+}
+
+.section h2 {
+  margin-bottom: var(--space-lg);
+}
+
+.categoryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+
+.categoryCard {
+  display: block;
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.categoryCard:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.categoryCard h3 {
+  margin-bottom: var(--space-xs);
+  color: var(--color-primary);
+}
+
+.categoryCard p {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-md);
+}
+
+.featureCard {
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.featureCard h3 {
+  margin-bottom: var(--space-sm);
+  color: var(--color-text);
+}
+
+.featureCard p {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

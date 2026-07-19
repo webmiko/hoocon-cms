@@ -9,9 +9,13 @@
     "lint": "eslint . && oxlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript openapi.json -o src/api/schema.d.ts",
+    "gen:api:remote": "curl -s http://127.0.0.1:8000/api/schema/ | openapi-typescript - -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-sans-condensed": "^5.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"
@@ -27,6 +31,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.71.0",
     "prettier": "^3.9.5",
     "typescript": "~6.0.2",

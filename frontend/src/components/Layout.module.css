@@ -1,0 +1,126 @@
+.header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--space-lg);
+}
+
+.logo {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.logo:hover {
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+.navLink {
+  color: var(--color-text);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  padding: var(--space-sm) 0;
+}
+
+.navLink:hover {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.searchForm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.searchInput {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  width: 200px;
+  font-family: inherit;
+}
+
+.searchInput:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+.searchButton {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.searchButton:hover {
+  background: var(--color-primary-hover);
+}
+
+.main {
+  min-height: calc(100vh - var(--header-height) - 200px);
+  padding: var(--space-xl) 0;
+}
+
+.footer {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-xl) 0;
+  margin-top: var(--space-2xl);
+}
+
+.footerInner {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.footerContacts {
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .nav {
+    display: none;
+  }
+
+  .searchInput {
+    width: 140px;
+  }
+
+  .footerInner {
+    flex-direction: column;
+  }
+
+  .footerContacts {
+    text-align: left;
+  }
+}

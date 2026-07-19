@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import django_filters
 from django.db.models import Q, QuerySet
+from rest_framework.filters import BaseFilterBackend
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
@@ -63,11 +64,23 @@ class SKUFilterSet(django_filters.FilterSet):
         )
 
 
-class AttributeQueryFilterBackend:
+class AttributeQueryFilterBackend(BaseFilterBackend):
     """Apply `?<attribute_slug>=<value>` as EAV exact filters.
 
-    DRF filter backend (duck-typed): filter_queryset(request, queryset, view).
+    Inherits from DRF BaseFilterBackend so drf-spectacular can introspect it
+    (get_schema_operation_parameters). The EAV filters are dynamic (driven by
+    Attribute.slug values in the DB), so we return no static schema parameters.
     """
+
+    def get_schema_operation_parameters(self, view: APIView) -> list[dict[str, object]]:
+        """Tell drf-spectacular this backend adds no static query parameters.
+
+        EAV filter keys (`?<attribute_slug>=<value>`) are dynamic and depend
+        on the Attribute dictionary in the DB, so we don't enumerate them in
+        the OpenAPI schema. The frontend discovers available filters from the
+        catalog data itself.
+        """
+        return []
 
     def filter_queryset(
         self,

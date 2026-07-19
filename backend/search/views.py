@@ -27,6 +27,7 @@ from rest_framework.views import APIView
 
 from catalog.models import SKU
 from content.models import Article, News
+from search.serializers import SearchResponseSerializer
 
 
 class SearchView(APIView):
@@ -40,6 +41,8 @@ class SearchView(APIView):
     permission_classes = (AllowAny,)
     http_method_names = ["get", "head", "options"]
     pagination_class = PageNumberPagination
+    # For drf-spectacular schema generation (response shape).
+    serializer_class = SearchResponseSerializer
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
         """Handle GET: parse `q`, run FTS on all three models, return paginated.
