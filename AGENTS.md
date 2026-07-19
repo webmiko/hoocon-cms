@@ -39,6 +39,9 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md) | Scope, итерации, решения |
 | [docs/](docs/) | Рынок, стек, SEO URL, ETL, UX, security, infra reg.ru |
 | [docs/security-baseline.md][sec-baseline] | OWASP 2025 → Hoocon |
+| [docs/seo-url-migration.md](docs/seo-url-migration.md) | Сохранение URL и 301 |
+| [docs/seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) | Title/description для Яндекс и Google |
+| [docs/tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) | Канон терминологии ТТХ / инструкций (Belimo RU) |
 | `../hoocon/` | Tilda-контент и данные каталога (соседний репо) |
 
 Стек: Django + DRF + Postgres + Celery/Redis; React + Vite; prod — VPS/DNS/mail
@@ -52,6 +55,8 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Новый код / модуль | БЗ ПРОМПТ + TDD; apps в `backend/` |
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |
 | SEO / редиректы | [seo-url-migration.md](docs/seo-url-migration.md) |
+| Title / description (Яндекс, Google) | [seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) |
+| ТТХ / инструкции / перевод | [tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) |
 | ETL / качество данных | [data-quality-etl.md](docs/data-quality-etl.md) |
 | UX / дизайн B2B | [readiness-backend-ux.md](docs/readiness-backend-ux.md); прототипы `../hoocon/docs/прототипы/` |
 | Веб / SEO SPA | БЗ `ВЕБ-РАЗРАБОТКА-Кастомный-стек/` |

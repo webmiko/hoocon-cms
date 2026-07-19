@@ -4,6 +4,7 @@
 Правило: **не ломать индексированные URL без 301**.  
 Опора БЗ: `ВЕБ-РАЗРАБОТКА-Кастомный-стек/SEO-индексация-SPA.md`
 (canonical без trailing slash; nginx 301 дублей; head в исходном HTML).
+Title/description для сниппетов: [seo-meta-yandex-google.md](seo-meta-yandex-google.md).
 
 Снимки sitemap: 2026-07-19 (`sitemap.xml` + `sitemap-store.xml`).
 

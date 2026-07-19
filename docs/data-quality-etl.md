@@ -7,6 +7,7 @@
 
 Связано: [seo-url-migration.md](seo-url-migration.md),
 [market-analysis.md](market-analysis.md),
+[tech-copy-belimo-ru.md](tech-copy-belimo-ru.md) — терминология ТТХ,
 аудит `../hoocon/docs/АУДИТ_HOOCON_RU.md`.
 
 ---
@@ -78,6 +79,9 @@
 - [ ] Один смысловой H1 на страницу (в шаблоне, не из сырого HTML)
 - [ ] Description уникален; не копипаст соседних SKU
 - [ ] HTML описаний: strip script/style; без Tilda-классов
+- [ ] ТТХ/инструкции — терминология
+  [tech-copy-belimo-ru.md](tech-copy-belimo-ru.md)
+  (`В=` не `VDC`; IP = «степень защиты корпуса», не «класс»)
 - [ ] Аналоги: только если есть запись AnalogMap; иначе блок скрыт
 
 ### 4.3 Медиа

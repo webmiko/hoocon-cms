@@ -180,7 +180,8 @@ skip-link; performance budget CWV.
 
 ### 4.5 Перенос в React
 
-- CSS variables из §4.2 → `frontend/src/styles/tokens.css`.
+- CSS variables из §4.2 → `frontend/src/styles/tokens.css`
+  (см. также [design-system.md](design-system.md)).
 - Компоненты layout по прототипу (Header, Filters, SkuCard, PdpBuy).
 - Контент hero — реальные фото продукции (из media ETL), не абстрактный
   градиент.
