@@ -109,3 +109,54 @@ def validate_pdf_upload(uploaded: Any) -> None:
     magic = _read_magic(uploaded, len(PDF_MAGIC_PREFIX))
     if not magic.startswith(PDF_MAGIC_PREFIX):
         raise ValidationError("Файл не является PDF (magic bytes).")
+
+
+# --- Product images (JPEG / PNG / WebP) -------------------------------------
+
+MAX_PRODUCT_IMAGE_SIZE_BYTES: int = 8 * 1024 * 1024
+ALLOWED_IMAGE_EXTENSIONS: frozenset[str] = frozenset({".jpg", ".jpeg", ".png", ".webp"})
+ALLOWED_IMAGE_MIMES: frozenset[str] = frozenset(
+    {"image/jpeg", "image/png", "image/webp"},
+)
+# JPEG SOI, PNG signature, WebP "RIFF....WEBP"
+_JPEG_MAGIC: bytes = b"\xff\xd8\xff"
+_PNG_MAGIC: bytes = b"\x89PNG\r\n\x1a\n"
+
+
+def validate_image_upload(uploaded: Any) -> None:
+    """Validate image upload: extension, MIME, magic bytes, size.
+
+    Args:
+        uploaded: Django UploadedFile or file-like with `.name` and read/seek.
+
+    Raises:
+        ValidationError: on empty, wrong type, spoofed content, or oversize.
+    """
+    name = getattr(uploaded, "name", "") or ""
+    safe_name = sanitize_upload_filename(name)
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValidationError(
+            f"Допустимы расширения {sorted(ALLOWED_IMAGE_EXTENSIONS)}, получено: {ext!r}.",
+        )
+
+    content_type = getattr(uploaded, "content_type", None)
+    if content_type and content_type not in ALLOWED_IMAGE_MIMES:
+        raise ValidationError(
+            f"Допустимый MIME: {sorted(ALLOWED_IMAGE_MIMES)}, получено: {content_type!r}.",
+        )
+
+    size = _upload_size(uploaded)
+    if size <= 0:
+        raise ValidationError("Файл пуст (size must be > 0).")
+    if size > MAX_PRODUCT_IMAGE_SIZE_BYTES:
+        raise ValidationError(
+            f"Файл превышает лимит {MAX_PRODUCT_IMAGE_SIZE_BYTES} байт (получено {size}).",
+        )
+
+    magic = _read_magic(uploaded, 12)
+    is_jpeg = magic.startswith(_JPEG_MAGIC)
+    is_png = magic.startswith(_PNG_MAGIC)
+    is_webp = len(magic) >= 12 and magic[:4] == b"RIFF" and magic[8:12] == b"WEBP"
+    if not (is_jpeg or is_png or is_webp):
+        raise ValidationError("Файл не является JPEG/PNG/WebP (magic bytes).")

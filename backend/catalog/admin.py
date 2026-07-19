@@ -7,7 +7,15 @@ from __future__ import annotations
 
 from django.contrib import admin
 
-from catalog.models import SKU, Attribute, AttributeValue, Category, Product, ProductFile
+from catalog.models import (
+    SKU,
+    Attribute,
+    AttributeValue,
+    Category,
+    Product,
+    ProductFile,
+    ProductImage,
+)
 
 
 @admin.register(Category)
@@ -49,6 +57,14 @@ class ProductFileInline(admin.TabularInline):
     fields = ("title", "file", "file_type", "is_published", "sort_order")
 
 
+class ProductImageInline(admin.TabularInline):
+    """Inline product photos on SKU change form."""
+
+    model = ProductImage
+    extra = 0
+    fields = ("image", "alt", "source_url", "sort_order", "is_published")
+
+
 @admin.register(SKU)
 class SKUAdmin(admin.ModelAdmin):
     """Admin for SKU — артикул, slug, цена (скрыта в публичном API)."""
@@ -66,7 +82,7 @@ class SKUAdmin(admin.ModelAdmin):
     search_fields = ("sku_code", "name", "slug", "analog_belimo_code")
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("product",)
-    inlines = (AttributeValueInline, ProductFileInline)
+    inlines = (AttributeValueInline, ProductImageInline, ProductFileInline)
     ordering = ("sku_code",)
 
 
@@ -106,3 +122,14 @@ class ProductFileAdmin(admin.ModelAdmin):
     search_fields = ("title", "sku__sku_code", "sku__name")
     autocomplete_fields = ("sku",)
     ordering = ("sort_order", "title")
+
+
+@admin.register(ProductImage)
+class ProductImageAdmin(admin.ModelAdmin):
+    """Admin for ProductImage (WebP gallery)."""
+
+    list_display = ("sku", "alt", "sort_order", "is_published", "updated_at")
+    list_filter = ("is_published",)
+    search_fields = ("alt", "sku__sku_code", "source_url")
+    autocomplete_fields = ("sku",)
+    ordering = ("sku", "sort_order")

@@ -3,8 +3,9 @@
 Spec: ПЛАН §6 Iter 1; docs/readiness-backend-ux.md §2.2 —
 Category (tree, slug), Product, SKU, Attribute, ProductFile.
 
-Категории по применению: воздух / ПБ / дым / краны.
-slug = path-сегмент канонического URL (сохраняем из sitemap Tilda).
+Категории приводов — по спецификации модельного ряда
+(``catalog.series_categories``); плюс одна корзина для шаровых кранов.
+slug = path-сегмент канонического URL.
 """
 
 from __future__ import annotations
@@ -15,7 +16,11 @@ from pathlib import Path
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
-from catalog.validators import sanitize_upload_filename, validate_pdf_upload
+from catalog.validators import (
+    sanitize_upload_filename,
+    validate_image_upload,
+    validate_pdf_upload,
+)
 
 
 def product_file_upload_to(instance: ProductFile, filename: str) -> str:
@@ -26,6 +31,13 @@ def product_file_upload_to(instance: ProductFile, filename: str) -> str:
     safe = sanitize_upload_filename(filename)
     sku_part = instance.sku_id if instance.sku_id is not None else "pending"
     return f"product_files/{sku_part}/{uuid.uuid4().hex}_{safe}"
+
+
+def product_image_upload_to(instance: ProductImage, filename: str) -> str:
+    """Store under product_images/<sku_id>/<uuid>_<safe_basename>.webp."""
+    safe = sanitize_upload_filename(filename)
+    sku_part = instance.sku_id if instance.sku_id is not None else "pending"
+    return f"product_images/{sku_part}/{uuid.uuid4().hex}_{safe}"
 
 
 class Category(models.Model):
@@ -52,7 +64,16 @@ class Category(models.Model):
         related_name="children",
         help_text="Родительская категория (None для корня дерева).",
     )
-    description: models.TextField = models.TextField(blank=True, default="")
+    description: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Общее описание семейства (для страницы категории).",
+    )
+    instructions: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Общая инструкция по монтажу/управлению для семейства.",
+    )
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -90,7 +111,26 @@ class Product(models.Model):
     )
     name: models.CharField = models.CharField(max_length=200)
     slug: models.SlugField = models.SlugField(max_length=200, unique=True, db_index=True)
-    description: models.TextField = models.TextField(blank=True, default="")
+    description: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Описание линейки (общее для всех изданий Product).",
+    )
+    instructions: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Инструкция линейки (если отличается от категории).",
+    )
+    specs_text: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Характеристики линейки (до scoping по SKU).",
+    )
+    analogs_text: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Аналоги линейки (до scoping по SKU).",
+    )
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -153,7 +193,21 @@ class SKU(models.Model):
         blank=True,
         help_text=("Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."),
     )
-    description: models.TextField = models.TextField(blank=True, default="")
+    description: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Описание конкретной модели/издания для карточки.",
+    )
+    specs_text: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Характеристики издания (напряжение/управление scoped).",
+    )
+    analogs_text: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Аналоги для этого издания (артикула).",
+    )
     is_published: models.BooleanField = models.BooleanField(
         default=True,
         db_index=True,
@@ -316,3 +370,68 @@ class ProductFile(models.Model):
             if name:
                 sanitize_upload_filename(name)
             validate_pdf_upload(self.file)
+
+
+class ProductImage(models.Model):
+    """Product photo for catalog card / PDP gallery (WebP).
+
+    Spec: docs/data-quality-etl.md §2 — изображения из Tilda Store CSV.
+    `source_url` — идемпотентность ETL (не качать повторно).
+
+    Args (fields):
+        sku: FK SKU (CASCADE).
+        image: ImageField (WebP/JPEG/PNG на входе; ETL пишет WebP).
+        alt: alt-текст для a11y / SEO.
+        source_url: исходный URL Tilda CDN (unique per SKU).
+        sort_order: 0 = primary (карточка каталога).
+        is_published: видимость в публичном API.
+    """
+
+    sku: models.ForeignKey = models.ForeignKey(
+        SKU,
+        on_delete=models.CASCADE,
+        related_name="images",
+        help_text="SKU, к которому привязано фото.",
+    )
+    image: models.ImageField = models.ImageField(
+        upload_to=product_image_upload_to,
+        validators=[validate_image_upload],
+        help_text="WebP предпочтительно; JPEG/PNG допустимы.",
+    )
+    alt: models.CharField = models.CharField(max_length=300, blank=True, default="")
+    source_url: models.URLField = models.URLField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Исходный URL (Tilda CDN) для идемпотентного ETL.",
+    )
+    sort_order: models.PositiveIntegerField = models.PositiveIntegerField(default=0)
+    is_published: models.BooleanField = models.BooleanField(default=True, db_index=True)
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "изображение продукта"
+        verbose_name_plural = "изображения продуктов"
+        ordering = ("sort_order", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("sku", "source_url"),
+                name="catalog_productimage_sku_source_url_uniq",
+                condition=~models.Q(source_url=""),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Return alt or filename for Admin."""
+        label = self.alt or Path(getattr(self.image, "name", "") or "").name or "image"
+        return f"{label} ({self.sku.sku_code})"  # type: ignore[attr-defined]
+
+    def clean(self) -> None:
+        """Validate image when present."""
+        super().clean()
+        if self.image:
+            name = Path(getattr(self.image, "name", "") or "").name
+            if name:
+                sanitize_upload_filename(name)
+            validate_image_upload(self.image)

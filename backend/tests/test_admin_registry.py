@@ -20,6 +20,7 @@ CATALOG_MODELS = (
     "catalog.Attribute",
     "catalog.AttributeValue",
     "catalog.ProductFile",
+    "catalog.ProductImage",
 )
 
 CONTENT_MODELS = (
