@@ -14,21 +14,90 @@ import type { components, paths } from "./schema";
 export type { paths, components };
 
 // Category
-export type Category = components["schemas"]["Category"];
+export type Category = components["schemas"]["Category"] & {
+  image?: { id: number; image: string; alt?: string } | null;
+};
 export type CategoryListResponse =
   paths["/api/catalog/categories/"]["get"]["responses"]["200"]["content"]["application/json"];
 
 // SKU
-export type SKUList = components["schemas"]["SKUList"];
-export type SKUDetail = components["schemas"]["SKUDetail"];
+export type SKUList = components["schemas"]["SKUList"] & {
+  highlights?: CatalogHighlight[];
+  image?: { id: number; image: string; alt?: string } | null;
+};
+export type CatalogAttribute = {
+  name: string;
+  slug: string;
+  unit: string;
+  value: string;
+  group?: string;
+  group_label?: string;
+};
+
+export type CatalogAttributeGroup = {
+  key: string;
+  title: string;
+  items: CatalogAttribute[];
+};
+
+export type SKUDetail = components["schemas"]["SKUDetail"] & {
+  highlights?: CatalogHighlight[];
+  attributes?: CatalogAttribute[];
+  attribute_groups?: CatalogAttributeGroup[];
+  images?: Array<{ id: number; image: string; alt?: string }>;
+  lead?: string;
+  specs_text?: string;
+  analogs_text?: string;
+  category_name?: string;
+  category_description?: string;
+  category_instructions?: string;
+};
 export type SKUListResponse =
   paths["/api/catalog/skus/"]["get"]["responses"]["200"]["content"]["application/json"];
 export type SKUDetailResponse =
   paths["/api/catalog/skus/{slug}/"]["get"]["responses"]["200"]["content"]["application/json"];
 
+export interface CatalogHighlight {
+  key: string;
+  name: string;
+  value: string;
+  unit: string;
+}
+
+export interface CatalogFacetValue {
+  value: string;
+  count: number;
+}
+
+export interface CatalogFacet {
+  key: string;
+  label: string;
+  values: CatalogFacetValue[];
+}
+
+export interface CatalogFacetsResponse {
+  results: CatalogFacet[];
+}
+
 // Search
 export type SearchResultItem = components["schemas"]["SearchResultItem"];
 export type SearchResponse = components["schemas"]["SearchResponse"];
+
+// Content (Page / Article / News)
+export type Page = components["schemas"]["Page"];
+export type Article = components["schemas"]["Article"] & {
+  excerpt?: string;
+  cover?: string | null;
+  related_skus?: Array<{
+    name: string;
+    slug: string;
+    sku_code: string;
+    image: string | null;
+  }>;
+};
+export type News = components["schemas"]["News"] & {
+  cover?: string | null;
+};
 
 // Lead (request payload)
 export type LeadCreate = components["schemas"]["Lead"];
@@ -97,8 +166,40 @@ export const api = {
     return apiFetch<SKUListResponse>(`/api/catalog/skus/${qs}`);
   },
 
+  facets(params?: { category?: string }): Promise<CatalogFacetsResponse> {
+    const qs = params?.category
+      ? `?${new URLSearchParams({ category: params.category }).toString()}`
+      : "";
+    return apiFetch<CatalogFacetsResponse>(`/api/catalog/facets/${qs}`);
+  },
+
   skuDetail(slug: string): Promise<SKUDetailResponse> {
     return apiFetch<SKUDetailResponse>(`/api/catalog/skus/${slug}/`);
+  },
+
+  // ── Content ───────────────────────────────────────────────────────
+  pages(): Promise<{ count: number; results: Page[] }> {
+    return apiFetch("/api/content/pages/");
+  },
+
+  pageDetail(slug: string): Promise<Page> {
+    return apiFetch(`/api/content/pages/${slug}/`);
+  },
+
+  articles(): Promise<{ count: number; results: Article[] }> {
+    return apiFetch("/api/content/articles/");
+  },
+
+  articleDetail(slug: string): Promise<Article> {
+    return apiFetch(`/api/content/articles/${slug}/`);
+  },
+
+  news(): Promise<{ count: number; results: News[] }> {
+    return apiFetch("/api/content/news/");
+  },
+
+  newsDetail(slug: string): Promise<News> {
+    return apiFetch(`/api/content/news/${slug}/`);
   },
 
   // ── Search ─────────────────────────────────────────────────────────
@@ -106,6 +207,18 @@ export const api = {
     const params = new URLSearchParams({ q });
     if (page) params.set("page", String(page));
     return apiFetch<SearchResponse>(`/api/search/?${params.toString()}`);
+  },
+
+  // ── CSRF ──────────────────────────────────────────────────────────
+  /**
+   * Fetch the CSRF token cookie from the backend.
+   *
+   * Call once on app load (e.g. in main.tsx) so that subsequent POST
+   * requests can include the X-CSRFToken header. The token is also
+   * set as the `csrftoken` cookie by Django's CSRF middleware.
+   */
+  fetchCsrfToken(): Promise<{ csrfToken: string }> {
+    return apiFetch<{ csrfToken: string }>("/api/csrf/");
   },
 
   // ── Leads ──────────────────────────────────────────────────────────

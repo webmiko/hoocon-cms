@@ -1,48 +1,16 @@
-/* ── Global styles: IBM Plex Sans, reset, base typography ────────────
- * Spec: ПЛАН §10 — IBM Plex Sans; docs/readiness-backend-ux.md (B2B UX).
+/* Global styles: tokens, fonts, reset, a11y, soft motion.
+ * Spec: docs/readiness-backend-ux.md §4; docs/design-system.md.
  */
 
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-sans/700.css";
-
-:root {
-  /* Color palette — industrial B2B (cool grays + accent blue) */
-  --color-bg: #f7f8fa;
-  --color-surface: #ffffff;
-  --color-border: #e2e5e9;
-  --color-text: #1a1d21;
-  --color-text-muted: #6b7280;
-  --color-primary: #0f62fe;
-  --color-primary-hover: #0353e9;
-  --color-accent: #0094b6;
-  --color-danger: #da1e28;
-  --color-success: #198038;
-
-  /* Spacing scale */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 40px;
-  --space-2xl: 64px;
-
-  /* Typography */
-  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-size-sm: 14px;
-  --font-size-base: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 24px;
-  --font-size-2xl: 32px;
-
-  /* Layout */
-  --max-width: 1280px;
-  --header-height: 64px;
-  --radius: 4px;
-}
-
-/* ── Reset ──────────────────────────────────────────────────────────── */
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/montserrat/800.css";
+@import "./tokens.css";
 
 *,
 *::before,
@@ -55,26 +23,66 @@
 html {
   font-size: var(--font-size-base);
   scroll-behavior: smooth;
+  overflow-x: clip;
+  /* Overscroll / rubber-band past the page matches dark footer */
+  background-color: var(--color-footer);
 }
 
 body {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--color-text);
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+  /* Bottom chrome padding is on .footer (dark) — avoids white gap under page */
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: manual;
+  text-wrap: pretty;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--gradient-page);
+  background-size: cover;
+  pointer-events: none;
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--color-link);
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
 
-a:hover {
-  color: var(--color-primary-hover);
+a:visited {
+  color: var(--color-link-visited);
+}
+
+a:hover,
+a:visited:hover {
+  color: var(--color-link-hover);
   text-decoration: underline;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 4px;
 }
 
 img {
@@ -86,6 +94,13 @@ img {
 button {
   font-family: inherit;
   cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+button:active,
+a:active {
+  transform: scale(0.98);
 }
 
 h1,
@@ -94,8 +109,25 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   line-height: 1.25;
+  /* inherit — dark panels set color on the surface; forced --color-text
+     made titles invisible on #111 / hero (direct rule beats inheritance). */
+  color: inherit;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  text-wrap: balance;
+}
+
+/* Длинные коды / slug — перенос только при необходимости, без mid-letter shatter */
+.text-tech {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: none;
+  text-wrap: unset;
 }
 
 h1 {
@@ -110,8 +142,6 @@ h3 {
   font-size: var(--font-size-lg);
 }
 
-/* ── Layout helpers ────────────────────────────────────────────────── */
-
 .container {
   max-width: var(--max-width);
   margin: 0 auto;
@@ -124,7 +154,80 @@ h3 {
   }
 }
 
-/* ── Screen reader only ────────────────────────────────────────────── */
+/* Soft rise — one intentional motion, used sparingly */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-rise {
+  animation: rise 0.7s var(--ease-out) both;
+}
+
+.anim-rise-delay {
+  animation: rise 0.7s var(--ease-out) 0.1s both;
+}
+
+.anim-rise-delay-2 {
+  animation: rise 0.7s var(--ease-out) 0.18s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Skip link — WCAG 2.2 AA */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.skip-link:focus {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 9999;
+  width: auto;
+  height: auto;
+  padding: 12px 18px;
+  background: #111;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
 
 .sr-only {
   position: absolute;
@@ -136,4 +239,9 @@ h3 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Atomic wrap units from SoftBreakText (factory note, edition suffix). */
+.u-nowrap {
+  white-space: nowrap;
 }

@@ -73,6 +73,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/content/articles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/articles/ and /api/content/articles/{slug}/. */
+        get: operations["content_articles_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/articles/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/articles/ and /api/content/articles/{slug}/. */
+        get: operations["content_articles_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/news/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/news/ and /api/content/news/{slug}/. */
+        get: operations["content_news_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/news/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/news/ and /api/content/news/{slug}/. */
+        get: operations["content_news_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/pages/ and /api/content/pages/{slug}/. */
+        get: operations["content_pages_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/pages/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/pages/ and /api/content/pages/{slug}/. */
+        get: operations["content_pages_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/leads/": {
         parameters: {
             query?: never;
@@ -152,6 +254,31 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Expert article (/statyi/<slug>) with cover + excerpt. */
+        Article: {
+            readonly id: number;
+            readonly title: string;
+            readonly slug: string;
+            /** @description Краткий анонс для списка /statyi (без HTML). */
+            readonly excerpt: string;
+            /**
+             * Format: uri
+             * @description Обложка статьи (локальный MEDIA URL).
+             */
+            readonly cover: string | null;
+            readonly body: string;
+            /** @description Видимость в публичном API. */
+            readonly is_published: boolean;
+            /**
+             * Format: date-time
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
         /** @description ТТХ row for SKU detail: slug of Attribute + value + unit. */
         AttributeValue: {
             readonly name: string;
@@ -159,7 +286,7 @@ export interface components {
             readonly unit: string;
             readonly value: string;
         };
-        /** @description Public category list/detail fields. */
+        /** @description Public category list/detail fields (series overview + install). */
         Category: {
             readonly id: number;
             readonly name: string;
@@ -167,6 +294,14 @@ export interface components {
             /** @description Родительская категория (None для корня дерева). */
             readonly parent: number | null;
             readonly description: string;
+            /** @description Общая инструкция по монтажу/управлению для семейства. */
+            readonly instructions: string;
+            /** @description First published product photo in this category, if any. */
+            readonly image: {
+                readonly id: number;
+                readonly image: string;
+                readonly alt?: string;
+            } | null;
         };
         /**
          * @description * `datasheet` - Паспорт / datasheet
@@ -216,6 +351,59 @@ export interface components {
          * @enum {string}
          */
         LeadTypeEnum: "rfq" | "consultation" | "replacement";
+        /** @description Company news item (/novosti/<slug>). */
+        News: {
+            readonly id: number;
+            readonly title: string;
+            readonly slug: string;
+            readonly body: string;
+            /** @description Обложка новости (JPEG/PNG/WebP). */
+            readonly cover: string | null;
+            /** @description Видимость в публичном API. */
+            readonly is_published: boolean;
+            /**
+             * Format: date-time
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        /** @description Public CMS page (/<slug>). */
+        Page: {
+            readonly id: number;
+            readonly title: string;
+            readonly slug: string;
+            readonly body: string;
+            /** @description Видимость в публичном API. */
+            readonly is_published: boolean;
+            /**
+             * Format: date-time
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        PaginatedArticleList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Article"][];
+        };
         PaginatedCategoryList: {
             /** @example 123 */
             count: number;
@@ -230,6 +418,36 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Category"][];
+        };
+        PaginatedNewsList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["News"][];
+        };
+        PaginatedPageList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Page"][];
         };
         PaginatedProductFileUploadList: {
             /** @example 123 */
@@ -295,6 +513,11 @@ export interface components {
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
             readonly description: string;
+            readonly specs_text: string;
+            readonly analogs_text: string;
+            readonly category_name: string;
+            readonly category_description: string;
+            readonly category_instructions: string;
             readonly attributes: components["schemas"]["AttributeValue"][];
             /** @description Return only published ProductFile rows, ordered. */
             readonly files: {
@@ -470,6 +693,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SKUDetail"];
+                };
+            };
+        };
+    };
+    content_articles_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedArticleList"];
+                };
+            };
+        };
+    };
+    content_articles_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Article"];
+                };
+            };
+        };
+    };
+    content_news_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedNewsList"];
+                };
+            };
+        };
+    };
+    content_news_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["News"];
+                };
+            };
+        };
+    };
+    content_pages_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPageList"];
+                };
+            };
+        };
+    };
+    content_pages_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
                 };
             };
         };
