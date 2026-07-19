@@ -19,6 +19,7 @@ dependencies = [
     "django-celery-beat (>=2.9.0,<3.0.0)",
     "whitenoise (>=6.6,<7)",
     "gunicorn (>=23.0,<24)",
+    "django-axes (>=8.3.1,<9.0.0)",
 ]
 
 [tool.poetry]

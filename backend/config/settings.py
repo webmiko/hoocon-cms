@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "drf_spectacular",
     "rest_framework",
+    # Brute-force protection for admin login (ПЛАН §6 Iter 1).
+    "axes",
     # Project apps (с итерации 1)
     "redirects",
     "sitesettings",
@@ -86,8 +88,23 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "axes.middleware.AxesMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+# django-axes: brute-force protection for admin login.
+# Spec: docs/security-baseline.md §3.2; ПЛАН §6 Iter 1.
+# Lock out an IP after N failed logins within the reset window.
+AXES_FAILURE_LIMIT = int(os.getenv("AXES_FAILURE_LIMIT", "5"))
+AXES_COOLOFF_TIME = int(os.getenv("AXES_COOLOFF_TIME", "1"))  # hours
+AXES_LOCKOUT_PARAMETERS = [["ip_address"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_VERBOSE = _env_bool("DJANGO_DEBUG", default=True)  # log failures in dev too
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 ROOT_URLCONF = "config.urls"

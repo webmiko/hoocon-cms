@@ -525,6 +525,25 @@ argon2 = ["argon2-cffi (>=23.1.0)"]
 bcrypt = ["bcrypt (>=4.1.1)"]
 
 [[package]]
+name = "django-axes"
+version = "8.3.1"
+description = "Keep track of failed login attempts in Django-powered sites."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "django_axes-8.3.1-py3-none-any.whl", hash = "sha256:f7887582fd12713064f1602091ff6152752becae5e891a15bf802746cab0f51a"},
+    {file = "django_axes-8.3.1.tar.gz", hash = "sha256:d57e923c0ba33cf45275253dd1313c3a3ff04bec686b38d677beb2b3d43c7bcd"},
+]
+
+[package.dependencies]
+asgiref = ">=3.6.0"
+django = ">=4.2"
+
+[package.extras]
+ipware = ["django-ipware (>=3)"]
+
+[[package]]
 name = "django-celery-beat"
 version = "2.9.0"
 description = "Database-backed Periodic Tasks."
@@ -2211,4 +2230,4 @@ brotli = ["brotli"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "16c9832d4e613ae712ef2cf61a117a7f2a1cbf6d9c87fd5ad19da8dba751b99d"
+content-hash = "9e6c815b4d10078d30fb307189c49e3a215d8b070ffd4fc1b67b01b2ace05c15"
