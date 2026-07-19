@@ -154,3 +154,73 @@ class SKU(models.Model):
     def __str__(self) -> str:
         """Return the SKU name for Admin and logs."""
         return self.name
+
+
+class Attribute(models.Model):
+    """Dictionary entry for a SKU technical attribute (EAV).
+
+    Словарь ТТХ: момент, напряжение, тип управления, пружина… Значения
+    хранятся в AttributeValue (одна строка на пару SKU+attribute). EAV даёт
+    фильтруемость (Slice 9) без JSONB-магии; см. docs/data-quality-etl.md §4.1.
+
+    Args (fields):
+        name: человекочитаемое имя, напр. «Момент».
+        slug: ключ фильтра, напр. `moment` (уникален).
+        unit: единица измерения, напр. «Н·м», «В»; пусто для безразмерных.
+        created_at / updated_at: авто-таймстампы.
+    """
+
+    name: models.CharField = models.CharField(max_length=200)
+    slug: models.SlugField = models.SlugField(max_length=100, unique=True, db_index=True)
+    unit: models.CharField = models.CharField(max_length=50, blank=True, default="")
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "атрибут"
+        verbose_name_plural = "атрибуты"
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        """Return the attribute name for Admin and logs."""
+        return self.name
+
+
+class AttributeValue(models.Model):
+    """Value of an Attribute for a specific SKU (EAV link).
+
+    Одна строка на пару (sku, attribute). `value` хранится строкой —
+    фильтры каталога (Slice 9) делают exact match (напр. moment=5).
+    Numeric range filtering — P1 (можно добавить value_number позже).
+
+    Args (fields):
+        sku: FK SKU (CASCADE — удаление SKU удаляет его ТТХ).
+        attribute: FK Attribute (PROTECT — нельзя удалить словарный атрибут,
+            если он используется в SKU).
+        value: значение как строка, напр. «5», «230», «да».
+        created_at / updated_at: авто-таймстампы.
+    """
+
+    sku: models.ForeignKey = models.ForeignKey(
+        SKU,
+        on_delete=models.CASCADE,
+        related_name="attribute_values",
+    )
+    attribute: models.ForeignKey = models.ForeignKey(
+        Attribute,
+        on_delete=models.PROTECT,
+        related_name="values",
+    )
+    value: models.CharField = models.CharField(max_length=200)
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "значение атрибута"
+        verbose_name_plural = "значения атрибутов"
+        unique_together = (("sku", "attribute"),)
+        ordering = ("attribute__name",)
+
+    def __str__(self) -> str:
+        """Return 'sku_code / attribute_name = value' for Admin readability."""
+        return f"{self.sku.sku_code} / {self.attribute.name} = {self.value}"
