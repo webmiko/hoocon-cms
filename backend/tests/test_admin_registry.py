@@ -22,6 +22,12 @@ CATALOG_MODELS = (
     "catalog.ProductFile",
 )
 
+CONTENT_MODELS = (
+    "content.Page",
+    "content.Article",
+    "content.News",
+)
+
 
 def _model_by_label(label: str):
     """Import model class from 'app_label.ModelName'."""
@@ -34,6 +40,13 @@ def _model_by_label(label: str):
 @pytest.mark.parametrize("label", CATALOG_MODELS)
 def test_catalog_model_registered_in_admin(label: str) -> None:
     """Each catalog model is registered with admin.site."""
+    model = _model_by_label(label)
+    assert model in site._registry
+
+
+@pytest.mark.parametrize("label", CONTENT_MODELS)
+def test_content_model_registered_in_admin(label: str) -> None:
+    """Each content model (Page/Article/News) is registered with admin.site."""
     model = _model_by_label(label)
     assert model in site._registry
 
@@ -140,3 +153,34 @@ def test_product_file_admin_list_filter_includes_file_type() -> None:
 
     ma = ProductFileAdmin(ProductFile, site)
     assert "file_type" in ma.list_filter
+
+
+@pytest.mark.django_db
+def test_content_admin_list_display_includes_slug_and_published() -> None:
+    """Content admins expose slug + is_published in list view."""
+    from content.admin import ArticleAdmin, NewsAdmin, PageAdmin
+    from content.models import Article, News, Page
+
+    for admin_cls, model in (
+        (PageAdmin, Page),
+        (ArticleAdmin, Article),
+        (NewsAdmin, News),
+    ):
+        ma = admin_cls(model, site)
+        assert "slug" in ma.list_display
+        assert "is_published" in ma.list_display
+
+
+@pytest.mark.django_db
+def test_content_admin_prepopulates_slug_from_title() -> None:
+    """Content admins prepopulate slug from title for editor UX."""
+    from content.admin import ArticleAdmin, NewsAdmin, PageAdmin
+    from content.models import Article, News, Page
+
+    for admin_cls, model in (
+        (PageAdmin, Page),
+        (ArticleAdmin, Article),
+        (NewsAdmin, News),
+    ):
+        ma = admin_cls(model, site)
+        assert ma.prepopulated_fields == {"slug": ("title",)}

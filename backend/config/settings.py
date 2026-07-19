@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "redirects",
     "sitesettings",
     "catalog",
+    "content",
 ]
 
 MIDDLEWARE = [
