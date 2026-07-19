@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "sitesettings",
     "catalog",
     "content",
+    "leads",
 ]
 
 MIDDLEWARE = [

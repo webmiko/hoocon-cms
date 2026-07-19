@@ -65,6 +65,13 @@ def test_sitesettings_registered_in_admin() -> None:
     assert SiteSettings in site._registry
 
 
+def test_lead_registered_in_admin() -> None:
+    """leads.Lead is registered."""
+    from leads.models import Lead
+
+    assert Lead in site._registry
+
+
 @pytest.mark.django_db
 def test_anon_changelist_redirects_to_login(client) -> None:
     """Anonymous user cannot open SKU changelist (AuthN)."""
