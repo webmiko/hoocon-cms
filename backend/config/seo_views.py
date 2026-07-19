@@ -1,24 +1,27 @@
-"""Sitemap.xml and robots.txt generators for SEO.
+"""Sitemap.xml, robots.txt, and llms.txt generators for SEO.
 
-Spec: ПЛАН §6 Iter 2 — sitemap.xml (only canonical paths, no /tproduct/,
-no query filters); robots.txt (Disallow /tilda/, /admin/).
-docs/seo-url-migration.md (canonical URLs only).
+Spec: ПЛАН §6 Iter 2; БЗ SEO-индексация-SPA.md; docs/seo-url-migration.md
+(canonical URLs without trailing slash).
 """
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.views import View
 
-from catalog.models import SKU, Category, Product
-from content.models import Article, News
+from catalog.models import SKU
+from config.seo.routes import PUBLIC_STATIC_ROUTES
+from content.models import Article, News, Page
 
-# Sitemap 0.9 namespace.
 _SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
 
 def _site_base_url(request: HttpRequest) -> str:
-    """Return the site base URL (scheme + host)."""
+    """Return the site base URL (scheme + host), preferring SITE_URL."""
+    configured = getattr(settings, "SITE_URL", "") or ""
+    if configured.startswith("http"):
+        return configured.rstrip("/")
     scheme = "https" if request.is_secure() else "http"
     return f"{scheme}://{request.get_host()}"
 
@@ -36,6 +39,9 @@ class RobotsTxtView(View):
             "Disallow: /admin/",
             "Disallow: /tilda/",
             "Disallow: /api/",
+            "Disallow: /search",
+            "Disallow: /consultation",
+            "Disallow: /replacement",
             "",
             f"Sitemap: {_site_base_url(request)}/sitemap.xml",
         ]
@@ -43,40 +49,65 @@ class RobotsTxtView(View):
         return HttpResponse(body, content_type="text/plain; charset=utf-8")
 
 
-class SitemapXmlView(View):
-    """GET /sitemap.xml — canonical URLs for published catalog content."""
+class LlmsTxtView(View):
+    """GET /llms.txt — brief site summary for AI crawlers (optional БЗ)."""
 
     http_method_names = ["get", "head", "options"]
 
     def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
-        """Return sitemap.xml with canonical category/product/SKU URLs."""
+        """Return llms.txt content."""
+        base = _site_base_url(request)
+        lines = [
+            "# Hoocon",
+            "",
+            "> B2B электроприводы ОВК: каталог, паспорта, подбор аналогов Belimo, RFQ.",
+            "",
+            f"- Каталог: {base}/catalog",
+            f"- Статьи: {base}/statyi",
+            f"- FAQ: {base}/faq",
+            f"- Контакты: {base}/kontakty",
+            f"- Sitemap: {base}/sitemap.xml",
+            "",
+        ]
+        return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+
+
+class SitemapXmlView(View):
+    """GET /sitemap.xml — canonical URLs without trailing slash."""
+
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        """Return sitemap.xml with canonical public URLs."""
         base = _site_base_url(request)
         urls: list[str] = []
 
-        # Category list page (canonical /catalog/).
-        urls.append(f"{base}/catalog/")
+        for path in sorted(PUBLIC_STATIC_ROUTES.keys()):
+            urls.append(f"{base}{path}" if path != "/" else f"{base}/")
 
-        # Category pages (by slug).
-        for cat in Category.objects.all().order_by("slug"):
-            urls.append(f"{base}/catalog/{cat.slug}/")
+        for sku in SKU.objects.filter(is_published=True).order_by("slug"):
+            urls.append(f"{base}/{sku.slug}")
 
-        # Product pages (by slug, under their category).
-        for prod in Product.objects.select_related("category").order_by("slug"):
-            urls.append(f"{base}/catalog/{prod.category.slug}/{prod.slug}/")  # type: ignore[attr-defined]
+        for page in Page.objects.filter(is_published=True).order_by("slug"):
+            path = f"/{page.slug}"
+            if path not in PUBLIC_STATIC_ROUTES:
+                urls.append(f"{base}{path}")
 
-        # SKU pages (by slug, published only — no /tproduct/, no query filters).
-        for sku in SKU.objects.filter(is_published=True).select_related("product__category").order_by("slug"):
-            urls.append(f"{base}/{sku.slug}/")
-
-        # Article pages (/statyi/<slug>, published only).
         for art in Article.objects.filter(is_published=True).order_by("slug"):
-            urls.append(f"{base}/statyi/{art.slug}/")
+            urls.append(f"{base}/statyi/{art.slug}")
 
-        # News pages (/novosti/<slug>, published only).
         for news in News.objects.filter(is_published=True).order_by("slug"):
-            urls.append(f"{base}/novosti/{news.slug}/")
+            urls.append(f"{base}/novosti/{news.slug}")
 
-        body = self._render_xml(urls)
+        # Deduplicate while preserving order.
+        seen: set[str] = set()
+        unique: list[str] = []
+        for url in urls:
+            if url not in seen:
+                seen.add(url)
+                unique.append(url)
+
+        body = self._render_xml(unique)
         return HttpResponse(body, content_type="application/xml; charset=utf-8")
 
     @staticmethod

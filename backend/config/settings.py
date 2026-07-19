@@ -60,6 +60,12 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = False
 
+# Trusted origins for CSRF (admin login POST from SPA dev server / prod domain).
+# Spec: security-baseline §CORS/CSRF; ПЛАН §6 Iter 4 — F8.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", _DEFAULT_CORS).split(",") if origin.strip()
+]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -95,6 +101,7 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "config.csp_middleware.CspMiddleware",
 ]
 
 # django-axes: brute-force protection for admin login.
@@ -168,6 +175,15 @@ STATIC_URL = "static/"
 STATIC_ROOT = str(BASE_DIR / "staticfiles")
 MEDIA_URL = "media/"
 MEDIA_ROOT = str(BASE_DIR / "media")
+
+# ── SEO / SPA shell (БЗ SEO-индексация-SPA.md) ───────────────────────
+SITE_URL = os.getenv("SITE_URL", "https://hoocon.ru").rstrip("/")
+_SPA_DEFAULT = str(BASE_DIR.parent / "frontend" / "dist" / "index.html")
+SPA_INDEX_HTML = os.getenv("SPA_INDEX_HTML", _SPA_DEFAULT)
+
+# Analytics (loaded client-side only after cookie consent).
+YANDEX_METRIKA_ID = os.getenv("YANDEX_METRIKA_ID", "").strip()
+GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "").strip()
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -94,10 +94,18 @@ def test_nginx_conf_has_lead_rate_limit() -> None:
 
 
 def test_nginx_conf_has_spa_fallback() -> None:
-    """nginx config has SPA fallback (try_files → /index.html)."""
+    """nginx config proxies HTML SPA routes to Django (@spa)."""
     content = NGINX_CONF.read_text(encoding="utf-8")
     assert "try_files" in content
-    assert "/index.html" in content
+    assert "@spa" in content
+    assert "proxy_pass" in content
+
+
+def test_nginx_conf_strips_trailing_slash() -> None:
+    """nginx 301-rewrites trailing slash (БЗ canonical without /)."""
+    content = NGINX_CONF.read_text(encoding="utf-8")
+    assert "rewrite ^/(.*)/$ /$1 permanent" in content
+    assert "location = /index.html" in content
 
 
 def test_nginx_conf_has_redirects_map_placeholder() -> None:

@@ -166,13 +166,15 @@ def test_sitemap_has_valid_xml_structure(client) -> None:
 
 
 @pytest.mark.django_db
-def test_sitemap_includes_category_pages(client) -> None:
-    """sitemap.xml includes category list URLs."""
-    _seed_for_sitemap()
+def test_sitemap_includes_home_and_static_pages(client) -> None:
+    """sitemap.xml includes home and CMS static paths (no trailing slash)."""
     response = client.get("/sitemap.xml")
     body = response.content.decode()
-    # Category slugs should appear as canonical paths.
-    assert "/vozdushnie-sm" in body or "/protivopozharnie-sm" in body
+    assert "<loc>http://testserver/</loc>" in body or "https://hoocon.ru/" in body
+    assert "/catalog</loc>" in body or "/catalog<" in body
+    assert "/company" in body
+    assert "/faq" in body
+    assert "/novosti</loc>" in body or 'novosti"' in body or "/novosti\n" in body
 
 
 # ── sitemap.xml: Article / News (Iter 3) ──────────────────────────────

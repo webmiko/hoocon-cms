@@ -1,0 +1,105 @@
+"""Static SEO routes — mirror frontend Seo titles / noindex paths.
+
+Spec: БЗ SEO-индексация-SPA.md; docs/seo-url-migration.md (no trailing slash).
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+
+class StaticRouteSeo(TypedDict, total=False):
+    title: str
+    description: str
+
+
+SITE_NAME = "Hoocon"
+DEFAULT_TITLE = "Hoocon — электроприводы ОВК"
+DEFAULT_DESCRIPTION = (
+    "Производство электроприводов для вентиляции, кондиционирования и "
+    "противопожарных систем. Каталог, фильтры по ТТХ, паспорта, аналоги "
+    "Belimo, запрос КП."
+)
+OG_IMAGE_PATH = "/og-image.svg"
+SLUG_RE = r"^[a-z0-9][a-z0-9-]{0,298}[a-z0-9]$|^[a-z0-9]$"
+
+# FAQ snippets for FAQPage JSON-LD (home + /faq). Keep in sync with HomePage.
+HOME_FAQ_ITEMS: tuple[tuple[str, str], ...] = (
+    (
+        "Можно ли заменить SA10FU230-DS на DA10FU230-DS?",
+        "Нет. SA — для огнезадерживающих клапанов (пружина ≤ 25 с, работа при "
+        "нагреве). DA — для общеобменной вентиляции. Для ОЗК используйте серию SA.",
+    ),
+    (
+        "Как оценить нужный крутящий момент?",
+        "Учитывайте давление, тип заслонки и среду. Ориентир: "
+        "M ≈ (D³ × P × k) / C. Для проекта сверяйте таблицы заслонки и "
+        "паспорт привода в каталоге.",
+    ),
+    (
+        "Как заказать и получить КП?",
+        "Подберите SKU в каталоге или опишите задачу — заявка на консультацию. Ответ до 2 рабочих часов.",
+    ),
+)
+
+PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
+    "/": {
+        "title": "Электроприводы ОВК Hoocon — каталог, подбор, аналоги Belimo",
+        "description": DEFAULT_DESCRIPTION,
+    },
+    "/catalog": {
+        "title": "Каталог электроприводов ОВК",
+        "description": (
+            "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
+            "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
+        ),
+    },
+    "/statyi": {
+        "title": "Статьи по электроприводам ОВК",
+        "description": (
+            "Подбор привода, монтаж, противопожарные и дымоудаляющие клапаны, "
+            "шаровые краны и замена аналогов Belimo — для инженеров и снабжения."
+        ),
+    },
+    "/novosti": {
+        "title": "Новости",
+        "description": "Новости компании Hoocon: продукция, сертификаты, поставки.",
+    },
+    "/company": {
+        "title": "О компании",
+        "description": "ООО «Хогон» (бренд Hoocon): производство электроприводов ОВК.",
+    },
+    "/gde-kupit": {
+        "title": "Где купить",
+        "description": "Партнёры и каналы поставок электроприводов Hoocon по РФ.",
+    },
+    "/faq": {
+        "title": "Ответы на частые вопросы",
+        "description": ("Расчёт сечения, совместимость серий SA/DA, подбор крутящего момента электропривода ОВК."),
+    },
+    "/kontakty": {
+        "title": "Контакты",
+        "description": "Контакты ООО «Хогон»: телефон, email, адрес, реквизиты.",
+    },
+    "/oferta": {
+        "title": "Публичная оферта",
+        "description": "Публичная оферта ООО «Хогон» для юридических лиц (B2B).",
+    },
+    "/privacy-policy": {
+        "title": "Политика обработки персональных данных",
+        "description": (
+            "Политика ООО «Хогон» по обработке ПДн и cookie на hoocon.ru "
+            "(152-ФЗ): оператор, цели, согласия, аналитика по opt-in."
+        ),
+    },
+    "/terms": {
+        "title": "Согласие на обработку ПДн",
+        "description": "Согласие на обработку персональных данных при заявках с сайта.",
+    },
+}
+
+NOINDEX_PREFIXES: tuple[str, ...] = (
+    "/search",
+    "/consultation",
+    "/replacement",
+)

@@ -6,6 +6,8 @@ Spec: ПЛАН §6 Iter 1; docs/security-baseline.md §3.2 (цены скрыт�
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.db import models
 
 
@@ -43,7 +45,7 @@ class SiteSettings(models.Model):
         obj, _created = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
         return obj
 
-    def save(self, *args: object, **kwargs: object) -> None:
+    def save(self, *args: Any, **kwargs: Any) -> None:
         """Force pk=1 and switch to UPDATE if singleton already exists.
 
         Без переключения _state.adding новый экземпляр с pk=1 делает INSERT
@@ -57,7 +59,7 @@ class SiteSettings(models.Model):
             self.created_at = existing.created_at
         super().save(*args, **kwargs)
 
-    def delete(self, *args: object, **kwargs: object) -> None:
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         """Prevent deletion — singleton must always exist."""
         raise RuntimeError(
             "SiteSettings is a singleton and cannot be deleted.",
