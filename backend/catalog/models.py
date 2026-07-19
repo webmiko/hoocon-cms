@@ -86,3 +86,71 @@ class Product(models.Model):
     def __str__(self) -> str:
         """Return the product name for Admin and logs."""
         return self.name
+
+
+class SKU(models.Model):
+    """Stock-keeping unit — конкретная модель (единица каталога).
+
+    SKU = то, что клиент подбирает и запрашивает (напр. «HVA-5NM»).
+    `slug` = канонический path из sitemap Tilda (сохраняем дословно, даже с
+    опечатками — см. docs/seo-url-migration.md). `sku_code` = артикул.
+    `price` хранится, но в публичный API не утекает (SiteSettings.show_prices).
+    `analog_belimo_code` — задел для AnalogMap (P1, docs/market-analysis.md §6.3).
+
+    Args (fields):
+        product: FK Product (required). PROTECT — нельзя удалить линейку с SKU.
+        name: человекочитаемое имя, напр. «Привод воздушный HVA 5NM».
+        slug: канонический URL-путь (уникален), напр. `privod-vozdushniy-hva-5nm`.
+        sku_code: артикул (уникален, не пуст), напр. `HVA-5NM` или `BV215`.
+        analog_belimo_code: опц. код аналога Belimo (задел для AnalogMap P1).
+        price: опц. цена (Decimal); null = по запросу. Скрыт в публичном API.
+        description: опц. описание для карточки.
+        is_published: видимость в каталоге (default True).
+        created_at / updated_at: авто-таймстампы.
+    """
+
+    product: models.ForeignKey = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="skus",
+        help_text="Продукт/линейка (обязательный). PROTECT — нельзя удалить.",
+    )
+    name: models.CharField = models.CharField(max_length=300)
+    slug: models.SlugField = models.SlugField(max_length=300, unique=True, db_index=True)
+    sku_code: models.CharField = models.CharField(
+        max_length=100,
+        unique=True,
+        db_index=True,
+        help_text="Артикул (уникален, не пуст), напр. HVA-5NM или BV215.",
+    )
+    analog_belimo_code: models.CharField | None = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Код аналога Belimo (задел для AnalogMap P1).",
+    )
+    price: models.DecimalField | None = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=("Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."),
+    )
+    description: models.TextField = models.TextField(blank=True, default="")
+    is_published: models.BooleanField = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Видимость SKU в публичном каталоге.",
+    )
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "SKU"
+        verbose_name_plural = "SKU"
+        ordering = ("sku_code",)
+
+    def __str__(self) -> str:
+        """Return the SKU name for Admin and logs."""
+        return self.name
