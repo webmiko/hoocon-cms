@@ -34,6 +34,26 @@ class ArticleAdmin(_ContentBaseAdmin):
     """Expert article admin (/statyi/<slug>)."""
 
     verbose_name = "Статья"
+    list_display = (
+        "title",
+        "slug",
+        "is_published",
+        "published_at",
+        "updated_at",
+    )
+    search_fields = ("title", "slug", "body", "excerpt")
+    readonly_fields = ("created_at", "updated_at")
+    fields = (
+        "title",
+        "slug",
+        "excerpt",
+        "cover",
+        "body",
+        "is_published",
+        "published_at",
+        "created_at",
+        "updated_at",
+    )
 
 
 @admin.register(News)
@@ -41,3 +61,13 @@ class NewsAdmin(_ContentBaseAdmin):
     """Company news admin (/novosti/<slug>)."""
 
     verbose_name = "Новость"
+    fields = (
+        "title",
+        "slug",
+        "cover",
+        "body",
+        "is_published",
+        "published_at",
+        "created_at",
+        "updated_at",
+    )

@@ -15,8 +15,26 @@ docs/seo-url-migration.md (slug = canonical path, напр. /company, /statyi).
 
 from __future__ import annotations
 
+import uuid
+
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
+
+from catalog.validators import sanitize_upload_filename, validate_image_upload
+
+
+def article_cover_upload_to(instance: Article, filename: str) -> str:
+    """Store under article_covers/<slug>/<uuid>_<safe_basename>.webp."""
+    safe = sanitize_upload_filename(filename)
+    slug = instance.slug or "pending"
+    return f"article_covers/{slug}/{uuid.uuid4().hex}_{safe}"
+
+
+def news_cover_upload_to(instance: News, filename: str) -> str:
+    """Store under news_covers/<slug>/<uuid>_<safe_basename>.webp."""
+    safe = sanitize_upload_filename(filename)
+    slug = instance.slug or "pending"
+    return f"news_covers/{slug}/{uuid.uuid4().hex}_{safe}"
 
 
 class _ContentBase(models.Model):
@@ -70,9 +88,11 @@ class Page(_ContentBase):
     Канонический путь = /<slug>. Используется для служебных страниц,
     не имеющих даты публикации (статичный контент сайта).
 
-    Note: Page intentionally has no `search_vector` — статичные страницы
-    не участвуют в глобальном поиске (только Article/News, см. ПЛАН Iter 3).
+    SearchVector (title A + body B) — для глобального поиска по сайту.
     """
+
+    # Postgres FTS vector (auto-maintained by DB trigger; see migration).
+    search_vector = SearchVectorField(null=True, blank=True, editable=False)
 
     class Meta(_ContentBase.Meta):
         verbose_name = "страница"
@@ -88,6 +108,18 @@ class Article(_ContentBase):
     Postgres-триггером (см. миграцию 0002).
     """
 
+    excerpt: models.TextField = models.TextField(
+        blank=True,
+        default="",
+        help_text="Краткий анонс для списка /statyi (без HTML).",
+    )
+    cover: models.ImageField = models.ImageField(
+        upload_to=article_cover_upload_to,
+        blank=True,
+        null=True,
+        validators=[validate_image_upload],
+        help_text="Обложка статьи (JPEG/PNG/WebP).",
+    )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 3 — FTS на Article (SearchVector title + body).
     search_vector = SearchVectorField(null=True, blank=True, editable=False)
@@ -104,6 +136,13 @@ class News(_ContentBase):
     поддерживается Postgres-триггером (см. миграцию 0002).
     """
 
+    cover: models.ImageField = models.ImageField(
+        upload_to=news_cover_upload_to,
+        blank=True,
+        null=True,
+        validators=[validate_image_upload],
+        help_text="Обложка новости (JPEG/PNG/WebP).",
+    )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 3 — FTS на News (SearchVector title + body).
     search_vector = SearchVectorField(null=True, blank=True, editable=False)

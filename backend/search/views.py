@@ -1,12 +1,12 @@
-"""Unified search view: GET /api/search/?q= (SKU + Article + News).
+"""Unified search view: GET /api/search/?q= (SKU + Article + News + Page).
 
-Spec: ПЛАН §6 — глобальный поиск по каталогу и статьям (Postgres FTS);
+Spec: ПЛАН §6 — глобальный поиск по сайту (Postgres FTS);
 docs/readiness-backend-ux.md §2.3 (`GET /api/search/?q=`).
 
 Контракт:
 - Публичный (AllowAny); read-only (GET only).
 - Параметр `q` — текст запроса; пустой/короткий → пустой список (не 400).
-- Ищет по search_vector (FTS) на SKU (published), Article (published), News (published).
+- Ищет по search_vector (FTS) на SKU, Article, News, Page (published).
 - Результаты объединяются, ранжируются по релевантности (SearchRank).
 - Каждый результат: type, slug, title, url (канонический path).
 - PII: Lead НЕ участвует в поиске; никаких email/phone в выдаче.
@@ -26,26 +26,25 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from catalog.models import SKU
-from content.models import Article, News
+from content.models import Article, News, Page
 from search.serializers import SearchResponseSerializer
 
 
 class SearchView(APIView):
-    """GET /api/search/?q=<text> — unified FTS search across catalog + content.
+    """GET /api/search/?q=<text> — unified FTS across the whole site.
 
-    Searches published SKUs, Articles, and News using their pre-computed
-    `search_vector` fields (Postgres FTS with russian config). Returns a
-    combined, ranked list. PII (Lead) is never included.
+    Searches published SKUs, Articles, News, and Pages using pre-computed
+    `search_vector` fields (Postgres FTS, russian config). PII (Lead) is
+    never included.
     """
 
     permission_classes = (AllowAny,)
     http_method_names = ["get", "head", "options"]
     pagination_class = PageNumberPagination
-    # For drf-spectacular schema generation (response shape).
     serializer_class = SearchResponseSerializer
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:
-        """Handle GET: parse `q`, run FTS on all three models, return paginated.
+        """Handle GET: parse `q`, run FTS on all content models, paginate.
 
         Args:
             request: DRF request with optional `q` query parameter.
@@ -63,17 +62,16 @@ class SearchView(APIView):
         return self._paginated_response(request, items)
 
     def _collect_results(self, query: SearchQuery) -> list[dict[str, str]]:
-        """Run FTS on SKU, Article, News and merge into a ranked list.
+        """Run FTS on SKU, Article, News, Page and merge into a ranked list.
 
         Args:
             query: pre-built SearchQuery (russian config).
 
         Returns:
-            List of dicts: {type, slug, title, url, rank}, sorted by rank desc.
+            List of dicts: {type, slug, title, url}, sorted by rank desc.
         """
         results: list[dict[str, str | float]] = []
 
-        # SKU: published only; canonical URL = /<slug>.
         for sku in self._search_skus(query):
             results.append(
                 {
@@ -85,7 +83,6 @@ class SearchView(APIView):
                 },
             )
 
-        # Article: published only; canonical URL = /statyi/<slug>.
         for art in self._search_articles(query):
             results.append(
                 {
@@ -97,7 +94,6 @@ class SearchView(APIView):
                 },
             )
 
-        # News: published only; canonical URL = /novosti/<slug>.
         for news in self._search_news(query):
             results.append(
                 {
@@ -109,11 +105,25 @@ class SearchView(APIView):
                 },
             )
 
-        # Sort by rank descending (most relevant first).
+        for page in self._search_pages(query):
+            results.append(
+                {
+                    "type": "page",
+                    "slug": page.slug,
+                    "title": page.title,
+                    "url": f"/{page.slug}/",
+                    "rank": float(page.rank),  # type: ignore[attr-defined]
+                },
+            )
+
         results.sort(key=lambda r: r["rank"], reverse=True)  # type: ignore[arg-type]
-        # Drop rank from the output (internal only).
         return [
-            {"type": str(r["type"]), "slug": str(r["slug"]), "title": str(r["title"]), "url": str(r["url"])}
+            {
+                "type": str(r["type"]),
+                "slug": str(r["slug"]),
+                "title": str(r["title"]),
+                "url": str(r["url"]),
+            }
             for r in results
         ]
 
@@ -144,7 +154,20 @@ class SearchView(APIView):
             .order_by("-rank", "slug")
         )
 
-    def _paginated_response(self, request: Request, items: Sequence[dict[str, str]]) -> Response:
+    @staticmethod
+    def _search_pages(query: SearchQuery) -> QuerySet[Page]:
+        """FTS on published CMS pages, ranked by SearchRank."""
+        return (
+            Page.objects.filter(is_published=True, search_vector=query)
+            .annotate(rank=SearchRank("search_vector", query))
+            .order_by("-rank", "slug")
+        )
+
+    def _paginated_response(
+        self,
+        request: Request,
+        items: Sequence[dict[str, str]],
+    ) -> Response:
         """Apply DRF pagination to the merged list and return a Response.
 
         Args:
@@ -155,8 +178,6 @@ class SearchView(APIView):
             DRF Response with paginated structure {count, next, previous, results}.
         """
         paginator = self.pagination_class()
-        # DRF paginate_queryset accepts a sequence; stubs type it as QuerySet,
-        # but it works with plain lists (our merged cross-model results).
         page: list[dict[str, str]] | None = paginator.paginate_queryset(  # type: ignore[assignment]
             list(items),  # type: ignore[arg-type]
             request,

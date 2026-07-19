@@ -21,9 +21,9 @@ import pytest
 
 
 def _seed_search_data():
-    """Seed SKU + Article + News for search tests."""
+    """Seed SKU + Article + News + Page for search tests."""
     from catalog.models import SKU, Category, Product
-    from content.models import Article, News
+    from content.models import Article, News, Page
 
     cat = Category.objects.create(name="Воздушные", slug="vozdushnie-s")
     prod = Product.objects.create(name="HVA серия", slug="hva-s", category=cat)
@@ -70,6 +70,19 @@ def _seed_search_data():
         slug="anons-novogo-privoda-s",
         body="Компания Hoocon расширяет линейку приводов.",
         is_published=True,
+    )
+
+    Page.objects.create(
+        title="О компании Hoocon",
+        slug="o-kompanii",
+        body="Производство электроприводов ОВК, склад в Москве.",
+        is_published=True,
+    )
+    Page.objects.create(
+        title="Скрытая страница",
+        slug="hidden-page",
+        body="Не должна попасть в поиск.",
+        is_published=False,
     )
 
 
@@ -131,6 +144,18 @@ def test_search_finds_news(client) -> None:
 
 
 @pytest.mark.django_db
+def test_search_finds_pages(client) -> None:
+    """Search finds published CMS pages by title/body."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "компании"})
+    body = response.json()
+    types = {r.get("type") for r in body["results"]}
+    assert "page" in types
+    page_urls = [r["url"] for r in body["results"] if r.get("type") == "page"]
+    assert "/o-kompanii/" in page_urls
+
+
+@pytest.mark.django_db
 def test_search_combines_all_types(client) -> None:
     """Search for 'привод' returns sku + article + news (all match)."""
     _seed_search_data()
@@ -160,6 +185,19 @@ def test_search_excludes_unpublished_article(client) -> None:
     """Unpublished Article does NOT appear in search results."""
     _seed_search_data()
     response = client.get("/api/search/", {"q": "черновик"})
+    body = response.json()
+    titles = [r.get("title", "").lower() for r in body["results"]]
+    assert not any("черновик" in t for t in titles)
+
+
+@pytest.mark.django_db
+def test_search_excludes_unpublished_page(client) -> None:
+    """Unpublished Page does NOT appear in search results."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "скрытая"})
+    body = response.json()
+    slugs = [r.get("slug") for r in body["results"] if r.get("type") == "page"]
+    assert "hidden-page" not in slugs
     body = response.json()
     slugs = [r.get("slug") for r in body["results"]]
     assert "draft-statya-s" not in slugs
