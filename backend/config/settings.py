@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "catalog",
     "content",
     "leads",
+    "search",
 ]
 
 MIDDLEWARE = [

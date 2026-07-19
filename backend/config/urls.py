@@ -11,6 +11,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/catalog/", include("catalog.urls")),
     path("api/leads/", include("leads.urls")),
+    path("api/", include("search.urls")),
     path("api/health/", HealthView.as_view(), name="api-health"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
