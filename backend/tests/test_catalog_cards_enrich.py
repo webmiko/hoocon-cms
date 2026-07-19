@@ -1,0 +1,145 @@
+"""Tests for specs_text → canonical EAV card enricher."""
+
+from __future__ import annotations
+
+import pytest
+
+from catalog.etl.label_to_slug import label_to_slug
+from catalog.etl.specs_to_attrs import parse_specs_bullets
+
+
+def test_label_to_slug_core_fields() -> None:
+    """Common Belimo-RU labels map to canonical slugs."""
+    assert label_to_slug("Крутящий момент", value="8 Нм") == "moment"
+    assert label_to_slug("Номинальное напряжение", value="24 В") == "voltage"
+    assert label_to_slug("Степень защиты", value="IP54") == "ip-rating"
+    assert label_to_slug("Класс защиты", value="IP54") == "ip-rating"
+    assert label_to_slug("Класс защиты", value="III (SELV)") == "protection-class"
+    assert label_to_slug("Мощность", value="5 Нм") == "moment"
+    assert label_to_slug("Управление", value="2-/3-позиционное") == "control"
+
+
+def test_parse_specs_bullets_damu_sample() -> None:
+    """DA..MU-style specs bullets become grouped canonical attrs."""
+    text = """
+ОБЩИЕ ПАРАМЕТРЫ:
+– Крутящий момент: 8 Нм
+– Время срабатывания (90°): ≤ 55 сек
+– Максимальная площадь заслонки: 0,8 м²
+– Степень защиты: IP44
+– Рабочая температура: -20°C до +50°C
+– Номинальное напряжение: AC/DC 24V 50/60Hz
+– Потребляемая мощность: 4,5 Вт (работа), 0,5 Вт (ожидание)
+– Класс защиты: III (безопасное низкое напряжение)
+– Сечение провода: 0,5 мм²
+"""
+    parsed = {p.slug: p.value for p in parse_specs_bullets(text)}
+    assert parsed["moment"] == "8 Нм"
+    assert parsed["running-time"]
+    assert parsed["damper-area"]
+    assert parsed["ip-rating"] == "IP44"
+    assert "ambient-temp" in parsed
+    assert "voltage" in parsed
+    assert "power-consumption" in parsed
+    assert "удержание" in parsed["power-consumption"]
+    assert parsed["protection-class"].startswith("III")
+    assert parsed["wire-cross-section"]
+
+
+@pytest.mark.django_db
+def test_enrich_sku_cards_writes_groups() -> None:
+    """Enricher writes canonical attrs and clears specs when enough rows."""
+    from catalog.etl.specs_to_attrs import enrich_sku_cards
+    from catalog.models import SKU, AttributeValue, Category, Product
+    from catalog.serializers import SKUDetailSerializer
+
+    cat = Category.objects.create(name="Test cards", slug="test-cards-cat")
+    product = Product.objects.create(
+        category=cat,
+        name="DA9MU | Test",
+        slug="test-da9mu-cards",
+        specs_text=(
+            "– Крутящий момент: 9 Нм\n"
+            "– Площадь заслонки: до 0,9 м²\n"
+            "– Угол поворота: макс. 90°\n"
+            "– Направление вращения: вручную\n"
+            "– Ручное управление: есть\n"
+            "– Индикация положения: механическая\n"
+            "– Уровень шума: 45 дБ\n"
+            "– Степень защиты: IP54\n"
+            "– Температура окружающей среды: –20…+50 °C\n"
+            "– Температура хранения: –30…+80 °C\n"
+            "– Влажность: 95%\n"
+            "– Номинальное напряжение: AC/DC 24V\n"
+            "– Потребляемая мощность: 4 Вт / 0,5 Вт\n"
+            "– Сечение провода: 0,5 мм²\n"
+            "– Класс защиты: III\n"
+            "– Диаметр вала: 10…16 мм\n"
+            "– Масса: 1 кг\n"
+        ),
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="DA9MU | Test",
+        slug="test-da9mu24-d",
+        sku_code="DA9MU24-D",
+        is_published=True,
+        specs_text=product.specs_text,
+        description="Тестовый привод. Используется в ОВК.",
+    )
+    result = enrich_sku_cards(sku)
+    assert not result.skipped
+    assert result.attrs_after >= 8
+    assert result.cleared_specs
+    sku.refresh_from_db()
+    assert (sku.specs_text or "") == ""
+    assert AttributeValue.objects.filter(sku=sku, attribute__slug="moment").exists()
+    ser = SKUDetailSerializer()
+    groups = ser.get_attribute_groups(sku)
+    titles = {g["title"] for g in groups}
+    assert "Электрические параметры" in titles
+    assert "Функциональные параметры" in titles
+    assert ser.get_specs_text(sku) == ""
+
+
+@pytest.mark.django_db
+def test_da8mqu_skipped_by_enrich() -> None:
+    """Canonical DA8MQU product is not rewritten by catalog cards enricher."""
+    from catalog.etl.specs_to_attrs import DA8MQU_PRODUCT_SLUG, enrich_sku_cards
+    from catalog.models import SKU
+
+    sku = SKU.objects.filter(product__slug=DA8MQU_PRODUCT_SLUG).first()
+    if sku is None:
+        pytest.skip("DA8MQU not loaded in test DB")
+    before = sku.attribute_values.count()
+    result = enrich_sku_cards(sku)
+    assert result.skipped
+    sku.refresh_from_db()
+    assert sku.attribute_values.count() == before
+
+
+@pytest.mark.django_db
+def test_enrich_infers_dn_from_bv_sku_code() -> None:
+    """BV article DN uses int() (BV215 → 15), not fragile lstrip('0')."""
+    from catalog.etl.specs_to_attrs import enrich_sku_cards
+    from catalog.models import SKU, AttributeValue, Category, Product
+
+    cat = Category.objects.create(name="Valves", slug="test-valves-dn")
+    product = Product.objects.create(
+        category=cat,
+        name="BV215 | Шаровой кран",
+        slug="test-sharovoy-kran-bv215-dn",
+        specs_text="",
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="Шаровой кран BV215A",
+        slug="test-bv215a-dn",
+        sku_code="8100-BV215A",
+        is_published=True,
+        specs_text="",
+    )
+    enrich_sku_cards(sku)
+    dn = AttributeValue.objects.filter(sku=sku, attribute__slug="dn").first()
+    assert dn is not None
+    assert dn.value == "15"

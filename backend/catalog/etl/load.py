@@ -155,6 +155,7 @@ def load_product(
                 "name": nsku.name,
                 "slug": nsku.slug,
                 "price": nsku.price,
+                "description": nsku.description,
             },
         )
         stats.skus_created += int(sku_created)

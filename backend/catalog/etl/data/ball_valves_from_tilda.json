@@ -1,0 +1,353 @@
+[
+  {
+    "code": "BV215",
+    "dn": "15",
+    "ways": "2-ходовый",
+    "uid": "629593806372",
+    "title": "BV215 | Шаровой кран 2-ходовый DN 15",
+    "photos": [
+      "https://static.tildacdn.com/stor3565-3236-4264-b836-393737366133/59803238.jpg",
+      "https://static.tildacdn.com/stor3834-3662-4461-a163-333161343165/41950617.jpg",
+      "https://static.tildacdn.com/stor3363-3364-4733-a530-633532663233/31551682.jpg"
+    ],
+    "drives": [
+      "DA6MU24",
+      "DA8MQU24",
+      "DA5FU24"
+    ],
+    "kvs": {
+      "a": "1,6",
+      "b": "2,5",
+      "c": "4,0",
+      "d": "6,3",
+      "e": "10,1"
+    },
+    "thread": "G ½",
+    "height_actuator": "142",
+    "height_stem": "39",
+    "valve_length": "60",
+    "valve_od": "25",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv215"
+  },
+  {
+    "code": "BV220",
+    "dn": "20",
+    "ways": "2-ходовый",
+    "uid": "599842821022",
+    "title": "BV220 | Шаровой кран 2-ходовый DN 20",
+    "photos": [
+      "https://static.tildacdn.com/stor6664-3366-4434-b037-616366623837/53837835.jpg",
+      "https://static.tildacdn.com/stor3933-6631-4362-b136-373534373430/34234966.jpg",
+      "https://static.tildacdn.com/stor6466-6366-4239-a565-303366316531/47623588.jpg"
+    ],
+    "drives": [
+      "DA6MU24",
+      "DA8MQU24"
+    ],
+    "kvs": {
+      "a": "1,6",
+      "b": "2,5",
+      "c": "4,0",
+      "d": "6,3",
+      "e": "10,1"
+    },
+    "thread": "G 3/4",
+    "height_actuator": "146",
+    "height_stem": "43",
+    "valve_length": "68",
+    "valve_od": "32",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv220"
+  },
+  {
+    "code": "BV225",
+    "dn": "25",
+    "ways": "2-ходовый",
+    "uid": "733627027812",
+    "title": "BV225 | Шаровой кран 2-ходовый DN 25",
+    "photos": [
+      "https://static.tildacdn.com/stor3834-6462-4238-b032-353836303964/81167993.jpg",
+      "https://static.tildacdn.com/stor6161-6238-4437-a138-646266353131/74038997.jpg",
+      "https://static.tildacdn.com/stor6662-6237-4636-a535-613238643630/26999373.jpg"
+    ],
+    "drives": [
+      "DA6MU24",
+      "DA8MQU24"
+    ],
+    "kvs": {
+      "a": "10",
+      "b": "16"
+    },
+    "thread": "G1",
+    "height_actuator": "150",
+    "height_stem": "47",
+    "valve_length": "89",
+    "valve_od": "39",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv225"
+  },
+  {
+    "code": "BV232",
+    "dn": "32",
+    "ways": "2-ходовый",
+    "uid": "883566600902",
+    "title": "BV232 | Шаровой кран 2-ходовый DN 32",
+    "photos": [
+      "https://static.tildacdn.com/stor6436-6434-4266-a366-396639616232/70304878.jpg",
+      "https://static.tildacdn.com/stor6134-3865-4135-b537-336363643630/15178200.jpg",
+      "https://static.tildacdn.com/stor6665-6264-4864-b366-656436663733/92251646.jpg"
+    ],
+    "drives": [
+      "DA8MU24",
+      "DA8MQU24"
+    ],
+    "kvs": {
+      "a": "16",
+      "b": "25"
+    },
+    "thread": "G1−¼",
+    "height_actuator": "155",
+    "height_stem": "52",
+    "valve_length": "102,5",
+    "valve_od": "48",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv232"
+  },
+  {
+    "code": "BV240",
+    "dn": "40",
+    "ways": "2-ходовый",
+    "uid": "437694431492",
+    "title": "BV240 | Шаровой кран 2-ходовый DN 40",
+    "photos": [
+      "https://static.tildacdn.com/stor6261-3361-4262-a265-306365386339/85132177.jpg",
+      "https://static.tildacdn.com/stor3530-3261-4663-a232-323133303431/14508423.jpg",
+      "https://static.tildacdn.com/stor3434-3463-4336-a666-646538616366/45045179.jpg"
+    ],
+    "drives": [
+      "DA8MU24",
+      "DA8MQU24"
+    ],
+    "kvs": {
+      "a": "25",
+      "b": "40"
+    },
+    "thread": "G1−½",
+    "height_actuator": "160",
+    "height_stem": "57",
+    "valve_length": "113",
+    "valve_od": "56",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv240"
+  },
+  {
+    "code": "BV250",
+    "dn": "50",
+    "ways": "2-ходовый",
+    "uid": "269932116952",
+    "title": "BV250 | Шаровой кран 2-ходовый DN 50",
+    "photos": [
+      "https://static.tildacdn.com/stor3339-6363-4533-b665-353966656365/85747750.jpg",
+      "https://static.tildacdn.com/stor6635-3637-4337-b833-623639663562/53769663.jpg",
+      "https://static.tildacdn.com/stor3539-6463-4164-a561-313239386238/17178895.jpg"
+    ],
+    "drives": [
+      "DA16MU24",
+      "DA16MQU24"
+    ],
+    "kvs": {
+      "a": "40",
+      "b": "63"
+    },
+    "thread": "G2",
+    "height_actuator": "165",
+    "height_stem": "62",
+    "valve_length": "127",
+    "valve_od": "70",
+    "diff_pressure": "0,35",
+    "center_edge": "",
+    "product_slug": "sharovoy-kran-bv250"
+  },
+  {
+    "code": "BV315",
+    "dn": "15",
+    "ways": "3-ходовый",
+    "uid": "943485105132",
+    "title": "BV315 | Шаровой кран 3-ходовый DN 15",
+    "photos": [
+      "https://static.tildacdn.com/stor3038-6661-4563-b463-376139383661/61844452.jpg",
+      "https://static.tildacdn.com/stor3764-6566-4135-a561-653633623835/48365123.jpg",
+      "https://static.tildacdn.com/stor3065-3336-4961-b834-633039643663/88592166.jpg"
+    ],
+    "drives": [
+      "DA4MU230",
+      "DA8MQU230",
+      "DA5FU30",
+      "DA5FU230"
+    ],
+    "kvs": {
+      "a": "1,6",
+      "b": "2,5",
+      "c": "4,0",
+      "d": "6,3",
+      "e": "10,1"
+    },
+    "thread": "G ½",
+    "height_actuator": "142",
+    "height_stem": "39",
+    "valve_length": "60",
+    "valve_od": "25",
+    "diff_pressure": "0,35",
+    "center_edge": "30 мм",
+    "product_slug": "sharovoy-kran-bv315"
+  },
+  {
+    "code": "BV320",
+    "dn": "20",
+    "ways": "3-ходовый",
+    "uid": "995512036422",
+    "title": "BV320 | Шаровой кран 3-ходовый DN20",
+    "photos": [
+      "https://static.tildacdn.com/stor3235-3636-4837-b064-316637336430/40508736.jpg",
+      "https://static.tildacdn.com/stor3530-6262-4334-a431-323331386361/55429147.jpg",
+      "https://static.tildacdn.com/stor3132-6162-4337-a565-346165633838/91193774.jpg"
+    ],
+    "drives": [
+      "DA6MU230",
+      "DA8MQU230"
+    ],
+    "kvs": {
+      "a": "1,6",
+      "b": "2,5",
+      "c": "4,0",
+      "d": "6,3",
+      "e": "10,1"
+    },
+    "thread": "G 3/4",
+    "height_actuator": "146",
+    "height_stem": "43",
+    "valve_length": "67",
+    "valve_od": "32",
+    "diff_pressure": "0,35",
+    "center_edge": "33 мм",
+    "product_slug": "sharovoy-kran-bv320"
+  },
+  {
+    "code": "BV325",
+    "dn": "25",
+    "ways": "3-ходовый",
+    "uid": "969516435522",
+    "title": "BV325 | Шаровой кран 3-ходовый DN25",
+    "photos": [
+      "https://static.tildacdn.com/stor3336-6365-4937-b238-613837633865/68323802.jpg",
+      "https://static.tildacdn.com/stor3865-6531-4334-b637-623463303363/31354629.jpg",
+      "https://static.tildacdn.com/stor3337-6633-4562-b165-373634666361/56408583.jpg"
+    ],
+    "drives": [
+      "DA8MU230",
+      "DA8MQU230"
+    ],
+    "kvs": {
+      "a": "10",
+      "b": "16"
+    },
+    "thread": "G 1",
+    "height_actuator": "150",
+    "height_stem": "47",
+    "valve_length": "89",
+    "valve_od": "39",
+    "diff_pressure": "0,35",
+    "center_edge": "47 мм",
+    "product_slug": "sharovoy-kran-bv325"
+  },
+  {
+    "code": "BV332",
+    "dn": "32",
+    "ways": "3-ходовый",
+    "uid": "607702691702",
+    "title": "BV332 | Шаровой кран 3-ходовый DN 32",
+    "photos": [
+      "https://static.tildacdn.com/stor6466-3434-4336-b730-376532373532/82129717.jpg",
+      "https://static.tildacdn.com/stor3338-6434-4333-a164-373739613165/62249530.jpg",
+      "https://static.tildacdn.com/stor6534-3836-4236-b765-653735343936/98134368.jpg"
+    ],
+    "drives": [
+      "DA8MU230",
+      "DA8MQU230"
+    ],
+    "kvs": {
+      "a": "16",
+      "b": "25"
+    },
+    "thread": "G 1−¼",
+    "height_actuator": "155",
+    "height_stem": "52",
+    "valve_length": "98",
+    "valve_od": "48",
+    "diff_pressure": "0,35",
+    "center_edge": "50 мм",
+    "product_slug": "sharovoy-kran-bv332"
+  },
+  {
+    "code": "BV340",
+    "dn": "40",
+    "ways": "3-ходовый",
+    "uid": "456866237412",
+    "title": "BV340 | Шаровой кран 3-ходовый DN 40",
+    "photos": [
+      "https://static.tildacdn.com/stor3930-3234-4263-a534-316534643732/10266469.jpg",
+      "https://static.tildacdn.com/stor3738-3139-4531-a237-316662373765/65736920.jpg",
+      "https://static.tildacdn.com/stor6534-3836-4236-b765-653735343936/98134368.jpg"
+    ],
+    "drives": [
+      "DA8MU230",
+      "DA8MQU230"
+    ],
+    "kvs": {
+      "a": "25",
+      "b": "40"
+    },
+    "thread": "G 1−½",
+    "height_actuator": "160",
+    "height_stem": "57",
+    "valve_length": "106,5",
+    "valve_od": "55",
+    "diff_pressure": "0,35",
+    "center_edge": "53 мм",
+    "product_slug": "sharovoy-kran-bv340"
+  },
+  {
+    "code": "BV350",
+    "dn": "50",
+    "ways": "3-ходовый",
+    "uid": "963986387552",
+    "title": "BV350 | Шаровой кран 3-ходовый DN 50",
+    "photos": [
+      "https://static.tildacdn.com/stor3064-6165-4265-a537-373031326136/56844430.jpg",
+      "https://static.tildacdn.com/stor6337-3833-4863-b861-373637326337/39650174.jpg",
+      "https://static.tildacdn.com/stor6534-3836-4236-b765-653735343936/98134368.jpg"
+    ],
+    "drives": [
+      "DA16MU230",
+      "DA16MQU230"
+    ],
+    "kvs": {
+      "a": "40",
+      "b": "63"
+    },
+    "thread": "G2",
+    "height_actuator": "165",
+    "height_stem": "62",
+    "valve_length": "122,5",
+    "valve_od": "70",
+    "diff_pressure": "0,35",
+    "center_edge": "70 мм",
+    "product_slug": "sharovoy-kran-bv350"
+  }
+]

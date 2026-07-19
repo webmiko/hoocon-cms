@@ -151,7 +151,7 @@ def test_normalize_product_extracts_attributes_from_editions() -> None:
     attrs = {a.title: a.value for a in sku0.attributes}
     assert attrs["Мощность"] == "3 Нм"
     assert attrs["Напряжение (В)"] == "24 В"
-    assert attrs["Управление"] == "Открыто/Закрыто"
+    assert attrs["Управление"] == "Открыто/закрыто"
 
 
 def test_normalize_edition_without_sku_quarantines() -> None:

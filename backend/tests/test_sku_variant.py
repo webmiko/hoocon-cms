@@ -1,0 +1,84 @@
+"""Tests for SKU variant parsing and description scoping."""
+
+from __future__ import annotations
+
+from catalog.etl.sku_variant import (
+    filter_description_for_variant,
+    parse_sku_variant,
+)
+
+SAMPLE = """Лид про серию.
+
+Электрические параметры
+
+DA3FU24-D/DS:
+
+– Напряжение питания: AC/DC 24В, 50/60 Гц
+– Класс защиты: III
+
+DA3FU230-D/DS:
+
+– Напряжение питания: AC 100...240В, 50/60 Гц
+– Класс защиты: II
+
+Диапазон напряжения для:
+
+– 24 В: 19,2−28,8 В
+– 230 В: 85−250 В
+
+– Работают от AC/DC 24V или AC 100...240V (50/60 Гц).
+"""
+
+
+def test_parse_sku_variant_voltage_and_control() -> None:
+    """Edition suffixes drive voltage / control / aux flags."""
+    v = parse_sku_variant("da3fu230-d")
+    assert v.voltage == "230"
+    assert v.control == "on_off"
+    assert v.aux_switch is False
+
+    v24 = parse_sku_variant("da10fu24-as")
+    assert v24.voltage == "24"
+    assert v24.control == "modulating"
+    assert v24.aux_switch is True
+
+
+def test_filter_description_keeps_matching_electrical_block() -> None:
+    """230 V SKU keeps only DA3FU230 block and 230 range bullet."""
+    out = filter_description_for_variant(SAMPLE, parse_sku_variant("da3fu230-d"))
+    assert "DA3FU230-D:" in out
+    assert "D/DS" not in out
+    assert "DA3FU24" not in out
+    assert "230 В: 85" in out
+    assert "24 В: 19" not in out
+    assert "Работает от AC 100" in out
+    assert "или AC 100" not in out
+
+
+def test_filter_description_24v_variant() -> None:
+    """24 V SKU keeps DA3FU24 block only."""
+    out = filter_description_for_variant(SAMPLE, parse_sku_variant("da3fu24-ds"))
+    assert "DA3FU24-DS:" in out
+    assert "DA3FU230" not in out
+    assert "24 В: 19" in out
+
+
+def test_rewrite_dual_voltage_model_mask() -> None:
+    """DA3FU24/230-D/DS becomes the concrete edition from the SKU code."""
+    from catalog.etl.sku_variant import rewrite_series_tokens_for_variant
+
+    line = "– DA3FU24/230-D/DS (3 Нм) — до 0,3 м²."
+    out_230 = rewrite_series_tokens_for_variant(line, parse_sku_variant("da3fu230-d"))
+    assert "DA3FU230-D" in out_230
+    assert "24/230" not in out_230
+    assert "D/DS" not in out_230
+
+    out_24 = rewrite_series_tokens_for_variant(line, parse_sku_variant("da3fu24-ds"))
+    assert "DA3FU24-DS" in out_24
+    assert "24/230" not in out_24
+
+    paren = rewrite_series_tokens_for_variant(
+        "модель DA3FU24(230)-D(S)",
+        parse_sku_variant("da3fu230-ds"),
+    )
+    assert "DA3FU230-DS" in paren
