@@ -41,11 +41,25 @@ class SKUFilterSet(django_filters.FilterSet):
         fields = ("category",)
 
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
-        """icontains search on name / sku_code / slug (FTS — Iter 2)."""
+        """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
+
+        FTS (SearchVector with russian config) handles Cyrillic stemming for
+        product names. sku_code is matched with icontains because articles
+        (e.g. 'HVA-5NM') don't benefit from stemming — exact substring is
+        what the engineer types. Results ranked by SearchRank (FTS matches
+        rank higher than sku_code-only matches).
+
+        Spec: ПЛАН §6 Iter 2 — FTS по SKU + артикул.
+        """
         if not value:
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(sku_code__icontains=value) | Q(slug__icontains=value),
+        from django.contrib.postgres.search import SearchQuery, SearchRank
+
+        query = SearchQuery(value, config="russian")
+        return (
+            queryset.filter(Q(search_vector=query) | Q(sku_code__icontains=value))
+            .annotate(rank=SearchRank("search_vector", query))
+            .order_by("-rank", "sku_code")
         )
 
 

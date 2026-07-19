@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 from catalog.validators import sanitize_upload_filename, validate_pdf_upload
@@ -158,6 +159,9 @@ class SKU(models.Model):
         db_index=True,
         help_text="Видимость SKU в публичном каталоге.",
     )
+    # Postgres FTS vector (auto-maintained by DB trigger; see migration).
+    # Spec: ПЛАН §6 Iter 2 — SearchVector on name + sku_code + slug.
+    search_vector = SearchVectorField(null=True, blank=True, editable=False)
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
