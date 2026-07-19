@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "rest_framework",
     # Project apps (с итерации 1)
     "redirects",
+    "sitesettings",
 ]
 
 MIDDLEWARE = [
