@@ -1,7 +1,7 @@
 """Query filters for public SKU list.
 
 Spec: docs/readiness-backend-ux.md §2.3 —
-`?category=&q=&moment=&voltage=&spring=` (EAV exact match by Attribute.slug).
+``?category=&q=&moment=&voltage=&control=`` (canonical facets + EAV slug).
 """
 
 from __future__ import annotations
@@ -12,9 +12,10 @@ from rest_framework.filters import BaseFilterBackend
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from catalog.facets import FACET_BY_KEY, FACET_KEYS, filter_skus_by_facet
 from catalog.models import SKU, Attribute
 
-# Reserved query keys — not treated as Attribute.slug filters.
+# Reserved query keys — not treated as Attribute.slug / facet filters.
 _RESERVED_QUERY_KEYS: frozenset[str] = frozenset(
     {
         "page",
@@ -65,22 +66,20 @@ class SKUFilterSet(django_filters.FilterSet):
 
 
 class AttributeQueryFilterBackend(BaseFilterBackend):
-    """Apply `?<attribute_slug>=<value>` as EAV exact filters.
-
-    Inherits from DRF BaseFilterBackend so drf-spectacular can introspect it
-    (get_schema_operation_parameters). The EAV filters are dynamic (driven by
-    Attribute.slug values in the DB), so we return no static schema parameters.
-    """
+    """Apply facet aliases and ``?<attribute_slug>=<value>`` EAV filters."""
 
     def get_schema_operation_parameters(self, view: APIView) -> list[dict[str, object]]:
-        """Tell drf-spectacular this backend adds no static query parameters.
-
-        EAV filter keys (`?<attribute_slug>=<value>`) are dynamic and depend
-        on the Attribute dictionary in the DB, so we don't enumerate them in
-        the OpenAPI schema. The frontend discovers available filters from the
-        catalog data itself.
-        """
-        return []
+        """Document stable facet keys; dynamic attr slugs stay out of schema."""
+        return [
+            {
+                "name": key,
+                "required": False,
+                "in": "query",
+                "description": f"ТТХ facet: {FACET_BY_KEY[key].label}",
+                "schema": {"type": "string"},
+            }
+            for key in sorted(FACET_KEYS)
+        ]
 
     def filter_queryset(
         self,
@@ -88,19 +87,30 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
         queryset: QuerySet[SKU],
         _view: APIView,
     ) -> QuerySet[SKU]:
-        """Filter by Attribute.slug query params (exact value match)."""
-        candidate_keys = [key for key in request.query_params if key not in _RESERVED_QUERY_KEYS]
+        """Filter by canonical facets first, then raw Attribute.slug params."""
+        params = request.query_params
+        candidate_keys = [key for key in params if key not in _RESERVED_QUERY_KEYS]
         if not candidate_keys:
             return queryset
 
+        for key in candidate_keys:
+            value = params.get(key)
+            if value is None or value == "":
+                continue
+            if key in FACET_BY_KEY:
+                queryset = filter_skus_by_facet(queryset, FACET_BY_KEY[key], value)
+                continue
+
+        # Remaining keys that are real Attribute.slug values (legacy / exact).
+        leftover = [key for key in candidate_keys if key not in FACET_KEYS and params.get(key) not in (None, "")]
+        if not leftover:
+            return queryset.distinct()
+
         attr_slugs = set(
-            Attribute.objects.filter(slug__in=candidate_keys).values_list(
-                "slug",
-                flat=True,
-            ),
+            Attribute.objects.filter(slug__in=leftover).values_list("slug", flat=True),
         )
         for slug in attr_slugs:
-            value = request.query_params.get(slug)
+            value = params.get(slug)
             if value is None or value == "":
                 continue
             queryset = queryset.filter(

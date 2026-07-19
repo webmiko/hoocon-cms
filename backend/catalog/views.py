@@ -7,30 +7,98 @@ staff-only (IsAdminUser).
 
 from __future__ import annotations
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Count, Prefetch, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from catalog.facets import collect_facet_options
 from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
-from catalog.models import SKU, AttributeValue, Category, ProductFile
+from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
 from catalog.serializers import (
     CategorySerializer,
     SKUDetailSerializer,
     SKUListSerializer,
 )
+from catalog.series_categories import spec_order_case
 from catalog.upload_serializers import ProductFileUploadSerializer
 
 
+def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImage]:
+    """Return the first published ProductImage per category id.
+
+    Args:
+        category_ids: Category primary keys to resolve.
+
+    Returns:
+        Mapping category_id → ProductImage (one photo each, if any).
+    """
+    if not category_ids:
+        return {}
+    images = (
+        ProductImage.objects.filter(
+            is_published=True,
+            sku__is_published=True,
+            sku__product__category_id__in=category_ids,
+        )
+        .select_related("sku__product")
+        .order_by("sku__product__category_id", "sort_order", "id")
+    )
+    result: dict[int, ProductImage] = {}
+    for img in images:
+        cat_id = img.sku.product.category_id
+        if cat_id not in result:
+            result[cat_id] = img
+    return result
+
+
 class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    """GET /api/catalog/categories/ — public category list."""
+    """GET /api/catalog/categories/ — specification categories with products."""
 
     permission_classes = (AllowAny,)
     serializer_class = CategorySerializer
-    queryset = Category.objects.all().order_by("name")
     http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self) -> QuerySet[Category]:
+        """Return non-empty categories in series-table order."""
+        return (
+            Category.objects.annotate(product_count=Count("products"))
+            .filter(product_count__gt=0)
+            .annotate(spec_order=spec_order_case())
+            .order_by("spec_order", "name")
+        )
+
+    def list(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """List categories with a product preview image per row."""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        cats = list(page) if page is not None else list(queryset)
+        context = self.get_serializer_context()
+        context["preview_images"] = preview_images_by_category([c.pk for c in cats])
+        serializer = self.get_serializer(cats, many=True, context=context)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
+class FacetViewSet(viewsets.ViewSet):
+    """GET /api/catalog/facets/ — ТТХ filter options with counts.
+
+    Optional ``?category=<slug>`` scopes value counts to that category.
+    """
+
+    permission_classes = (AllowAny,)
+    http_method_names = ["get", "head", "options"]
+
+    def list(self, request: Request) -> Response:
+        """Return canonical facets for the catalog filter UI."""
+        qs = SKU.objects.filter(is_published=True)
+        category = request.query_params.get("category", "").strip()
+        if category:
+            qs = qs.filter(product__category__slug=category)
+        return Response({"results": collect_facet_options(base_queryset=qs)})
 
 
 class SKUViewSet(
@@ -47,14 +115,38 @@ class SKUViewSet(
     http_method_names = ["get", "head", "options"]
 
     def get_queryset(self) -> QuerySet[SKU]:
-        """Published SKUs only; prefetch ТТХ/files for detail."""
-        qs = SKU.objects.filter(is_published=True).select_related("product", "product__category").order_by("sku_code")
+        """Published SKUs only; prefetch ТТХ/files/images for cards and detail."""
+        published_images = Prefetch(
+            "images",
+            queryset=ProductImage.objects.filter(is_published=True).order_by(
+                "sort_order",
+                "id",
+            ),
+            to_attr="_prefetched_images",
+        )
+        published_attrs = Prefetch(
+            "attribute_values",
+            queryset=AttributeValue.objects.select_related("attribute"),
+            to_attr="_prefetched_attribute_values",
+        )
+        qs = (
+            SKU.objects.filter(is_published=True)
+            .select_related("product", "product__category")
+            .prefetch_related(published_images, published_attrs)
+            .annotate(
+                category_spec_order=spec_order_case(
+                    slug_field="product__category__slug",
+                ),
+            )
+            # Same category order as the filter sidebar, then article within.
+            .order_by(
+                "category_spec_order",
+                "product__category__name",
+                "sku_code",
+            )
+        )
         if self.action == "retrieve":
             qs = qs.prefetch_related(
-                Prefetch(
-                    "attribute_values",
-                    queryset=AttributeValue.objects.select_related("attribute"),
-                ),
                 Prefetch(
                     "files",
                     queryset=ProductFile.objects.filter(is_published=True),

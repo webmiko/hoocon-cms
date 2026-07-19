@@ -216,6 +216,73 @@ def test_category_list(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sku_list_follows_category_filter_order(client) -> None:
+    """Catalog cards appear in the same category order as the filter sidebar."""
+    from catalog.models import SKU, Category, Product
+    from catalog.series_categories import spec_categories
+
+    specs = spec_categories()
+    # Seed last → first so sku_code order would invert category order.
+    for spec in reversed(specs):
+        cat = Category.objects.create(name=spec.name, slug=spec.slug)
+        product = Product.objects.create(
+            name=f"P-{spec.slug}",
+            slug=f"p-{spec.slug}",
+            category=cat,
+        )
+        SKU.objects.create(
+            product=product,
+            name=f"SKU {spec.slug}",
+            slug=f"sku-{spec.slug}",
+            sku_code=f"Z-{spec.sort_order:02d}",
+            is_published=True,
+        )
+
+    cats = client.get(reverse("catalog-category-list"))
+    assert cats.status_code == 200
+    cat_slugs = [row["slug"] for row in cats.data["results"]]
+
+    skus = client.get(reverse("catalog-sku-list"), {"page_size": 100})
+    assert skus.status_code == 200
+    seen: list[str] = []
+    for row in skus.data["results"]:
+        slug = row["category_slug"]
+        if slug not in seen:
+            seen.append(slug)
+
+    assert seen == cat_slugs
+    assert seen == [s.slug for s in specs]
+
+
+@pytest.mark.django_db
+def test_category_list_includes_preview_image(client) -> None:
+    """Category payload includes first published product photo when present."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from catalog.models import ProductImage
+
+    seed = _seed_catalog()
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
+        b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    ProductImage.objects.create(
+        sku=seed["sku"],
+        image=SimpleUploadedFile("t.png", png, content_type="image/png"),
+        alt="HVA preview",
+        is_published=True,
+        sort_order=0,
+    )
+    response = client.get(reverse("catalog-category-list"))
+    assert response.status_code == 200
+    row = next(r for r in response.data["results"] if r["slug"] == "vozdushnie")
+    assert row["image"] is not None
+    assert "image" in row["image"]
+    assert row["image"]["alt"] == "HVA preview"
+
+
+@pytest.mark.django_db
 def test_sku_list_is_read_only_for_anon(client) -> None:
     """Public API is read-only: POST → 405."""
     _seed_catalog()

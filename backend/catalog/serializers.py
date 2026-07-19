@@ -11,7 +11,25 @@ from typing import Any
 
 from rest_framework import serializers
 
-from catalog.models import SKU, AttributeValue, Category, ProductFile
+from catalog.etl.attr_groups import attach_groups, group_attribute_rows
+from catalog.etl.html_text import dedupe_description_lines, filter_analogs_for_sku
+from catalog.etl.sku_variant import (
+    filter_attributes_for_variant,
+    filter_description_for_variant,
+    parse_sku_variant,
+    rewrite_series_tokens_for_variant,
+)
+from catalog.facets import (
+    dedupe_attribute_values,
+    extract_sku_lead,
+    format_sku_heading_name,
+    highlights_for_sku,
+    normalize_area_attribute_value,
+    normalize_aux_switch_value,
+    strip_attribute_echo_from_text,
+    strip_heading_echo_from_description,
+)
+from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
 from sitesettings.models import SiteSettings
 
 
@@ -20,13 +38,163 @@ def _prices_visible() -> bool:
     return bool(SiteSettings.load().show_prices_on_site)
 
 
+def _sku_kvs_value(obj: SKU) -> str:
+    """Kvs for valve heading uniqueness (empty for actuators)."""
+    values = getattr(obj, "_prefetched_attribute_values", None)
+    if values is None:
+        values = list(obj.attribute_values.select_related("attribute"))
+    for av in values:
+        slug = (av.attribute.slug or "").casefold()
+        name = (av.attribute.name or "").casefold()
+        if slug.startswith("kvs") or name.startswith("kvs"):
+            return str(av.value).strip()
+    return ""
+
+
+def _sku_heading(obj: SKU) -> str:
+    """Unique display title for cards / H1 / breadcrumbs."""
+    return format_sku_heading_name(
+        obj.name,
+        description=obj.description or "",
+        sku_code=obj.sku_code or "",
+        kvs=_sku_kvs_value(obj),
+    )
+
+
+def _sku_description(obj: SKU) -> str:
+    """Description scoped to this SKU edition (no foreign 24/230 blocks)."""
+    text = dedupe_description_lines(obj.description or "")
+    return filter_description_for_variant(text, parse_sku_variant(obj.sku_code))
+
+
+def _sku_specs_text(obj: SKU) -> str:
+    """Характеристики text scoped to this edition."""
+    text = obj.specs_text or obj.product.specs_text or ""
+    variant = parse_sku_variant(obj.sku_code)
+    text = filter_description_for_variant(dedupe_description_lines(text), variant)
+    return rewrite_series_tokens_for_variant(text, variant)
+
+
+def _sku_analogs_text(obj: SKU) -> str:
+    """Аналоги text for this edition only."""
+    text = obj.analogs_text or obj.product.analogs_text or ""
+    if not text.strip():
+        return ""
+    if obj.analogs_text:
+        return dedupe_description_lines(obj.analogs_text)
+    return filter_analogs_for_sku(text, obj.sku_code)
+
+
+def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Deduped + variant-filtered ТТХ rows for API."""
+    values = getattr(obj, "_prefetched_attribute_values", None)
+    if values is None:
+        values = list(obj.attribute_values.select_related("attribute"))
+    deduped = dedupe_attribute_values(values)
+    rows = AttributeValueSerializer(deduped, many=True, context=context).data
+    filtered = filter_attributes_for_variant(list(rows), parse_sku_variant(obj.sku_code))
+    result: list[dict[str, Any]] = []
+    for row in filtered:
+        name = (row.get("name") or "").casefold()
+        if "управл" in name:
+            from catalog.etl.tech_copy import normalize_control_attribute_value
+
+            row = {
+                **row,
+                "value": normalize_control_attribute_value(
+                    str(row.get("value") or ""),
+                    sku_code=obj.sku_code,
+                    category_slug=obj.product.category.slug,
+                ),
+            }
+        if "напряж" in name and "диапазон" not in name:
+            from catalog.etl.tech_copy import normalize_voltage_attribute_value
+
+            row = {
+                **row,
+                "value": normalize_voltage_attribute_value(
+                    str(row.get("value") or ""),
+                    sku_code=obj.sku_code,
+                ),
+            }
+        if "площад" in name:
+            row = {
+                **row,
+                "value": normalize_area_attribute_value(str(row.get("value") or "")),
+            }
+        if "вспомогательн" in name:
+            row = {
+                **row,
+                "value": normalize_aux_switch_value(
+                    str(row.get("value") or ""),
+                    sku_code=obj.sku_code,
+                    description=obj.description or "",
+                ),
+            }
+        if "время поворота" in name or "время срабатывания" in name:
+            from catalog.etl.tech_copy import (
+                attribute_display_unit,
+                normalize_running_time_value,
+            )
+
+            value = normalize_running_time_value(str(row.get("value") or ""))
+            row = {
+                **row,
+                "value": value,
+                "unit": attribute_display_unit(value, str(row.get("unit") or "")),
+            }
+        else:
+            from catalog.etl.tech_copy import attribute_display_unit
+
+            row = {
+                **row,
+                "unit": attribute_display_unit(
+                    str(row.get("value") or ""),
+                    str(row.get("unit") or ""),
+                ),
+            }
+        result.append(row)
+    return attach_groups(result)
+
+
 class CategorySerializer(serializers.ModelSerializer):
-    """Public category list/detail fields."""
+    """Public category list/detail fields (series overview + install)."""
+
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ("id", "name", "slug", "parent", "description")
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "parent",
+            "description",
+            "instructions",
+            "image",
+        )
         read_only_fields = fields
+
+    def get_image(self, obj: Category) -> dict[str, Any] | None:
+        """First published product photo in this category (homepage tiles)."""
+        preview_map = self.context.get("preview_images")
+        if isinstance(preview_map, dict):
+            img = preview_map.get(obj.pk)
+            if img is None:
+                return None
+            return ProductImageSerializer(img, context=self.context).data
+        img = (
+            ProductImage.objects.filter(
+                is_published=True,
+                sku__is_published=True,
+                sku__product__category_id=obj.pk,
+            )
+            .order_by("sort_order", "id")
+            .first()
+        )
+        if img is None:
+            return None
+        return ProductImageSerializer(img, context=self.context).data
 
 
 class AttributeValueSerializer(serializers.ModelSerializer):
@@ -51,15 +219,27 @@ class ProductFileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class SKUListSerializer(serializers.ModelSerializer):
-    """SKU card for list: no nested ТТХ; price gated by SiteSettings."""
+class ProductImageSerializer(serializers.ModelSerializer):
+    """Public product image (WebP URL + alt)."""
 
+    class Meta:
+        model = ProductImage
+        fields = ("id", "image", "alt", "sort_order")
+        read_only_fields = fields
+
+
+class SKUListSerializer(serializers.ModelSerializer):
+    """SKU card for list: key ТТХ highlights; price gated by SiteSettings."""
+
+    name = serializers.SerializerMethodField()
     price_on_request = serializers.SerializerMethodField()
     category_slug = serializers.CharField(
         source="product.category.slug",
         read_only=True,
     )
     product_slug = serializers.CharField(source="product.slug", read_only=True)
+    image = serializers.SerializerMethodField()
+    highlights = serializers.SerializerMethodField()
 
     class Meta:
         model = SKU
@@ -73,12 +253,48 @@ class SKUListSerializer(serializers.ModelSerializer):
             "product_slug",
             "price",
             "price_on_request",
+            "image",
+            "highlights",
         )
         read_only_fields = fields
+
+    def get_name(self, obj: SKU) -> str:
+        """H1/card title: unique article + cleaned product type."""
+        return _sku_heading(obj)
 
     def get_price_on_request(self, _obj: SKU) -> bool:
         """True when prices are hidden (RFQ policy)."""
         return not _prices_visible()
+
+    def get_image(self, obj: SKU) -> dict[str, Any] | None:
+        """Primary published image for catalog cards (sort_order ASC)."""
+        images = getattr(obj, "_prefetched_images", None)
+        if images is None:
+            images = list(
+                obj.images.filter(is_published=True).order_by("sort_order", "id")[:1],
+            )
+        if not images:
+            return None
+        return ProductImageSerializer(images[0], context=self.context).data
+
+    def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
+        """Compact ТТХ for catalog cards (moment / voltage / control / …)."""
+        values = getattr(obj, "_prefetched_attribute_values", None)
+        if values is None:
+            values = list(obj.attribute_values.select_related("attribute"))
+        deduped = dedupe_attribute_values(values)
+        variant = parse_sku_variant(obj.sku_code)
+        rows = [{"name": av.attribute.name, "value": str(av.value).strip()} for av in deduped]
+        allowed = {(row["name"], row["value"]) for row in filter_attributes_for_variant(rows, variant)}
+        filtered = [av for av in deduped if (av.attribute.name, str(av.value).strip()) in allowed]
+        return highlights_for_sku(
+            filtered,
+            # Room for Y/U after «Управление» on modulating editions.
+            limit=7,
+            description=obj.description or "",
+            sku_code=obj.sku_code,
+            category_slug=obj.product.category.slug,
+        )
 
     def to_representation(self, instance: SKU) -> dict[str, Any]:
         """Drop `price` key entirely when show_prices_on_site is False."""
@@ -89,25 +305,120 @@ class SKUListSerializer(serializers.ModelSerializer):
 
 
 class SKUDetailSerializer(SKUListSerializer):
-    """SKU PDP payload: list fields + attributes + files."""
+    """SKU PDP payload: list fields + sectioned copy + attributes + files."""
 
-    attributes = AttributeValueSerializer(
-        source="attribute_values",
-        many=True,
+    attributes = serializers.SerializerMethodField()
+    attribute_groups = serializers.SerializerMethodField()
+    files = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    lead = serializers.SerializerMethodField()
+    specs_text = serializers.SerializerMethodField()
+    analogs_text = serializers.SerializerMethodField()
+    category_name = serializers.CharField(
+        source="product.category.name",
         read_only=True,
     )
-    files = serializers.SerializerMethodField()
-    description = serializers.CharField(read_only=True)
+    category_description = serializers.CharField(
+        source="product.category.description",
+        read_only=True,
+    )
+    category_instructions = serializers.SerializerMethodField()
 
     class Meta(SKUListSerializer.Meta):
         fields = (
             *SKUListSerializer.Meta.fields,
             "description",
+            "lead",
+            "specs_text",
+            "analogs_text",
+            "category_name",
+            "category_description",
+            "category_instructions",
             "attributes",
+            "attribute_groups",
             "files",
+            "images",
         )
+
+    def get_description(self, obj: SKU) -> str:
+        """Return description for this SKU edition only (no H1/lead echo).
+
+        Attribute-card facts are not stripped here: short edition lines
+        (управление / SPDT) stay as list items in the Описание tab.
+        """
+        text = _sku_description(obj)
+        heading = _sku_heading(obj)
+        lead = extract_sku_lead(text or obj.description or "")
+        return strip_heading_echo_from_description(
+            text,
+            heading=heading,
+            lead=lead,
+        )
+
+    def get_lead(self, obj: SKU) -> str:
+        """Short prose blurb for PDP hero (application sentence)."""
+        return extract_sku_lead(_sku_description(obj) or obj.description or "")
+
+    def get_specs_text(self, obj: SKU) -> str:
+        """Характеристики prose — only when there are no structured attrs.
+
+        When EAV / category cards cover the ТТХ, return empty to avoid a
+        duplicate StructuredText block under the cards.
+        """
+        rows = _sku_attribute_rows(obj, self.context)
+        if rows:
+            return ""
+        text = _sku_specs_text(obj)
+        return strip_attribute_echo_from_text(text, rows)
+
+    def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
+        """Hero ТТХ on PDP: fuller set than catalog cards."""
+        values = getattr(obj, "_prefetched_attribute_values", None)
+        if values is None:
+            values = list(obj.attribute_values.select_related("attribute"))
+        deduped = dedupe_attribute_values(values)
+        variant = parse_sku_variant(obj.sku_code)
+        rows = [{"name": av.attribute.name, "value": str(av.value).strip()} for av in deduped]
+        allowed = {(row["name"], row["value"]) for row in filter_attributes_for_variant(rows, variant)}
+        filtered = [av for av in deduped if (av.attribute.name, str(av.value).strip()) in allowed]
+        return highlights_for_sku(
+            filtered,
+            limit=11,
+            description=obj.description or "",
+            sku_code=obj.sku_code,
+            category_slug=obj.product.category.slug,
+        )
+
+    def get_analogs_text(self, obj: SKU) -> str:
+        """Return Аналоги for this SKU edition."""
+        return _sku_analogs_text(obj)
+
+    def get_category_instructions(self, obj: SKU) -> str:
+        """Install guide: category first, then product-level fallback."""
+        cat = obj.product.category.instructions or ""
+        if cat.strip():
+            return cat
+        return obj.product.instructions or ""
+
+    def get_attributes(self, obj: SKU) -> list[dict[str, Any]]:
+        """ТТХ rows deduped and scoped to the SKU voltage/control variant."""
+        return _sku_attribute_rows(obj, self.context)
+
+    def get_attribute_groups(self, obj: SKU) -> list[dict[str, Any]]:
+        """ТТХ grouped for category cards on the Характеристики tab."""
+        return group_attribute_rows(_sku_attribute_rows(obj, self.context))
 
     def get_files(self, obj: SKU) -> list[dict[str, Any]]:
         """Return only published ProductFile rows, ordered."""
         qs = obj.files.filter(is_published=True).order_by("sort_order", "title")
         return ProductFileSerializer(qs, many=True, context=self.context).data
+
+    def get_images(self, obj: SKU) -> list[dict[str, Any]]:
+        """Return published gallery images, ordered."""
+        images = getattr(obj, "_prefetched_images", None)
+        if images is None:
+            images = list(
+                obj.images.filter(is_published=True).order_by("sort_order", "id"),
+            )
+        return ProductImageSerializer(images, many=True, context=self.context).data
