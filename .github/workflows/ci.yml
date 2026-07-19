@@ -1,0 +1,101 @@
+# CI for Hoocon CMS: test → lint. Deploy job — с итерации 5 (reg.ru VPS).
+# Spec: ПЛАН §6 Iter 1 — CI skeleton (ruff + mypy + pytest matrix);
+# docs/security-baseline.md §5 (CI: ruff, mypy, pytest, pip-audit).
+name: Hoocon CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  # push и pull_request не отменяют друг друга; внутри одного типа — последний run.
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+  POETRY_VERSION: "2.0.2"
+
+jobs:
+  test:
+    name: test (pytest + Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hoocon
+          POSTGRES_PASSWORD: ci-db-password
+          POSTGRES_DB: hoocon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hoocon -d hoocon_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-secret-key-not-for-production
+      DJANGO_DEBUG: "false"
+      DB_NAME: hoocon_test
+      DB_USER: hoocon
+      DB_PASSWORD: ci-db-password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      USE_SQLITE: "False"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
+      - run: poetry install --with dev
+      - run: poetry run python manage.py migrate --noinput
+      - run: poetry run pytest -q
+
+  lint:
+    name: lint (ruff + mypy + pip-audit)
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-secret-key-not-for-production
+      DJANGO_DEBUG: "false"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
+      - run: poetry install --with dev
+      - run: poetry run ruff check .
+      - run: poetry run ruff format --check .
+      - run: poetry run mypy config manage.py
+      - name: pip-audit (supply chain)
+        run: poetry run pip-audit --strict
