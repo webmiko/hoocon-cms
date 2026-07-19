@@ -10,12 +10,21 @@ FAIL=0
 fail() { echo "✗ $1"; FAIL=$((FAIL + 1)); }
 ok() { echo "✓ $1"; }
 
-# 1) Frontend: no dangerouslySetInnerHTML without sanitization
+# 1) Frontend: no dangerouslySetInnerHTML without sanitization.
+# Allow only if the __html value is wrapped in sanitizeHtml(...) (DOMPurify).
 if [ -d "$ROOT/frontend/src" ]; then
-  if grep -RInE 'dangerouslySetInnerHTML' frontend/src 2>/dev/null | grep -v node_modules; then
+  VIOLATIONS=""
+  while IFS= read -r line; do
+    file_line="$line"
+    if ! printf '%s' "$file_line" | grep -qE 'sanitizeHtml\('; then
+      VIOLATIONS="$VIOLATIONS\n$file_line"
+    fi
+  done < <(grep -RInE 'dangerouslySetInnerHTML' frontend/src 2>/dev/null | grep -v node_modules || true)
+  if [ -n "$VIOLATIONS" ]; then
+    printf "%b\n" "$VIOLATIONS"
     fail "frontend: dangerouslySetInnerHTML — нужна санитизация (security-baseline)"
   else
-    ok "frontend: нет dangerouslySetInnerHTML"
+    ok "frontend: dangerouslySetInnerHTML только с sanitizeHtml()"
   fi
 fi
 

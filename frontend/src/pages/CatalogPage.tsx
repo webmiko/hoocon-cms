@@ -1,14 +1,43 @@
 import { Link, useSearchParams } from "react-router-dom";
+import { useState } from "react";
 
-import { api, type Category, type SKUList } from "../api/client";
+import { Seo } from "../components/Seo";
+import { CatalogSkeleton } from "../components/CatalogSkeleton";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import {
+  api,
+  type CatalogFacet,
+  type Category,
+  type SKUList,
+} from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { facetLabelShort, facetValueShort } from "../utils/facetDisplay";
+import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
+import { parseDescription } from "../utils/parseDescription";
+import { SoftBreakText } from "../components/SoftBreakText";
+import { softBreak } from "../utils/softBreak";
+import { specDisplayUnit } from "../utils/specDisplay";
 import styles from "./CatalogPage.module.css";
 
+/** Facet query keys synced to the URL (backend catalog.facets). */
+const FACET_KEYS = [
+  "moment",
+  "voltage",
+  "control",
+  "area",
+  "aux_switch",
+  "dn",
+  "ways",
+  "kvs",
+] as const;
+
+type FacetKey = (typeof FACET_KEYS)[number];
+
 /**
- * Catalog list page: category filter + search + SKU cards + pagination.
+ * Catalog list: categories + ТТХ facets + compact SKU cards.
  *
- * Filters sync to query string (?category=...&q=...&page=...) so URLs are
- * shareable and back/forward works. Spec: ПЛАН §6 Iter 4; docs/readiness-backend-ux.md.
+ * Filters sync to query string so URLs are shareable.
+ * Spec: docs/plan-detail-mvp.md S2; live PDP hero style (hoocon.ru).
  */
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,19 +45,38 @@ export function CatalogPage() {
   const q = searchParams.get("q") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
 
-  // Fetch categories for the sidebar.
-  const { data: categoriesData } = useAsync(() => api.categories(), []);
+  const activeFacets: Partial<Record<FacetKey, string>> = {};
+  for (const key of FACET_KEYS) {
+    const value = searchParams.get(key);
+    if (value) activeFacets[key] = value;
+  }
 
-  // Fetch SKUs with current filters.
+  const { data: categoriesData } = useAsync(() => api.categories(), []);
+  const { data: facetsData } = useAsync(
+    () => api.facets(category ? { category } : undefined),
+    [category],
+  );
+
   const params: Record<string, string> = {};
   if (category) params.category = category;
   if (q) params.q = q;
   if (page > 1) params.page = String(page);
+  for (const [key, value] of Object.entries(activeFacets)) {
+    if (value) params[key] = value;
+  }
 
-  const { data: skusData, loading, error } = useAsync(() => api.skus(params), [category, q, page]);
+  const facetKey = FACET_KEYS.map((k) => activeFacets[k] ?? "").join("|");
+  const { data: skusData, loading, error } = useAsync(
+    () => api.skus(params),
+    [category, q, page, facetKey],
+  );
 
   const categories: Category[] = categoriesData?.results ?? [];
-  const skus: SKUList[] = skusData?.results ?? [];
+  const facets: CatalogFacet[] = facetsData?.results ?? [];
+  const skus: SKUList[] = (skusData?.results ?? []) as SKUList[];
+  const activeCount =
+    Object.keys(activeFacets).length + (q ? 1 : 0) + (category ? 1 : 0);
+  const activeCategory = categories.find((c) => c.slug === category);
 
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(searchParams);
@@ -37,9 +85,12 @@ export function CatalogPage() {
     } else {
       next.delete(key);
     }
-    // Reset page when filters change.
     if (key !== "page") next.delete("page");
     setSearchParams(next);
+  }
+
+  function clearAllFilters() {
+    setSearchParams(new URLSearchParams());
   }
 
   function handleSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -54,29 +105,162 @@ export function CatalogPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  return (
-    <div className={styles.catalog}>
-      <aside className={styles.sidebar}>
-        <h2 className={styles.sidebarTitle}>Категории</h2>
-        <nav className={styles.categoryNav}>
+  const filterHead = (
+    <div className={styles.filterPanelHead}>
+      <h2 className={styles.filterPanelTitle}>Фильтры</h2>
+      {activeCount > 0 ? (
+        <button
+          type="button"
+          className={styles.clearFacets}
+          onClick={clearAllFilters}
+        >
+          Сбросить
+        </button>
+      ) : null}
+    </div>
+  );
+
+  const filterSections = (
+    <>
+      <details className={styles.filterSection} open>
+        <summary className={styles.filterSummary}>
+          <span className={styles.filterSummaryLabel}>Категория</span>
+          <span
+            className={
+              category
+                ? styles.filterSummaryValueActive
+                : styles.filterSummaryValue
+            }
+          >
+            {activeCategory ? softBreak(activeCategory.name) : "Все"}
+          </span>
+        </summary>
+        <nav className={styles.categoryNav} aria-label="Категории каталога">
           <Link
             to="/catalog"
-            className={category === "" ? styles.categoryLinkActive : styles.categoryLink}
+            className={
+              category === "" ? styles.optionRowActive : styles.optionRow
+            }
             onClick={() => updateFilter("category", "")}
           >
-            Все категории
+            <span className={styles.optionText}>Все категории</span>
           </Link>
           {categories.map((cat) => (
             <Link
               key={cat.slug}
               to={`/catalog?category=${encodeURIComponent(cat.slug)}`}
-              className={category === cat.slug ? styles.categoryLinkActive : styles.categoryLink}
+              className={
+                category === cat.slug ? styles.optionRowActive : styles.optionRow
+              }
               onClick={() => updateFilter("category", cat.slug)}
             >
-              {cat.name}
+              <span className={styles.optionText}>{softBreak(cat.name)}</span>
             </Link>
           ))}
         </nav>
+      </details>
+
+      {facets.map((facet) => {
+        const selected = activeFacets[facet.key as FacetKey];
+        const shortLabel = facetLabelShort(facet.key, facet.label);
+        return (
+          <details key={facet.key} className={styles.filterSection}>
+            <summary className={styles.filterSummary}>
+              <span className={styles.filterSummaryLabel}>{shortLabel}</span>
+              <span
+                className={
+                  selected
+                    ? styles.filterSummaryValueActive
+                    : styles.filterSummaryValue
+                }
+              >
+                {selected ? facetValueShort(facet.key, selected) : "Любое"}
+              </span>
+            </summary>
+            <ul className={styles.optionList}>
+              {facet.values.map((item) => {
+                const isOn = selected === item.value;
+                return (
+                  <li key={item.value}>
+                    <button
+                      type="button"
+                      className={isOn ? styles.optionRowActive : styles.optionRow}
+                      aria-pressed={isOn}
+                      title={item.value}
+                      onClick={() =>
+                        updateFilter(facet.key, isOn ? "" : item.value)
+                      }
+                    >
+                      <span className={styles.optionText}>
+                        {facetValueShort(facet.key, item.value)}
+                      </span>
+                      <span className={styles.optionCount}>{item.count}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        );
+      })}
+    </>
+  );
+
+  return (
+    <div className={styles.page}>
+      <Seo
+        title="Каталог электроприводов ОВК"
+        description="Каталог электроприводов Hoocon для вентиляции и кондиционирования. Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
+        path="/catalog"
+        jsonLd={[
+          buildBreadcrumbJsonLd([
+            { name: "Главная", path: "/" },
+            { name: "Каталог", path: "/catalog" },
+            ...(activeCategory
+              ? [
+                  {
+                    name: activeCategory.name,
+                    path: `/catalog?category=${encodeURIComponent(activeCategory.slug)}`,
+                  },
+                ]
+              : []),
+          ]),
+        ]}
+      />
+
+      <Breadcrumbs
+        items={[
+          { label: "Главная", to: "/" },
+          {
+            label: "Каталог",
+            to: activeCategory ? "/catalog" : undefined,
+          },
+          ...(activeCategory
+            ? [{ label: activeCategory.name }]
+            : []),
+        ]}
+      />
+
+      <div className={styles.catalog}>
+      <aside className={styles.sidebar} aria-label="Фильтры каталога">
+        <div className={styles.filtersDesktop}>
+          <div className={styles.filterStickyHead}>{filterHead}</div>
+          <div className={styles.filterScroll}>
+            <div className={styles.filterPanel}>{filterSections}</div>
+          </div>
+        </div>
+        <details className={styles.filtersMobile}>
+          <summary className={styles.filtersMobileSummary}>
+            <span>Фильтры</span>
+            {activeCount > 0 ? (
+              <span className={styles.filtersMobileBadge}>{activeCount}</span>
+            ) : null}
+          </summary>
+          <div className={styles.filterPanel}>
+            {filterHead}
+            {filterSections}
+          </div>
+        </details>
       </aside>
 
       <div className={styles.content}>
@@ -102,40 +286,153 @@ export function CatalogPage() {
           </form>
         </div>
 
-        {q && (
-          <p className={styles.searchInfo}>
-            Результаты по запросу: <strong>«{q}»</strong>{" "}
-            <button className={styles.clearSearch} onClick={() => updateFilter("q", "")}>
-              очистить
+        {activeCount > 0 ? (
+          <div className={styles.activeTags} aria-label="Активные фильтры">
+            {category && activeCategory ? (
+              <button
+                type="button"
+                className={styles.activeTag}
+                onClick={() => updateFilter("category", "")}
+              >
+                <span className={styles.activeTagLabel}>Категория</span>
+                <span className={styles.activeTagValue}>
+                  {softBreak(activeCategory.name)}
+                </span>
+                <span className={styles.activeTagRemove} aria-hidden="true">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            {q ? (
+              <button
+                type="button"
+                className={styles.activeTag}
+                onClick={() => updateFilter("q", "")}
+              >
+                <span className={styles.activeTagLabel}>Поиск</span>
+                <span className={styles.activeTagValue}>{q}</span>
+                <span className={styles.activeTagRemove} aria-hidden="true">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            {FACET_KEYS.map((key) => {
+              const value = activeFacets[key];
+              if (!value) return null;
+              const facetMeta = facets.find((f) => f.key === key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.activeTag}
+                  onClick={() => updateFilter(key, "")}
+                >
+                  <span className={styles.activeTagLabel}>
+                    {facetLabelShort(key, facetMeta?.label ?? key)}
+                  </span>
+                  <span className={styles.activeTagValue}>
+                    {facetValueShort(key, value)}
+                  </span>
+                  <span className={styles.activeTagRemove} aria-hidden="true">
+                    ×
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className={styles.clearSearch}
+              onClick={clearAllFilters}
+            >
+              Очистить всё
             </button>
-          </p>
+          </div>
+        ) : null}
+
+        {category ? (
+          <CategoryOverview
+            category={categories.find((c) => c.slug === category)}
+          />
+        ) : null}
+
+        {loading && <CatalogSkeleton />}
+        {error && (
+          <p className={styles.error}>Ошибка загрузки каталога. Попробуйте позже.</p>
         )}
 
-        {loading && <p className={styles.status}>Загрузка…</p>}
-        {error && <p className={styles.error}>Ошибка загрузки каталога. Попробуйте позже.</p>}
-
         {!loading && !error && skus.length === 0 && (
-          <p className={styles.status}>Ничего не найдено. Попробуйте изменить фильтры.</p>
+          <div className={styles.emptyState}>
+            <span className={styles.emptyIcon} aria-hidden="true">
+              ∅
+            </span>
+            <p className={styles.emptyTitle}>Ничего не найдено</p>
+            <p className={styles.emptyHint}>
+              Попробуйте изменить фильтры или сбросить выбор.
+            </p>
+            {activeCount > 0 && (
+              <button
+                type="button"
+                className={styles.emptyCta}
+                onClick={clearAllFilters}
+              >
+                Сбросить фильтры
+              </button>
+            )}
+          </div>
         )}
 
         {skus.length > 0 && (
           <>
             <div className={styles.grid}>
               {skus.map((sku) => (
-                <Link key={sku.slug} to={`/${sku.slug}/`} className={styles.card}>
-                  <h3 className={styles.cardTitle}>{sku.name}</h3>
-                  <p className={styles.cardCode}>Артикул: {sku.sku_code}</p>
-                  {sku.analog_belimo_code && (
-                    <p className={styles.cardAnalog}>Аналог Belimo: {sku.analog_belimo_code}</p>
+                <Link key={sku.slug} to={`/${sku.slug}`} className={styles.card}>
+                  {sku.image?.image ? (
+                    <div className={styles.cardMedia}>
+                      <img
+                        src={sku.image.image}
+                        alt={sku.image.alt || sku.name}
+                        className={styles.cardImage}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  ) : (
+                    <div className={styles.cardMediaPlaceholder} aria-hidden="true" />
                   )}
-                  {"price" in sku && sku.price && (
-                    <p className={styles.cardPrice}>
-                      Цена: {sku.price} ₽
+                  <div className={styles.cardBody}>
+                    <p className={`${styles.cardCode} text-tech`}>
+                      {softBreak(sku.sku_code)}
                     </p>
-                  )}
-                  {sku.price_on_request && (
-                    <p className={styles.cardPriceOnRequest}>Цена по запросу</p>
-                  )}
+                    <h3 className={styles.cardTitle}>{softBreak(sku.name)}</h3>
+                    {sku.highlights && sku.highlights.length > 0 ? (
+                      <ul className={styles.cardSpecs}>
+                        {sku.highlights.slice(0, 6).map((h) => {
+                          const unit = specDisplayUnit(h.value, h.unit);
+                          return (
+                            <li key={h.key}>
+                              <span className={styles.cardSpecName}>{h.name}</span>
+                              <span className={styles.cardSpecValue}>
+                                <SoftBreakText text={h.value} />
+                                {unit ? ` ${unit}` : ""}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                    <div className={styles.cardFooter}>
+                      {sku.analog_belimo_code ? (
+                        <span className={`${styles.cardAnalog} text-tech`}>
+                          Belimo: {softBreak(sku.analog_belimo_code)}
+                        </span>
+                      ) : (
+                        <span className={styles.cardPriceOnRequest}>
+                          Цена по запросу
+                        </span>
+                      )}
+                      <span className={styles.cardCta}>Паспорт и ТТХ</span>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -143,6 +440,7 @@ export function CatalogPage() {
             {skusData && (skusData.next || skusData.previous) && (
               <nav className={styles.pagination} aria-label="Пагинация">
                 <button
+                  type="button"
                   className={styles.pageButton}
                   disabled={!skusData.previous || page <= 1}
                   onClick={() => goToPage(page - 1)}
@@ -151,6 +449,7 @@ export function CatalogPage() {
                 </button>
                 <span className={styles.pageInfo}>Страница {page}</span>
                 <button
+                  type="button"
                   className={styles.pageButton}
                   disabled={!skusData.next}
                   onClick={() => goToPage(page + 1)}
@@ -162,6 +461,88 @@ export function CatalogPage() {
           </>
         )}
       </div>
+      </div>
     </div>
+  );
+}
+
+function CategoryOverview({ category }: { category?: Category }) {
+  const [openInst, setOpenInst] = useState(false);
+  if (!category) return null;
+  const hasDesc = Boolean(category.description?.trim());
+  const hasInst = Boolean(category.instructions?.trim());
+  if (!hasDesc && !hasInst) return null;
+
+  return (
+    <section className={styles.categoryOverview} aria-label="О категории">
+      {hasDesc ? (
+        <div className={styles.categoryDesc}>
+          {parseDescription(category.description)
+            .slice(0, 8)
+            .map((block, index) => {
+              if (block.type === "paragraph") {
+                return (
+                  <p key={`p-${index}`} className={styles.categoryLead}>
+                    {softBreak(block.text)}
+                  </p>
+                );
+              }
+              if (block.type === "section") {
+                return (
+                  <h3 key={`s-${index}`} className={styles.categorySection}>
+                    {softBreak(block.title)}
+                  </h3>
+                );
+              }
+              return (
+                <ul key={`l-${index}`} className={styles.categoryList}>
+                  {block.items.slice(0, 6).map((item) => (
+                    <li key={item}>{softBreak(item)}</li>
+                  ))}
+                </ul>
+              );
+            })}
+        </div>
+      ) : null}
+      {hasInst ? (
+        <div className={styles.categoryInst}>
+          <button
+            type="button"
+            className={styles.categoryInstToggle}
+            aria-expanded={openInst}
+            onClick={() => setOpenInst((v) => !v)}
+          >
+            {openInst ? "Скрыть инструкцию" : "Инструкция по монтажу и управлению"}
+          </button>
+          {openInst ? (
+            <div className={styles.categoryInstBody}>
+              {parseDescription(category.instructions).map((block, index) => {
+                if (block.type === "paragraph") {
+                  return (
+                    <p key={`ip-${index}`} className={styles.categoryLead}>
+                      {softBreak(block.text)}
+                    </p>
+                  );
+                }
+                if (block.type === "section") {
+                  return (
+                    <h3 key={`is-${index}`} className={styles.categorySection}>
+                      {softBreak(block.title)}
+                    </h3>
+                  );
+                }
+                return (
+                  <ul key={`il-${index}`} className={styles.categoryList}>
+                    {block.items.map((item) => (
+                      <li key={item}>{softBreak(item)}</li>
+                    ))}
+                  </ul>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }

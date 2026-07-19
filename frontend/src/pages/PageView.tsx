@@ -1,12 +1,90 @@
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
-/** Static CMS page — stub (filled in F6). */
-export function PageView() {
-  const { slug } = useParams<{ slug: string }>();
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import { Seo } from "../components/Seo";
+import { api } from "../api/client";
+import { useAsync } from "../hooks/useAsync";
+import { sanitizeHtml } from "../utils/sanitize";
+import { buildBreadcrumbJsonLd, buildFaqJsonLd } from "../utils/jsonLd";
+import styles from "./PageView.module.css";
+
+interface PageViewProps {
+  /** Explicit slug when route has no :slug param (e.g. /o-kompanii). */
+  slug?: string;
+}
+
+/**
+ * Static CMS page (/o-kompanii, /kontakty, /privacy, …).
+ * Spec: ПЛАН §6 Iter 4; docs/readiness-backend-ux.md §2.2.
+ */
+export function PageView({ slug: slugProp }: PageViewProps) {
+  const params = useParams<{ slug: string }>();
+  const slug = slugProp ?? params.slug ?? "";
+  const { data: page, loading, error } = useAsync(
+    () => api.pageDetail(slug),
+    [slug],
+  );
+
+  if (!slug) {
+    return (
+      <div className={styles.notFound}>
+        <h1>Страница не найдена</h1>
+        <Link to="/" className={styles.link}>
+          ← На главную
+        </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <p className={styles.status}>Загрузка…</p>;
+  }
+
+  if (error || !page) {
+    return (
+      <div className={styles.notFound}>
+        <h1>Страница не найдена</h1>
+        <Link to="/" className={styles.link}>
+          ← На главную
+        </Link>
+      </div>
+    );
+  }
+
+  const desc = page.body.replace(/<[^>]+>/g, "").slice(0, 160);
+  const jsonLd =
+    page.slug === "faq"
+      ? [buildFaqJsonLd(), buildBreadcrumbJsonLd([
+          { name: "Главная", path: "/" },
+          { name: page.title, path: `/${page.slug}` },
+        ])]
+      : [
+          buildBreadcrumbJsonLd([
+            { name: "Главная", path: "/" },
+            { name: page.title, path: `/${page.slug}` },
+          ]),
+        ];
+
   return (
-    <div>
-      <h1>Страница: {slug}</h1>
-      <p>Статичная CMS-страница — слайс F6.</p>
-    </div>
+    <article className={styles.page}>
+      <Seo
+        title={page.title}
+        description={desc}
+        path={`/${page.slug}`}
+        jsonLd={jsonLd}
+      />
+      <Breadcrumbs
+        items={[
+          { label: "Главная", to: "/" },
+          { label: page.title },
+        ]}
+      />
+      <h1 className={styles.title}>{page.title}</h1>
+
+      <div
+        className={styles.body}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body) }}
+      />
+    </article>
   );
 }

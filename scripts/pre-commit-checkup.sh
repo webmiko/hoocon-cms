@@ -97,10 +97,16 @@ if [ -n "$STAGED" ]; then
   PY_FILES=$(echo "$STAGED" | grep -E '\.py$' || true)
   if [ -n "$PY_FILES" ]; then
     # shellcheck disable=SC2086
-    SECRETS=$(echo "$PY_FILES" | xargs grep -lE \
-      '(sk_live_|sk_test_|SECRET_KEY\s*=\s*["\x27][^"\x27]{16,}|password\s*=\s*["\x27][^"\x27]{8,}|EMAIL_HOST_PASSWORD\s*=\s*["\x27][^"\x27]+)' \
-      2>/dev/null || true)
-    # Allow insecure default string only in settings with getenv fallback pattern checked manually
+    # Ignore fixture markers like password="test-pass-not-secret" in tests.
+    SECRETS=$(
+      echo "$PY_FILES" | xargs grep -nE \
+        '(sk_live_|sk_test_|SECRET_KEY\s*=\s*["\x27][^"\x27]{16,}|password\s*=\s*["\x27][^"\x27]{8,}|EMAIL_HOST_PASSWORD\s*=\s*["\x27][^"\x27]+)' \
+        2>/dev/null \
+        | grep -vE 'not-secret|change-me|ci-secret|ci-db-password' \
+        | cut -d: -f1 \
+        | sort -u \
+        || true
+    )
     if [ -z "$SECRETS" ]; then
       ok "Нет хардкоженных секретов в .py"
     else
