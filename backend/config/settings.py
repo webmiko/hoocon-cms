@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     # Project apps (с итерации 1)
     "redirects",
     "sitesettings",
+    "catalog",
 ]
 
 MIDDLEWARE = [
