@@ -48,3 +48,41 @@ class Category(models.Model):
     def __str__(self) -> str:
         """Return the human-readable name for Admin and logs."""
         return self.name
+
+
+class Product(models.Model):
+    """Product line/series (groups SKUs).
+
+    Product = линейка (напр. «HVA серия»); SKU = конкретная модель
+    (напр. «HVA-5NM»). `category` — обязательная FK с on_delete=PROTECT:
+    нельзя удалить категорию, в которой есть товары (защита каталога).
+
+    Args (fields):
+        category: FK Category (required). PROTECT — удаление категории
+            с товарами блокируется.
+        name: человекочитаемое имя линейки, напр. «HVA серия».
+        slug: path-сегмент URL, уникален.
+        description: опциональное описание для SEO/листинга.
+        created_at / updated_at: авто-таймстампы.
+    """
+
+    category: models.ForeignKey = models.ForeignKey(
+        Category,
+        on_delete=models.PROTECT,
+        related_name="products",
+        help_text="Категория товара (обязательная). PROTECT — нельзя удалить.",
+    )
+    name: models.CharField = models.CharField(max_length=200)
+    slug: models.SlugField = models.SlugField(max_length=200, unique=True, db_index=True)
+    description: models.TextField = models.TextField(blank=True, default="")
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "продукт"
+        verbose_name_plural = "продукты"
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        """Return the product name for Admin and logs."""
+        return self.name
