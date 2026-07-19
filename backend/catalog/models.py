@@ -44,7 +44,7 @@ class Category(models.Model):
 
     name: models.CharField = models.CharField(max_length=200)
     slug: models.SlugField = models.SlugField(max_length=200, unique=True, db_index=True)
-    parent: models.ForeignKey = models.ForeignKey(
+    parent: models.ForeignKey = models.ForeignKey(  # type: ignore[misc]
         "self",
         on_delete=models.CASCADE,
         null=True,
@@ -242,7 +242,7 @@ class AttributeValue(models.Model):
 
     def __str__(self) -> str:
         """Return 'sku_code / attribute_name = value' for Admin readability."""
-        return f"{self.sku.sku_code} / {self.attribute.name} = {self.value}"
+        return f"{self.sku.sku_code} / {self.attribute.name} = {self.value}"  # type: ignore[attr-defined]
 
 
 class ProductFile(models.Model):
@@ -305,7 +305,7 @@ class ProductFile(models.Model):
 
     def __str__(self) -> str:
         """Return 'title (sku_code)' for Admin readability."""
-        return f"{self.title} ({self.sku.sku_code})"
+        return f"{self.title} ({self.sku.sku_code})"  # type: ignore[attr-defined]
 
     def clean(self) -> None:
         """Run PDF validators when file is present (Admin / full_clean)."""
