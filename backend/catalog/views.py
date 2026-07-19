@@ -1,15 +1,18 @@
-"""Public read-only catalog API views.
+"""Public read-only catalog API views + staff ProductFile upload.
 
 Spec: docs/readiness-backend-ux.md §2.3; security — AllowAny GET only,
-prices gated in serializers via SiteSettings.
+prices gated in serializers via SiteSettings. ProductFile upload is
+staff-only (IsAdminUser).
 """
 
 from __future__ import annotations
 
 from django.db.models import Prefetch, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework import mixins, status, viewsets
+from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.request import Request
+from rest_framework.response import Response
 
 from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
 from catalog.models import SKU, AttributeValue, Category, ProductFile
@@ -18,6 +21,7 @@ from catalog.serializers import (
     SKUDetailSerializer,
     SKUListSerializer,
 )
+from catalog.upload_serializers import ProductFileUploadSerializer
 
 
 class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -63,3 +67,50 @@ class SKUViewSet(
         if self.action == "retrieve":
             return SKUDetailSerializer
         return SKUListSerializer
+
+
+class ProductFileViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """GET (public) + POST (staff) /api/catalog/skus/{sku_slug}/files/."""
+
+    serializer_class = ProductFileUploadSerializer
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_permissions(self) -> list:
+        """GET is public (AllowAny); POST requires staff (IsAdminUser)."""
+        if self.action == "create":
+            return [IsAdminUser()]
+        return [AllowAny()]
+
+    def get_queryset(self) -> QuerySet[ProductFile]:
+        """Published files for the SKU identified by sku_slug."""
+        sku_slug = self.kwargs.get("sku_slug")
+        qs = ProductFile.objects.filter(is_published=True).select_related("sku")
+        if sku_slug:
+            qs = qs.filter(sku__slug=sku_slug)
+        return qs.order_by("sort_order", "title")
+
+    def create(self, request: Request, *args: object, **kwargs: object) -> Response:
+        """Upload a PDF to the SKU identified by sku_slug in the URL."""
+        sku_slug = kwargs.get("sku_slug")
+        try:
+            sku = SKU.objects.get(slug=sku_slug)
+        except SKU.DoesNotExist:
+            return Response(
+                {"detail": "SKU not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product_file = serializer.save(sku=sku)
+        return Response(
+            ProductFileUploadSerializer(
+                product_file,
+                context=self.get_serializer_context(),
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
