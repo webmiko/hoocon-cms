@@ -9,7 +9,13 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from config.csrf_views import CsrfTokenView
 from config.health_views import HealthView
 from config.seo.spa_index import spa_index_view
-from config.seo_views import LlmsTxtView, RobotsTxtView, SitemapXmlView
+from config.seo_views import (
+    LlmsFullTxtView,
+    LlmsTxtView,
+    LlmTxtAliasView,
+    RobotsTxtView,
+    SitemapXmlView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -28,6 +34,8 @@ urlpatterns = [
     path("robots.txt", RobotsTxtView.as_view(), name="robots-txt"),
     path("sitemap.xml", SitemapXmlView.as_view(), name="sitemap-xml"),
     path("llms.txt", LlmsTxtView.as_view(), name="llms-txt"),
+    path("llm.txt", LlmTxtAliasView.as_view(), name="llm-txt"),
+    path("llms-full.txt", LlmsFullTxtView.as_view(), name="llms-full-txt"),
 ]
 
 if settings.DEBUG:

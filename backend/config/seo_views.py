@@ -50,26 +50,99 @@ class RobotsTxtView(View):
 
 
 class LlmsTxtView(View):
-    """GET /llms.txt — brief site summary for AI crawlers (optional БЗ)."""
+    """GET /llms.txt — curated index for LLM agents (llmstxt.org)."""
 
     http_method_names = ["get", "head", "options"]
 
     def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
-        """Return llms.txt content."""
-        base = _site_base_url(request)
-        lines = [
-            "# Hoocon",
-            "",
-            "> B2B электроприводы ОВК: каталог, паспорта, подбор аналогов Belimo, RFQ.",
-            "",
-            f"- Каталог: {base}/catalog",
-            f"- Статьи: {base}/statyi",
-            f"- FAQ: {base}/faq",
-            f"- Контакты: {base}/kontakty",
-            f"- Sitemap: {base}/sitemap.xml",
-            "",
-        ]
-        return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
+        """Return llms.txt Markdown content."""
+        return HttpResponse(
+            _build_llms_txt(_site_base_url(request)),
+            content_type="text/plain; charset=utf-8",
+        )
+
+
+class LlmTxtAliasView(LlmsTxtView):
+    """GET /llm.txt — alias of /llms.txt."""
+
+
+class LlmsFullTxtView(View):
+    """GET /llms-full.txt — expanded context for LLM agents."""
+
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        """Return llms-full.txt Markdown content."""
+        return HttpResponse(
+            _build_llms_full_txt(_site_base_url(request)),
+            content_type="text/plain; charset=utf-8",
+        )
+
+
+def _build_llms_txt(base: str) -> str:
+    """Build the short llms.txt index (llmstxt.org shape)."""
+    lines = [
+        "# Hoocon",
+        (
+            "> B2B-сайт электроприводов Hoocon для систем ОВК (HVAC): каталог SKU, "
+            "документы, статьи и запрос КП (RFQ). Онлайн-корзины и оплаты в v1 нет."
+        ),
+        "",
+        "Цены на витрине по умолчанию скрыты. Канонические URL без опечаток; устаревшие path с опечатками отдают 301.",
+        "",
+        "## Основные страницы",
+        f"- [Главная]({base}/): обзор ассортимента и вход в каталог",
+        f"- [Каталог]({base}/catalog): список продукции с фильтрами по ТТХ",
+        f"- [Статьи]({base}/statyi): технические материалы по ОВК и приводам",
+        f"- [Новости]({base}/novosti): новости компании",
+        f"- [FAQ]({base}/faq): частые вопросы по подбору",
+        f"- [Контакты]({base}/kontakty): как связаться",
+        "",
+        "## Для LLM",
+        f"- [Полный контекст]({base}/llms-full.txt): расширенное описание продукта и URL",
+        f"- [Краткий индекс (алиас)]({base}/llm.txt): то же, что /llms.txt",
+        "",
+        "## Optional",
+        f"- [Sitemap]({base}/sitemap.xml): полный список индексируемых URL",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _build_llms_full_txt(base: str) -> str:
+    """Build the expanded llms-full.txt companion file."""
+    lines = [
+        "# Hoocon — полный контекст для LLM",
+        ("> Расширенное описание B2B-сайта Hoocon (электроприводы ОВК / HVAC) для агентов и языковых моделей."),
+        "",
+        "## Продукт",
+        "Hoocon поставляет электроприводы для воздушного клапана, противопожарных "
+        "систем и дымоудаления. Клиент — инженер, снабженец или дилер: подобрать "
+        "модель по ТТХ, скачать PDF, запросить КП. В v1 нет онлайн-корзины и оплаты.",
+        "",
+        f"Канонический домен: {base}",
+        "",
+        "## Канонические URL и редиректы",
+        "- Опечатки в старых ЧПУ исправлены; 301 со старых path:",
+        f"  - `{base}/privod-protivipozharniy-3nm` → `{base}/privod-protivopozharniy-3nm`",
+        f"  - `{base}/privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm` → "
+        f"`{base}/privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm`",
+        "- Tilda `/tproduct/…` → канонические ЧПУ (см. redirects seed).",
+        "",
+        "## Ключевые разделы",
+        f"- {base}/catalog — каталог",
+        f"- {base}/statyi — статьи",
+        f"- {base}/novosti — новости",
+        f"- {base}/faq — FAQ",
+        f"- {base}/kontakty — контакты",
+        "",
+        "## Файлы для LLM",
+        f"- {base}/llms.txt — краткий индекс (llmstxt.org)",
+        f"- {base}/llm.txt — алиас краткого индекса",
+        f"- {base}/llms-full.txt — этот файл",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 class SitemapXmlView(View):

@@ -26,6 +26,15 @@ html {
   overflow-x: clip;
   /* Overscroll / rubber-band past the page matches dark footer */
   background-color: var(--color-footer);
+  /* Hide page scrollbar; content still scrolls. Nested scrolls keep their own. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 body {
@@ -37,11 +46,20 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: clip;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   /* Bottom chrome padding is on .footer (dark) — avoids white gap under page */
   overflow-wrap: break-word;
   word-break: normal;
   hyphens: manual;
   text-wrap: pretty;
+}
+
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 body::before {
