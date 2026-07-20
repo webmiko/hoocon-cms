@@ -50,3 +50,45 @@ def test_mentioned_skus_one_per_product() -> None:
     assert "da3fu230-d" in codes or "da3fu24-d" in codes
     assert len([s for s in found if s.product_id == p1.pk]) == 1
     assert any(s.product_id == p2.pk for s in found)
+
+
+@pytest.mark.django_db
+def test_article_related_sku_serializer_image() -> None:
+    """Serializer returns root-relative ``/media/...`` image path."""
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.test import RequestFactory
+    from PIL import Image
+
+    from catalog.models import SKU, Category, Product, ProductImage
+    from content.serializers import ArticleRelatedSkuSerializer
+
+    cat = Category.objects.create(name="C", slug="c-img-rel")
+    product = Product.objects.create(name="P", slug="p-img-rel", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA1MU24-D",
+        slug="da1mu24-d-img",
+        sku_code="da1mu24-d",
+        is_published=True,
+    )
+    buf = BytesIO()
+    Image.new("RGB", (4, 4), color=(10, 20, 30)).save(buf, format="JPEG")
+    ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile("x.jpg", buf.getvalue(), content_type="image/jpeg"),
+        alt="x",
+        sort_order=0,
+        is_published=True,
+    )
+    request = RequestFactory().get("/")
+    data = ArticleRelatedSkuSerializer(sku, context={"request": request}).data
+    assert data["sku_code"] == "da1mu24-d"
+    assert data["image"] is not None
+    assert data["image"].startswith("/media/")
+    assert "://" not in data["image"]
+
+    bare = ArticleRelatedSkuSerializer(sku, context={}).data
+    assert bare["image"] is not None
+    assert bare["image"].startswith("/media/")

@@ -21,12 +21,25 @@ def test_branded_title_within_snippet_limit() -> None:
 
 
 def test_sku_meta_title_puts_code_first() -> None:
-    """PDP title starts with article code and fits with brand."""
+    """PDP title starts with article code; omits Нм (shown in highlights)."""
     partial = sku_meta_title_partial("DA8MQU230-A", moment="8 Нм", voltage="230 В")
     assert partial.startswith("DA8MQU230-A")
+    assert "Нм" not in partial
+    assert "230 В" in partial
     full = format_branded_title(partial)
     assert len(full) <= TITLE_MAX_LEN
     assert "Нет" not in full
+
+
+def test_sku_meta_title_shortens_long_voltage_canon() -> None:
+    """Long Belimo voltage canon collapses to ``24 В`` in the title."""
+    partial = sku_meta_title_partial(
+        "DA5FU24-DS",
+        moment="5 Нм",
+        voltage="AC/DC 24 В, 50/60 Гц",
+    )
+    assert partial == "DA5FU24-DS — 24 В"
+    assert "Нм" not in partial
 
 
 def test_sku_meta_description_capped() -> None:

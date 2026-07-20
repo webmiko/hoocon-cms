@@ -54,28 +54,36 @@ class Category(models.Model):
         created_at / updated_at: авто-таймстампы.
     """
 
-    name: models.CharField = models.CharField(max_length=200)
-    slug: models.SlugField = models.SlugField(max_length=200, unique=True, db_index=True)
+    name: models.CharField = models.CharField("название", max_length=200)
+    slug: models.SlugField = models.SlugField(
+        "slug (URL)",
+        max_length=200,
+        unique=True,
+        db_index=True,
+    )
     parent: models.ForeignKey = models.ForeignKey(  # type: ignore[misc]
         "self",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="children",
+        verbose_name="родитель",
         help_text="Родительская категория (None для корня дерева).",
     )
     description: models.TextField = models.TextField(
+        "описание",
         blank=True,
         default="",
         help_text="Общее описание семейства (для страницы категории).",
     )
     instructions: models.TextField = models.TextField(
+        "инструкция",
         blank=True,
         default="",
         help_text="Общая инструкция по монтажу/управлению для семейства.",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "категория"
@@ -107,32 +115,42 @@ class Product(models.Model):
         Category,
         on_delete=models.PROTECT,
         related_name="products",
+        verbose_name="категория",
         help_text="Категория товара (обязательная). PROTECT — нельзя удалить.",
     )
-    name: models.CharField = models.CharField(max_length=200)
-    slug: models.SlugField = models.SlugField(max_length=200, unique=True, db_index=True)
+    name: models.CharField = models.CharField("название", max_length=200)
+    slug: models.SlugField = models.SlugField(
+        "slug (URL)",
+        max_length=200,
+        unique=True,
+        db_index=True,
+    )
     description: models.TextField = models.TextField(
+        "описание",
         blank=True,
         default="",
         help_text="Описание линейки (общее для всех изданий Product).",
     )
     instructions: models.TextField = models.TextField(
+        "инструкция",
         blank=True,
         default="",
         help_text="Инструкция линейки (если отличается от категории).",
     )
     specs_text: models.TextField = models.TextField(
+        "характеристики",
         blank=True,
         default="",
         help_text="Характеристики линейки (до scoping по SKU).",
     )
     analogs_text: models.TextField = models.TextField(
+        "аналоги",
         blank=True,
         default="",
         help_text="Аналоги линейки (до scoping по SKU).",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "продукт"
@@ -169,17 +187,25 @@ class SKU(models.Model):
         Product,
         on_delete=models.PROTECT,
         related_name="skus",
+        verbose_name="продукт",
         help_text="Продукт/линейка (обязательный). PROTECT — нельзя удалить.",
     )
-    name: models.CharField = models.CharField(max_length=300)
-    slug: models.SlugField = models.SlugField(max_length=300, unique=True, db_index=True)
+    name: models.CharField = models.CharField("название", max_length=300)
+    slug: models.SlugField = models.SlugField(
+        "slug (URL)",
+        max_length=300,
+        unique=True,
+        db_index=True,
+    )
     sku_code: models.CharField = models.CharField(
+        "артикул",
         max_length=100,
         unique=True,
         db_index=True,
         help_text="Артикул (уникален, не пуст), напр. HVA-5NM или BV215.",
     )
     analog_belimo_code: models.CharField | None = models.CharField(
+        "код аналога Belimo",
         max_length=100,
         null=True,
         blank=True,
@@ -187,6 +213,7 @@ class SKU(models.Model):
         help_text="Код аналога Belimo (задел для AnalogMap P1).",
     )
     price: models.DecimalField | None = models.DecimalField(
+        "цена",
         max_digits=10,
         decimal_places=2,
         null=True,
@@ -194,34 +221,43 @@ class SKU(models.Model):
         help_text=("Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."),
     )
     description: models.TextField = models.TextField(
+        "описание",
         blank=True,
         default="",
         help_text="Описание конкретной модели/издания для карточки.",
     )
     specs_text: models.TextField = models.TextField(
+        "характеристики",
         blank=True,
         default="",
         help_text="Характеристики издания (напряжение/управление scoped).",
     )
     analogs_text: models.TextField = models.TextField(
+        "аналоги",
         blank=True,
         default="",
         help_text="Аналоги для этого издания (артикула).",
     )
     is_published: models.BooleanField = models.BooleanField(
+        "опубликован",
         default=True,
         db_index=True,
         help_text="Видимость SKU в публичном каталоге.",
     )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 2 — SearchVector on name + sku_code + slug.
-    search_vector = SearchVectorField(null=True, blank=True, editable=False)
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    search_vector = SearchVectorField(
+        "поисковый вектор",
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "SKU"
-        verbose_name_plural = "SKU"
+        verbose_name = "артикул (SKU)"
+        verbose_name_plural = "артикулы (SKU)"
         ordering = ("sku_code",)
 
     def __str__(self) -> str:
@@ -243,11 +279,21 @@ class Attribute(models.Model):
         created_at / updated_at: авто-таймстампы.
     """
 
-    name: models.CharField = models.CharField(max_length=200)
-    slug: models.SlugField = models.SlugField(max_length=100, unique=True, db_index=True)
-    unit: models.CharField = models.CharField(max_length=50, blank=True, default="")
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    name: models.CharField = models.CharField("название", max_length=200)
+    slug: models.SlugField = models.SlugField(
+        "slug (ключ)",
+        max_length=100,
+        unique=True,
+        db_index=True,
+    )
+    unit: models.CharField = models.CharField(
+        "единица",
+        max_length=50,
+        blank=True,
+        default="",
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "атрибут"
@@ -278,15 +324,17 @@ class AttributeValue(models.Model):
         SKU,
         on_delete=models.CASCADE,
         related_name="attribute_values",
+        verbose_name="артикул (SKU)",
     )
     attribute: models.ForeignKey = models.ForeignKey(
         Attribute,
         on_delete=models.PROTECT,
         related_name="values",
+        verbose_name="атрибут",
     )
-    value: models.CharField = models.CharField(max_length=200)
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    value: models.CharField = models.CharField("значение", max_length=200)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "значение атрибута"
@@ -317,7 +365,7 @@ class ProductFile(models.Model):
     """
 
     class FileType(models.TextChoices):
-        DATASHEET = "datasheet", "Паспорт / datasheet"
+        DATASHEET = "datasheet", "Паспорт"
         CERTIFICATE = "certificate", "Сертификат"
         CATALOG = "catalog", "Каталог"
         OTHER = "other", "Прочее"
@@ -326,31 +374,36 @@ class ProductFile(models.Model):
         SKU,
         on_delete=models.CASCADE,
         related_name="files",
+        verbose_name="артикул (SKU)",
         help_text="SKU, к которому привязан документ.",
     )
-    title: models.CharField = models.CharField(max_length=300)
+    title: models.CharField = models.CharField("название", max_length=300)
     file: models.FileField = models.FileField(
+        "файл",
         upload_to=product_file_upload_to,
         validators=[validate_pdf_upload],
         help_text="Только PDF; лимит и magic bytes — catalog.validators.",
     )
     file_type: models.CharField = models.CharField(
+        "тип файла",
         max_length=20,
         choices=FileType.choices,
         default=FileType.DATASHEET,
         db_index=True,
     )
     is_published: models.BooleanField = models.BooleanField(
+        "опубликован",
         default=True,
         db_index=True,
         help_text="Видимость файла в публичном каталоге / PDP.",
     )
     sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
+        "порядок",
         default=0,
         help_text="Порядок в блоке «Документы» (меньше = выше).",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "файл продукта"
@@ -391,24 +444,39 @@ class ProductImage(models.Model):
         SKU,
         on_delete=models.CASCADE,
         related_name="images",
+        verbose_name="артикул (SKU)",
         help_text="SKU, к которому привязано фото.",
     )
     image: models.ImageField = models.ImageField(
+        "изображение",
         upload_to=product_image_upload_to,
         validators=[validate_image_upload],
         help_text="WebP предпочтительно; JPEG/PNG допустимы.",
     )
-    alt: models.CharField = models.CharField(max_length=300, blank=True, default="")
+    alt: models.CharField = models.CharField(
+        "alt-текст",
+        max_length=300,
+        blank=True,
+        default="",
+    )
     source_url: models.URLField = models.URLField(
+        "исходный URL",
         max_length=500,
         blank=True,
         default="",
         help_text="Исходный URL (Tilda CDN) для идемпотентного ETL.",
     )
-    sort_order: models.PositiveIntegerField = models.PositiveIntegerField(default=0)
-    is_published: models.BooleanField = models.BooleanField(default=True, db_index=True)
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
+        "порядок",
+        default=0,
+    )
+    is_published: models.BooleanField = models.BooleanField(
+        "опубликовано",
+        default=True,
+        db_index=True,
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "изображение продукта"

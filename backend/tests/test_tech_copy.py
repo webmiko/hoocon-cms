@@ -5,6 +5,29 @@ from __future__ import annotations
 from catalog.etl.tech_copy import normalize_control_attribute_value, normalize_tech_copy
 
 
+def test_normalize_modulating_signal_drops_factory_dup() -> None:
+    """Card form: no factory 0...10 dup; мА marked спецзаказ."""
+    from catalog.etl.tech_copy import (
+        CONTROL_SIGNAL_Y_CANON,
+        normalize_modulating_signal_value,
+    )
+
+    long = "0(2)...10 В= / 0(4)...20 мА (Заводская установка 0...10 В=)"
+    assert normalize_modulating_signal_value(long) == CONTROL_SIGNAL_Y_CANON
+    assert "Заводская" not in normalize_modulating_signal_value(long)
+    assert "спецзаказ" in CONTROL_SIGNAL_Y_CANON
+    assert normalize_modulating_signal_value(CONTROL_SIGNAL_Y_CANON) == (CONTROL_SIGNAL_Y_CANON)
+    assert normalize_modulating_signal_value("") == CONTROL_SIGNAL_Y_CANON
+    assert normalize_modulating_signal_value("0(2)...10 В= / 0(4)...20 мА") == CONTROL_SIGNAL_Y_CANON
+    # Voltage-only snippet: strip note if present, do not invent current range.
+    assert (
+        normalize_modulating_signal_value(
+            "0(2)...10 В= (Заводская установка 0...10 В=)",
+        )
+        == "0(2)...10 В="
+    )
+
+
 def test_normalize_smooth_control_phrase() -> None:
     """«Плавное управление» → пропорциональное (модулирующее)."""
     assert (

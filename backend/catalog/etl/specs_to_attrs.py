@@ -215,8 +215,24 @@ def _apply_variant_overrides(sku: SKU, by_slug: dict[str, str]) -> None:
             f"SPDT-{count}",
             sku_code=sku.sku_code,
         )
-    elif variant.aux_switch is False and "aux-switch" not in by_slug:
-        by_slug["aux-switch"] = "Нет"
+    elif variant.aux_switch is False:
+        # Absent → omit (never store «Нет»).
+        by_slug.pop("aux-switch", None)
+
+    # Drop legacy «Нет» / empty aux values from specs parse.
+    from catalog.facets import AUX_SWITCH_NONE, format_aux_switch_display
+
+    aux_raw = by_slug.get("aux-switch")
+    if aux_raw is not None:
+        formatted = format_aux_switch_display(
+            aux_raw,
+            sku_code=sku.sku_code,
+            description=sku.description or "",
+        )
+        if formatted is None or formatted == AUX_SWITCH_NONE:
+            by_slug.pop("aux-switch", None)
+        else:
+            by_slug["aux-switch"] = formatted
 
 
 def _valve_from_sku_code(sku: SKU, by_slug: dict[str, str]) -> None:
@@ -311,8 +327,10 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
             extras: list[str] = []
             if "control" in by_slug:
                 extras.append(f"– Управление: {by_slug['control']}")
-            if by_slug.get("aux-switch") == "Да":
-                extras.append("– Вспомогательный переключатель: 2 SPDT.")
+            if str(by_slug.get("aux-switch") or "").upper().startswith("SPDT"):
+                extras.append(
+                    f"– Вспомогательный переключатель: {by_slug['aux-switch']}.",
+                )
             new_desc = stripped
             if extras:
                 new_desc = (stripped + "\n" + "\n".join(extras)).strip() if stripped else "\n".join(extras)

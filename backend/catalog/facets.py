@@ -79,6 +79,13 @@ FACET_DEFS: tuple[FacetDef, ...] = (
         name_substrings=("kvs",),
         legacy_slugs=("kvs",),
     ),
+    # Belimo codes: card «Аналоги» text, SKU.analog_belimo_code, or ТТХ inference.
+    FacetDef(
+        key="analog",
+        label="Аналоги",
+        name_substrings=(),
+        legacy_slugs=("analog_belimo_code",),
+    ),
 )
 
 FACET_BY_KEY: dict[str, FacetDef] = {f.key: f for f in FACET_DEFS}
@@ -136,6 +143,9 @@ EXTRA_HIGHLIGHT_DEFS: tuple[FacetDef, ...] = (
 
 def attribute_matches_facet(attr: Attribute, facet: FacetDef) -> bool:
     """Return True if Attribute belongs to the facet definition."""
+    if facet.key == "analog":
+        # Codes live on SKU.analog_belimo_code, not AttributeValue.
+        return False
     slug = attr.slug or ""
     if slug in facet.legacy_slugs:
         return True
@@ -162,6 +172,8 @@ def attribute_matches_facet(attr: Attribute, facet: FacetDef) -> bool:
     if facet.key == "voltage":
         if slug == "voltage-range" or "диапазон" in name:
             return False
+    if not facet.name_substrings:
+        return False
     return any(token in name for token in facet.name_substrings)
 
 
@@ -332,6 +344,9 @@ def filter_skus_by_facet(
     attr_ids: Iterable[int] | None = None,
 ) -> QuerySet[SKU]:
     """Filter SKUs whose EAV value matches the facet (loose)."""
+    if facet.key == "analog":
+        return _filter_skus_by_belimo_analog(queryset, value)
+
     ids = list(attr_ids) if attr_ids is not None else attribute_ids_for_facet(facet)
     if not ids:
         return queryset.none()
@@ -403,6 +418,11 @@ def collect_facet_options(
     result: list[dict[str, object]] = []
 
     for facet in FACET_DEFS:
+        if facet.key == "analog":
+            analog_facet = _collect_analog_facet_options(sku_ids)
+            if analog_facet is not None:
+                result.append(analog_facet)
+            continue
         attr_ids = attribute_ids_for_facet(facet)
         if not attr_ids:
             continue
@@ -427,6 +447,9 @@ def collect_facet_options(
             )
             if not val:
                 continue
+            # Aux absent («Нет») is not a filter chip — only SPDT-1 / SPDT-2.
+            if facet.key == "aux_switch" and val == AUX_SWITCH_NONE:
+                continue
             counts.setdefault(val, set()).add(sku_id)
         if not counts:
             continue
@@ -439,6 +462,68 @@ def collect_facet_options(
         ]
         result.append({"key": facet.key, "label": facet.label, "values": values})
     return result
+
+
+def _filter_skus_by_belimo_analog(
+    queryset: QuerySet[SKU],
+    value: str,
+) -> QuerySet[SKU]:
+    """Match SKUs that list the Belimo article (card text, field, or inference)."""
+    from catalog.etl.belimo_analogs import belimo_codes_for_sku, normalize_belimo_code
+
+    needle = normalize_belimo_code(value)
+    if not needle:
+        return queryset.none()
+    # Fast path: persisted primary code.
+    direct_ids = set(
+        queryset.filter(analog_belimo_code__iexact=needle).values_list("id", flat=True),
+    )
+    skus = queryset.select_related("product", "product__category").prefetch_related(
+        "attribute_values__attribute",
+    )
+    matching: set[int] = set(direct_ids)
+    for sku in skus:
+        if sku.id in matching:
+            continue
+        codes = {normalize_belimo_code(c) for c in belimo_codes_for_sku(sku)}
+        if needle in codes:
+            matching.add(sku.id)
+    if not matching:
+        return queryset.none()
+    return queryset.filter(id__in=matching)
+
+
+def _collect_analog_facet_options(
+    sku_ids: list[int],
+) -> dict[str, object] | None:
+    """Build «Аналоги» facet from card Belimo lines, field, or ТТХ inference."""
+    from catalog.etl.belimo_analogs import belimo_codes_for_sku
+
+    if not sku_ids:
+        return None
+    counts: dict[str, set[int]] = {}
+    skus = (
+        SKU.objects.filter(id__in=sku_ids)
+        .select_related("product", "product__category")
+        .prefetch_related("attribute_values__attribute")
+    )
+    for sku in skus:
+        for code in belimo_codes_for_sku(sku):
+            counts.setdefault(code, set()).add(sku.id)
+    if not counts:
+        return None
+    values = [
+        {"value": value, "count": len(sku_set)}
+        for value, sku_set in sorted(
+            counts.items(),
+            key=lambda item: _facet_sort_key("analog", item[0]),
+        )
+    ]
+    return {
+        "key": "analog",
+        "label": FACET_BY_KEY["analog"].label,
+        "values": values,
+    }
 
 
 def _facet_sort_key(facet_key: str, value: str) -> tuple:
@@ -624,6 +709,32 @@ _HEADING_VALVE_TRAILER = re.compile(
     r"\s*[-–—]\s*\d+-ходов\w*\s*[-–—]\s*\d+\s*[-–—]\s*[\d.,]+\s*$",
     re.IGNORECASE,
 )
+# Control-type phrases baked into the body before the edition trailer
+# (HVA/HVD series): «пропорциональное управление», «управление 2-/3-позиционное»,
+# «позиционное управление», «Плавное управление», «Открыто/Закрыто».
+# Stripped from the end of the body; control type belongs in highlights.
+_HEADING_CONTROL_TAIL = re.compile(
+    r"\s+"
+    r"(?:"
+    r"(?:пропорциональн\w*|плавн\w*|позицион\w*)\s+управление"
+    r"|управление\s+(?:2-?/?3?-?позицион\w*|позицион\w*)"
+    r"|2-?/?3?-?позицион\w*"
+    r"|открыт\w*/?\s*закрыт\w*"
+    r")"
+    r"\s*$",
+    re.IGNORECASE,
+)
+# Canonical word order for fast-acting springless actuators: «ускоренного
+# срабатывания без возвратной пружины» (matches DA8MQU canon). HVA-5Q raw
+# stores the reverse order; swap so the family reads the same across series.
+_HEADING_REORDER_FAST = re.compile(
+    r"\bбез\s+возвратной\s+пружины\s+ускоренного\s+срабатывания\b",
+    re.IGNORECASE,
+)
+# Bare product noun → SEO-valuable «Электропривод» (matches category names
+# «Электроприводы …»). Only matches a standalone lead word so mid-body
+# occurrences (none currently) are untouched.
+_HEADING_PRIVOD_TO_ELEKTRO = re.compile(r"^привод\b", re.IGNORECASE)
 _LEAD_SKIP = re.compile(
     r"^(?:[-–—•*]|\d+[.)])\s*|"
     r"^(?:номинальн|управлен|питание|сигнал|основные|характеристик)",
@@ -654,6 +765,30 @@ def _heading_article(sku_code: str, fallback: str) -> str:
     return code
 
 
+def _strip_control_tail(body: str) -> str:
+    """Drop a trailing control-type phrase baked into the heading body.
+
+    HVA/HVD raw names embed «пропорциональное управление» / «управление
+    2-/3-позиционное» / «позиционное управление» before the edition trailer.
+    Control type belongs in highlights, not H1 — but restore the original
+    body when stripping would leave a bare product noun («Привод …» →
+    «Привод»), which is too generic for a unique title.
+
+    Args:
+        body: Body text after pipe split and edition/valve trailer strip.
+
+    Returns:
+        Body without the trailing control phrase, or the original body when
+        the result would be too short.
+    """
+    if not body:
+        return body
+    stripped = _HEADING_CONTROL_TAIL.sub("", body).strip(" |-–—")
+    if not stripped or len(stripped.split()) < 2:
+        return body
+    return stripped
+
+
 def format_sku_heading_name(
     name: str,
     *,
@@ -665,8 +800,12 @@ def format_sku_heading_name(
 
     Strips edition trailer (``- 8 Нм - 230 В - управление - Нет/Да``),
     valve facet trailer (``- 2-ходовый - 15 - 1,6``), optional ``NНм`` after
-    ``|``. When ``sku_code`` is set, the left side is the article (unique per
-    SKU). Ball valves append ``Kvs`` when provided.
+    ``|``, and control-type phrases baked into the body (``пропорциональное
+    управление``, ``управление 2-/3-позиционное``). Normalizes the bare
+    product noun to SEO-valuable «Электропривод» and unifies the word order
+    for fast-acting springless actuators. When ``sku_code`` is set, the left
+    side is the article (unique per SKU). Ball valves append ``Kvs`` when
+    provided.
 
     Args:
         name: Raw ``SKU.name`` from import.
@@ -675,7 +814,7 @@ def format_sku_heading_name(
         kvs: Optional Kvs value for valve titles.
 
     Returns:
-        Display title, e.g. ``DA8MU24-D | Привод воздушный…`` or
+        Display title, e.g. ``DA8MU24-D | Электропривод воздушный…`` or
         ``BV215A | Шаровой кран 2-ходовый DN 15, Kvs 1,6``.
     """
     _ = description  # call-site compat; aux lives in highlights
@@ -684,6 +823,15 @@ def format_sku_heading_name(
     text = normalize_tech_copy(" ".join((name or "").split()))
     if not text:
         return (sku_code or "").strip()
+
+    # Product titles: «пропорциональное управление» without Belimo parenthetical.
+    text = re.sub(
+        r"\s*\(\s*модулирующ\w*\s*\)",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = " ".join(text.split())
 
     if _HEADING_AUX_ABSENT.search(text):
         text = _HEADING_AUX_ABSENT.sub("", text).rstrip(" -–—")
@@ -704,9 +852,11 @@ def format_sku_heading_name(
             body,
             flags=re.IGNORECASE,
         ).strip()
+        body = _strip_control_tail(body)
     else:
         body = _HEADING_EDITION_TRAILER.sub("", text).strip()
         body = _HEADING_VALVE_TRAILER.sub("", body).strip()
+        body = _strip_control_tail(body)
 
     article = _heading_article(sku_code, code)
     # Drop accidental article echo inside body.
@@ -717,6 +867,20 @@ def format_sku_heading_name(
             body,
             flags=re.IGNORECASE,
         ).strip(" |-–—")
+
+    # Torque belongs in highlights — never echo «N Нм» in the display title.
+    body = re.sub(
+        r"(?:^|\s)\d+[.,]?\d*\s*нм\b",
+        "",
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = _HEADING_REORDER_FAST.sub(
+        "ускоренного срабатывания без возвратной пружины",
+        body,
+    )
+    body = _HEADING_PRIVOD_TO_ELEKTRO.sub("Электропривод", body, count=1)
+    body = " ".join(body.split()).strip(" |-–—")
 
     kvs_val = " ".join((kvs or "").split())
     if kvs_val and body and "kvs" not in body.casefold():
@@ -1090,21 +1254,13 @@ def highlights_for_sku(
 
             if facet.key in {"control_signal", "feedback_signal"}:
                 from catalog.etl.tech_copy import (
-                    CONTROL_SIGNAL_Y_CANON,
                     CONTROL_SIGNAL_Y_LABEL,
-                    FEEDBACK_SIGNAL_U_CANON,
                     FEEDBACK_SIGNAL_U_LABEL,
+                    normalize_modulating_signal_value,
                 )
 
-                if facet.key == "control_signal":
-                    label = CONTROL_SIGNAL_Y_LABEL
-                    if len(display) < 12:
-                        display = CONTROL_SIGNAL_Y_CANON
-                else:
-                    label = FEEDBACK_SIGNAL_U_LABEL
-                    if len(display) < 12:
-                        display = FEEDBACK_SIGNAL_U_CANON
-
+                display = normalize_modulating_signal_value(display)
+                label = CONTROL_SIGNAL_Y_LABEL if facet.key == "control_signal" else FEEDBACK_SIGNAL_U_LABEL
             if facet.key == "runtime":
                 from catalog.etl.tech_copy import (
                     attribute_display_unit,

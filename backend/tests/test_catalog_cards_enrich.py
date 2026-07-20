@@ -143,3 +143,73 @@ def test_enrich_infers_dn_from_bv_sku_code() -> None:
     dn = AttributeValue.objects.filter(sku=sku, attribute__slug="dn").first()
     assert dn is not None
     assert dn.value == "15"
+
+
+@pytest.mark.django_db
+def test_enrich_catalog_cards_and_clear_product_specs() -> None:
+    """Batch enrich clears product.specs_text when all SKU specs are empty."""
+    from catalog.etl.specs_to_attrs import enrich_catalog_cards, maybe_clear_product_specs
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Batch", slug="test-batch-cards")
+    product = Product.objects.create(
+        category=cat,
+        name="Batch product",
+        slug="test-batch-enrich-product",
+        specs_text="legacy product specs",
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="Batch SKU",
+        slug="test-batch-sku",
+        sku_code="DA7MU24-A",
+        is_published=True,
+        specs_text=(
+            "– Крутящий момент: 7 Нм\n"
+            "– Площадь заслонки: до 0,7 м²\n"
+            "– Угол поворота: макс. 90°\n"
+            "– Направление вращения: вручную\n"
+            "– Ручное управление: есть\n"
+            "– Индикация положения: механическая\n"
+            "– Уровень шума: 45 дБ\n"
+            "– Степень защиты: IP54\n"
+            "– Температура окружающей среды: –20…+50 °C\n"
+            "– Масса: 1 кг\n"
+        ),
+    )
+    summary = enrich_catalog_cards(product_slug=product.slug, dry_run=False)
+    assert summary["enriched"] >= 1
+    assert summary["skipped"] == 0
+    product.refresh_from_db()
+    sku.refresh_from_db()
+    assert (sku.specs_text or "") == ""
+    assert (product.specs_text or "") == ""
+
+    # Already cleared — second call is a no-op.
+    assert maybe_clear_product_specs(product) is False
+
+
+@pytest.mark.django_db
+def test_enrich_catalog_cards_dry_run_no_writes() -> None:
+    from catalog.etl.specs_to_attrs import enrich_catalog_cards
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Dry", slug="test-dry-cards")
+    product = Product.objects.create(
+        category=cat,
+        name="Dry",
+        slug="test-dry-enrich",
+        specs_text="– Крутящий момент: 5 Нм\n– Степень защиты: IP54\n– Масса: 1 кг",
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="Dry SKU",
+        slug="test-dry-sku",
+        sku_code="DA5MU24-D",
+        specs_text=product.specs_text,
+        is_published=True,
+    )
+    summary = enrich_catalog_cards(product_slug=product.slug, dry_run=True)
+    assert summary["enriched"] >= 1
+    sku.refresh_from_db()
+    assert "Крутящий момент" in (sku.specs_text or "")

@@ -346,14 +346,7 @@ def apply_damqu_enrichment() -> dict[str, int]:
                 "",
                 normalize_aux_switch_value(f"SPDT-{count}", sku_code=sku.sku_code),
             )
-        elif variant.aux_switch is False:
-            _set_attr(
-                sku,
-                "Вспомогательный переключатель",
-                "aux-switch",
-                "",
-                "Нет",
-            )
-        attrs += 1
+            attrs += 1
+        # Absent → do not write «Нет» (omit the attribute entirely).
 
     return {"products": 1, "skus": len(skus), "attributes": attrs}

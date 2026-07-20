@@ -78,6 +78,32 @@ def test_sku_filter_by_canonical_moment_alias(client) -> None:
 
 
 @pytest.mark.django_db
+def test_analog_facet_from_belimo_code(client) -> None:
+    """«Аналоги» facet lists SKU.analog_belimo_code and filters by it."""
+    seeded = _seed_with_attrs()
+    seeded["sku5"].analog_belimo_code = "LM24A-S"
+    seeded["sku5"].save(update_fields=["analog_belimo_code"])
+    seeded["sku10"].analog_belimo_code = "NM230A"
+    seeded["sku10"].save(update_fields=["analog_belimo_code"])
+
+    facets = client.get(reverse("catalog-facet-list"))
+    assert facets.status_code == 200
+    by_key = {row["key"]: row for row in facets.data["results"]}
+    assert "analog" in by_key
+    assert by_key["analog"]["label"] == "Аналоги"
+    codes = {v["value"] for v in by_key["analog"]["values"]}
+    assert codes == {"LM24A-S", "NM230A"}
+
+    filtered = client.get(reverse("catalog-sku-list"), {"analog": "LM24A-S"})
+    assert filtered.status_code == 200
+    assert {row["slug"] for row in filtered.data["results"]} == {"privod-dafu-5nm"}
+
+    # Case-insensitive match for Belimo article codes.
+    loose = client.get(reverse("catalog-sku-list"), {"analog": "lm24a-s"})
+    assert {row["slug"] for row in loose.data["results"]} == {"privod-dafu-5nm"}
+
+
+@pytest.mark.django_db
 def test_sku_list_includes_highlights(client) -> None:
     """List cards expose compact highlights for moment/voltage."""
     _seed_with_attrs()
@@ -381,8 +407,8 @@ def test_format_aux_switch_display_hides_absent() -> None:
 
 
 @pytest.mark.django_db
-def test_facets_aux_switch_three_values(client) -> None:
-    """Aux facet exposes Нет / SPDT-1 / SPDT-2 (not bare Да)."""
+def test_facets_aux_switch_spdt_only(client) -> None:
+    """Aux facet exposes SPDT-1 / SPDT-2 only (no «Нет» chip)."""
     from catalog.facets import AUX_SWITCH_NONE, AUX_SWITCH_SPDT_1, AUX_SWITCH_SPDT_2
     from catalog.models import (
         SKU,
@@ -418,7 +444,8 @@ def test_facets_aux_switch_three_values(client) -> None:
     by_key = {row["key"]: row for row in response.data["results"]}
     assert "aux_switch" in by_key
     values = {v["value"] for v in by_key["aux_switch"]["values"]}
-    assert values == {AUX_SWITCH_NONE, AUX_SWITCH_SPDT_1, AUX_SWITCH_SPDT_2}
+    assert values == {AUX_SWITCH_SPDT_1, AUX_SWITCH_SPDT_2}
+    assert AUX_SWITCH_NONE not in values
     assert "Да" not in values
 
     filtered = client.get(
@@ -441,6 +468,19 @@ def test_format_sku_heading_uses_glossary_control() -> None:
         "без возвратной пружины - 8 Нм - 230 В - Плавное управление - Нет",
     )
     assert out == ("DA8MQU | Электропривод воздушный ускоренного срабатывания без возвратной пружины")
+
+
+def test_format_sku_heading_drops_modulating_parenthetical() -> None:
+    """Product titles keep «пропорциональное управление» without (модулирующее)."""
+    from catalog.facets import format_sku_heading_name
+
+    out = format_sku_heading_name(
+        "DA8MU | Привод пропорциональное (модулирующее) управление",
+        sku_code="DA8MU24-A",
+    )
+    assert "модулирующ" not in out.casefold()
+    assert "пропорциональное управление" in out.casefold()
+    assert out.startswith("DA8MU24-A |")
 
 
 def test_format_sku_heading_unique_with_sku_code() -> None:
@@ -467,7 +507,24 @@ def test_format_sku_heading_maps_present_aux_to_spdt() -> None:
     assert "Нет" not in out
     assert "Да" not in out
     assert "3 Нм - 230" not in out
+    assert "нм" not in out.casefold()
     assert out.startswith("DA3FU |")
+
+
+def test_format_sku_heading_never_keeps_torque_unit() -> None:
+    """Display titles must not echo «N Нм» (moment is a highlight only).
+
+    Bare «Привод» is normalized to SEO-valuable «Электропривод» to match the
+    category names («Электроприводы …»).
+    """
+    from catalog.facets import format_sku_heading_name
+
+    out = format_sku_heading_name(
+        "DA5FU | 5 Нм Привод воздушный с возвратной пружиной - 5 Нм - 24 В - Открыто/Закрыто - Нет",
+        sku_code="da5fu24-d",
+    )
+    assert "нм" not in out.casefold()
+    assert out == "da5fu24-d | Электропривод воздушный с возвратной пружиной"
 
 
 def test_format_sku_heading_strips_valve_facet_trailer() -> None:
@@ -480,6 +537,54 @@ def test_format_sku_heading_strips_valve_facet_trailer() -> None:
         kvs="1,6",
     )
     assert out == "BV215A | Шаровой кран 2-ходовый DN 15, Kvs 1,6"
+
+
+def test_format_sku_heading_strips_baked_control_tail() -> None:
+    """HVA/HVD bodies drop control-type tail; noun → Электропривод.
+
+    «пропорциональное управление» / «управление 2-/3-позиционное» / «позиционное
+    управление» are baked into the body before the edition trailer. Control
+    type belongs in highlights, not H1.
+    """
+    from catalog.facets import format_sku_heading_name
+
+    proportional = format_sku_heading_name(
+        "HVA-5 | 5 НМ Привод воздушный без возвратной пружины "
+        "пропорциональное (модулирующее) управление "
+        "- 5 Нм - 230 В - Пропорциональное (модулирующее) управление - Нет",
+        sku_code="HVA230-5",
+    )
+    assert proportional == ("HVA230-5 | Электропривод воздушный без возвратной пружины")
+
+    positional = format_sku_heading_name(
+        "HVD-10 | 10Нм Привод воздушный без возвратной пружины управление 2-/3-позиционное - 10 Нм - 230 В - Нет",
+        sku_code="HVD230-10",
+    )
+    assert positional == ("HVD230-10 | Электропривод воздушный без возвратной пружины")
+
+    fast_positional = format_sku_heading_name(
+        "HVD-40Q | 40 Нм Привод воздушный без возвратной пружины "
+        "ускоренный позиционное управление - 40 Нм - 230 В - Нет",
+        sku_code="HVD230-40Q",
+    )
+    assert fast_positional == ("HVD230-40Q | Электропривод воздушный без возвратной пружины ускоренный")
+
+
+def test_format_sku_heading_unifies_fast_actuator_word_order() -> None:
+    """HVA-5Q reorders to DA8MQU canon: «ускоренного срабатывания без …».
+
+    Same product family in one category must read identically regardless of
+    the raw store CSV word order.
+    """
+    from catalog.facets import format_sku_heading_name
+
+    hva = format_sku_heading_name(
+        "HVA-5Q | 5 НМ Привод воздушный без возвратной пружины "
+        "ускоренного срабатывания "
+        "- 5 Нм - 230 В - Пропорциональное (модулирующее) управление - Нет",
+        sku_code="HVA230-5Q",
+    )
+    assert hva == ("HVA230-5Q | Электропривод воздушный ускоренного срабатывания без возвратной пружины")
 
 
 def test_strip_heading_echo_from_description() -> None:

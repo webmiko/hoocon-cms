@@ -59,7 +59,9 @@ class SKUFilterSet(django_filters.FilterSet):
 
         query = SearchQuery(value, config="russian")
         return (
-            queryset.filter(Q(search_vector=query) | Q(sku_code__icontains=value))
+            queryset.filter(
+                Q(search_vector=query) | Q(sku_code__icontains=value) | Q(analog_belimo_code__icontains=value),
+            )
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "sku_code")
         )

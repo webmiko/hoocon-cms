@@ -14,6 +14,12 @@ from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from catalog.compare import (
+    COMPARE_MAX_SKUS,
+    build_compare_response,
+    parse_compare_slugs,
+    resolve_compare_skus,
+)
 from catalog.facets import collect_facet_options
 from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
@@ -99,6 +105,45 @@ class FacetViewSet(viewsets.ViewSet):
         if category:
             qs = qs.filter(product__category__slug=category)
         return Response({"results": collect_facet_options(base_queryset=qs)})
+
+
+class CompareViewSet(viewsets.ViewSet):
+    """GET /api/catalog/compare/?skus=slug-a,slug-b — side-by-side ТТХ.
+
+    Spec: docs/plan-compare-sku.md (max 4, free mix of categories).
+    """
+
+    permission_classes = (AllowAny,)
+    http_method_names = ["get", "head", "options"]
+
+    def list(self, request: Request) -> Response:
+        """Return SKU columns and highlight matrix rows."""
+        raw = request.query_params.get("skus", "")
+        slugs = parse_compare_slugs(raw)
+        if len(slugs) > COMPARE_MAX_SKUS:
+            return Response(
+                {
+                    "detail": (f"Не больше {COMPARE_MAX_SKUS} моделей в сравнении."),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not slugs:
+            return Response({"skus": [], "rows": []})
+
+        skus, missing = resolve_compare_skus(slugs)
+        if missing:
+            return Response(
+                {
+                    "detail": "Неизвестные или неопубликованные SKU.",
+                    "missing": missing,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = build_compare_response(
+            skus,
+            serializer_context={"request": request},
+        )
+        return Response(payload)
 
 
 class SKUViewSet(

@@ -47,21 +47,43 @@ def sku_meta_title_partial(
     moment: str = "",
     voltage: str = "",
 ) -> str:
-    """Short PDP title body (before brand): артикул + ключевые ТТХ.
+    """Short PDP title body (before brand): артикул + напряжение.
+
+    Torque (``Нм``) is omitted: it already lives in the article family and in
+    on-page highlights — repeating it in ``<title>`` only wastes snippet space.
 
     Args:
         sku_code: Public article code.
-        moment: Optional torque highlight (e.g. ``8 Нм``).
+        moment: Ignored (kept for call-site compatibility).
         voltage: Optional voltage highlight (e.g. ``230 В``).
 
     Returns:
         Partial title without brand suffix.
     """
+    _ = moment  # call-site compat; do not echo Нм in <title>
     code = (sku_code or "").strip() or "SKU"
-    specs = ", ".join(part for part in (moment.strip(), voltage.strip()) if part)
-    if specs:
-        return f"{code} — {specs}"
+    volt = _short_voltage_for_title(voltage)
+    if volt:
+        return f"{code} — {volt}"
     return f"{code} — электропривод ОВК"
+
+
+def _short_voltage_for_title(voltage: str) -> str:
+    """Collapse long Belimo voltage canon to ``24 В`` / ``230 В`` for SERP."""
+    text = " ".join((voltage or "").split())
+    if not text:
+        return ""
+    from catalog.etl.tech_copy import detect_voltage_family
+
+    family = detect_voltage_family(text)
+    if family == "24":
+        return "24 В"
+    if family == "230":
+        return "230 В"
+    # Already short or unknown — keep a compact form.
+    if len(text) <= 12:
+        return text
+    return text[:12].rsplit(" ", 1)[0] if " " in text[:12] else text[:12]
 
 
 def sku_meta_description(

@@ -91,12 +91,52 @@ CONTROL_FLOATING = "2-/3-позиционное"
 CONTROL_MODULATING = "Пропорциональное"
 
 # Belimo RU — modulating editions (docs/tech-copy-belimo-ru.md).
+# Voltage 0(2)...10 is factory default; current 0(4)...20 мА — special order only.
 CONTROL_SIGNAL_Y_LABEL = "Управляющий сигнал Y"
 FEEDBACK_SIGNAL_U_LABEL = "Обратная связь U"
-CONTROL_SIGNAL_Y_CANON = "0(2)...10 В= / 0(4)...20 мА (Заводская установка 0...10 В=)"
+CONTROL_SIGNAL_Y_CANON = "0(2)...10 В= / 0(4)...20 мА (спецзаказ)"
 FEEDBACK_SIGNAL_U_CANON = CONTROL_SIGNAL_Y_CANON
 CONTROL_SIGNAL_Y_SLUG = "control-signal"
 FEEDBACK_SIGNAL_U_SLUG = "feedback-signal"
+# FAQ anchor explaining current-mode special order (Page slug=faq).
+SIGNAL_MA_SPECIAL_ORDER_FAQ_PATH = "/faq#signal-ma-special-order"
+
+_FACTORY_SIGNAL_NOTE_RE = re.compile(
+    r"\s*\(\s*Заводская установка\s+0\.\.\.10\s*В=\s*\)\s*",
+    re.IGNORECASE,
+)
+_SPECIAL_ORDER_NOTE_RE = re.compile(
+    r"\s*\(\s*спецзаказ\s*\)\s*",
+    re.IGNORECASE,
+)
+
+
+def normalize_modulating_signal_value(value: str) -> str:
+    """Compact Y/U signal: drop factory 0...10 note; mark мА as спецзаказ.
+
+    Factory default is voltage ``0(2)...10 В=``. Current ``0(4)...20 мА`` is
+    available only on special order (DIP / factory config).
+
+    Args:
+        value: Raw or long attribute value.
+
+    Returns:
+        Canon string with спецзаказ note when modulating Y/U ranges match.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return CONTROL_SIGNAL_Y_CANON
+    compact = _FACTORY_SIGNAL_NOTE_RE.sub(" ", raw)
+    compact = _SPECIAL_ORDER_NOTE_RE.sub(" ", compact)
+    compact = re.sub(r"\s+", " ", compact).strip()
+    compact = re.sub(r"\s*/\s*", " / ", compact)
+    # Recognize Belimo modulating ranges (ellipsis variants).
+    if re.search(r"0\s*\(\s*2\s*\)\s*\.\.\.?\s*10", compact) and re.search(
+        r"0\s*\(\s*4\s*\)\s*\.\.\.?\s*20",
+        compact,
+    ):
+        return CONTROL_SIGNAL_Y_CANON
+    return compact or CONTROL_SIGNAL_Y_CANON
 
 
 def is_proportional_control(value: str) -> bool:

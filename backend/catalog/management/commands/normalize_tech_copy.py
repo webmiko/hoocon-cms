@@ -7,6 +7,7 @@ from django.db import transaction
 
 from catalog.etl.tech_copy import (
     normalize_control_attribute_value,
+    normalize_modulating_signal_value,
     normalize_running_time_value,
     normalize_tech_copy,
     normalize_voltage_attribute_value,
@@ -27,7 +28,7 @@ class Command(BaseCommand):
     help = (
         "Normalize tech copy: плавное→пропорциональное (модулирующее), "
         "VDC→В=, класс защиты IP→степень защиты корпуса, напряжение→Belimo, "
-        "и т.д."
+        "Y/U сигнал без дубля «заводская 0...10 В=», и т.д."
     )
 
     def add_arguments(self, parser) -> None:
@@ -118,6 +119,7 @@ class Command(BaseCommand):
         voltage_facet = FACET_BY_KEY["voltage"]
         aux_facet = FACET_BY_KEY["aux_switch"]
         area_facet = FACET_BY_KEY["area"]
+        signal_slugs = frozenset({"control-signal", "feedback-signal"})
         qs = AttributeValue.objects.select_related(
             "attribute",
             "sku",
@@ -125,8 +127,13 @@ class Command(BaseCommand):
         ).iterator()
         for av in qs:
             name = (av.attribute.name or "").casefold()
+            slug = (av.attribute.slug or "").casefold()
             raw = av.value or ""
-            if "управл" in name:
+            if slug in signal_slugs or "обратная связь" in name:
+                new = normalize_modulating_signal_value(raw)
+            elif "управляющий сигнал" in name or "сигнал управления" in name:
+                new = normalize_modulating_signal_value(raw)
+            elif "управл" in name:
                 new = normalize_control_attribute_value(
                     raw,
                     sku_code=av.sku.sku_code if av.sku_id else None,

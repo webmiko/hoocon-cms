@@ -22,13 +22,14 @@ from catalog.etl.sku_variant import (
 from catalog.facets import (
     dedupe_attribute_values,
     extract_sku_lead,
+    format_aux_switch_display,
     format_sku_heading_name,
     highlights_for_sku,
     normalize_area_attribute_value,
-    normalize_aux_switch_value,
     strip_attribute_echo_from_text,
     strip_heading_echo_from_description,
 )
+from catalog.media_urls import RelativeImageField
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
 from sitesettings.models import SiteSettings
 
@@ -123,14 +124,15 @@ def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any
                 "value": normalize_area_attribute_value(str(row.get("value") or "")),
             }
         if "вспомогательн" in name:
-            row = {
-                **row,
-                "value": normalize_aux_switch_value(
-                    str(row.get("value") or ""),
-                    sku_code=obj.sku_code,
-                    description=obj.description or "",
-                ),
-            }
+            formatted = format_aux_switch_display(
+                str(row.get("value") or ""),
+                sku_code=obj.sku_code,
+                description=obj.description or "",
+            )
+            if formatted is None:
+                # Absent → omit the row (no «Нет» in ТТХ).
+                continue
+            row = {**row, "value": formatted}
         if "время поворота" in name or "время срабатывания" in name:
             from catalog.etl.tech_copy import (
                 attribute_display_unit,
@@ -221,6 +223,8 @@ class ProductFileSerializer(serializers.ModelSerializer):
 
 class ProductImageSerializer(serializers.ModelSerializer):
     """Public product image (WebP URL + alt)."""
+
+    image = RelativeImageField(read_only=True)
 
     class Meta:
         model = ProductImage

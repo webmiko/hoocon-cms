@@ -197,3 +197,43 @@ def test_drive_families_from_mods_marker_after_pipe() -> None:
 
 def test_drive_families_from_mods_missing_marker() -> None:
     assert _drive_families_from_mods("Выбор кронштейна:BR-M") == []
+
+
+def test_apply_bv215_enrichment_delegates_and_strips_series_key() -> None:
+    """BV215 wrapper drops ``series`` counter from the multi-series stats."""
+    from catalog.etl.series_copy_bv215 import apply_bv215_enrichment
+
+    fake = {
+        "products": 1,
+        "skus": 2,
+        "attributes": 10,
+        "images_created": 3,
+        "images_failed": 0,
+        "series": 1,
+    }
+    with patch(
+        "catalog.etl.series_copy_bv215.apply_all_ball_valve_enrichment",
+        return_value=fake,
+    ) as mocked:
+        out = apply_bv215_enrichment(import_images=False)
+    mocked.assert_called_once_with(
+        import_images=False,
+        series_codes=("BV215",),
+    )
+    assert out == {
+        "products": 1,
+        "skus": 2,
+        "attributes": 10,
+        "images_created": 3,
+        "images_failed": 0,
+    }
+    assert "series" not in out
+
+
+def test_kvs_for_sku_code_returns_none_when_series_missing() -> None:
+    """If BV215 is absent from loaded series, Kvs lookup yields None."""
+    with patch(
+        "catalog.etl.series_copy_bv215.load_ball_valve_series",
+        return_value=[],
+    ):
+        assert kvs_for_sku_code("8100-bv215a") is None
