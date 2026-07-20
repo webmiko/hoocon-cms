@@ -20,6 +20,7 @@ from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
+from unfold.admin import ModelAdmin
 
 from leads.models import Lead
 from leads.services import (
@@ -33,7 +34,7 @@ from leads.services import (
 
 
 @admin.register(Lead)
-class LeadAdmin(admin.ModelAdmin):
+class LeadAdmin(ModelAdmin):
     """Admin for customer inquiries (RFQ / consultation / replacement).
 
     PII (email/phone) is visible to staff in Admin — that's the only

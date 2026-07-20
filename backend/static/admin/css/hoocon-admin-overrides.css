@@ -75,9 +75,9 @@ html body #changelist #changelist-filter li a {
 }
 
 html body #changelist #changelist-filter li.selected a {
-  background: var(--selected-bg, rgba(37, 99, 235, 0.08)) !important;
-  border-color: color-mix(in srgb, var(--hoocon-primary, #2563eb) 35%, transparent) !important;
-  color: var(--link-selected-fg, #1e40af) !important;
+  background: var(--selected-bg, rgba(220, 19, 19, 0.09)) !important;
+  border-color: color-mix(in srgb, var(--hoocon-primary, #dc1313) 35%, transparent) !important;
+  color: var(--link-selected-fg, #8a0c0c) !important;
 }
 
 /* Длинные списки фильтров — не заслоняют таблицу. */

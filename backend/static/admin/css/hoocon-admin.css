@@ -1,5 +1,6 @@
 /*
  * Django admin — современный CMS-layout (светлая / тёмная тема).
+ * Палитра = фронт tokens.css (бренд #dc1313), layout ближе к Venix-панели.
  * Flat-поверхности, мягкие тени, много воздуха между блоками.
  * Контент и данные читаются первее декора (как Strapi / Payload / Sanity).
  * Шрифт: system-ui / SF Pro.
@@ -49,22 +50,33 @@ html {
 html,
 html[data-theme="light"] {
   color-scheme: light;
-  --hoocon-primary: #2563eb;
-  --hoocon-primary-hover: #1d4ed8;
-  --hoocon-primary-pressed: #1e40af;
-  --hoocon-accent: #3b82f6;
-  --hoocon-tint: rgba(37, 99, 235, 0.08);
-  --hoocon-success: #16a34a;
+  /* Brand = frontend/src/styles/tokens.css */
+  --hoocon-primary: #dc1313;
+  --hoocon-primary-hover: #b01010;
+  --hoocon-primary-pressed: #8a0c0c;
+  --hoocon-accent: #dc1313;
+  --hoocon-tint: rgba(220, 19, 19, 0.09);
+  --hoocon-success: #2d6a4f;
   --hoocon-warning: #d97706;
-  --hoocon-danger: #dc2626;
+  --hoocon-danger: #b01010;
   /* Solid surfaces — без glass/blur, чтобы текст не «тонул». */
   --hoocon-glass: var(--hoocon-surface);
   --hoocon-glass-strong: var(--hoocon-surface);
-  --hoocon-glass-border: #e5e7eb;
+  --hoocon-glass-border: rgba(30, 30, 40, 0.08);
   --hoocon-glass-edge: transparent;
-  --hoocon-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --hoocon-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --hoocon-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
+  --hoocon-shadow-soft: 0 4px 20px rgba(20, 20, 30, 0.04);
   --hoocon-specular: none;
+  --hoocon-page-bg-fallback: #f3f4f7;
+  --hoocon-surface: #ffffff;
+  --hoocon-surface-muted: #f8f9fb;
+  /* Venix-like dark nav strip (site masthead). */
+  --hoocon-sidebar-bg: #141414;
+  --hoocon-sidebar-fg: #e8e8ea;
+  --hoocon-sidebar-quiet: #9a9aa3;
+  --hoocon-sidebar-border: rgba(255, 255, 255, 0.1);
+  --hoocon-sidebar-hover: rgba(220, 19, 19, 0.16);
+  --hoocon-sidebar-current: rgba(220, 19, 19, 0.22);
 
   --font-family-primary:
     -apple-system,
@@ -79,31 +91,31 @@ html[data-theme="light"] {
     sans-serif;
 
   --primary: var(--hoocon-primary);
-  --secondary: #475569;
+  --secondary: #5a5a5a;
   --accent: var(--hoocon-accent);
   --primary-fg: #ffffff;
 
-  --body-fg: #0f172a;
-  --body-bg: #f4f5f7;
-  --body-quiet-color: #64748b;
-  --body-medium-color: #334155;
-  --body-loud-color: #020617;
+  --body-fg: #2a2a2a;
+  --body-bg: #f3f4f7;
+  --body-quiet-color: #6f6f6f;
+  --body-medium-color: #5a5a5a;
+  --body-loud-color: #141414;
 
-  --header-color: #0f172a;
-  --header-branding-color: #0f172a;
+  --header-color: #2a2a2a;
+  --header-branding-color: #141414;
   --header-bg: transparent;
-  --header-link-color: var(--hoocon-primary);
+  --header-link-color: var(--hoocon-primary-hover);
 
-  --breadcrumbs-fg: #64748b;
-  --breadcrumbs-link-fg: var(--hoocon-primary);
+  --breadcrumbs-fg: #6f6f6f;
+  --breadcrumbs-link-fg: var(--hoocon-primary-hover);
   --breadcrumbs-bg: transparent;
 
-  --link-fg: var(--hoocon-primary);
-  --link-hover-color: var(--hoocon-primary-hover);
+  --link-fg: var(--hoocon-primary-hover);
+  --link-hover-color: var(--hoocon-primary);
   --link-selected-fg: var(--hoocon-primary-pressed);
 
   --hairline-color: #eef0f3;
-  --border-color: #e5e7eb;
+  --border-color: rgba(30, 30, 40, 0.14);
 
   --button-fg: #ffffff;
   --button-bg: var(--hoocon-primary);
@@ -113,36 +125,43 @@ html[data-theme="light"] {
 
   --darkened-bg: var(--hoocon-surface-muted);
   --selected-bg: var(--hoocon-tint);
-  --selected-row: rgba(37, 99, 235, 0.06);
+  --selected-row: rgba(220, 19, 19, 0.06);
 
-  --message-success-bg: rgba(22, 163, 74, 0.1);
+  --message-success-bg: rgba(45, 106, 79, 0.1);
   --message-warning-bg: rgba(217, 119, 6, 0.1);
-  --message-error-bg: rgba(220, 38, 38, 0.1);
-  --message-info-bg: rgba(37, 99, 235, 0.08);
+  --message-error-bg: rgba(176, 16, 16, 0.1);
+  --message-info-bg: rgba(220, 19, 19, 0.09);
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --hoocon-primary: #60a5fa;
-  --hoocon-primary-hover: #93c5fd;
-  --hoocon-primary-pressed: #bfdbfe;
-  --hoocon-accent: #38bdf8;
-  --hoocon-tint: rgba(96, 165, 250, 0.14);
-  --hoocon-success: #4ade80;
+  /* Buttons keep brand fill; links are lighter red for AA on dark surfaces. */
+  --hoocon-primary: #dc1313;
+  --hoocon-primary-hover: #e83434;
+  --hoocon-primary-pressed: #ff7070;
+  --hoocon-accent: #ff7070;
+  --hoocon-tint: rgba(220, 19, 19, 0.2);
+  --hoocon-success: #4caf7a;
   --hoocon-warning: #fbbf24;
-  --hoocon-danger: #f87171;
-  --hoocon-surface: #1e293b;
-  --hoocon-surface-muted: #0f172a;
+  --hoocon-danger: #ff6b6b;
+  --hoocon-surface: #1c1c20;
+  --hoocon-surface-muted: #24242a;
   --hoocon-glass: var(--hoocon-surface);
-  --hoocon-glass-strong: #243044;
-  --hoocon-glass-border: #334155;
+  --hoocon-glass-strong: #24242a;
+  --hoocon-glass-border: rgba(255, 255, 255, 0.1);
   --hoocon-glass-edge: transparent;
   --hoocon-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   --hoocon-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.4);
   --hoocon-specular: none;
-  --hoocon-page-bg-fallback: #0b1220;
+  --hoocon-page-bg-fallback: #121214;
   --hoocon-card-bg: var(--hoocon-surface);
   --hoocon-card-bg-sidebar: var(--hoocon-glass-strong);
+  --hoocon-sidebar-bg: #0f0f0f;
+  --hoocon-sidebar-fg: #e8e8ea;
+  --hoocon-sidebar-quiet: #9a9aa3;
+  --hoocon-sidebar-border: rgba(255, 255, 255, 0.1);
+  --hoocon-sidebar-hover: rgba(220, 19, 19, 0.22);
+  --hoocon-sidebar-current: rgba(220, 19, 19, 0.28);
 
   --font-family-primary:
     -apple-system,
@@ -157,32 +176,33 @@ html[data-theme="dark"] {
     sans-serif;
 
   --primary: var(--hoocon-primary);
-  --secondary: #94a3b8;
+  --secondary: #b8b8c0;
   --accent: var(--hoocon-accent);
-  --primary-fg: #0f172a;
+  --primary-fg: #ffffff;
 
-  --body-fg: #e2e8f0;
-  --body-bg: #0b1220;
-  --body-quiet-color: #94a3b8;
-  --body-medium-color: #cbd5e1;
-  --body-loud-color: #f8fafc;
+  --body-fg: #e8e8ea;
+  --body-bg: #121214;
+  --body-quiet-color: #9a9aa3;
+  --body-medium-color: #b8b8c0;
+  --body-loud-color: #ffffff;
 
-  --header-color: #e2e8f0;
-  --header-branding-color: #f8fafc;
+  --header-color: #e8e8ea;
+  --header-branding-color: #ffffff;
   --header-bg: transparent;
-  --header-link-color: var(--hoocon-primary);
+  --header-link-color: #ff7070;
 
-  --breadcrumbs-fg: #94a3b8;
-  --breadcrumbs-link-fg: var(--hoocon-primary);
+  --breadcrumbs-fg: #9a9aa3;
+  --breadcrumbs-link-fg: #ff7070;
   --breadcrumbs-bg: transparent;
 
-  --link-fg: var(--hoocon-primary);
-  --link-hover-color: var(--hoocon-primary-hover);
-  --link-selected-fg: var(--hoocon-primary-pressed);
+  --link-fg: #ff7070;
+  --link-hover-color: #ff9a9a;
+  --link-selected-fg: #ff9a9a;
 
-  --hairline-color: #1e293b;
-  --border-color: #334155;
+  --hairline-color: #24242a;
+  --border-color: rgba(255, 255, 255, 0.16);
 
+  --button-fg: #ffffff;
   --button-bg: var(--hoocon-primary);
   --button-hover-bg: var(--hoocon-primary-hover);
   --default-button-bg: var(--hoocon-primary);
@@ -190,12 +210,12 @@ html[data-theme="dark"] {
 
   --darkened-bg: var(--hoocon-surface-muted);
   --selected-bg: var(--hoocon-tint);
-  --selected-row: rgba(96, 165, 250, 0.12);
+  --selected-row: rgba(220, 19, 19, 0.16);
 
-  --message-success-bg: rgba(74, 222, 128, 0.12);
+  --message-success-bg: rgba(76, 175, 122, 0.12);
   --message-warning-bg: rgba(251, 191, 36, 0.12);
-  --message-error-bg: rgba(248, 113, 113, 0.12);
-  --message-info-bg: rgba(96, 165, 250, 0.12);
+  --message-error-bg: rgba(255, 107, 107, 0.12);
+  --message-info-bg: rgba(220, 19, 19, 0.16);
 }
 
 /* Фон: спокойный flat (без цветных радиалов — они отвлекают от данных). */
@@ -214,17 +234,19 @@ html[data-theme="dark"] body::before {
   content: none;
 }
 
-/* !important на height/overflow: changelists/responsive грузятся после hoocon-admin.css. */
+/* !important на height/overflow: changelists/responsive грузятся после hoocon-admin.css.
+   Venix-like shell: full-bleed panel (dark nav | light content), без «плавающей» рамки. */
 html body:not(.login) {
   height: auto !important;
   min-height: 100vh;
-  padding: var(--hoocon-edge-gap);
+  padding: 0;
   box-sizing: border-box;
   overflow: visible !important;
+  background: var(--hoocon-page-bg-fallback);
 }
 
 #container {
-  border-radius: var(--hoocon-radius-lg);
+  border-radius: 0;
   box-sizing: border-box;
 }
 
@@ -233,20 +255,17 @@ html body:not(.login) #container {
   min-width: 0;
   max-width: 100%;
   height: auto !important;
-  min-height: calc(100vh - 2 * var(--hoocon-edge-gap));
-  background: var(--hoocon-surface);
-  border: 1px solid var(--hoocon-glass-border);
+  min-height: 100vh;
+  background: var(--hoocon-page-bg-fallback);
+  border: none;
   outline: none;
-  box-shadow: var(--hoocon-shadow-soft);
+  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  /* clip: обрезает детей по border-radius, не создаёт scrollport (в отличие от hidden
-     при height:100%). Скролл страницы идёт у document — контейнер растёт с контентом. */
-  overflow: clip !important;
+  overflow: visible !important;
 }
 
-/* Header — без собственной подложки: glass даёт #container.
-   Верхние углы совпадают с контейнером (на случай фона/бордера). */
+/* Header — верхняя полоса контентной колонки (как у Venix topbar). */
 html body:not(.login) #header {
   display: flex;
   flex-wrap: wrap;
@@ -254,11 +273,14 @@ html body:not(.login) #header {
   justify-content: space-between;
   gap: 0.75rem 1.25rem;
   background: var(--hoocon-surface) !important;
-  box-shadow: none;
-  border-bottom: 1px solid var(--hairline-color);
-  border-radius: var(--hoocon-radius-lg) var(--hoocon-radius-lg) 0 0;
-  padding: 1rem var(--hoocon-content-padding-x);
+  box-shadow: var(--hoocon-shadow);
+  border-bottom: 1px solid var(--hoocon-glass-border);
+  border-radius: 0;
+  padding: 0.85rem var(--hoocon-content-padding-x);
   color: var(--header-color);
+  position: sticky;
+  top: 0;
+  z-index: 40;
 }
 
 #branding h1,
@@ -627,9 +649,9 @@ a.hoocon-leads-stats-link {
 div.breadcrumbs {
   border-radius: 0;
   box-shadow: none;
-  padding: 0.9rem var(--hoocon-content-padding-x);
-  background: var(--hoocon-surface-muted) !important;
-  border-bottom: 1px solid var(--hairline-color);
+  padding: 0.75rem var(--hoocon-content-padding-x);
+  background: transparent !important;
+  border-bottom: none;
   color: var(--breadcrumbs-fg);
 }
 
@@ -641,7 +663,8 @@ div.breadcrumbs a {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  padding: 2rem var(--hoocon-content-padding-x) 2.75rem;
+  padding: 1.5rem var(--hoocon-content-padding-x) 2.5rem;
+  background: transparent;
 }
 
 #content-main > .module,
@@ -654,19 +677,19 @@ div.breadcrumbs a {
 #content h1 {
   font-weight: 650;
   letter-spacing: -0.025em;
-  margin: 0 0 1.35rem;
+  margin: 0 0 1.25rem;
   font-size: 1.5rem;
   line-height: 1.3;
 }
 
-/* Surfaces / cards / filter — solid, без glass-stack. */
+/* Surfaces / cards — белые плитки на сером фоне (смысл Venix KPI cards). */
 .module,
 #content-main .module,
 .dashboard #content-main .module,
 #changelist-filter {
   border-radius: var(--hoocon-radius-lg);
   border: 1px solid var(--hoocon-glass-border);
-  box-shadow: var(--hoocon-shadow);
+  box-shadow: var(--hoocon-shadow-soft);
   overflow: clip;
   background: var(--hoocon-surface);
   backdrop-filter: none;
@@ -1508,10 +1531,11 @@ html body #changelist #changelist-filter {
 #nav-sidebar,
 #nav-sidebar.sticky {
   border-radius: 0;
-  border-right: 1px solid var(--hairline-color);
-  padding: 1.35rem var(--hoocon-inline-padding) !important;
+  border-right: 1px solid var(--hoocon-sidebar-border);
+  padding: 1.15rem 1rem 1.5rem !important;
   box-sizing: border-box;
-  background: var(--hoocon-surface-muted);
+  background: var(--hoocon-sidebar-bg);
+  color: var(--hoocon-sidebar-fg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   max-height: none !important;
@@ -1519,6 +1543,9 @@ html body #changelist #changelist-filter {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   min-width: 0 !important;
+  /* Full-height rail flush to viewport left (Venix shell). */
+  align-self: stretch;
+  min-height: 100vh;
 }
 
 /* #main — flex (sidebar + content). nav_sidebar.css даёт контенту flex-shrink:0
@@ -1542,7 +1569,8 @@ html body #nav-sidebar::-webkit-scrollbar {
 
 html[data-theme="dark"] #nav-sidebar,
 html[data-theme="dark"] #nav-sidebar.sticky {
-  background: var(--hoocon-surface-muted);
+  background: var(--hoocon-sidebar-bg);
+  color: var(--hoocon-sidebar-fg);
 }
 
 #nav-sidebar #nav-filter {
@@ -1551,11 +1579,19 @@ html[data-theme="dark"] #nav-sidebar.sticky {
   margin: 0 0 1.15rem;
   padding: 0.65rem 0.95rem !important;
   border-radius: var(--hoocon-radius-control) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--hoocon-sidebar-border) !important;
+  color: var(--hoocon-sidebar-fg) !important;
 }
 
 #nav-sidebar .current-app .section {
-  color: var(--hoocon-primary);
+  color: #ff7070;
   font-weight: 620;
+}
+
+#nav-sidebar .module tbody tr.current-model th a {
+  color: #ff7070 !important;
+  font-weight: 600;
 }
 
 #nav-sidebar .module {
@@ -1604,11 +1640,11 @@ html[data-theme="dark"] #nav-sidebar .module tbody tr {
 }
 
 #nav-sidebar .module tbody tr:hover {
-  background: var(--selected-bg);
+  background: var(--hoocon-sidebar-hover);
 }
 
 #nav-sidebar .module tbody tr.current-model {
-  background: var(--selected-row);
+  background: var(--hoocon-sidebar-current);
 }
 
 /* Заголовки колонок скрыты визуально — thead не участвует в card-layout. */
@@ -1619,6 +1655,14 @@ html[data-theme="dark"] #nav-sidebar .module tbody tr {
 #nav-sidebar .module th,
 #nav-sidebar .module caption {
   padding: 0.65rem 0.75rem !important;
+  color: var(--hoocon-sidebar-quiet) !important;
+  background: transparent !important;
+}
+
+#nav-sidebar .module caption a,
+#nav-sidebar .module th a,
+#nav-sidebar .module .section {
+  color: var(--hoocon-sidebar-quiet) !important;
 }
 
 #nav-sidebar .module tbody th {
@@ -1657,10 +1701,12 @@ html body #nav-sidebar .module tbody td {
   white-space: nowrap;
   font-size: 0.8125rem;
   line-height: 1.3;
+  color: var(--hoocon-sidebar-fg) !important;
 }
 
 #nav-sidebar .module tbody th a:hover {
-  background: var(--selected-bg);
+  background: transparent;
+  color: #ffffff !important;
 }
 
 /* Добавить / Изменить / Смотреть — только иконки + title при наведении. */

@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
 # Load project-root .env; do not call load_dotenv() twice (avoid CWD-anchored
@@ -81,6 +83,11 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 INSTALLED_APPS = [
+    # django-unfold must precede django.contrib.admin (template/override order).
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.inlines",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -208,6 +215,82 @@ MEDIA_ROOT = str(BASE_DIR / "media")
 
 # Optional deploy SHA for admin CSS/JS cache-bust (?v=); empty → mtime in DEBUG.
 BUILD_SHA = os.getenv("BUILD_SHA", "").strip()
+
+# ── django-unfold Admin UI (Hoocon brand; no heavy hoocon-admin.css shell) ─
+# Primary scale around brand #dc1313 / hover #b01010 (frontend tokens.css).
+_UNFOLD_PRIMARY = {
+    "50": "#fef2f2",
+    "100": "#fee2e2",
+    "200": "#fecaca",
+    "300": "#fca5a5",
+    "400": "#f87171",
+    "500": "#dc1313",
+    "600": "#b01010",
+    "700": "#8f0d0d",
+    "800": "#6e0a0a",
+    "900": "#4d0707",
+    "950": "#2c0404",
+}
+
+UNFOLD = {
+    "SITE_TITLE": _("Админка Hoocon"),
+    "SITE_HEADER": _("Hoocon"),
+    "SITE_SUBHEADER": _("Панель управления"),
+    "SITE_URL": "/",
+    "COLORS": {
+        "primary": _UNFOLD_PRIMARY,
+    },
+    "STYLES": [
+        "config.unfold_callbacks.unfold_extras_css",
+    ],
+    "SCRIPTS": [],
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {
+                "title": _("Навигация"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Панель"),
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                    {
+                        "title": _("Заявки"),
+                        "icon": "inbox",
+                        "link": reverse_lazy("admin:leads_lead_changelist"),
+                        "badge": "config.unfold_callbacks.badge_new_leads",
+                        "badge_variant": "danger",
+                        "badge_style": "solid",
+                        "permission": "config.unfold_callbacks.perm_view_lead",
+                    },
+                    {
+                        "title": _("Клиенты"),
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:crm_client_changelist"),
+                        "permission": "config.unfold_callbacks.perm_view_client",
+                    },
+                    {
+                        "title": _("SKU"),
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("admin:catalog_sku_changelist"),
+                        "permission": "config.unfold_callbacks.perm_view_sku",
+                    },
+                    {
+                        "title": _("Настройки сайта"),
+                        "icon": "settings",
+                        "link": reverse_lazy(
+                            "admin:sitesettings_sitesettings_changelist",
+                        ),
+                        "permission": "config.unfold_callbacks.perm_view_sitesettings",
+                    },
+                ],
+            },
+        ],
+    },
+}
 
 # ── SEO / SPA shell (БЗ SEO-индексация-SPA.md) ───────────────────────
 SITE_URL = os.getenv("SITE_URL", "https://hoocon.ru").rstrip("/")

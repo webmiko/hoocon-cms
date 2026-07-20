@@ -22,11 +22,8 @@ def static_version(_request: HttpRequest) -> dict[str, str]:
         base = settings.BASE_DIR / "static/admin"
         mtimes: list[int] = []
         for rel in (
-            "css/hoocon-admin.css",
-            "css/hoocon-admin-overrides.css",
-            "js/hoocon-admin-tables.js",
+            "css/hoocon-unfold-extras.css",
             "js/hoocon-admin-leads-sticker.js",
-            "js/theme.js",
         ):
             path = base / rel
             if path.is_file():
@@ -48,6 +45,13 @@ def new_leads_sticker(request: HttpRequest) -> dict[str, object]:
     """
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated or not user.is_staff:
+        return {
+            "HOOCON_NEW_LEADS_COUNT": 0,
+            "HOOCON_NEW_LEADS_URL": "",
+            "HOOCON_NEW_LEADS_COUNT_URL": "",
+        }
+
+    if not user.has_perm("leads.view_lead"):
         return {
             "HOOCON_NEW_LEADS_COUNT": 0,
             "HOOCON_NEW_LEADS_URL": "",

@@ -163,7 +163,8 @@ def _migrate_legacy_attrs(sku: SKU) -> dict[str, str]:
             found.setdefault("dn", value)
             continue
         mapped = label_to_slug(name, value=value)
-        if mapped:
+        # Mirror parse_specs_bullets: only keep slugs known to CANONICAL_ATTRS.
+        if mapped and canonical_meta(mapped) is not None:
             found.setdefault(mapped, value)
     return found
 
@@ -183,7 +184,7 @@ def _apply_variant_overrides(sku: SKU, by_slug: dict[str, str]) -> None:
         from catalog.etl.tech_copy import normalize_control_attribute_value
 
         cat_slug = ""
-        if sku.product_id:
+        if sku.product_id and sku.product.category_id:
             cat_slug = sku.product.category.slug
         by_slug["control"] = normalize_control_attribute_value(
             "2-/3-позиционное",
@@ -304,7 +305,7 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
         if desc.strip():
             from catalog.facets import strip_attribute_echo_from_text
 
-            rows = [{"name": CANONICAL_ATTRS[s][0], "value": v} for s, v in by_slug.items()]
+            rows = [{"name": CANONICAL_ATTRS[s][0], "value": v} for s, v in by_slug.items() if s in CANONICAL_ATTRS]
             # Re-append control/aux bullets after strip.
             stripped = strip_attribute_echo_from_text(desc, rows)
             extras: list[str] = []

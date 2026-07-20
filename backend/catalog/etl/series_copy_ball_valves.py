@@ -526,12 +526,12 @@ def attach_gallery_images(
     existing = 0
     failed = 0
     for sort_order, url in enumerate(urls):
-        if ProductImage.objects.filter(sku=sku, source_url=url).exists():
+        updated = ProductImage.objects.filter(sku=sku, source_url=url).update(
+            sort_order=sort_order,
+            is_published=True,
+        )
+        if updated:
             existing += 1
-            ProductImage.objects.filter(sku=sku, source_url=url).update(
-                sort_order=sort_order,
-                is_published=True,
-            )
             continue
         if dry_run:
             created += 1

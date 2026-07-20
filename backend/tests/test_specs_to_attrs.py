@@ -83,6 +83,39 @@ def test_enrich_sku_cards_from_specs_and_variant() -> None:
 
 
 @pytest.mark.django_db
+def test_migrate_legacy_attrs_drops_non_canonical_mapped_slugs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """label_to_slug hits must still pass canonical_meta before enrich uses them."""
+    from catalog.etl import specs_to_attrs as mod
+
+    cat = Category.objects.create(name="Act", slug="act-legacy-filter")
+    product = Product.objects.create(
+        category=cat,
+        name="Legacy filter",
+        slug="privod-legacy-filter",
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="HVD24-5",
+        slug="hvd24-5-legacy-filter",
+        sku_code="HVD24-5",
+        is_published=True,
+    )
+    legacy = Attribute.objects.create(name="Странный параметр", slug="hash-xyz")
+    AttributeValue.objects.create(sku=sku, attribute=legacy, value="42")
+
+    monkeypatch.setattr(mod, "label_to_slug", lambda *a, **k: "not-a-canonical-slug")
+
+    found = mod._migrate_legacy_attrs(sku)
+    assert "not-a-canonical-slug" not in found
+
+    # enrich must not KeyError on description strip when by_slug is built.
+    result = enrich_sku_cards(sku, dry_run=False)
+    assert not result.skipped
+
+
+@pytest.mark.django_db
 def test_enrich_sku_cards_skips_canonical_series() -> None:
     """DA8MQU product is owned by series_copy_damqu — skip card enrich."""
     cat = Category.objects.create(name="Act", slug="act-canon-skip")

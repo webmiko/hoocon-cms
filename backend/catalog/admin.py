@@ -6,6 +6,7 @@ Spec: ПЛАН §6 Iter 1; docs/admin-vs-wagtail.md — редактор v1 = Dj
 from __future__ import annotations
 
 from django.contrib import admin
+from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import (
     SKU,
@@ -19,7 +20,7 @@ from catalog.models import (
 
 
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(ModelAdmin):
     """Admin for Category tree (slug = URL path segment)."""
 
     list_display = ("name", "slug", "parent", "updated_at")
@@ -30,7 +31,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(ModelAdmin):
     """Admin for Product lines (FK Category, PROTECT)."""
 
     list_display = ("name", "slug", "category", "updated_at")
@@ -41,7 +42,7 @@ class ProductAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
-class AttributeValueInline(admin.TabularInline):
+class AttributeValueInline(TabularInline):
     """Inline ТТХ on SKU change form."""
 
     model = AttributeValue
@@ -49,7 +50,7 @@ class AttributeValueInline(admin.TabularInline):
     autocomplete_fields = ("attribute",)
 
 
-class ProductFileInline(admin.TabularInline):
+class ProductFileInline(TabularInline):
     """Inline PDF documents on SKU change form."""
 
     model = ProductFile
@@ -57,7 +58,7 @@ class ProductFileInline(admin.TabularInline):
     fields = ("title", "file", "file_type", "is_published", "sort_order")
 
 
-class ProductImageInline(admin.TabularInline):
+class ProductImageInline(TabularInline):
     """Inline product photos on SKU change form."""
 
     model = ProductImage
@@ -66,7 +67,7 @@ class ProductImageInline(admin.TabularInline):
 
 
 @admin.register(SKU)
-class SKUAdmin(admin.ModelAdmin):
+class SKUAdmin(ModelAdmin):
     """Admin for SKU — артикул, slug, цена (скрыта в публичном API)."""
 
     list_display = (
@@ -87,7 +88,7 @@ class SKUAdmin(admin.ModelAdmin):
 
 
 @admin.register(Attribute)
-class AttributeAdmin(admin.ModelAdmin):
+class AttributeAdmin(ModelAdmin):
     """Admin for Attribute dictionary (EAV)."""
 
     list_display = ("name", "slug", "unit", "updated_at")
@@ -97,7 +98,7 @@ class AttributeAdmin(admin.ModelAdmin):
 
 
 @admin.register(AttributeValue)
-class AttributeValueAdmin(admin.ModelAdmin):
+class AttributeValueAdmin(ModelAdmin):
     """Admin for AttributeValue (SKU × Attribute)."""
 
     list_display = ("sku", "attribute", "value", "updated_at")
@@ -107,7 +108,7 @@ class AttributeValueAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductFile)
-class ProductFileAdmin(admin.ModelAdmin):
+class ProductFileAdmin(ModelAdmin):
     """Admin for ProductFile PDF (MIME/size validated on upload)."""
 
     list_display = (
@@ -125,7 +126,7 @@ class ProductFileAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductImage)
-class ProductImageAdmin(admin.ModelAdmin):
+class ProductImageAdmin(ModelAdmin):
     """Admin for ProductImage (WebP gallery)."""
 
     list_display = ("sku", "alt", "sort_order", "is_published", "updated_at")

@@ -6,12 +6,13 @@ from typing import Any
 
 from django.contrib import admin
 from django.http import HttpRequest
+from unfold.admin import ModelAdmin
 
 from content.models import Article, News, Page
 from social.admin import SocialAnnounceAdminMixin, maybe_auto_announce
 
 
-class _ContentBaseAdmin(admin.ModelAdmin):
+class _ContentBaseAdmin(ModelAdmin):
     """Shared admin config for Page / Article / News (DRY)."""
 
     list_display = ("title", "slug", "is_published", "published_at", "updated_at")

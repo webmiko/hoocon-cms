@@ -9,13 +9,14 @@ from django.db import models
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import ModelAdmin
 
 from social.models import SocialPost
 from social.services import announce_content, schedule_announce_on_commit
 
 
 @admin.register(SocialPost)
-class SocialPostAdmin(admin.ModelAdmin):
+class SocialPostAdmin(ModelAdmin):
     """Read-mostly log of social deliveries."""
 
     list_display = (

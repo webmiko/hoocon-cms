@@ -20,7 +20,7 @@ from leads.tasks import send_lead_notification
 
 User = get_user_model()
 
-_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin.css"
+_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
 
 
 def test_parse_notify_emails_splits_and_strips() -> None:

@@ -71,11 +71,11 @@ def load_categories(
     for nc in categories:
         if nc.parent_id is not None:
             continue
-        _, created = Category.objects.update_or_create(
+        cat, created = Category.objects.update_or_create(
             slug=nc.slug,
             defaults={"name": nc.name, "parent": None},
         )
-        by_tilda_id[nc.tilda_id] = Category.objects.get(slug=nc.slug)
+        by_tilda_id[nc.tilda_id] = cat
         stats.created += int(created)
 
     # Pass 2: subcategories — resolve parent by tilda_id.
@@ -83,24 +83,24 @@ def load_categories(
         if nc.parent_id is None:
             continue
         parent = by_tilda_id.get(nc.parent_id)
-        _, created = Category.objects.update_or_create(
+        cat, created = Category.objects.update_or_create(
             slug=nc.slug,
             defaults={"name": nc.name, "parent": parent},
         )
-        by_tilda_id[nc.tilda_id] = Category.objects.get(slug=nc.slug)
+        by_tilda_id[nc.tilda_id] = cat
         stats.created += int(created)
 
     # Re-link subcategories whose parent arrived in pass 1 after them.
     for nc in categories:
         if nc.parent_id is None:
             continue
-        cat = by_tilda_id.get(nc.tilda_id)
-        if cat is None or cat.parent is not None:
+        child = by_tilda_id.get(nc.tilda_id)
+        if child is None or child.parent is not None:
             continue
         parent = by_tilda_id.get(nc.parent_id)
-        if parent is not None and parent.pk != cat.pk:
-            cat.parent = parent
-            cat.save(update_fields=["parent"])
+        if parent is not None and parent.pk != child.pk:
+            child.parent = parent
+            child.save(update_fields=["parent"])
 
     return stats, by_tilda_id
 

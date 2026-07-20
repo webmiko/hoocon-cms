@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block bodyclass %}{{ block.super }} app-{{ app_label }}{% endblock %}
+
+{% block content %}
+  <div class="flex flex-row -mx-4">
+    <div class="grow px-4">
+      {% include "unfold/helpers/app_list_default.html" %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}

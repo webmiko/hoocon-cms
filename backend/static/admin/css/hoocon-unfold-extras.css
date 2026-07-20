@@ -1,0 +1,325 @@
+/**
+ * Thin Unfold extras — lead sticker, status tags, open button, stats page.
+ * Do not load the full hoocon-admin.css shell (conflicts with Unfold DOM).
+ * Brand: #dc1313 / #b01010 (aligned with frontend tokens.css).
+ */
+
+:root {
+  --hoocon-primary: #dc1313;
+  --hoocon-primary-hover: #b01010;
+  --hoocon-surface: #ffffff;
+  --hoocon-surface-muted: color-mix(in srgb, #141414 4%, #ffffff);
+  --hoocon-glass-border: rgba(30, 30, 40, 0.12);
+  --hoocon-quiet: #6f6f6f;
+  --hoocon-radius: 0.5rem;
+  --hoocon-radius-pill: 999px;
+  --hoocon-btn-height: 2.25rem;
+  --hoocon-inline-padding: 1.1rem;
+  --hoocon-shadow-soft: 0 4px 20px rgba(20, 20, 30, 0.04);
+  --hoocon-hairline: rgba(30, 30, 40, 0.1);
+  --hoocon-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dark {
+  --hoocon-surface: #171717;
+  --hoocon-surface-muted: color-mix(in srgb, #ffffff 6%, #171717);
+  --hoocon-glass-border: rgba(255, 255, 255, 0.12);
+  --hoocon-quiet: #a3a3a3;
+  --hoocon-hairline: rgba(255, 255, 255, 0.1);
+}
+
+.hoocon-admin-lead-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  padding: 0 0.65rem 0 0.85rem;
+  color: var(--hoocon-quiet) !important;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  text-decoration: none !important;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  transition:
+    background 0.15s var(--hoocon-ease),
+    border-color 0.15s var(--hoocon-ease),
+    color 0.15s var(--hoocon-ease);
+}
+
+.hoocon-admin-lead-sticker:hover {
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-glass-border));
+  color: var(--hoocon-primary) !important;
+}
+
+.hoocon-admin-lead-sticker__label {
+  letter-spacing: -0.01em;
+}
+
+.hoocon-admin-lead-sticker__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hoocon-quiet) 14%, transparent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.hoocon-admin-lead-sticker--active {
+  color: #9a3412 !important;
+  border-color: color-mix(in srgb, #ea580c 40%, var(--hoocon-glass-border));
+  background: color-mix(in srgb, #ea580c 12%, var(--hoocon-surface));
+}
+
+.hoocon-admin-lead-sticker--active:hover {
+  color: #9a3412 !important;
+  background: color-mix(in srgb, #ea580c 18%, var(--hoocon-surface));
+}
+
+.hoocon-admin-lead-sticker--active .hoocon-admin-lead-sticker__count {
+  background: #ea580c;
+  color: #fff;
+}
+
+.dark .hoocon-admin-lead-sticker--active {
+  color: #fdba74 !important;
+  background: color-mix(in srgb, #ea580c 22%, var(--hoocon-surface));
+}
+
+.dark .hoocon-admin-lead-sticker--active:hover {
+  color: #fdba74 !important;
+}
+
+.hoocon-lead-status {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.hoocon-lead-status--new {
+  color: #9a3412;
+  background: color-mix(in srgb, #ea580c 16%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #ea580c 42%, transparent);
+}
+
+.hoocon-lead-status--in_progress {
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #2563eb 32%, transparent);
+}
+
+.hoocon-lead-status--done {
+  color: #166534;
+  background: color-mix(in srgb, #16a34a 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #16a34a 32%, transparent);
+}
+
+.dark .hoocon-lead-status--new {
+  color: #fdba74;
+}
+
+.dark .hoocon-lead-status--in_progress {
+  color: #93c5fd;
+}
+
+.dark .hoocon-lead-status--done {
+  color: #86efac;
+}
+
+a.hoocon-admin-lead-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 2rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
+  background: var(--hoocon-primary);
+  color: #fff !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+a.hoocon-admin-lead-open:hover {
+  background: var(--hoocon-primary-hover);
+  color: #fff !important;
+}
+
+a.hoocon-leads-stats-link {
+  font-weight: 600;
+}
+
+.hoocon-lead-stats {
+  max-width: 56rem;
+}
+
+.hoocon-lead-stats__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.hoocon-lead-stats__toolbar h1 {
+  margin: 0;
+}
+
+.hoocon-lead-stats__periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hoocon-lead-stats__periods a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  color: var(--hoocon-quiet);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.hoocon-lead-stats__periods a.is-active,
+.hoocon-lead-stats__periods a:hover {
+  color: var(--hoocon-primary);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
+}
+
+.hoocon-lead-stats__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.hoocon-lead-stats__card {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--hoocon-radius);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface);
+  box-shadow: var(--hoocon-shadow-soft);
+}
+
+.hoocon-lead-stats__card--accent {
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--hoocon-primary) 8%, var(--hoocon-surface));
+}
+
+.hoocon-lead-stats__label {
+  margin: 0 0 0.35rem;
+  color: var(--hoocon-quiet);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.hoocon-lead-stats__value {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.hoocon-lead-stats__table-wrap {
+  overflow-x: clip;
+}
+
+.hoocon-lead-stats__table-wrap h2 {
+  margin: 0;
+  padding: 1rem var(--hoocon-inline-padding);
+  border-bottom: 1px solid var(--hoocon-hairline);
+  font-size: 1rem;
+}
+
+.hoocon-lead-stats__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hoocon-lead-stats__table th,
+.hoocon-lead-stats__table td {
+  padding: 0.75rem 1.1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--hoocon-hairline);
+  font-variant-numeric: tabular-nums;
+}
+
+.hoocon-lead-stats__table thead th {
+  color: var(--hoocon-quiet);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.hoocon-lead-stats__empty {
+  padding: 1.25rem var(--hoocon-inline-padding);
+  color: var(--hoocon-quiet);
+}
+
+.hoocon-admin-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin: 0 0 1.25rem;
+  color: var(--hoocon-quiet);
+  font-size: 0.8125rem;
+}
+
+.hoocon-admin-breadcrumbs a {
+  color: var(--hoocon-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.hoocon-admin-breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hoocon-admin-lead-sticker--active .hoocon-admin-lead-sticker__count {
+    animation: hoocon-lead-sticker-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes hoocon-lead-sticker-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #ea580c 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 0.35rem color-mix(in srgb, #ea580c 0%, transparent);
+  }
+}

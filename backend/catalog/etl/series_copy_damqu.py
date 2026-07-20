@@ -314,7 +314,7 @@ def apply_damqu_enrichment() -> dict[str, int]:
                 normalize_control_attribute_value(
                     "2-/3-позиционное",
                     sku_code=sku.sku_code,
-                    category_slug=sku.product.category.slug,
+                    category_slug=(sku.product.category.slug if sku.product_id and sku.product.category_id else ""),
                 ),
             )
         attrs += 1

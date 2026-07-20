@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.html import format_html
+from unfold.admin import ModelAdmin
 
 from sitesettings.credentials import token_source_label
 from sitesettings.models import SiteSettings
@@ -65,7 +66,7 @@ class SiteSettingsAdminForm(forms.ModelForm):
 
 
 @admin.register(SiteSettings)
-class SiteSettingsAdmin(admin.ModelAdmin):
+class SiteSettingsAdmin(ModelAdmin):
     """Singleton Admin: edit only; no add/delete when row exists."""
 
     form = SiteSettingsAdminForm

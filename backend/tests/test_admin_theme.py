@@ -1,4 +1,4 @@
-"""Tests for Django Admin modern CMS theme."""
+"""Tests for Django Admin with django-unfold (Hoocon branding)."""
 
 from __future__ import annotations
 
@@ -7,15 +7,19 @@ from pathlib import Path
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from unfold.admin import ModelAdmin
+
+from catalog.admin import SKUAdmin
+from leads.admin import LeadAdmin
 
 User = get_user_model()
 
-_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin.css"
+_EXTRAS_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
 
 
 @pytest.mark.django_db
-def test_admin_index_uses_hoocon_styles() -> None:
-    """Logged-in admin index loads hoocon-admin assets and branding."""
+def test_admin_index_uses_unfold_and_hoocon_branding() -> None:
+    """Logged-in admin index loads Unfold shell, extras, and Hoocon branding."""
     admin_user = User.objects.create_superuser(
         username="admin-styles",
         email="admin-styles@example.com",
@@ -27,102 +31,97 @@ def test_admin_index_uses_hoocon_styles() -> None:
     response = client.get("/admin/")
     assert response.status_code == 200
     html = response.content.decode()
-    assert "hoocon-admin.css" in html
-    assert "hoocon-admin-overrides.css" in html
-    assert "hoocon-admin-tables.js" in html
+    assert "unfold" in html.lower()
+    assert "hoocon-unfold-extras.css" in html
     assert "hoocon-admin-leads-sticker.js" in html
+    assert "hoocon-admin.css" not in html
+    assert "hoocon-admin-overrides.css" not in html
     assert "Hoocon" in html
     assert 'href="/"' in html
-    assert "hoocon-admin.css?v=" in html
+    # Sidebar navigation includes leads entry (badge when count > 0).
+    assert "/admin/leads/lead/" in html
 
 
 @pytest.mark.django_db
-def test_admin_login_page_uses_hoocon_styles() -> None:
-    """Login page loads theme CSS and resolves data-theme before styles."""
+def test_lead_sticker_visible_on_changelist_not_only_index() -> None:
+    """Sticker must survive Unfold change_list (nav-global-side = object-tools)."""
+    from leads.models import Lead
+
+    Lead.objects.create(
+        name="Changelist sticker",
+        email="changelist-sticker@example.com",
+        message="Нужен КП — проверка sticker на changelist.",
+    )
+    admin_user = User.objects.create_superuser(
+        username="admin-sticker-cl",
+        email="admin-sticker-cl@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/leads/lead/").content.decode()
+    assert "hoocon-admin-lead-sticker" in html
+    assert "data-hoocon-new-leads-count" in html
+    assert "hoocon-admin-leads-sticker.js" in html
+
+
+@pytest.mark.django_db
+def test_sidebar_hides_leads_without_view_permission() -> None:
+    """Staff without leads.view_lead must not see Заявки in Unfold sidebar."""
+    staff = User.objects.create_user(
+        username="staff-noperm-nav",
+        email="staff-noperm-nav@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    client = Client()
+    client.force_login(staff)
+    html = client.get("/admin/").content.decode()
+    assert 'href="/admin/leads/lead/"' not in html
+    assert "hoocon-admin-lead-sticker" not in html
+
+
+@pytest.mark.django_db
+def test_lead_stats_page_renders_in_content_breadcrumbs() -> None:
+    """Stats page breadcrumbs live in content (Unfold has no breadcrumbs block)."""
+    admin_user = User.objects.create_superuser(
+        username="admin-stats-bc",
+        email="admin-stats-bc@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    response = client.get("/admin/leads/lead/stats/")
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "hoocon-admin-breadcrumbs" in html
+    assert "Статистика" in html
+
+
+@pytest.mark.django_db
+def test_admin_login_page_loads_unfold() -> None:
+    """Login page renders Unfold without the legacy hoocon-admin shell CSS."""
     response = Client().get("/admin/login/")
     assert response.status_code == 200
     html = response.content.decode()
-    assert "hoocon-admin.css" in html
-    assert "data-theme-mode" in html
-    assert 'localStorage.getItem("theme")' in html
-    script_pos = html.find('localStorage.getItem("theme")')
-    css_pos = html.find("hoocon-admin.css")
-    assert script_pos != -1
-    assert css_pos != -1
-    assert script_pos < css_pos
+    assert "hoocon-admin.css" not in html
+    assert "unfold" in html.lower() or "Hoocon" in html
 
 
-def test_admin_css_is_modern_cms_layout() -> None:
-    """Theme uses calm CMS surfaces, system font, and generous spacing tokens."""
-    css = _CSS.read_text(encoding="utf-8")
-    assert "современный CMS-layout" in css
-    assert "-apple-system" in css
-    assert "SF Pro Text" in css
-    assert "--hoocon-primary: #2563eb" in css
-    assert "--hoocon-danger: #dc2626" in css
-    assert "--hoocon-block-gap: 1.75rem" in css
-    assert "--hoocon-inline-padding: 1.75rem" in css
-    assert "backdrop-filter: none" in css
-    assert "iOS 27" not in css
+def test_lead_and_sku_admins_use_unfold_modeladmin() -> None:
+    """LeadAdmin and SKUAdmin inherit Unfold ModelAdmin (styled forms)."""
+    assert issubclass(LeadAdmin, ModelAdmin)
+    assert issubclass(SKUAdmin, ModelAdmin)
 
 
-def test_admin_deletelink_uses_danger_color_not_primary() -> None:
-    """Delete link gets danger gradient, not primary (specificity trap)."""
-    css = _CSS.read_text(encoding="utf-8")
-    danger_block = css.split("a.deletelink,\n.deletelink,", 1)[1].split("}", 1)[0]
-    assert "var(--hoocon-danger)" in danger_block
-    assert "var(--hoocon-primary)" not in danger_block
-    assert "background-image: none" in danger_block
-
-
-def test_admin_tables_js_uses_hoocon_card_class() -> None:
-    """Tables JS adds card class and stacks when table cannot fit width."""
-    js_path = Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js"
-    js = js_path.read_text(encoding="utf-8")
-    assert "hoocon-admin-card-table" in js
-    assert "hoocon-admin-table-stacked" in js
-    assert "enableStackedCardNavigation" in js
-    assert 'STACK_MQ = "(max-width: 767px)"' in js
-    assert "measureNaturalTableWidth" in js
-    assert "measureComfortableTableWidth" in js
-    assert "MIN_DATA_COL_PX" in js
-    assert "max-content" in js
-    assert "ResizeObserver" in js
-    assert "collapseIdleFilters" in js
-    assert "enhanceSidebarActionTitles" in js
-    assert "lms-admin" not in js
-
-
-def test_admin_css_dashboard_uses_compact_rows_not_cards() -> None:
-    """Dashboard model lists stay horizontal rows; no block card stack at 1024px."""
-    css = _CSS.read_text(encoding="utf-8")
-    assert "#content-main .module table thead" in css
-    assert "display: none" in css.split("#content-main .module table thead", 1)[1].split("}", 1)[0]
-    assert ".dashboard #content-main .module table tr {" not in css
-    overrides = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-overrides.css").read_text(
-        encoding="utf-8"
-    )
-    assert "html body #content-main .module table tbody tr" in overrides
-    assert "display: flex !important" in overrides
-
-
-def test_admin_css_tables_avoid_horizontal_scroll() -> None:
-    """Changelist tables wrap/clip instead of overflow-x scroll."""
-    css = _CSS.read_text(encoding="utf-8")
-    results = css.split("#changelist-form .results {", 1)[1].split("}", 1)[0]
-    assert "overflow-x: clip !important" in results
-    assert "table-layout: fixed" in css
-    assert "hoocon-admin-table-stacked" in css
-    assert "overflow-wrap: anywhere" in css
-    assert "flex-direction: column" in css
-    assert "minmax(5.5rem, 32%)" in css
-    assert "#changelist table .field-name" in css
-
-
-def test_admin_theme_js_resolves_auto_to_light_or_dark() -> None:
-    """Custom theme.js keeps data-theme as resolved light|dark (not auto)."""
-    js_path = Path(__file__).resolve().parents[1] / "static/admin/js/theme.js"
-    js = js_path.read_text(encoding="utf-8")
-    assert "dataset.themeMode" in js
-    assert "resolveTheme" in js
-    assert "dataset.theme = resolveTheme(mode)" in js
+def test_unfold_extras_css_covers_lead_ui() -> None:
+    """Extras CSS keeps lead sticker, status tags, open button, stats layout."""
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    assert "--hoocon-primary: #dc1313" in css
+    assert "--hoocon-primary-hover: #b01010" in css
+    assert ".hoocon-admin-lead-sticker" in css
+    assert "hoocon-admin-lead-sticker__count" in css
+    assert ".hoocon-lead-status--new" in css
+    assert "a.hoocon-admin-lead-open" in css
+    assert ".hoocon-lead-stats" in css
+    assert ".hoocon-admin-breadcrumbs" in css

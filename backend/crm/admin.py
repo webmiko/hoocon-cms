@@ -9,13 +9,14 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
+from unfold.admin import ModelAdmin, TabularInline
 
 from crm.forms import ComposeEmailForm
 from crm.models import Activity, Client, EmailMessage, EmailStatus
 from crm.services import create_outbound_email
 
 
-class ActivityInline(admin.TabularInline):
+class ActivityInline(TabularInline):
     """Timeline notes on a Client card."""
 
     model = Activity
@@ -26,7 +27,7 @@ class ActivityInline(admin.TabularInline):
     show_change_link = True
 
 
-class EmailMessageInline(admin.TabularInline):
+class EmailMessageInline(TabularInline):
     """Recent emails on a Client card (read-mostly)."""
 
     model = EmailMessage
@@ -50,7 +51,7 @@ class EmailMessageInline(admin.TabularInline):
 
 
 @admin.register(Client)
-class ClientAdmin(admin.ModelAdmin):
+class ClientAdmin(ModelAdmin):
     """CRM client card: contacts, assignee, timeline, send email."""
 
     list_display = (
@@ -193,7 +194,7 @@ class ClientAdmin(admin.ModelAdmin):
 
 
 @admin.register(Activity)
-class ActivityAdmin(admin.ModelAdmin):
+class ActivityAdmin(ModelAdmin):
     """Standalone activity list (also edited via Client inline)."""
 
     list_display = (
@@ -225,7 +226,7 @@ class ActivityAdmin(admin.ModelAdmin):
 
 
 @admin.register(EmailMessage)
-class EmailMessageAdmin(admin.ModelAdmin):
+class EmailMessageAdmin(ModelAdmin):
     """Outbound/inbound email log; staff can resend failed/draft."""
 
     list_display = (

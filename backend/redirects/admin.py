@@ -6,12 +6,13 @@ Spec: docs/seo-url-migration.md §3; ПЛАН §6 Iter 1.
 from __future__ import annotations
 
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from redirects.models import Redirect
 
 
 @admin.register(Redirect)
-class RedirectAdmin(admin.ModelAdmin):
+class RedirectAdmin(ModelAdmin):
     """Admin for Redirect — from_path → to_path (301/302)."""
 
     list_display = ("from_path", "to_path", "status_code", "is_active", "updated_at")

@@ -1,16 +1,17 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block breadcrumbs %}
-<div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
-  &rsaquo; <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
-  &rsaquo; <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
-  &rsaquo; {% trans "Написать письмо" %}
-</div>
-{% endblock %}
-
 {% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="{% trans 'Breadcrumbs' %}">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
+  <span aria-hidden="true">›</span>
+  <span>{% trans "Написать письмо" %}</span>
+</nav>
+
 <h1>{{ title }}</h1>
 <form method="post" novalidate>
   {% csrf_token %}

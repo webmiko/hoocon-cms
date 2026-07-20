@@ -164,6 +164,24 @@ def test_normalize_product_extracts_attributes_from_editions() -> None:
     assert attrs["Управление"] == "Открыто/закрыто"
 
 
+def test_normalize_edition_control_uses_sku_code_heuristics() -> None:
+    """«Управление» on HVD editions maps to ON/OFF via sku_code, not floating."""
+    from catalog.etl.normalize import _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    sku = _normalize_edition(
+        {
+            "sku": "HVD24-5",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="hvd-5",
+        product_name="HVD-5",
+    )
+    attrs = {a.title: a.value for a in sku.attributes}
+    assert attrs["Управление"] == CONTROL_ON_OFF
+
+
 def test_normalize_edition_without_sku_quarantines() -> None:
     """Edition with empty sku raises QuarantineError."""
     from catalog.etl.normalize import QuarantineError, normalize_product

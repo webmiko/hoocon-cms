@@ -288,7 +288,10 @@ def _normalize_edition(
             # Edition-specific value overrides product-level characteristic.
             attrs = [a for a in attrs if a.title.lower() != title.lower()]
         if "управл" in title.casefold():
-            value_str = normalize_control_attribute_value(value_str)
+            value_str = normalize_control_attribute_value(
+                value_str,
+                sku_code=sku_code,
+            )
         else:
             value_str = normalize_tech_copy(value_str)
         attrs.append(NormalizedAttribute(title=title, value=value_str))

@@ -1,0 +1,16 @@
+{% load i18n static unfold %}
+
+{# Sticker lives here (not nav-global-side): Unfold change_list/change_form own that block. #}
+<div class="flex flex-row gap-4 items-center ml-auto">
+    {% if environment %}
+        {% include "unfold/helpers/label.html" with text=environment.0 type=environment.1 %}
+    {% endif %}
+
+    {% action_list %}
+
+    {% include "admin/includes/hoocon_lead_sticker.html" %}
+
+    {% if nav_global_side %}
+        {{ nav_global_side }}
+    {% endif %}
+</div>
