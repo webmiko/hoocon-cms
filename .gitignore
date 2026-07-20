@@ -57,7 +57,12 @@ backend/staticfiles/
 
 # Frontend build artifacts
 frontend/dist/
+frontend/dev-dist/
 node_modules/
+
+# Coverage / tooling artifacts
+backend/coverage.json
+coverage.json
 
 # Базы данных
 *.db

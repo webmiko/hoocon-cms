@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Seo } from "../components/Seo";
 import { CatalogSkeleton } from "../components/CatalogSkeleton";
@@ -14,6 +14,11 @@ import { useAsync } from "../hooks/useAsync";
 import { facetLabelShort, facetValueShort } from "../utils/facetDisplay";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseDescription } from "../utils/parseDescription";
+import {
+  isModulatingSignalKey,
+  SignalSpecValue,
+} from "../components/SignalSpecValue";
+import { CompareToggle } from "../components/CompareToggle";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
@@ -29,9 +34,23 @@ const FACET_KEYS = [
   "dn",
   "ways",
   "kvs",
+  "analog",
 ] as const;
 
 type FacetKey = (typeof FACET_KEYS)[number];
+
+type AppendState = {
+  key: string;
+  items: SKUList[];
+  lastPage: number;
+  hasNext: boolean;
+};
+
+type LoadMoreUi = {
+  key: string;
+  loading: boolean;
+  error: string | null;
+};
 
 /**
  * Catalog list: categories + ТТХ facets + compact SKU cards.
@@ -66,6 +85,7 @@ export function CatalogPage() {
   }
 
   const facetKey = FACET_KEYS.map((k) => activeFacets[k] ?? "").join("|");
+  const listKey = `${category}|${q}|${page}|${facetKey}`;
   const { data: skusData, loading, error } = useAsync(
     () => api.skus(params),
     [category, q, page, facetKey],
@@ -73,10 +93,70 @@ export function CatalogPage() {
 
   const categories: Category[] = categoriesData?.results ?? [];
   const facets: CatalogFacet[] = facetsData?.results ?? [];
-  const skus: SKUList[] = (skusData?.results ?? []) as SKUList[];
   const activeCount =
     Object.keys(activeFacets).length + (q ? 1 : 0) + (category ? 1 : 0);
   const activeCategory = categories.find((c) => c.slug === category);
+
+  // «Показать ещё»: append next DRF pages (PAGE_SIZE=20) without replacing.
+  const [append, setAppend] = useState<AppendState>({
+    key: "",
+    items: [],
+    lastPage: 1,
+    hasNext: false,
+  });
+  const [loadMoreUi, setLoadMoreUi] = useState<LoadMoreUi>({
+    key: "",
+    loading: false,
+    error: null,
+  });
+
+  const appendLastPage = append.key === listKey ? append.lastPage : page;
+  const appendHasNext =
+    append.key === listKey ? append.hasNext : Boolean(skusData?.next);
+  const loadingMore = loadMoreUi.key === listKey && loadMoreUi.loading;
+  const loadMoreError =
+    loadMoreUi.key === listKey ? loadMoreUi.error : null;
+
+  const displayedSkus = useMemo(() => {
+    const base = (skusData?.results ?? []) as SKUList[];
+    const extras = append.key === listKey ? append.items : [];
+    if (extras.length === 0) return base;
+    const seen = new Set(base.map((s) => s.slug));
+    const out = [...base];
+    for (const sku of extras) {
+      if (seen.has(sku.slug)) continue;
+      seen.add(sku.slug);
+      out.push(sku);
+    }
+    return out;
+  }, [skusData?.results, append, listKey]);
+
+  async function handleShowMore() {
+    if (loadingMore || !appendHasNext) return;
+    const nextPage = appendLastPage + 1;
+    const requestKey = listKey;
+    setLoadMoreUi({ key: requestKey, loading: true, error: null });
+    try {
+      const data = await api.skus({ ...params, page: String(nextPage) });
+      const batch = (data.results ?? []) as SKUList[];
+      setAppend((prev) => {
+        const prior = prev.key === requestKey ? prev.items : [];
+        return {
+          key: requestKey,
+          items: [...prior, ...batch],
+          lastPage: nextPage,
+          hasNext: Boolean(data.next),
+        };
+      });
+      setLoadMoreUi({ key: requestKey, loading: false, error: null });
+    } catch {
+      setLoadMoreUi({
+        key: requestKey,
+        loading: false,
+        error: "Не удалось загрузить ещё товары. Попробуйте снова.",
+      });
+    }
+  }
 
   function updateFilter(key: string, value: string) {
     const next = new URLSearchParams(searchParams);
@@ -360,7 +440,7 @@ export function CatalogPage() {
           <p className={styles.error}>Ошибка загрузки каталога. Попробуйте позже.</p>
         )}
 
-        {!loading && !error && skus.length === 0 && (
+        {!loading && !error && displayedSkus.length === 0 && (
           <div className={styles.emptyState}>
             <span className={styles.emptyIcon} aria-hidden="true">
               ∅
@@ -381,13 +461,27 @@ export function CatalogPage() {
           </div>
         )}
 
-        {skus.length > 0 && (
+        {displayedSkus.length > 0 && (
           <>
             <div className={styles.grid}>
-              {skus.map((sku) => (
-                <Link key={sku.slug} to={`/${sku.slug}`} className={styles.card}>
+              {displayedSkus.map((sku) => (
+                <article key={sku.slug} className={styles.card}>
+                  <Link
+                    to={`/${sku.slug}`}
+                    className={styles.cardHit}
+                    aria-label={sku.name}
+                  />
                   {sku.image?.image ? (
                     <div className={styles.cardMedia}>
+                      <CompareToggle
+                        className={`${styles.cardCompare} ${styles.cardInteractive}`}
+                        item={{
+                          slug: sku.slug,
+                          sku_code: sku.sku_code,
+                          name: sku.name,
+                          image: sku.image.image,
+                        }}
+                      />
                       <img
                         src={sku.image.image}
                         alt={sku.image.alt || sku.name}
@@ -397,7 +491,17 @@ export function CatalogPage() {
                       />
                     </div>
                   ) : (
-                    <div className={styles.cardMediaPlaceholder} aria-hidden="true" />
+                    <div className={styles.cardMediaPlaceholder}>
+                      <CompareToggle
+                        className={`${styles.cardCompare} ${styles.cardInteractive}`}
+                        item={{
+                          slug: sku.slug,
+                          sku_code: sku.sku_code,
+                          name: sku.name,
+                          image: null,
+                        }}
+                      />
+                    </div>
                   )}
                   <div className={styles.cardBody}>
                     <p className={`${styles.cardCode} text-tech`}>
@@ -410,11 +514,20 @@ export function CatalogPage() {
                           const unit = specDisplayUnit(h.value, h.unit);
                           return (
                             <li key={h.key}>
-                              <span className={styles.cardSpecName}>{h.name}</span>
-                              <span className={styles.cardSpecValue}>
-                                <SoftBreakText text={h.value} />
-                                {unit ? ` ${unit}` : ""}
+                              <span className={styles.cardSpecName}>
+                                {h.name}
                               </span>
+                              {isModulatingSignalKey(h.key) ? (
+                                <SignalSpecValue
+                                  value={`${h.value}${unit ? ` ${unit}` : ""}`}
+                                  className={`${styles.cardSpecValue} ${styles.cardInteractive}`}
+                                />
+                              ) : (
+                                <span className={styles.cardSpecValue}>
+                                  <SoftBreakText text={h.value} />
+                                  {unit ? ` ${unit}` : ""}
+                                </span>
+                              )}
                             </li>
                           );
                         })}
@@ -433,31 +546,50 @@ export function CatalogPage() {
                       <span className={styles.cardCta}>Паспорт и ТТХ</span>
                     </div>
                   </div>
-                </Link>
+                </article>
               ))}
             </div>
 
-            {skusData && (skusData.next || skusData.previous) && (
-              <nav className={styles.pagination} aria-label="Пагинация">
+            <div className={styles.listFooter}>
+              {appendHasNext ? (
                 <button
                   type="button"
-                  className={styles.pageButton}
-                  disabled={!skusData.previous || page <= 1}
-                  onClick={() => goToPage(page - 1)}
+                  className={styles.showMore}
+                  disabled={loadingMore}
+                  onClick={() => {
+                    void handleShowMore();
+                  }}
                 >
-                  ← Назад
+                  {loadingMore ? "Загрузка…" : "Показать ещё"}
                 </button>
-                <span className={styles.pageInfo}>Страница {page}</span>
-                <button
-                  type="button"
-                  className={styles.pageButton}
-                  disabled={!skusData.next}
-                  onClick={() => goToPage(page + 1)}
-                >
-                  Вперёд →
-                </button>
-              </nav>
-            )}
+              ) : null}
+              {loadMoreError ? (
+                <p className={styles.loadMoreError} role="alert">
+                  {loadMoreError}
+                </p>
+              ) : null}
+              {skusData && (skusData.next || skusData.previous) ? (
+                <nav className={styles.pagination} aria-label="Пагинация">
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    disabled={!skusData.previous || page <= 1}
+                    onClick={() => goToPage(page - 1)}
+                  >
+                    ← Назад
+                  </button>
+                  <span className={styles.pageInfo}>Страница {page}</span>
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    disabled={!skusData.next}
+                    onClick={() => goToPage(page + 1)}
+                  >
+                    Вперёд →
+                  </button>
+                </nav>
+              ) : null}
+            </div>
           </>
         )}
       </div>

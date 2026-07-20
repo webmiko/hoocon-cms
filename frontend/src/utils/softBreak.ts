@@ -11,7 +11,7 @@ const BREAK_AFTER_HYPHEN = /(-)(?=[^\s-])/g;
 
 /** Chunks that must wrap as a single token (edition suffix, factory note). */
 const NO_WRAP_CHUNK =
-  /\((?:[−-]?[A-Z]{1,4})(?:\s*\/\s*[−-]?[A-Z]{1,4})+\)|\(\s*Заводская установка[^)]*\)/gi;
+  /\((?:[−-]?[A-Z]{1,4})(?:\s*\/\s*[−-]?[A-Z]{1,4})+\)|\(\s*Заводская установка[^)]*\)|\(\s*спецзаказ\s*\)/gi;
 
 export type SoftBreakPart = {
   text: string;

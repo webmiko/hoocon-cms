@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
@@ -14,6 +15,19 @@ const TYPE_LABEL: Record<string, string> = {
   page: "Страница",
 };
 
+type AppendState = {
+  key: string;
+  items: SearchResultItem[];
+  lastPage: number;
+  hasNext: boolean;
+};
+
+type LoadMoreUi = {
+  key: string;
+  loading: boolean;
+  error: string | null;
+};
+
 /**
  * Search results page (/search/?q=...&page=...).
  *
@@ -26,15 +40,72 @@ export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
+  const listKey = `${q}|${page}`;
 
   const { data, loading, error } = useAsync(
     () => (q ? api.search(q, page) : Promise.resolve(null)),
     [q, page],
   );
 
-  const results: SearchResultItem[] = data?.results ?? [];
-  const hasNext = Boolean(data?.next);
+  const [append, setAppend] = useState<AppendState>({
+    key: "",
+    items: [],
+    lastPage: 1,
+    hasNext: false,
+  });
+  const [loadMoreUi, setLoadMoreUi] = useState<LoadMoreUi>({
+    key: "",
+    loading: false,
+    error: null,
+  });
+
+  const appendLastPage = append.key === listKey ? append.lastPage : page;
+  const appendHasNext =
+    append.key === listKey ? append.hasNext : Boolean(data?.next);
+  const loadingMore = loadMoreUi.key === listKey && loadMoreUi.loading;
+  const loadMoreError = loadMoreUi.key === listKey ? loadMoreUi.error : null;
   const hasPrev = Boolean(data?.previous) || page > 1;
+
+  const displayedResults = useMemo(() => {
+    const base = data?.results ?? [];
+    const extras = append.key === listKey ? append.items : [];
+    if (extras.length === 0) return base;
+    const seen = new Set(base.map((item) => `${item.type}-${item.slug}`));
+    const out = [...base];
+    for (const item of extras) {
+      const key = `${item.type}-${item.slug}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(item);
+    }
+    return out;
+  }, [data?.results, append, listKey]);
+
+  async function handleShowMore() {
+    if (loadingMore || !appendHasNext || !q) return;
+    const nextPage = appendLastPage + 1;
+    const requestKey = listKey;
+    setLoadMoreUi({ key: requestKey, loading: true, error: null });
+    try {
+      const more = await api.search(q, nextPage);
+      setAppend((prev) => {
+        const prior = prev.key === requestKey ? prev.items : [];
+        return {
+          key: requestKey,
+          items: [...prior, ...(more.results ?? [])],
+          lastPage: nextPage,
+          hasNext: Boolean(more.next),
+        };
+      });
+      setLoadMoreUi({ key: requestKey, loading: false, error: null });
+    } catch {
+      setLoadMoreUi({
+        key: requestKey,
+        loading: false,
+        error: "Не удалось загрузить ещё результаты. Попробуйте снова.",
+      });
+    }
+  }
 
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams);
@@ -113,16 +184,16 @@ export function SearchPage() {
         </p>
       )}
 
-      {!loading && !error && q && results.length === 0 && (
+      {!loading && !error && q && displayedResults.length === 0 && (
         <p className={styles.empty}>
           Ничего не найдено. Попробуйте сформулировать запрос иначе.
         </p>
       )}
 
-      {results.length > 0 && (
+      {displayedResults.length > 0 && (
         <>
           <ul className={styles.list}>
-            {results.map((item) => (
+            {displayedResults.map((item) => (
               <li key={`${item.type}-${item.slug}`} className={styles.item}>
                 <Link to={item.url} className={styles.itemLink}>
                   <span className={`${styles.badge} ${styles[`badge_${item.type}`] ?? ""}`}>
@@ -137,25 +208,46 @@ export function SearchPage() {
             ))}
           </ul>
 
-          {(hasNext || hasPrev) && (
-            <nav className={styles.pagination} aria-label="Пагинация">
+          <div className={styles.listFooter}>
+            {appendHasNext ? (
               <button
-                className={styles.pageButton}
-                disabled={!hasPrev}
-                onClick={() => goToPage(page - 1)}
+                type="button"
+                className={styles.showMore}
+                disabled={loadingMore}
+                onClick={() => {
+                  void handleShowMore();
+                }}
               >
-                ← Назад
+                {loadingMore ? "Загрузка…" : "Показать ещё"}
               </button>
-              <span className={styles.pageInfo}>Страница {page}</span>
-              <button
-                className={styles.pageButton}
-                disabled={!hasNext}
-                onClick={() => goToPage(page + 1)}
-              >
-                Вперёд →
-              </button>
-            </nav>
-          )}
+            ) : null}
+            {loadMoreError ? (
+              <p className={styles.loadMoreError} role="alert">
+                {loadMoreError}
+              </p>
+            ) : null}
+            {(Boolean(data?.next) || hasPrev) && (
+              <nav className={styles.pagination} aria-label="Пагинация">
+                <button
+                  type="button"
+                  className={styles.pageButton}
+                  disabled={!hasPrev}
+                  onClick={() => goToPage(page - 1)}
+                >
+                  ← Назад
+                </button>
+                <span className={styles.pageInfo}>Страница {page}</span>
+                <button
+                  type="button"
+                  className={styles.pageButton}
+                  disabled={!data?.next}
+                  onClick={() => goToPage(page + 1)}
+                >
+                  Вперёд →
+                </button>
+              </nav>
+            )}
+          </div>
         </>
       )}
     </div>

@@ -1,8 +1,7 @@
 /**
  * Load Yandex Metrika / GA4 only after explicit analytics consent (БЗ §8.6).
  *
- * Counter IDs come from Vite env (VITE_YANDEX_METRIKA_ID, VITE_GA4_MEASUREMENT_ID).
- * Essential cookies never require this gate.
+ * Counter IDs: GET /api/settings/public/ (Admin SiteSettings), fallback to Vite env.
  */
 
 import { useEffect } from "react";
@@ -21,6 +20,49 @@ declare global {
     gtag?: (...args: unknown[]) => void;
     ym?: (id: number, method: string, ...args: unknown[]) => void;
   }
+}
+
+type PublicAnalyticsIds = {
+  yandex_metrika_id: string;
+  ga4_measurement_id: string;
+};
+
+let cachedIds: PublicAnalyticsIds | null = null;
+let idsPromise: Promise<PublicAnalyticsIds> | null = null;
+
+async function fetchAnalyticsIds(): Promise<PublicAnalyticsIds> {
+  if (cachedIds) {
+    return cachedIds;
+  }
+  if (!idsPromise) {
+    idsPromise = (async () => {
+      const fallback: PublicAnalyticsIds = {
+        yandex_metrika_id:
+          (import.meta.env.VITE_YANDEX_METRIKA_ID as string | undefined) || "",
+        ga4_measurement_id:
+          (import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined) || "",
+      };
+      try {
+        const response = await fetch("/api/settings/public/", {
+          credentials: "omit",
+        });
+        if (!response.ok) {
+          return fallback;
+        }
+        const data = (await response.json()) as Partial<PublicAnalyticsIds>;
+        cachedIds = {
+          yandex_metrika_id:
+            (data.yandex_metrika_id || "").trim() || fallback.yandex_metrika_id,
+          ga4_measurement_id:
+            (data.ga4_measurement_id || "").trim() || fallback.ga4_measurement_id,
+        };
+        return cachedIds;
+      } catch {
+        return fallback;
+      }
+    })();
+  }
+  return idsPromise;
 }
 
 function loadYandexMetrika(counterId: string): void {
@@ -65,17 +107,16 @@ function loadGa4(measurementId: string): void {
   window.gtag("config", measurementId);
 }
 
-function tryLoadAnalytics(): void {
+async function tryLoadAnalytics(): Promise<void> {
   if (!isAnalyticsAllowed(readCookieConsent())) {
     return;
   }
-  const ymId = import.meta.env.VITE_YANDEX_METRIKA_ID as string | undefined;
-  const gaId = import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined;
-  if (ymId) {
-    loadYandexMetrika(ymId);
+  const ids = await fetchAnalyticsIds();
+  if (ids.yandex_metrika_id) {
+    loadYandexMetrika(ids.yandex_metrika_id);
   }
-  if (gaId) {
-    loadGa4(gaId);
+  if (ids.ga4_measurement_id) {
+    loadGa4(ids.ga4_measurement_id);
   }
 }
 
@@ -84,19 +125,19 @@ function tryLoadAnalytics(): void {
  */
 export function Analytics() {
   useEffect(() => {
-    tryLoadAnalytics();
+    void tryLoadAnalytics();
 
     function onStorage(event: StorageEvent) {
       if (event.key !== COOKIE_CONSENT_STORAGE_KEY) {
         return;
       }
       if (isAnalyticsAllowed(parseCookieConsent(event.newValue))) {
-        tryLoadAnalytics();
+        void tryLoadAnalytics();
       }
     }
 
     function onConsentChange() {
-      tryLoadAnalytics();
+      void tryLoadAnalytics();
     }
 
     window.addEventListener("storage", onStorage);

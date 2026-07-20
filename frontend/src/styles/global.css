@@ -263,3 +263,15 @@ select:focus-visible {
 .u-nowrap {
   white-space: nowrap;
 }
+
+/* FAQ note inside Y/U signal ТТХ (SignalSpecValue). */
+.signalSpecNoteLink {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+}
+
+.signalSpecNoteLink:hover {
+  color: var(--color-link-hover, var(--color-link));
+}

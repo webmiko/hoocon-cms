@@ -455,6 +455,7 @@
 }
 
 .card {
+  position: relative;
   display: grid;
   /* Photo share adapts with card/grid width — keeps media cell less “tall & skinny”. */
   --card-photo: minmax(7rem, 32%);
@@ -473,6 +474,19 @@
   box-shadow: var(--shadow-soft);
   transition: border-color var(--transition), box-shadow var(--transition),
     transform var(--transition-fast), background-color var(--transition);
+}
+
+/* Stretched hit target — FAQ «спецзаказ» sits above via .cardInteractive. */
+.cardHit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardInteractive {
+  position: relative;
+  z-index: 2;
 }
 
 /* Narrower grid → slightly wider photo column so cover shows the product. */
@@ -508,6 +522,13 @@
   border-right: 1px solid var(--color-border);
   overflow: hidden;
   line-height: 0;
+}
+
+.cardCompare {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
 }
 
 .cardMediaPlaceholder {
@@ -582,7 +603,7 @@
 
 .cardSpecs li {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
   font-size: 12px;
@@ -591,9 +612,6 @@
 
 .cardSpecName {
   color: var(--color-text-muted);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -602,6 +620,9 @@
   color: var(--color-text);
   text-align: right;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cardFooter {
@@ -639,7 +660,45 @@
   justify-content: center;
   align-items: center;
   gap: var(--space-md);
+  margin-top: 0;
+  width: 100%;
+}
+
+.listFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
   margin-top: var(--space-xl);
+}
+
+.showMore {
+  min-width: 12rem;
+  padding: var(--space-sm) var(--space-xl);
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.showMore:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary, #fff);
+}
+
+.showMore:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.loadMoreError {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger, #b42318);
+  text-align: center;
 }
 
 .pageButton {

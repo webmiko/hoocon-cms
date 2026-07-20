@@ -71,7 +71,7 @@ export function PullToRefresh({
 
       <div
         className={active ? `${styles.content} ${styles.contentActive}` : styles.content}
-        style={{ transform: `translateY(${pullDistance}px)` }}
+        style={{ top: `${pullDistance}px` }}
       >
         {children}
       </div>

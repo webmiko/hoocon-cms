@@ -10,6 +10,11 @@ import { LeadForm } from "../components/LeadForm";
 import { Seo } from "../components/Seo";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseDescription } from "../utils/parseDescription";
+import {
+  isModulatingSignalKey,
+  SignalSpecValue,
+} from "../components/SignalSpecValue";
+import { CompareToggle } from "../components/CompareToggle";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
@@ -34,6 +39,35 @@ interface SkuImage {
 }
 
 type TabId = "description" | "instructions" | "specs" | "analogs";
+
+/** Spec cell: Y/U with FAQ link on «спецзаказ», else SoftBreak + unit. */
+function SpecAttrValue({
+  slug,
+  value,
+  unit,
+  valueClassName,
+  unitClassName,
+}: {
+  slug: string;
+  value: string;
+  unit?: string | null;
+  valueClassName: string;
+  unitClassName: string;
+}) {
+  const displayUnit = specDisplayUnit(value, unit ?? undefined);
+  const display = `${value}${displayUnit ? ` ${displayUnit}` : ""}`;
+  if (isModulatingSignalKey(slug) || value.includes("(спецзаказ)")) {
+    return <SignalSpecValue value={display} className={valueClassName} />;
+  }
+  return (
+    <span className={valueClassName}>
+      <SoftBreakText text={value} />
+      {displayUnit ? (
+        <span className={unitClassName}> {displayUnit}</span>
+      ) : null}
+    </span>
+  );
+}
 
 /** True when category blurb is not a foreign-series dump (e.g. HVA on DA8MQU). */
 function categoryCopyFitsSku(
@@ -236,12 +270,19 @@ export function SkuDetailPage() {
             <ul className={styles.heroSpecs}>
               {sku.highlights.map((h) => {
                 const unit = specDisplayUnit(h.value, h.unit);
+                const display = `${h.value}${unit ? ` ${unit}` : ""}`;
                 return (
                   <li key={h.key}>
                     <span className={styles.heroSpecLabel}>{h.name}:</span>{" "}
                     <strong>
-                      <SoftBreakText text={h.value} />
-                      {unit ? ` ${unit}` : ""}
+                      {isModulatingSignalKey(h.key) ? (
+                        <SignalSpecValue value={display} />
+                      ) : (
+                        <>
+                          <SoftBreakText text={h.value} />
+                          {unit ? ` ${unit}` : ""}
+                        </>
+                      )}
                     </strong>
                   </li>
                 );
@@ -257,6 +298,15 @@ export function SkuDetailPage() {
                 <p className={styles.priceOnRequest}>Цена по запросу</p>
               )}
             </div>
+            <CompareToggle
+              variant="button"
+              item={{
+                slug: sku.slug,
+                sku_code: sku.sku_code,
+                name: sku.name,
+                image: sku.images?.[0]?.image ?? sku.image?.image ?? null,
+              }}
+            />
             <a href="#rfq" className={styles.heroCta}>
               Запросить цену
             </a>
@@ -374,21 +424,13 @@ export function SkuDetailPage() {
                                 <span className={styles.specName}>
                                   {softBreak(attr.name)}
                                 </span>
-                                <span className={styles.specValue}>
-                                  <SoftBreakText text={String(attr.value)} />
-                                  {(() => {
-                                    const unit = specDisplayUnit(
-                                      String(attr.value),
-                                      attr.unit,
-                                    );
-                                    return unit ? (
-                                      <span className={styles.specUnit}>
-                                        {" "}
-                                        {unit}
-                                      </span>
-                                    ) : null;
-                                  })()}
-                                </span>
+                                <SpecAttrValue
+                                  slug={attr.slug}
+                                  value={String(attr.value)}
+                                  unit={attr.unit}
+                                  valueClassName={styles.specValue}
+                                  unitClassName={styles.specUnit}
+                                />
                               </li>
                             ))}
                         </ul>
@@ -417,21 +459,13 @@ export function SkuDetailPage() {
                               <span className={styles.specName}>
                                 {softBreak(attr.name)}
                               </span>
-                              <span className={styles.specValue}>
-                                <SoftBreakText text={String(attr.value)} />
-                                {(() => {
-                                  const unit = specDisplayUnit(
-                                    String(attr.value),
-                                    attr.unit,
-                                  );
-                                  return unit ? (
-                                    <span className={styles.specUnit}>
-                                      {" "}
-                                      {unit}
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </span>
+                              <SpecAttrValue
+                                slug={attr.slug}
+                                value={String(attr.value)}
+                                unit={attr.unit}
+                                valueClassName={styles.specValue}
+                                unitClassName={styles.specUnit}
+                              />
                             </li>
                           ))}
                       </ul>

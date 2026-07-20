@@ -1,0 +1,113 @@
+.checkboxWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.checkboxUi {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.checkbox:checked + .checkboxUi {
+  background: var(--color-link);
+  border-color: var(--color-link);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.2'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.checkbox:focus-visible + .checkboxUi {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
+}
+
+.limitFloat {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-text);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.button,
+.buttonActive {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buttonGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.goLink {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.goLink:hover {
+  color: var(--color-link-hover, var(--color-link));
+}
+
+.button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.button:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+
+.buttonActive {
+  border: 1px solid var(--color-link);
+  background: rgba(220, 19, 19, 0.08);
+  color: var(--color-link);
+}
+
+.limit {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  width: 100%;
+}

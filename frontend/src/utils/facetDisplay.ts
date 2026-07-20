@@ -13,6 +13,7 @@ const FACET_LABEL_SHORT: Record<string, string> = {
   dn: "DN",
   ways: "Вид крана",
   kvs: "Kvs (м³/ч)",
+  analog: "Аналоги",
 };
 
 /**

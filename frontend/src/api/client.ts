@@ -79,6 +79,18 @@ export interface CatalogFacetsResponse {
   results: CatalogFacet[];
 }
 
+export interface CompareRow {
+  key: string;
+  name: string;
+  values: string[];
+  diff: boolean;
+}
+
+export interface CompareResponse {
+  skus: SKUList[];
+  rows: CompareRow[];
+}
+
 // Search
 export type SearchResultItem = components["schemas"]["SearchResultItem"];
 export type SearchResponse = components["schemas"]["SearchResponse"];
@@ -175,6 +187,14 @@ export const api = {
 
   skuDetail(slug: string): Promise<SKUDetailResponse> {
     return apiFetch<SKUDetailResponse>(`/api/catalog/skus/${slug}/`);
+  },
+
+  compare(slugs: string[]): Promise<CompareResponse> {
+    const qs =
+      slugs.length > 0
+        ? `?${new URLSearchParams({ skus: slugs.join(",") }).toString()}`
+        : "";
+    return apiFetch<CompareResponse>(`/api/catalog/compare/${qs}`);
   },
 
   // ── Content ───────────────────────────────────────────────────────

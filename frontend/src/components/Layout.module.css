@@ -343,6 +343,10 @@
   padding: var(--space-2xl) 0 var(--space-3xl);
 }
 
+:global(body:has([data-compare-tray])) .main {
+  padding-bottom: calc(var(--space-3xl) + 96px);
+}
+
 .footer {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),

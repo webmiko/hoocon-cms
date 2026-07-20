@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/HomePage";
 import { CatalogPage } from "./pages/CatalogPage";
+import { ComparePage } from "./pages/ComparePage";
 import { SkuDetailPage } from "./pages/SkuDetailPage";
 import { ArticlesListPage } from "./pages/ArticlesListPage";
 import { ArticlePage } from "./pages/ArticlePage";
@@ -39,6 +40,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="catalog" element={<CatalogPage />} />
+        <Route path="compare" element={<ComparePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route
           path="consultation"

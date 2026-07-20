@@ -16,6 +16,7 @@ describe("facetDisplay", () => {
     expect(facetLabelShort("aux_switch", "Вспомогательный переключатель")).toBe(
       "Вспом. перекл.",
     );
+    expect(facetLabelShort("analog", "Аналоги")).toBe("Аналоги");
   });
 
   it("normalizes area to always «до N м²»", () => {

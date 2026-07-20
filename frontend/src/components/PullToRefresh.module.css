@@ -58,12 +58,13 @@
 }
 
 .content {
-  will-change: transform;
-  transition: transform 0.18s ease-out;
+  position: relative;
+  transition: top 0.18s ease-out;
 }
 
 .contentActive {
   transition: none;
+  will-change: top;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,13 +6,16 @@
   margin-top: calc(-1 * var(--space-2xl));
 }
 
-/* Dark hero — looping HVAC video + brand-first copy */
+/* Dark hero — crossfade slider of reference sites + brand overlay */
 .hero {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   background: var(--color-hero);
   color: #fff;
-  padding: clamp(72px, 10vw, 112px) var(--space-lg);
-  min-height: min(72vh, 720px);
+  padding: clamp(72px, 10vw, 112px) var(--space-lg) clamp(48px, 6vw, 72px);
+  min-height: min(78vh, 760px);
   margin-bottom: 0;
   overflow: hidden;
   isolation: isolate;
@@ -26,39 +29,55 @@
   pointer-events: none;
 }
 
-.heroVideo {
+.heroSlider {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   position: absolute;
   inset: 0;
+}
+
+.heroSlide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.25s ease-in-out;
+}
+
+.heroSlideActive {
+  opacity: 1;
+  z-index: 1;
+}
+
+.heroSlideImg {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transform: scale(1.05);
-  /* Slow ease-in-out drift — softer than punchy --ease-out */
-  animation: heroDrift 64s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
 .heroShade {
   position: absolute;
   inset: 0;
-  /* Site dark hero + left reading column + brand red edge wash */
+  z-index: 2;
   background:
     linear-gradient(
       105deg,
-      rgba(16, 16, 16, 0.92) 0%,
-      rgba(16, 16, 16, 0.78) 38%,
-      rgba(16, 16, 16, 0.45) 68%,
-      rgba(16, 16, 16, 0.62) 100%
+      rgba(12, 12, 12, 0.88) 0%,
+      rgba(12, 12, 12, 0.62) 34%,
+      rgba(12, 12, 12, 0.35) 62%,
+      rgba(12, 12, 12, 0.48) 100%
     ),
     linear-gradient(
       180deg,
-      rgba(16, 16, 16, 0.35) 0%,
-      transparent 42%,
-      rgba(16, 16, 16, 0.55) 100%
+      rgba(12, 12, 12, 0.28) 0%,
+      transparent 38%,
+      rgba(12, 12, 12, 0.55) 100%
     ),
     radial-gradient(
-      80% 70% at 85% 40%,
-      rgba(220, 19, 19, 0.18) 0%,
+      70% 55% at 80% 20%,
+      rgba(220, 19, 19, 0.14) 0%,
       transparent 55%
     );
 }
@@ -95,23 +114,62 @@
   );
 }
 
-.heroInner {
+.heroBrand {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   max-width: var(--max-width);
+  width: 100%;
   margin: 0 auto;
   padding: 0;
   animation: rise 0.75s var(--ease-out) both;
 }
 
-@keyframes heroDrift {
-  from {
-    transform: scale(1.04) translate3d(0, 0, 0);
-  }
+.heroSliderUi {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  max-width: var(--max-width);
+  width: 100%;
+  margin: var(--space-xl) auto 0;
+  pointer-events: auto;
+}
 
-  to {
-    transform: scale(1.08) translate3d(-0.8%, -0.5%, 0);
-  }
+.heroSlideCaption {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.heroDots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.heroDot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.heroDot:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.heroDotActive {
+  background: var(--color-brand);
+  transform: scale(1.2);
 }
 
 .brand {
@@ -120,7 +178,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   color: #fff;
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-md);
   line-height: 0.92;
   overflow-wrap: normal;
   word-break: keep-all;
@@ -132,7 +190,7 @@
   font-size: clamp(1.2rem, 2.4vw, 1.65rem);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
-  margin: 0 0 var(--space-md);
+  margin: 0 0 var(--space-sm);
   max-width: 26ch;
   line-height: 1.3;
   letter-spacing: -0.02em;
@@ -141,11 +199,10 @@
 
 .heroLead {
   font-size: var(--font-size-lg);
-  line-height: 1.65;
-  /* ~0.88 white on #101010 ≈ 12:1; 0.72 was hard to read on the hero wash */
+  line-height: 1.55;
   color: rgba(255, 255, 255, 0.88);
-  max-width: 42ch;
-  margin: 0 0 var(--space-xl);
+  max-width: 36ch;
+  margin: 0 0 var(--space-lg);
   text-wrap: pretty;
 }
 
@@ -153,15 +210,6 @@
   display: flex;
   gap: var(--space-md);
   flex-wrap: wrap;
-}
-
-.heroNote {
-  margin: var(--space-md) 0 0;
-  max-width: 42ch;
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.78);
-  text-wrap: pretty;
 }
 
 .ctaPrimary,
@@ -418,6 +466,212 @@
   line-height: 1.55;
 }
 
+.partners {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: var(--space-3xl);
+  padding-block: clamp(72px, 10vw, 120px);
+  padding-inline: clamp(40px, 6vw, 72px);
+  min-height: clamp(360px, 48vw, 480px);
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  background: #0a0a0a;
+  animation: rise 0.7s var(--ease-out) 0.14s both;
+}
+
+.partnersBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.partnersParallax {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -40%;
+  height: 180%;
+  will-change: transform;
+}
+
+.partnersParallaxImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.partnersShade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 100% at 50% 50%,
+      rgba(220, 19, 19, 0.08) 0%,
+      transparent 70%
+    ),
+    rgba(8, 8, 8, 0.8);
+}
+
+.partnersInner {
+  position: relative;
+  z-index: 2;
+  grid-area: 1 / 1;
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  text-align: center;
+}
+
+.partnersHead {
+  margin-bottom: var(--space-xl);
+}
+
+.partnersHead h2 {
+  margin: 0 0 var(--space-sm);
+  color: #fff;
+}
+
+.partnersLead {
+  margin: 0 auto;
+  max-width: 48ch;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.partnersLead a {
+  color: #ff6b6b;
+}
+
+.partnersLead a:hover {
+  color: #fff;
+}
+
+.partnerLogos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+.partnerLogoItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: var(--space-sm);
+  background: transparent;
+  border: none;
+}
+
+.partnerLogoLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+}
+
+.partnerLogoImg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 56px;
+  object-fit: contain;
+  /* Black logo plate → transparent on dark photo */
+  mix-blend-mode: screen;
+  opacity: 0.9;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.partnerLogoLink:hover .partnerLogoImg,
+.partnerLogoItem:hover .partnerLogoImg {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.delivery {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: var(--space-3xl);
+  padding: var(--space-2xl) var(--space-lg);
+  background: var(--color-subtle);
+  border-block: 1px solid var(--color-border);
+  animation: rise 0.7s var(--ease-out) 0.14s both;
+}
+
+.deliveryInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: center;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.deliveryMedia {
+  min-width: 0;
+}
+
+.deliveryImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+}
+
+.deliveryCopy h2 {
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.deliveryCopy p {
+  margin: 0 0 var(--space-xl);
+  max-width: 44ch;
+  color: var(--color-text-soft);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.deliveryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color var(--transition), transform var(--transition-fast);
+}
+
+.deliveryCta:hover {
+  background: var(--color-brand-hover);
+  color: var(--color-on-brand);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
 .faqList {
   display: flex;
   flex-direction: column;
@@ -480,13 +734,24 @@
   }
 }
 
+@media (max-width: 900px) {
+  .partnerLogos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .deliveryInner {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .home {
     margin-top: calc(-1 * var(--space-lg));
   }
 
   .hero {
-    padding: 64px var(--space-md) 80px;
+    padding: 64px var(--space-md) 56px;
+    min-height: min(70vh, 640px);
   }
 
   .trust {
@@ -520,26 +785,33 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroInner,
+  .heroBrand,
+  .partners,
   .trust,
-  .section,
-  .heroVideo {
+  .section {
     animation: none;
   }
 
-  .heroVideo {
-    display: none;
+  .heroSlide {
+    transition: none;
   }
 
-  .heroMedia {
-    background:
-      url("/hero/hvac-vent-poster.jpg") center / cover no-repeat;
+  .partnersParallax {
+    top: -30%;
+    height: 160%;
+    transform: none !important;
+    will-change: auto;
+  }
+
+  .partnersParallaxImg {
+    will-change: auto;
   }
 
   .trustItem:hover,
   .directionLink:hover,
   .ctaPrimary:hover,
-  .ctaSecondary:hover {
+  .ctaSecondary:hover,
+  .heroDotActive {
     transform: none;
   }
 }

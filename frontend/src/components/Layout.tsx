@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { CompareProvider } from "../compare/CompareContext";
+import { CompareTray } from "./CompareTray";
 import { CookieConsent } from "./CookieConsent";
 import { Analytics } from "./Analytics";
 import { DesktopNav } from "./DesktopNav";
@@ -15,7 +17,7 @@ import styles from "./Layout.module.css";
  * App shell: utility masthead + brand header + main + dark footer.
  *
  * Spec: docs/readiness-backend-ux.md §4.3; prototip-hoocon-shared.css.
- * No Cart/Wishlist (B2B without checkout in v1).
+ * No Cart/Wishlist (B2B without checkout in v1). Compare tray is not wishlist.
  */
 export function Layout() {
   const navigate = useNavigate();
@@ -82,7 +84,7 @@ export function Layout() {
   }
 
   return (
-    <>
+    <CompareProvider>
       <StripTrailingSlash />
       <ScrollToTop />
       <Analytics />
@@ -229,6 +231,13 @@ export function Layout() {
               Вопросы
             </Link>
             <Link
+              to="/compare"
+              className={styles.navMobileLink}
+              onClick={closeMenu}
+            >
+              Сравнение
+            </Link>
+            <Link
               to="/consultation"
               className={styles.navMobileCta}
               onClick={closeMenu}
@@ -264,6 +273,9 @@ export function Layout() {
             <ul className={styles.footerList}>
               <li>
                 <Link to="/catalog">Вся продукция</Link>
+              </li>
+              <li>
+                <Link to="/compare">Сравнение</Link>
               </li>
               <li>
                 <Link to="/replacement">Аналог Belimo</Link>
@@ -328,6 +340,8 @@ export function Layout() {
         </div>
       </footer>
 
+      <CompareTray />
+
       {!hideMobileCta ? (
         <Link to="/consultation" className={styles.mobileStickyCta}>
           Запросить КП
@@ -335,6 +349,6 @@ export function Layout() {
       ) : null}
 
       <CookieConsent />
-    </>
+    </CompareProvider>
   );
 }

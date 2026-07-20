@@ -174,7 +174,45 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
+  margin-top: 0;
+  width: 100%;
+}
+
+.listFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   margin-top: 32px;
+}
+
+.showMore {
+  min-width: 12rem;
+  padding: 8px 24px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.showMore:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.showMore:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.loadMoreError {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-danger, #b42318);
+  text-align: center;
 }
 
 .pageButton {

@@ -28,13 +28,26 @@ export function skuSeoTitlePartial(
   skuCode: string,
   highlights?: Array<{ key: string; value: string }>,
 ): string {
-  const moment = highlights?.find((h) => h.key === "moment")?.value ?? "";
+  // Skip moment (Нм): already in article / on-page ТТХ — do not duplicate in <title>.
   const voltage = highlights?.find((h) => h.key === "voltage")?.value ?? "";
-  const specs = [moment, voltage].filter(Boolean).join(", ");
-  if (specs) {
-    return `${skuCode} — ${specs}`;
+  const volt = shortVoltageForTitle(voltage);
+  if (volt) {
+    return `${skuCode} — ${volt}`;
   }
   return `${skuCode} — электропривод ОВК`;
+}
+
+/** Collapse long voltage strings to ``24 В`` / ``230 В`` for SERP titles. */
+function shortVoltageForTitle(voltage: string): string {
+  const text = voltage.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (/(?:^|[^0-9])230(?:[^0-9]|$)/.test(text) || /100\s*\.\.\.\s*240/.test(text)) {
+    return "230 В";
+  }
+  if (/(?:^|[^0-9])24(?:[^0-9]|$)/.test(text)) {
+    return "24 В";
+  }
+  return text.length <= 12 ? text : text.slice(0, 12).trim();
 }
 
 export function skuSeoDescription(
