@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import logging
-
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
+from config.logging_utils import setup_logger
 from crm.models import (
     Activity,
     ActivityType,
@@ -18,11 +17,25 @@ from crm.models import (
 )
 from leads.models import Lead
 
-logger = logging.getLogger("hoocon.crm")
+logger = setup_logger("hoocon.crm")
+
+
+def normalize_client_email(raw: str) -> str:
+    """Normalize email for Client dedup (strip + lower).
+
+    Args:
+        raw: raw email string.
+
+    Returns:
+        Normalized email.
+    """
+    return (raw or "").strip().lower()
 
 
 def get_or_create_client_from_lead(lead: Lead) -> Client:
     """Find Client by email or create from Lead contact fields.
+
+    Uses unique email + IntegrityError retry to avoid race duplicates.
 
     Args:
         lead: saved Lead instance.
@@ -30,15 +43,23 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
     Returns:
         Client linked (or to be linked) to this lead.
     """
-    email = (lead.email or "").strip().lower()
-    client = Client.objects.filter(email__iexact=email).first()
-    if client is None:
-        client = Client.objects.create(
-            name=lead.name.strip() or email,
-            email=email,
-            phone=lead.phone or "",
-            company=lead.company or "",
-        )
+    email = normalize_client_email(lead.email)
+    defaults = {
+        "name": lead.name.strip() or email,
+        "phone": lead.phone or "",
+        "company": lead.company or "",
+    }
+    try:
+        with transaction.atomic():
+            client, created = Client.objects.get_or_create(
+                email=email,
+                defaults=defaults,
+            )
+    except IntegrityError:
+        client = Client.objects.get(email=email)
+        created = False
+
+    if created:
         return client
 
     # Refresh sparse fields from newer lead if empty on client.
@@ -73,6 +94,20 @@ def link_lead_to_client(lead: Lead) -> Client:
     lead.client_id = client.pk
     lead.client = client
     return client
+
+
+def enqueue_crm_email(email_id: int) -> None:
+    """Schedule Celery send after the current DB transaction commits.
+
+    Args:
+        email_id: EmailMessage primary key.
+    """
+    from crm.tasks import send_crm_email
+
+    def _enqueue() -> None:
+        send_crm_email.delay(email_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def create_outbound_email(
@@ -121,12 +156,5 @@ def create_outbound_email(
         author=created_by,  # type: ignore[misc]
     )
     if send_now:
-        from crm.tasks import send_crm_email
-
-        email_id = msg.pk
-
-        def _enqueue() -> None:
-            send_crm_email.delay(email_id)
-
-        transaction.on_commit(_enqueue)
+        enqueue_crm_email(msg.pk)
     return msg

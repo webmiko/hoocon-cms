@@ -1,8 +1,15 @@
 """URL configuration for Hoocon CMS."""
 
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.views import redirect_to_login
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponse
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -18,6 +25,23 @@ from config.seo_views import (
     SitemapXmlView,
 )
 
+
+def _openapi_access(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
+    """DEBUG: open docs; otherwise staff login required (checked per request)."""
+
+    @wraps(view)
+    def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        if settings.DEBUG:
+            return view(request, *args, **kwargs)
+        if not request.user.is_authenticated:
+            return redirect_to_login(request.get_full_path())
+        if not (request.user.is_active and request.user.is_staff):
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+
+    return _wrapped
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/catalog/", include("catalog.urls")),
@@ -27,10 +51,10 @@ urlpatterns = [
     path("api/", include("search.urls")),
     path("api/health/", HealthView.as_view(), name="api-health"),
     path("api/csrf/", CsrfTokenView.as_view(), name="api-csrf"),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/schema/", _openapi_access(SpectacularAPIView.as_view()), name="schema"),
     path(
         "api/docs/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
+        _openapi_access(SpectacularSwaggerView.as_view(url_name="schema")),
         name="swagger-ui",
     ),
     path("robots.txt", RobotsTxtView.as_view(), name="robots-txt"),

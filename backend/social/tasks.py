@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import logging
+from typing import Any
 
 from celery import shared_task
 from django.apps import apps
 
-logger = logging.getLogger("hoocon.social")
+from config.logging_utils import setup_logger
+
+logger = setup_logger("hoocon.social")
 
 
 @shared_task(
@@ -18,7 +20,7 @@ logger = logging.getLogger("hoocon.social")
     name="social.announce_content",
 )
 def announce_content_task(
-    self,  # noqa: ANN001
+    self: Any,
     model_label: str,
     object_id: int,
     *,

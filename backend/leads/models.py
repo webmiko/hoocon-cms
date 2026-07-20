@@ -140,5 +140,5 @@ class Lead(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        """Return 'name (lead_type)' for Admin and logs (no PII in str)."""
-        return f"{self.name} ({self.get_lead_type_display()})"
+        """Return Lead #pk and type — no contact PII (safe for logs)."""
+        return f"Lead #{self.pk} ({self.get_lead_type_display()})"

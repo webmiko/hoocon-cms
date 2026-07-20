@@ -27,9 +27,10 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
     ATTR_GROUP_VALVE,
 )
+from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.tech_copy import normalize_tech_copy
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, convert_bytes_to_webp
-from catalog.models import SKU, Attribute, AttributeValue, Product, ProductImage
+from catalog.models import SKU, AttributeValue, Product, ProductImage
 
 logger = logging.getLogger(__name__)
 
@@ -506,25 +507,8 @@ def _shared_attrs(series: BallValveSeries) -> tuple[AttrRow, ...]:
     return tuple(rows)
 
 
-def _ensure_attr(name: str, slug: str, unit: str) -> Attribute:
-    attr, _ = Attribute.objects.get_or_create(
-        slug=slug,
-        defaults={"name": name, "unit": unit},
-    )
-    if attr.name != name or attr.unit != unit:
-        attr.name = name
-        attr.unit = unit
-        attr.save(update_fields=["name", "unit"])
-    return attr
-
-
 def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
-    attr = _ensure_attr(name, slug, unit)
-    AttributeValue.objects.update_or_create(
-        sku=sku,
-        attribute=attr,
-        defaults={"value": value},
-    )
+    set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
 def attach_gallery_images(

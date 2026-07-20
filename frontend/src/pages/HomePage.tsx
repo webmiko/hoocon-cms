@@ -12,6 +12,61 @@ import styles from "./HomePage.module.css";
 /** Auto-advance interval for hero background slides. */
 const HERO_SLIDE_MS = 6500;
 
+/** Soft cap for category card lead under the title. */
+const CATEGORY_LEAD_MAX = 140;
+
+/**
+ * First sentence of a category description for the directions card.
+ *
+ * Args:
+ *   description: Raw category description from the API.
+ *   maxLen: Soft character cap before ellipsis.
+ *
+ * Returns:
+ *   Plain lead text, or empty string when description is blank.
+ */
+function categoryLead(
+  description: string,
+  maxLen: number = CATEGORY_LEAD_MAX,
+): string {
+  const text = description.replace(/\s+/g, " ").trim();
+  if (!text) {
+    return "";
+  }
+  const first = text.split(/(?<=[.!?…])\s+/)[0] ?? text;
+  if (first.length <= maxLen) {
+    return first;
+  }
+  const cut = first.slice(0, maxLen - 1).replace(/\s+\S*$/, "");
+  return `${cut || first.slice(0, maxLen - 1)}…`;
+}
+
+type DirectionImageProps = {
+  apiSrc: string | null | undefined;
+  className: string;
+  placeholderClassName: string;
+};
+
+/** Direction card photo from the catalog API preview. */
+function DirectionCardImage({
+  apiSrc,
+  className,
+  placeholderClassName,
+}: DirectionImageProps) {
+  if (apiSrc) {
+    return (
+      <img
+        className={className}
+        src={apiSrc}
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
+    );
+  }
+  return <span className={placeholderClassName} aria-hidden="true" />;
+}
+
 /** Partner logos from live hoocon.ru «Наша профессиональная среда». */
 const HOME_PARTNERS = [
   {
@@ -240,50 +295,53 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2>Направления продукции</h2>
-          <p className={styles.sectionLead}>
-            Выберите семейство по задаче: воздушные клапаны, противопожарные
-            системы, дымоудаление или шаровые краны.
-          </p>
-        </div>
-      {loading && <HomeSkeleton />}
-      {error && <p className={styles.status}>Ошибка загрузки категорий.</p>}
-      {categoriesData && (
-          <div className={styles.directionGrid}>
-            {categoriesData.results.map((cat) => (
-              <Link
-                key={cat.slug}
-                to={`/catalog?category=${encodeURIComponent(cat.slug)}`}
-                className={styles.directionLink}
-              >
-                {cat.image?.image ? (
-                  <img
-                    className={styles.directionImage}
-                    src={cat.image.image}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <span
-                    className={styles.directionImagePlaceholder}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className={styles.directionBody}>
-                  <span className={styles.directionName}>
-                    {softBreak(cat.name)}
-                  </span>
-                  <span className={styles.directionArrow} aria-hidden="true">
-                    →
-                  </span>
-                </span>
-              </Link>
-            ))}
+      <section
+        className={styles.directions}
+        aria-labelledby="directions-heading"
+      >
+        <div className={styles.directionsInner}>
+          <div className={styles.sectionHead}>
+            <h2 id="directions-heading">Направления продукции</h2>
+            <p className={styles.sectionLead}>
+              Выберите семейство по задаче: воздушные клапаны, противопожарные
+              системы, дымоудаление или шаровые краны.
+            </p>
           </div>
-        )}
+          {loading && <HomeSkeleton />}
+          {error && <p className={styles.status}>Ошибка загрузки категорий.</p>}
+          {categoriesData && (
+            <div className={styles.directionGrid}>
+              {categoriesData.results.map((cat, index) => {
+                const lead = categoryLead(cat.description ?? "");
+                return (
+                  <Link
+                    key={cat.slug}
+                    to={`/catalog?category=${encodeURIComponent(cat.slug)}`}
+                    className={styles.directionBlock}
+                    style={{ animationDelay: `${0.06 + index * 0.05}s` }}
+                  >
+                    <span className={styles.directionMedia}>
+                      <DirectionCardImage
+                        apiSrc={cat.image?.image}
+                        className={styles.directionImage}
+                        placeholderClassName={styles.directionImagePlaceholder}
+                      />
+                    </span>
+                    <span className={styles.directionBody}>
+                      <span className={styles.directionName}>
+                        {softBreak(cat.name)}
+                      </span>
+                      {lead ? (
+                        <span className={styles.directionDesc}>{lead}</span>
+                      ) : null}
+                      <span className={styles.directionMore}>В каталог →</span>
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className={styles.section}>

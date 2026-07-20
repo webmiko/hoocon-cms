@@ -6,6 +6,8 @@ Spec: docs/readiness-backend-ux.md §2.3 —
 
 from __future__ import annotations
 
+from typing import Any
+
 import django_filters
 from django.db.models import Q, QuerySet
 from rest_framework.filters import BaseFilterBackend
@@ -86,9 +88,9 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
     def filter_queryset(
         self,
         request: Request,
-        queryset: QuerySet[SKU],
+        queryset: QuerySet[Any],
         _view: APIView,
-    ) -> QuerySet[SKU]:
+    ) -> QuerySet[Any]:
         """Filter by canonical facets first, then raw Attribute.slug params."""
         params = request.query_params
         candidate_keys = [key for key in params if key not in _RESERVED_QUERY_KEYS]

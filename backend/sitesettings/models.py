@@ -19,7 +19,9 @@ class SiteSettings(models.Model):
     сериализатор каталога отдаёт цену только если True.
 
     Analytics IDs — публичные счётчики (без секретов). Токены ботов соцсетей
-    только в ``.env`` (TELEGRAM_BOT_TOKEN / VK_ACCESS_TOKEN / MAX_BOT_TOKEN).
+    задаются в Admin (поле ниже) или запасным вариантом в ``.env``
+    (TELEGRAM_BOT_TOKEN / VK_ACCESS_TOKEN / MAX_BOT_TOKEN). В публичный API
+    токены и chat ID **не** попадают.
     """
 
     SINGLETON_PK = 1
@@ -49,44 +51,79 @@ class SiteSettings(models.Model):
         help_text="Measurement ID вида G-XXXXXXXX. Пусто = не подключать.",
     )
 
-    # ── Social announcements ──
+    # ── Social announce policy ──
     social_announce_on_publish: models.BooleanField = models.BooleanField(
         "автоанонс при публикации",
         default=False,
         help_text=("При первой публикации статьи/новости отправить анонс во все включённые каналы (Celery)."),
     )
+
+    # ── Telegram integration ──
     telegram_enabled: models.BooleanField = models.BooleanField(
         "Telegram включён",
         default=False,
     )
+    telegram_bot_token: models.CharField = models.CharField(
+        "Telegram bot token",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text=(
+            "Токен бота (@BotFather). Пустое поле при сохранении не стирает "
+            "уже сохранённый токен. Запасной вариант: TELEGRAM_BOT_TOKEN в .env."
+        ),
+    )
     telegram_chat_id: models.CharField = models.CharField(
-        "Telegram chat ID",
+        "Telegram chat / channel ID",
         max_length=64,
         blank=True,
         default="",
-        help_text="ID канала/чата. Токен бота — TELEGRAM_BOT_TOKEN в .env.",
+        help_text="ID канала или чата (напр. -100… или @channel).",
     )
+
+    # ── VK integration ──
     vk_enabled: models.BooleanField = models.BooleanField(
         "VK включён",
         default=False,
+    )
+    vk_access_token: models.CharField = models.CharField(
+        "VK access token",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Ключ сообщества с правом wall. Пустое поле при сохранении не "
+            "стирает токен. Запасной вариант: VK_ACCESS_TOKEN в .env."
+        ),
     )
     vk_group_id: models.CharField = models.CharField(
         "VK group ID",
         max_length=32,
         blank=True,
         default="",
-        help_text="Числовой ID сообщества (без минуса). Токен — VK_ACCESS_TOKEN в .env.",
+        help_text="Числовой ID сообщества (без минуса).",
     )
+
+    # ── MAX integration ──
     max_enabled: models.BooleanField = models.BooleanField(
         "MAX включён",
         default=False,
+    )
+    max_bot_token: models.CharField = models.CharField(
+        "MAX bot token",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Токен бота MAX. Пустое поле при сохранении не стирает токен. Запасной вариант: MAX_BOT_TOKEN в .env."
+        ),
     )
     max_chat_id: models.CharField = models.CharField(
         "MAX chat ID",
         max_length=64,
         blank=True,
         default="",
-        help_text="ID чата для бота MAX. Токен — MAX_BOT_TOKEN в .env.",
+        help_text="ID чата для бота MAX.",
     )
 
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)

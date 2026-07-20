@@ -30,4 +30,40 @@ describe("parseDescription", () => {
     });
     expect(blocks[3]).toMatchObject({ type: "section", title: "Преимущества" });
   });
+
+  it("recognizes marketing section titles as headings", () => {
+    const blocks = parseDescription(
+      [
+        "Привод Hoocon DA..MU представляет собой электромеханический привод.",
+        "",
+        "Технические возможности:",
+        "",
+        "Функциональные особенности",
+        "",
+        "– Пропорциональное управление",
+        "",
+        "Отличительные преимущества",
+        "",
+        "– Надежность конструкции",
+        "",
+        "Конкурентные преимущества перед аналогами",
+        "",
+        "– Низкое энергопотребление",
+      ].join("\n"),
+    );
+    expect(blocks.map((b) => b.type)).toEqual([
+      "paragraph",
+      "section",
+      "section",
+      "list",
+      "section",
+      "list",
+      "section",
+      "list",
+    ]);
+    expect(blocks[2]).toMatchObject({
+      type: "section",
+      title: "Функциональные особенности",
+    });
+  });
 });

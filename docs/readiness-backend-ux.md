@@ -42,7 +42,7 @@
 | Схема атрибутов (момент, В, сигнал…) как словарь | Кривые фильтры | Итерация 1 + [data-quality-etl.md](data-quality-etl.md) |
 | Контент статей/новостей для импорта | Пустые `/statyi` | Итерация 3; тексты **не** as-is с Tilda |
 | VPS reg.ru + DNS/SMTP в бою | Не блокер кода | Итерация 5 |
-| Docker Desktop локально | Не поднять Postgres | Сейчас (или USE_SQLITE) |
+| Docker Desktop локально | Не поднять Postgres | Поднять Postgres (FTS/GIN). `USE_SQLITE` — не для полного migrate |
 | Утверждённый макет mobile sticky CTA | Мелкие правки | Итерация 4 (есть в прототипе) |
 | Remote GitHub private | Процесс | По команде |
 

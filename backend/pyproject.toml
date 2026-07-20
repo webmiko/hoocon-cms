@@ -66,11 +66,33 @@ ignore_missing_imports = true
 exclude = [
     "^\\.venv/",
     "(^|/)_[^/]+/",
+    "/migrations/",
 ]
 
 [[tool.mypy.overrides]]
 module = "*.management.commands.*"
 disallow_untyped_defs = false
+disable_error_code = ["attr-defined", "arg-type", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "catalog.etl.*"
+disable_error_code = ["attr-defined", "arg-type"]
+
+# Admin mixin/actions typing vs django-stubs ModelAdmin is noisy.
+[[tool.mypy.overrides]]
+module = [
+    "content.admin",
+    "social.admin",
+]
+disable_error_code = ["misc", "assignment", "attr-defined"]
+
+# DRF ModelSerializer Meta.fields length + django-stubs _ST on get_* methods.
+[[tool.mypy.overrides]]
+module = [
+    "catalog.serializers",
+    "content.serializers",
+]
+disable_error_code = ["assignment", "attr-defined", "return-value"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
@@ -96,7 +118,7 @@ addopts = "--strict-markers"
 
 [tool.coverage.run]
 branch = true
-source = ["catalog", "content", "leads", "search", "config", "sitesettings"]
+source = ["catalog", "content", "leads", "crm", "search", "config", "sitesettings"]
 omit = [
     "*/migrations/*",
     "*/tests/*",

@@ -16,7 +16,9 @@ class ComposeEmailForm(forms.Form):
     subject = forms.CharField(label="Тема", max_length=300)
     body = forms.CharField(
         label="Текст письма",
+        max_length=20000,
         widget=forms.Textarea(attrs={"rows": 12, "cols": 80}),
+        help_text="Не более 20 000 символов.",
     )
     send_now = forms.BooleanField(
         label="Отправить сразу",

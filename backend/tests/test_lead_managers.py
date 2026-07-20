@@ -211,3 +211,124 @@ def test_admin_action_take_in_work() -> None:
     lead.refresh_from_db()
     assert lead.status == Lead.LeadStatus.IN_PROGRESS
     assert lead.assignee_id == manager.pk
+
+
+@pytest.mark.django_db
+def test_take_lead_in_work_skips_other_assignee() -> None:
+    """Second manager cannot steal a lead already assigned."""
+    mgr_a = User.objects.create_user(
+        username="lock_a",
+        email="lock_a@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    mgr_b = User.objects.create_user(
+        username="lock_b",
+        email="lock_b@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    lead = Lead.objects.create(
+        name="Locked",
+        email="locked@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.NEW,
+    )
+    take_lead_in_work(lead, mgr_a)
+    take_lead_in_work(lead, mgr_b)
+    lead.refresh_from_db()
+    assert lead.assignee_id == mgr_a.pk
+
+
+@pytest.mark.django_db
+def test_reopen_done_clears_processed_fields() -> None:
+    """Leaving DONE clears processed_by / processed_at for accurate stats."""
+    manager = User.objects.create_user(
+        username="reopen",
+        email="reopen@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    lead = Lead.objects.create(
+        name="Reopen",
+        email="reopen-lead@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.DONE,
+        assignee=manager,
+        processed_by=manager,
+        processed_at=timezone.now(),
+    )
+    lead.status = Lead.LeadStatus.IN_PROGRESS
+    apply_lead_manager_on_save(lead, actor=manager)
+    assert lead.processed_by_id is None
+    assert lead.processed_at is None
+
+
+@pytest.mark.django_db
+def test_done_total_ignores_processed_by_on_reopened() -> None:
+    """done_total counts only status=DONE, not stale processed_by."""
+    manager = User.objects.create_user(
+        username="stats_reopen",
+        email="stats_reopen@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    # Still DONE — counts.
+    Lead.objects.create(
+        name="Still done",
+        email="stilldone@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.DONE,
+        processed_by=manager,
+        processed_at=timezone.now(),
+    )
+    # Reopened but processed_by still set in DB (legacy) — must not count.
+    Lead.objects.create(
+        name="Reopened",
+        email="reopened@example.com",
+        message="y" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=manager,
+        processed_by=manager,
+        processed_at=timezone.now(),
+    )
+    stats = build_lead_processing_stats()
+    by_id = {row["user_id"]: row for row in stats["managers"]}
+    assert by_id[manager.pk]["done_total"] == 1
+
+
+@pytest.mark.django_db
+def test_admin_mark_done_creates_activity() -> None:
+    """Mark-done action writes CRM Activity when lead has a client."""
+    from crm.models import Activity, ActivityType
+
+    manager = User.objects.create_superuser(
+        username="mark-done-mgr",
+        email="mark-done@example.com",
+        password="password12",
+    )
+    lead = Lead.objects.create(
+        name="Mark Done",
+        email="markdone@example.com",
+        message="Завершить через action.",
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=manager,
+    )
+    lead.refresh_from_db()
+    assert lead.client_id is not None
+    client = Client()
+    client.force_login(manager)
+    response = client.post(
+        "/admin/leads/lead/",
+        {
+            "action": "action_mark_done",
+            "_selected_action": [str(lead.pk)],
+        },
+    )
+    assert response.status_code in {200, 302}
+    lead.refresh_from_db()
+    assert lead.status == Lead.LeadStatus.DONE
+    assert Activity.objects.filter(
+        lead=lead,
+        activity_type=ActivityType.STATUS,
+    ).exists()

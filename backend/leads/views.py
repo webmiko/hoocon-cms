@@ -14,8 +14,6 @@ docs/security-baseline.md §3 (PII не в логах; honeypot silent drop; 429
 
 from __future__ import annotations
 
-import logging
-
 from django.db import transaction
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny
@@ -23,11 +21,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from config.logging_utils import setup_logger
 from leads.models import Lead
 from leads.serializers import LeadSerializer
 from leads.tasks import send_lead_notification
 
-logger = logging.getLogger("hoocon.leads")
+logger = setup_logger("hoocon.leads")
 
 # Throttle scope name (matches REST_FRAMEWORK.DEFAULT_THROTTLE_RATES).
 _LEAD_THROTTLE_SCOPE = "lead_create"

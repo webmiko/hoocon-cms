@@ -26,6 +26,7 @@ from leads.services import (
     apply_lead_manager_on_save,
     build_lead_processing_stats,
     count_new_leads,
+    log_manager_activity,
     mark_lead_seen,
     take_lead_in_work,
 )
@@ -51,7 +52,14 @@ class LeadAdmin(admin.ModelAdmin):
         "open_lead",
     )
     list_display_links = ("name",)
-    list_filter = ("lead_type", "status", "assignee", "processed_by", "created_at")
+    list_filter = (
+        "lead_type",
+        "status",
+        "assignee",
+        "processed_by",
+        ("seen_at", admin.EmptyFieldListFilter),
+        "created_at",
+    )
     search_fields = ("name", "company", "email", "message", "analog_belimo_code")
     autocomplete_fields = ("sku", "client", "assignee", "processed_by")
     readonly_fields = ("created_at", "updated_at", "seen_at", "processed_at")
@@ -153,15 +161,22 @@ class LeadAdmin(admin.ModelAdmin):
         return qs.order_by("_status_rank", "-created_at", "-pk")
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
-        """New → in progress → done, then newest first.
+        """New-first only on Lead changelist (needs ``_status_rank`` annotate).
+
+        Other admins (e.g. EmailMessage FK widgets) call this without the
+        annotation — return model fields only in that case.
 
         Args:
             request: current admin request.
 
         Returns:
-            Ordering tuple consumed by the changelist (needs annotation).
+            Ordering tuple safe for the current admin URL.
         """
-        return ("_status_rank", "-created_at", "-pk")
+        match = getattr(request, "resolver_match", None)
+        url_name = getattr(match, "url_name", "") or ""
+        if url_name.startswith("leads_lead_changelist"):
+            return ("_status_rank", "-created_at", "-pk")
+        return ("-created_at", "-pk")
 
     def save_model(
         self,
@@ -223,6 +238,12 @@ class LeadAdmin(admin.ModelAdmin):
             if lead.processed_at is None:
                 lead.processed_at = now
             lead.save()
+            log_manager_activity(
+                lead,
+                author=request.user,
+                subject=f"Завершена: {request.user.get_username()}",
+                body="Статус → Завершена",
+            )
             count += 1
         self.message_user(
             request,

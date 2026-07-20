@@ -32,7 +32,9 @@ class _ContentViewSet(
 
     def get_queryset(self) -> QuerySet:
         """Published items only, ordered by published_at desc."""
-        model = self.queryset.model
+        qs = self.queryset
+        assert qs is not None
+        model = qs.model
         return model.objects.filter(is_published=True).order_by(
             "-published_at",
             "-created_at",

@@ -37,13 +37,21 @@ def test_public_settings_api_returns_analytics_ids_only() -> None:
     s.yandex_metrika_id = "12345678"
     s.ga4_measurement_id = "G-TEST123"
     s.telegram_chat_id = "-100123"
+    s.telegram_bot_token = "secret-tg-token-should-not-leak"
+    s.vk_access_token = "secret-vk-token"
+    s.max_bot_token = "secret-max-token"
     s.save()
 
     response = Client().get("/api/settings/public/")
     assert response.status_code == 200
     data = response.json()
-    assert data["yandex_metrika_id"] == "12345678"
-    assert data["ga4_measurement_id"] == "G-TEST123"
-    assert "telegram" not in str(data).lower() or "token" not in str(data).lower()
-    assert "token" not in data
-    assert "vk_access_token" not in data
+    assert data == {
+        "yandex_metrika_id": "12345678",
+        "ga4_measurement_id": "G-TEST123",
+    }
+    body = response.content.decode()
+    assert "secret-tg-token" not in body
+    assert "secret-vk-token" not in body
+    assert "secret-max-token" not in body
+    assert "telegram_bot_token" not in body
+    assert "vk_access_token" not in body

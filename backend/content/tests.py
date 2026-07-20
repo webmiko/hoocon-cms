@@ -1,1 +1,1 @@
-# Create your tests here.
+"""Tests live in ``backend/tests/`` (pytest testpaths)."""

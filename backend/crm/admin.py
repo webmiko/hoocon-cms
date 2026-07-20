@@ -13,7 +13,6 @@ from django.utils.translation import gettext_lazy as _
 from crm.forms import ComposeEmailForm
 from crm.models import Activity, Client, EmailMessage, EmailStatus
 from crm.services import create_outbound_email
-from crm.tasks import send_crm_email
 
 
 class ActivityInline(admin.TabularInline):
@@ -87,6 +86,23 @@ class ClientAdmin(admin.ModelAdmin):
         ),
     )
     change_form_template = "admin/crm/client/change_form.html"
+
+    def save_formset(
+        self,
+        request: HttpRequest,
+        form: Any,
+        formset: Any,
+        change: bool,
+    ) -> None:
+        """Set author on new Activity inline rows."""
+        instances = formset.save(commit=False)
+        for obj in instances:
+            if isinstance(obj, Activity) and obj.author_id is None:
+                obj.author = request.user
+            obj.save()
+        formset.save_m2m()
+        for obj in formset.deleted_objects:
+            obj.delete()
 
     def get_urls(self) -> list:
         """Add compose-email URL for the change-form button."""
@@ -265,17 +281,29 @@ class EmailMessageAdmin(admin.ModelAdmin):
         request: HttpRequest,
         queryset: Any,
     ) -> None:
-        """Enqueue draft/failed/queued messages for Celery send."""
-        allowed = queryset.exclude(status=EmailStatus.SENT)
+        """Enqueue draft/failed messages (skip already queued/sent).
+
+        Uses transaction.on_commit so Celery never races the DB commit.
+        """
+        from crm.services import enqueue_crm_email
+
+        allowed = queryset.filter(
+            status__in=(EmailStatus.DRAFT, EmailStatus.FAILED),
+        )
         count = 0
         for msg in allowed:
-            EmailMessage.objects.filter(pk=msg.pk).update(status=EmailStatus.QUEUED)
-            send_crm_email.delay(msg.pk)
+            updated = EmailMessage.objects.filter(
+                pk=msg.pk,
+                status__in=(EmailStatus.DRAFT, EmailStatus.FAILED),
+            ).update(status=EmailStatus.QUEUED)
+            if not updated:
+                continue
+            enqueue_crm_email(msg.pk)
             count += 1
         skipped = queryset.count() - count
         self.message_user(
             request,
-            _("В очередь: %(n)s. Уже отправленных пропущено: %(skip)s.") % {"n": count, "skip": skipped},
+            _("В очередь: %(n)s. Пропущено: %(skip)s.") % {"n": count, "skip": skipped},
             messages.SUCCESS if count else messages.WARNING,
         )
 
@@ -286,9 +314,15 @@ class EmailMessageAdmin(admin.ModelAdmin):
         form: Any,
         change: bool,
     ) -> None:
-        """On create, set created_by; queue if status is QUEUED."""
+        """On create, set created_by; enqueue only on transition to QUEUED."""
+        from crm.services import enqueue_crm_email
+
         if not change and obj.created_by_id is None:
             obj.created_by = request.user
+        previous_status = None
+        if change and obj.pk:
+            previous_status = EmailMessage.objects.filter(pk=obj.pk).values_list("status", flat=True).first()
         super().save_model(request, obj, form, change)
-        if obj.status == EmailStatus.QUEUED:
-            send_crm_email.delay(obj.pk)
+        became_queued = obj.status == EmailStatus.QUEUED and (not change or previous_status != EmailStatus.QUEUED)
+        if became_queued:
+            enqueue_crm_email(obj.pk)

@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from django.conf import settings
+from sitesettings.credentials import max_bot_token, telegram_bot_token, vk_access_token
 
 logger = logging.getLogger("hoocon.social")
 
@@ -61,7 +61,7 @@ def publish_telegram(*, chat_id: str, text: str) -> PublishResult:
     Returns:
         PublishResult with Telegram message_id when successful.
     """
-    token = getattr(settings, "TELEGRAM_BOT_TOKEN", "").strip()
+    token = telegram_bot_token()
     if not token or not chat_id.strip():
         return PublishResult(ok=False, skipped=True, error="Telegram не настроен")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -82,7 +82,7 @@ def publish_telegram(*, chat_id: str, text: str) -> PublishResult:
         desc = str(data.get("description") or data.get("raw") or status)[:300]
         return PublishResult(ok=False, error=f"Telegram: {desc}")
     result = data.get("result") if isinstance(data.get("result"), dict) else {}
-    mid = result.get("message_id", "")
+    mid = result.get("message_id", "") if isinstance(result, dict) else ""
     return PublishResult(ok=True, external_id=str(mid))
 
 
@@ -96,7 +96,7 @@ def publish_vk(*, group_id: str, text: str) -> PublishResult:
     Returns:
         PublishResult with VK post_id when successful.
     """
-    token = getattr(settings, "VK_ACCESS_TOKEN", "").strip()
+    token = vk_access_token()
     gid = group_id.strip().lstrip("-")
     if not token or not gid.isdigit():
         return PublishResult(ok=False, skipped=True, error="VK не настроен")
@@ -141,7 +141,7 @@ def publish_max(*, chat_id: str, text: str) -> PublishResult:
     Returns:
         PublishResult when successful.
     """
-    token = getattr(settings, "MAX_BOT_TOKEN", "").strip()
+    token = max_bot_token()
     if not token or not chat_id.strip():
         return PublishResult(ok=False, skipped=True, error="MAX не настроен")
     url = f"https://platform-api2.max.ru/messages?chat_id={chat_id.strip()}"

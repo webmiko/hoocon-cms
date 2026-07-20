@@ -283,6 +283,56 @@ def test_category_list_includes_preview_image(client) -> None:
 
 
 @pytest.mark.django_db
+def test_ball_valves_category_prefers_dn40_preview(client) -> None:
+    """Homepage tile for шаровые краны uses DN 40 (BV240), not the first DN 15."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
+        b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(name="BV", slug="bv-series", category=cat)
+    sku_dn15 = SKU.objects.create(
+        product=product,
+        name="BV215 DN15",
+        slug="8100-bv215a",
+        sku_code="8100-bv215a",
+        is_published=True,
+    )
+    sku_dn40 = SKU.objects.create(
+        product=product,
+        name="BV240 DN40",
+        slug="8100-bv240a",
+        sku_code="8100-bv240a",
+        is_published=True,
+    )
+    ProductImage.objects.create(
+        sku=sku_dn15,
+        image=SimpleUploadedFile("dn15.png", png, content_type="image/png"),
+        alt="DN 15",
+        is_published=True,
+        sort_order=0,
+    )
+    ProductImage.objects.create(
+        sku=sku_dn40,
+        image=SimpleUploadedFile("dn40.png", png, content_type="image/png"),
+        alt="DN 40",
+        is_published=True,
+        sort_order=0,
+    )
+
+    response = client.get(reverse("catalog-category-list"))
+    assert response.status_code == 200
+    row = next(r for r in response.data["results"] if r["slug"] == "sharovye-krany")
+    assert row["image"] is not None
+    assert row["image"]["alt"] == "DN 40"
+
+
+@pytest.mark.django_db
 def test_sku_list_is_read_only_for_anon(client) -> None:
     """Public API is read-only: POST → 405."""
     _seed_catalog()

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import logging
-
+from django.db import DatabaseError, IntegrityError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from config.logging_utils import setup_logger
 from leads.models import Lead
 
-logger = logging.getLogger("hoocon.crm")
+logger = setup_logger("hoocon.crm")
 
 
 @receiver(post_save, sender=Lead)
@@ -34,15 +34,15 @@ def link_new_lead_to_client(
     try:
         if not instance.client_id:
             link_lead_to_client(instance)
-        client = instance.client
-        if client is None:
+        client_id = instance.client_id
+        if not client_id:
             return
         Activity.objects.create(
-            client=client,
+            client_id=client_id,
             lead=instance,
             activity_type=ActivityType.NOTE,
             subject=f"Входящая заявка #{instance.pk}: {instance.get_lead_type_display()}",
             body=(instance.message or "")[:2000],
         )
-    except Exception:
+    except (DatabaseError, IntegrityError):
         logger.exception("crm_link_lead_failed lead_id=%s", instance.pk)

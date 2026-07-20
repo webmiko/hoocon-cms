@@ -267,3 +267,27 @@ def test_get_leads_not_allowed(client) -> None:
     """GET /api/leads/ is not allowed (write-only endpoint)."""
     response = client.get("/api/leads/")
     assert response.status_code == 405
+
+
+@pytest.mark.django_db
+def test_post_lead_rejects_unpublished_sku(client) -> None:
+    """Public lead API accepts only published SKU ids."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C", slug="c-unpub")
+    product = Product.objects.create(name="P", slug="p-unpub", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="Hidden",
+        slug="hidden-sku",
+        sku_code="HIDDEN-1",
+        is_published=False,
+    )
+    payload = {
+        "name": "Buyer",
+        "email": "buyer-sku@example.com",
+        "message": "Нужен КП на скрытый артикул из каталога.",
+        "sku": sku.pk,
+    }
+    response = client.post("/api/leads/", data=payload, content_type="application/json")
+    assert response.status_code == 400

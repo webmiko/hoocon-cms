@@ -11,16 +11,15 @@ Spec: ПЛАН §6 Iter 3 — Celery email; docs/security-baseline.md §3 (PII �
 
 from __future__ import annotations
 
-import logging
-
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 
+from config.logging_utils import setup_logger
 from leads.models import Lead
 from leads.services import parse_notify_emails, render_lead_notification
 
-logger = logging.getLogger("hoocon.leads")
+logger = setup_logger("hoocon.leads")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

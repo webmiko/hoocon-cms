@@ -10,12 +10,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.label_to_slug import CANONICAL_ATTRS, canonical_meta, label_to_slug
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs
 from catalog.etl.sku_variant import filter_description_for_variant, parse_sku_variant
 from catalog.etl.tech_copy import normalize_tech_copy
-from catalog.models import SKU, Attribute, AttributeValue, Product
+from catalog.models import SKU, Product
 
 logger = logging.getLogger(__name__)
 
@@ -137,30 +138,12 @@ def _normalize_value(slug: str, value: str) -> str:
     return v
 
 
-def _ensure_attr(slug: str, name: str, unit: str) -> Attribute:
-    attr, _ = Attribute.objects.get_or_create(
-        slug=slug,
-        defaults={"name": name, "unit": unit},
-    )
-    if attr.name != name or (unit and attr.unit != unit):
-        attr.name = name
-        if unit:
-            attr.unit = unit
-        attr.save(update_fields=["name", "unit"])
-    return attr
-
-
 def _set_attr(sku: SKU, slug: str, value: str) -> None:
     meta = canonical_meta(slug)
     if meta is None:
         return
     name, unit, _ = meta
-    attr = _ensure_attr(slug, name, unit)
-    AttributeValue.objects.update_or_create(
-        sku=sku,
-        attribute=attr,
-        defaults={"value": value[:500]},
-    )
+    set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
 def _migrate_legacy_attrs(sku: SKU) -> dict[str, str]:

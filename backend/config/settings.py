@@ -29,11 +29,21 @@ SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
     "django-insecure-change-me-in-local-env-only",
 )
-DEBUG = _env_bool("DJANGO_DEBUG", default=True)
+# Fail closed: require explicit DJANGO_DEBUG=True for local; prod omits it.
+DEBUG = _env_bool("DJANGO_DEBUG", default=False)
 
 if not DEBUG and (not SECRET_KEY or SECRET_KEY.startswith("django-insecure")):
     raise ImproperlyConfigured(
         "Set DJANGO_SECRET_KEY in the environment when DJANGO_DEBUG=False",
+    )
+
+if DEBUG and SECRET_KEY.startswith("django-insecure"):
+    import warnings
+
+    warnings.warn(
+        "DJANGO_SECRET_KEY is the insecure default — set a real key before any shared env.",
+        UserWarning,
+        stacklevel=1,
     )
 
 ALLOWED_HOSTS = [
@@ -47,10 +57,14 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+    SECURE_REFERRER_POLICY = "same-origin"
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
     if _env_bool("DJANGO_BEHIND_HTTPS_PROXY", default=True):
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -116,8 +130,13 @@ AXES_FAILURE_LIMIT = int(os.getenv("AXES_FAILURE_LIMIT", "5"))
 AXES_COOLOFF_TIME = int(os.getenv("AXES_COOLOFF_TIME", "1"))  # hours
 AXES_LOCKOUT_PARAMETERS = [["ip_address"]]
 AXES_RESET_ON_SUCCESS = True
-AXES_VERBOSE = _env_bool("DJANGO_DEBUG", default=True)  # log failures in dev too
-
+AXES_VERBOSE = _env_bool("DJANGO_DEBUG", default=False)
+# Trust one reverse-proxy hop (nginx) for client IP.
+AXES_IPWARE_PROXY_COUNT = int(os.getenv("AXES_IPWARE_PROXY_COUNT", "1"))
+AXES_IPWARE_META_PRECEDENCE_ORDER = [
+    "HTTP_X_FORWARDED_FOR",
+    "REMOTE_ADDR",
+]
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -236,6 +255,23 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+
+# Shared cache for DRF throttles (LocMem is per-worker — weak under Gunicorn).
+_cache_url = os.getenv("DJANGO_CACHE_URL", "").strip()
+if not _cache_url and not DEBUG:
+    # Prod default: Redis DB 2 (broker 0, results 1).
+    _cache_url = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+    if _cache_url.endswith("/0"):
+        _cache_url = f"{_cache_url[:-2]}/2"
+    elif "/0?" in _cache_url:
+        _cache_url = _cache_url.replace("/0?", "/2?", 1)
+if _cache_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _cache_url,
+        },
+    }
 
 # ── Email (SMTP reg.ru on prod; see docs/infra-reg-ru.md) ───────────
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")

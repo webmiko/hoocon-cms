@@ -67,11 +67,11 @@ def test_get_or_create_client_from_lead_dedupes() -> None:
     """Service finds existing Client by email case-insensitively."""
     existing = Client.objects.create(
         name="Exist",
-        email="Dedup@Example.com",
+        email="dedup@example.com",
     )
     lead = Lead.objects.create(
         name="New Name",
-        email="dedup@example.com",
+        email="Dedup@Example.com",
         message="msg",
     )
     # Signal already linked; service should return same client.
@@ -228,3 +228,98 @@ def test_anon_cannot_compose_email(client) -> None:
     response = client.get(url)
     assert response.status_code == 302
     assert "/admin/login" in response.url
+
+
+@pytest.mark.django_db
+def test_client_email_unique_normalized() -> None:
+    """Client.email is unique after lowercase normalization on save."""
+    from django.db import IntegrityError
+
+    Client.objects.create(name="A", email="Unique@Example.com")
+    with pytest.raises(IntegrityError):
+        Client.objects.create(name="B", email="unique@example.com")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_email_admin_queue_send_skips_already_queued(
+    client,
+    django_user_model,
+) -> None:
+    """queue_send action enqueues draft only once; skips QUEUED."""
+    user = django_user_model.objects.create_user(
+        username="crm-queue",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    draft = EmailMessage.objects.create(
+        client=crm_client,
+        to_email="buyer@example.com",
+        from_email="sales@hoocon.test",
+        subject="Draft",
+        body="Body",
+        status=EmailStatus.DRAFT,
+    )
+    queued = EmailMessage.objects.create(
+        client=crm_client,
+        to_email="buyer@example.com",
+        from_email="sales@hoocon.test",
+        subject="Already",
+        body="Body",
+        status=EmailStatus.QUEUED,
+    )
+    client.force_login(user)
+    with patch("crm.tasks.send_crm_email.delay") as delay_mock:
+        response = client.post(
+            reverse("admin:crm_emailmessage_changelist"),
+            {
+                "action": "queue_send",
+                "_selected_action": [str(draft.pk), str(queued.pk)],
+            },
+        )
+    assert response.status_code in {200, 302}
+    delay_mock.assert_called_once_with(draft.pk)
+    draft.refresh_from_db()
+    assert draft.status == EmailStatus.QUEUED
+
+
+@pytest.mark.django_db(transaction=True)
+def test_email_admin_save_does_not_reenqueue_queued(
+    client,
+    django_user_model,
+) -> None:
+    """Editing an already QUEUED message does not call delay again."""
+    user = django_user_model.objects.create_user(
+        username="crm-edit-q",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer2@example.com")
+    msg = EmailMessage.objects.create(
+        client=crm_client,
+        to_email="buyer2@example.com",
+        from_email="sales@hoocon.test",
+        subject="Queued",
+        body="Body text here",
+        status=EmailStatus.QUEUED,
+        created_by=user,
+    )
+    client.force_login(user)
+    url = reverse("admin:crm_emailmessage_change", args=[msg.pk])
+    with patch("crm.tasks.send_crm_email.delay") as delay_mock:
+        response = client.post(
+            url,
+            {
+                "client": crm_client.pk,
+                "direction": "outbound",
+                "status": EmailStatus.QUEUED,
+                "to_email": "buyer2@example.com",
+                "from_email": "sales@hoocon.test",
+                "subject": "Queued edited",
+                "body": "Body text here",
+            },
+        )
+    assert response.status_code in {200, 302}
+    delay_mock.assert_not_called()

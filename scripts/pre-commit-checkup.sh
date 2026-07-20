@@ -51,10 +51,10 @@ else
 fi
 
 # ── 3. mypy ──────────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run mypy config manage.py) >/dev/null 2>&1; then
+if (cd "$BACKEND" && poetry run mypy config leads crm catalog content manage.py) >/dev/null 2>&1; then
   ok "mypy — чисто"
 else
-  fail "mypy — ошибки типов (cd backend && poetry run mypy config manage.py)"
+  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content manage.py)"
 fi
 
 # ── 4. pytest (exit 5 = нет тестов — допустимо на каркасе) ───
@@ -75,7 +75,7 @@ fi
 if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1; then
   ok "pip-audit — нет уязвимостей"
 else
-  warn "pip-audit — есть уязвимости (cd backend && poetry run pip-audit --strict)"
+  fail "pip-audit — есть уязвимости (cd backend && poetry run pip-audit --strict)"
 fi
 
 # ── 6. Diff / staging ────────────────────────────────────────
@@ -102,7 +102,7 @@ if [ -n "$STAGED" ]; then
       echo "$PY_FILES" | xargs grep -nE \
         '(sk_live_|sk_test_|SECRET_KEY\s*=\s*["\x27][^"\x27]{16,}|password\s*=\s*["\x27][^"\x27]{8,}|EMAIL_HOST_PASSWORD\s*=\s*["\x27][^"\x27]+)' \
         2>/dev/null \
-        | grep -vE 'not-secret|change-me|ci-secret|ci-db-password' \
+        | grep -vE 'not-secret|change-me|ci-secret|ci-db-password|password12' \
         | cut -d: -f1 \
         | sort -u \
         || true

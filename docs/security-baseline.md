@@ -58,13 +58,23 @@ Admin, файлы, SPA, VPS.
 - Prod: `DJANGO_SECRET_KEY` **обязателен**; insecure default запрещён при
   `DEBUG=False` (`ImproperlyConfigured`).
 - `DJANGO_DEBUG=False` на VPS; `ALLOWED_HOSTS` явный список.
+- **Postgres обязателен** для `migrate` (FTS/GIN/triggers). `USE_SQLITE=True` —
+  только аварийный/ограниченный режим; полный локальный стек — Postgres.
 - Prod cookies: `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, HSTS,
   `SECURE_SSL_REDIRECT` (за reverse proxy — `SECURE_PROXY_SSL_HEADER`).
+- Prod: Redis `CACHES` для DRF throttle (не LocMem per-worker).
+- OpenAPI `/api/schema/`, `/api/docs/` — только staff при `DEBUG=False`.
 
 ### 3.2 Django / DRF
 
 - CSRF включён для session; CORS — whitelist origin (Vite/prod domain), не `*`.
 - Публичные POST (leads): `AnonRateThrottle` + honeypot-поле.
+  **Политика CSRF (v1):** SPA берёт токен через `GET /api/csrf/` и шлёт
+  `X-CSRFToken` на `POST /api/leads/` (см. `frontend/src/api/client.ts`).
+  Throttle shared через Redis `CACHES` в prod (`DJANGO_CACHE_URL` / DB 2).
+  CAPTCHA — опционально позже, не вместо honeypot+throttle+CSRF.
+- **Соцсети / боты:** токены и chat ID — только Admin (`SiteSettings`) или
+  `.env` (fallback). В `GET /api/settings/public/` — только analytics IDs.
 - Сериализаторы: explicit fields; mass assignment закрыт.
 - Ошибки API: без stack trace клиенту; логировать `type(e).__name__`.
 - Admin: только staff; опц. IP allowlist nginx на `/admin/` (prod).

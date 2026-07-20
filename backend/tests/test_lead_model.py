@@ -195,7 +195,7 @@ def test_lead_status_can_progress() -> None:
 
 @pytest.mark.django_db
 def test_lead_str() -> None:
-    """__str__ returns a readable summary (name + lead_type)."""
+    """__str__ is PII-safe: Lead #pk and type, not contact name."""
     from leads.models import Lead
 
     lead = Lead.objects.create(
@@ -205,7 +205,8 @@ def test_lead_str() -> None:
         lead_type=Lead.LeadType.RFQ,
     )
     s = str(lead)
-    assert "Иван" in s
+    assert "Иван" not in s
+    assert f"Lead #{lead.pk}" in s
     assert "rfq" in s.lower() or "RFQ" in s or "КП" in s
 
 

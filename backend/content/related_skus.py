@@ -83,7 +83,7 @@ def mentioned_skus_for_article(
             if sku.product_id in used_products:
                 continue
             code = sku.sku_code.casefold().replace("-", "").replace(" ", "")
-            product_slug = (sku.product.slug or "").casefold()
+            product_slug = (getattr(sku.product, "slug", None) or "").casefold()
             # Exact / prefix match on sku_code, or series in product slug.
             series_core = re.sub(r"(?:24|230)$", "", needle)
             hit = (

@@ -13,9 +13,10 @@ _EXPECTED_APP_NAMES = {
     "catalog": "Каталог",
     "content": "Контент",
     "leads": "Заявки",
+    "crm": "CRM / клиенты",
     "redirects": "Редиректы",
     "sitesettings": "Настройки сайта",
-    "social": "Соцсети",
+    "social": "Соцсети / анонсы",
     "axes": "Защита входа",
     "django_celery_beat": "Периодические задачи",
 }

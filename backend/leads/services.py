@@ -12,7 +12,15 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import Avg, DurationField, ExpressionWrapper, F
+from django.db import transaction
+from django.db.models import (
+    Avg,
+    Count,
+    DurationField,
+    ExpressionWrapper,
+    F,
+    Q,
+)
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -93,6 +101,8 @@ def manager_display_name(user: Any) -> str:
 def take_lead_in_work(lead: Lead, manager: Any) -> Lead:
     """Assign lead to manager and set status to in_progress.
 
+    Uses select_for_update; skips overwrite if another assignee already set.
+
     Args:
         lead: Lead to claim.
         manager: staff user taking the lead.
@@ -100,13 +110,19 @@ def take_lead_in_work(lead: Lead, manager: Any) -> Lead:
     Returns:
         Updated Lead instance (saved).
     """
-    lead.assignee = manager
-    lead.status = Lead.LeadStatus.IN_PROGRESS
-    if lead.seen_at is None:
-        lead.seen_at = timezone.now()
-    lead.save(
-        update_fields=["assignee", "status", "seen_at", "updated_at"],
-    )
+    with transaction.atomic():
+        locked = Lead.objects.select_for_update().get(pk=lead.pk)
+        if locked.assignee_id and locked.assignee_id != manager.pk:
+            lead.refresh_from_db()
+            return lead
+        locked.assignee = manager
+        locked.status = Lead.LeadStatus.IN_PROGRESS
+        if locked.seen_at is None:
+            locked.seen_at = timezone.now()
+        locked.save(
+            update_fields=["assignee", "status", "seen_at", "updated_at"],
+        )
+        lead.refresh_from_db()
     _log_manager_activity(
         lead,
         author=manager,
@@ -120,11 +136,16 @@ def apply_lead_manager_on_save(lead: Lead, *, actor: Any) -> None:
     """Fill assignee / processed_* from status transitions (in-memory).
 
     Call before ``lead.save()`` from Admin ``save_model``.
+    Leaving DONE clears processed_* so stats stay accurate.
 
     Args:
         lead: Lead being saved (may be unsaved status change).
         actor: current staff user performing the save.
     """
+    if lead.status != Lead.LeadStatus.DONE:
+        if lead.processed_by_id is not None or lead.processed_at is not None:
+            lead.processed_by = None
+            lead.processed_at = None
     if lead.status == Lead.LeadStatus.IN_PROGRESS and lead.assignee_id is None:
         lead.assignee = actor
     if lead.status == Lead.LeadStatus.DONE:
@@ -134,6 +155,17 @@ def apply_lead_manager_on_save(lead: Lead, *, actor: Any) -> None:
             lead.processed_at = timezone.now()
         if lead.assignee_id is None:
             lead.assignee = actor
+
+
+def log_manager_activity(
+    lead: Lead,
+    *,
+    author: Any,
+    subject: str,
+    body: str = "",
+) -> None:
+    """Public wrapper for CRM Activity on manager actions."""
+    _log_manager_activity(lead, author=author, subject=subject, body=body)
 
 
 def _log_manager_activity(
@@ -168,6 +200,8 @@ def _log_manager_activity(
 def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, Any]:
     """Aggregate lead processing totals and per-manager breakdown.
 
+    Uses grouped annotations to avoid N+1 per manager.
+
     Args:
         since: optional lower bound for ``done_in_period`` / avg time
             (uses ``processed_at``). Totals by status are always global.
@@ -175,69 +209,79 @@ def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, A
     Returns:
         Dict with ``totals``, ``managers``, ``since`` ISO string or None.
     """
+    status_counts = {row["status"]: row["n"] for row in Lead.objects.values("status").annotate(n=Count("id"))}
     totals: dict[str, Any] = {
-        "new": Lead.objects.filter(status=Lead.LeadStatus.NEW).count(),
-        "in_progress": Lead.objects.filter(status=Lead.LeadStatus.IN_PROGRESS).count(),
-        "done": Lead.objects.filter(status=Lead.LeadStatus.DONE).count(),
+        "new": status_counts.get(Lead.LeadStatus.NEW, 0),
+        "in_progress": status_counts.get(Lead.LeadStatus.IN_PROGRESS, 0),
+        "done": status_counts.get(Lead.LeadStatus.DONE, 0),
         "unassigned_open": Lead.objects.filter(
             status__in=(Lead.LeadStatus.NEW, Lead.LeadStatus.IN_PROGRESS),
             assignee__isnull=True,
         ).count(),
     }
-    done_qs = Lead.objects.filter(status=Lead.LeadStatus.DONE)
+    done_filter = Q(status=Lead.LeadStatus.DONE)
+    period_done = done_filter
     if since is not None:
-        done_qs = done_qs.filter(processed_at__gte=since)
-    totals["done_in_period"] = done_qs.count()
+        period_done &= Q(processed_at__gte=since)
 
     duration = ExpressionWrapper(
         F("processed_at") - F("created_at"),
         output_field=DurationField(),
     )
-    avg_row = done_qs.filter(processed_at__isnull=False).aggregate(
-        avg_duration=Avg(duration),
-    )
-    avg_duration = avg_row["avg_duration"]
+    done_qs = Lead.objects.filter(done_filter, processed_at__isnull=False)
+    if since is not None:
+        done_qs = done_qs.filter(processed_at__gte=since)
+    totals["done_in_period"] = done_qs.count()
+    avg_duration = done_qs.aggregate(avg_duration=Avg(duration))["avg_duration"]
     totals["avg_hours_to_done"] = round(avg_duration.total_seconds() / 3600, 1) if avg_duration else None
 
-    staff_ids = set(
-        Lead.objects.exclude(assignee_id=None).values_list("assignee_id", flat=True),
-    ) | set(
-        Lead.objects.exclude(processed_by_id=None).values_list(
-            "processed_by_id",
-            flat=True,
-        ),
+    assignee_rows = (
+        Lead.objects.exclude(assignee_id=None)
+        .values("assignee_id")
+        .annotate(
+            assigned_open=Count(
+                "id",
+                filter=Q(status__in=(Lead.LeadStatus.NEW, Lead.LeadStatus.IN_PROGRESS)),
+            ),
+            in_progress=Count(
+                "id",
+                filter=Q(status=Lead.LeadStatus.IN_PROGRESS),
+            ),
+        )
     )
+    processed_rows = (
+        Lead.objects.exclude(processed_by_id=None)
+        .filter(status=Lead.LeadStatus.DONE)
+        .values("processed_by_id")
+        .annotate(
+            done_total=Count("id"),
+            done_in_period=Count("id", filter=period_done),
+            avg_duration=Avg(
+                duration,
+                filter=Q(processed_at__isnull=False) & period_done,
+            ),
+        )
+    )
+    by_assignee = {row["assignee_id"]: row for row in assignee_rows}
+    by_processed = {row["processed_by_id"]: row for row in processed_rows}
+    staff_ids = set(by_assignee) | set(by_processed)
+
     managers: list[dict[str, Any]] = []
     if staff_ids:
         users = User.objects.filter(pk__in=staff_ids).order_by("first_name", "username")
         for user in users:
-            assigned_open = Lead.objects.filter(
-                assignee=user,
-                status__in=(Lead.LeadStatus.NEW, Lead.LeadStatus.IN_PROGRESS),
-            ).count()
-            in_progress = Lead.objects.filter(
-                assignee=user,
-                status=Lead.LeadStatus.IN_PROGRESS,
-            ).count()
-            done_total = Lead.objects.filter(processed_by=user).count()
-            mgr_done_qs = Lead.objects.filter(
-                processed_by=user,
-                status=Lead.LeadStatus.DONE,
-                processed_at__isnull=False,
-            )
-            if since is not None:
-                mgr_done_qs = mgr_done_qs.filter(processed_at__gte=since)
-            done_in_period = mgr_done_qs.count()
-            mgr_avg = mgr_done_qs.aggregate(avg_duration=Avg(duration))["avg_duration"]
+            a = by_assignee.get(user.pk, {})
+            p = by_processed.get(user.pk, {})
+            mgr_avg = p.get("avg_duration")
             managers.append(
                 {
                     "user_id": user.pk,
                     "username": user.get_username(),
                     "display_name": manager_display_name(user),
-                    "assigned_open": assigned_open,
-                    "in_progress": in_progress,
-                    "done_total": done_total,
-                    "done_in_period": done_in_period,
+                    "assigned_open": a.get("assigned_open", 0),
+                    "in_progress": a.get("in_progress", 0),
+                    "done_total": p.get("done_total", 0),
+                    "done_in_period": p.get("done_in_period", 0),
                     "avg_hours_to_done": (round(mgr_avg.total_seconds() / 3600, 1) if mgr_avg else None),
                 },
             )
@@ -251,13 +295,13 @@ def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, A
 
 
 def new_leads_changelist_url() -> str:
-    """Relative Admin URL for filtered new-leads changelist.
+    """Relative Admin URL for unread new leads (matches sticker count).
 
     Returns:
-        Path with status__exact=new query string.
+        Path with status=new and seen_at empty.
     """
     base = reverse("admin:leads_lead_changelist")
-    return f"{base}?status__exact=new"
+    return f"{base}?status__exact=new&seen_at__isempty=1"
 
 
 def build_lead_admin_url(lead_id: int) -> str:

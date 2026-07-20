@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -14,7 +16,12 @@ class Client(models.Model):
     """
 
     name: models.CharField = models.CharField("имя / контакт", max_length=200)
-    email: models.EmailField = models.EmailField("email", db_index=True)
+    email: models.EmailField = models.EmailField(
+        "email",
+        unique=True,
+        db_index=True,
+        help_text="Уникальный ключ карточки (нормализуется в нижний регистр).",
+    )
     phone: models.CharField = models.CharField(
         "телефон",
         max_length=50,
@@ -58,6 +65,11 @@ class Client(models.Model):
         indexes = [
             models.Index(fields=("email", "company")),
         ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Normalize email before save (unique key is lowercase)."""
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         """Return 'name (company)' or email for Admin."""
@@ -185,7 +197,11 @@ class EmailMessage(models.Model):
         default="",
     )
     subject: models.CharField = models.CharField("тема", max_length=300)
-    body: models.TextField = models.TextField("текст письма")
+    body: models.TextField = models.TextField(
+        "текст письма",
+        max_length=20000,
+        help_text="До 20 000 символов.",
+    )
     error_message: models.TextField = models.TextField(
         "ошибка",
         blank=True,

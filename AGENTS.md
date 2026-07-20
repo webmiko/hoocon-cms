@@ -37,7 +37,8 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Документ | Назначение |
 |----------|------------|
 | [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md) | Scope, итерации, решения |
-| [docs/](docs/) | Рынок, стек, SEO URL, ETL, UX, security, infra reg.ru |
+| [docs/](docs/) | Рынок, стек, SEO URL, ETL, UX, security, infra reg.ru, audit |
+| [docs/audit-2026-07-20.md](docs/audit-2026-07-20.md) | Аудит баги/БЗ/security + статус фиксов A–E |
 | [docs/security-baseline.md][sec-baseline] | OWASP 2025 → Hoocon |
 | [docs/seo-url-migration.md](docs/seo-url-migration.md) | Сохранение URL и 301 |
 | [docs/seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) | Title/description для Яндекс и Google |
@@ -52,8 +53,10 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Задача | Куда |
 |--------|------|
 | Коммит / push | `./scripts/pre-commit-checkup.sh` + канон §4 |
+| Аудит / hardening backlog | [docs/audit-2026-07-20.md](docs/audit-2026-07-20.md); план Iter 4.5–5 |
 | Новый код / модуль | БЗ ПРОМПТ + TDD; apps в `backend/` |
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |
+| Чат поддержки (TG/VK/MAX) | [plan-support-chat-social.md](docs/plan-support-chat-social.md) |
 | SEO / редиректы | [seo-url-migration.md](docs/seo-url-migration.md) |
 | Title / description (Яндекс, Google) | [seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) |
 | ТТХ / инструкции / перевод | [tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) |

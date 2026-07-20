@@ -5,7 +5,7 @@ Spec: docs/plan-compare-sku.md — max 4 SKU, highlights-based rows, «—» gap
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.db.models import Prefetch
 
@@ -210,4 +210,4 @@ def resolve_compare_skus(slugs: list[str]) -> tuple[list[SKU], list[str]]:
     }
     ordered = [found[s] for s in slugs if s in found]
     missing = [s for s in slugs if s not in found]
-    return ordered, missing
+    return cast(list[SKU], ordered), missing

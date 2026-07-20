@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from django.contrib import admin, messages
 from django.db import models
@@ -59,7 +59,11 @@ class SocialPostAdmin(admin.ModelAdmin):
 class SocialAnnounceAdminMixin:
     """Admin mixin: action + change-form button to announce Article/News."""
 
-    actions = ("announce_to_social",)
+    actions: ClassVar[tuple[str, ...]] = ("announce_to_social",)
+
+    def message_user(self, *args: Any, **kwargs: Any) -> None:
+        """Typed shim — real implementation comes from ModelAdmin."""
+        admin.ModelAdmin.message_user(self, *args, **kwargs)  # type: ignore[arg-type]
 
     @admin.action(description=_("Опубликовать в соцсети (Telegram / VK / MAX)"))
     def announce_to_social(

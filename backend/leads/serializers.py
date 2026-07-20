@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from catalog.models import SKU
 from leads.models import Lead
 
 # Message length bounds (anti-spam + DoS guard).
@@ -40,6 +41,11 @@ class LeadSerializer(serializers.ModelSerializer):
         allow_blank=True,
         default="",
         help_text="Honeypot — leave empty (hidden from real users).",
+    )
+    sku = serializers.PrimaryKeyRelatedField(
+        queryset=SKU.objects.filter(is_published=True),
+        required=False,
+        allow_null=True,
     )
 
     class Meta:

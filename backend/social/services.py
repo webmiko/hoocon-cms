@@ -16,13 +16,15 @@ logger = logging.getLogger("hoocon.social")
 
 
 def _enabled_channels(site: SiteSettings) -> list[SocialChannel]:
-    """Return channels enabled in SiteSettings (config only, not tokens)."""
+    """Return channels with flag + destination + token (Admin or .env)."""
+    from sitesettings.credentials import max_bot_token, telegram_bot_token, vk_access_token
+
     channels: list[SocialChannel] = []
-    if site.telegram_enabled and site.telegram_chat_id.strip():
+    if site.telegram_enabled and site.telegram_chat_id.strip() and telegram_bot_token(site):
         channels.append(SocialChannel.TELEGRAM)
-    if site.vk_enabled and site.vk_group_id.strip():
+    if site.vk_enabled and site.vk_group_id.strip() and vk_access_token(site):
         channels.append(SocialChannel.VK)
-    if site.max_enabled and site.max_chat_id.strip():
+    if site.max_enabled and site.max_chat_id.strip() and max_bot_token(site):
         channels.append(SocialChannel.MAX)
     return channels
 

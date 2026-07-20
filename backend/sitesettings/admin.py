@@ -4,16 +4,71 @@ from __future__ import annotations
 
 from typing import Any
 
+from django import forms
+from django.conf import settings
 from django.contrib import admin
 from django.http import HttpRequest
+from django.utils.html import format_html
 
+from sitesettings.credentials import token_source_label
 from sitesettings.models import SiteSettings
+
+
+class SiteSettingsAdminForm(forms.ModelForm):
+    """Keep existing bot tokens when password fields are left blank."""
+
+    class Meta:
+        model = SiteSettings
+        fields = "__all__"
+        widgets = {
+            "telegram_bot_token": forms.PasswordInput(
+                render_value=False,
+                attrs={"autocomplete": "new-password", "placeholder": "••••••••"},
+            ),
+            "vk_access_token": forms.PasswordInput(
+                render_value=False,
+                attrs={"autocomplete": "new-password", "placeholder": "••••••••"},
+            ),
+            "max_bot_token": forms.PasswordInput(
+                render_value=False,
+                attrs={"autocomplete": "new-password", "placeholder": "••••••••"},
+            ),
+        }
+
+    def clean_telegram_bot_token(self) -> str:
+        """Blank input keeps the previously saved token."""
+        return self._keep_secret_if_blank("telegram_bot_token")
+
+    def clean_vk_access_token(self) -> str:
+        """Blank input keeps the previously saved token."""
+        return self._keep_secret_if_blank("vk_access_token")
+
+    def clean_max_bot_token(self) -> str:
+        """Blank input keeps the previously saved token."""
+        return self._keep_secret_if_blank("max_bot_token")
+
+    def _keep_secret_if_blank(self, field_name: str) -> str:
+        """Return new value or existing instance value when form field is empty.
+
+        Args:
+            field_name: model field name for the secret.
+
+        Returns:
+            Token string to persist.
+        """
+        value = (self.cleaned_data.get(field_name) or "").strip()
+        if value:
+            return value
+        if self.instance.pk:
+            return getattr(self.instance, field_name) or ""
+        return ""
 
 
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(admin.ModelAdmin):
     """Singleton Admin: edit only; no add/delete when row exists."""
 
+    form = SiteSettingsAdminForm
     list_display = (
         "__str__",
         "show_prices_on_site",
@@ -21,7 +76,13 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         "social_announce_on_publish",
         "updated_at",
     )
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = (
+        "telegram_token_status",
+        "vk_token_status",
+        "max_token_status",
+        "created_at",
+        "updated_at",
+    )
     fieldsets = (
         (
             "Каталог",
@@ -38,20 +99,53 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Анонсы в соцсети",
+            "Интеграции: Telegram",
             {
                 "fields": (
-                    "social_announce_on_publish",
                     "telegram_enabled",
+                    "telegram_bot_token",
+                    "telegram_token_status",
                     "telegram_chat_id",
-                    "vk_enabled",
-                    "vk_group_id",
-                    "max_enabled",
-                    "max_chat_id",
                 ),
                 "description": (
-                    "Токены ботов хранятся только в .env: TELEGRAM_BOT_TOKEN, "
-                    "VK_ACCESS_TOKEN, MAX_BOT_TOKEN. Здесь — флаги и ID чатов."
+                    "Токен и ID канала/чата для бота. Пустой токен при сохранении "
+                    "не затирает уже сохранённый. Запасной вариант — .env."
+                ),
+            },
+        ),
+        (
+            "Интеграции: VK",
+            {
+                "fields": (
+                    "vk_enabled",
+                    "vk_access_token",
+                    "vk_token_status",
+                    "vk_group_id",
+                ),
+                "description": (
+                    "Ключ сообщества и ID группы (без минуса). Пустой токен при "
+                    "сохранении не затирает уже сохранённый."
+                ),
+            },
+        ),
+        (
+            "Интеграции: MAX",
+            {
+                "fields": (
+                    "max_enabled",
+                    "max_bot_token",
+                    "max_token_status",
+                    "max_chat_id",
+                ),
+                "description": ("Токен бота MAX и chat ID. Пустой токен при сохранении не затирает уже сохранённый."),
+            },
+        ),
+        (
+            "Анонсы контента",
+            {
+                "fields": ("social_announce_on_publish",),
+                "description": (
+                    "Автоотправка при первой публикации статьи/новости. Журнал отправок — в разделе «Соцсети»."
                 ),
             },
         ),
@@ -63,6 +157,33 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    @admin.display(description="Статус токена Telegram")
+    def telegram_token_status(self, obj: SiteSettings) -> str:
+        """Show whether Telegram token is configured (not the value)."""
+        label = token_source_label(
+            obj.telegram_bot_token,
+            getattr(settings, "TELEGRAM_BOT_TOKEN", ""),
+        )
+        return format_html("<strong>{}</strong>", label)
+
+    @admin.display(description="Статус токена VK")
+    def vk_token_status(self, obj: SiteSettings) -> str:
+        """Show whether VK token is configured (not the value)."""
+        label = token_source_label(
+            obj.vk_access_token,
+            getattr(settings, "VK_ACCESS_TOKEN", ""),
+        )
+        return format_html("<strong>{}</strong>", label)
+
+    @admin.display(description="Статус токена MAX")
+    def max_token_status(self, obj: SiteSettings) -> str:
+        """Show whether MAX token is configured (not the value)."""
+        label = token_source_label(
+            obj.max_bot_token,
+            getattr(settings, "MAX_BOT_TOKEN", ""),
+        )
+        return format_html("<strong>{}</strong>", label)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Allow add only if singleton row is missing."""

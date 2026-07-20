@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import logging
-
 from celery import shared_task
 from django.core.mail import send_mail
 
+from config.logging_utils import setup_logger
 from crm.models import EmailMessage, EmailStatus
 
-logger = logging.getLogger("hoocon.crm")
+logger = setup_logger("hoocon.crm")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

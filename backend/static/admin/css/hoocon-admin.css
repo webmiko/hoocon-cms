@@ -1935,6 +1935,20 @@ html[data-theme="dark"] body.login #container {
     --hoocon-row-gap: 1rem;
   }
 
+  #header #nav-global {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .hoocon-admin-lead-sticker {
+    margin-right: 0;
+  }
+
   #header {
     padding: 1rem var(--hoocon-content-padding-x);
   }

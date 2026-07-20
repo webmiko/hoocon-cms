@@ -8,7 +8,7 @@ class CrmConfig(AppConfig):
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "crm"
-    verbose_name = "CRM"
+    verbose_name = "CRM / клиенты"
 
     def ready(self) -> None:
         """Import signal handlers."""

@@ -7,6 +7,8 @@ staff-only (IsAdminUser).
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.db.models import Count, Prefetch, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
@@ -22,7 +24,7 @@ from catalog.compare import (
 )
 from catalog.facets import collect_facet_options
 from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
-from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
+from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
 from catalog.serializers import (
     CategorySerializer,
     SKUDetailSerializer,
@@ -31,9 +33,17 @@ from catalog.serializers import (
 from catalog.series_categories import spec_order_case
 from catalog.upload_serializers import ProductFileUploadSerializer
 
+# Representative SKU photos for homepage / category tiles (slug → sku_code).
+CATEGORY_PREVIEW_SKU_CODES: dict[str, str] = {
+    "sharovye-krany": "8100-bv240a",  # DN 40 2-way — clearer than first DN 15
+}
+
 
 def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImage]:
-    """Return the first published ProductImage per category id.
+    """Return one published ProductImage per category id.
+
+    Prefers ``CATEGORY_PREVIEW_SKU_CODES`` when that SKU has a published photo;
+    otherwise the first image by sort_order / id.
 
     Args:
         category_ids: Category primary keys to resolve.
@@ -43,6 +53,35 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
     """
     if not category_ids:
         return {}
+
+    result: dict[int, ProductImage] = {}
+    slug_by_id = dict(
+        Category.objects.filter(pk__in=category_ids).values_list("pk", "slug"),
+    )
+    preferred_codes = [
+        CATEGORY_PREVIEW_SKU_CODES[slug] for slug in slug_by_id.values() if slug in CATEGORY_PREVIEW_SKU_CODES
+    ]
+    if preferred_codes:
+        preferred_imgs = (
+            ProductImage.objects.filter(
+                is_published=True,
+                sku__is_published=True,
+                sku__sku_code__in=preferred_codes,
+                sku__product__category_id__in=category_ids,
+            )
+            .select_related("sku__product__category")
+            .order_by("sku__sku_code", "sort_order", "id")
+        )
+        by_code: dict[str, ProductImage] = {}
+        for img in preferred_imgs:
+            code = cast(SKU, img.sku).sku_code
+            if code not in by_code:
+                by_code[code] = img
+        for cat_id, slug in slug_by_id.items():
+            code = CATEGORY_PREVIEW_SKU_CODES.get(slug)
+            if code and code in by_code:
+                result[cat_id] = by_code[code]
+
     images = (
         ProductImage.objects.filter(
             is_published=True,
@@ -52,9 +91,9 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
         .select_related("sku__product")
         .order_by("sku__product__category_id", "sort_order", "id")
     )
-    result: dict[int, ProductImage] = {}
     for img in images:
-        cat_id = img.sku.product.category_id
+        product = cast(Product, cast(SKU, img.sku).product)
+        cat_id = product.category_id
         if cat_id not in result:
             result[cat_id] = img
     return result

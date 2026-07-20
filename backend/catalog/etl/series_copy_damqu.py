@@ -7,9 +7,10 @@ Characteristics are stored as EAV rows with group keys for PDP cards.
 from __future__ import annotations
 
 from catalog.etl.attr_groups import ATTR_GROUP_ELECTRICAL, ATTR_GROUP_FUNCTIONAL, ATTR_GROUP_OPERATING, ATTR_GROUP_SIZE
+from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import normalize_tech_copy
-from catalog.models import SKU, Attribute, AttributeValue, Product
+from catalog.models import SKU, AttributeValue, Product
 
 PRODUCT_SLUG = "privod-vozdushniy-da8mqu-8nm"
 
@@ -205,25 +206,8 @@ def _sku_description(variant: SkuVariant) -> str:
     return normalize_tech_copy("\n".join(lines))
 
 
-def _ensure_attr(name: str, slug: str, unit: str) -> Attribute:
-    attr, _ = Attribute.objects.get_or_create(
-        slug=slug,
-        defaults={"name": name, "unit": unit},
-    )
-    if attr.name != name or attr.unit != unit:
-        attr.name = name
-        attr.unit = unit
-        attr.save(update_fields=["name", "unit"])
-    return attr
-
-
 def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
-    attr = _ensure_attr(name, slug, unit)
-    AttributeValue.objects.update_or_create(
-        sku=sku,
-        attribute=attr,
-        defaults={"value": value},
-    )
+    set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
 def _clear_sku_attributes(sku: SKU) -> None:

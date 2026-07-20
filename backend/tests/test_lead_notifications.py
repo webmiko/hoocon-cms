@@ -200,6 +200,7 @@ def test_admin_index_shows_lead_sticker_when_new_exists() -> None:
     assert "hoocon-admin-lead-sticker" in html
     assert "data-hoocon-new-leads-count" in html
     assert "status__exact=new" in html
+    assert "seen_at__isempty=1" in html
 
 
 @pytest.mark.django_db

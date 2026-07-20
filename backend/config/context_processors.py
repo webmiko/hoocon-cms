@@ -9,7 +9,7 @@ from django.http import HttpRequest
 def static_version(_request: HttpRequest) -> dict[str, str]:
     """Cache-bust token for admin static assets (?v=).
 
-    In DEBUG without BUILD_SHA uses mtime of hoocon-admin.css.
+    In DEBUG without BUILD_SHA uses max mtime of theme CSS + JS.
 
     Args:
         _request: unused request (Django context processor signature).
@@ -19,9 +19,20 @@ def static_version(_request: HttpRequest) -> dict[str, str]:
     """
     version = getattr(settings, "BUILD_SHA", "").strip()
     if not version and settings.DEBUG:
-        css_path = settings.BASE_DIR / "static/admin/css/hoocon-admin.css"
-        if css_path.is_file():
-            version = str(int(css_path.stat().st_mtime))
+        base = settings.BASE_DIR / "static/admin"
+        mtimes: list[int] = []
+        for rel in (
+            "css/hoocon-admin.css",
+            "css/hoocon-admin-overrides.css",
+            "js/hoocon-admin-tables.js",
+            "js/hoocon-admin-leads-sticker.js",
+            "js/theme.js",
+        ):
+            path = base / rel
+            if path.is_file():
+                mtimes.append(int(path.stat().st_mtime))
+        if mtimes:
+            version = str(max(mtimes))
     return {"STATIC_VERSION": version or "dev"}
 
 
