@@ -257,15 +257,29 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
 # Shared cache for DRF throttles (LocMem is per-worker — weak under Gunicorn).
+# Set DJANGO_CACHE_URL=locmem:// in CI (no Redis). Prod: redis://…/2 or omit for default.
 _cache_url = os.getenv("DJANGO_CACHE_URL", "").strip()
-if not _cache_url and not DEBUG:
+if _cache_url in {"locmem", "locmem://", "memory"}:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "hoocon-default",
+        },
+    }
+elif not _cache_url and not DEBUG:
     # Prod default: Redis DB 2 (broker 0, results 1).
     _cache_url = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
     if _cache_url.endswith("/0"):
         _cache_url = f"{_cache_url[:-2]}/2"
     elif "/0?" in _cache_url:
         _cache_url = _cache_url.replace("/0?", "/2?", 1)
-if _cache_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _cache_url,
+        },
+    }
+elif _cache_url:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
