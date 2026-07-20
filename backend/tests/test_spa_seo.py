@@ -83,10 +83,29 @@ def test_spa_article_json_ld(client) -> None:
 
 
 def test_llms_txt(client) -> None:
-    """GET /llms.txt returns plain text summary."""
+    """GET /llms.txt returns llmstxt.org-shaped plain text summary."""
     response = client.get("/llms.txt")
     assert response.status_code == 200
+    body = response.content.decode()
+    assert "Hoocon" in body
+    assert "/catalog" in body
+    assert "/llms-full.txt" in body
+
+
+def test_llm_txt_alias(client) -> None:
+    """GET /llm.txt mirrors /llms.txt."""
+    response = client.get("/llm.txt")
+    assert response.status_code == 200
     assert "Hoocon" in response.content.decode()
+
+
+def test_llms_full_txt(client) -> None:
+    """GET /llms-full.txt returns expanded LLM context."""
+    response = client.get("/llms-full.txt")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "полный контекст" in body
+    assert "protivopozharniy" in body
 
 
 @override_settings(SITE_URL="https://hoocon.ru")
