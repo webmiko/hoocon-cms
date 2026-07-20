@@ -10,6 +10,7 @@ from PIL import Image
 
 from catalog.etl.label_to_slug import label_to_slug
 from catalog.etl.series_copy_ball_valves import (
+    DEFAULT_STORE_CSV,
     BallValveSeries,
     _diff_pressure_mpa,
     _drive_families_from_mods,
@@ -29,7 +30,13 @@ from catalog.models import (
     ProductImage,
 )
 
+requires_store_csv = pytest.mark.skipif(
+    not DEFAULT_STORE_CSV.is_file(),
+    reason="Sibling hoocon store CSV not available in CI",
+)
 
+
+@requires_store_csv
 def test_kvs_for_sku_code_editions() -> None:
     """Edition letters a–e map to Tilda Kvs values for BV215."""
     assert kvs_for_sku_code("8100-bv215a") == "1,6"
@@ -79,6 +86,7 @@ def test_format_compatible_actuators_bracket_only_with_fu() -> None:
     assert format_bracket(("DA6MU24", "DA8MQU24")) == "BR-M"
 
 
+@requires_store_csv
 def test_load_ball_valve_series_from_csv() -> None:
     """Store CSV yields all 12 BV series with DN / Kvs / drives / photos."""
     series_list = load_ball_valve_series()
@@ -121,6 +129,7 @@ def test_label_to_slug_valve_fields() -> None:
 
 
 @pytest.mark.django_db
+@requires_store_csv
 def test_apply_bv220_enrichment_cards_and_gallery() -> None:
     """BV220 follows the same card template as BV215."""
     series = next(s for s in load_ball_valve_series() if s.code == "BV220")
