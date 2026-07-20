@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Новая заявка #{{ lead.pk }}</title>
+</head>
+<body style="font-family: system-ui, sans-serif; line-height: 1.45; color: #0f172a;">
+  <p style="margin: 0 0 1rem;">Поступила новая заявка с сайта <strong>Hoocon</strong>.</p>
+  <table style="border-collapse: collapse; width: 100%; max-width: 36rem;">
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Тип</td>
+      <td style="padding: 0.35rem 0;">{{ lead_type_display }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Имя</td>
+      <td style="padding: 0.35rem 0;">{{ lead.name }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Компания</td>
+      <td style="padding: 0.35rem 0;">{{ lead.company|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Email</td>
+      <td style="padding: 0.35rem 0;">
+        <a href="mailto:{{ lead.email }}">{{ lead.email }}</a>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Телефон</td>
+      <td style="padding: 0.35rem 0;">{{ lead.phone|default:"—" }}</td>
+    </tr>
+    {% if lead.sku %}
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">SKU</td>
+      <td style="padding: 0.35rem 0;">{{ lead.sku.sku_code }} ({{ lead.sku.name }})</td>
+    </tr>
+    {% endif %}
+    {% if lead.quantity %}
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Количество</td>
+      <td style="padding: 0.35rem 0;">{{ lead.quantity }}</td>
+    </tr>
+    {% endif %}
+    {% if lead.analog_belimo_code %}
+    <tr>
+      <td style="padding: 0.35rem 0; color: #64748b;">Аналог Belimo</td>
+      <td style="padding: 0.35rem 0;">{{ lead.analog_belimo_code }}</td>
+    </tr>
+    {% endif %}
+  </table>
+  <p style="margin: 1rem 0 0.35rem; color: #64748b;">Сообщение</p>
+  <p style="margin: 0; white-space: pre-wrap;">{{ lead.message }}</p>
+  <p style="margin: 1.25rem 0 0;">
+    <a href="{{ admin_url }}"
+       style="display: inline-block; padding: 0.55rem 1rem; background: #2563eb;
+              color: #fff; text-decoration: none; border-radius: 8px;">
+      Открыть заявку в Admin
+    </a>
+  </p>
+  <p style="margin: 0.75rem 0 0; font-size: 0.875rem;">
+    <a href="{{ inbox_url }}">Все новые заявки</a>
+    · создано {{ lead.created_at|date:"Y-m-d H:i" }}
+  </p>
+</body>
+</html>

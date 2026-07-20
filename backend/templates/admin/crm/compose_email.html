@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
+  &rsaquo; {% trans "Написать письмо" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" novalidate>
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    {% for field in form %}
+      <div class="form-row">
+        {{ field.errors }}
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <div class="help">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </fieldset>
+  <div class="submit-row">
+    <input type="submit" value="{% trans 'Сохранить / отправить' %}" class="default">
+    <a href="{% url 'admin:crm_client_change' original.pk %}" class="button cancel-link">
+      {% trans "Отмена" %}
+    </a>
+  </div>
+</form>
+{% endblock %}

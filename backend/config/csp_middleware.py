@@ -13,6 +13,25 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 
+def _analytics_counter_ids() -> tuple[str, str]:
+    """Resolve Metrika/GA4 IDs from SiteSettings with env fallback.
+
+    Returns:
+        Tuple ``(yandex_metrika_id, ga4_measurement_id)``.
+    """
+    ym = getattr(settings, "YANDEX_METRIKA_ID", "") or ""
+    ga = getattr(settings, "GA4_MEASUREMENT_ID", "") or ""
+    try:
+        from sitesettings.models import SiteSettings
+
+        site = SiteSettings.load()
+        ym = (site.yandex_metrika_id or "").strip() or ym
+        ga = (site.ga4_measurement_id or "").strip() or ga
+    except Exception:  # noqa: BLE001 — CSP must not break on DB errors
+        pass
+    return ym.strip(), ga.strip()
+
+
 def build_csp(*, nonce: str | None = None) -> str:
     """Build CSP directive string.
 
@@ -28,12 +47,13 @@ def build_csp(*, nonce: str | None = None) -> str:
     connect_parts = ["'self'"]
     img_parts = ["'self'", "data:"]
 
-    if getattr(settings, "YANDEX_METRIKA_ID", ""):
+    ym_id, ga_id = _analytics_counter_ids()
+    if ym_id:
         script_parts.extend(["https://mc.yandex.ru", "https://mc.yandex.com"])
         connect_parts.extend(["https://mc.yandex.ru", "https://mc.yandex.com"])
         img_parts.append("https://mc.yandex.ru")
 
-    if getattr(settings, "GA4_MEASUREMENT_ID", ""):
+    if ga_id:
         script_parts.append("https://www.googletagmanager.com")
         connect_parts.extend(
             [

@@ -1,14 +1,14 @@
-"""Admin registration for content models: Page / Article / News.
-
-Spec: ПЛАН §6 Iter 3 — content app; docs/readiness-backend-ux.md §2.2.
-Staff manages CMS content via Django Admin; public API is read-only.
-"""
+"""Admin registration for content models: Page / Article / News."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.contrib import admin
+from django.http import HttpRequest
 
 from content.models import Article, News, Page
+from social.admin import SocialAnnounceAdminMixin, maybe_auto_announce
 
 
 class _ContentBaseAdmin(admin.ModelAdmin):
@@ -30,9 +30,10 @@ class PageAdmin(_ContentBaseAdmin):
 
 
 @admin.register(Article)
-class ArticleAdmin(_ContentBaseAdmin):
+class ArticleAdmin(SocialAnnounceAdminMixin, _ContentBaseAdmin):
     """Expert article admin (/statyi/<slug>)."""
 
+    change_form_template = "admin/content/change_form_social.html"
     verbose_name = "Статья"
     list_display = (
         "title",
@@ -55,11 +56,26 @@ class ArticleAdmin(_ContentBaseAdmin):
         "updated_at",
     )
 
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Article,
+        form: Any,
+        change: bool,
+    ) -> None:
+        """Persist article and optionally auto-announce on first publish."""
+        was_published = False
+        if change and obj.pk:
+            was_published = Article.objects.filter(pk=obj.pk).values_list("is_published", flat=True).first() or False
+        super().save_model(request, obj, form, change)
+        maybe_auto_announce(obj, was_published=was_published)
+
 
 @admin.register(News)
-class NewsAdmin(_ContentBaseAdmin):
+class NewsAdmin(SocialAnnounceAdminMixin, _ContentBaseAdmin):
     """Company news admin (/novosti/<slug>)."""
 
+    change_form_template = "admin/content/change_form_social.html"
     verbose_name = "Новость"
     fields = (
         "title",
@@ -71,3 +87,17 @@ class NewsAdmin(_ContentBaseAdmin):
         "created_at",
         "updated_at",
     )
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: News,
+        form: Any,
+        change: bool,
+    ) -> None:
+        """Persist news and optionally auto-announce on first publish."""
+        was_published = False
+        if change and obj.pk:
+            was_published = News.objects.filter(pk=obj.pk).values_list("is_published", flat=True).first() or False
+        super().save_model(request, obj, form, change)
+        maybe_auto_announce(obj, was_published=was_published)

@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  {% if compose_email_url %}
+    <li>
+      <a href="{{ compose_email_url }}" class="historylink">
+        {% trans "Написать письмо" %}
+      </a>
+    </li>
+  {% endif %}
+{% endblock %}

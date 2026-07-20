@@ -1,0 +1,2516 @@
+/*
+ * Django admin — современный CMS-layout (светлая / тёмная тема).
+ * Flat-поверхности, мягкие тени, много воздуха между блоками.
+ * Контент и данные читаются первее декора (как Strapi / Payload / Sanity).
+ * Шрифт: system-ui / SF Pro.
+ */
+
+html {
+  /* Django base.css: height:100% ломает скролл длинных страниц. */
+  height: auto !important;
+  min-height: 100%;
+  --hoocon-radius: 12px;
+  --hoocon-radius-lg: 14px;
+  --hoocon-radius-pill: 10px;
+  --hoocon-radius-control: 10px;
+  /* Воздух: внешний зазор и внутренние отступы — просторнее, чем «glass»-версия. */
+  --hoocon-edge-gap: 1.75rem;
+  --hoocon-content-padding-x: 2rem;
+  --hoocon-inline-padding: 1.75rem;
+  --hoocon-block-gap: 1.75rem;
+  --hoocon-row-gap: 1.25rem;
+  /* Единые внутренние отступы/высота кнопок (submit, object-tools, «На сайт»). */
+  --hoocon-btn-height: 2.5rem;
+  --hoocon-btn-padding-x: 1.25rem;
+  /* Запас справа под tooltag: иконка не должна заходить в скругление. */
+  --hoocon-btn-padding-x-icon: 2.5rem;
+  --hoocon-btn-icon-inset: 1.15rem;
+  --hoocon-btn-font-size: 0.875rem;
+  --hoocon-blur: 0px;
+  --hoocon-saturate: 1;
+  --hoocon-spring: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --hoocon-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* Card-layout (sidebar, dashboard, changelist). */
+  --hoocon-card-gap: 1.25rem;
+  --hoocon-card-padding: 1.25rem 1.5rem;
+  --hoocon-card-padding-compact: 0.9rem 1.1rem;
+  --hoocon-card-border: 1px solid var(--hoocon-glass-border);
+  --hoocon-card-bg: var(--hoocon-glass);
+  --hoocon-card-bg-sidebar: var(--hoocon-glass-strong);
+  --hoocon-card-margin: 1.15rem;
+  --hoocon-card-margin-compact: 0.85rem;
+  --hoocon-page-bg-fallback: #f4f5f7;
+  --hoocon-surface: #ffffff;
+  --hoocon-surface-muted: #f8f9fb;
+}
+
+/* Default = light. Also covers brief flash before theme.js resolves. */
+:root,
+html,
+html[data-theme="light"] {
+  color-scheme: light;
+  --hoocon-primary: #2563eb;
+  --hoocon-primary-hover: #1d4ed8;
+  --hoocon-primary-pressed: #1e40af;
+  --hoocon-accent: #3b82f6;
+  --hoocon-tint: rgba(37, 99, 235, 0.08);
+  --hoocon-success: #16a34a;
+  --hoocon-warning: #d97706;
+  --hoocon-danger: #dc2626;
+  /* Solid surfaces — без glass/blur, чтобы текст не «тонул». */
+  --hoocon-glass: var(--hoocon-surface);
+  --hoocon-glass-strong: var(--hoocon-surface);
+  --hoocon-glass-border: #e5e7eb;
+  --hoocon-glass-edge: transparent;
+  --hoocon-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --hoocon-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --hoocon-specular: none;
+
+  --font-family-primary:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    system-ui,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  --primary: var(--hoocon-primary);
+  --secondary: #475569;
+  --accent: var(--hoocon-accent);
+  --primary-fg: #ffffff;
+
+  --body-fg: #0f172a;
+  --body-bg: #f4f5f7;
+  --body-quiet-color: #64748b;
+  --body-medium-color: #334155;
+  --body-loud-color: #020617;
+
+  --header-color: #0f172a;
+  --header-branding-color: #0f172a;
+  --header-bg: transparent;
+  --header-link-color: var(--hoocon-primary);
+
+  --breadcrumbs-fg: #64748b;
+  --breadcrumbs-link-fg: var(--hoocon-primary);
+  --breadcrumbs-bg: transparent;
+
+  --link-fg: var(--hoocon-primary);
+  --link-hover-color: var(--hoocon-primary-hover);
+  --link-selected-fg: var(--hoocon-primary-pressed);
+
+  --hairline-color: #eef0f3;
+  --border-color: #e5e7eb;
+
+  --button-fg: #ffffff;
+  --button-bg: var(--hoocon-primary);
+  --button-hover-bg: var(--hoocon-primary-hover);
+  --default-button-bg: var(--hoocon-primary);
+  --default-button-hover-bg: var(--hoocon-primary-hover);
+
+  --darkened-bg: var(--hoocon-surface-muted);
+  --selected-bg: var(--hoocon-tint);
+  --selected-row: rgba(37, 99, 235, 0.06);
+
+  --message-success-bg: rgba(22, 163, 74, 0.1);
+  --message-warning-bg: rgba(217, 119, 6, 0.1);
+  --message-error-bg: rgba(220, 38, 38, 0.1);
+  --message-info-bg: rgba(37, 99, 235, 0.08);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --hoocon-primary: #60a5fa;
+  --hoocon-primary-hover: #93c5fd;
+  --hoocon-primary-pressed: #bfdbfe;
+  --hoocon-accent: #38bdf8;
+  --hoocon-tint: rgba(96, 165, 250, 0.14);
+  --hoocon-success: #4ade80;
+  --hoocon-warning: #fbbf24;
+  --hoocon-danger: #f87171;
+  --hoocon-surface: #1e293b;
+  --hoocon-surface-muted: #0f172a;
+  --hoocon-glass: var(--hoocon-surface);
+  --hoocon-glass-strong: #243044;
+  --hoocon-glass-border: #334155;
+  --hoocon-glass-edge: transparent;
+  --hoocon-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --hoocon-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --hoocon-specular: none;
+  --hoocon-page-bg-fallback: #0b1220;
+  --hoocon-card-bg: var(--hoocon-surface);
+  --hoocon-card-bg-sidebar: var(--hoocon-glass-strong);
+
+  --font-family-primary:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro Display",
+    system-ui,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  --primary: var(--hoocon-primary);
+  --secondary: #94a3b8;
+  --accent: var(--hoocon-accent);
+  --primary-fg: #0f172a;
+
+  --body-fg: #e2e8f0;
+  --body-bg: #0b1220;
+  --body-quiet-color: #94a3b8;
+  --body-medium-color: #cbd5e1;
+  --body-loud-color: #f8fafc;
+
+  --header-color: #e2e8f0;
+  --header-branding-color: #f8fafc;
+  --header-bg: transparent;
+  --header-link-color: var(--hoocon-primary);
+
+  --breadcrumbs-fg: #94a3b8;
+  --breadcrumbs-link-fg: var(--hoocon-primary);
+  --breadcrumbs-bg: transparent;
+
+  --link-fg: var(--hoocon-primary);
+  --link-hover-color: var(--hoocon-primary-hover);
+  --link-selected-fg: var(--hoocon-primary-pressed);
+
+  --hairline-color: #1e293b;
+  --border-color: #334155;
+
+  --button-bg: var(--hoocon-primary);
+  --button-hover-bg: var(--hoocon-primary-hover);
+  --default-button-bg: var(--hoocon-primary);
+  --default-button-hover-bg: var(--hoocon-primary-hover);
+
+  --darkened-bg: var(--hoocon-surface-muted);
+  --selected-bg: var(--hoocon-tint);
+  --selected-row: rgba(96, 165, 250, 0.12);
+
+  --message-success-bg: rgba(74, 222, 128, 0.12);
+  --message-warning-bg: rgba(251, 191, 36, 0.12);
+  --message-error-bg: rgba(248, 113, 113, 0.12);
+  --message-info-bg: rgba(96, 165, 250, 0.12);
+}
+
+/* Фон: спокойный flat (без цветных радиалов — они отвлекают от данных). */
+body {
+  background: var(--hoocon-page-bg-fallback);
+  color: var(--body-fg);
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+}
+
+body::before {
+  content: none;
+}
+
+html[data-theme="dark"] body::before {
+  content: none;
+}
+
+/* !important на height/overflow: changelists/responsive грузятся после hoocon-admin.css. */
+html body:not(.login) {
+  height: auto !important;
+  min-height: 100vh;
+  padding: var(--hoocon-edge-gap);
+  box-sizing: border-box;
+  overflow: visible !important;
+}
+
+#container {
+  border-radius: var(--hoocon-radius-lg);
+  box-sizing: border-box;
+}
+
+html body:not(.login) #container {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  height: auto !important;
+  min-height: calc(100vh - 2 * var(--hoocon-edge-gap));
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-glass-border);
+  outline: none;
+  box-shadow: var(--hoocon-shadow-soft);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  /* clip: обрезает детей по border-radius, не создаёт scrollport (в отличие от hidden
+     при height:100%). Скролл страницы идёт у document — контейнер растёт с контентом. */
+  overflow: clip !important;
+}
+
+/* Header — без собственной подложки: glass даёт #container.
+   Верхние углы совпадают с контейнером (на случай фона/бордера). */
+html body:not(.login) #header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  background: var(--hoocon-surface) !important;
+  box-shadow: none;
+  border-bottom: 1px solid var(--hairline-color);
+  border-radius: var(--hoocon-radius-lg) var(--hoocon-radius-lg) 0 0;
+  padding: 1rem var(--hoocon-content-padding-x);
+  color: var(--header-color);
+}
+
+#branding h1,
+#branding #site-name {
+  margin: 0;
+}
+
+#branding {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  row-gap: 0.5rem;
+}
+
+#branding #site-name a {
+  font-weight: 650;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+  color: var(--header-branding-color) !important;
+}
+
+#branding #site-name a:hover {
+  opacity: 0.78;
+  text-decoration: none;
+}
+
+.hoocon-admin-site-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  padding: 0 var(--hoocon-btn-padding-x);
+  color: var(--hoocon-primary) !important;
+  font-weight: 560;
+  font-size: var(--hoocon-btn-font-size);
+  line-height: 1.2;
+  text-align: center;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background 0.15s var(--hoocon-ease), border-color 0.15s var(--hoocon-ease);
+}
+
+/* Стикер входящих заявок (status=new) в nav-global. */
+.hoocon-admin-lead-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  padding: 0 0.65rem 0 0.85rem;
+  margin-right: 0.5rem;
+  color: var(--body-quiet-color) !important;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  text-decoration: none !important;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  transition:
+    background 0.15s var(--hoocon-ease),
+    border-color 0.15s var(--hoocon-ease),
+    color 0.15s var(--hoocon-ease);
+}
+
+.hoocon-admin-lead-sticker:hover {
+  background: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-glass-border));
+  color: var(--hoocon-primary) !important;
+}
+
+.hoocon-admin-lead-sticker__label {
+  letter-spacing: -0.01em;
+}
+
+.hoocon-admin-lead-sticker__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--body-quiet-color) 14%, transparent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.hoocon-admin-lead-sticker--active {
+  color: #9a3412 !important;
+  border-color: color-mix(in srgb, #ea580c 40%, var(--hoocon-glass-border));
+  background: color-mix(in srgb, #ea580c 12%, var(--hoocon-surface));
+}
+
+.hoocon-admin-lead-sticker--active:hover {
+  color: #9a3412 !important;
+  background: color-mix(in srgb, #ea580c 18%, var(--hoocon-surface));
+}
+
+.hoocon-admin-lead-sticker--active .hoocon-admin-lead-sticker__count {
+  background: #ea580c;
+  color: #fff;
+}
+
+html[data-theme="dark"] .hoocon-admin-lead-sticker--active {
+  color: #fdba74 !important;
+  background: color-mix(in srgb, #ea580c 22%, var(--hoocon-surface));
+}
+
+html[data-theme="dark"] .hoocon-admin-lead-sticker--active:hover {
+  color: #fdba74 !important;
+}
+
+/* Тег статуса заявки + кнопка «Открыть» в changelist / карточках. */
+.hoocon-lead-status {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.hoocon-lead-status--new {
+  color: #9a3412;
+  background: color-mix(in srgb, #ea580c 16%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #ea580c 42%, transparent);
+}
+
+.hoocon-lead-status--in_progress {
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #2563eb 32%, transparent);
+}
+
+.hoocon-lead-status--done {
+  color: #166534;
+  background: color-mix(in srgb, #16a34a 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #16a34a 32%, transparent);
+}
+
+html[data-theme="dark"] .hoocon-lead-status--new {
+  color: #fdba74;
+}
+
+html[data-theme="dark"] .hoocon-lead-status--in_progress {
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .hoocon-lead-status--done {
+  color: #86efac;
+}
+
+a.hoocon-admin-lead-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 2rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
+  background: var(--hoocon-primary);
+  color: #fff !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+a.hoocon-admin-lead-open:hover {
+  background: var(--hoocon-primary-hover);
+  color: #fff !important;
+  filter: none;
+}
+
+a.hoocon-leads-stats-link {
+  font-weight: 600;
+}
+
+/* Статистика обработки заявок (Admin). */
+.hoocon-lead-stats {
+  max-width: 56rem;
+}
+
+.hoocon-lead-stats__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.hoocon-lead-stats__toolbar h1 {
+  margin: 0;
+}
+
+.hoocon-lead-stats__periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hoocon-lead-stats__periods a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  color: var(--body-quiet-color);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.hoocon-lead-stats__periods a.is-active,
+.hoocon-lead-stats__periods a:hover {
+  color: var(--hoocon-primary);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
+  background: var(--selected-bg);
+}
+
+.hoocon-lead-stats__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.hoocon-lead-stats__card {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--hoocon-radius);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface);
+  box-shadow: var(--hoocon-shadow-soft);
+}
+
+.hoocon-lead-stats__card--accent {
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--hoocon-primary) 8%, var(--hoocon-surface));
+}
+
+.hoocon-lead-stats__label {
+  margin: 0 0 0.35rem;
+  color: var(--body-quiet-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.hoocon-lead-stats__value {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.hoocon-lead-stats__table-wrap {
+  overflow-x: clip;
+}
+
+.hoocon-lead-stats__table-wrap h2 {
+  margin: 0;
+  padding: 1rem var(--hoocon-inline-padding);
+  border-bottom: 1px solid var(--hairline-color);
+  font-size: 1rem;
+}
+
+.hoocon-lead-stats__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hoocon-lead-stats__table th,
+.hoocon-lead-stats__table td {
+  padding: 0.75rem 1.1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--hairline-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.hoocon-lead-stats__table thead th {
+  color: var(--body-quiet-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.hoocon-lead-stats__empty {
+  padding: 1.25rem var(--hoocon-inline-padding);
+  color: var(--body-quiet-color);
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_lead,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead {
+  padding-top: 0.55rem !important;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_lead::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead::before {
+  display: none;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge::before {
+  display: none;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge,
+#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge {
+  order: -1;
+  margin-bottom: 0.15rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hoocon-admin-lead-sticker--active .hoocon-admin-lead-sticker__count {
+    animation: hoocon-lead-sticker-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes hoocon-lead-sticker-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #ea580c 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 0.35rem color-mix(in srgb, #ea580c 0%, transparent);
+  }
+}
+
+.hoocon-admin-site-link:hover {
+  background: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-glass-border));
+  text-decoration: none !important;
+  filter: none;
+}
+
+.hoocon-admin-site-link:active {
+  filter: none;
+  background: var(--selected-row);
+}
+
+div.breadcrumbs {
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.9rem var(--hoocon-content-padding-x);
+  background: var(--hoocon-surface-muted) !important;
+  border-bottom: 1px solid var(--hairline-color);
+  color: var(--breadcrumbs-fg);
+}
+
+div.breadcrumbs a {
+  color: var(--breadcrumbs-link-fg);
+}
+
+#content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 2rem var(--hoocon-content-padding-x) 2.75rem;
+}
+
+#content-main > .module,
+.dashboard #content-main .module,
+#changelist,
+#content-related .module {
+  margin-bottom: var(--hoocon-block-gap);
+}
+
+#content h1 {
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  margin: 0 0 1.35rem;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+/* Surfaces / cards / filter — solid, без glass-stack. */
+.module,
+#content-main .module,
+.dashboard #content-main .module,
+#changelist-filter {
+  border-radius: var(--hoocon-radius-lg);
+  border: 1px solid var(--hoocon-glass-border);
+  box-shadow: var(--hoocon-shadow);
+  overflow: clip;
+  background: var(--hoocon-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Changelist — таблица скроллится в .results, модуль не режет строки/карточки. */
+#changelist.module {
+  overflow: visible;
+}
+
+.module h2,
+.module caption,
+.inline-group h2,
+#changelist-filter h2 {
+  background: var(--hoocon-surface-muted);
+  color: var(--body-loud-color);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  padding: 1rem var(--hoocon-inline-padding) !important;
+  border-bottom: 1px solid var(--hairline-color);
+  box-sizing: border-box;
+  border-radius: var(--hoocon-radius-lg) var(--hoocon-radius-lg) 0 0;
+}
+
+html[data-theme="dark"] .module h2,
+html[data-theme="dark"] .module caption,
+html[data-theme="dark"] .inline-group h2,
+html[data-theme="dark"] #changelist-filter h2 {
+  background: var(--hoocon-surface-muted);
+  color: var(--body-loud-color);
+}
+
+/* Горизонтальный внутренний отступ — один набор для текстовых блоков. */
+.module p,
+.module ul,
+.module h3,
+.module h4,
+.module dl,
+.module pre,
+fieldset .fieldset-heading,
+fieldset .inline-heading,
+:not(.inline-related) .collapse summary,
+.inline-group div.add-row,
+.inline-group .tabular tr.add-row td,
+.inline-related h3,
+.inline-related:not(.tabular) .collapse summary,
+#changelist-filter h3,
+#changelist-filter details summary,
+#changelist-filter ul,
+ul.messagelist {
+  padding-left: var(--hoocon-inline-padding);
+  padding-right: var(--hoocon-inline-padding);
+}
+
+.submit-row {
+  padding: 1.35rem var(--hoocon-inline-padding) !important;
+  background: var(--hoocon-surface-muted) !important;
+  border-top: 1px solid var(--hairline-color);
+  box-sizing: border-box;
+  gap: 0.75rem;
+}
+
+/* Формы — ширина от родителя (один набор box-sizing/width). */
+#content-main form,
+#content-main form fieldset.module,
+.inline-group .tabular fieldset.module,
+fieldset.module.aligned,
+.inline-group .module {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+#content-main form .form-row,
+#content-main form .aligned .form-row > div,
+#content-main form .aligned .form-row .flex-container,
+#content-main form .related-widget-wrapper,
+#content-main form .aligned input,
+#content-main form .aligned select,
+#content-main form .aligned textarea,
+#content-main form .aligned .vLargeTextField,
+#content-main form .aligned .vXMLLargeTextField,
+#content-main form textarea,
+#content-main form .vLargeTextField,
+#content-main form .vXMLLargeTextField,
+#content-main form .vURLField,
+#content-main form .inline-group .tabular input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+#content-main form .inline-group .tabular select,
+#content-main form .inline-group .tabular textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#content-main form .form-row {
+  padding: var(--hoocon-row-gap) var(--hoocon-inline-padding) !important;
+  border-bottom: 1px solid var(--hairline-color);
+}
+
+#content-main form .form-row:last-child {
+  border-bottom: none;
+}
+
+#content-main form .aligned .form-row .flex-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
+#content-main form .aligned label,
+#content-main form .aligned legend {
+  float: none;
+  display: block;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 0.35rem;
+  box-sizing: border-box;
+}
+
+.inline-related.tabular div.wrapper {
+  overflow-x: clip;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#content-main form .related-widget-wrapper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(2.25rem, max-content));
+  gap: 0.75rem;
+  align-items: center;
+}
+
+#content-main form .related-widget-wrapper select {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#content-main form .related-widget-wrapper > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+}
+
+#content-main form .inline-group .aligned label {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+fieldset.module.aligned .form-row,
+.inline-group[data-inline-type="stacked"] .inline-related .module .form-row,
+.login .form-row {
+  padding-inline: var(--hoocon-inline-padding);
+}
+
+form .aligned p.help,
+form .aligned div.help,
+form .aligned input + p.help,
+form .aligned select + p.help,
+form .aligned textarea + p.help,
+form .aligned input + div.help,
+form .aligned select + div.help,
+form .aligned textarea + div.help,
+.aligned label + p,
+.aligned label + div.help,
+.aligned label + div.readonly,
+form .aligned ul,
+form .aligned ul.errorlist,
+.description,
+.errornote {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  padding: 0.75rem var(--hoocon-inline-padding) !important;
+}
+
+/* Django base.css (грузится после hoocon-admin.css) задаёт help-тексту
+   margin-left: 160px — из-за этого он вылезал за правый край поля.
+   Гасим margin повышенной специфичностью: help растягивается на ширину
+   строки (box-sizing:border-box + width:100% выше) и переносится по словам. */
+html body #content-main form .aligned p.help,
+html body #content-main form .aligned div.help,
+html body #content-main form .aligned input + p.help,
+html body #content-main form .aligned select + p.help,
+html body #content-main form .aligned textarea + p.help,
+html body #content-main form .aligned input + div.help,
+html body #content-main form .aligned select + div.help,
+html body #content-main form .aligned textarea + div.help,
+html body #content-main .aligned label + div.help {
+  margin-left: 0 !important;
+}
+
+.object-tools {
+  /* Django base.css: overflow:hidden обрезает pill/иконку справа. */
+  overflow: visible !important;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+  margin-top: 1px;
+  margin-bottom: 1.5rem !important;
+  text-align: left;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.object-tools li {
+  display: inline-block;
+  max-width: 100%;
+  overflow: visible;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+}
+
+ul.messagelist {
+  box-sizing: border-box;
+}
+
+.main > .content,
+.main.shifted > .content {
+  padding-inline: 0.75rem;
+  box-sizing: border-box;
+}
+
+/* Inputs — спокойные solid fields */
+input:not([type]),
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="search"],
+input[type="tel"],
+textarea,
+select {
+  border-radius: var(--hoocon-radius-control) !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--hoocon-surface) !important;
+  color: var(--body-fg) !important;
+  box-shadow: none;
+  padding-top: 0.55rem !important;
+  padding-bottom: 0.55rem !important;
+  line-height: 1.45;
+  transition:
+    border-color 0.18s var(--hoocon-ease),
+    box-shadow 0.18s var(--hoocon-ease),
+    background 0.18s var(--hoocon-ease);
+}
+
+html[data-theme="dark"] input:not([type]),
+html[data-theme="dark"] input[type="text"],
+html[data-theme="dark"] input[type="password"],
+html[data-theme="dark"] input[type="email"],
+html[data-theme="dark"] input[type="url"],
+html[data-theme="dark"] input[type="number"],
+html[data-theme="dark"] input[type="date"],
+html[data-theme="dark"] input[type="datetime-local"],
+html[data-theme="dark"] input[type="month"],
+html[data-theme="dark"] input[type="time"],
+html[data-theme="dark"] input[type="search"],
+html[data-theme="dark"] input[type="tel"],
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background: var(--hoocon-surface-muted) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--hoocon-primary) 55%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hoocon-primary) 16%, transparent);
+}
+
+/* Buttons — flat, без градиентов. */
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button,
+a.deletelink {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--hoocon-radius-pill) !important;
+  font-weight: 600 !important;
+  font-size: var(--hoocon-btn-font-size) !important;
+  letter-spacing: -0.01em;
+  text-align: center !important;
+  vertical-align: middle;
+  box-sizing: border-box;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  padding: 0 var(--hoocon-btn-padding-x) !important;
+  line-height: 1.2 !important;
+  box-shadow: none !important;
+  transition: background 0.15s var(--hoocon-ease), border-color 0.15s var(--hoocon-ease);
+}
+
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+  border: 1px solid transparent !important;
+  background: var(--hoocon-primary) !important;
+  color: var(--button-fg) !important;
+}
+
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.submit-row input:hover,
+a.button:hover,
+input[type="submit"].default:hover,
+.submit-row input.default:hover {
+  filter: none;
+  background: var(--hoocon-primary-hover) !important;
+  transform: none;
+}
+
+.button:active,
+input[type="submit"]:active,
+input[type="button"]:active,
+.submit-row input:active,
+a.button:active {
+  transform: none;
+  filter: none;
+  background: var(--hoocon-primary-pressed) !important;
+}
+
+input[type="submit"].default,
+.submit-row input.default {
+  background: var(--hoocon-primary) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+a.deletelink,
+.deletelink,
+.deletelink-box a.deletelink,
+.delete-confirmation form input[type="submit"] {
+  padding-left: var(--hoocon-btn-padding-x) !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  background: var(--hoocon-danger) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+a.deletelink:hover,
+a.deletelink:focus,
+.deletelink-box a.deletelink:hover,
+.delete-confirmation form input[type="submit"]:hover {
+  filter: none;
+  background: color-mix(in srgb, var(--hoocon-danger) 88%, black) !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+
+.object-tools a {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  float: none !important;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: visible;
+  text-align: center !important;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  line-height: 1.2 !important;
+  padding: 0 var(--hoocon-btn-padding-x) !important;
+  border-radius: var(--hoocon-radius-pill) !important;
+  background: var(--hoocon-surface-muted) !important;
+  color: var(--hoocon-primary) !important;
+  border: 1px solid var(--hoocon-glass-border) !important;
+  box-shadow: none !important;
+  font-weight: 600;
+  font-size: var(--hoocon-btn-font-size) !important;
+  background-clip: border-box;
+}
+
+.object-tools a:hover {
+  background: var(--selected-bg) !important;
+  filter: none;
+}
+
+.object-tools a.addlink,
+.object-tools a.viewsitelink {
+  padding: 0 var(--hoocon-btn-padding-x-icon) 0 var(--hoocon-btn-padding-x) !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-position: right var(--hoocon-btn-icon-inset) center, 0 0 !important;
+  background-size: 0.8125rem 0.8125rem, auto !important;
+  background-clip: padding-box, border-box !important;
+  background-origin: padding-box, border-box !important;
+}
+
+.object-tools a.addlink {
+  background-image:
+    url("../img/tooltag-add.svg"),
+    linear-gradient(var(--hoocon-primary), var(--hoocon-primary)) !important;
+  border-color: var(--hoocon-primary) !important;
+  color: #ffffff !important;
+}
+
+.object-tools a.viewsitelink {
+  background-image:
+    url("../img/tooltag-arrowright.svg"),
+    linear-gradient(var(--hoocon-surface-muted), var(--hoocon-surface-muted)) !important;
+}
+
+/* Checkboxes & radios */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.2rem !important;
+  height: 1.2rem !important;
+  margin: 0;
+  padding: 0 !important;
+  border: 1.5px solid var(--border-color) !important;
+  background: var(--hoocon-surface) !important;
+  box-shadow: none;
+  vertical-align: middle;
+  cursor: pointer;
+  transition:
+    background 0.18s var(--hoocon-ease),
+    border-color 0.18s var(--hoocon-ease);
+}
+
+input[type="checkbox"] {
+  border-radius: 6px !important;
+}
+
+input[type="radio"] {
+  border-radius: 50% !important;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background: var(--hoocon-primary) !important;
+  border-color: var(--hoocon-primary) !important;
+  box-shadow: none;
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  display: block;
+  width: 0.28rem;
+  height: 0.55rem;
+  margin: 0.12rem auto 0;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="radio"]:checked::after {
+  content: "";
+  display: block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: 0.32rem auto 0;
+  border-radius: 50%;
+  background: #fff;
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--hoocon-primary) 55%, transparent);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:active,
+input[type="radio"]:active {
+  transform: scale(0.92);
+}
+
+#content-main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  /* Не clip здесь: object-tools flush к краю — overflow-x:clip срезает 1px antialias pill. */
+  overflow: visible;
+}
+
+#content-main > form {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+#changelist {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+#changelist-form .results {
+  /* Без горизонтального скролла: перенос / card-stack, не scrollport.
+     !important: changelists.css грузится после темы и ставит overflow-x:auto. */
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  container-type: inline-size;
+  container-name: changelist-results;
+}
+
+#changelist table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  box-sizing: border-box;
+}
+
+/* Пропорции колонок: классы thead = column-*, tbody = field-* (Django).
+   table-layout:fixed берёт ширины из первой строки (thead). */
+#changelist table th.action-checkbox-column,
+#changelist table td.action-checkbox {
+  width: 2.75rem;
+}
+
+#changelist table .column-is_published,
+#changelist table .field-is_published {
+  width: 7%;
+  text-align: center;
+}
+
+#changelist table .column-price,
+#changelist table .field-price {
+  width: 7%;
+}
+
+#changelist table .column-updated_at,
+#changelist table .field-updated_at {
+  width: 12%;
+}
+
+#changelist table .column-sku_code,
+#changelist table .field-sku_code {
+  width: 10%;
+}
+
+#changelist table .column-name,
+#changelist table .field-name {
+  width: 26%;
+}
+
+#changelist table .column-slug,
+#changelist table .field-slug {
+  width: 14%;
+}
+
+#changelist table .column-product,
+#changelist table .field-product {
+  width: 17%;
+}
+
+#changelist table .column-email,
+#changelist table .field-email,
+#changelist table .column-company,
+#changelist table .field-company {
+  width: 16%;
+}
+
+#changelist table tbody td.nowrap,
+#changelist table tbody th.nowrap {
+  white-space: normal !important;
+}
+
+#changelist table thead th {
+  padding: 0.55rem 0.4rem !important;
+  background: var(--hoocon-surface-muted);
+  border-bottom: 1px solid var(--hairline-color);
+  /* Не рвать слова по буквам — из‑за этого «Опубликован» становился столбиком. */
+  white-space: normal !important;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  min-width: 0;
+  vertical-align: bottom;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--body-quiet-color);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#changelist table thead th .text {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#changelist table thead th .text a {
+  display: inline-block;
+  max-width: 100%;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Короткие подписи для узких колонок (полный текст — в title). */
+#changelist table thead th.column-is_published .text a {
+  font-size: 0;
+  line-height: 0;
+}
+
+#changelist table thead th.column-is_published .text a::after {
+  content: "Публ.";
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+#changelist table thead th.column-sku_code .text a {
+  font-size: 0;
+  line-height: 0;
+}
+
+#changelist table thead th.column-sku_code .text a::after {
+  content: "Арт.";
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+#changelist table thead th.column-updated_at .text a {
+  font-size: 0;
+  line-height: 0;
+}
+
+#changelist table thead th.column-updated_at .text a::after {
+  content: "Обновл.";
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+#changelist table thead th.column-slug .text a {
+  font-size: 0;
+  line-height: 0;
+}
+
+#changelist table thead th.column-slug .text a::after {
+  content: "Slug";
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+#changelist table thead th.action-checkbox-column,
+#changelist table tbody td.action-checkbox {
+  /* Узкая колонка: не использовать --hoocon-inline-padding (съедает ширину). */
+  padding: 0.55rem 0.35rem !important;
+  width: 2.75rem;
+  max-width: 3rem;
+  text-align: center;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+#changelist table tbody td.action-checkbox .action-select {
+  margin: 0;
+  vertical-align: top;
+}
+
+#changelist table tbody td,
+#changelist table tbody th {
+  padding: 0.85rem 1rem !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline-color);
+  line-height: 1.45;
+}
+
+#changelist table tbody td a,
+#changelist table tbody th a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#changelist-filter li.selected {
+  margin-left: 0;
+  padding-left: var(--hoocon-inline-padding);
+  border-left: 3px solid var(--hoocon-primary);
+  background: var(--selected-bg);
+}
+
+/* Фильтр changelist — сверху полной шириной (changelists.css грузится ПОСЛЕ темы). */
+html body #changelist .changelist-form-container:has(#changelist-filter) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 1.25rem;
+}
+
+html body #changelist .changelist-form-container:has(#changelist-filter) > div {
+  max-width: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+html body #changelist #changelist-filter {
+  flex: 0 0 auto !important;
+  order: -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 0.25rem !important;
+  border-left: none !important;
+  padding: 0.35rem 0 0.85rem;
+  box-sizing: border-box;
+}
+
+#changelist #changelist-filter h2 {
+  padding: 0.85rem var(--hoocon-inline-padding) !important;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--body-quiet-color);
+  background: transparent;
+  border-bottom: none;
+}
+
+#changelist #changelist-filter #changelist-filter-extra-actions {
+  margin-bottom: 0.65rem;
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 0 var(--hoocon-inline-padding) 0.65rem;
+}
+
+#changelist #changelist-filter details {
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 0.5rem var(--hoocon-inline-padding) 0.65rem;
+}
+
+#changelist #changelist-filter details:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0.35rem;
+}
+
+#changelist #changelist-filter details > summary {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--body-medium-color);
+  padding: 0.25rem 0;
+  margin-bottom: 0;
+}
+
+/* Опции фильтра — компактные chips. */
+#changelist #changelist-filter ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+#changelist #changelist-filter li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#changelist #changelist-filter li.selected {
+  border-left: none;
+  padding-left: 0;
+  background: transparent;
+}
+
+#changelist #changelist-filter li a {
+  display: inline-block;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--hoocon-surface-muted);
+  color: var(--body-quiet-color);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+#changelist #changelist-filter li.selected a {
+  background: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 40%, transparent);
+  color: var(--link-selected-fg);
+}
+
+#changelist #changelist-filter li a:hover,
+#changelist #changelist-filter li.selected a:hover {
+  background: var(--selected-bg);
+  color: var(--link-hover-color);
+}
+
+#changelist #toolbar,
+#changelist .actions,
+#changelist .changelist-footer,
+#changelist .paginator {
+  padding: 1.1rem var(--hoocon-inline-padding) !important;
+  box-sizing: border-box;
+}
+
+#changelist .actions label {
+  padding-left: 0;
+  padding-right: 0.5rem;
+}
+
+#changelist .actions span.all,
+#changelist .actions span.action-counter,
+#changelist .actions span.clear,
+#changelist .actions span.question {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+#nav-sidebar,
+#nav-sidebar.sticky {
+  border-radius: 0;
+  border-right: 1px solid var(--hairline-color);
+  padding: 1.35rem var(--hoocon-inline-padding) !important;
+  box-sizing: border-box;
+  background: var(--hoocon-surface-muted);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-height: none !important;
+  overflow: visible !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  min-width: 0 !important;
+}
+
+/* #main — flex (sidebar + content). nav_sidebar.css даёт контенту flex-shrink:0
+   и max-width: calc(100% - 299px) — это не учитывает, что сайдбар может расти,
+   и контент не сжимается → горизонтальное переполнение. Разрешаем сжиматься. */
+#main { min-width: 0; }
+
+#content-start,
+.main > .content,
+.main.shifted > .content {
+  min-width: 0 !important;
+  flex-shrink: 1 !important;
+  max-width: 100% !important;
+}
+
+html body #nav-sidebar::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+html[data-theme="dark"] #nav-sidebar,
+html[data-theme="dark"] #nav-sidebar.sticky {
+  background: var(--hoocon-surface-muted);
+}
+
+#nav-sidebar #nav-filter {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 1.15rem;
+  padding: 0.65rem 0.95rem !important;
+  border-radius: var(--hoocon-radius-control) !important;
+}
+
+#nav-sidebar .current-app .section {
+  color: var(--hoocon-primary);
+  font-weight: 620;
+}
+
+#nav-sidebar .module {
+  margin-bottom: 1.15rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Сайдбар ~275px: строка th+td часто не помещается — каждая модель = карточка
+   (тот же принцип, что hoocon-admin-card-table на changelist). */
+#nav-sidebar .module table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#nav-sidebar .module tbody {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Сайдбар: имя модели + иконки действий в одну строку. */
+#nav-sidebar .module tbody tr {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.2rem;
+  padding: 0.4rem 0.45rem;
+  border: none;
+  border-radius: var(--hoocon-radius);
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+html[data-theme="dark"] #nav-sidebar .module tbody tr {
+  background: transparent;
+}
+
+#nav-sidebar .module tbody tr:hover {
+  background: var(--selected-bg);
+}
+
+#nav-sidebar .module tbody tr.current-model {
+  background: var(--selected-row);
+}
+
+/* Заголовки колонок скрыты визуально — thead не участвует в card-layout. */
+#nav-sidebar .module thead {
+  display: none;
+}
+
+#nav-sidebar .module th,
+#nav-sidebar .module caption {
+  padding: 0.65rem 0.75rem !important;
+}
+
+#nav-sidebar .module tbody th {
+  flex: 1 1 auto;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body #nav-sidebar .module tbody td {
+  flex: 0 0 auto;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0 !important;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap !important;
+  overflow: visible;
+}
+
+#nav-sidebar .module tbody td:empty {
+  display: none;
+}
+
+#nav-sidebar .module tbody th a {
+  display: block;
+  padding: 0.2rem 0.15rem;
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+#nav-sidebar .module tbody th a:hover {
+  background: var(--selected-bg);
+}
+
+/* Добавить / Изменить / Смотреть — только иконки + title при наведении. */
+#nav-sidebar .module tbody td a.addlink,
+#nav-sidebar .module tbody td a.changelink,
+#nav-sidebar .module tbody td a.viewlink {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 1.85rem !important;
+  min-height: 1.85rem !important;
+  max-width: 1.85rem !important;
+  padding: 0 !important;
+  margin: 0;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  text-indent: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 0.9rem 0.9rem !important;
+  transition:
+    background-color 0.15s var(--hoocon-ease),
+    border-color 0.15s var(--hoocon-ease);
+}
+
+#nav-sidebar .module tbody td a.addlink {
+  background-image: url(../img/icon-addlink.svg) !important;
+}
+
+#nav-sidebar .module tbody td a.changelink {
+  background-image: url(../img/icon-changelink.svg) !important;
+}
+
+#nav-sidebar .module tbody td a.viewlink {
+  background-image: url(../img/icon-viewlink.svg) !important;
+}
+
+#nav-sidebar .module tbody td a.addlink:hover,
+#nav-sidebar .module tbody td a.changelink:hover,
+#nav-sidebar .module tbody td a.viewlink:hover,
+#nav-sidebar .module tbody td a.addlink:focus-visible,
+#nav-sidebar .module tbody td a.changelink:focus-visible,
+#nav-sidebar .module tbody td a.viewlink:focus-visible {
+  background-color: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, transparent);
+  outline: none;
+}
+
+/* Дашборд / app index: компактные строки (имя модели + иконки), как в сайдбаре. */
+.dashboard #content-main .module table,
+#content-main .module table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.dashboard #content-main .module table tbody,
+#content-main .module table tbody {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.dashboard #content-main .module table thead,
+#content-main .module table thead {
+  display: none;
+}
+
+.dashboard #content-main .module tbody tr,
+#content-main .module table tbody tr {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.55rem var(--hoocon-inline-padding);
+  border: none;
+  border-bottom: 1px solid var(--hairline-color);
+  background: transparent;
+}
+
+.dashboard #content-main .module tbody tr:last-child,
+#content-main .module table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.dashboard #content-main .module tbody tr:hover,
+#content-main .module table tbody tr:hover {
+  background: var(--selected-bg);
+}
+
+.dashboard #content-main .module tbody th,
+#content-main .module table tbody th {
+  flex: 1 1 auto;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  border: none;
+}
+
+.dashboard #content-main .module tbody th a,
+#content-main .module table tbody th a {
+  display: block;
+  padding: 0.2rem 0.15rem;
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard #content-main .module tbody td,
+#content-main .module table tbody td {
+  flex: 0 0 auto;
+  display: block;
+  width: auto;
+  min-width: 0;
+  padding: 0 !important;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap !important;
+  border: none;
+}
+
+.dashboard #content-main .module tbody td:empty,
+#content-main .module table tbody td:empty {
+  display: none;
+}
+
+.dashboard #content-main .module tbody td a.addlink,
+.dashboard #content-main .module tbody td a.changelink,
+.dashboard #content-main .module tbody td a.viewlink,
+#content-main .module table tbody td a.addlink,
+#content-main .module table tbody td a.changelink,
+#content-main .module table tbody td a.viewlink {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2rem !important;
+  height: 2rem !important;
+  min-width: 2rem !important;
+  max-width: 2rem !important;
+  min-height: 2rem !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 0.95rem 0.95rem !important;
+}
+
+.dashboard #content-main .module tbody td a.addlink,
+#content-main .module table tbody td a.addlink {
+  background-image: url(../img/icon-addlink.svg) !important;
+}
+
+.dashboard #content-main .module tbody td a.changelink,
+#content-main .module table tbody td a.changelink {
+  background-image: url(../img/icon-changelink.svg) !important;
+}
+
+.dashboard #content-main .module tbody td a.viewlink,
+#content-main .module table tbody td a.viewlink {
+  background-image: url(../img/icon-viewlink.svg) !important;
+}
+
+.dashboard #content-main .module tbody td a.addlink:hover,
+.dashboard #content-main .module tbody td a.changelink:hover,
+.dashboard #content-main .module tbody td a.viewlink:hover,
+#content-main .module table tbody td a.addlink:hover,
+#content-main .module table tbody td a.changelink:hover,
+#content-main .module table tbody td a.viewlink:hover {
+  background-color: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, transparent);
+}
+
+#content-related h3,
+#content-related p,
+#content-related .module h2 {
+  padding-left: var(--hoocon-inline-padding);
+  padding-right: var(--hoocon-inline-padding);
+}
+
+/* Login — выше специфичность, чем admin/css/login.css (грузится после) */
+html body.login {
+  padding: 0 var(--hoocon-edge-gap);
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--hoocon-page-bg-fallback) !important;
+}
+
+html[data-theme="dark"] body.login {
+  background: var(--hoocon-page-bg-fallback) !important;
+}
+
+/* Как у основного #header: без своей подложки — поверхность даёт #container. */
+html body.login #header {
+  background: transparent !important;
+  box-shadow: none;
+  border-bottom: 1px solid var(--hairline-color);
+  border-radius: var(--hoocon-radius-lg) var(--hoocon-radius-lg) 0 0;
+}
+
+html body.login #container {
+  border-radius: var(--hoocon-radius-lg) !important;
+  border: 1px solid var(--hoocon-glass-border) !important;
+  box-shadow: var(--hoocon-shadow-soft) !important;
+  overflow: hidden;
+  background: var(--hoocon-surface) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-width: min(28rem, calc(100% - 2 * var(--hoocon-edge-gap)));
+  width: min(28rem, calc(100% - 2 * var(--hoocon-edge-gap))) !important;
+  margin: 4rem auto !important;
+}
+
+html[data-theme="dark"] body.login #container {
+  background: var(--hoocon-surface) !important;
+}
+
+.login #content {
+  padding: 2rem var(--hoocon-content-padding-x) 2.25rem;
+}
+
+.login #content-main {
+  border-radius: var(--hoocon-radius);
+}
+
+.login .submit-row {
+  padding: 1rem 0 0;
+  text-align: center;
+  border-top: none;
+}
+
+.login .submit-row input {
+  width: 100%;
+  height: var(--hoocon-btn-height);
+  min-height: var(--hoocon-btn-height);
+  padding: 0 var(--hoocon-btn-padding-x) !important;
+}
+
+@media (max-width: 768px) {
+  html {
+    --hoocon-edge-gap: 1rem;
+    --hoocon-content-padding-x: 1.25rem;
+    --hoocon-inline-padding: 1.25rem;
+    --hoocon-block-gap: 1.25rem;
+    --hoocon-row-gap: 1rem;
+  }
+
+  #header {
+    padding: 1rem var(--hoocon-content-padding-x);
+  }
+
+  #content {
+    padding: 1.35rem var(--hoocon-content-padding-x) 1.85rem;
+  }
+
+  .module,
+  #content-main .module {
+    border-radius: var(--hoocon-radius);
+  }
+
+  .module h2,
+  .module caption,
+  .inline-group h2,
+  #changelist-filter h2 {
+    border-radius: var(--hoocon-radius) var(--hoocon-radius) 0 0;
+  }
+
+  /* Django responsive.css: width: calc(100vw - 30px) — ломается с --hoocon-edge-gap. */
+  .aligned .form-row,
+  .aligned .form-row > div,
+  #content-main form .aligned .form-row,
+  #content-main form .aligned .form-row > div,
+  #content-main form .aligned .form-row .flex-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #changelist-search > div {
+    flex-wrap: wrap;
+    max-width: 100%;
+    gap: 0.5rem;
+  }
+
+  #toolbar form #searchbar {
+    flex: 1 1 8rem;
+    min-width: 0;
+    width: auto;
+  }
+
+  #user-tools {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  form .aligned ul,
+  form .aligned ul.errorlist,
+  form .aligned p.help,
+  form .aligned div.help,
+  form .aligned .form-row div.help,
+  .description,
+  .errornote {
+    margin-left: 0;
+    padding-left: var(--hoocon-inline-padding);
+    padding-right: var(--hoocon-inline-padding);
+  }
+
+  .inline-group[data-inline-type="stacked"] .inline-related .module {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .inline-group[data-inline-type="stacked"] .inline-related h3 {
+    padding-left: var(--hoocon-inline-padding);
+    padding-right: var(--hoocon-inline-padding);
+  }
+
+  #changelist-form .results,
+  .inline-group {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+}
+
+/* Планшет и узкий десктоп (≤1024px): компактные submit-кнопки.
+   Card-layout changelist — через .hoocon-admin-table-stacked (JS). */
+@media (max-width: 1024px) {
+  .submit-row {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .submit-row input,
+  .submit-row input.default,
+  .submit-row a {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding-left: 0.45rem !important;
+    padding-right: 0.45rem !important;
+    font-size: 0.6875rem !important;
+    letter-spacing: -0.02em;
+  }
+
+  .submit-row a.deletelink {
+    width: auto !important;
+    max-width: 100% !important;
+    padding-left: var(--hoocon-btn-padding-x) !important;
+    padding-right: var(--hoocon-btn-padding-x) !important;
+    font-size: var(--hoocon-btn-font-size) !important;
+  }
+}
+
+/* Card-layout: узкий экран (JS) или overflow — без горизонтального скролла.
+   Поля карточки — строками: подпись слева, значение справа. */
+table.hoocon-admin-card-table.hoocon-admin-table-stacked {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  table-layout: auto;
+  box-sizing: border-box;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  /* Сброс узких ширин table-mode — строка на всю ширину карточки. */
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked thead {
+  display: none;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.95rem 0.75rem;
+  border: 1px solid var(--hoocon-glass-border);
+  border-radius: var(--hoocon-radius);
+  background: var(--hoocon-surface);
+  box-shadow: none;
+  overflow: visible;
+  cursor: pointer;
+}
+
+html[data-theme="dark"] table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
+  background: var(--hoocon-card-bg);
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr.selected,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr:has(.action-select:checked) {
+  background: var(--selected-row);
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 32%) minmax(0, 1fr);
+  column-gap: 0.75rem;
+  align-items: baseline;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0.45rem 0;
+  border: none;
+  border-bottom: 1px solid var(--hairline-color);
+  text-align: left;
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td:last-child,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th:last-child {
+  border-bottom: none;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td::before,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 0;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--body-quiet-color);
+  text-align: left;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox {
+  display: inline-flex !important;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  gap: 0.45rem;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0.15rem 0 0.5rem !important;
+  margin: 0;
+  border-bottom: 1px solid var(--hairline-color);
+  text-align: left !important;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox::before {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 1.2;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox .action-select {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td:empty {
+  display: none;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td textarea,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Inline tabular: те же правила ширины, без горизонтального скролла. */
+.inline-group .tabular {
+  overflow-x: clip;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.inline-group .tabular table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+.inline-group .tabular table th,
+.inline-group .tabular table td {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+
+@media (min-width: 769px) {
+  html {
+    --hoocon-content-padding-x: 2.25rem;
+    --hoocon-inline-padding: 1.75rem;
+  }
+
+  #content-main form .aligned .form-row .flex-container:not(.checkbox-row) {
+    grid-template-columns: minmax(9rem, 28%) minmax(0, 1fr);
+    column-gap: 1.25rem;
+    align-items: start;
+  }
+
+  #content-main form .aligned label:not(.vCheckboxLabel) {
+    width: auto;
+    max-width: 100%;
+    padding-bottom: 0;
+  }
+
+  #content-main form .related-widget-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  #content-main form .related-widget-wrapper select {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    grid-column: auto;
+  }
+}
+
+/* Unified radius for Django widgets */
+.errornote,
+ul.messagelist li,
+.delete-confirmation form input[type="submit"],
+.delete-confirmation form .cancel-link,
+.selector-chosen,
+.selector-available,
+.calendarbox,
+.clockbox,
+.calendar-shortcuts a,
+.paginator a,
+.select2-container .select2-selection--single,
+.select2-container--default .select2-search--dropdown .select2-search__field,
+.select2-dropdown {
+  border-radius: var(--hoocon-radius) !important;
+}
+
+ul.messagelist li {
+  border: 1px solid var(--hoocon-glass-border);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.paginator a,
+.paginator .this-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--hoocon-btn-height);
+  padding: 0 var(--hoocon-btn-padding-x) !important;
+  border-radius: var(--hoocon-radius-pill) !important;
+  font-size: var(--hoocon-btn-font-size);
+  line-height: 1.2;
+}
+
+.paginator a {
+  background: var(--hoocon-surface-muted) !important;
+  border: 1px solid var(--hoocon-glass-border) !important;
+  color: var(--hoocon-primary) !important;
+}
+
+.paginator a:hover {
+  background: var(--selected-bg) !important;
+}
+
+.paginator .this-page {
+  background: var(--hoocon-primary) !important;
+  color: #fff !important;
+  border: 1px solid transparent !important;
+}
+
+/* Theme toggle — quiet control */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  margin-inline-start: 0.5rem;
+  border: 1px solid var(--hoocon-glass-border);
+  border-radius: var(--hoocon-radius-control) !important;
+  background: var(--hoocon-surface-muted);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--hoocon-primary);
+  transition:
+    background 0.2s var(--hoocon-ease),
+    border-color 0.2s var(--hoocon-ease);
+}
+
+.theme-toggle:hover {
+  background: var(--selected-bg);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
+  transform: none;
+  box-shadow: none;
+}
+
+.theme-toggle:active {
+  transform: none;
+}
+
+.theme-toggle:focus {
+  outline: none;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--hoocon-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+#user-tools .theme-toggle,
+#branding .theme-toggle {
+  border-bottom: none !important;
+  text-decoration: none !important;
+}
+
+#user-tools .theme-toggle:hover,
+#user-tools .theme-toggle:focus,
+#user-tools .theme-toggle:focus-visible {
+  border-bottom: none !important;
+}
+
+html[data-theme-mode="auto"] .theme-toggle::after {
+  content: "";
+  position: absolute;
+  right: 0.28rem;
+  bottom: 0.28rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--hoocon-accent), var(--secondary));
+  border: 1.5px solid color-mix(in srgb, #fff 80%, transparent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.theme-toggle svg {
+  flex: 0 0 auto;
+  height: 1.125rem;
+  width: 1.125rem;
+  /* Sprite Django: первый path — фон 24×24 с fill="currentColor" (делаем transparent),
+     второй path — glyph, наследует fill от SVG */
+  fill: var(--hoocon-primary);
+  color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+  transition: transform 0.22s var(--hoocon-spring), fill 0.2s var(--hoocon-ease);
+}
+
+.theme-toggle:hover svg {
+  transform: scale(1.08);
+  fill: var(--hoocon-primary-hover);
+}
+
+.theme-toggle .visually-hidden {
+  display: none !important;
+}
+
+.theme-toggle svg.theme-icon-when-auto,
+.theme-toggle svg.theme-icon-when-dark,
+.theme-toggle svg.theme-icon-when-light,
+.theme-toggle .theme-label-when-auto,
+.theme-toggle .theme-label-when-dark,
+.theme-toggle .theme-label-when-light {
+  display: none !important;
+}
+
+html[data-theme-mode="auto"] .theme-toggle svg.theme-icon-when-auto,
+html[data-theme-mode="auto"] .theme-toggle .theme-label-when-auto {
+  display: block !important;
+}
+
+html[data-theme-mode="dark"] .theme-toggle svg.theme-icon-when-dark,
+html[data-theme-mode="dark"] .theme-toggle .theme-label-when-dark {
+  display: block !important;
+}
+
+html[data-theme-mode="light"] .theme-toggle svg.theme-icon-when-light,
+html[data-theme-mode="light"] .theme-toggle .theme-label-when-light {
+  display: block !important;
+}
+
+#user-tools {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  color: var(--body-quiet-color);
+}
+
+#user-tools a {
+  color: var(--hoocon-primary);
+}
+
+#user-tools a:focus,
+#user-tools a:hover {
+  color: var(--hoocon-primary-hover);
+}
+
+#footer {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.hoocon-admin-build-badge {
+  position: fixed;
+  left: var(--hoocon-edge-gap);
+  bottom: var(--hoocon-edge-gap);
+  z-index: 120;
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--hoocon-radius-pill);
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--hoocon-shadow-soft);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--body-quiet-color);
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-theme="dark"] .hoocon-admin-build-badge {
+  background: var(--hoocon-surface);
+}
+
+/* Reduced transparency / motion accessibility */
+@media (prefers-reduced-transparency: reduce) {
+  body:not(.login) #container,
+  .module,
+  #content-main .module,
+  #changelist-filter,
+  #nav-sidebar,
+  html body.login #container,
+  .theme-toggle,
+  .hoocon-admin-site-link {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--hoocon-glass-strong) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  input[type="submit"],
+  input[type="button"],
+  a.button,
+  .theme-toggle,
+  .hoocon-admin-site-link,
+  input[type="checkbox"],
+  input[type="radio"] {
+    transition: none;
+  }
+
+  .button:hover,
+  input[type="submit"]:hover,
+  .theme-toggle:hover,
+  .hoocon-admin-site-link:hover {
+    transform: none;
+  }
+}

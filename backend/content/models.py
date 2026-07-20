@@ -56,22 +56,29 @@ class _ContentBase(models.Model):
         created_at / updated_at: авто-таймстампы.
     """
 
-    title: models.CharField = models.CharField(max_length=300)
-    slug: models.SlugField = models.SlugField(max_length=300, unique=True, db_index=True)
-    body: models.TextField = models.TextField(blank=True, default="")
+    title: models.CharField = models.CharField("заголовок", max_length=300)
+    slug: models.SlugField = models.SlugField(
+        "slug (URL)",
+        max_length=300,
+        unique=True,
+        db_index=True,
+    )
+    body: models.TextField = models.TextField("текст", blank=True, default="")
     is_published: models.BooleanField = models.BooleanField(
+        "опубликовано",
         default=True,
         db_index=True,
         help_text="Видимость в публичном API.",
     )
     published_at: models.DateTimeField | None = models.DateTimeField(
+        "дата публикации",
         null=True,
         blank=True,
         db_index=True,
         help_text="Дата публикации (для сортировки/SEO); null = черновик.",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         abstract = True
@@ -92,7 +99,12 @@ class Page(_ContentBase):
     """
 
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
-    search_vector = SearchVectorField(null=True, blank=True, editable=False)
+    search_vector = SearchVectorField(
+        "поисковый вектор",
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     class Meta(_ContentBase.Meta):
         verbose_name = "страница"
@@ -109,11 +121,13 @@ class Article(_ContentBase):
     """
 
     excerpt: models.TextField = models.TextField(
+        "анонс",
         blank=True,
         default="",
         help_text="Краткий анонс для списка /statyi (без HTML).",
     )
     cover: models.ImageField = models.ImageField(
+        "обложка",
         upload_to=article_cover_upload_to,
         blank=True,
         null=True,
@@ -122,7 +136,12 @@ class Article(_ContentBase):
     )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 3 — FTS на Article (SearchVector title + body).
-    search_vector = SearchVectorField(null=True, blank=True, editable=False)
+    search_vector = SearchVectorField(
+        "поисковый вектор",
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     class Meta(_ContentBase.Meta):
         verbose_name = "статья"
@@ -137,6 +156,7 @@ class News(_ContentBase):
     """
 
     cover: models.ImageField = models.ImageField(
+        "обложка",
         upload_to=news_cover_upload_to,
         blank=True,
         null=True,
@@ -145,7 +165,12 @@ class News(_ContentBase):
     )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 3 — FTS на News (SearchVector title + body).
-    search_vector = SearchVectorField(null=True, blank=True, editable=False)
+    search_vector = SearchVectorField(
+        "поисковый вектор",
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     class Meta(_ContentBase.Meta):
         verbose_name = "новость"

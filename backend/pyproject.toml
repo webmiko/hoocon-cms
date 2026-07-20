@@ -96,10 +96,11 @@ addopts = "--strict-markers"
 
 [tool.coverage.run]
 branch = true
-source = ["config"]
+source = ["catalog", "content", "leads", "search", "config", "sitesettings"]
 omit = [
     "*/migrations/*",
     "*/tests/*",
+    "*/management/commands/*",
     "manage.py",
     "**/asgi.py",
     "**/wsgi.py",

@@ -70,4 +70,5 @@ def test_str_shows_show_prices_state() -> None:
 
     settings = SiteSettings.load()
     text = str(settings)
-    assert "show_prices_on_site" in text or "False" in text
+    assert "цены" in text
+    assert "нет" in text or "да" in text

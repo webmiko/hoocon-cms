@@ -1,0 +1,18 @@
+Поступила новая заявка с сайта Hoocon.
+
+Тип: {{ lead_type_display }}
+Имя: {{ lead.name }}
+Компания: {{ lead.company|default:"—" }}
+Email: {{ lead.email }}
+Телефон: {{ lead.phone|default:"—" }}
+{% if lead.sku %}SKU: {{ lead.sku.sku_code }} ({{ lead.sku.name }})
+{% endif %}{% if lead.quantity %}Количество: {{ lead.quantity }}
+{% endif %}{% if lead.analog_belimo_code %}Аналог Belimo: {{ lead.analog_belimo_code }}
+{% endif %}
+Сообщение:
+{{ lead.message }}
+
+—
+Заявка создана: {{ lead.created_at|date:"Y-m-d H:i" }}
+Открыть в Admin: {{ admin_url }}
+Все новые заявки: {{ inbox_url }}

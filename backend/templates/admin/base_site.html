@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}
+  {% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_("Django site admin") }}
+{% endblock %}
+
+{% block dark-mode-vars %}
+  <script>
+    (function () {
+      var p = localStorage.getItem("theme");
+      var pref = p === "light" || p === "dark" || p === "auto" ? p : "auto";
+      var dark =
+        pref === "dark" ||
+        (pref === "auto" &&
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches);
+      var resolved = pref === "light" ? "light" : pref === "dark" ? "dark" : dark ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", resolved);
+      document.documentElement.setAttribute("data-theme-mode", pref);
+    })();
+  </script>
+  <script src="{% static 'admin/js/theme.js' %}?v={{ STATIC_VERSION }}"></script>
+{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link
+    rel="stylesheet"
+    href="{% static 'admin/css/hoocon-admin.css' %}?v={{ STATIC_VERSION }}"
+  />
+{% endblock %}
+
+{% block responsive %}
+  {{ block.super }}
+  {# After responsive.css — layout overrides must win Django load order. #}
+  <link
+    rel="stylesheet"
+    href="{% static 'admin/css/hoocon-admin-overrides.css' %}?v={{ STATIC_VERSION }}"
+  />
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script
+    src="{% static 'admin/js/hoocon-admin-tables.js' %}?v={{ STATIC_VERSION }}"
+    defer
+  ></script>
+  {% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_COUNT_URL %}
+  <script
+    src="{% static 'admin/js/hoocon-admin-leads-sticker.js' %}?v={{ STATIC_VERSION }}"
+    defer
+    data-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"
+    data-poll-ms="60000"
+  ></script>
+  {% endif %}
+{% endblock %}
+
+{% block branding %}
+  <div id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_header|default:_("Django administration") }}</a>
+  </div>
+  {% if user.is_anonymous %}
+    {% include "admin/color_theme_toggle.html" %}
+  {% endif %}
+{% endblock %}
+
+{% block nav-global %}
+  {% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_URL %}
+  <a
+    href="{{ HOOCON_NEW_LEADS_URL }}"
+    class="hoocon-admin-lead-sticker{% if HOOCON_NEW_LEADS_COUNT %} hoocon-admin-lead-sticker--active{% endif %}"
+    id="hoocon-admin-lead-sticker"
+    title="Новые непросмотренные заявки"
+    aria-label="Новые непросмотренные заявки: {{ HOOCON_NEW_LEADS_COUNT }}"
+    {% if not HOOCON_NEW_LEADS_COUNT %}hidden{% endif %}
+  >
+    <span class="hoocon-admin-lead-sticker__label">Заявки</span>
+    <span
+      class="hoocon-admin-lead-sticker__count"
+      data-hoocon-new-leads-count
+    >{{ HOOCON_NEW_LEADS_COUNT }}</span>
+  </a>
+  {% endif %}
+  <a href="/" class="hoocon-admin-site-link">{% trans "← На сайт" %}</a>
+{% endblock %}

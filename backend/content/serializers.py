@@ -11,6 +11,7 @@ from typing import Any
 
 from rest_framework import serializers
 
+from catalog.media_urls import RelativeImageField, to_media_path
 from content.models import Article, News, Page
 from content.related_skus import mentioned_skus_for_article
 
@@ -42,7 +43,7 @@ class PageSerializer(_ContentSerializer):
 class ArticleListSerializer(_ContentSerializer):
     """Article card for /statyi list (no related SKUs)."""
 
-    cover = serializers.ImageField(read_only=True, allow_null=True)
+    cover = RelativeImageField(read_only=True, allow_null=True)
 
     class Meta(_ContentSerializer.Meta):
         model = Article
@@ -70,7 +71,7 @@ class ArticleRelatedSkuSerializer(serializers.Serializer):
     image = serializers.SerializerMethodField()
 
     def get_image(self, obj: Any) -> str | None:
-        """Primary published image URL, if any."""
+        """Primary published image path (root-relative ``/media/...``)."""
         images = getattr(obj, "_prefetched_images", None)
         if images is None:
             images = list(
@@ -78,11 +79,7 @@ class ArticleRelatedSkuSerializer(serializers.Serializer):
             )
         if not images:
             return None
-        request = self.context.get("request")
-        url = images[0].image.url
-        if request is not None:
-            return request.build_absolute_uri(url)
-        return url
+        return to_media_path(images[0].image.url)
 
 
 class ArticleSerializer(ArticleListSerializer):
@@ -108,7 +105,7 @@ class ArticleSerializer(ArticleListSerializer):
 class NewsSerializer(_ContentSerializer):
     """Company news item (/novosti/<slug>)."""
 
-    cover = serializers.ImageField(read_only=True, allow_null=True)
+    cover = RelativeImageField(read_only=True, allow_null=True)
 
     class Meta(_ContentSerializer.Meta):
         model = News

@@ -1,0 +1,95 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{{ changelist_url }}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; Статистика
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="hoocon-lead-stats">
+  <div class="hoocon-lead-stats__toolbar">
+    <h1>Статистика заявок</h1>
+    <nav class="hoocon-lead-stats__periods" aria-label="Период">
+      <a href="?days=7" class="{% if days == 7 %}is-active{% endif %}">7 дней</a>
+      <a href="?days=30" class="{% if days == 30 %}is-active{% endif %}">30 дней</a>
+      <a href="?days=0" class="{% if days == 0 %}is-active{% endif %}">Всё время</a>
+      <a href="{{ changelist_url }}">← К списку заявок</a>
+    </nav>
+  </div>
+
+  <section class="hoocon-lead-stats__cards" aria-label="Сводка">
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Новые</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.new }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">В работе</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.in_progress }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Без менеджера</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.unassigned_open }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Завершено всего</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.done }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card hoocon-lead-stats__card--accent">
+      <p class="hoocon-lead-stats__label">Завершено за период</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.done_in_period }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Среднее время, ч</p>
+      <p class="hoocon-lead-stats__value">
+        {% if stats.totals.avg_hours_to_done != None %}
+          {{ stats.totals.avg_hours_to_done }}
+        {% else %}
+          —
+        {% endif %}
+      </p>
+    </article>
+  </section>
+
+  <section class="module hoocon-lead-stats__table-wrap">
+    <h2>По менеджерам</h2>
+    {% if stats.managers %}
+    <table class="hoocon-lead-stats__table">
+      <thead>
+        <tr>
+          <th scope="col">Менеджер</th>
+          <th scope="col">Открытые</th>
+          <th scope="col">В работе</th>
+          <th scope="col">Завершил (период)</th>
+          <th scope="col">Завершил (всего)</th>
+          <th scope="col">Среднее, ч</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.managers %}
+        <tr>
+          <th scope="row">{{ row.display_name }}</th>
+          <td>{{ row.assigned_open }}</td>
+          <td>{{ row.in_progress }}</td>
+          <td>{{ row.done_in_period }}</td>
+          <td>{{ row.done_total }}</td>
+          <td>
+            {% if row.avg_hours_to_done != None %}
+              {{ row.avg_hours_to_done }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="hoocon-lead-stats__empty">Пока нет назначенных или обработанных заявок.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,210 @@
+/*
+ * Overrides loaded in extrahead (after changelists.css / forms.css).
+ * Keeps CMS layout rules from losing to Django admin CSS load order.
+ */
+
+html body #changelist .changelist-form-container:has(#changelist-filter) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 1.25rem;
+}
+
+html body #changelist .changelist-form-container:has(#changelist-filter) > div,
+html body #changelist .changelist-form-container:has(#changelist-filter) > form {
+  max-width: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+html body #changelist #changelist-filter {
+  flex: 0 0 auto !important;
+  order: -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  border-left: none !important;
+  background: var(--hoocon-surface, #fff) !important;
+  box-sizing: border-box;
+}
+
+html body #changelist #changelist-filter h2 {
+  padding: 0.85rem 1.75rem !important;
+  margin: 0 !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  color: var(--body-quiet-color, #64748b) !important;
+  background: transparent !important;
+  border-bottom: 1px solid var(--hairline-color, #eef0f3) !important;
+}
+
+html body #changelist #changelist-filter details {
+  padding: 0.55rem 1.75rem 0.7rem !important;
+  border-bottom: 1px solid var(--hairline-color, #eef0f3) !important;
+}
+
+html body #changelist #changelist-filter ul {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.4rem !important;
+  margin: 0.4rem 0 0 !important;
+  padding: 0 !important;
+}
+
+html body #changelist #changelist-filter li {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+}
+
+html body #changelist #changelist-filter li a {
+  display: inline-block !important;
+  padding: 0.35rem 0.75rem !important;
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
+  background: var(--hoocon-surface-muted, #f8f9fb) !important;
+  color: var(--body-quiet-color, #64748b) !important;
+  text-decoration: none !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.35 !important;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+html body #changelist #changelist-filter li.selected a {
+  background: var(--selected-bg, rgba(37, 99, 235, 0.08)) !important;
+  border-color: color-mix(in srgb, var(--hoocon-primary, #2563eb) 35%, transparent) !important;
+  color: var(--link-selected-fg, #1e40af) !important;
+}
+
+/* Длинные списки фильтров — не заслоняют таблицу. */
+html body #changelist #changelist-filter details ul {
+  max-height: 8.5rem !important;
+  overflow-y: auto !important;
+  padding-right: 0.25rem !important;
+}
+
+html body #changelist-form .results {
+  overflow-x: clip !important;
+}
+
+html body #changelist table:not(.hoocon-admin-table-stacked) thead th {
+  padding: 0.35rem 0.3rem !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  font-size: 0.6875rem !important;
+  line-height: 1.2 !important;
+  vertical-align: middle !important;
+}
+
+html body #changelist table thead th .text a {
+  display: inline-block !important;
+  padding: 0.15rem 0.2rem !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+html body #changelist table thead th .text span {
+  display: inline-block !important;
+  padding: 0.15rem 0.2rem !important;
+}
+
+html body #changelist table thead th.sorted .text {
+  padding-right: 1.15rem !important;
+}
+
+html body #changelist table:not(.hoocon-admin-table-stacked) thead th.action-checkbox-column,
+html body #changelist table:not(.hoocon-admin-table-stacked) tbody td.action-checkbox {
+  padding: 0.45rem 0.25rem !important;
+  width: 2.75rem !important;
+  max-width: 3rem !important;
+  min-width: 2.5rem !important;
+  vertical-align: top !important;
+  box-sizing: border-box !important;
+}
+
+/* Card mode: checkbox + «Выбрать» слева, не на всю ширину карточки. */
+html body #changelist table.hoocon-admin-table-stacked tbody td.action-checkbox {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-self: flex-start !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0.15rem 0 0.5rem !important;
+  text-align: left !important;
+}
+
+/* Sort controls: не раздувать высоту строки заголовков. */
+html body #changelist table thead th.sorted {
+  position: relative;
+  padding-right: 1.5rem !important;
+}
+
+html body #changelist table thead th.sorted .sortoptions {
+  display: block !important;
+  float: none !important;
+  position: absolute !important;
+  top: 0.35rem;
+  right: 0.2rem;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+html body #changelist table thead th.sorted .text {
+  float: none !important;
+  max-width: calc(100% - 1.1rem);
+}
+
+html body #changelist table thead th .clear {
+  display: none !important;
+}
+
+html body #nav-sidebar .module tbody td a.addlink,
+html body #nav-sidebar .module tbody td a.changelink,
+html body #nav-sidebar .module tbody td a.viewlink,
+html body #content-main .module tbody td a.addlink,
+html body #content-main .module tbody td a.changelink,
+html body #content-main .module tbody td a.viewlink {
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 1.85rem !important;
+  max-width: 1.85rem !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  background-position: center !important;
+  background-size: 0.9rem 0.9rem !important;
+}
+
+/* Dashboard / app index: строки моделей, не card-stack на ≤1024px. */
+html body #content-main .module table thead {
+  display: none !important;
+}
+
+html body #content-main .module table tbody tr {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+html body #content-main .module table tbody th,
+html body #content-main .module table tbody td {
+  display: block !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* Header: branding left, tools right (avoid stacked/centered chrome). */
+@media (min-width: 1025px) {
+  html body:not(.login) #header {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+}

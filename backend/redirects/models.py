@@ -28,32 +28,36 @@ class Redirect(models.Model):
     HTTP_FOUND = 302
 
     STATUS_CHOICES = (
-        (HTTP_MOVED_PERMANENTLY, "301 Moved Permanently"),
-        (HTTP_FOUND, "302 Found"),
+        (HTTP_MOVED_PERMANENTLY, "301 — постоянно"),
+        (HTTP_FOUND, "302 — временно"),
     )
 
     from_path: models.CharField = models.CharField(
+        "откуда",
         max_length=512,
         unique=True,
         db_index=True,
         help_text="Старый URL с leading slash, напр. /tproduct/12345-bv215.",
     )
     to_path: models.CharField = models.CharField(
+        "куда",
         max_length=512,
         help_text="Канонический path, напр. /sharovoy-kran-bv215.",
     )
     status_code: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "код ответа",
         choices=STATUS_CHOICES,
         default=HTTP_MOVED_PERMANENTLY,
         help_text="301 (постоянный, по умолчанию) или 302 (временный).",
     )
     is_active: models.BooleanField = models.BooleanField(
+        "активен",
         default=True,
         db_index=True,
         help_text="Можно выключить редирект без удаления записи.",
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "редирект"

@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+import config.admin_branding  # noqa: F401 — site_header / site_title
 from config.csrf_views import CsrfTokenView
 from config.health_views import HealthView
 from config.seo.spa_index import spa_index_view
@@ -22,6 +23,7 @@ urlpatterns = [
     path("api/catalog/", include("catalog.urls")),
     path("api/content/", include("content.urls")),
     path("api/leads/", include("leads.urls")),
+    path("api/settings/", include("sitesettings.urls")),
     path("api/", include("search.urls")),
     path("api/health/", HealthView.as_view(), name="api-health"),
     path("api/csrf/", CsrfTokenView.as_view(), name="api-csrf"),

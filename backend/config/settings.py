@@ -87,7 +87,9 @@ INSTALLED_APPS = [
     "catalog",
     "content",
     "leads",
+    "crm.apps.CrmConfig",
     "search",
+    "social",
 ]
 
 MIDDLEWARE = [
@@ -97,6 +99,7 @@ MIDDLEWARE = [
     # SEO redirects before CommonMiddleware so typo/legacy paths never hit views.
     "redirects.middleware.RedirectMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -125,13 +128,15 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "config.context_processors.static_version",
+                "config.context_processors.new_leads_sticker",
             ],
         },
     },
@@ -173,19 +178,31 @@ TIME_ZONE = "Europe/Moscow"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = str(BASE_DIR / "staticfiles")
-MEDIA_URL = "media/"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+# Dev: WhiteNoise must use Django finders so STATICFILES_DIRS (admin theme) works.
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_AUTOREFRESH = DEBUG
+MEDIA_URL = "/media/"
 MEDIA_ROOT = str(BASE_DIR / "media")
+
+# Optional deploy SHA for admin CSS/JS cache-bust (?v=); empty → mtime in DEBUG.
+BUILD_SHA = os.getenv("BUILD_SHA", "").strip()
 
 # ── SEO / SPA shell (БЗ SEO-индексация-SPA.md) ───────────────────────
 SITE_URL = os.getenv("SITE_URL", "https://hoocon.ru").rstrip("/")
 _SPA_DEFAULT = str(BASE_DIR.parent / "frontend" / "dist" / "index.html")
 SPA_INDEX_HTML = os.getenv("SPA_INDEX_HTML", _SPA_DEFAULT)
 
-# Analytics (loaded client-side only after cookie consent).
+# Analytics (fallback if SiteSettings IDs empty; SPA prefers /api/settings/public/).
 YANDEX_METRIKA_ID = os.getenv("YANDEX_METRIKA_ID", "").strip()
 GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "").strip()
+
+# Social bots (secrets — never expose via API; chat IDs live in SiteSettings Admin).
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
+MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
