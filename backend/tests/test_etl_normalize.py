@@ -55,7 +55,17 @@ def test_normalize_slug_strips_leading_slash() -> None:
     """buttonlink '/privod-...-3nm' → 'privod-...-3nm'."""
     from catalog.etl.normalize import normalize_slug
 
-    assert normalize_slug("/privod-protivipozharniy-3nm") == "privod-protivipozharniy-3nm"
+    assert normalize_slug("/privod-protivipozharniy-3nm") == "privod-protivopozharniy-3nm"
+
+
+def test_normalize_slug_remaps_bezpruzhini_typo() -> None:
+    """Missing hyphen in bezpruzhini is corrected to bez-pruzhini."""
+    from catalog.etl.normalize import normalize_slug
+
+    assert (
+        normalize_slug("/privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm")
+        == "privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"
+    )
 
 
 def test_normalize_slug_rejects_empty() -> None:
@@ -96,7 +106,7 @@ def test_normalize_product_with_buttonlink_succeeds() -> None:
     raw = _load_raw()
     np = normalize_product(raw["products"][0])
     assert isinstance(np, NormalizedProduct)
-    assert np.slug == "privod-protivipozharniy-3nm"
+    assert np.slug == "privod-protivopozharniy-3nm"
     assert np.name.startswith("SA3FU")
     assert len(np.skus) == 2
     assert np.skus[0].sku_code == "sa3fu24-ds"
@@ -171,8 +181,8 @@ def test_normalize_sku_slug_derived_from_product_and_sku_code() -> None:
 
     raw = _load_raw()
     np = normalize_product(raw["products"][0])
-    assert np.skus[0].slug == "privod-protivipozharniy-3nm-sa3fu24-ds"
-    assert np.skus[1].slug == "privod-protivipozharniy-3nm-sa3fu24-as"
+    assert np.skus[0].slug == "privod-protivopozharniy-3nm-sa3fu24-ds"
+    assert np.skus[1].slug == "privod-protivopozharniy-3nm-sa3fu24-as"
 
 
 def test_normalize_product_price_empty_becomes_none() -> None:

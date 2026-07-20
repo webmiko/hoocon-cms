@@ -1,6 +1,6 @@
 # SEO: сохранение URL и редиректы (Tilda → Hoocon CMS)
 
-Дата: 2026-07-19  
+Дата: 2026-07-19 (обновлено 2026-07-20)  
 Правило: **не ломать индексированные URL без 301**.  
 Опора БЗ: `ВЕБ-РАЗРАБОТКА-Кастомный-стек/SEO-индексация-SPA.md`
 (canonical без trailing slash; nginx 301 дублей; head в исходном HTML).
@@ -16,19 +16,20 @@ Title/description для сниппетов: [seo-meta-yandex-google.md](seo-met
 |---------|---------|
 | Хорошие ЧПУ из основного sitemap | **Сохранить path как canonical** (`slug` в БД = path без `/`) |
 | Tilda `/tproduct/…` | **301** → ЧПУ карточки SKU |
-| Опечатки в slug (уже в индексе) | **Оставить как есть** (не «чинить» path) |
+| Опечатки в slug (уже в индексе) | **Исправить canonical** + **301** со старого path |
 | Trailing slash, `/index.html` | **301** на канон без `/` (как LMS) |
 | Новые посадочные | Новые ЧПУ + внутренние ссылки; старые не трогать |
 | Реализация | Поле `slug` + таблица `Redirect` + nginx map на VPS |
 
-Предпочтение: **сохранить адрес** важнее «красивого» нового path.
-Редирект — только где path технически нельзя отдать тем же URL.
+Предпочтение: **правильный ЧПУ** как canonical; старый (с опечаткой)
+адрес не удаляем — отдаём **301** на канон
+([redirects-slug-typo-seed.csv](redirects-slug-typo-seed.csv)).
 
 ---
 
 ## 2. Инвентарь текущего сайта
 
-### 2.1 Основной `sitemap.xml` (сохранить 1:1)
+### 2.1 Основной `sitemap.xml` → канон на новом сайте
 
 | Path | Тип в CMS | Canonical на новом сайте |
 |------|-----------|--------------------------|
@@ -44,15 +45,15 @@ Title/description для сниппетов: [seo-meta-yandex-google.md](seo-met
 | `/terms` | legal | `/terms` |
 | `/sitemap` | html map | `/sitemap` или 301→`/sitemap.xml` |
 | `/elektroprivody-dlya-zaslonok-ventilyatsii` | landing | тот же path (Page/Article) |
-| `/privod-…` (все SKU ниже) | SKU detail | **тот же path** |
+| `/privod-…` (SKU ниже) | SKU detail | **исправленный** ЧПУ (см. список) |
 
-SKU ЧПУ (сохранить slug дословно):
+SKU ЧПУ (канон; опечатки Tilda → 301):
 
 ```
 privod-dimoudaleniya-10nm
 privod-dimoudaleniya-15nm
 privod-dimoudaleniya-30nm
-privod-protivipozharniy-3nm          ← опечатка в индексе — НЕ менять
+privod-protivopozharniy-3nm          ← было protivipozharniy
 privod-protivopozharniy-5nm
 privod-protivopozharniy-10nm
 privod-protivopozharniy-15nm
@@ -64,7 +65,7 @@ privod-vozdushniy-bez-pruzhini-damu-8nm
 privod-vozdushniy-bez-pruzhini-damu-16nm
 privod-vozdushniy-bez-pruzhini-damu-24nm
 privod-vozdushniy-bez-pruzhini-damu-32nm
-privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm
+privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm  ← было bezpruzhini
 privod-vozdushniy-hva-5nm
 privod-vozdushniy-hvd-5nm
 privod-vozdushniy-hvd-10nm
@@ -75,6 +76,9 @@ privod-vozdushniy-pruzhina-dafu-10nm
 privod-vozdushniy-pruzhina-dafu-15nm
 privod-vozdushniy-pruzhina-dafu-20nm
 ```
+
+**301 с опечаток:** [redirects-slug-typo-seed.csv](redirects-slug-typo-seed.csv)
+(`import_redirects` + `RedirectMiddleware` + nginx map).
 
 ### 2.2 `sitemap-store.xml` — Tilda Store (нужны 301)
 

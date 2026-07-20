@@ -28,6 +28,13 @@ _EDITION_RESERVED_KEYS: frozenset[str] = frozenset(
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
+# Typo → canonical product slugs (Tilda index → Hoocon CMS).
+# Spec: docs/seo-url-migration.md §2.1.1; seed docs/redirects-slug-typo-seed.csv.
+PRODUCT_SLUG_REMAP: dict[str, str] = {
+    "privod-protivipozharniy-3nm": "privod-protivopozharniy-3nm",
+    "privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm": ("privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"),
+}
+
 
 def _sku_code_segment(sku_code: str) -> str:
     """Normalize sku_code into a slug-safe path segment."""
@@ -92,13 +99,13 @@ class NormalizedProduct:
 
 
 def normalize_slug(buttonlink: str) -> str:
-    """Strip leading slash and validate slug format `[a-z0-9-]+`.
+    """Strip leading slash, fix known typo slugs, validate `[a-z0-9-]+`.
 
     Args:
         buttonlink: Tilda buttonlink, e.g. '/privod-...-3nm'.
 
     Returns:
-        Slug without leading slash.
+        Canonical slug without leading slash.
 
     Raises:
         QuarantineError: empty or invalid format.
@@ -114,7 +121,7 @@ def normalize_slug(buttonlink: str) -> str:
             f"invalid slug format: {slug!r}",
             {"buttonlink": buttonlink},
         )
-    return slug
+    return PRODUCT_SLUG_REMAP.get(slug, slug)
 
 
 def _slugify_ru(text: str) -> str:

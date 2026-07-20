@@ -86,11 +86,11 @@ def test_load_product_creates_product_and_skus() -> None:
     assert stats.products_created == 1
     assert stats.skus_created == 2
 
-    product = Product.objects.get(slug="privod-protivipozharniy-3nm")
+    product = Product.objects.get(slug="privod-protivopozharniy-3nm")
     assert product.category.slug == "elektroprivod-protivopozharnogo-klapana"
     assert SKU.objects.filter(product=product).count() == 2
     sku = SKU.objects.get(sku_code="sa3fu24-ds")
-    assert sku.slug == "privod-protivipozharniy-3nm-sa3fu24-ds"
+    assert sku.slug == "privod-protivopozharniy-3nm-sa3fu24-ds"
     attrs = {av.attribute.name: av.value for av in sku.attribute_values.all()}
     assert attrs["Мощность"] == "3 Нм"
     assert attrs["Напряжение (В)"] == "24 В"

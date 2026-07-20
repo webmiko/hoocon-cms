@@ -1,9 +1,10 @@
 # Качество данных при переносе (Tilda → CMS)
 
-Дата: 2026-07-19  
+Дата: 2026-07-19 (обновлено 2026-07-20)  
 Принцип: **переносим номенклатуру и факты, не копируем ошибки UX/текста
-и мусор платформы.** URL-slug из индекса сохраняем даже с опечаткой
-(SEO); контент и мета — правим.
+и мусор платформы.** Опечатки в URL **исправляем** в canonical slug
+(`PRODUCT_SLUG_REMAP` в ETL); старый path — через **301**
+([redirects-slug-typo-seed.csv](redirects-slug-typo-seed.csv)).
 
 Связано: [seo-url-migration.md](seo-url-migration.md),
 [market-analysis.md](market-analysis.md),
@@ -17,7 +18,7 @@
 | Приоритет | Источник | Что брать |
 |-----------|----------|-----------|
 | 1 | Структурированный каталог (`hoocon_catalog_api.json`, CSV) | Артикул, атрибуты, цены (в БД), uid |
-| 2 | Карта URL / seed CSV | `slug`, 301 from_path |
+| 2 | Карта URL / seed CSV | канон `slug`, 301 from_path (typo + tproduct) |
 | 3 | PDF / заводские datasheet | ТТХ при конфликте с HTML |
 | 4 | HTML карточки Tilda | Описание — только после вычитки |
 | 5 | Главная / «О компании» Tilda | **Не** копировать 1:1; переписать по прототипу |
@@ -32,10 +33,16 @@
 - Номенклатура: все SKU каталога (~39).
 - Технические атрибуты из API/фильтров (момент, напряжение, пружина…).
 - Цены в БД (на сайте скрыты по флагу).
-- **Path/slug** из sitemap (включая `privod-protivipozharniy-3nm`).
 - Файлы PDF/изображения, если валидны (не битые, не placeholder).
 - Полезный FAQ (SA≠DA, расчёт площади, момент) — как контент, с правкой
   формулировок при необходимости.
+
+Опечатки slug (Tilda → канон + 301):
+
+| Было | Канон |
+|------|-------|
+| `privod-protivipozharniy-3nm` | `privod-protivopozharniy-3nm` |
+| `…-bezpruzhini-uskorenniy-hva-q-5nm` | `…-bez-pruzhini-uskorenniy-hva-q-5nm` |
 
 ---
 

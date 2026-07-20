@@ -82,7 +82,7 @@ def test_command_preserves_canonical_slugs(tmp_path) -> None:
     from catalog.models import Product
 
     _run_command(tmp_path)
-    assert Product.objects.filter(slug="privod-protivipozharniy-3nm").exists()
+    assert Product.objects.filter(slug="privod-protivopozharniy-3nm").exists()
     assert Product.objects.filter(slug="privod-vozdushniy-pruzhina-dafu-3nm").exists()
 
 
