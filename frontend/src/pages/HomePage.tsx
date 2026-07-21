@@ -105,7 +105,7 @@ const HOME_PROJECTS = [
     height: 1067,
   },
   {
-    name: "АЭС Даявань",
+    name: "АЭС Даявань, Шэньчжэнь",
     image: "/home/projects/dayawan-npp.webp",
     width: 1600,
     height: 1067,
