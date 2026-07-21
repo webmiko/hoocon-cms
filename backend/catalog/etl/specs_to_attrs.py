@@ -252,16 +252,49 @@ def _specs_source(sku: SKU) -> str:
     )
 
 
+def _sku_ready_for_card_enrichment(sku: SKU) -> bool:
+    """True when product (+ category) and attribute_values are cached."""
+    fields_cache = sku._state.fields_cache
+    if "product" not in fields_cache:
+        return False
+    product = fields_cache["product"]
+    if product is not None and product.category_id:
+        if "category" not in product._state.fields_cache:
+            return False
+    prefetched = getattr(sku, "_prefetched_objects_cache", None) or {}
+    return "attribute_values" in prefetched
+
+
+def _load_sku_for_card_enrichment(sku: SKU) -> SKU:
+    """Ensure product/category and EAV are loaded (avoids N+1 for callers).
+
+    Args:
+        sku: SKU instance (may be bare or already select_related).
+
+    Returns:
+        Same instance when relations are cached; otherwise a refetch.
+    """
+    if _sku_ready_for_card_enrichment(sku):
+        return sku
+    return (
+        SKU.objects.select_related("product", "product__category")
+        .prefetch_related("attribute_values__attribute")
+        .get(pk=sku.pk)
+    )
+
+
 def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
     """Build canonical EAV cards for one SKU from specs + legacy attrs.
 
     Args:
-        sku: Target SKU (with product).
+        sku: Target SKU. Prefer ``select_related("product", "product__category")``
+            and prefetched ``attribute_values``; otherwise this function refetches.
         dry_run: If True, do not write DB.
 
     Returns:
         EnrichResult counters.
     """
+    sku = _load_sku_for_card_enrichment(sku)
     result = EnrichResult(sku_code=sku.sku_code)
     if sku.product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
         result.skipped = True
@@ -352,16 +385,16 @@ def enrich_catalog_cards(
     Returns:
         Summary dict with counts and per-SKU results.
     """
-    qs = SKU.objects.select_related("product").prefetch_related(
+    qs = SKU.objects.select_related("product", "product__category").prefetch_related(
         "attribute_values__attribute",
     )
     if product_slug:
         qs = qs.filter(product__slug=product_slug)
     results: list[EnrichResult] = []
     for sku in qs.iterator(chunk_size=50):
-        # Re-fetch with relations for writes
+        # Re-fetch with relations for writes (iterator drops prefetch cache).
         sku = (
-            SKU.objects.select_related("product")
+            SKU.objects.select_related("product", "product__category")
             .prefetch_related(
                 "attribute_values__attribute",
             )

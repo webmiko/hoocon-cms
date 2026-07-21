@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from catalog.models import SKU, Attribute, AttributeValue
 
-_ATTR_VALUE_MAX_LEN = 500
+# Keep in sync with AttributeValue.value max_length (DB constraint).
+_value_max_length = AttributeValue._meta.get_field("value").max_length
+if not isinstance(_value_max_length, int):
+    raise TypeError("AttributeValue.value.max_length must be int")
+_ATTR_VALUE_MAX_LEN = _value_max_length
 
 
 def ensure_attribute(slug: str, name: str, unit: str = "") -> Attribute:
@@ -46,7 +50,7 @@ def set_sku_attribute(
     Args:
         sku: target SKU.
         slug: Attribute.slug.
-        value: stored value (truncated to 500 chars).
+        value: stored value (truncated to ``AttributeValue.value`` max_length).
         name: Attribute.name (used on create / sync).
         unit: Attribute.unit (used on create / sync).
     """

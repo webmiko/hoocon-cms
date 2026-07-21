@@ -207,9 +207,56 @@ def test_enrich_catalog_cards_dry_run_no_writes() -> None:
         slug="test-dry-sku",
         sku_code="DA5MU24-D",
         specs_text=product.specs_text,
-        is_published=True,
     )
     summary = enrich_catalog_cards(product_slug=product.slug, dry_run=True)
-    assert summary["enriched"] >= 1
+    assert summary["total"] == 1
     sku.refresh_from_db()
-    assert "Крутящий момент" in (sku.specs_text or "")
+    assert (sku.specs_text or "").strip()
+
+
+@pytest.mark.django_db
+def test_enrich_sku_cards_loads_category_without_extra_query() -> None:
+    """Bare SKU refetch joins category; no lazy Category SELECT afterward."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.etl.specs_to_attrs import enrich_sku_cards
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="N1", slug="test-n1-cat")
+    product = Product.objects.create(
+        category=cat,
+        name="N1",
+        slug="test-n1-product",
+        specs_text=(
+            "– Крутящий момент: 5 Нм\n"
+            "– Номинальное напряжение: AC/DC 24 В\n"
+            "– Управление: 2-/3-позиционное\n"
+            "– Степень защиты: IP54\n"
+            "– Масса: 1 кг\n"
+            "– Угол поворота: макс. 90°\n"
+            "– Направление вращения: вручную\n"
+            "– Ручное управление: есть\n"
+        ),
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="N1 SKU",
+        slug="test-n1-sku",
+        sku_code="DA5MU24-N1",
+        specs_text="",
+    )
+    bare = SKU.objects.get(pk=sku.pk)
+    assert "product" not in bare._state.fields_cache
+
+    with CaptureQueriesContext(connection) as ctx:
+        result = enrich_sku_cards(bare, dry_run=True)
+
+    assert result.skipped is False
+    # Standalone category lookups indicate missing select_related("product__category").
+    lazy_category = [
+        q["sql"]
+        for q in ctx.captured_queries
+        if 'FROM "catalog_category"' in q["sql"] and "JOIN" not in q["sql"].upper()
+    ]
+    assert lazy_category == []

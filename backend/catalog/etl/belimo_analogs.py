@@ -350,18 +350,24 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
 
 
 def primary_belimo_code_for_sku(sku: SKU) -> str | None:
-    """First Belimo code for ``SKU.analog_belimo_code`` persistence."""
+    """First Belimo code for ``SKU.analog_belimo_code`` persistence.
+
+    Thermal editions (``DST`` / ``-T`` in the Hoocon article) must map to a
+    thermal Belimo code (``FST`` / ``-T``). If none is present among resolved
+    codes, return ``None`` rather than a non-thermal fallback.
+    """
     codes = belimo_codes_for_sku(sku)
     if not codes:
         return None
     code_l = (sku.sku_code or "").casefold()
     thermal = "dst" in code_l or code_l.endswith("-t")
-    if thermal:
-        for code in codes:
-            upper = code.upper()
-            if "FST" in upper or upper.endswith("-T") or "-T" in upper:
-                return code
-    return codes[0]
+    if not thermal:
+        return codes[0]
+    for code in codes:
+        upper = code.upper()
+        if "FST" in upper or upper.endswith("-T") or "-T" in upper:
+            return code
+    return None
 
 
 def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:

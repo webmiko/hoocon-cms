@@ -10,6 +10,7 @@ from catalog.etl.belimo_analogs import (
     extract_belimo_codes_from_text,
     infer_belimo_codes,
     normalize_belimo_code,
+    primary_belimo_code_for_sku,
 )
 from catalog.models import (
     SKU,
@@ -255,3 +256,36 @@ def test_sku_attr_map_keeps_first_slug_value() -> None:
     attrs = _sku_attr_map(sku)
     assert attrs["moment"] == "5 Нм"
     assert attrs["attr-dup"] == "first"
+
+
+@pytest.mark.django_db
+def test_primary_belimo_prefers_thermal_code_for_dst_sku() -> None:
+    """Thermal Hoocon editions pick FST/-T Belimo codes when present."""
+    cat = Category.objects.create(name="Fire", slug="fire-thermal-pick")
+    product = Product.objects.create(name="SA", slug="sa-thermal-pick", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SA5FU24-DST",
+        slug="sa5fu24-dst-pick",
+        sku_code="SA5FU24-DST",
+        is_published=True,
+        analogs_text="– Belimo BF24-S\n– Belimo BF24-T\n",
+    )
+    assert primary_belimo_code_for_sku(sku) == "BF24-T"
+
+
+@pytest.mark.django_db
+def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
+    """Thermal SKU must not persist a non-thermal Belimo code as primary."""
+    cat = Category.objects.create(name="Fire", slug="fire-thermal-none")
+    product = Product.objects.create(name="SA", slug="sa-thermal-none", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SA5FU24-DST",
+        slug="sa5fu24-dst-none",
+        sku_code="SA5FU24-DST",
+        is_published=True,
+        analogs_text="– Belimo BF24-S\n– Belimo BF24\n",
+    )
+    assert belimo_codes_for_sku(sku) == ["BF24-S", "BF24"]
+    assert primary_belimo_code_for_sku(sku) is None

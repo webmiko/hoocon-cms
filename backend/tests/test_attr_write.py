@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from catalog.etl.attr_write import ensure_attribute, set_sku_attribute
+from catalog.etl.attr_write import (
+    _ATTR_VALUE_MAX_LEN,
+    ensure_attribute,
+    set_sku_attribute,
+)
 from catalog.models import SKU, Attribute, AttributeValue, Category, Product
 
 
@@ -38,3 +42,32 @@ def test_set_sku_attribute_upserts_value() -> None:
     set_sku_attribute(sku, slug="voltage", value="24 В", name="Напряжение", unit="В")
     av = AttributeValue.objects.get(sku=sku, attribute__slug="voltage")
     assert av.value == "24 В"
+
+
+def test_attr_value_max_len_matches_model_field() -> None:
+    """ETL truncate limit must equal AttributeValue.value max_length."""
+    field_max = AttributeValue._meta.get_field("value").max_length
+    assert _ATTR_VALUE_MAX_LEN == field_max == 200
+
+
+@pytest.mark.django_db
+def test_set_sku_attribute_truncates_to_model_max_length() -> None:
+    """Values longer than the CharField max_length save without DB error."""
+    cat = Category.objects.create(name="C", slug="c-attr-long")
+    product = Product.objects.create(name="P", slug="p-attr-long", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="S",
+        slug="s-attr-long",
+        sku_code="ATTR-LONG",
+    )
+    long_value = "x" * (_ATTR_VALUE_MAX_LEN + 50)
+    set_sku_attribute(
+        sku,
+        slug="notes",
+        value=long_value,
+        name="Примечание",
+    )
+    av = AttributeValue.objects.get(sku=sku, attribute__slug="notes")
+    assert len(av.value) == _ATTR_VALUE_MAX_LEN
+    assert av.value == long_value[:_ATTR_VALUE_MAX_LEN]
