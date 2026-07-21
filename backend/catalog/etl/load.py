@@ -114,28 +114,31 @@ def load_product(
 
     Args:
         np: normalized product record.
-        category_map: tilda_id → Category (from load_categories). Required
-            when np.category_id is set; if the id is missing from the map,
-            raises QuarantineError (Product.category is NOT NULL).
+        category_map: tilda_id → Category (from load_categories). Always
+            required: Product.category is NOT NULL. Empty/missing category_id
+            or an id absent from the map raises QuarantineError.
 
     Returns:
         LoadStats with products_created / skus_created / attribute_values_created.
 
     Raises:
-        QuarantineError: if np.category_id is set but not in category_map.
+        QuarantineError: if category cannot be resolved (None id or map miss).
     """
     from catalog.etl.normalize import QuarantineError
 
     stats = LoadStats()
 
-    category: Category | None = None
-    if np.category_id is not None:
-        if category_map is None or np.category_id not in category_map:
-            raise QuarantineError(
-                f"category not found: tilda_id={np.category_id}",
-                {"uid": np.tilda_uid, "title": np.name, "category_id": np.category_id},
-            )
-        category = category_map[np.category_id]
+    if np.category_id is None:
+        raise QuarantineError(
+            "empty category_id (Product.category is required)",
+            {"uid": np.tilda_uid, "title": np.name},
+        )
+    if category_map is None or np.category_id not in category_map:
+        raise QuarantineError(
+            f"category not found: tilda_id={np.category_id}",
+            {"uid": np.tilda_uid, "title": np.name, "category_id": np.category_id},
+        )
+    category = category_map[np.category_id]
 
     product, created = Product.objects.update_or_create(
         slug=np.slug,

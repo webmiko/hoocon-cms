@@ -48,6 +48,31 @@ def test_extract_categories_returns_tree() -> None:
     assert "Специальная противопожарная серия" in top_names
 
 
+def test_extract_categories_preserves_parent_id_zero() -> None:
+    """top_id=0 must remain parent 0, not None (0 is falsy but valid)."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "id": 0,
+                            "value": "Root Zero",
+                            "subparts": [{"id": 10, "value": "Child Of Zero"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert (0, "Root Zero", None) in cats
+    assert (10, "Child Of Zero", 0) in cats
+
+
 # ── normalize_slug ──────────────────────────────────────────────────
 
 

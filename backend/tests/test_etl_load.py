@@ -174,3 +174,51 @@ def test_load_product_quarantines_when_category_missing() -> None:
         load_product(np, category_map={})
     assert "category not found" in exc_info.value.reason
     assert not Product.objects.filter(slug="orphan-product").exists()
+
+
+@pytest.mark.django_db
+def test_load_product_quarantines_when_category_id_none() -> None:
+    """Empty partuids → category_id=None must not nullify Product.category.
+
+    update_or_create must never write category=None (NOT NULL); quarantine
+    instead so existing products keep their category.
+    """
+    from decimal import Decimal
+
+    from catalog.etl.load import load_product
+    from catalog.etl.normalize import (
+        NormalizedProduct,
+        NormalizedSKU,
+        QuarantineError,
+    )
+    from catalog.models import Category, Product
+
+    cat = Category.objects.create(name="Keep Me", slug="keep-me")
+    Product.objects.create(
+        name="Existing",
+        slug="existing-product",
+        category=cat,
+        description="old",
+    )
+    np = NormalizedProduct(
+        tilda_uid="1",
+        name="Existing Updated",
+        slug="existing-product",
+        description="new",
+        category_id=None,
+        skus=(
+            NormalizedSKU(
+                sku_code="EX-1",
+                slug="existing-product-ex-1",
+                name="Existing (EX-1)",
+                price=Decimal("0"),
+                attributes=(),
+            ),
+        ),
+    )
+    with pytest.raises(QuarantineError) as exc_info:
+        load_product(np, category_map={cat.pk: cat})
+    assert "empty category_id" in exc_info.value.reason
+    product = Product.objects.get(slug="existing-product")
+    assert product.category_id == cat.pk
+    assert product.description == "old"

@@ -56,4 +56,4 @@ def extract_categories(
             sub_id = sub.get("id")
             sub_name = sub.get("value") or ""
             if sub_id is not None and sub_name:
-                yield (int(sub_id), str(sub_name), int(top_id) if top_id else None)
+                yield (int(sub_id), str(sub_name), int(top_id) if top_id is not None else None)
