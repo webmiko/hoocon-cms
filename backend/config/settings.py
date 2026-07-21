@@ -241,7 +241,7 @@ UNFOLD = {
     "SITE_HEADER": _("Hoocon"),
     "SITE_SUBHEADER": _("Панель управления"),
     "SITE_URL": "/",
-    # Release badge next to branding (e.g. «v0.0.2 beta»).
+    # Release badge next to branding (e.g. «v0.0.3 beta»).
     "ENVIRONMENT": release_label(),
     "COLORS": {
         "primary": _UNFOLD_PRIMARY,

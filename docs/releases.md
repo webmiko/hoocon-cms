@@ -11,9 +11,9 @@
 | Новая **фича** (Admin или фронт) | PATCH `0.0.N` → `0.0.N+1` (до `0.0.9`) | `0.0.1` → `0.0.2` |
 | Косметика / docs / тесты без UX | Версию **не** поднимать | — |
 | **Глобальное** обновление (GA / breaking) | `1.0.0`, канал `""` | `v1.0.0` |
-| Статус до GA | `RELEASE_CHANNEL = "beta"` | `v0.0.2 beta` |
+| Статус до GA | `RELEASE_CHANNEL = "beta"` | `v0.0.3 beta` |
 
-Отображение: **`v{VERSION} {channel}`** (например `v0.0.2 beta`).
+Отображение: **`v{VERSION} {channel}`** (например `v0.0.3 beta`).
 После `0.0.9` следующая фича в beta — согласовать MINOR (`0.1.0`) или
 переход к `1.0.0`.
 
@@ -35,6 +35,11 @@
    отдельным `Bumped release to v0.0.N beta`.
 
 ## Changelog
+
+### v0.0.3 beta — 2026-07-21
+
+- Admin sidebar: узкий icon rail на desktop, hover-peek, мобильный overlay,
+  sticky header.
 
 ### v0.0.2 beta — 2026-07-21
 

@@ -673,3 +673,209 @@ a.hoocon-leads-stats-link {
 .hoocon-dash__apps {
   margin-top: 0.5rem;
 }
+
+/* Admin top bar stays under the viewport top while content scrolls. */
+.hoocon-admin-header {
+  position: sticky;
+  top: 0;
+}
+
+/* ── Sidebar shell / rail ───────────────────────────────────────────
+ * ≥1024: 72px flex spacer + fixed panel (does not scroll with page).
+ * <1024: hide until .hoocon-nav-shell--open; panel is fixed overlay.
+ */
+@media (max-width: 1023px) {
+  .hoocon-nav-shell:not(.hoocon-nav-shell--open) {
+    display: none !important;
+  }
+
+  .hoocon-nav-shell {
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  /* Mobile open = full menu, never icon rail. */
+  .hoocon-nav-shell--open .hoocon-nav-panel {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: min(300px, 85vw) !important;
+    max-width: min(300px, 85vw);
+    overflow: auto;
+  }
+
+  .hoocon-nav-shell--open .hoocon-nav-panel .hoocon-sidebar-label {
+    display: revert !important;
+  }
+
+  .hoocon-nav-shell--open .hoocon-nav-panel.hoocon-sidebar-rail {
+    width: min(300px, 85vw) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Shell only reserves the flex column; panel is fixed to the viewport. */
+  .hoocon-nav-shell {
+    display: block !important;
+    visibility: visible !important;
+    flex-shrink: 0;
+    align-self: stretch;
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    min-height: 100vh;
+  }
+
+  .hoocon-nav-panel {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .hoocon-nav-panel.hoocon-sidebar-rail {
+    width: 72px !important;
+  }
+
+  .hoocon-nav-panel.hoocon-sidebar-peek {
+    z-index: 70;
+    box-shadow: 8px 0 24px rgba(20, 20, 30, 0.12);
+  }
+
+  .dark .hoocon-nav-panel.hoocon-sidebar-peek {
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .hoocon-mobile-nav-toggle {
+    display: none !important;
+  }
+}
+
+.hoocon-sidebar-expand {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ⌘K / Ctrl+K: fixed chip, never stretch with the search row. */
+kbd.hoocon-sidebar-shortcut {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 18px;
+  max-height: 18px;
+  margin: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+kbd.hoocon-sidebar-shortcut > span {
+  display: block;
+  line-height: 16px;
+}
+
+/* Collapsed sidebar: icon rail — desktop only (never on mobile overlay). */
+@media (min-width: 1024px) {
+  #nav-sidebar.hoocon-sidebar-rail {
+    overflow-x: hidden;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-label {
+    display: none !important;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-inner > div:first-child {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    gap: 0;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-inner > div:first-child > div {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-apps ol {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-apps a {
+    justify-content: center;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-apps a .material-symbols-outlined {
+    margin-right: 0 !important;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail #nav-sidebar-apps a .sidebar-badge {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.15rem;
+    margin-left: 0;
+    min-width: 0.55rem;
+    width: 0.55rem;
+    height: 0.55rem;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 999px;
+    font-size: 0;
+    line-height: 0;
+    text-indent: -999px;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-search {
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-search > div {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-shortcut,
+  #nav-sidebar.hoocon-sidebar-peek .hoocon-sidebar-shortcut {
+    display: none !important;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .mt-auto > a {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .mt-auto > a .material-symbols-outlined {
+    margin-right: 0 !important;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-user {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  #nav-sidebar.hoocon-sidebar-rail .hoocon-sidebar-user > div.cursor-pointer {
+    justify-content: center;
+    gap: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}

@@ -125,3 +125,47 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "a.hoocon-admin-lead-open" in css
     assert ".hoocon-lead-stats" in css
     assert ".hoocon-admin-breadcrumbs" in css
+    assert ".hoocon-sidebar-rail" in css
+    assert ".hoocon-sidebar-label" in css
+    assert ".hoocon-nav-shell" in css
+    assert ".hoocon-admin-header" in css
+
+
+@pytest.mark.django_db
+def test_admin_header_is_sticky_to_top() -> None:
+    """Main admin header stays pinned to the top while scrolling."""
+    admin_user = User.objects.create_superuser(
+        username="admin-sticky-header",
+        email="admin-sticky-header@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/").content.decode()
+    assert "hoocon-admin-header" in html
+    assert "sticky" in html
+    assert "top-0" in html
+
+
+@pytest.mark.django_db
+def test_admin_sidebar_keeps_icon_rail_when_collapsed() -> None:
+    """Collapsed desktop sidebar stays as a narrow icon rail (not fully hidden)."""
+    admin_user = User.objects.create_superuser(
+        username="admin-rail",
+        email="admin-rail@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/").content.decode()
+    assert "hoocon-sidebar-rail" in html or "hoocon-sidebar-peek" in html
+    assert "hoocon-nav-shell" in html
+    assert "hoocon-nav-panel" in html
+    assert "railWidth" in html
+    assert "panelWidth" in html
+    assert "sidebarPeek" in html
+    assert "hoocon-sidebar-expand" not in html
+    assert "isDesktopNav" in html
+    assert "hoocon-sidebar-shortcut" in html
+    assert "Закрыть меню" in html
+    assert 'title="Панель"' in html or 'title="Панель"' in html

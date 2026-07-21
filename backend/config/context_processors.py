@@ -40,7 +40,7 @@ def release_info(_request: HttpRequest) -> dict[str, str]:
         _request: unused request (Django context processor signature).
 
     Returns:
-        Dict with RELEASE_LABEL (e.g. ``v0.0.2 beta``).
+        Dict with RELEASE_LABEL (e.g. ``v0.0.3 beta``).
     """
     from config.release import release_label
 
