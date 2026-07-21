@@ -124,3 +124,11 @@ class SocialPost(models.Model):
         self.status = SocialPostStatus.SKIPPED
         self.error_message = reason[:2000]
         self.save(update_fields=["status", "error_message"])
+
+
+# GenericForeignKey defaults to English "content object" — RU Admin label.
+setattr(
+    SocialPost._meta.get_field("content_object"),
+    "verbose_name",
+    "связанный объект",
+)

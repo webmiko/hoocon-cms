@@ -68,7 +68,7 @@ class Category(models.Model):
         blank=True,
         related_name="children",
         verbose_name="родитель",
-        help_text="Родительская категория (None для корня дерева).",
+        help_text="Родительская категория (пусто = корень дерева).",
     )
     description: models.TextField = models.TextField(
         "описание",
@@ -116,7 +116,7 @@ class Product(models.Model):
         on_delete=models.PROTECT,
         related_name="products",
         verbose_name="категория",
-        help_text="Категория товара (обязательная). PROTECT — нельзя удалить.",
+        help_text="Категория товара (обязательная). Удалить категорию с товарами нельзя.",
     )
     name: models.CharField = models.CharField("название", max_length=200)
     slug: models.SlugField = models.SlugField(
@@ -129,7 +129,7 @@ class Product(models.Model):
         "описание",
         blank=True,
         default="",
-        help_text="Описание линейки (общее для всех изданий Product).",
+        help_text="Описание линейки (общее для всех изданий продукта).",
     )
     instructions: models.TextField = models.TextField(
         "инструкция",
@@ -141,13 +141,13 @@ class Product(models.Model):
         "характеристики",
         blank=True,
         default="",
-        help_text="Характеристики линейки (до scoping по SKU).",
+        help_text="Характеристики линейки (до уточнения по артикулу SKU).",
     )
     analogs_text: models.TextField = models.TextField(
         "аналоги",
         blank=True,
         default="",
-        help_text="Аналоги линейки (до scoping по SKU).",
+        help_text="Аналоги линейки (до уточнения по артикулу SKU).",
     )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
@@ -188,7 +188,7 @@ class SKU(models.Model):
         on_delete=models.PROTECT,
         related_name="skus",
         verbose_name="продукт",
-        help_text="Продукт/линейка (обязательный). PROTECT — нельзя удалить.",
+        help_text="Продукт/линейка (обязательный). Удалить линейку с артикулами нельзя.",
     )
     name: models.CharField = models.CharField("название", max_length=300)
     slug: models.SlugField = models.SlugField(
@@ -210,7 +210,7 @@ class SKU(models.Model):
         null=True,
         blank=True,
         default=None,
-        help_text="Код аналога Belimo (задел для AnalogMap P1).",
+        help_text="Код аналога Belimo (для будущей карты аналогов).",
     )
     price: models.DecimalField | None = models.DecimalField(
         "цена",
@@ -218,7 +218,7 @@ class SKU(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text=("Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."),
+        help_text=("Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»)."),
     )
     description: models.TextField = models.TextField(
         "описание",
@@ -230,7 +230,7 @@ class SKU(models.Model):
         "характеристики",
         blank=True,
         default="",
-        help_text="Характеристики издания (напряжение/управление scoped).",
+        help_text="Характеристики издания (напряжение и управление — по артикулу).",
     )
     analogs_text: models.TextField = models.TextField(
         "аналоги",
@@ -375,14 +375,14 @@ class ProductFile(models.Model):
         on_delete=models.CASCADE,
         related_name="files",
         verbose_name="артикул (SKU)",
-        help_text="SKU, к которому привязан документ.",
+        help_text="Артикул (SKU), к которому привязан документ.",
     )
     title: models.CharField = models.CharField("название", max_length=300)
     file: models.FileField = models.FileField(
         "файл",
         upload_to=product_file_upload_to,
         validators=[validate_pdf_upload],
-        help_text="Только PDF; лимит и magic bytes — catalog.validators.",
+        help_text="Только PDF; размер и тип файла проверяются при загрузке.",
     )
     file_type: models.CharField = models.CharField(
         "тип файла",
@@ -395,7 +395,7 @@ class ProductFile(models.Model):
         "опубликован",
         default=True,
         db_index=True,
-        help_text="Видимость файла в публичном каталоге / PDP.",
+        help_text="Видимость файла в публичном каталоге и на карточке товара.",
     )
     sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
         "порядок",
@@ -445,7 +445,7 @@ class ProductImage(models.Model):
         on_delete=models.CASCADE,
         related_name="images",
         verbose_name="артикул (SKU)",
-        help_text="SKU, к которому привязано фото.",
+        help_text="Артикул (SKU), к которому привязано фото.",
     )
     image: models.ImageField = models.ImageField(
         "изображение",
@@ -464,7 +464,7 @@ class ProductImage(models.Model):
         max_length=500,
         blank=True,
         default="",
-        help_text="Исходный URL (Tilda CDN) для идемпотентного ETL.",
+        help_text="Исходный URL (CDN Tilda) для повторного импорта без дублей.",
     )
     sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
         "порядок",

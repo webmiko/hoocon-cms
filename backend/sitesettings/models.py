@@ -29,10 +29,7 @@ class SiteSettings(models.Model):
     show_prices_on_site: models.BooleanField = models.BooleanField(
         "показывать цены на сайте",
         default=False,
-        help_text=(
-            "Показывать цены в публичном API/UI. По умолчанию False — "
-            "цены скрыты (политика RFQ). См. docs/security-baseline.md §3.2."
-        ),
+        help_text=("Показывать цены в публичном API и на сайте. По умолчанию выкл. — цены скрыты (политика RFQ)."),
     )
 
     # ── Analytics (public counter IDs; loaded after cookie consent) ──
@@ -55,7 +52,7 @@ class SiteSettings(models.Model):
     social_announce_on_publish: models.BooleanField = models.BooleanField(
         "автоанонс при публикации",
         default=False,
-        help_text=("При первой публикации статьи/новости отправить анонс во все включённые каналы (Celery)."),
+        help_text=("При первой публикации статьи/новости отправить анонс во все включённые каналы (фоновая очередь)."),
     )
 
     # ── Telegram integration ──
@@ -70,7 +67,8 @@ class SiteSettings(models.Model):
         default="",
         help_text=(
             "Токен бота (@BotFather). Пустое поле при сохранении не стирает "
-            "уже сохранённый токен. Запасной вариант: TELEGRAM_BOT_TOKEN в .env."
+            "уже сохранённый токен. Запасной вариант: TELEGRAM_BOT_TOKEN "
+            "в файле окружения."
         ),
     )
     telegram_chat_id: models.CharField = models.CharField(
@@ -78,7 +76,7 @@ class SiteSettings(models.Model):
         max_length=64,
         blank=True,
         default="",
-        help_text="ID канала или чата (напр. -100… или @channel).",
+        help_text="ID канала или чата (напр. -100… или @имя_канала).",
     )
 
     # ── VK integration ──
@@ -92,8 +90,9 @@ class SiteSettings(models.Model):
         blank=True,
         default="",
         help_text=(
-            "Ключ сообщества с правом wall. Пустое поле при сохранении не "
-            "стирает токен. Запасной вариант: VK_ACCESS_TOKEN в .env."
+            "Ключ сообщества с правом публикации на стене. Пустое поле при "
+            "сохранении не стирает токен. Запасной вариант: VK_ACCESS_TOKEN "
+            "в файле окружения."
         ),
     )
     vk_group_id: models.CharField = models.CharField(
@@ -115,7 +114,8 @@ class SiteSettings(models.Model):
         blank=True,
         default="",
         help_text=(
-            "Токен бота MAX. Пустое поле при сохранении не стирает токен. Запасной вариант: MAX_BOT_TOKEN в .env."
+            "Токен бота MAX. Пустое поле при сохранении не стирает токен. "
+            "Запасной вариант: MAX_BOT_TOKEN в файле окружения."
         ),
     )
     max_chat_id: models.CharField = models.CharField(

@@ -75,7 +75,7 @@ class _ContentBase(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text="Дата публикации (для сортировки/SEO); null = черновик.",
+        help_text="Дата публикации (для сортировки/SEO); пусто = черновик.",
     )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
@@ -124,7 +124,7 @@ class Article(_ContentBase):
         "анонс",
         blank=True,
         default="",
-        help_text="Краткий анонс для списка /statyi (без HTML).",
+        help_text="Краткий анонс для списка статей (без HTML).",
     )
     cover: models.ImageField = models.ImageField(
         "обложка",

@@ -66,20 +66,22 @@ class Lead(models.Model):
         blank=True,
         related_name="leads",
         verbose_name="артикул (SKU)",
-        help_text="SKU, по которому пришла заявка (опц.; SET_NULL при удалении SKU).",
+        help_text=(
+            "Артикул (SKU), по которому пришла заявка (необязательно; при удалении артикула связь обнуляется)."
+        ),
     )
     quantity: models.PositiveIntegerField | None = models.PositiveIntegerField(
         "количество",
         null=True,
         blank=True,
-        help_text="Количество (для RFQ).",
+        help_text="Количество позиций в запросе КП (RFQ).",
     )
     analog_belimo_code: models.CharField = models.CharField(
         "код аналога Belimo",
         max_length=100,
         blank=True,
         default="",
-        help_text="Код аналога Belimo (для replacement).",
+        help_text="Код аналога Belimo (для заявок на замену).",
     )
     status: models.CharField = models.CharField(
         "статус",
@@ -122,14 +124,14 @@ class Lead(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text="Когда заявка была завершена (status=done).",
+        help_text="Когда заявка была завершена (статус «Завершена»).",
     )
     seen_at: models.DateTimeField | None = models.DateTimeField(
         "просмотрено",
         null=True,
         blank=True,
         db_index=True,
-        help_text="Когда менеджер открыл заявку в Admin (стикер считает непросмотренные).",
+        help_text=("Когда менеджер открыл заявку в админке (стикер считает непросмотренные)."),
     )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)

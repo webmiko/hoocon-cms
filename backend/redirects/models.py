@@ -42,7 +42,7 @@ class Redirect(models.Model):
     to_path: models.CharField = models.CharField(
         "куда",
         max_length=512,
-        help_text="Канонический path, напр. /sharovoy-kran-bv215.",
+        help_text="Канонический путь URL, напр. /sharovoy-kran-bv215.",
     )
     status_code: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
         "код ответа",

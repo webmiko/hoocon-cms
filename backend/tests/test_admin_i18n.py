@@ -1,15 +1,24 @@
-"""Tests for Russian Admin labels (apps, models, branding)."""
+"""Tests for Russian Admin labels (apps, models, branding, no English UI)."""
 
 from __future__ import annotations
 
 import pytest
 from django.apps import apps
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import Client
+
+from config.ru_ui_lint import (
+    PROJECT_APP_LABELS,
+    iter_admin_ui_strings,
+    iter_model_ui_strings,
+    unexpected_latin_tokens,
+)
 
 User = get_user_model()
 
 _EXPECTED_APP_NAMES = {
+    "accounts": "Учётные записи / роли",
     "catalog": "Каталог",
     "content": "Контент",
     "leads": "Заявки",
@@ -98,3 +107,30 @@ def test_sku_changelist_has_open_button() -> None:
     assert "Открыть" in html
     assert f"/admin/catalog/sku/{sku.pk}/change/" in html
     assert "Артикулы" in client.get("/admin/").content.decode()
+
+
+def test_project_ui_strings_have_no_unexpected_english() -> None:
+    """Model/Admin RU labels must not leak English words (allowlist only).
+
+    Catches developer English in verbose_name / help_text / choices /
+    fieldset copy so managers see a fully Russian Admin.
+    """
+    failures: list[str] = []
+
+    for model in apps.get_models():
+        if model._meta.app_label not in PROJECT_APP_LABELS:
+            continue
+        for where, text in iter_model_ui_strings(model):
+            bad = unexpected_latin_tokens(text)
+            if bad:
+                failures.append(f"{where}: {bad!r} in {text!r}")
+
+    for model, model_admin in admin.site._registry.items():
+        if model._meta.app_label not in PROJECT_APP_LABELS:
+            continue
+        for where, text in iter_admin_ui_strings(model_admin, model):
+            bad = unexpected_latin_tokens(text)
+            if bad:
+                failures.append(f"{where}: {bad!r} in {text!r}")
+
+    assert not failures, "English leftovers in RU Admin UI:\n" + "\n".join(failures)

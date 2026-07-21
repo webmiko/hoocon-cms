@@ -137,7 +137,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             {
                 "fields": ("email", "name", "phone", "company", "is_active"),
                 "description": (
-                    "Одинаковый email (ID) = один клиент. Заявки с тем же ID "
+                    "Одинаковая эл. почта (ID) = один клиент. Заявки с тем же ID "
                     "добавляются в эту карточку, новая карточка не создаётся."
                 ),
             },

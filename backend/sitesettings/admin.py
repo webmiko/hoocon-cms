@@ -96,8 +96,9 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             {
                 "fields": ("yandex_metrika_id", "ga4_measurement_id"),
                 "description": (
-                    "ID загружаются на сайте только после согласия на cookies. "
-                    "Можно также задать через .env / VITE_* как запасной вариант."
+                    "ID загружаются на сайте только после согласия в баннере "
+                    "конфиденциальности. Можно также задать через файл окружения "
+                    "или VITE_* как запасной вариант."
                 ),
             },
         ),
@@ -112,7 +113,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                 ),
                 "description": (
                     "Токен и ID канала/чата для бота. Пустой токен при сохранении "
-                    "не затирает уже сохранённый. Запасной вариант — .env."
+                    "не затирает уже сохранённый. Запасной вариант — файл окружения."
                 ),
             },
         ),
@@ -140,7 +141,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "max_token_status",
                     "max_chat_id",
                 ),
-                "description": ("Токен бота MAX и chat ID. Пустой токен при сохранении не затирает уже сохранённый."),
+                "description": ("Токен бота MAX и ID чата. Пустой токен при сохранении не затирает уже сохранённый."),
             },
         ),
         (

@@ -99,7 +99,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             {
                 "fields": ("email", "name", "phone", "company", "client"),
                 "description": (
-                    "Email = ID клиента в CRM. Несколько заявок с одним email попадают в одну карточку клиента."
+                    "Эл. почта = ID клиента в CRM. Несколько заявок с одним адресом попадают в одну карточку клиента."
                 ),
             },
         ),
