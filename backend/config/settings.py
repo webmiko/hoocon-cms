@@ -10,6 +10,8 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
+from config.release import RELEASE_VERSION, release_label
+
 # Load project-root .env; do not call load_dotenv() twice (avoid CWD-anchored
 # overrides pulling in an unexpected file).
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
@@ -163,6 +165,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "config.context_processors.static_version",
+                "config.context_processors.release_info",
                 "config.context_processors.new_leads_sticker",
             ],
         },
@@ -238,6 +241,8 @@ UNFOLD = {
     "SITE_HEADER": _("Hoocon"),
     "SITE_SUBHEADER": _("Панель управления"),
     "SITE_URL": "/",
+    # Release badge next to branding (e.g. «v0.0.2 beta»).
+    "ENVIRONMENT": release_label(),
     "COLORS": {
         "primary": _UNFOLD_PRIMARY,
     },
@@ -330,7 +335,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "Hoocon CMS API",
     "DESCRIPTION": "B2B catalog and content API for Hoocon HVAC actuators.",
-    "VERSION": "0.1.0",
+    "VERSION": RELEASE_VERSION,
 }
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")

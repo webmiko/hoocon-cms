@@ -33,6 +33,20 @@ def static_version(_request: HttpRequest) -> dict[str, str]:
     return {"STATIC_VERSION": version or "dev"}
 
 
+def release_info(_request: HttpRequest) -> dict[str, str]:
+    """Expose release label to Admin templates (dashboard, base).
+
+    Args:
+        _request: unused request (Django context processor signature).
+
+    Returns:
+        Dict with RELEASE_LABEL (e.g. ``v0.0.2 beta``).
+    """
+    from config.release import release_label
+
+    return {"RELEASE_LABEL": release_label()}
+
+
 def new_leads_sticker(request: HttpRequest) -> dict[str, object]:
     """Admin sticker: count of leads with status=new + inbox URL.
 

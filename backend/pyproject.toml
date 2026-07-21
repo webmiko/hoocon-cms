@@ -1,6 +1,6 @@
 [project]
 name = "hoocon-cms"
-version = "0.1.0"
+version = "0.0.2"
 description = "B2B CMS and catalog for Hoocon HVAC actuators (Django + DRF)"
 license = "Proprietary"
 authors = [{ name = "niko" }]

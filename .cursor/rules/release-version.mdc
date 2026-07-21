@@ -1,0 +1,27 @@
+---
+description: Нумерация релизов Admin/фронт при фичах (0.0.x beta → 1.0.0)
+alwaysApply: true
+---
+
+# Релизы: версия при фиче
+
+Канон: [docs/releases.md](docs/releases.md), код —
+`backend/config/release.py` + `frontend/src/release.ts`.
+
+## Когда поднимать
+
+1. **Новая фича** (Admin или публичный фронт) → PATCH `0.0.N` → `0.0.N+1`
+   (диапазон beta `0.0.1`…`0.0.9`). Отображение: `v0.0.N beta`.
+2. **Косметика / docs / только тесты** → версию не трогать.
+3. **Глобальное обновление (GA)** → `1.0.0`, канал пустой (`""`).
+
+## Что синхронизировать в одном коммите с бампом
+
+- `backend/config/release.py` (`RELEASE_VERSION`, `RELEASE_CHANNEL`)
+- `backend/pyproject.toml` → `[project].version`
+- `frontend/package.json` → `version`
+- `frontend/src/release.ts` (те же константы)
+- Строка в changelog [docs/releases.md](docs/releases.md)
+
+Перед коммитом — `./scripts/pre-commit-checkup.sh`. Не версионировать
+под оплату/корзину (нет в v1).

@@ -27,6 +27,8 @@
    - запусти `./scripts/pre-commit-checkup.sh` (правило
      `.cursor/rules/pre-commit-checkup.mdc`), включая ревью diff
      (баги / стандарты БЗ / security через `scripts/diff-quality-review.py`);
+   - при **новой фиче** подними релиз по [docs/releases.md](docs/releases.md)
+     (сейчас `v0.0.x beta`);
    - учитывай проектный [docs/security-baseline.md][sec-baseline].
    Красный checkup, красное ревью или критичный пункт §4 — **не коммить**.
 
@@ -39,6 +41,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 |----------|------------|
 | [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md) | Scope, итерации, решения |
 | [docs/](docs/) | Рынок, стек, SEO URL, ETL, UX, security, infra reg.ru, audit |
+| [docs/releases.md](docs/releases.md) | Версии Admin/фронт (`v0.0.x beta` → `1.0.0`) |
 | [docs/audit-2026-07-20.md](docs/audit-2026-07-20.md) | Аудит баги/БЗ/security + статус фиксов A–E |
 | [docs/security-baseline.md][sec-baseline] | OWASP 2025 → Hoocon |
 | [docs/seo-url-migration.md](docs/seo-url-migration.md) | Сохранение URL и 301 |
@@ -54,6 +57,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Задача | Куда |
 |--------|------|
 | Коммит / push | `./scripts/pre-commit-checkup.sh` + канон §4 |
+| Релиз / версия | [docs/releases.md](docs/releases.md); `config/release.py` |
 | Аудит / hardening backlog | [docs/audit-2026-07-20.md](docs/audit-2026-07-20.md); план Iter 4.5–5 |
 | Новый код / модуль | БЗ ПРОМПТ + TDD; apps в `backend/` |
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |

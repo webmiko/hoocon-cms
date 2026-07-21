@@ -11,6 +11,7 @@ import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
+import { releaseLabel } from "../release";
 import styles from "./Layout.module.css";
 
 /**
@@ -324,7 +325,10 @@ export function Layout() {
           </div>
         </div>
         <div className={`container ${styles.footerBottom}`}>
-          <p>© {new Date().getFullYear()} Hoocon · Управление системами ОВК</p>
+          <p>
+            © {new Date().getFullYear()} Hoocon · Управление системами ОВК
+            <span className={styles.footerRelease}> · {releaseLabel()}</span>
+          </p>
           <nav className={styles.footerLegal} aria-label="Правовая информация">
             <Link to="/privacy-policy">Обработка ПДн</Link>
             <Link to="/terms">Согласие на ПДн</Link>
