@@ -11,4 +11,5 @@ alwaysApply: true
 3. Без онлайн-корзины в v1; заявки RFQ вместо checkout.
 4. Переносимые паттерны — в канон по инструкции обновления БЗ.
 5. Перед любым commit/push — `./scripts/pre-commit-checkup.sh`
-   (правило `pre-commit-checkup.mdc`).
+   (правило `pre-commit-checkup.mdc`), включая ревью diff
+   баги/БЗ/security (`scripts/diff-quality-review.py`).

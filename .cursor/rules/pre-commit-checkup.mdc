@@ -22,10 +22,48 @@ alwaysApply: true
 
 Скрипт: ruff, ruff format, mypy, pytest, pip-audit, секреты в diff, запрет
 `.env` / `db.sqlite3` / `media/` / `.venv` в staging, длина строк ≤ 119,
-`print()`, security hotspots, frontend lint при изменениях в `frontend/`.
+`print()`, security hotspots, **ревью diff (баги / стандарты БЗ / security)**
+(`scripts/diff-quality-review.py`), frontend lint при изменениях в `frontend/`.
 Если скрипт красный — **не коммить**.
 
-## 2. Безопасность (рукописная проверка)
+## 1b. Ревью баги · БЗ · безопасность (обязательно)
+
+Статическая часть входит в `./scripts/pre-commit-checkup.sh` (шаг
+`diff-quality-review.py`). Агент **дополнительно** проходит рукописное
+ревью по diff (канон БЗ §4.1–4.3 + ниже). Кратко зафиксируй итог в ответе
+пользователю перед коммитом: «ревью: чисто» или список блокеров.
+
+### Баги и регрессии
+
+- [ ] Happy path + границы (пустой ввод, duplicate, race, throttle, 403/404).
+- [ ] Нет N+1 на list/detail (`select_related` / `prefetch_related`).
+- [ ] Пагинация list-эндпоинтов; Celery — retry + `transaction.on_commit`.
+- [ ] Admin/API: чужой ресурс / anon → 403/404, не утечка данных.
+- [ ] Счётчики/сообщения Admin правдивы (не «успех» при no-op).
+- [ ] ETL — quarantine плохих строк ([data-quality-etl.md](docs/data-quality-etl.md)).
+
+### Стандарты БЗ (стиль / типы / модуль)
+
+- [ ] PEP 585/604: `list[str]`, `dict[str, Any]`, `str | None` (не `Optional`/`List`).
+- [ ] Докстринги Google style на публичных функциях; константы `UPPER_SNAKE`.
+- [ ] Нет `print` / голого `except:`; логи через `logger`, без PII/секретов.
+- [ ] Длина строк ≤ 119; структура модуля по БЗ; DRY.
+
+### Безопасность
+
+- [ ] Секреты только в `.env`; в diff — placeholder.
+- [ ] AuthN + AuthZ + **владелец/скоуп** (IDOR): Admin queryset, custom
+      `admin_view`, compose-email/stats, публичный API.
+- [ ] Ввод валидируется; SQL только ORM/params; нет `eval`/`exec`/`shell=True`.
+- [ ] Mass assignment — whitelist полей; throttle на login и публичные POST.
+- [ ] Open redirect — allowlist; CORS не `*` + credentials; цены не утекают
+      при `show_prices=False`.
+- [ ] Файлы — лимит типа/размера, нет path traversal.
+- [ ] CSP (итерация 5): `object-src 'none'`, `frame-ancestors 'none'`.
+
+Красный `diff-quality-review` или неснятый пункт ревью — **не коммить**.
+
+## 2. Безопасность (расширенный чеклист)
 
 - [ ] **Секреты** — в diff нет `DJANGO_SECRET_KEY` с реальным значением,
       `EMAIL_HOST_PASSWORD`, токенов, паролей БД. Только `.env.example`

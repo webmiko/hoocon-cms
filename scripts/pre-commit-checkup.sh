@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pre-commit checkup — обязательная проверка перед коммитом (Hoocon CMS).
-# Backend: ruff, format, mypy, pytest, pip-audit, секреты, длина строк, hotspots.
+# Backend: ruff, format, mypy, pytest, pip-audit, секреты, длина строк, hotspots,
+# ревью diff (баги / стандарты БЗ / security).
 # Выход: 0 — чисто, 1 — есть проблемы.
 set -euo pipefail
 
@@ -185,7 +186,23 @@ else
   warn "scripts/security-hotspot-check.sh отсутствует или не executable"
 fi
 
-# ── 11. Frontend lint (если менялся frontend/) ───────────────
+# ── 11. Ревью diff: баги · БЗ · безопасность ─────────────────
+REVIEW_PY="$ROOT/scripts/diff-quality-review.py"
+if [ -f "$REVIEW_PY" ]; then
+  set +e
+  REVIEW_OUT=$(python3 "$REVIEW_PY" 2>&1)
+  REVIEW_OK=$?
+  set -e
+  if [ "$REVIEW_OK" -eq 0 ]; then
+    ok "Ревью diff — баги / стандарты БЗ / security"
+  else
+    fail "Ревью diff (баги/БЗ/security):"$'\n'"$REVIEW_OUT"
+  fi
+else
+  fail "scripts/diff-quality-review.py отсутствует"
+fi
+
+# ── 12. Frontend lint (если менялся frontend/) ───────────────
 FE_CHANGED=$(echo "$STAGED" | grep -E '^frontend/' || true)
 if [ -n "$FE_CHANGED" ] && [ -f "$ROOT/frontend/package.json" ]; then
   if (cd "$ROOT/frontend" && npm run lint) >/dev/null 2>&1; then

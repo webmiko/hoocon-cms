@@ -25,9 +25,10 @@
 6. Перед **каждым** `git commit` / `git push` / деплоем:
    - пройди канон [AGENTS.md §4][kb-agents];
    - запусти `./scripts/pre-commit-checkup.sh` (правило
-     `.cursor/rules/pre-commit-checkup.mdc`);
+     `.cursor/rules/pre-commit-checkup.mdc`), включая ревью diff
+     (баги / стандарты БЗ / security через `scripts/diff-quality-review.py`);
    - учитывай проектный [docs/security-baseline.md][sec-baseline].
-   Красный checkup или критичный пункт §4 — **не коммить**.
+   Красный checkup, красное ревью или критичный пункт §4 — **не коммить**.
 
 ## Проект Hoocon CMS
 
