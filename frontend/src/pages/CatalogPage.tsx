@@ -19,6 +19,7 @@ import {
   SignalSpecValue,
 } from "../components/SignalSpecValue";
 import { CompareToggle } from "../components/CompareToggle";
+import { InstructionText } from "../components/InstructionText";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
@@ -648,29 +649,16 @@ function CategoryOverview({ category }: { category?: Category }) {
           </button>
           {openInst ? (
             <div className={styles.categoryInstBody}>
-              {parseDescription(category.instructions).map((block, index) => {
-                if (block.type === "paragraph") {
-                  return (
-                    <p key={`ip-${index}`} className={styles.categoryLead}>
-                      {softBreak(block.text)}
-                    </p>
-                  );
-                }
-                if (block.type === "section") {
-                  return (
-                    <h3 key={`is-${index}`} className={styles.categorySection}>
-                      {softBreak(block.title)}
-                    </h3>
-                  );
-                }
-                return (
-                  <ul key={`il-${index}`} className={styles.categoryList}>
-                    {block.items.map((item) => (
-                      <li key={item}>{softBreak(item)}</li>
-                    ))}
-                  </ul>
-                );
-              })}
+              <InstructionText
+                text={category.instructions ?? ""}
+                styles={{
+                  lead: styles.categoryLead,
+                  docTitle: styles.categoryDocTitle,
+                  section: styles.categorySection,
+                  subsection: styles.categorySubsection,
+                  list: styles.categoryList,
+                }}
+              />
             </div>
           ) : null}
         </div>

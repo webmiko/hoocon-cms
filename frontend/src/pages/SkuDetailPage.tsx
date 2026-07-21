@@ -10,6 +10,7 @@ import { LeadForm } from "../components/LeadForm";
 import { Seo } from "../components/Seo";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseDescription } from "../utils/parseDescription";
+import { InstructionText } from "../components/InstructionText";
 import {
   isModulatingSignalKey,
   SignalSpecValue,
@@ -392,7 +393,16 @@ export function SkuDetailPage() {
 
                 {activeTab === "instructions" && sku.category_instructions ? (
                   <section className={styles.section}>
-                    <StructuredText text={sku.category_instructions} />
+                    <InstructionText
+                      text={sku.category_instructions}
+                      styles={{
+                        lead: styles.descLead,
+                        docTitle: styles.descDocTitle,
+                        section: styles.descSection,
+                        subsection: styles.descSubsection,
+                        list: styles.descList,
+                      }}
+                    />
                   </section>
                 ) : null}
 

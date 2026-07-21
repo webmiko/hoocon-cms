@@ -19,10 +19,57 @@ const SECTION_BARE_RE = new RegExp(
   "i",
 );
 
+export type InstructionSectionLevel = 2 | 3 | 4;
+
 export type DescriptionBlock =
   | { type: "paragraph"; text: string }
-  | { type: "section"; title: string }
+  | { type: "section"; title: string; level?: InstructionSectionLevel }
   | { type: "list"; items: string[] };
+
+/** ``3.1 …``, ``7.2 …`` — подраздел инструкции (h4). */
+const INSTRUCTION_H4_RE = /^\d+\.\d+(?:\.\d+)*\s+/;
+/** ``1. …``, ``10. …`` — раздел инструкции (h3). */
+const INSTRUCTION_H3_RE = /^\d+\.\s+(?!\d)/;
+/** Документ без нумерации, напр. «Инструкция по установке…» (h2). */
+const INSTRUCTION_H2_RE = /^инструкция\b/i;
+
+/**
+ * Detect semantic heading level for install/control instruction lines.
+ *
+ * Returns:
+ * - ``2`` — document title (no chapter number)
+ * - ``3`` — top-level numbered sections ``1.``, ``2.``, …
+ * - ``4`` — nested sections ``3.1``, ``4.2``, …
+ */
+export function instructionHeadingLevel(line: string): InstructionSectionLevel | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  if (INSTRUCTION_H4_RE.test(trimmed)) return 4;
+  if (INSTRUCTION_H3_RE.test(trimmed)) return 3;
+  if (INSTRUCTION_H2_RE.test(trimmed)) return 2;
+  return null;
+}
+
+/**
+ * Parse category install instructions with h2/h3/h4 section levels.
+ *
+ * Reclassifies numbered chapter lines that ``parseDescription`` would emit
+ * as plain paragraphs into section blocks with ``level``.
+ */
+export function parseInstructions(raw: string): DescriptionBlock[] {
+  return parseDescription(raw).map((block) => {
+    if (block.type === "section") {
+      return { ...block, level: instructionHeadingLevel(block.title) ?? 2 };
+    }
+    if (block.type === "paragraph") {
+      const level = instructionHeadingLevel(block.text);
+      if (level !== null) {
+        return { type: "section" as const, title: block.text, level };
+      }
+    }
+    return block;
+  });
+}
 
 /**
  * Split a structured plain-text product description into renderable blocks.

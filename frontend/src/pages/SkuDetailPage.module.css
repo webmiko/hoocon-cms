@@ -381,6 +381,15 @@
   margin-top: calc(-1 * var(--space-md));
 }
 
+.descDocTitle {
+  margin: 0 0 var(--space-lg);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-link);
+}
+
 .descSection {
   margin: var(--space-xl) 0 var(--space-md);
   font-family: var(--font-display);
@@ -392,6 +401,15 @@
 
 .descSection:first-child {
   margin-top: 0;
+}
+
+.descSubsection {
+  margin: var(--space-md) 0 var(--space-sm);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-text);
 }
 
 .descList {
