@@ -42,6 +42,11 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert v24.control == "modulating"
     assert v24.aux_switch is True
 
+    dst = parse_sku_variant("sa10mu24-dst")
+    assert dst.voltage == "24"
+    assert dst.control == "on_off"
+    assert dst.aux_switch is True
+
 
 def test_parse_sku_variant_ignores_non_terminal_suffix_lookalikes() -> None:
     """Suffix tags must match only at the very end of sku_code."""

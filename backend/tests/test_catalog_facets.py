@@ -389,7 +389,7 @@ def test_facets_control_excludes_manual_override(client) -> None:
 
 
 def test_format_aux_switch_display_hides_absent() -> None:
-    """Hero omits «Нет»; «Да» becomes SPDT-1 / SPDT-2 from SKU / description."""
+    """ТТХ table omits «Нет»; «Да» becomes SPDT-1 / SPDT-2 from SKU / description."""
     from catalog.facets import (
         AUX_SWITCH_SPDT_1,
         AUX_SWITCH_SPDT_2,
@@ -404,6 +404,100 @@ def test_format_aux_switch_display_hides_absent() -> None:
     assert format_aux_switch_display("2 SPDT") == AUX_SWITCH_SPDT_2
     assert normalize_aux_switch_value("Да", sku_code="da5fu24-d") == "Нет"
     assert normalize_aux_switch_value("Нет") == "Нет"
+
+
+@pytest.mark.django_db
+def test_highlights_aux_switch_shows_none_spdt() -> None:
+    """Catalog cards always show aux as Нет / SPDT-1 / SPDT-2."""
+    from catalog.facets import (
+        AUX_SWITCH_NONE,
+        AUX_SWITCH_SPDT_1,
+        AUX_SWITCH_SPDT_2,
+        highlights_for_sku,
+    )
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(name="FU", slug="fu-aux-hl")
+    product = Product.objects.create(name="DA", slug="da-aux-hl", category=cat)
+    aux = Attribute.objects.create(
+        name="Вспомогательный переключатель",
+        slug="aux-switch",
+    )
+
+    cases = (
+        ("da3fu230-d", AUX_SWITCH_NONE, AUX_SWITCH_NONE),
+        ("da3fu230-ds", "SPDT-1", AUX_SWITCH_SPDT_1),
+        ("da5fu24-as", "SPDT-2", AUX_SWITCH_SPDT_2),
+    )
+    for sku_code, stored, expected in cases:
+        sku = SKU.objects.create(
+            product=product,
+            name=sku_code,
+            slug=f"hl-{sku_code}",
+            sku_code=sku_code,
+            is_published=True,
+        )
+        AttributeValue.objects.create(sku=sku, attribute=aux, value=stored)
+        rows = highlights_for_sku(
+            list(sku.attribute_values.select_related("attribute")),
+            limit=8,
+            sku_code=sku_code,
+            category_slug=cat.slug,
+        )
+        by_key = {r["key"]: r for r in rows}
+        assert "aux_switch" in by_key, sku_code
+        assert by_key["aux_switch"]["value"] == expected
+        assert by_key["aux_switch"]["name"] == "Вспомогательный переключатель"
+
+
+@pytest.mark.django_db
+def test_highlights_aux_switch_injected_from_sku_code() -> None:
+    """Missing aux EAV still yields a card row from the edition suffix."""
+    from catalog.facets import AUX_SWITCH_SPDT_1, highlights_for_sku
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="FU", slug="fu-aux-inject")
+    product = Product.objects.create(name="DA", slug="da-aux-inject", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="da3fu230-ds",
+        slug="hl-inject-ds",
+        sku_code="da3fu230-ds",
+        is_published=True,
+    )
+    rows = highlights_for_sku([], limit=8, sku_code=sku.sku_code)
+    by_key = {r["key"]: r for r in rows}
+    assert by_key["aux_switch"]["value"] == AUX_SWITCH_SPDT_1
+
+
+@pytest.mark.django_db
+def test_highlights_control_injected_from_dst_suffix() -> None:
+    """``-dst`` editions get Управление even without a control EAV row."""
+    from catalog.facets import highlights_for_sku
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(
+        name="Smoke",
+        slug="elektroprivody-dlya-klapanov-dymoudaleniya",
+    )
+    product = Product.objects.create(name="SA", slug="sa-dst-hl", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SA10MU24-DST",
+        slug="sa10mu24-dst-hl",
+        sku_code="SA10MU24-DST",
+        is_published=True,
+    )
+    rows = highlights_for_sku([], limit=8, sku_code=sku.sku_code, category_slug=cat.slug)
+    by_key = {r["key"]: r for r in rows}
+    assert by_key["control"]["value"] == "Открыто/закрыто"
+    assert by_key["aux_switch"]["value"] == "SPDT-1"
 
 
 @pytest.mark.django_db

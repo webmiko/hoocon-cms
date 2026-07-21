@@ -8,7 +8,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import cast
 
-from catalog.facets.aux import format_aux_switch_display
+from catalog.facets.aux import (
+    AUX_SWITCH_NONE,
+    AUX_SWITCH_SPDT_1,
+    AUX_SWITCH_SPDT_2,
+    aux_spdt_count_from_sku,
+    normalize_aux_switch_value,
+)
 from catalog.facets.dedupe import dedupe_attribute_values
 from catalog.facets.defs import (
     EXTRA_HIGHLIGHT_DEFS,
@@ -78,15 +84,13 @@ def highlights_for_sku(
                     sku_code=sku_code,
                 )
             if facet.key == "aux_switch":
-                formatted = format_aux_switch_display(
+                # Cards / hero always show canonical Нет / SPDT-1 / SPDT-2.
+                display = normalize_aux_switch_value(
                     display,
                     description=description,
                     sku_code=sku_code,
                 )
-                if formatted is None:
-                    continue
-                display = formatted
-                label = "Вспом. переключатель"
+                label = FACET_BY_KEY["aux_switch"].label
 
             if facet.key in {"control_signal", "feedback_signal"}:
                 from catalog.etl.tech_copy import (
@@ -125,6 +129,12 @@ def highlights_for_sku(
             break
 
     _ensure_modulating_signal_highlights(by_key)
+    _ensure_control_highlight(
+        by_key,
+        sku_code=sku_code,
+        category_slug=category_slug,
+    )
+    _ensure_aux_switch_highlight(by_key, sku_code=sku_code)
 
     ordered: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -143,6 +153,72 @@ def highlights_for_sku(
         if len(ordered) >= limit:
             break
     return ordered
+
+
+def _ensure_control_highlight(
+    by_key: dict[str, dict[str, str]],
+    *,
+    sku_code: str | None,
+    category_slug: str | None,
+) -> None:
+    """Require «Управление» when the edition suffix encodes control family."""
+    if "control" in by_key:
+        return
+    from catalog.etl.sku_variant import parse_sku_variant
+    from catalog.etl.tech_copy import (
+        CONTROL_FLOATING,
+        CONTROL_MODULATING,
+        CONTROL_ON_OFF,
+        normalize_control_attribute_value,
+    )
+
+    variant = parse_sku_variant(sku_code or "")
+    if variant.control is None:
+        return
+    if variant.control == "modulating":
+        seed = CONTROL_MODULATING
+    elif variant.control == "on_off":
+        seed = CONTROL_ON_OFF
+    else:
+        seed = CONTROL_FLOATING
+    display = normalize_control_attribute_value(
+        seed,
+        sku_code=sku_code,
+        category_slug=category_slug,
+    )
+    if not display:
+        return
+    by_key["control"] = {
+        "key": "control",
+        "name": FACET_BY_KEY["control"].label,
+        "value": display,
+        "unit": "",
+    }
+
+
+def _ensure_aux_switch_highlight(
+    by_key: dict[str, dict[str, str]],
+    *,
+    sku_code: str | None,
+) -> None:
+    """Require aux row (Нет / SPDT-1 / SPDT-2) when edition suffix is known."""
+    if "aux_switch" in by_key:
+        return
+    count = aux_spdt_count_from_sku(sku_code or "")
+    if count is None:
+        return
+    if count <= 0:
+        value = AUX_SWITCH_NONE
+    elif count == 1:
+        value = AUX_SWITCH_SPDT_1
+    else:
+        value = AUX_SWITCH_SPDT_2
+    by_key["aux_switch"] = {
+        "key": "aux_switch",
+        "name": FACET_BY_KEY["aux_switch"].label,
+        "value": value,
+        "unit": "",
+    }
 
 
 def _ensure_modulating_signal_highlights(

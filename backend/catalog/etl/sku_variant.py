@@ -75,8 +75,12 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     control: str | None = None
     aux: bool | None = None
     # Suffixes are hyphen-prefixed edition tags strictly at the code end.
+    # ``-dst`` before ``-ds`` (thermal ON/OFF with aux).
     if code.endswith("-as"):
         control = "modulating"
+        aux = True
+    elif code.endswith("-dst"):
+        control = "on_off"
         aux = True
     elif code.endswith("-ds"):
         control = "on_off"

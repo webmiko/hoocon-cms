@@ -384,7 +384,11 @@ def test_primary_belimo_prefers_thermal_code_for_dst_sku() -> None:
 
 @pytest.mark.django_db
 def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
-    """Thermal SKU must not persist a non-thermal Belimo code as primary."""
+    """Thermal SKU must not persist a non-thermal Belimo code as primary.
+
+    ``-dst`` editions have aux switches, so BASE / BASE-S pairs keep only ``-S``;
+    without a thermal Belimo article (``-T`` / ``FST``) primary stays empty.
+    """
     cat = Category.objects.create(name="Fire", slug="fire-thermal-none")
     product = Product.objects.create(name="SA", slug="sa-thermal-none", category=cat)
     sku = SKU.objects.create(
@@ -395,5 +399,5 @@ def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
         is_published=True,
         analogs_text="– Belimo BF24-S\n– Belimo BF24\n",
     )
-    assert belimo_codes_for_sku(sku) == ["BF24-S", "BF24"]
+    assert belimo_codes_for_sku(sku) == ["BF24-S"]
     assert primary_belimo_code_for_sku(sku) is None

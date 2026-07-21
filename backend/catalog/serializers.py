@@ -296,8 +296,8 @@ class SKUListSerializer(serializers.ModelSerializer):
         filtered = [av for av in deduped if (av.attribute.name, str(av.value).strip()) in allowed]
         return highlights_for_sku(
             filtered,
-            # Room for Y/U after «Управление» on modulating editions.
-            limit=7,
+            # Room for Y/U + aux after «Управление» on modulating editions.
+            limit=8,
             description=obj.description or "",
             sku_code=obj.sku_code,
             category_slug=sku_category_slug_or_empty(obj),

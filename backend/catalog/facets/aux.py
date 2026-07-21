@@ -116,10 +116,11 @@ def format_aux_switch_display(
     description: str = "",
     sku_code: str | None = None,
 ) -> str | None:
-    """Format auxiliary-switch value for hero / cards.
+    """Format auxiliary-switch for full ТТХ table (not catalog cards).
 
-    - Absent / «Нет» → ``None`` (do not show on cards).
+    - Absent / «Нет» → ``None`` (omit the row in PDP attributes).
     - Present → ``SPDT-1`` or ``SPDT-2``.
+    Cards / hero use ``normalize_aux_switch_value`` and always show «Нет».
 
     Args:
         value: Raw AttributeValue (Да / Нет / already ``SPDT-2``).

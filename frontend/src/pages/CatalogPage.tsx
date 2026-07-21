@@ -12,6 +12,7 @@ import {
 } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { facetLabelShort, facetValueShort } from "../utils/facetDisplay";
+import { cardHighlights } from "../utils/cardHighlights";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseDescription } from "../utils/parseDescription";
 import {
@@ -518,7 +519,7 @@ export function CatalogPage() {
                     <h3 className={styles.cardTitle}>{softBreak(sku.name)}</h3>
                     {sku.highlights && sku.highlights.length > 0 ? (
                       <ul className={styles.cardSpecs}>
-                        {sku.highlights.slice(0, 6).map((h) => {
+                        {cardHighlights(sku.highlights).map((h) => {
                           const unit = specDisplayUnit(h.value, h.unit);
                           return (
                             <li key={h.key}>
