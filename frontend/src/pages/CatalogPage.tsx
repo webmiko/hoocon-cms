@@ -23,6 +23,7 @@ import { InstructionText } from "../components/InstructionText";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
+import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import styles from "./CatalogPage.module.css";
 
 /** Facet query keys synced to the URL (backend catalog.facets). */
@@ -473,7 +474,10 @@ export function CatalogPage() {
                     aria-label={sku.name}
                   />
                   {sku.image?.image ? (
-                    <div className={styles.cardMedia}>
+                    <div
+                      className={styles.cardMedia}
+                      data-purpose={mediaPurposeFromCategory(sku.category_slug)}
+                    >
                       <CompareToggle
                         className={`${styles.cardCompare} ${styles.cardInteractive}`}
                         item={{
@@ -492,7 +496,10 @@ export function CatalogPage() {
                       />
                     </div>
                   ) : (
-                    <div className={styles.cardMediaPlaceholder}>
+                    <div
+                      className={styles.cardMediaPlaceholder}
+                      data-purpose={mediaPurposeFromCategory(sku.category_slug)}
+                    >
                       <CompareToggle
                         className={`${styles.cardCompare} ${styles.cardInteractive}`}
                         item={{

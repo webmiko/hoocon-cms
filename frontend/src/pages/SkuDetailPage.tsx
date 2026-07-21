@@ -20,6 +20,9 @@ import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
+import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import { sizeDiagramSrcForTheme } from "../utils/sizeDiagramTheme";
+import { useTheme } from "../theme/ThemeContext";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import styles from "./SkuDetailPage.module.css";
@@ -100,6 +103,7 @@ function categoryCopyFitsSku(
  */
 export function SkuDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { resolved: theme } = useTheme();
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug!),
     [slug],
@@ -112,13 +116,22 @@ export function SkuDetailPage() {
     [sku],
   );
 
+  const mediaPurpose = useMemo(
+    () => mediaPurposeFromCategory(sku?.category_slug),
+    [sku?.category_slug],
+  );
+
   const galleryImages: LightboxImage[] = useMemo(() => {
     if (!sku) return [];
+    const mapImg = (img: SkuImage): LightboxImage => {
+      const alt = img.alt || sku.name;
+      return {
+        src: sizeDiagramSrcForTheme(img.image, theme),
+        alt,
+      };
+    };
     if ("images" in sku && Array.isArray(sku.images) && sku.images.length > 0) {
-      return (sku.images as SkuImage[]).map((img) => ({
-        src: img.image,
-        alt: img.alt || sku.name,
-      }));
+      return (sku.images as SkuImage[]).map(mapImg);
     }
     if (
       "image" in sku &&
@@ -127,11 +140,10 @@ export function SkuDetailPage() {
       "image" in sku.image &&
       typeof (sku.image as SkuImage).image === "string"
     ) {
-      const img = sku.image as SkuImage;
-      return [{ src: img.image, alt: img.alt || sku.name }];
+      return [mapImg(sku.image as SkuImage)];
     }
     return [];
-  }, [sku]);
+  }, [sku, theme]);
 
   if (loading) {
     return <p className={styles.status}>Загрузка…</p>;
@@ -232,7 +244,7 @@ export function SkuDetailPage() {
       />
 
       <div className={styles.hero}>
-        <div className={styles.heroMedia}>
+        <div className={styles.heroMedia} data-purpose={mediaPurpose}>
           {galleryImages.length > 0 ? (
             <button
               type="button"
@@ -320,7 +332,11 @@ export function SkuDetailPage() {
           {galleryImages.slice(1).map((item, offset) => {
             const fullIndex = offset + 1;
             return (
-              <figure key={`${item.src}-${fullIndex}`} className={styles.galleryItem}>
+              <figure
+                key={`${item.src}-${fullIndex}`}
+                className={styles.galleryItem}
+                data-purpose={mediaPurpose}
+              >
                 <button
                   type="button"
                   className={styles.galleryZoomTrigger}
