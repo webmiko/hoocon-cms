@@ -85,12 +85,11 @@ def test_normalize_slug_strips_leading_slash() -> None:
 
 def test_normalize_slug_remaps_bezpruzhini_typo() -> None:
     """Missing hyphen in bezpruzhini is corrected to bez-pruzhini."""
-    from catalog.etl.normalize import normalize_slug
+    from catalog.etl.normalize import PRODUCT_SLUG_REMAP, normalize_slug
 
-    assert (
-        normalize_slug("/privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm")
-        == "privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"
-    )
+    key = "privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm"
+    assert isinstance(PRODUCT_SLUG_REMAP[key], str)
+    assert normalize_slug(f"/{key}") == "privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"
 
 
 def test_normalize_slug_rejects_empty() -> None:

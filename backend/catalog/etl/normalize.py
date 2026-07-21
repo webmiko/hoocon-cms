@@ -32,7 +32,7 @@ _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 # Spec: docs/seo-url-migration.md §2.1.1; seed docs/redirects-slug-typo-seed.csv.
 PRODUCT_SLUG_REMAP: dict[str, str] = {
     "privod-protivipozharniy-3nm": "privod-protivopozharniy-3nm",
-    "privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm": ("privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"),
+    "privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm": "privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm",
 }
 
 
