@@ -11,6 +11,7 @@ slug/sku_code (SEO-stable). Tilda ids could be added later for reconciliation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from django.db import transaction
 
@@ -50,22 +51,24 @@ def _slugify_attr(title: str) -> str:
 @transaction.atomic
 def load_categories(
     categories: list[NormalizedCategory],
-) -> tuple[LoadStats, dict[int, Category]]:
+) -> tuple[LoadStats, dict[int, Category], list[dict[str, Any]]]:
     """Create/update Category rows from normalized data.
 
-    Two-pass: first create top-level (parent=None), then subcategories so
-    the parent FK can be resolved by slug.
+    Two-phase: top-level (parent=None), then subcategories resolved by
+    ``parent_id`` → tilda map. Nested parents are applied in rounds until
+    the map stops growing. A subcategory whose parent is never found is
+    **not** written as a top-level orphan — it goes to quarantine.
 
     Args:
         categories: normalized category records.
 
     Returns:
-        (LoadStats, map from tilda_id to Category) — the map is consumed by
-        load_product to resolve a Product's category without storing tilda_id
-        on the Category model.
+        ``(LoadStats, tilda_id→Category, quarantined_rows)``. Quarantined
+        rows are dicts ``{reason, payload}`` for CSV logging.
     """
     stats = LoadStats()
     by_tilda_id: dict[int, Category] = {}
+    quarantined: list[dict[str, Any]] = []
 
     # Pass 1: top-level categories.
     for nc in categories:
@@ -78,31 +81,40 @@ def load_categories(
         by_tilda_id[nc.tilda_id] = cat
         stats.created += int(created)
 
-    # Pass 2: subcategories — resolve parent by tilda_id.
-    for nc in categories:
-        if nc.parent_id is None:
-            continue
-        parent = by_tilda_id.get(nc.parent_id)
-        cat, created = Category.objects.update_or_create(
-            slug=nc.slug,
-            defaults={"name": nc.name, "parent": parent},
+    # Pass 2+: subcategories — only when parent is already in the map.
+    pending = [nc for nc in categories if nc.parent_id is not None]
+    progress = True
+    while pending and progress:
+        progress = False
+        still_pending: list[NormalizedCategory] = []
+        for nc in pending:
+            parent = by_tilda_id.get(nc.parent_id) if nc.parent_id is not None else None
+            if parent is None:
+                still_pending.append(nc)
+                continue
+            cat, created = Category.objects.update_or_create(
+                slug=nc.slug,
+                defaults={"name": nc.name, "parent": parent},
+            )
+            by_tilda_id[nc.tilda_id] = cat
+            stats.created += int(created)
+            progress = True
+        pending = still_pending
+
+    for nc in pending:
+        quarantined.append(
+            {
+                "reason": f"parent not found: tilda_id={nc.parent_id}",
+                "payload": {
+                    "id": nc.tilda_id,
+                    "name": nc.name,
+                    "slug": nc.slug,
+                    "parent_id": nc.parent_id,
+                },
+            },
         )
-        by_tilda_id[nc.tilda_id] = cat
-        stats.created += int(created)
 
-    # Re-link subcategories whose parent arrived in pass 1 after them.
-    for nc in categories:
-        if nc.parent_id is None:
-            continue
-        child = by_tilda_id.get(nc.tilda_id)
-        if child is None or child.parent is not None:
-            continue
-        parent = by_tilda_id.get(nc.parent_id)
-        if parent is not None and parent.pk != child.pk:
-            child.parent = parent
-            child.save(update_fields=["parent"])
-
-    return stats, by_tilda_id
+    return stats, by_tilda_id, quarantined
 
 
 @transaction.atomic

@@ -169,7 +169,8 @@ class Command(BaseCommand):
             except QuarantineError as exc:
                 quarantined.append({"reason": exc.reason, "payload": exc.payload})
 
-        cat_stats, cat_map = load_categories(cat_norm)
+        cat_stats, cat_map, cat_q = load_categories(cat_norm)
+        quarantined.extend(cat_q)
 
         prod_stats = LoadStats()
         loaded_slugs: list[str] = []

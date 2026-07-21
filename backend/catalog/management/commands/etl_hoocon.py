@@ -75,7 +75,8 @@ class Command(BaseCommand):
                     {"reason": exc.reason, "payload": {"id": cid, "name": name, **exc.payload}},
                 )
 
-        cat_stats, cat_map = load_categories(cat_norm)
+        cat_stats, cat_map, cat_q = load_categories(cat_norm)
+        quarantined.extend(cat_q)
 
         # ── Products ─────────────────────────────────────────────────
         prod_stats = LoadStats()

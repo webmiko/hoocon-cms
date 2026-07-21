@@ -28,7 +28,7 @@ def test_load_categories_creates_rows() -> None:
 
     raw = _load_raw()
     norm = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
-    stats, _cat_map = load_categories(norm)
+    stats, _cat_map, _q = load_categories(norm)
     assert stats.created >= 5
     assert Category.objects.count() == 5
     # Top-level category present.
@@ -54,6 +54,70 @@ def test_load_categories_links_parent() -> None:
 
 
 @pytest.mark.django_db
+def test_load_categories_quarantines_missing_parent() -> None:
+    """Subcategory with unknown parent_id is not created as a top-level orphan."""
+    from catalog.etl.load import load_categories
+    from catalog.etl.normalize import NormalizedCategory
+    from catalog.models import Category
+
+    cats = [
+        NormalizedCategory(
+            tilda_id=1,
+            name="Корень",
+            slug="koren",
+            parent_id=None,
+        ),
+        NormalizedCategory(
+            tilda_id=2,
+            name="Сирота",
+            slug="sirota-podkategoriya",
+            parent_id=999_999_999,
+        ),
+    ]
+    stats, cat_map, quarantined = load_categories(cats)
+    assert stats.created == 1
+    assert 1 in cat_map
+    assert 2 not in cat_map
+    assert Category.objects.filter(slug="sirota-podkategoriya").count() == 0
+    assert Category.objects.filter(parent__isnull=True).count() == 1
+    assert len(quarantined) == 1
+    assert "parent not found" in quarantined[0]["reason"]
+    assert quarantined[0]["payload"]["parent_id"] == 999_999_999
+
+
+@pytest.mark.django_db
+def test_load_categories_resolves_nested_parent_order() -> None:
+    """Child listed before its non-root parent still gets the correct FK."""
+    from catalog.etl.load import load_categories
+    from catalog.etl.normalize import NormalizedCategory
+    from catalog.models import Category
+
+    cats = [
+        NormalizedCategory(tilda_id=1, name="Корень", slug="root-cat", parent_id=None),
+        NormalizedCategory(
+            tilda_id=3,
+            name="Внук",
+            slug="vnuk-cat",
+            parent_id=2,
+        ),
+        NormalizedCategory(
+            tilda_id=2,
+            name="Сын",
+            slug="syn-cat",
+            parent_id=1,
+        ),
+    ]
+    _stats, cat_map, quarantined = load_categories(cats)
+    assert quarantined == []
+    assert set(cat_map) == {1, 2, 3}
+    vnuk = Category.objects.get(slug="vnuk-cat")
+    assert vnuk.parent is not None
+    assert vnuk.parent.slug == "syn-cat"
+    assert vnuk.parent.parent is not None
+    assert vnuk.parent.parent.slug == "root-cat"
+
+
+@pytest.mark.django_db
 def test_load_categories_is_idempotent() -> None:
     """Running load_categories twice does not duplicate rows."""
     from catalog.etl.extract import extract_categories
@@ -64,7 +128,7 @@ def test_load_categories_is_idempotent() -> None:
     raw = _load_raw()
     norm = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
     load_categories(norm)
-    stats, _ = load_categories(norm)
+    stats, _, _q = load_categories(norm)
     assert stats.created == 0
     assert Category.objects.count() == 5
 
@@ -79,7 +143,7 @@ def test_load_product_creates_product_and_skus() -> None:
 
     raw = _load_raw()
     cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
-    _stats, cat_map = load_categories(cats)
+    _stats, cat_map, _q = load_categories(cats)
 
     np = normalize_product(raw["products"][0])
     stats = load_product(np, category_map=cat_map)
@@ -107,7 +171,7 @@ def test_load_product_is_idempotent() -> None:
 
     raw = _load_raw()
     cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
-    _stats, cat_map = load_categories(cats)
+    _stats, cat_map, _q = load_categories(cats)
 
     np = normalize_product(raw["products"][0])
     load_product(np, category_map=cat_map)
@@ -128,7 +192,7 @@ def test_load_product_creates_attributes_in_dictionary() -> None:
 
     raw = _load_raw()
     cats = [normalize_category(cid=cid, name=name, parent_id=parent) for cid, name, parent in extract_categories(raw)]
-    _stats, cat_map = load_categories(cats)
+    _stats, cat_map, _q = load_categories(cats)
 
     np = normalize_product(raw["products"][0])
     load_product(np, category_map=cat_map)
