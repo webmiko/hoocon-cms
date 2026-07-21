@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.http import HttpRequest
 from django.templatetags.static import static
 
@@ -22,6 +24,22 @@ def badge_new_leads(request: HttpRequest) -> int | str:
 
     count = count_new_leads()
     return count if count > 0 else ""
+
+
+def dashboard_callback(request: HttpRequest, context: dict[str, Any]) -> dict[str, Any]:
+    """Inject Hoocon dashboard data into Unfold Admin index.
+
+    Args:
+        request: admin index request.
+        context: Unfold/Django Admin template context.
+
+    Returns:
+        Context with ``hoocon_dashboard`` when staff is authenticated.
+    """
+    from config.dashboard import build_admin_dashboard
+
+    context.update(build_admin_dashboard(request))
+    return context
 
 
 def perm_view_lead(request: HttpRequest) -> bool:

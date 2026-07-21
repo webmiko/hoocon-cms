@@ -72,3 +72,29 @@ def test_locale_middleware_is_enabled() -> None:
     from django.conf import settings
 
     assert "django.middleware.locale.LocaleMiddleware" in settings.MIDDLEWARE
+
+
+@pytest.mark.django_db
+def test_sku_changelist_has_open_button() -> None:
+    """SKU list shows «Открыть» so cards need no ID click."""
+    from catalog.models import SKU, Category, Product
+
+    admin_user = User.objects.create_superuser(
+        username="admin-open",
+        email="admin-open@example.com",
+        password="password12",
+    )
+    cat = Category.objects.create(name="Cat", slug="cat-open")
+    product = Product.objects.create(name="Prod", slug="prod-open", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SKU Open",
+        slug="sku-open-test",
+        sku_code="OPEN-1",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/catalog/sku/").content.decode()
+    assert "Открыть" in html
+    assert f"/admin/catalog/sku/{sku.pk}/change/" in html
+    assert "Артикулы" in client.get("/admin/").content.decode()

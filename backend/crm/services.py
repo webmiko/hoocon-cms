@@ -32,10 +32,81 @@ def normalize_client_email(raw: str) -> str:
     return (raw or "").strip().lower()
 
 
-def get_or_create_client_from_lead(lead: Lead) -> Client:
-    """Find Client by email or create from Lead contact fields.
+def normalize_client_name(raw: str) -> str:
+    """Normalize contact name for comparison (strip + collapse spaces)."""
+    return " ".join((raw or "").split())
 
-    Uses unique email + IntegrityError retry to avoid race duplicates.
+
+def normalize_client_company(raw: str) -> str:
+    """Normalize company for comparison (strip + collapse spaces)."""
+    return " ".join((raw or "").split())
+
+
+def contact_matches_client(
+    client: Client,
+    *,
+    email: str,
+    name: str,
+    company: str,
+) -> bool:
+    """True when email (ID) matches and name/company are the same profile.
+
+    Empty company on either side still matches on email + name when the
+    other side is empty (first lead without company).
+
+    Args:
+        client: existing CRM card.
+        email: normalized lead email.
+        name: normalized lead name.
+        company: normalized lead company.
+
+    Returns:
+        Whether this lead belongs to the same client card.
+    """
+    if normalize_client_email(client.email) != email:
+        return False
+    client_name = normalize_client_name(client.name)
+    if client_name and name and client_name.casefold() != name.casefold():
+        return False
+    client_company = normalize_client_company(client.company)
+    if client_company and company and client_company.casefold() != company.casefold():
+        return False
+    return True
+
+
+def find_client_for_lead(lead: Lead) -> Client | None:
+    """Find existing Client by email (ID); prefer name/company match.
+
+    Email is the unique card key: several leads with the same email always
+    map to one Client. When several cards somehow share an email prefix
+    search, prefer the row whose name and company also match.
+
+    Args:
+        lead: Lead with contact fields.
+
+    Returns:
+        Matching Client or None.
+    """
+    email = normalize_client_email(lead.email)
+    if not email:
+        return None
+    candidates = list(Client.objects.filter(email=email))
+    if not candidates:
+        return None
+    name = normalize_client_name(lead.name)
+    company = normalize_client_company(lead.company)
+    for client in candidates:
+        if contact_matches_client(client, email=email, name=name, company=company):
+            return client
+    # Same email ID → always the same card (unique constraint).
+    return candidates[0]
+
+
+def get_or_create_client_from_lead(lead: Lead) -> Client:
+    """Find Client by email (ID) or create from Lead contact fields.
+
+    Multiple requests with the same email attach to one client card.
+    Name/company are used for profile match and to fill empty fields.
 
     Args:
         lead: saved Lead instance.
@@ -44,10 +115,14 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         Client linked (or to be linked) to this lead.
     """
     email = normalize_client_email(lead.email)
+    existing = find_client_for_lead(lead)
+    if existing is not None:
+        return _merge_lead_contact_into_client(existing, lead)
+
     defaults = {
-        "name": lead.name.strip() or email,
+        "name": normalize_client_name(lead.name) or email,
         "phone": lead.phone or "",
-        "company": lead.company or "",
+        "company": normalize_client_company(lead.company),
     }
     try:
         with transaction.atomic():
@@ -59,27 +134,41 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         client = Client.objects.get(email=email)
         created = False
 
-    if created:
-        return client
+    if not created:
+        return _merge_lead_contact_into_client(client, lead)
+    return client
 
-    # Refresh sparse fields from newer lead if empty on client.
+
+def _merge_lead_contact_into_client(client: Client, lead: Lead) -> Client:
+    """Attach lead contact data to an existing card without duplicating it.
+
+    Fills empty phone/company/name; does not overwrite filled fields when
+    the lead brings a different name/company (same email = same client).
+    """
     updated = False
     if not client.phone and lead.phone:
         client.phone = lead.phone
         updated = True
-    if not client.company and lead.company:
-        client.company = lead.company
+    lead_company = normalize_client_company(lead.company)
+    if not client.company and lead_company:
+        client.company = lead_company
         updated = True
-    if lead.name and client.name == client.email and lead.name.strip():
-        client.name = lead.name.strip()
-        updated = True
+    lead_name = normalize_client_name(lead.name)
+    if lead_name and (
+        not client.name
+        or client.name == client.email
+        or normalize_client_name(client.name).casefold() == lead_name.casefold()
+    ):
+        if client.name != lead_name:
+            client.name = lead_name
+            updated = True
     if updated:
         client.save()
     return client
 
 
 def link_lead_to_client(lead: Lead) -> Client:
-    """Ensure Lead.client is set; create Client if needed.
+    """Ensure Lead.client is set; reuse Client card for the same email ID.
 
     Args:
         lead: Lead to attach.

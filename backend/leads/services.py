@@ -20,6 +20,7 @@ from django.db.models import (
     ExpressionWrapper,
     F,
     Q,
+    QuerySet,
 )
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -65,6 +66,37 @@ def count_new_leads() -> int:
         status=Lead.LeadStatus.NEW,
         seen_at__isnull=True,
     ).count()
+
+
+def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lead]:
+    """Limit leads for a working manager in Admin.
+
+    Superuser sees all. A regular staff manager sees:
+    - new leads (pool);
+    - leads assigned to them (``assignee``);
+    - leads they finished (``processed_by``);
+    - leads on CRM clients they own (``client.assignee``);
+    - leads where they authored a CRM activity (mentioned in the card).
+
+    Args:
+        queryset: base Lead queryset (may already be annotated).
+        user: authenticated staff user.
+
+    Returns:
+        Filtered queryset (``.distinct()`` when joins are needed).
+    """
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+
+    return queryset.filter(
+        Q(status=Lead.LeadStatus.NEW)
+        | Q(assignee_id=user.pk)
+        | Q(processed_by_id=user.pk)
+        | Q(client__assignee_id=user.pk)
+        | Q(crm_activities__author_id=user.pk),
+    ).distinct()
 
 
 def mark_lead_seen(lead_id: int) -> bool:

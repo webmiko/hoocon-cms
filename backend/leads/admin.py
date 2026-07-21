@@ -7,6 +7,9 @@ context only (PII never exposed in public API — Slice 19).
 Also exposes ``/admin/leads/lead/new-count/`` for the header sticker poll
 and ``/admin/leads/lead/stats/`` for processing statistics.
 Opening a lead marks it seen (sticker drops); status «Новая» stays until edited.
+
+Change form opens in **view mode** by default; editing requires ``?edit=1``
+or the «Редактировать» button.
 """
 
 from __future__ import annotations
@@ -15,13 +18,14 @@ from datetime import timedelta
 
 from django.contrib import admin, messages
 from django.db.models import Case, IntegerField, QuerySet, When
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 
+from config.admin_mixins import OpenChangeLinkMixin
 from leads.models import Lead
 from leads.services import (
     apply_lead_manager_on_save,
@@ -29,43 +33,50 @@ from leads.services import (
     count_new_leads,
     log_manager_activity,
     mark_lead_seen,
+    scope_leads_for_manager,
     take_lead_in_work,
 )
 
+_LEAD_EDIT_QUERY = "edit"
+
 
 @admin.register(Lead)
-class LeadAdmin(ModelAdmin):
+class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Admin for customer inquiries (RFQ / consultation / replacement).
 
     PII (email/phone) is visible to staff in Admin — that's the only
     place where full contact data is exposed. Public API (Slice 19)
     never returns email/phone in the response.
+
+    Existing leads open read-only; enable changes via «Редактировать».
     """
 
     list_display = (
         "status_badge",
+        "email_id",
         "name",
-        "lead_type",
         "company",
+        "lead_type",
         "assignee",
         "processed_by",
         "created_at",
-        "open_lead",
     )
-    list_display_links = ("name",)
+    list_display_links = ("email_id", "name")
     list_filter = (
         "lead_type",
         "status",
         "assignee",
         "processed_by",
+        "company",
         ("seen_at", admin.EmptyFieldListFilter),
         "created_at",
     )
-    search_fields = ("name", "company", "email", "message", "analog_belimo_code")
+    search_fields = ("email", "name", "company", "message", "analog_belimo_code", "phone")
     autocomplete_fields = ("sku", "client", "assignee", "processed_by")
     readonly_fields = ("created_at", "updated_at", "seen_at", "processed_at")
     ordering = ()
     actions = ("action_take_in_work", "action_mark_done")
+    change_form_template = "admin/leads/lead/change_form.html"
     fieldsets = (
         (
             "Тип заявки",
@@ -85,7 +96,10 @@ class LeadAdmin(ModelAdmin):
         (
             "Контакт",
             {
-                "fields": ("name", "email", "phone", "company", "client"),
+                "fields": ("email", "name", "phone", "company", "client"),
+                "description": (
+                    "Email = ID клиента в CRM. Несколько заявок с одним email попадают в одну карточку клиента."
+                ),
             },
         ),
         (
@@ -103,6 +117,11 @@ class LeadAdmin(ModelAdmin):
         ),
     )
 
+    @admin.display(description="ID", ordering="email")
+    def email_id(self, obj: Lead) -> str:
+        """Lead contact ID (= CRM client email)."""
+        return obj.email
+
     @admin.display(description="Статус", ordering="status")
     def status_badge(self, obj: Lead) -> str:
         """Colored status tag; «Новая» stands out on cards and table rows.
@@ -119,24 +138,99 @@ class LeadAdmin(ModelAdmin):
             obj.get_status_display(),
         )
 
-    @admin.display(description="")
-    def open_lead(self, obj: Lead) -> str:
-        """Primary open button (easier than clicking the id column).
+    def is_lead_edit_mode(self, request: HttpRequest, obj: Lead | None) -> bool:
+        """Whether the change form allows editing (new or ``?edit=1``)."""
+        if obj is None:
+            return True
+        if request.POST.get("_lead_edit") == "1":
+            return True
+        return request.GET.get(_LEAD_EDIT_QUERY) == "1"
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: Lead | None = None,
+    ) -> tuple[str, ...]:
+        """All fields read-only in view mode; timestamps always locked."""
+        if obj is not None and not self.is_lead_edit_mode(request, obj):
+            names = [f.name for f in self.model._meta.fields]
+            return tuple(names)
+        return tuple(self.readonly_fields)
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict | None = None,
+    ) -> HttpResponse:
+        """Mark seen on open; view mode unless ``?edit=1``.
 
         Args:
-            obj: Lead row.
+            request: admin request.
+            object_id: lead pk when editing.
+            form_url: unused passthrough.
+            extra_context: template context extras.
 
         Returns:
-            Safe HTML link styled as a button.
+            Changeform response from ModelAdmin.
         """
-        url = reverse("admin:leads_lead_change", args=[obj.pk])
-        return format_html(
-            '<a class="hoocon-admin-lead-open" href="{}">Открыть</a>',
-            url,
-        )
+        extra = dict(extra_context or {})
+        obj: Lead | None = None
+        if object_id:
+            obj = self.get_object(request, object_id)
+            if obj is not None and request.method == "GET":
+                try:
+                    mark_lead_seen(int(object_id))
+                except (TypeError, ValueError):
+                    pass
+            edit_mode = self.is_lead_edit_mode(request, obj)
+            extra["lead_view_mode"] = not edit_mode
+            if obj is not None:
+                change_url = reverse("admin:leads_lead_change", args=[obj.pk])
+                if edit_mode:
+                    extra["lead_view_url"] = change_url
+                    # Keep edit=1 on the form action URL for POST.
+                    if not form_url:
+                        form_url = f"?{_LEAD_EDIT_QUERY}=1"
+                else:
+                    extra["lead_edit_url"] = f"{change_url}?{_LEAD_EDIT_QUERY}=1"
+        else:
+            extra["lead_view_mode"] = False
+
+        # Reject POST without edit flag (view mode must not mutate).
+        if (
+            object_id
+            and request.method == "POST"
+            and request.GET.get(_LEAD_EDIT_QUERY) != "1"
+            and request.POST.get("_lead_edit") != "1"
+        ):
+            return HttpResponseRedirect(
+                reverse("admin:leads_lead_change", args=[object_id]),
+            )
+
+        return super().changeform_view(request, object_id, form_url, extra_context=extra)
+
+    def response_change(
+        self,
+        request: HttpRequest,
+        obj: Lead,
+    ) -> HttpResponse:
+        """After save, return to view mode (drop ``?edit=1``)."""
+        response = super().response_change(request, obj)
+        if isinstance(response, HttpResponseRedirect):
+            view_url = reverse("admin:leads_lead_change", args=[obj.pk])
+            if "_continue" in request.POST:
+                return HttpResponseRedirect(f"{view_url}?{_LEAD_EDIT_QUERY}=1")
+            if "_addanother" not in request.POST:
+                return HttpResponseRedirect(view_url)
+        return response
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Lead]:
-        """Annotate status rank so new leads sort first.
+        """Annotate status rank; scope rows for non-superuser managers.
+
+        Manager sees: new leads, own (assignee / processed_by), client they
+        own, and leads where they appear in CRM activity. Superuser sees all.
 
         Does not call ModelAdmin.get_queryset order_by before annotate —
         ``_status_rank`` is not a model field.
@@ -159,6 +253,7 @@ class LeadAdmin(ModelAdmin):
                 ),
             )
         )
+        qs = scope_leads_for_manager(qs, request.user)
         return qs.order_by("_status_rank", "-created_at", "-pk")
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
@@ -269,31 +364,6 @@ class LeadAdmin(ModelAdmin):
         extra = dict(extra_context or {})
         extra["hoocon_leads_stats_url"] = reverse("admin:leads_lead_stats")
         return super().changelist_view(request, extra_context=extra)
-
-    def changeform_view(
-        self,
-        request: HttpRequest,
-        object_id: str | None = None,
-        form_url: str = "",
-        extra_context: dict | None = None,
-    ) -> HttpResponse:
-        """Mark lead seen on open so the header sticker drops.
-
-        Args:
-            request: admin request.
-            object_id: lead pk when editing.
-            form_url: unused passthrough.
-            extra_context: unused passthrough.
-
-        Returns:
-            Changeform response from ModelAdmin.
-        """
-        if object_id and request.method == "GET":
-            try:
-                mark_lead_seen(int(object_id))
-            except (TypeError, ValueError):
-                pass
-        return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_urls(self) -> list:
         """Add sticker poll + processing stats endpoints.

@@ -8,14 +8,16 @@ from django.contrib import admin
 from django.http import HttpRequest
 from unfold.admin import ModelAdmin
 
+from config.admin_mixins import OpenChangeLinkMixin
 from content.models import Article, News, Page
 from social.admin import SocialAnnounceAdminMixin, maybe_auto_announce
 
 
-class _ContentBaseAdmin(ModelAdmin):
+class _ContentBaseAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Shared admin config for Page / Article / News (DRY)."""
 
     list_display = ("title", "slug", "is_published", "published_at", "updated_at")
+    list_display_links = ("title",)
     list_filter = ("is_published",)
     search_fields = ("title", "slug", "body")
     prepopulated_fields = {"slug": ("title",)}

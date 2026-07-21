@@ -60,6 +60,59 @@ def test_second_lead_same_email_reuses_client() -> None:
     assert Client.objects.filter(email__iexact="shared@example.com").count() == 1
     assert lead2.client is not None
     assert lead2.client.company == "NewCo"
+    assert lead2.client.leads.count() == 2
+
+
+@pytest.mark.django_db
+def test_matching_email_name_company_stays_one_client() -> None:
+    """Same ID + name + company → one card; both leads listed on it."""
+    Lead.objects.create(
+        name="Иван",
+        email="same.id@example.com",
+        company="ООО Ромашка",
+        message="Первая",
+    )
+    lead2 = Lead.objects.create(
+        name="Иван",
+        email="same.id@example.com",
+        company="ООО Ромашка",
+        message="Вторая",
+    )
+    lead2.refresh_from_db()
+    assert Client.objects.filter(email="same.id@example.com").count() == 1
+    client = lead2.client
+    assert client is not None
+    assert set(client.leads.values_list("message", flat=True)) == {"Первая", "Вторая"}
+
+
+@pytest.mark.django_db
+def test_client_change_form_lists_leads_inline(client, django_user_model) -> None:
+    """Client card shows attached leads (not a second client)."""
+    user = django_user_model.objects.create_user(
+        username="crm-inline",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    Lead.objects.create(
+        name="Иван",
+        email="card@example.com",
+        company="ООО",
+        message="Заявка А",
+    )
+    Lead.objects.create(
+        name="Иван",
+        email="card@example.com",
+        company="ООО",
+        message="Заявка Б",
+    )
+    crm_client = Client.objects.get(email="card@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_change", args=[crm_client.pk])
+    html = client.get(url).content.decode()
+    assert "Заявка А" in html
+    assert "Заявка Б" in html
+    assert "заявки клиента" in html.lower() or "Заявки" in html
 
 
 @pytest.mark.django_db
@@ -171,17 +224,44 @@ def test_send_crm_email_task_marks_failed_on_smtp_error(settings) -> None:
 
 @pytest.mark.django_db
 def test_staff_can_open_client_changelist(client, django_user_model) -> None:
-    """Staff gets 200 on CRM Client changelist."""
+    """Staff gets 200 on CRM Client changelist; ID column is email."""
     user = django_user_model.objects.create_user(
         username="crm-editor",
         password="test-pass-not-secret",
         is_staff=True,
         is_superuser=True,
     )
+    Client.objects.create(name="Иван", email="ivan.group@example.com")
+    Client.objects.create(name="Пётр", email="peter.group@example.com")
     client.force_login(user)
     url = reverse("admin:crm_client_changelist")
     response = client.get(url)
     assert response.status_code == 200
+    html = response.content.decode()
+    assert "ivan.group@example.com" in html
+    assert "peter.group@example.com" in html
+    # Sorted by email → ivan before peter.
+    assert html.index("ivan.group@example.com") < html.index("peter.group@example.com")
+
+
+@pytest.mark.django_db
+def test_activity_changelist_groups_by_client_email(client, django_user_model) -> None:
+    """Activity list shows email as ID and orders same emails together."""
+    user = django_user_model.objects.create_user(
+        username="crm-act",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    a = Client.objects.create(name="A", email="a@example.com")
+    b = Client.objects.create(name="B", email="b@example.com")
+    Activity.objects.create(client=b, subject="B late", author=user)
+    Activity.objects.create(client=a, subject="A first", author=user)
+    Activity.objects.create(client=a, subject="A second", author=user)
+    client.force_login(user)
+    html = client.get(reverse("admin:crm_activity_changelist")).content.decode()
+    assert html.count("a@example.com") >= 2
+    assert html.index("a@example.com") < html.index("b@example.com")
 
 
 @pytest.mark.django_db(transaction=True)

@@ -134,8 +134,143 @@ def test_build_lead_processing_stats_by_manager() -> None:
 
 
 @pytest.mark.django_db
+def test_scope_leads_for_manager_sees_new_own_and_mentioned() -> None:
+    """Manager list: new + assignee/processed + client + activity mention."""
+    from crm.models import Activity, ActivityType
+    from crm.models import Client as CrmClient
+    from leads.services import scope_leads_for_manager
+
+    mgr = User.objects.create_user(
+        username="scope-mgr",
+        email="scope-mgr@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    other = User.objects.create_user(
+        username="scope-other",
+        email="scope-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    new_lead = Lead.objects.create(
+        name="New",
+        email="new@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.NEW,
+    )
+    mine = Lead.objects.create(
+        name="Mine",
+        email="mine@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=mgr,
+    )
+    finished = Lead.objects.create(
+        name="Done by me",
+        email="done@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.DONE,
+        processed_by=mgr,
+    )
+    crm = CrmClient.objects.create(
+        name="Card",
+        email="card-scope@example.com",
+        assignee=mgr,
+    )
+    on_my_client = Lead.objects.create(
+        name="Client lead",
+        email="card-scope@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+        client=crm,
+    )
+    mentioned = Lead.objects.create(
+        name="Mentioned",
+        email="mention@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+    )
+    Activity.objects.create(
+        client=crm,
+        lead=mentioned,
+        activity_type=ActivityType.NOTE,
+        subject="Упоминание менеджера",
+        author=mgr,
+    )
+    foreign = Lead.objects.create(
+        name="Foreign",
+        email="foreign@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+    )
+
+    visible = set(
+        scope_leads_for_manager(Lead.objects.all(), mgr).values_list("pk", flat=True),
+    )
+    assert new_lead.pk in visible
+    assert mine.pk in visible
+    assert finished.pk in visible
+    assert on_my_client.pk in visible
+    assert mentioned.pk in visible
+    assert foreign.pk not in visible
+
+    # Superuser sees everything.
+    su = User.objects.create_superuser(
+        username="scope-su",
+        email="scope-su@example.com",
+        password="password12",
+    )
+    assert scope_leads_for_manager(Lead.objects.all(), su).count() == Lead.objects.count()
+
+
+@pytest.mark.django_db
+def test_manager_admin_changelist_hides_foreign_leads() -> None:
+    """Non-superuser staff changelist does not list another manager's lead."""
+    mgr = User.objects.create_user(
+        username="list-mgr",
+        email="list-mgr@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    # Grant admin access to Lead.
+    from django.contrib.auth.models import Permission
+
+    for codename in ("view_lead", "change_lead"):
+        mgr.user_permissions.add(Permission.objects.get(codename=codename))
+
+    other = User.objects.create_user(
+        username="list-other",
+        email="list-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    Lead.objects.create(
+        name="Visible new",
+        email="vis-new@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.create(
+        name="Hidden",
+        email="hidden@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+    )
+    client = Client()
+    client.force_login(mgr)
+    html = client.get("/admin/leads/lead/").content.decode()
+    assert "Visible new" in html
+    assert "Hidden" not in html
+
+
+@pytest.mark.django_db
 def test_admin_lead_form_shows_manager_fields() -> None:
-    """Change form includes assignee / processed_by fields."""
+    """View mode is read-only; edit mode exposes assignee / processed_by."""
     admin_user = User.objects.create_superuser(
         username="lead-mgr-admin",
         email="lead-mgr-admin@example.com",
@@ -148,13 +283,21 @@ def test_admin_lead_form_shows_manager_fields() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    response = client.get(f"/admin/leads/lead/{lead.pk}/change/")
-    assert response.status_code == 200
-    html = response.content.decode()
-    assert "assignee" in html
-    assert 'name="assignee"' in html or "id_assignee" in html
-    assert "processed_by" in html or "id_processed_by" in html
-    assert "Менеджер" in html
+
+    view = client.get(f"/admin/leads/lead/{lead.pk}/change/")
+    assert view.status_code == 200
+    view_html = view.content.decode()
+    assert "Редактировать" in view_html
+    assert "Менеджер" in view_html
+    # View mode: no editable select for assignee.
+    assert 'name="assignee"' not in view_html
+
+    edit = client.get(f"/admin/leads/lead/{lead.pk}/change/?edit=1")
+    assert edit.status_code == 200
+    edit_html = edit.content.decode()
+    assert 'name="assignee"' in edit_html or "id_assignee" in edit_html
+    assert "processed_by" in edit_html or "id_processed_by" in edit_html
+    assert "К просмотру" in edit_html
 
 
 @pytest.mark.django_db

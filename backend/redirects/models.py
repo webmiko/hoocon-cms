@@ -37,7 +37,7 @@ class Redirect(models.Model):
         max_length=512,
         unique=True,
         db_index=True,
-        help_text="Старый URL с leading slash, напр. /tproduct/12345-bv215.",
+        help_text="Старый URL с ведущим слэшем, напр. /tproduct/12345-bv215.",
     )
     to_path: models.CharField = models.CharField(
         "куда",

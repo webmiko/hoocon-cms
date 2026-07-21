@@ -23,12 +23,28 @@ _THIRD_PARTY_MODEL_NAMES: dict[str, tuple[str, str]] = {
         "сроки попыток доступа",
     ),
     "django_celery_beat.CrontabSchedule": (
-        "расписание crontab",
-        "расписания crontab",
+        "расписание по cron",
+        "расписания по cron",
     ),
     "django_celery_beat.PeriodicTasks": (
         "трекер периодических задач",
         "трекеры периодических задач",
+    ),
+    "django_celery_beat.PeriodicTask": (
+        "периодическая задача",
+        "периодические задачи",
+    ),
+    "django_celery_beat.IntervalSchedule": (
+        "интервальное расписание",
+        "интервальные расписания",
+    ),
+    "django_celery_beat.SolarSchedule": (
+        "солнечное расписание",
+        "солнечные расписания",
+    ),
+    "django_celery_beat.ClockedSchedule": (
+        "разовое расписание",
+        "разовые расписания",
     ),
 }
 

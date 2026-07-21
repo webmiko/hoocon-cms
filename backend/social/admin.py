@@ -11,16 +11,16 @@ from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
+from config.admin_mixins import OpenChangeLinkMixin
 from social.models import SocialPost
 from social.services import announce_content, schedule_announce_on_commit
 
 
 @admin.register(SocialPost)
-class SocialPostAdmin(ModelAdmin):
+class SocialPostAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Read-mostly log of social deliveries."""
 
     list_display = (
-        "id",
         "channel",
         "status",
         "content_type",
@@ -29,6 +29,7 @@ class SocialPostAdmin(ModelAdmin):
         "created_at",
         "sent_at",
     )
+    list_display_links = ("channel",)
     list_filter = ("channel", "status", "created_at")
     search_fields = ("message_preview", "external_id", "error_message")
     readonly_fields = (
@@ -118,7 +119,7 @@ class SocialAnnounceAdminMixin:
         if not obj.is_published:
             self.message_user(
                 request,
-                _("Сначала опубликуйте материал (is_published)."),
+                _("Сначала опубликуйте материал (флаг «опубликовано»)."),
                 messages.WARNING,
             )
             return HttpResponseRedirect(change_url)

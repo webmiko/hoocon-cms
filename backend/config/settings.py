@@ -244,6 +244,7 @@ UNFOLD = {
         "config.unfold_callbacks.unfold_extras_css",
     ],
     "SCRIPTS": [],
+    "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": True,
@@ -273,7 +274,7 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_client",
                     },
                     {
-                        "title": _("SKU"),
+                        "title": _("Артикулы"),
                         "icon": "inventory_2",
                         "link": reverse_lazy("admin:catalog_sku_changelist"),
                         "permission": "config.unfold_callbacks.perm_view_sku",

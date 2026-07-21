@@ -58,7 +58,7 @@ class _ContentBase(models.Model):
 
     title: models.CharField = models.CharField("заголовок", max_length=300)
     slug: models.SlugField = models.SlugField(
-        "slug (URL)",
+        "сегмент URL",
         max_length=300,
         unique=True,
         db_index=True,

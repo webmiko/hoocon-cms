@@ -2,18 +2,47 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django.contrib import admin, messages
+from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
+from config.admin_mixins import OpenChangeLinkMixin
 from crm.forms import ComposeEmailForm
 from crm.models import Activity, Client, EmailMessage, EmailStatus
 from crm.services import create_outbound_email
+from leads.models import Lead
+
+
+class LeadInline(TabularInline):
+    """All RFQ / consult requests on this client card (no duplicate cards)."""
+
+    model = Lead
+    extra = 0
+    fields = (
+        "status",
+        "lead_type",
+        "name",
+        "company",
+        "message",
+        "assignee",
+        "created_at",
+    )
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    ordering = ("-created_at",)
+    verbose_name = "заявка"
+    verbose_name_plural = "заявки клиента"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Leads arrive via public API / signal — not manual add on the card."""
+        return False
 
 
 class ActivityInline(TabularInline):
@@ -51,28 +80,40 @@ class EmailMessageInline(TabularInline):
 
 
 @admin.register(Client)
-class ClientAdmin(ModelAdmin):
-    """CRM client card: contacts, assignee, timeline, send email."""
+class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
+    """CRM client card: contacts, assignee, leads, timeline, send email.
+
+    ID клиента = email. Несколько заявок с одним email попадают в одну
+    карточку. Поиск/фильтры: email (ID), имя, компания.
+    """
 
     list_display = (
+        "email_id",
         "name",
         "company",
-        "email",
+        "leads_count",
         "phone",
         "assignee",
         "is_active",
         "updated_at",
     )
-    list_filter = ("is_active", "assignee", "updated_at")
-    search_fields = ("name", "email", "company", "phone", "notes")
+    list_display_links = ("email_id", "name")
+    list_filter = ("is_active", "assignee", "company", "updated_at")
+    search_fields = ("email", "name", "company", "phone", "notes")
     autocomplete_fields = ("assignee",)
-    readonly_fields = ("created_at", "updated_at")
-    inlines = (ActivityInline, EmailMessageInline)
-    ordering = ("-updated_at",)
+    readonly_fields = ("created_at", "updated_at", "leads_count")
+    inlines = (LeadInline, ActivityInline, EmailMessageInline)
+    ordering = ("email", "name", "company")
     fieldsets = (
         (
-            "Контакт",
-            {"fields": ("name", "email", "phone", "company", "is_active")},
+            "Контакт (ID = эл. почта)",
+            {
+                "fields": ("email", "name", "phone", "company", "is_active"),
+                "description": (
+                    "Одинаковый email (ID) = один клиент. Заявки с тем же ID "
+                    "добавляются в эту карточку, новая карточка не создаётся."
+                ),
+            },
         ),
         (
             "Менеджер",
@@ -81,12 +122,31 @@ class ClientAdmin(ModelAdmin):
         (
             "Метаданные",
             {
-                "fields": ("created_at", "updated_at"),
+                "fields": ("leads_count", "created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),
     )
     change_form_template = "admin/crm/client/change_form.html"
+
+    @admin.display(description="ID", ordering="email")
+    def email_id(self, obj: Client) -> str:
+        """Client ID is the email address (unique card key)."""
+        return obj.email
+
+    @admin.display(description="Заявок", ordering="_leads_count")
+    def leads_count(self, obj: Client) -> int:
+        """Number of leads attached to this card."""
+        count = getattr(obj, "_leads_count", None)
+        if count is not None:
+            return int(count)
+        return obj.leads.count()  # type: ignore[attr-defined]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Client]:
+        """Annotate lead count for the changelist column."""
+        from django.db.models import Count
+
+        return super().get_queryset(request).annotate(_leads_count=Count("leads", distinct=True))
 
     def save_formset(
         self,
@@ -194,11 +254,14 @@ class ClientAdmin(ModelAdmin):
 
 
 @admin.register(Activity)
-class ActivityAdmin(ModelAdmin):
-    """Standalone activity list (also edited via Client inline)."""
+class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
+    """Standalone activity list (also edited via Client inline).
+
+    ID = email клиента; строки с одним email идут группой.
+    """
 
     list_display = (
-        "id",
+        "client_email_id",
         "activity_type",
         "subject",
         "client",
@@ -206,11 +269,23 @@ class ActivityAdmin(ModelAdmin):
         "author",
         "created_at",
     )
+    list_display_links = ("subject",)
     list_filter = ("activity_type", "created_at")
     search_fields = ("subject", "body", "client__name", "client__email")
     autocomplete_fields = ("client", "lead", "author")
     readonly_fields = ("created_at",)
-    ordering = ("-created_at",)
+    ordering = ("client__email", "-created_at")
+
+    @admin.display(description="ID", ordering="client__email")
+    def client_email_id(self, obj: Activity) -> str:
+        """Group key: client email (same ID → same client card)."""
+        if not obj.client_id:
+            return "—"
+        return cast(Client, obj.client).email
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Activity]:
+        """Prefetch client for email ID column."""
+        return super().get_queryset(request).select_related("client", "lead", "author")
 
     def save_model(
         self,
@@ -226,11 +301,14 @@ class ActivityAdmin(ModelAdmin):
 
 
 @admin.register(EmailMessage)
-class EmailMessageAdmin(ModelAdmin):
-    """Outbound/inbound email log; staff can resend failed/draft."""
+class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
+    """Outbound/inbound email log; staff can resend failed/draft.
+
+    ID = email клиента (или to_email); одинаковые ID группируются.
+    """
 
     list_display = (
-        "id",
+        "client_email_id",
         "direction",
         "status",
         "to_email",
@@ -239,8 +317,9 @@ class EmailMessageAdmin(ModelAdmin):
         "created_at",
         "sent_at",
     )
+    list_display_links = ("subject",)
     list_filter = ("direction", "status", "created_at")
-    search_fields = ("subject", "to_email", "from_email", "client__name", "body")
+    search_fields = ("subject", "to_email", "from_email", "client__name", "client__email", "body")
     autocomplete_fields = ("client", "lead", "created_by")
     readonly_fields = (
         "direction",
@@ -250,7 +329,7 @@ class EmailMessageAdmin(ModelAdmin):
         "sent_at",
         "created_by",
     )
-    ordering = ("-created_at",)
+    ordering = ("client__email", "-created_at")
     actions = ("queue_send",)
     fieldsets = (
         (
@@ -275,6 +354,17 @@ class EmailMessageAdmin(ModelAdmin):
             },
         ),
     )
+
+    @admin.display(description="ID", ordering="client__email")
+    def client_email_id(self, obj: EmailMessage) -> str:
+        """Group key: client email (fallback to to_email)."""
+        if obj.client_id:
+            return cast(Client, obj.client).email
+        return (obj.to_email or "").strip().lower() or "—"
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EmailMessage]:
+        """Prefetch client for email ID column."""
+        return super().get_queryset(request).select_related("client", "lead", "created_by")
 
     @admin.action(description=_("Отправить выбранные (очередь)"))
     def queue_send(

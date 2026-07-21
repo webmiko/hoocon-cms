@@ -12,12 +12,13 @@ from django.utils import timezone
 class Client(models.Model):
     """B2B contact / company card for managers.
 
-    Deduped primarily by email. Leads can be linked via Lead.client.
+    ID = email (unique). Several Leads with the same email attach to one card
+    (name/company used for search/filter and profile fill). See crm.services.
     """
 
     name: models.CharField = models.CharField("имя / контакт", max_length=200)
     email: models.EmailField = models.EmailField(
-        "email",
+        "эл. почта",
         unique=True,
         db_index=True,
         help_text="Уникальный ключ карточки (нормализуется в нижний регистр).",
@@ -72,10 +73,10 @@ class Client(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        """Return 'name (company)' or email for Admin."""
+        """Return email as ID, then name/company for Admin FK widgets."""
         if self.company:
-            return f"{self.name} — {self.company}"
-        return f"{self.name} <{self.email}>"
+            return f"{self.email} — {self.name} ({self.company})"
+        return f"{self.email} — {self.name}"
 
 
 class ActivityType(models.TextChoices):

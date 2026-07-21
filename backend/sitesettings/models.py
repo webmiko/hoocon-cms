@@ -44,11 +44,11 @@ class SiteSettings(models.Model):
         help_text="Числовой ID счётчика (напр. 12345678). Пусто = не подключать.",
     )
     ga4_measurement_id: models.CharField = models.CharField(
-        "ID Google Analytics 4",
+        "идентификатор Google Analytics 4",
         max_length=32,
         blank=True,
         default="",
-        help_text="Measurement ID вида G-XXXXXXXX. Пусто = не подключать.",
+        help_text="Идентификатор вида G-XXXXXXXX. Пусто = не подключать.",
     )
 
     # ── Social announce policy ──
@@ -64,7 +64,7 @@ class SiteSettings(models.Model):
         default=False,
     )
     telegram_bot_token: models.CharField = models.CharField(
-        "Telegram bot token",
+        "токен бота Telegram",
         max_length=200,
         blank=True,
         default="",
@@ -74,7 +74,7 @@ class SiteSettings(models.Model):
         ),
     )
     telegram_chat_id: models.CharField = models.CharField(
-        "Telegram chat / channel ID",
+        "ID чата / канала Telegram",
         max_length=64,
         blank=True,
         default="",
@@ -87,7 +87,7 @@ class SiteSettings(models.Model):
         default=False,
     )
     vk_access_token: models.CharField = models.CharField(
-        "VK access token",
+        "токен доступа VK",
         max_length=500,
         blank=True,
         default="",
@@ -97,7 +97,7 @@ class SiteSettings(models.Model):
         ),
     )
     vk_group_id: models.CharField = models.CharField(
-        "VK group ID",
+        "ID сообщества VK",
         max_length=32,
         blank=True,
         default="",
@@ -110,7 +110,7 @@ class SiteSettings(models.Model):
         default=False,
     )
     max_bot_token: models.CharField = models.CharField(
-        "MAX bot token",
+        "токен бота MAX",
         max_length=500,
         blank=True,
         default="",
@@ -119,7 +119,7 @@ class SiteSettings(models.Model):
         ),
     )
     max_chat_id: models.CharField = models.CharField(
-        "MAX chat ID",
+        "ID чата MAX",
         max_length=64,
         blank=True,
         default="",

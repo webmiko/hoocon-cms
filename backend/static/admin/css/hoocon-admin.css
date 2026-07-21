@@ -523,7 +523,7 @@ a.hoocon-leads-stats-link {
 
 .hoocon-lead-stats__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
   gap: 0.85rem;
   margin-bottom: 1.75rem;
 }
@@ -535,6 +535,8 @@ a.hoocon-leads-stats-link {
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface);
   box-shadow: var(--hoocon-shadow-soft);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hoocon-lead-stats__card--accent {
@@ -548,7 +550,10 @@ a.hoocon-leads-stats-link {
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  line-height: 1.3;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .hoocon-lead-stats__value {
@@ -598,12 +603,16 @@ a.hoocon-leads-stats-link {
 }
 
 #changelist table.hoocon-admin-table-stacked tbody td.field-open_lead,
-#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead {
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead,
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_link,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_link {
   padding-top: 0.55rem !important;
 }
 
 #changelist table.hoocon-admin-table-stacked tbody td.field-open_lead::before,
-#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead::before {
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead::before,
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_link::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_link::before {
   display: none;
 }
 

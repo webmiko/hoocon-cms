@@ -2,14 +2,14 @@
 {% load i18n %}
 
 {% block content %}
-<nav class="hoocon-admin-breadcrumbs" aria-label="{% trans 'Breadcrumbs' %}">
-  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
   <span aria-hidden="true">›</span>
   <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
   <span aria-hidden="true">›</span>
   <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
   <span aria-hidden="true">›</span>
-  <span>{% trans "Написать письмо" %}</span>
+  <span>Написать письмо</span>
 </nav>
 
 <h1>{{ title }}</h1>

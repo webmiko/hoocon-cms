@@ -45,7 +45,7 @@ class Lead(models.Model):
         db_index=True,
     )
     name: models.CharField = models.CharField("имя", max_length=200)
-    email: models.EmailField = models.EmailField("email")
+    email: models.EmailField = models.EmailField("эл. почта")
     phone: models.CharField = models.CharField(
         "телефон",
         max_length=50,
@@ -140,5 +140,5 @@ class Lead(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        """Return Lead #pk and type — no contact PII (safe for logs)."""
-        return f"Lead #{self.pk} ({self.get_lead_type_display()})"
+        """Return Заявка #pk and type — no contact PII (safe for logs)."""
+        return f"Заявка #{self.pk} ({self.get_lead_type_display()})"

@@ -56,7 +56,7 @@ class Category(models.Model):
 
     name: models.CharField = models.CharField("название", max_length=200)
     slug: models.SlugField = models.SlugField(
-        "slug (URL)",
+        "сегмент URL",
         max_length=200,
         unique=True,
         db_index=True,
@@ -120,7 +120,7 @@ class Product(models.Model):
     )
     name: models.CharField = models.CharField("название", max_length=200)
     slug: models.SlugField = models.SlugField(
-        "slug (URL)",
+        "сегмент URL",
         max_length=200,
         unique=True,
         db_index=True,
@@ -192,7 +192,7 @@ class SKU(models.Model):
     )
     name: models.CharField = models.CharField("название", max_length=300)
     slug: models.SlugField = models.SlugField(
-        "slug (URL)",
+        "сегмент URL",
         max_length=300,
         unique=True,
         db_index=True,
@@ -281,7 +281,7 @@ class Attribute(models.Model):
 
     name: models.CharField = models.CharField("название", max_length=200)
     slug: models.SlugField = models.SlugField(
-        "slug (ключ)",
+        "ключ фильтра",
         max_length=100,
         unique=True,
         db_index=True,
@@ -454,7 +454,7 @@ class ProductImage(models.Model):
         help_text="WebP предпочтительно; JPEG/PNG допустимы.",
     )
     alt: models.CharField = models.CharField(
-        "alt-текст",
+        "альтернативный текст",
         max_length=300,
         blank=True,
         default="",

@@ -11,6 +11,7 @@ from django.http import HttpRequest
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 
+from config.admin_mixins import OpenChangeLinkMixin
 from sitesettings.credentials import token_source_label
 from sitesettings.models import SiteSettings
 
@@ -66,7 +67,7 @@ class SiteSettingsAdminForm(forms.ModelForm):
 
 
 @admin.register(SiteSettings)
-class SiteSettingsAdmin(ModelAdmin):
+class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Singleton Admin: edit only; no add/delete when row exists."""
 
     form = SiteSettingsAdminForm
@@ -77,6 +78,7 @@ class SiteSettingsAdmin(ModelAdmin):
         "social_announce_on_publish",
         "updated_at",
     )
+    list_display_links = ("__str__",)
     readonly_fields = (
         "telegram_token_status",
         "vk_token_status",
