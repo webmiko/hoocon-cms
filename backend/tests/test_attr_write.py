@@ -6,6 +6,7 @@ import pytest
 
 from catalog.etl.attr_write import (
     _ATTR_VALUE_MAX_LEN,
+    clip_attribute_value,
     ensure_attribute,
     set_sku_attribute,
 )
@@ -48,6 +49,13 @@ def test_attr_value_max_len_matches_model_field() -> None:
     """ETL truncate limit must equal AttributeValue.value max_length."""
     field_max = AttributeValue._meta.get_field("value").max_length
     assert _ATTR_VALUE_MAX_LEN == field_max == 200
+
+
+def test_clip_attribute_value_matches_set_sku_attribute_limit() -> None:
+    """clip_attribute_value is the shared truncate used by load and writers."""
+    long_value = "x" * (_ATTR_VALUE_MAX_LEN + 10)
+    assert clip_attribute_value(long_value) == long_value[:_ATTR_VALUE_MAX_LEN]
+    assert len(clip_attribute_value("short")) == 5
 
 
 @pytest.mark.django_db

@@ -15,6 +15,18 @@ if not isinstance(_value_max_length, int):
 _ATTR_VALUE_MAX_LEN = _value_max_length
 
 
+def clip_attribute_value(value: str) -> str:
+    """Truncate to ``AttributeValue.value`` max_length (DB CharField).
+
+    Args:
+        value: Raw attribute value from ETL / enrichers.
+
+    Returns:
+        Value clipped to the model field length (currently 200).
+    """
+    return value[:_ATTR_VALUE_MAX_LEN]
+
+
 def ensure_attribute(slug: str, name: str, unit: str = "") -> Attribute:
     """Get or create Attribute by slug; sync name/unit when they drift.
 
@@ -58,5 +70,5 @@ def set_sku_attribute(
     AttributeValue.objects.update_or_create(
         sku=sku,
         attribute=attr,
-        defaults={"value": value[:_ATTR_VALUE_MAX_LEN]},
+        defaults={"value": clip_attribute_value(value)},
     )

@@ -16,12 +16,12 @@ from typing import Any
 
 from django.db import transaction
 
+from catalog.etl.attr_write import clip_attribute_value, ensure_attribute
 from catalog.etl.normalize import (
-    NormalizedAttribute,
     NormalizedCategory,
     NormalizedProduct,
 )
-from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+from catalog.models import SKU, AttributeValue, Category, Product
 
 
 @dataclass
@@ -178,26 +178,12 @@ def load_product(
         stats.skus_created += int(sku_created)
 
         for nattr in nsku.attributes:
-            attr = _ensure_attribute(nattr)
+            attr = ensure_attribute(_slugify_attr(nattr.title), nattr.title)
             _, av_created = AttributeValue.objects.update_or_create(
                 sku=sku,
                 attribute=attr,
-                defaults={"value": nattr.value},
+                defaults={"value": clip_attribute_value(nattr.value)},
             )
             stats.attribute_values_created += int(av_created)
 
     return stats
-
-
-def _ensure_attribute(nattr: NormalizedAttribute) -> Attribute:
-    """Get or create an Attribute dictionary entry (keyed by slug)."""
-    slug = _slugify_attr(nattr.title)
-    attr, _ = Attribute.objects.get_or_create(
-        slug=slug,
-        defaults={"name": nattr.title},
-    )
-    # If the attribute exists but the name was updated, keep the latest name.
-    if attr.name != nattr.title:
-        attr.name = nattr.title
-        attr.save(update_fields=["name"])
-    return attr

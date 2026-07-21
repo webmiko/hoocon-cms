@@ -245,6 +245,44 @@ def test_load_product_uses_stable_attr_slug_fallback_for_cjk_titles() -> None:
 
 
 @pytest.mark.django_db
+def test_load_product_truncates_attribute_value_to_max_length() -> None:
+    """Long EAV values must clip like set_sku_attribute (CharField max_length)."""
+    from decimal import Decimal
+
+    from catalog.etl.attr_write import _ATTR_VALUE_MAX_LEN
+    from catalog.etl.load import load_product
+    from catalog.etl.normalize import (
+        NormalizedAttribute,
+        NormalizedProduct,
+        NormalizedSKU,
+    )
+    from catalog.models import AttributeValue, Category
+
+    cat = Category.objects.create(name="Test", slug="test-long-attr")
+    long_value = "я" * (_ATTR_VALUE_MAX_LEN + 40)
+    np = NormalizedProduct(
+        tilda_uid="long-1",
+        name="Long Attr Product",
+        slug="long-attr-product",
+        description="",
+        category_id=1,
+        skus=(
+            NormalizedSKU(
+                sku_code="LONG-1",
+                slug="long-attr-product-long-1",
+                name="Long Attr Product (LONG-1)",
+                price=Decimal("0"),
+                attributes=(NormalizedAttribute(title="Примечание", value=long_value),),
+            ),
+        ),
+    )
+    load_product(np, category_map={1: cat})
+    av = AttributeValue.objects.get(sku__sku_code="LONG-1", attribute__name="Примечание")
+    assert len(av.value) == _ATTR_VALUE_MAX_LEN
+    assert av.value == long_value[:_ATTR_VALUE_MAX_LEN]
+
+
+@pytest.mark.django_db
 def test_load_product_quarantines_when_category_missing() -> None:
     """If category_id is unknown, load_product raises QuarantineError.
 
