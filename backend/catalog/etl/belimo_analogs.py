@@ -434,9 +434,9 @@ def _sku_attr_map(sku: SKU) -> dict[str, str]:
     First occurrence of each slug wins (keeps the earlier AttributeValue).
     Opaque Tilda ``attr-*`` slugs are aliased to canonical keys via names below.
     """
-    values = getattr(sku, "_prefetched_attribute_values", None)
-    if values is None:
-        values = list(sku.attribute_values.select_related("attribute"))
+    from catalog.sku_access import sku_attribute_values
+
+    values = sku_attribute_values(sku)
     out: dict[str, str] = {}
     for av in values:
         slug = (av.attribute.slug or "").casefold()

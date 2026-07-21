@@ -197,10 +197,10 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         is_proportional_control,
         normalize_control_attribute_value,
     )
-    from catalog.sku_access import sku_category_slug_or_empty
+    from catalog.sku_access import sku_attribute_values, sku_category_slug_or_empty
 
     control_raw = ""
-    for av in sku.attribute_values.select_related("attribute"):
+    for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)
         if attribute_matches_facet(attr, FACET_BY_KEY["control"]):
             control_raw = str(av.value or "")

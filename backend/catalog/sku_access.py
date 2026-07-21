@@ -12,7 +12,30 @@ from typing import TYPE_CHECKING, cast
 from django.core.exceptions import ObjectDoesNotExist
 
 if TYPE_CHECKING:
-    from catalog.models import SKU, Category, Product
+    from catalog.models import SKU, AttributeValue, Category, Product
+
+
+def sku_attribute_values(sku: SKU) -> list[AttributeValue]:
+    """Return AttributeValues without bypassing an existing prefetch cache.
+
+    ``sku.attribute_values.select_related("attribute")`` always issues a new
+    SELECT and ignores ``prefetch_related("attribute_values__attribute")`` and
+    view-layer ``to_attr="_prefetched_attribute_values"``. Prefer this helper
+    in hot paths (enrich, serializers, facets).
+
+    Args:
+        sku: Catalog SKU (may already have EAV prefetched).
+
+    Returns:
+        List of AttributeValue rows (empty when none).
+    """
+    custom = getattr(sku, "_prefetched_attribute_values", None)
+    if custom is not None:
+        return list(custom)
+    prefetched = getattr(sku, "_prefetched_objects_cache", None) or {}
+    if "attribute_values" in prefetched:
+        return list(sku.attribute_values.all())
+    return list(sku.attribute_values.select_related("attribute"))
 
 
 def sku_product(sku: SKU | None) -> Product | None:

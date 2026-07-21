@@ -32,6 +32,7 @@ from catalog.facets import (
 from catalog.media_urls import RelativeImageField
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
 from catalog.sku_access import (
+    sku_attribute_values,
     sku_category_instructions,
     sku_category_slug_or_empty,
     sku_product_field,
@@ -47,10 +48,7 @@ def _prices_visible() -> bool:
 
 def _sku_kvs_value(obj: SKU) -> str:
     """Kvs for valve heading uniqueness (empty for actuators)."""
-    values = getattr(obj, "_prefetched_attribute_values", None)
-    if values is None:
-        values = list(obj.attribute_values.select_related("attribute"))
-    for av in values:
+    for av in sku_attribute_values(obj):
         slug = (av.attribute.slug or "").casefold()
         name = (av.attribute.name or "").casefold()
         if slug.startswith("kvs") or name.startswith("kvs"):
@@ -97,9 +95,7 @@ def _sku_analogs_text(obj: SKU) -> str:
 
 def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any]]:
     """Deduped + variant-filtered ТТХ rows for API."""
-    values = getattr(obj, "_prefetched_attribute_values", None)
-    if values is None:
-        values = list(obj.attribute_values.select_related("attribute"))
+    values = sku_attribute_values(obj)
     deduped = dedupe_attribute_values(values)
     rows = AttributeValueSerializer(deduped, many=True, context=context).data
     filtered = filter_attributes_for_variant(list(rows), parse_sku_variant(obj.sku_code))
@@ -292,9 +288,7 @@ class SKUListSerializer(serializers.ModelSerializer):
 
     def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
         """Compact ТТХ for catalog cards (moment / voltage / control / …)."""
-        values = getattr(obj, "_prefetched_attribute_values", None)
-        if values is None:
-            values = list(obj.attribute_values.select_related("attribute"))
+        values = sku_attribute_values(obj)
         deduped = dedupe_attribute_values(values)
         variant = parse_sku_variant(obj.sku_code)
         rows = [{"name": av.attribute.name, "value": str(av.value).strip()} for av in deduped]
@@ -387,9 +381,7 @@ class SKUDetailSerializer(SKUListSerializer):
 
     def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
         """Hero ТТХ on PDP: fuller set than catalog cards."""
-        values = getattr(obj, "_prefetched_attribute_values", None)
-        if values is None:
-            values = list(obj.attribute_values.select_related("attribute"))
+        values = sku_attribute_values(obj)
         deduped = dedupe_attribute_values(values)
         variant = parse_sku_variant(obj.sku_code)
         rows = [{"name": av.attribute.name, "value": str(av.value).strip()} for av in deduped]

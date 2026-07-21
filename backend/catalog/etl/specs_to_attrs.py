@@ -148,8 +148,10 @@ def _set_attr(sku: SKU, slug: str, value: str) -> None:
 
 def _migrate_legacy_attrs(sku: SKU) -> dict[str, str]:
     """Map existing hash/legacy AttributeValues onto canonical slugs."""
+    from catalog.sku_access import sku_attribute_values
+
     found: dict[str, str] = {}
-    for av in sku.attribute_values.select_related("attribute"):
+    for av in sku_attribute_values(sku):
         slug = av.attribute.slug
         name = av.attribute.name or ""
         value = str(av.value).strip()
@@ -306,7 +308,10 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
         result.reason = "missing_product"
         return result
 
-    result.attrs_before = sku.attribute_values.count()
+    from catalog.sku_access import sku_attribute_values
+
+    existing_avs = sku_attribute_values(sku)
+    result.attrs_before = len(existing_avs)
     variant = parse_sku_variant(sku.sku_code)
     raw = _specs_source(sku)
     filtered = filter_description_for_variant(raw, variant) if raw else ""
@@ -326,7 +331,7 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
 
     # Rewrite EAV: keep only canonical slugs for this SKU.
     keep_slugs = set(by_slug)
-    for av in list(sku.attribute_values.select_related("attribute")):
+    for av in existing_avs:
         if av.attribute.slug not in keep_slugs:
             av.delete()
 

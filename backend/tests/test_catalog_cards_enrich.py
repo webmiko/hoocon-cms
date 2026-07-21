@@ -260,3 +260,50 @@ def test_enrich_sku_cards_loads_category_without_extra_query() -> None:
         if 'FROM "catalog_category"' in q["sql"] and "JOIN" not in q["sql"].upper()
     ]
     assert lazy_category == []
+
+
+@pytest.mark.django_db
+def test_enrich_sku_cards_reuses_prefetched_attribute_values() -> None:
+    """Prefetched EAV must not be re-queried via select_related in migrate/rewrite."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.etl.attr_write import set_sku_attribute
+    from catalog.etl.specs_to_attrs import enrich_sku_cards
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="PrefetchAV", slug="test-prefetch-av-cat")
+    product = Product.objects.create(
+        category=cat,
+        name="PrefetchAV",
+        slug="test-prefetch-av-product",
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="Prefetch AV SKU",
+        slug="test-prefetch-av-sku",
+        sku_code="DA5MU24-PAV",
+        specs_text=(
+            "– Крутящий момент: 5 Нм\n"
+            "– Номинальное напряжение: AC/DC 24 В\n"
+            "– Управление: 2-/3-позиционное\n"
+            "– Степень защиты: IP54\n"
+            "– Масса: 1 кг\n"
+            "– Угол поворота: макс. 90°\n"
+            "– Направление вращения: вручную\n"
+            "– Ручное управление: есть\n"
+        ),
+    )
+    set_sku_attribute(sku, slug="moment", value="4", name="Крутящий момент", unit="Нм")
+    warmed = (
+        SKU.objects.select_related("product", "product__category")
+        .prefetch_related("attribute_values__attribute")
+        .get(pk=sku.pk)
+    )
+
+    with CaptureQueriesContext(connection) as ctx:
+        result = enrich_sku_cards(warmed, dry_run=True)
+
+    assert result.skipped is False
+    av_selects = [q["sql"] for q in ctx.captured_queries if 'FROM "catalog_attributevalue"' in q["sql"]]
+    assert av_selects == [], av_selects
