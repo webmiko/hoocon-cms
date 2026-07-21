@@ -220,3 +220,38 @@ def test_analog_facet_from_card_text(client) -> None:
     filtered = client.get(reverse("catalog-sku-list"), {"analog": "LF24-S"})
     assert filtered.status_code == 200
     assert {row["slug"] for row in filtered.data["results"]} == {sku.slug}
+
+
+@pytest.mark.django_db
+def test_sku_attr_map_keeps_first_slug_value() -> None:
+    """Duplicate slugs in the attr list keep the first value (first-wins)."""
+    from types import SimpleNamespace
+
+    from catalog.etl.belimo_analogs import _sku_attr_map
+
+    cat = Category.objects.create(name="Air", slug="air-attr-map")
+    product = Product.objects.create(name="P", slug="p-attr-map", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SKU",
+        slug="sku-attr-map",
+        sku_code="SKU-ATTR-MAP",
+        is_published=True,
+    )
+
+    def av(slug: str, value: str, name: str = "") -> SimpleNamespace:
+        return SimpleNamespace(
+            attribute=SimpleNamespace(slug=slug, name=name),
+            value=value,
+        )
+
+    # Prefetch may theoretically list the same slug twice; do not last-wins.
+    sku._prefetched_attribute_values = [  # type: ignore[attr-defined]
+        av("moment", "5 Нм", "Момент"),
+        av("moment", "10 Нм", "Момент"),
+        av("attr-dup", "first"),
+        av("attr-dup", "second"),
+    ]
+    attrs = _sku_attr_map(sku)
+    assert attrs["moment"] == "5 Нм"
+    assert attrs["attr-dup"] == "first"

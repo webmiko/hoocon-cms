@@ -398,17 +398,18 @@ def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:
 
 
 def _sku_attr_map(sku: SKU) -> dict[str, str]:
-    """Slug → value for inference (prefetched when available)."""
+    """Slug → value for inference (prefetched when available).
+
+    First occurrence of each slug wins (keeps the earlier AttributeValue).
+    Opaque Tilda ``attr-*`` slugs are aliased to canonical keys via names below.
+    """
     values = getattr(sku, "_prefetched_attribute_values", None)
     if values is None:
         values = list(sku.attribute_values.select_related("attribute"))
     out: dict[str, str] = {}
     for av in values:
         slug = (av.attribute.slug or "").casefold()
-        if not slug:
-            continue
-        # Prefer canonical short slugs when duplicates exist.
-        if slug in out and slug.startswith("attr-"):
+        if not slug or slug in out:
             continue
         out[slug] = str(av.value or "")
     # Alias opaque Tilda slugs by attribute name when needed.
