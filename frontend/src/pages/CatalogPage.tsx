@@ -14,7 +14,7 @@ import { useAsync } from "../hooks/useAsync";
 import { facetLabelShort, facetValueShort } from "../utils/facetDisplay";
 import { cardHighlights } from "../utils/cardHighlights";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
-import { parseDescription } from "../utils/parseDescription";
+import { parseProductDescription } from "../utils/parseDescription";
 import {
   isModulatingSignalKey,
   SignalSpecValue,
@@ -618,7 +618,7 @@ function CategoryOverview({ category }: { category?: Category }) {
     <section className={styles.categoryOverview} aria-label="О категории">
       {hasDesc ? (
         <div className={styles.categoryDesc}>
-          {parseDescription(category.description)
+          {parseProductDescription(category.description)
             .slice(0, 8)
             .map((block, index) => {
               if (block.type === "paragraph") {
@@ -629,10 +629,18 @@ function CategoryOverview({ category }: { category?: Category }) {
                 );
               }
               if (block.type === "section") {
+                const level = block.level ?? 3;
+                const Tag = level === 2 ? "h2" : level === 4 ? "h4" : "h3";
+                const className =
+                  level === 2
+                    ? styles.categoryDocTitle
+                    : level === 4
+                      ? styles.categorySubsection
+                      : styles.categorySection;
                 return (
-                  <h3 key={`s-${index}`} className={styles.categorySection}>
+                  <Tag key={`s-${index}`} className={className}>
                     {softBreak(block.title)}
-                  </h3>
+                  </Tag>
                 );
               }
               return (
@@ -661,6 +669,7 @@ function CategoryOverview({ category }: { category?: Category }) {
                 text={category.instructions ?? ""}
                 styles={{
                   lead: styles.categoryLead,
+                  quote: styles.categoryQuote,
                   docTitle: styles.categoryDocTitle,
                   section: styles.categorySection,
                   subsection: styles.categorySubsection,

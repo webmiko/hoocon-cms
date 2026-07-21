@@ -730,6 +730,57 @@ def test_strip_attribute_echo_from_text() -> None:
     assert "Функциональные параметры" in out
 
 
+def test_strip_echo_drops_bare_orphan_temp_header() -> None:
+    """Bare «Температурный режим» without body is dropped after EAV strip."""
+    from catalog.facets import strip_attribute_echo_from_text
+
+    text = (
+        "Эксплуатационные параметры\n\n"
+        "Класс защиты:\n\n"
+        "– II (двойная изоляция) для 230 В\n\n"
+        "Температурный режим\n\n"
+        "– Рабочий диапазон: −20…+50 °C.\n"
+        "– Хранение: −30…+80 °C.\n\n"
+        "Уровень шума:\n\n"
+        "– двигатель: до 45 дБ\n"
+    )
+    attrs = [
+        {"name": "Температура окружающей среды", "value": "-20...+50°C"},
+        {"name": "Температура хранения", "value": "-30...+80°C"},
+    ]
+    out = strip_attribute_echo_from_text(text, attrs)
+    assert "Температурный режим" not in out
+    assert "Рабочий диапазон" not in out
+    assert "Хранение" not in out
+    assert "Уровень шума" in out
+    assert "двигатель" in out
+    assert "Эксплуатационные параметры" in out
+    assert "Класс защиты" in out
+
+
+def test_strip_echo_drops_conflicting_standby_watt_claim() -> None:
+    """Series «3−5 Вт» marketing must not contradict ТТХ power card."""
+    from catalog.facets import strip_attribute_echo_from_text
+
+    text = (
+        "Преимущества серии DA. FU\n\n"
+        "– Универсальность: вал 8−21 мм\n"
+        "– Совместимость с аналогами Belimo.\n"
+        "– Низкое энергопотребление: 3−5 Вт в режиме ожидания.\n"
+    )
+    attrs = [
+        {
+            "name": "Потребляемая мощность",
+            "value": "7 Вт (работа) / 2 Вт (удержание)",
+        },
+    ]
+    out = strip_attribute_echo_from_text(text, attrs)
+    assert "3−5" not in out and "3-5" not in out
+    assert "энергопотребление" not in out.lower()
+    assert "Универсальность" in out
+    assert "Belimo" in out
+
+
 def test_extract_sku_lead_picks_prose() -> None:
     """Lead prefers application blurb over bullet ТТХ."""
     from catalog.facets import extract_sku_lead

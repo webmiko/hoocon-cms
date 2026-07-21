@@ -9,7 +9,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 import { LeadForm } from "../components/LeadForm";
 import { Seo } from "../components/Seo";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "../utils/jsonLd";
-import { parseDescription } from "../utils/parseDescription";
+import { parseProductDescription } from "../utils/parseDescription";
 import { InstructionText } from "../components/InstructionText";
 import {
   isModulatingSignalKey,
@@ -94,6 +94,27 @@ function categoryCopyFitsSku(
     if (family.length >= 3 && skuCompact.includes(family)) return true;
     return skuCompact.includes(token.slice(0, Math.min(6, token.length)));
   });
+}
+
+/** True when two copy blocks share the same series lead (avoid double Описание). */
+function descriptionsOverlap(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[«»""„]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return false;
+  const window = 160;
+  const wa = na.slice(0, window);
+  const wb = nb.slice(0, window);
+  if (wa === wb) return true;
+  const probe = 100;
+  return (
+    na.includes(wb.slice(0, probe)) || nb.includes(wa.slice(0, probe))
+  );
 }
 /**
  * SKU detail page (PDP): tabs as on Tilda (Описание / Инструкция /
@@ -395,12 +416,16 @@ export function SkuDetailPage() {
                     ) : null}
                     {sku.category_description &&
                     sku.category_description !== sku.description &&
+                    !descriptionsOverlap(
+                      sku.category_description,
+                      sku.description ?? "",
+                    ) &&
                     categoryCopyFitsSku(
                       sku.category_description,
                       sku.sku_code,
                     ) ? (
                       <div className={styles.seriesBlock}>
-                        <h3 className={styles.descSection}>О линейке продукции</h3>
+                        <h2 className={styles.descDocTitle}>О линейке продукции</h2>
                         <StructuredText text={sku.category_description} />
                       </div>
                     ) : null}
@@ -413,6 +438,7 @@ export function SkuDetailPage() {
                       text={sku.category_instructions}
                       styles={{
                         lead: styles.descLead,
+                        quote: styles.descQuote,
                         docTitle: styles.descDocTitle,
                         section: styles.descSection,
                         subsection: styles.descSubsection,
@@ -566,31 +592,17 @@ export function SkuDetailPage() {
 function StructuredText({ text }: { text: string }) {
   return (
     <div className={styles.description}>
-      {parseDescription(text).map((block, index) => {
-        if (block.type === "paragraph") {
-          return (
-            <p key={`p-${index}`} className={styles.descLead}>
-              <SoftBreakText text={block.text} />
-            </p>
-          );
-        }
-        if (block.type === "section") {
-          return (
-            <h3 key={`s-${index}`} className={styles.descSection}>
-              <SoftBreakText text={block.title} />
-            </h3>
-          );
-        }
-        return (
-          <ul key={`l-${index}`} className={styles.descList}>
-            {block.items.map((item) => (
-              <li key={item}>
-                <SoftBreakText text={item} />
-              </li>
-            ))}
-          </ul>
-        );
-      })}
+      <InstructionText
+        text={text}
+        parse={parseProductDescription}
+        styles={{
+          lead: styles.descLead,
+          docTitle: styles.descDocTitle,
+          section: styles.descSection,
+          subsection: styles.descSubsection,
+          list: styles.descList,
+        }}
+      />
     </div>
   );
 }

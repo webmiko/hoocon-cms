@@ -7,6 +7,7 @@ import {
 
 export type InstructionTextStyles = {
   lead: string;
+  quote?: string;
   docTitle: string;
   section: string;
   subsection: string;
@@ -16,6 +17,8 @@ export type InstructionTextStyles = {
 type InstructionTextProps = {
   text: string;
   styles: InstructionTextStyles;
+  /** Defaults to install-instruction parser (numbered chapters → h2). */
+  parse?: (raw: string) => DescriptionBlock[];
 };
 
 function sectionClassName(
@@ -27,6 +30,10 @@ function sectionClassName(
   return styles.section;
 }
 
+function isInstructionIntro(text: string): boolean {
+  return /^инструкция(?:\s|$)/i.test(text.trim());
+}
+
 function InstructionBlock({
   block,
   styles,
@@ -35,6 +42,13 @@ function InstructionBlock({
   styles: InstructionTextStyles;
 }) {
   if (block.type === "paragraph") {
+    if (isInstructionIntro(block.text) && styles.quote) {
+      return (
+        <blockquote className={styles.quote}>
+          <SoftBreakText text={block.text} />
+        </blockquote>
+      );
+    }
     return (
       <p className={styles.lead}>
         <SoftBreakText text={block.text} />
@@ -61,9 +75,13 @@ function InstructionBlock({
   );
 }
 
-/** Render category install instructions with h2/h3/h4 heading hierarchy. */
-export function InstructionText({ text, styles }: InstructionTextProps) {
-  return parseInstructions(text).map((block, index) => (
+/** Render structured plain text with h2/h3/h4 from ``parse`` (default: instructions). */
+export function InstructionText({
+  text,
+  styles,
+  parse = parseInstructions,
+}: InstructionTextProps) {
+  return parse(text).map((block, index) => (
     <InstructionBlock key={index} block={block} styles={styles} />
   ));
 }

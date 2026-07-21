@@ -1,8 +1,11 @@
 /** Parse catalog description (lead + bullets + section titles) into semantic HTML. */
 
 const BULLET_RE = /^[–—\-•·*]\s+/;
+/** Strip decorative markers before matching section titles (``✅ Преимущества``). */
+const TITLE_DECOR_RE = /^[✅⚠❗●•]\s*/;
 /** ``Основные особенности:`` or colon-less titles like ``Преимущества``. */
 const SECTION_RE = /^(.{2,60}):\s*$/;
+/** Major marketing / series sections → h2. */
 const SECTION_BARE_RE = new RegExp(
   "^(" +
     "основные особенности|области применения|" +
@@ -14,7 +17,21 @@ const SECTION_BARE_RE = new RegExp(
     "эксплуатационные параметры|безопасность и сертификация|" +
     "важные замечания(?:\\s+по\\s+эксплуатации)?|" +
     "технические характеристики|комплектация|назначение|" +
-    "общие характеристики аналогов|преимущества серии\\s+.+" +
+    "назначение и принцип работы|" +
+    "требования безопасности и эксплуатации|" +
+    "особенности восстановления после пожара|" +
+    "заключение|" +
+    "общие характеристики аналогов|" +
+    "преимущества серии(?:\\s.+)?" +
+    ")$",
+  "i",
+);
+/** Known bare subsections (no trailing colon in source) → h3. */
+const SECTION_SUB_BARE_RE = new RegExp(
+  "^(" +
+    "промышленные объекты|общественные здания|специальные сооружения|" +
+    "интеграция|температурный режим|класс защиты|уровень шума|" +
+    "особенности(?:\\s+приводов)?|вспомогательные компоненты|запреты" +
     ")$",
   "i",
 );
@@ -26,40 +43,69 @@ export type DescriptionBlock =
   | { type: "section"; title: string; level?: InstructionSectionLevel }
   | { type: "list"; items: string[] };
 
-/** ``3.1 …``, ``7.2 …`` — подраздел инструкции (h4). */
-const INSTRUCTION_H4_RE = /^\d+\.\d+(?:\.\d+)*\s+/;
-/** ``1. …``, ``10. …`` — раздел инструкции (h3). */
-const INSTRUCTION_H3_RE = /^\d+\.\s+(?!\d)/;
-/** Документ без нумерации, напр. «Инструкция по установке…» (h2). */
-const INSTRUCTION_H2_RE = /^инструкция\b/i;
+/** ``3.1 …``, ``7.2 …`` — вложенный подпункт (h3 under numbered h2). */
+const INSTRUCTION_NESTED_RE = /^\d+\.\d+(?:\.\d+)*\s+/;
+/** ``1. …``, ``10. …`` — глава инструкции (h2). */
+const INSTRUCTION_CHAPTER_RE = /^\d+\.\s+(?!\d)/;
+/** Intro line «Инструкция…» — lead/quote, not a heading. */
+const INSTRUCTION_INTRO_RE = /^инструкция(?:\s|$)/i;
 
 /**
  * Detect semantic heading level for install/control instruction lines.
  *
+ * Hierarchy (outline):
+ * - ``2`` — numbered chapter ``1.``, ``2.``, …
+ * - ``3`` — subsection under a chapter (``Проверка совместимости``, ``3.1 …``)
+ * - ``4`` — reserved for deeper nesting (unused in current copy)
+ *
+ * The document intro ``Инструкция…`` stays a paragraph (quote), not a heading.
+ *
  * Returns:
- * - ``2`` — document title (no chapter number)
- * - ``3`` — top-level numbered sections ``1.``, ``2.``, …
- * - ``4`` — nested sections ``3.1``, ``4.2``, …
+ * - ``2`` / ``3`` / ``4`` or ``null`` when the line is not a heading.
  */
 export function instructionHeadingLevel(line: string): InstructionSectionLevel | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
-  if (INSTRUCTION_H4_RE.test(trimmed)) return 4;
-  if (INSTRUCTION_H3_RE.test(trimmed)) return 3;
-  if (INSTRUCTION_H2_RE.test(trimmed)) return 2;
+  if (INSTRUCTION_NESTED_RE.test(trimmed)) return 3;
+  if (INSTRUCTION_CHAPTER_RE.test(trimmed)) return 2;
   return null;
+}
+
+/**
+ * Connective / sentence-lead titles that must not become headings
+ * (``Например:``, ``Режимы:``, ``Привод предназначен для использования в:``).
+ */
+const WEAK_CONNECTIVE_RE = new RegExp(
+  "^(" +
+    "например|режимы|диапазон напряжения для|" +
+    "привод предназначен для использования в" +
+    ")$",
+  "i",
+);
+
+/** Numbered marketing feature ``1. Крутящий момент`` (not ``1.1`` nested). */
+const NUMBERED_FEATURE_RE = /^\d+\.\s+(?!\d).{2,80}$/;
+
+/** Normalize a title line for regex matching (drop colon / emoji). */
+function cleanTitle(line: string): string {
+  return line.replace(TITLE_DECOR_RE, "").replace(/:$/, "").trim();
 }
 
 /**
  * Parse category install instructions with h2/h3/h4 section levels.
  *
  * Reclassifies numbered chapter lines that ``parseDescription`` would emit
- * as plain paragraphs into section blocks with ``level``.
+ * as plain paragraphs into section blocks with ``level``. Colon-only titles
+ * (``Проверка совместимости:``) become h3 subsections. Intro ``Инструкция…``
+ * remains a lead paragraph. Weak connective colon-lines stay paragraphs.
  */
 export function parseInstructions(raw: string): DescriptionBlock[] {
   return parseDescription(raw).map((block) => {
     if (block.type === "section") {
-      return { ...block, level: instructionHeadingLevel(block.title) ?? 2 };
+      if (WEAK_CONNECTIVE_RE.test(cleanTitle(block.title))) {
+        return { type: "paragraph" as const, text: block.title };
+      }
+      return { ...block, level: instructionHeadingLevel(block.title) ?? 3 };
     }
     if (block.type === "paragraph") {
       const level = instructionHeadingLevel(block.text);
@@ -69,6 +115,79 @@ export function parseInstructions(raw: string): DescriptionBlock[] {
     }
     return block;
   });
+}
+
+/**
+ * Detect semantic heading level for product/marketing description titles.
+ *
+ * Hierarchy (outline under page h1):
+ * - ``2`` — major sections (``Ключевые характеристики``, ``Области применения``)
+ * - ``3`` — numbered features and known/minor subheads (``1. …``, ``Класс защиты``)
+ * - ``null`` — connective leads (``Например``) — stay as paragraphs
+ */
+export function descriptionHeadingLevel(line: string): InstructionSectionLevel | null {
+  const cleaned = cleanTitle(line);
+  if (!cleaned || BULLET_RE.test(cleaned)) return null;
+  if (WEAK_CONNECTIVE_RE.test(cleaned)) return null;
+  if (INSTRUCTION_NESTED_RE.test(cleaned)) return 4;
+  if (NUMBERED_FEATURE_RE.test(cleaned)) return 3;
+  if (SECTION_BARE_RE.test(cleaned)) return 2;
+  if (SECTION_SUB_BARE_RE.test(cleaned)) return 3;
+  return 3;
+}
+
+/**
+ * Parse product/marketing description with h2 majors and h3 features.
+ *
+ * Demotes weak connective titles to paragraphs; promotes numbered
+ * ``1. Title`` lines and known bare subheads that ``parseDescription``
+ * left as paragraphs. Drops empty sections (heading with no body).
+ */
+export function parseProductDescription(raw: string): DescriptionBlock[] {
+  const out: DescriptionBlock[] = [];
+  for (const block of parseDescription(raw)) {
+    if (block.type === "section") {
+      const level = descriptionHeadingLevel(block.title);
+      if (level === null) {
+        out.push({ type: "paragraph", text: block.title });
+        continue;
+      }
+      out.push({ ...block, title: cleanTitle(block.title), level });
+      continue;
+    }
+    if (block.type === "paragraph") {
+      const rawText = block.text.trim();
+      const cleaned = cleanTitle(rawText);
+      const level = descriptionHeadingLevel(cleaned);
+      if (
+        level !== null &&
+        (NUMBERED_FEATURE_RE.test(cleaned) ||
+          SECTION_BARE_RE.test(cleaned) ||
+          SECTION_SUB_BARE_RE.test(cleaned))
+      ) {
+        out.push({ type: "section", title: cleaned, level });
+        continue;
+      }
+    }
+    out.push(block);
+  }
+  return dropEmptySections(out);
+}
+
+/** Remove empty h3/h4 sections (no body before next section / EOF). Keep h2 group titles. */
+function dropEmptySections(blocks: DescriptionBlock[]): DescriptionBlock[] {
+  const out: DescriptionBlock[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (block.type === "section" && (block.level ?? 3) >= 3) {
+      const next = blocks[i + 1];
+      if (!next || next.type === "section") {
+        continue;
+      }
+    }
+    out.push(block);
+  }
+  return out;
 }
 
 /**
@@ -93,6 +212,7 @@ export function parseDescription(raw: string): DescriptionBlock[] {
   const lineKey = (line: string) =>
     line
       .toLowerCase()
+      .replace(TITLE_DECOR_RE, "")
       .replace(/^[–—\-•·*]+\s*/, "")
       .replace(/\s+/g, " ")
       .replace(/:$/, "")
@@ -124,17 +244,35 @@ export function parseDescription(raw: string): DescriptionBlock[] {
   const pushSection = (title: string) => {
     flushList();
     flushParagraph();
-    const cleaned = title.replace(/:$/, "").trim();
+    const cleaned = cleanTitle(title);
     if (remember(cleaned)) {
       blocks.push({ type: "section", title: cleaned });
     }
   };
 
   for (const rawLine of text.split(/\n/)) {
-    const line = rawLine.trim();
+    const line = rawLine.replace(/\u200b/g, "").trim();
     if (!line) {
       flushList();
       flushParagraph();
+      continue;
+    }
+
+    // Bullets before section titles — «– Убедитесь…:» is a list item, not h2.
+    if (BULLET_RE.test(line)) {
+      flushParagraph();
+      listBuf.push(line.replace(BULLET_RE, "").trim());
+      continue;
+    }
+
+    // «Инструкция…» intro stays its own lead paragraph (quote), never merges with
+    // the following description line when the source omits a blank line.
+    if (INSTRUCTION_INTRO_RE.test(line)) {
+      flushList();
+      flushParagraph();
+      if (remember(line)) {
+        blocks.push({ type: "paragraph", text: line });
+      }
       continue;
     }
 
@@ -144,14 +282,9 @@ export function parseDescription(raw: string): DescriptionBlock[] {
       continue;
     }
 
-    if (SECTION_BARE_RE.test(line)) {
-      pushSection(line);
-      continue;
-    }
-
-    if (BULLET_RE.test(line)) {
-      flushParagraph();
-      listBuf.push(line.replace(BULLET_RE, "").trim());
+    const bare = cleanTitle(line);
+    if (SECTION_BARE_RE.test(bare) || SECTION_SUB_BARE_RE.test(bare)) {
+      pushSection(bare);
       continue;
     }
 

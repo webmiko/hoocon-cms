@@ -351,18 +351,22 @@ class SKUDetailSerializer(SKUListSerializer):
         )
 
     def get_description(self, obj: SKU) -> str:
-        """Return description for this SKU edition only (no H1/lead echo).
+        """Return description for this SKU edition only (no H1/lead/EAV echo).
 
-        Attribute-card facts are not stripped here: short edition lines
-        (управление / SPDT) stay as list items in the Описание tab.
+        Drops bullets that only restate AttributeValue rows already shown in
+        ТТХ cards / highlights (e.g. «Управление: …», «Вспомогательный…»).
         """
         text = _sku_description(obj)
         heading = _sku_heading(obj)
         lead = extract_sku_lead(text or obj.description or "")
-        return strip_heading_echo_from_description(
+        cleaned = strip_heading_echo_from_description(
             text,
             heading=heading,
             lead=lead,
+        )
+        return strip_attribute_echo_from_text(
+            cleaned,
+            _sku_attribute_rows(obj, self.context),
         )
 
     def get_lead(self, obj: SKU) -> str:

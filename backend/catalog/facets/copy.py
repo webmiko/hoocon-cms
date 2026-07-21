@@ -344,6 +344,41 @@ _BULLET_ATTR_LINE = re.compile(
     r"^(?:[-–—•*]|\d+[.)])\s*(?P<body>.+)$",
 )
 
+# Decorative markers before bare titles (``✅ Преимущества серии``).
+_TITLE_DECOR_RE = re.compile(r"^[✅⚠❗●•]\s*")
+
+# Bare subsection titles (no colon) that may become empty after EAV strip.
+_BARE_SUB_SECTION_HEADER_RE = re.compile(
+    r"^(?:"
+    r"промышленные объекты|общественные здания|специальные сооружения|"
+    r"интеграция|температурный режим|класс защиты|уровень шума|"
+    r"особенности(?:\s+приводов)?|вспомогательные компоненты|запреты"
+    r")$",
+    re.IGNORECASE,
+)
+
+# Any bare section title (major or sub) — used when scanning for "next header".
+_BARE_SECTION_HEADER_RE = re.compile(
+    r"^(?:"
+    r"основные особенности|области применения|область применения|сфера применения|"
+    r"преимущества|отличительные преимущества|"
+    r"конкурентные преимущества(?:\s+перед\s+аналогами)?|"
+    r"функциональные особенности|технические возможности|"
+    r"ключевые характеристики|конструктивные особенности|"
+    r"эксплуатационные параметры|безопасность и сертификация|"
+    r"важные замечания(?:\s+по\s+эксплуатации)?|"
+    r"технические характеристики|комплектация|назначение|"
+    r"назначение и принцип работы|"
+    r"требования безопасности и эксплуатации|"
+    r"особенности восстановления после пожара|заключение|"
+    r"общие характеристики аналогов|преимущества серии(?:\s.+)?|"
+    r"промышленные объекты|общественные здания|специальные сооружения|"
+    r"интеграция|температурный режим|класс защиты|уровень шума|"
+    r"особенности(?:\s+приводов)?|вспомогательные компоненты|запреты"
+    r")$",
+    re.IGNORECASE,
+)
+
 
 def strip_attribute_echo_from_text(
     text: str,
@@ -430,7 +465,33 @@ def _bullet_echoes_attribute(
     body_n = _norm_heading_phrase(body)
     if body_n in values:
         return True
+    if _bullet_numeric_power_claim(body, names=names):
+        return True
     return False
+
+
+def _has_power_consumption_attr(names: set[str]) -> bool:
+    """True when ТТХ already lists consumed power."""
+    return any("потребляем" in n or n == "мощность" for n in names)
+
+
+def _bullet_numeric_power_claim(body: str, *, names: set[str]) -> bool:
+    """Drop marketing wattage claims when power is already in ТТХ cards.
+
+    Series copy often says «3−5 Вт в режиме ожидания» while the SKU card
+    has a different ``Потребляемая мощность`` — characteristics win.
+    """
+    if not _has_power_consumption_attr(names):
+        return False
+    body_l = body.lower().replace("−", "-")
+    if "вт" not in body_l or not re.search(r"\d", body_l):
+        return False
+    return bool(
+        re.search(
+            r"энергопотреб|режиме ожидания|удержани|потребляем\w*\s+мощност",
+            body_l,
+        )
+    )
 
 
 def _label_matches_attr_name(label_n: str, names: set[str]) -> bool:
@@ -463,15 +524,45 @@ def _label_matches_attr_name(label_n: str, names: set[str]) -> bool:
     return False
 
 
+def _bare_section_title(stripped: str) -> str:
+    """Strip emoji / trailing colon for bare-title matching."""
+    return _TITLE_DECOR_RE.sub("", stripped).rstrip(":").strip()
+
+
+def _is_any_section_header(stripped: str) -> bool:
+    """True for ``Title:`` and known bare major/sub section titles."""
+    if not stripped or _BULLET_ATTR_LINE.match(stripped):
+        return False
+    if stripped.endswith(":"):
+        return True
+    return bool(_BARE_SECTION_HEADER_RE.match(_bare_section_title(stripped)))
+
+
+def _is_orphan_candidate_header(stripped: str) -> bool:
+    """Headers we may drop when empty — colon titles and bare *sub* titles.
+
+    Major bare group headers (``Эксплуатационные параметры``) stay even when
+    the next line is a nested ``Класс защиты:`` subsection.
+    """
+    if not stripped or _BULLET_ATTR_LINE.match(stripped):
+        return False
+    if stripped.endswith(":"):
+        return True
+    return bool(_BARE_SUB_SECTION_HEADER_RE.match(_bare_section_title(stripped)))
+
+
 def _drop_orphan_section_headers(lines: list[str]) -> str:
-    """Drop headers that have no content until the next header / EOF."""
+    """Drop headers that have no content until the next header / EOF.
+
+    Bare subsection titles (``Температурный режим``) are included so EAV
+    echo-stripping does not leave an empty heading above the next section.
+    """
     cleaned: list[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
         stripped = " ".join(line.split())
-        is_header = bool(stripped) and stripped.endswith(":") and not (_BULLET_ATTR_LINE.match(stripped))
-        if is_header:
+        if _is_orphan_candidate_header(stripped):
             j = i + 1
             has_body = False
             while j < len(lines):
@@ -479,7 +570,7 @@ def _drop_orphan_section_headers(lines: list[str]) -> str:
                 if not nxt:
                     j += 1
                     continue
-                if nxt.endswith(":") and not _BULLET_ATTR_LINE.match(nxt):
+                if _is_any_section_header(nxt):
                     break
                 has_body = True
                 break
