@@ -294,7 +294,7 @@ export interface components {
             /** @description Родительская категория (None для корня дерева). */
             readonly parent: number | null;
             readonly description: string;
-            /** @description Общая инструкция по монтажу/управлению для семейства. */
+            /** @description Общая инструкция по монтажу/управлению для линейки продукции. */
             readonly instructions: string;
             /** @description First published product photo in this category, if any. */
             readonly image: {

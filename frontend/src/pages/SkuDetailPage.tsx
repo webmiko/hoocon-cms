@@ -400,7 +400,7 @@ export function SkuDetailPage() {
                       sku.sku_code,
                     ) ? (
                       <div className={styles.seriesBlock}>
-                        <h3 className={styles.descSection}>О семействе</h3>
+                        <h3 className={styles.descSection}>О линейке продукции</h3>
                         <StructuredText text={sku.category_description} />
                       </div>
                     ) : null}

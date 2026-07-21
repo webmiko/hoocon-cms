@@ -74,13 +74,13 @@ class Category(models.Model):
         "описание",
         blank=True,
         default="",
-        help_text="Общее описание семейства (для страницы категории).",
+        help_text="Общее описание линейки продукции (для страницы категории).",
     )
     instructions: models.TextField = models.TextField(
         "инструкция",
         blank=True,
         default="",
-        help_text="Общая инструкция по монтажу/управлению для семейства.",
+        help_text="Общая инструкция по монтажу/управлению для линейки продукции.",
     )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)

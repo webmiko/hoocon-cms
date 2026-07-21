@@ -303,8 +303,8 @@ export function HomePage() {
           <div className={styles.sectionHead}>
             <h2 id="directions-heading">Направления продукции</h2>
             <p className={styles.sectionLead}>
-              Выберите семейство по задаче: воздушные клапаны, противопожарные
-              системы, дымоудаление или шаровые краны.
+              Выберите линейку продукции по задаче: воздушные клапаны,
+              противопожарные системы, дымоудаление или шаровые краны.
             </p>
           </div>
           {loading && <HomeSkeleton />}
