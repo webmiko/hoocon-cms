@@ -63,7 +63,7 @@ def new_leads_sticker(request: HttpRequest) -> dict[str, object]:
     from leads.services import count_new_leads, new_leads_changelist_url
 
     return {
-        "HOOCON_NEW_LEADS_COUNT": count_new_leads(),
+        "HOOCON_NEW_LEADS_COUNT": count_new_leads(user=user),
         "HOOCON_NEW_LEADS_URL": new_leads_changelist_url(),
         "HOOCON_NEW_LEADS_COUNT_URL": reverse("admin:leads_lead_new_count"),
     }

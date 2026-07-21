@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Case, IntegerField, QuerySet, When
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
@@ -229,8 +230,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Lead]:
         """Annotate status rank; scope rows for non-superuser managers.
 
-        Manager sees: new leads, own (assignee / processed_by), client they
-        own, and leads where they appear in CRM activity. Superuser sees all.
+        Manager sees: new leads, own (assignee / processed_by), and leads on
+        CRM clients they own. Superuser sees all.
 
         Does not call ModelAdmin.get_queryset order_by before annotate —
         ``_status_rank`` is not a model field.
@@ -305,14 +306,25 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             queryset: selected Lead rows.
         """
         count = 0
+        skipped = 0
         for lead in queryset:
-            take_lead_in_work(lead, request.user)
-            count += 1
-        self.message_user(
-            request,
-            f"Взято в работу: {count}",
-            messages.SUCCESS,
-        )
+            _lead, taken = take_lead_in_work(lead, request.user)
+            if taken:
+                count += 1
+            else:
+                skipped += 1
+        if skipped:
+            self.message_user(
+                request,
+                f"Взято в работу: {count}. Пропущено (уже у другого): {skipped}",
+                messages.WARNING if count == 0 else messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                f"Взято в работу: {count}",
+                messages.SUCCESS,
+            )
 
     @admin.action(description="Отметить обработанными (я завершил)")
     def action_mark_done(
@@ -392,14 +404,17 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             request: authenticated staff request (enforced by admin_view).
 
         Returns:
-            JSON with unread new-lead count.
+            JSON with unread new-lead count (scoped for managers).
         """
-        return JsonResponse({"count": count_new_leads()})
+        if not request.user.has_perm("leads.view_lead"):
+            raise PermissionDenied
+        return JsonResponse({"count": count_new_leads(user=request.user)})
 
     def stats_view(self, request: HttpRequest) -> HttpResponse:
         """Processing statistics for admins / managers.
 
         Query ``?days=7|30|0`` — period for done_in_period (0 = all time).
+        Non-superuser managers see only their scoped lead set.
 
         Args:
             request: authenticated staff request.
@@ -407,13 +422,16 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         Returns:
             Rendered stats page.
         """
+        if not request.user.has_perm("leads.view_lead"):
+            raise PermissionDenied
         raw_days = request.GET.get("days", "30")
         try:
             days = int(raw_days)
         except (TypeError, ValueError):
             days = 30
         since = None if days <= 0 else timezone.now() - timedelta(days=days)
-        stats = build_lead_processing_stats(since=since)
+        scoped = scope_leads_for_manager(Lead.objects.all(), request.user)
+        stats = build_lead_processing_stats(since=since, queryset=scoped)
         context = {
             **self.admin_site.each_context(request),
             "title": "Статистика заявок",

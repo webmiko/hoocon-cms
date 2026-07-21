@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -15,12 +16,23 @@ from unfold.admin import ModelAdmin, TabularInline
 from config.admin_mixins import OpenChangeLinkMixin
 from crm.forms import ComposeEmailForm
 from crm.models import Activity, Client, EmailMessage, EmailStatus
-from crm.services import create_outbound_email
+from crm.services import (
+    create_outbound_email,
+    scope_activities_for_manager,
+    scope_clients_for_manager,
+    scope_emails_for_manager,
+)
 from leads.models import Lead
+from leads.services import lead_visible_to_manager, scope_leads_for_manager
+
+
+def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
+    """Leads the current manager may attach to CRM rows."""
+    return scope_leads_for_manager(Lead.objects.all(), request.user)
 
 
 class LeadInline(TabularInline):
-    """All RFQ / consult requests on this client card (no duplicate cards)."""
+    """RFQ / consult requests on this client card (scoped for managers)."""
 
     model = Lead
     extra = 0
@@ -44,6 +56,10 @@ class LeadInline(TabularInline):
         """Leads arrive via public API / signal — not manual add on the card."""
         return False
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Lead]:
+        """Hide foreign leads that the manager cannot open in Lead Admin."""
+        return scope_leads_for_manager(super().get_queryset(request), request.user)
+
 
 class ActivityInline(TabularInline):
     """Timeline notes on a Client card."""
@@ -54,6 +70,17 @@ class ActivityInline(TabularInline):
     readonly_fields = ("created_at",)
     autocomplete_fields = ("lead",)
     show_change_link = True
+
+    def formfield_for_foreignkey(
+        self,
+        db_field: Any,
+        request: HttpRequest,
+        **kwargs: Any,
+    ) -> Any:
+        """Restrict lead FK to scoped rows (blocks visibility escalation)."""
+        if db_field.name == "lead":
+            kwargs["queryset"] = _scoped_lead_queryset(request)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class EmailMessageInline(TabularInline):
@@ -143,10 +170,11 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         return obj.leads.count()  # type: ignore[attr-defined]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Client]:
-        """Annotate lead count for the changelist column."""
+        """Annotate lead count; scope cards for non-superuser managers."""
         from django.db.models import Count
 
-        return super().get_queryset(request).annotate(_leads_count=Count("leads", distinct=True))
+        qs = super().get_queryset(request).annotate(_leads_count=Count("leads", distinct=True))
+        return scope_clients_for_manager(qs, request.user)
 
     def save_formset(
         self,
@@ -155,11 +183,17 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         formset: Any,
         change: bool,
     ) -> None:
-        """Set author on new Activity inline rows."""
+        """Set author on new Activity rows; reject out-of-scope lead FKs."""
         instances = formset.save(commit=False)
         for obj in instances:
-            if isinstance(obj, Activity) and obj.author_id is None:
-                obj.author = request.user
+            if isinstance(obj, Activity):
+                if obj.author_id is None:
+                    obj.author = request.user
+                lead = cast(Lead | None, obj.lead) if obj.lead_id else None
+                if not lead_visible_to_manager(lead, request.user):
+                    raise PermissionDenied(
+                        _("Нельзя привязать активность к чужой заявке."),
+                    )
             obj.save()
         formset.save_m2m()
         for obj in formset.deleted_objects:
@@ -204,7 +238,11 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         object_id: str,
     ) -> HttpResponse:
         """Form to compose and queue an outbound email to this Client."""
-        client = get_object_or_404(Client, pk=object_id)
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        client = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, client):
+            raise PermissionDenied
         change_url = reverse("admin:crm_client_change", args=[client.pk])
 
         if request.method == "POST":
@@ -284,8 +322,22 @@ class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
         return cast(Client, obj.client).email
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Activity]:
-        """Prefetch client for email ID column."""
-        return super().get_queryset(request).select_related("client", "lead", "author")
+        """Prefetch relations; scope rows for managers."""
+        qs = super().get_queryset(request).select_related("client", "lead", "author")
+        return scope_activities_for_manager(qs, request.user)
+
+    def formfield_for_foreignkey(
+        self,
+        db_field: Any,
+        request: HttpRequest,
+        **kwargs: Any,
+    ) -> Any:
+        """Restrict client/lead pickers to scoped rows."""
+        if db_field.name == "lead":
+            kwargs["queryset"] = _scoped_lead_queryset(request)
+        if db_field.name == "client":
+            kwargs["queryset"] = scope_clients_for_manager(Client.objects.all(), request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(
         self,
@@ -294,9 +346,12 @@ class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
         form: Any,
         change: bool,
     ) -> None:
-        """Set author to current staff user when creating."""
+        """Set author on create; reject out-of-scope lead FK."""
         if not change and obj.author_id is None:
             obj.author = request.user
+        lead = cast(Lead | None, obj.lead) if obj.lead_id else None
+        if not lead_visible_to_manager(lead, request.user):
+            raise PermissionDenied(_("Нельзя привязать активность к чужой заявке."))
         super().save_model(request, obj, form, change)
 
 
@@ -363,8 +418,22 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
         return (obj.to_email or "").strip().lower() or "—"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[EmailMessage]:
-        """Prefetch client for email ID column."""
-        return super().get_queryset(request).select_related("client", "lead", "created_by")
+        """Prefetch client; scope rows for managers."""
+        qs = super().get_queryset(request).select_related("client", "lead", "created_by")
+        return scope_emails_for_manager(qs, request.user)
+
+    def formfield_for_foreignkey(
+        self,
+        db_field: Any,
+        request: HttpRequest,
+        **kwargs: Any,
+    ) -> Any:
+        """Restrict client/lead pickers to scoped rows."""
+        if db_field.name == "lead":
+            kwargs["queryset"] = _scoped_lead_queryset(request)
+        if db_field.name == "client":
+            kwargs["queryset"] = scope_clients_for_manager(Client.objects.all(), request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     @admin.action(description=_("Отправить выбранные (очередь)"))
     def queue_send(
@@ -410,6 +479,9 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
 
         if not change and obj.created_by_id is None:
             obj.created_by = request.user
+        lead = cast(Lead | None, obj.lead) if obj.lead_id else None
+        if not lead_visible_to_manager(lead, request.user):
+            raise PermissionDenied(_("Нельзя привязать письмо к чужой заявке."))
         previous_status = None
         if change and obj.pk:
             previous_status = EmailMessage.objects.filter(pk=obj.pk).values_list("status", flat=True).first()

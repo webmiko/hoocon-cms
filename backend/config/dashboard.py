@@ -8,7 +8,7 @@ from typing import Any, cast
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import timezone
@@ -16,6 +16,7 @@ from django.utils import timezone
 _FEED_LIMIT = 8
 _LOG_LIMIT = 10
 _STATS_DAYS = 30
+_LOG_APP_LABELS = ("crm", "leads", "catalog")
 
 
 def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
@@ -46,7 +47,7 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
         can_crm=can_crm,
         since=since,
     )
-    chart = _build_status_chart(can_leads=can_leads, user=user) if can_leads else []
+    chart = _build_status_chart(user=user) if can_leads else []
 
     recent_leads: list[dict[str, Any]] | None = None
     if can_leads:
@@ -55,8 +56,8 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
     recent_clients: list[dict[str, Any]] | None = None
     recent_activities: list[dict[str, Any]] | None = None
     if can_crm:
-        recent_clients = _recent_clients()
-        recent_activities = _recent_activities()
+        recent_clients = _recent_clients(user)
+        recent_activities = _recent_activities(user)
 
     admin_log = _recent_admin_log(user)
 
@@ -83,19 +84,28 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
     }
 
 
+def _scoped_leads(user: Any) -> Any:
+    """Lead queryset visible to this manager (or all for superuser)."""
+    from leads.models import Lead
+    from leads.services import scope_leads_for_manager
+
+    return scope_leads_for_manager(Lead.objects.all(), user)
+
+
 def _build_notifications(
     *,
     user: Any,
     can_leads: bool,
     can_crm: bool,
 ) -> list[dict[str, Any]]:
-    """Unread / attention items for the alerts strip."""
+    """Unread / attention items for the alerts strip (scoped KPIs)."""
     items: list[dict[str, Any]] = []
     if can_leads:
         from leads.models import Lead
         from leads.services import count_new_leads, new_leads_changelist_url
 
-        unread = count_new_leads()
+        scoped = _scoped_leads(user)
+        unread = count_new_leads(user=user)
         if unread:
             items.append(
                 {
@@ -105,7 +115,7 @@ def _build_notifications(
                     "url": new_leads_changelist_url(),
                 },
             )
-        unassigned = Lead.objects.filter(
+        unassigned = scoped.filter(
             status__in=(Lead.LeadStatus.NEW, Lead.LeadStatus.IN_PROGRESS),
             assignee__isnull=True,
         ).count()
@@ -119,7 +129,7 @@ def _build_notifications(
                 },
             )
         if not user.is_superuser:
-            mine_open = Lead.objects.filter(
+            mine_open = scoped.filter(
                 assignee=user,
                 status=Lead.LeadStatus.IN_PROGRESS,
             ).count()
@@ -135,8 +145,12 @@ def _build_notifications(
 
     if can_crm:
         from crm.models import EmailMessage, EmailStatus
+        from crm.services import scope_emails_for_manager
 
-        failed = EmailMessage.objects.filter(status=EmailStatus.FAILED).count()
+        failed = scope_emails_for_manager(
+            EmailMessage.objects.filter(status=EmailStatus.FAILED),
+            user,
+        ).count()
         if failed:
             items.append(
                 {
@@ -166,18 +180,18 @@ def _build_stat_cards(
     can_crm: bool,
     since: Any,
 ) -> list[dict[str, Any]]:
-    """KPI tiles for the dashboard grid."""
+    """KPI tiles for the dashboard grid (scoped for managers)."""
     cards: list[dict[str, Any]] = []
     if can_leads:
         from leads.services import build_lead_processing_stats, count_new_leads
 
-        stats = build_lead_processing_stats(since=since)
+        stats = build_lead_processing_stats(since=since, queryset=_scoped_leads(user))
         totals = stats["totals"]
         cards.extend(
             [
                 {
                     "label": "Непросмотренные",
-                    "value": count_new_leads(),
+                    "value": count_new_leads(user=user),
                     "accent": True,
                     "url": reverse("admin:leads_lead_changelist"),
                 },
@@ -213,11 +227,18 @@ def _build_stat_cards(
 
     if can_crm:
         from crm.models import Client, EmailMessage, EmailStatus
+        from crm.services import scope_clients_for_manager, scope_emails_for_manager
 
-        clients_n = Client.objects.filter(is_active=True).count()
-        sent_period = EmailMessage.objects.filter(
-            status=EmailStatus.SENT,
-            sent_at__gte=since,
+        clients_n = scope_clients_for_manager(
+            Client.objects.filter(is_active=True),
+            user,
+        ).count()
+        sent_period = scope_emails_for_manager(
+            EmailMessage.objects.filter(
+                status=EmailStatus.SENT,
+                sent_at__gte=since,
+            ),
+            user,
         ).count()
         cards.extend(
             [
@@ -238,13 +259,11 @@ def _build_stat_cards(
     return cards
 
 
-def _build_status_chart(*, can_leads: bool, user: Any) -> list[dict[str, Any]]:
+def _build_status_chart(*, user: Any) -> list[dict[str, Any]]:
     """Simple bar data for lead status infographic."""
-    del can_leads
     from leads.models import Lead
-    from leads.services import scope_leads_for_manager
 
-    qs = scope_leads_for_manager(Lead.objects.all(), user)
+    qs = _scoped_leads(user)
     rows = list(qs.values("status").annotate(n=Count("id")))
     by_status = {row["status"]: row["n"] for row in rows}
     order = (
@@ -266,14 +285,7 @@ def _build_status_chart(*, can_leads: bool, user: Any) -> list[dict[str, Any]]:
 
 def _recent_leads(user: Any) -> list[dict[str, Any]]:
     """Latest leads visible to this manager."""
-    from leads.models import Lead
-    from leads.services import scope_leads_for_manager
-
-    qs = (
-        scope_leads_for_manager(Lead.objects.all(), user)
-        .select_related("assignee", "client")
-        .order_by("-created_at", "-pk")[:_FEED_LIMIT]
-    )
+    qs = _scoped_leads(user).select_related("assignee", "client").order_by("-created_at", "-pk")[:_FEED_LIMIT]
     out: list[dict[str, Any]] = []
     for lead in qs:
         out.append(
@@ -291,11 +303,16 @@ def _recent_leads(user: Any) -> list[dict[str, Any]]:
     return out
 
 
-def _recent_clients() -> list[dict[str, Any]]:
-    """Latest updated CRM client cards."""
+def _recent_clients(user: Any) -> list[dict[str, Any]]:
+    """Latest updated CRM client cards visible to this manager."""
     from crm.models import Client
+    from crm.services import scope_clients_for_manager
 
-    qs = Client.objects.select_related("assignee").order_by("-updated_at")[:_FEED_LIMIT]
+    qs = (
+        scope_clients_for_manager(Client.objects.all(), user)
+        .select_related("assignee")
+        .order_by("-updated_at")[:_FEED_LIMIT]
+    )
     out: list[dict[str, Any]] = []
     for client in qs:
         out.append(
@@ -311,11 +328,16 @@ def _recent_clients() -> list[dict[str, Any]]:
     return out
 
 
-def _recent_activities() -> list[dict[str, Any]]:
-    """Latest CRM timeline events (client work)."""
+def _recent_activities(user: Any) -> list[dict[str, Any]]:
+    """Latest CRM timeline events visible to this manager."""
     from crm.models import Activity
+    from crm.services import scope_activities_for_manager
 
-    qs = Activity.objects.select_related("client", "author", "lead").order_by("-created_at")[:_FEED_LIMIT]
+    qs = (
+        scope_activities_for_manager(Activity.objects.all(), user)
+        .select_related("client", "author", "lead")
+        .order_by("-created_at")[:_FEED_LIMIT]
+    )
     out: list[dict[str, Any]] = []
     for act in qs:
         out.append(
@@ -340,11 +362,13 @@ def _username(user: Any) -> str:
 
 
 def _recent_admin_log(user: Any) -> list[dict[str, Any]]:
-    """Recent Admin LogEntry for catalog/CRM/leads work."""
+    """Recent Admin LogEntry for catalog/CRM/leads (filter before slice)."""
     qs = LogEntry.objects.select_related("user", "content_type").order_by("-action_time")
-    # Non-superuser: only own actions (less noise / privacy).
     if not user.is_superuser:
         qs = qs.filter(user_id=user.pk)
+
+    ct_ids = ContentType.objects.filter(app_label__in=_LOG_APP_LABELS).values("pk")
+    qs = qs.filter(Q(content_type_id__in=ct_ids) | Q(content_type__isnull=True))
     entries = list(qs[:_LOG_LIMIT])
 
     out: list[dict[str, Any]] = []
@@ -353,9 +377,8 @@ def _recent_admin_log(user: Any) -> list[dict[str, Any]]:
         if entry.content_type_id:
             ct = cast(ContentType, entry.content_type)
             model = f"{ct.app_label}.{ct.model}"
-        # Focus on CRM / leads / catalog (clients & «orders» = leads).
-        if model and not model.startswith(("crm.", "leads.", "catalog.")):
-            continue
+            if not model.startswith(tuple(f"{a}." for a in _LOG_APP_LABELS)):
+                continue
         out.append(
             {
                 "time": entry.action_time,

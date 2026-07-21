@@ -54,29 +54,39 @@ def parse_notify_emails(raw: str) -> list[str]:
     return result
 
 
-def count_new_leads() -> int:
-    """Return unread new leads for the admin sticker.
+def count_new_leads(*, user: Any | None = None) -> int:
+    """Return unread new leads for the admin sticker / dashboard.
 
-    Counts leads with status=new and seen_at IS NULL (not yet opened).
+    Counts leads with status=new and seen_at IS NULL (pool for all managers).
+    When ``user`` is set and is not a superuser, count is limited to leads
+    visible via :func:`scope_leads_for_manager` (still includes the NEW pool).
+
+    Args:
+        user: optional staff user for scoped counting.
 
     Returns:
         Non-negative count of unread new leads.
     """
-    return Lead.objects.filter(
+    qs = Lead.objects.filter(
         status=Lead.LeadStatus.NEW,
         seen_at__isnull=True,
-    ).count()
+    )
+    if user is not None:
+        qs = scope_leads_for_manager(qs, user)
+    return qs.count()
 
 
 def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lead]:
     """Limit leads for a working manager in Admin.
 
     Superuser sees all. A regular staff manager sees:
-    - new leads (pool);
+    - new leads (shared pool);
     - leads assigned to them (``assignee``);
     - leads they finished (``processed_by``);
-    - leads on CRM clients they own (``client.assignee``);
-    - leads where they authored a CRM activity (mentioned in the card).
+    - leads on CRM clients they own (``client.assignee``).
+
+    Activity authorship does **not** unlock a foreign lead (closes IDOR via
+    ``Activity.lead`` + author self-assignment).
 
     Args:
         queryset: base Lead queryset (may already be annotated).
@@ -94,9 +104,23 @@ def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lea
         Q(status=Lead.LeadStatus.NEW)
         | Q(assignee_id=user.pk)
         | Q(processed_by_id=user.pk)
-        | Q(client__assignee_id=user.pk)
-        | Q(crm_activities__author_id=user.pk),
+        | Q(client__assignee_id=user.pk),
     ).distinct()
+
+
+def lead_visible_to_manager(lead: Lead | None, user: Any) -> bool:
+    """Whether ``user`` may link/see this lead under manager scope.
+
+    Args:
+        lead: Lead instance or None (None is always allowed for empty FK).
+        user: staff user.
+
+    Returns:
+        True when lead is None or present in the scoped queryset.
+    """
+    if lead is None:
+        return True
+    return scope_leads_for_manager(Lead.objects.filter(pk=lead.pk), user).exists()
 
 
 def mark_lead_seen(lead_id: int) -> bool:
@@ -130,7 +154,7 @@ def manager_display_name(user: Any) -> str:
     return full or user.get_username()
 
 
-def take_lead_in_work(lead: Lead, manager: Any) -> Lead:
+def take_lead_in_work(lead: Lead, manager: Any) -> tuple[Lead, bool]:
     """Assign lead to manager and set status to in_progress.
 
     Uses select_for_update; skips overwrite if another assignee already set.
@@ -140,13 +164,13 @@ def take_lead_in_work(lead: Lead, manager: Any) -> Lead:
         manager: staff user taking the lead.
 
     Returns:
-        Updated Lead instance (saved).
+        ``(lead, taken)`` — ``taken`` is False when another assignee held it.
     """
     with transaction.atomic():
         locked = Lead.objects.select_for_update().get(pk=lead.pk)
         if locked.assignee_id and locked.assignee_id != manager.pk:
             lead.refresh_from_db()
-            return lead
+            return lead, False
         locked.assignee = manager
         locked.status = Lead.LeadStatus.IN_PROGRESS
         if locked.seen_at is None:
@@ -161,7 +185,7 @@ def take_lead_in_work(lead: Lead, manager: Any) -> Lead:
         subject=f"Взята в работу: {manager_display_name(manager)}",
         body="Статус → В работе",
     )
-    return lead
+    return lead, True
 
 
 def apply_lead_manager_on_save(lead: Lead, *, actor: Any) -> None:
@@ -229,24 +253,30 @@ def _log_manager_activity(
     )
 
 
-def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, Any]:
+def build_lead_processing_stats(
+    *,
+    since: datetime | None = None,
+    queryset: QuerySet[Lead] | None = None,
+) -> dict[str, Any]:
     """Aggregate lead processing totals and per-manager breakdown.
 
     Uses grouped annotations to avoid N+1 per manager.
 
     Args:
         since: optional lower bound for ``done_in_period`` / avg time
-            (uses ``processed_at``). Totals by status are always global.
+            (uses ``processed_at``).
+        queryset: optional Lead queryset (manager scope). Defaults to all.
 
     Returns:
         Dict with ``totals``, ``managers``, ``since`` ISO string or None.
     """
-    status_counts = {row["status"]: row["n"] for row in Lead.objects.values("status").annotate(n=Count("id"))}
+    base = queryset if queryset is not None else Lead.objects.all()
+    status_counts = {row["status"]: row["n"] for row in base.values("status").annotate(n=Count("id"))}
     totals: dict[str, Any] = {
         "new": status_counts.get(Lead.LeadStatus.NEW, 0),
         "in_progress": status_counts.get(Lead.LeadStatus.IN_PROGRESS, 0),
         "done": status_counts.get(Lead.LeadStatus.DONE, 0),
-        "unassigned_open": Lead.objects.filter(
+        "unassigned_open": base.filter(
             status__in=(Lead.LeadStatus.NEW, Lead.LeadStatus.IN_PROGRESS),
             assignee__isnull=True,
         ).count(),
@@ -260,7 +290,7 @@ def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, A
         F("processed_at") - F("created_at"),
         output_field=DurationField(),
     )
-    done_qs = Lead.objects.filter(done_filter, processed_at__isnull=False)
+    done_qs = base.filter(done_filter, processed_at__isnull=False)
     if since is not None:
         done_qs = done_qs.filter(processed_at__gte=since)
     totals["done_in_period"] = done_qs.count()
@@ -268,7 +298,7 @@ def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, A
     totals["avg_hours_to_done"] = round(avg_duration.total_seconds() / 3600, 1) if avg_duration else None
 
     assignee_rows = (
-        Lead.objects.exclude(assignee_id=None)
+        base.exclude(assignee_id=None)
         .values("assignee_id")
         .annotate(
             assigned_open=Count(
@@ -282,7 +312,7 @@ def build_lead_processing_stats(*, since: datetime | None = None) -> dict[str, A
         )
     )
     processed_rows = (
-        Lead.objects.exclude(processed_by_id=None)
+        base.exclude(processed_by_id=None)
         .filter(status=Lead.LeadStatus.DONE)
         .values("processed_by_id")
         .annotate(

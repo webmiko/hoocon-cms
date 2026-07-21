@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import IntegrityError, transaction
+from django.db.models import Q, QuerySet
 
 from config.logging_utils import setup_logger
 from crm.models import (
@@ -247,3 +250,76 @@ def create_outbound_email(
     if send_now:
         enqueue_crm_email(msg.pk)
     return msg
+
+
+def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet[Client]:
+    """Limit CRM clients for a non-superuser manager.
+
+    Visible when: assigned to the manager, linked to a scoped lead, or the
+    manager authored an activity on the card (timeline access without unlocking
+    foreign leads — Lead inline stays scoped separately).
+
+    Args:
+        queryset: base Client queryset.
+        user: authenticated staff user.
+
+    Returns:
+        Filtered Client queryset.
+    """
+    from leads.services import scope_leads_for_manager
+
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+
+    scoped_lead_ids = scope_leads_for_manager(Lead.objects.all(), user).values("pk")
+    return queryset.filter(
+        Q(assignee_id=user.pk) | Q(leads__pk__in=scoped_lead_ids) | Q(activities__author_id=user.pk),
+    ).distinct()
+
+
+def scope_activities_for_manager(
+    queryset: QuerySet[Activity],
+    user: Any,
+) -> QuerySet[Activity]:
+    """Limit activities to scoped clients or ones authored by the user.
+
+    Args:
+        queryset: base Activity queryset.
+        user: authenticated staff user.
+
+    Returns:
+        Filtered Activity queryset.
+    """
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+
+    client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
+    return queryset.filter(
+        Q(client_id__in=client_ids) | Q(author_id=user.pk),
+    ).distinct()
+
+
+def scope_emails_for_manager(
+    queryset: QuerySet[EmailMessage],
+    user: Any,
+) -> QuerySet[EmailMessage]:
+    """Limit email rows to clients visible to the manager.
+
+    Args:
+        queryset: base EmailMessage queryset.
+        user: authenticated staff user.
+
+    Returns:
+        Filtered EmailMessage queryset.
+    """
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+
+    client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
+    return queryset.filter(client_id__in=client_ids)

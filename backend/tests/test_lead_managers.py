@@ -34,7 +34,8 @@ def test_take_lead_in_work_sets_assignee_and_status() -> None:
         message="Нужна консультация по приводам.",
         status=Lead.LeadStatus.NEW,
     )
-    take_lead_in_work(lead, manager)
+    _lead, taken = take_lead_in_work(lead, manager)
+    assert taken is True
     lead.refresh_from_db()
     assert lead.status == Lead.LeadStatus.IN_PROGRESS
     assert lead.assignee_id == manager.pk
@@ -134,8 +135,8 @@ def test_build_lead_processing_stats_by_manager() -> None:
 
 
 @pytest.mark.django_db
-def test_scope_leads_for_manager_sees_new_own_and_mentioned() -> None:
-    """Manager list: new + assignee/processed + client + activity mention."""
+def test_scope_leads_for_manager_sees_new_own_and_client() -> None:
+    """Manager list: new + assignee/processed + client assignee (not activity)."""
     from crm.models import Activity, ActivityType
     from crm.models import Client as CrmClient
     from leads.services import scope_leads_for_manager
@@ -214,7 +215,8 @@ def test_scope_leads_for_manager_sees_new_own_and_mentioned() -> None:
     assert mine.pk in visible
     assert finished.pk in visible
     assert on_my_client.pk in visible
-    assert mentioned.pk in visible
+    # Activity author must NOT unlock a foreign lead (IDOR).
+    assert mentioned.pk not in visible
     assert foreign.pk not in visible
 
     # Superuser sees everything.
@@ -377,8 +379,10 @@ def test_take_lead_in_work_skips_other_assignee() -> None:
         message="x" * 20,
         status=Lead.LeadStatus.NEW,
     )
-    take_lead_in_work(lead, mgr_a)
-    take_lead_in_work(lead, mgr_b)
+    _lead, taken_a = take_lead_in_work(lead, mgr_a)
+    assert taken_a is True
+    _lead, taken_b = take_lead_in_work(lead, mgr_b)
+    assert taken_b is False
     lead.refresh_from_db()
     assert lead.assignee_id == mgr_a.pk
 

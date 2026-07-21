@@ -22,7 +22,7 @@ def badge_new_leads(request: HttpRequest) -> int | str:
         return ""
     from leads.services import count_new_leads
 
-    count = count_new_leads()
+    count = count_new_leads(user=request.user)
     return count if count > 0 else ""
 
 
