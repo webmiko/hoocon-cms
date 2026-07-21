@@ -25,6 +25,7 @@ from catalog.compare import (
 from catalog.facets import collect_facet_options
 from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
 from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
+from catalog.ordering import annotate_moment_nm, catalog_list_order_by
 from catalog.serializers import (
     CategorySerializer,
     SKUDetailSerializer,
@@ -213,7 +214,7 @@ class SKUViewSet(
             queryset=AttributeValue.objects.select_related("attribute"),
             to_attr="_prefetched_attribute_values",
         )
-        qs = (
+        qs = annotate_moment_nm(
             SKU.objects.filter(is_published=True)
             .select_related("product", "product__category")
             .prefetch_related(published_images, published_attrs)
@@ -221,14 +222,8 @@ class SKUViewSet(
                 category_spec_order=spec_order_case(
                     slug_field="product__category__slug",
                 ),
-            )
-            # Same category order as the filter sidebar, then article within.
-            .order_by(
-                "category_spec_order",
-                "product__category__name",
-                "sku_code",
-            )
-        )
+            ),
+        ).order_by(*catalog_list_order_by())
         if self.action == "retrieve":
             qs = qs.prefetch_related(
                 Prefetch(

@@ -255,6 +255,69 @@ def test_sku_list_follows_category_filter_order(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sku_list_orders_by_moment_numeric_not_sku_code(client) -> None:
+    """Within a category, cards sort 2 → 10 → 32 Нм (not da10, da2, da32)."""
+    from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+
+    cat = Category.objects.create(name="Воздушные", slug="elektroprivody-vozdushnye")
+    product = Product.objects.create(name="P-moment", slug="p-moment-sort", category=cat)
+    moment = Attribute.objects.create(name="Крутящий момент", slug="moment", unit="Нм")
+    # Lexicographic sku_code order would be da10, da2, da32 — wrong for torque.
+    for code, nm in (("da32mu24", "32 Нм"), ("da10mu24", "10 Нм"), ("da2mu24", "2 Нм")):
+        sku = SKU.objects.create(
+            product=product,
+            name=code.upper(),
+            slug=f"sku-{code}",
+            sku_code=code,
+            is_published=True,
+        )
+        AttributeValue.objects.create(sku=sku, attribute=moment, value=nm)
+
+    response = client.get(
+        reverse("catalog-sku-list"),
+        {"category": cat.slug, "page_size": 20},
+    )
+    assert response.status_code == 200
+    codes = [row["sku_code"] for row in response.data["results"]]
+    assert codes == ["da2mu24", "da10mu24", "da32mu24"]
+
+
+@pytest.mark.django_db
+def test_sku_list_orders_category_then_moment(client) -> None:
+    """All-categories list: sidebar category order, then torque inside each."""
+    from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+    from catalog.series_categories import spec_categories
+
+    specs = [s for s in spec_categories() if s.slug != "sharovye-krany"][:2]
+    assert len(specs) == 2
+    moment = Attribute.objects.create(name="Крутящий момент", slug="moment", unit="Нм")
+    # Earlier category gets higher torque so sku_code/moment alone would invert.
+    for spec, nm, code in (
+        (specs[0], "32 Нм", "zz-early-32"),
+        (specs[1], "2 Нм", "aa-late-2"),
+    ):
+        cat = Category.objects.create(name=spec.name, slug=spec.slug)
+        product = Product.objects.create(
+            name=f"P-{spec.slug}",
+            slug=f"p-{spec.slug}-mom",
+            category=cat,
+        )
+        sku = SKU.objects.create(
+            product=product,
+            name=code,
+            slug=f"sku-{code}",
+            sku_code=code,
+            is_published=True,
+        )
+        AttributeValue.objects.create(sku=sku, attribute=moment, value=nm)
+
+    response = client.get(reverse("catalog-sku-list"), {"page_size": 50})
+    assert response.status_code == 200
+    codes = [row["sku_code"] for row in response.data["results"]]
+    assert codes.index("zz-early-32") < codes.index("aa-late-2")
+
+
+@pytest.mark.django_db
 def test_category_list_includes_preview_image(client) -> None:
     """Category payload includes first published product photo when present."""
     from django.core.files.uploadedfile import SimpleUploadedFile

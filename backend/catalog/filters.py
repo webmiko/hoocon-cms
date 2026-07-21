@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import django_filters
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -65,7 +65,7 @@ class SKUFilterSet(django_filters.FilterSet):
                 Q(search_vector=query) | Q(sku_code__icontains=value) | Q(analog_belimo_code__icontains=value),
             )
             .annotate(rank=SearchRank("search_vector", query))
-            .order_by("-rank", "sku_code")
+            .order_by("-rank", F("moment_nm").asc(nulls_last=True), "sku_code")
         )
 
 
