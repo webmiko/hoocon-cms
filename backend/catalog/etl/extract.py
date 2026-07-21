@@ -31,7 +31,8 @@ def extract_categories(
     """Yield (tilda_id, name, parent_tilda_id_or_None) from the Назначение filter.
 
     Walks the 'Назначение' filter tree (filters[0]) — top-level values + their
-    subparts. Returns a flat list of (id, name, parent_id) tuples.
+    subparts. Returns a flat list of (id, name, parent_id) tuples. Subparts
+    whose parent has no ``id`` are skipped (not promoted to top-level).
 
     Args:
         payload: parsed JSON from hoocon_catalog_api.json.
@@ -55,5 +56,8 @@ def extract_categories(
         for sub in value.get("subparts") or []:
             sub_id = sub.get("id")
             sub_name = sub.get("value") or ""
-            if sub_id is not None and sub_name:
-                yield (int(sub_id), str(sub_name), int(top_id) if top_id is not None else None)
+            # Missing parent id → skip (do not promote subcategory to top-level).
+            # Parent present but not yielded (e.g. empty name) still keeps
+            # parent_id so load can quarantine "parent not found".
+            if sub_id is not None and sub_name and top_id is not None:
+                yield (int(sub_id), str(sub_name), int(top_id))

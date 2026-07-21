@@ -9,6 +9,7 @@ Spec: docs/data-quality-etl.md §4.1 (SKU/атрибуты gates).
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -233,12 +234,46 @@ def _parse_price(raw: Any) -> Decimal | None:
         ) from exc
 
 
+def _normalize_attribute_value(
+    title: str,
+    value: str,
+    *,
+    sku_code: str,
+    category_slug: str = "",
+) -> str:
+    """Apply control / tech-copy normalization to one EAV value.
+
+    Args:
+        title: Attribute title (Russian label from Tilda).
+        value: Raw value string.
+        sku_code: Edition article (needed for «Управление» heuristics).
+        category_slug: Leaf category slug (spring/fire → ON/OFF heuristics).
+
+    Returns:
+        Normalized value string.
+    """
+    from catalog.etl.tech_copy import (
+        normalize_control_attribute_value,
+        normalize_tech_copy,
+    )
+
+    if "управл" in title.casefold():
+        return normalize_control_attribute_value(
+            value,
+            sku_code=sku_code,
+            category_slug=category_slug or None,
+        )
+    return normalize_tech_copy(value)
+
+
 def _normalize_edition(
     edition: dict[str, Any],
     product_slug: str,
     product_name: str,
     product_description: str = "",
     product_attributes: tuple[NormalizedAttribute, ...] = (),
+    *,
+    category_slug: str = "",
 ) -> NormalizedSKU:
     """Build a NormalizedSKU from a Tilda edition dict.
 
@@ -248,6 +283,7 @@ def _normalize_edition(
         product_name: parent product name (for SKU display name).
         product_description: plain-text description copied onto each SKU.
         product_attributes: product-level characteristics merged into EAV.
+        category_slug: Leaf category slug for «Управление» heuristics.
 
     Returns:
         NormalizedSKU.
@@ -268,13 +304,23 @@ def _normalize_edition(
 
     price = _parse_price(edition.get("price"))
 
-    from catalog.etl.tech_copy import (
-        normalize_control_attribute_value,
-        normalize_tech_copy,
-    )
+    from catalog.etl.tech_copy import normalize_tech_copy
 
-    attrs: list[NormalizedAttribute] = list(product_attributes)
-    seen_titles = {a.title.lower() for a in attrs}
+    attrs: list[NormalizedAttribute] = []
+    seen_titles: set[str] = set()
+    for product_attr in product_attributes:
+        title = product_attr.title.strip()
+        if not title:
+            continue
+        value_str = _normalize_attribute_value(
+            title,
+            product_attr.value,
+            sku_code=sku_code,
+            category_slug=category_slug,
+        )
+        attrs.append(NormalizedAttribute(title=title, value=value_str))
+        seen_titles.add(title.lower())
+
     for key, value in edition.items():
         if key in _EDITION_RESERVED_KEYS:
             continue
@@ -287,13 +333,12 @@ def _normalize_edition(
         if title.lower() in seen_titles:
             # Edition-specific value overrides product-level characteristic.
             attrs = [a for a in attrs if a.title.lower() != title.lower()]
-        if "управл" in title.casefold():
-            value_str = normalize_control_attribute_value(
-                value_str,
-                sku_code=sku_code,
-            )
-        else:
-            value_str = normalize_tech_copy(value_str)
+        value_str = _normalize_attribute_value(
+            title,
+            value_str,
+            sku_code=sku_code,
+            category_slug=category_slug,
+        )
         attrs.append(NormalizedAttribute(title=title, value=value_str))
         seen_titles.add(title.lower())
 
@@ -307,11 +352,17 @@ def _normalize_edition(
     )
 
 
-def normalize_product(raw: dict[str, Any]) -> NormalizedProduct:
+def normalize_product(
+    raw: dict[str, Any],
+    *,
+    category_slugs: Mapping[int, str] | None = None,
+) -> NormalizedProduct:
     """Build a NormalizedProduct from a raw Tilda product dict.
 
     Args:
         raw: raw product dict from extract_products.
+        category_slugs: Optional tilda_id → slug map so «Управление» can use
+            spring/fire category heuristics during normalize (before ORM load).
 
     Returns:
         NormalizedProduct with nested SKUs + attributes.
@@ -377,6 +428,10 @@ def normalize_product(raw: dict[str, Any]) -> NormalizedProduct:
         except (TypeError, ValueError):
             category_id = None
 
+    category_slug = ""
+    if category_id is not None and category_slugs:
+        category_slug = (category_slugs.get(category_id) or "").strip()
+
     editions = raw.get("editions") or []
     skus: list[NormalizedSKU] = []
     for edition in editions:
@@ -390,6 +445,7 @@ def normalize_product(raw: dict[str, Any]) -> NormalizedProduct:
                     name,
                     product_description=description,
                     product_attributes=tuple(product_attrs),
+                    category_slug=category_slug,
                 ),
             )
         except QuarantineError as exc:

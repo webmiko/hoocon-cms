@@ -172,12 +172,13 @@ class Command(BaseCommand):
         cat_stats, cat_map, cat_q = load_categories(cat_norm)
         quarantined.extend(cat_q)
 
+        category_slugs = {c.tilda_id: c.slug for c in cat_norm}
         prod_stats = LoadStats()
         loaded_slugs: list[str] = []
         for raw_product in extract_products(payload):
             patched = apply_slug_to_product(raw_product, uid_slug_map)
             try:
-                np = normalize_product(patched)
+                np = normalize_product(patched, category_slugs=category_slugs)
             except QuarantineError as exc:
                 quarantined.append({"reason": exc.reason, "payload": exc.payload})
                 continue

@@ -31,6 +31,12 @@ from catalog.facets import (
 )
 from catalog.media_urls import RelativeImageField
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
+from catalog.sku_access import (
+    sku_category_instructions,
+    sku_category_slug_or_empty,
+    sku_product_field,
+    sku_section_text,
+)
 from sitesettings.models import SiteSettings
 
 
@@ -70,7 +76,7 @@ def _sku_description(obj: SKU) -> str:
 
 def _sku_specs_text(obj: SKU) -> str:
     """Характеристики text scoped to this edition."""
-    text = obj.specs_text or obj.product.specs_text or ""
+    text = sku_section_text(obj, "specs_text")
     variant = parse_sku_variant(obj.sku_code)
     text = filter_description_for_variant(dedupe_description_lines(text), variant)
     return rewrite_series_tokens_for_variant(text, variant)
@@ -78,11 +84,14 @@ def _sku_specs_text(obj: SKU) -> str:
 
 def _sku_analogs_text(obj: SKU) -> str:
     """Аналоги text for this edition only."""
-    text = obj.analogs_text or obj.product.analogs_text or ""
+    # None → product inherit; "" on SKU stays empty (no product re-fetch).
+    if obj.analogs_text is not None:
+        if not obj.analogs_text.strip():
+            return ""
+        return dedupe_description_lines(obj.analogs_text)
+    text = sku_product_field(obj, "analogs_text")
     if not text.strip():
         return ""
-    if obj.analogs_text:
-        return dedupe_description_lines(obj.analogs_text)
     return filter_analogs_for_sku(text, obj.sku_code)
 
 
@@ -105,7 +114,7 @@ def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any
                 "value": normalize_control_attribute_value(
                     str(row.get("value") or ""),
                     sku_code=obj.sku_code,
-                    category_slug=obj.product.category.slug,
+                    category_slug=sku_category_slug_or_empty(obj),
                 ),
             }
         if "напряж" in name and "диапазон" not in name:
@@ -297,7 +306,7 @@ class SKUListSerializer(serializers.ModelSerializer):
             limit=7,
             description=obj.description or "",
             sku_code=obj.sku_code,
-            category_slug=obj.product.category.slug,
+            category_slug=sku_category_slug_or_empty(obj),
         )
 
     def to_representation(self, instance: SKU) -> dict[str, Any]:
@@ -391,7 +400,7 @@ class SKUDetailSerializer(SKUListSerializer):
             limit=11,
             description=obj.description or "",
             sku_code=obj.sku_code,
-            category_slug=obj.product.category.slug,
+            category_slug=sku_category_slug_or_empty(obj),
         )
 
     def get_analogs_text(self, obj: SKU) -> str:
@@ -400,10 +409,10 @@ class SKUDetailSerializer(SKUListSerializer):
 
     def get_category_instructions(self, obj: SKU) -> str:
         """Install guide: category first, then product-level fallback."""
-        cat = obj.product.category.instructions or ""
+        cat = sku_category_instructions(obj)
         if cat.strip():
             return cat
-        return obj.product.instructions or ""
+        return sku_product_field(obj, "instructions")
 
     def get_attributes(self, obj: SKU) -> list[dict[str, Any]]:
         """ТТХ rows deduped and scoped to the SKU voltage/control variant."""

@@ -10,6 +10,7 @@ slug/sku_code (SEO-stable). Tilda ids could be added later for reconciliation.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,14 +38,15 @@ def _slugify_attr(title: str) -> str:
     """Derive a stable slug for an Attribute from its Russian title.
 
     Uses Django's slugify (handles transliteration via unicode). Falls back
-    to a hash if slugify produces empty (rare for non-Latin titles).
+    to a stable digest if slugify produces empty (rare for non-Latin titles).
     """
     from django.utils.text import slugify
 
     slug = slugify(title)
     if not slug:
-        # Last-resort: ascii-safe fallback so Attribute.slug is never empty.
-        slug = "attr-" + str(abs(hash(title)))
+        # Last-resort: deterministic ascii-safe fallback for ETL idempotency.
+        digest = hashlib.sha1(title.encode("utf-8")).hexdigest()[:12]
+        slug = f"attr-{digest}"
     return slug[:100]
 
 

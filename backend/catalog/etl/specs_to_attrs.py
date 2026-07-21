@@ -182,14 +182,12 @@ def _apply_variant_overrides(sku: SKU, by_slug: dict[str, str]) -> None:
         by_slug["control"] = CONTROL_MODULATING
     elif variant.control == "on_off" and "control" not in by_slug:
         from catalog.etl.tech_copy import normalize_control_attribute_value
+        from catalog.sku_access import sku_category_slug_or_empty
 
-        cat_slug = ""
-        if sku.product_id and sku.product.category_id:
-            cat_slug = sku.product.category.slug
         by_slug["control"] = normalize_control_attribute_value(
             "2-/3-позиционное",
             sku_code=sku.sku_code,
-            category_slug=cat_slug,
+            category_slug=sku_category_slug_or_empty(sku),
         )
     if variant.aux_switch is True and "aux-switch" not in by_slug:
         from catalog.facets import aux_spdt_count_from_sku, normalize_aux_switch_value
@@ -247,9 +245,9 @@ def _is_valve_sku(sku: SKU) -> bool:
 
 
 def _specs_source(sku: SKU) -> str:
-    return dedupe_description_lines(
-        sku.specs_text or sku.product.specs_text or "",
-    )
+    from catalog.sku_access import sku_section_text
+
+    return dedupe_description_lines(sku_section_text(sku, "specs_text"))
 
 
 def _sku_ready_for_card_enrichment(sku: SKU) -> bool:
@@ -296,9 +294,16 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
     """
     sku = _load_sku_for_card_enrichment(sku)
     result = EnrichResult(sku_code=sku.sku_code)
-    if sku.product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
+    from catalog.sku_access import sku_product
+
+    product = sku_product(sku)
+    if product is not None and product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
         result.skipped = True
         result.reason = "canonical_series_copy"
+        return result
+    if product is None:
+        result.skipped = True
+        result.reason = "missing_product"
         return result
 
     result.attrs_before = sku.attribute_values.count()

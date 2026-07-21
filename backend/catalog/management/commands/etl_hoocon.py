@@ -79,10 +79,12 @@ class Command(BaseCommand):
         quarantined.extend(cat_q)
 
         # ── Products ─────────────────────────────────────────────────
+        # tilda_id → slug for «Управление» spring/fire heuristics at normalize.
+        category_slugs = {c.tilda_id: c.slug for c in cat_norm}
         prod_stats = LoadStats()
         for raw_product in extract_products(payload):
             try:
-                np = normalize_product(raw_product)
+                np = normalize_product(raw_product, category_slugs=category_slugs)
             except QuarantineError as exc:
                 quarantined.append(
                     {"reason": exc.reason, "payload": {**exc.payload, **exc.payload}},

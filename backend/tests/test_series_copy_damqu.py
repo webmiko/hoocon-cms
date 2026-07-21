@@ -98,3 +98,45 @@ def test_apply_damqu_enrichment_24v_and_230v_editions() -> None:
     assert "100" in by_230["voltage"] or "230" in by_230["voltage"]
     assert "позицион" in by_230["control"].casefold() or "2-/3" in by_230["control"]
     assert by_230["aux-switch"] in {"SPDT-1", "SPDT-2"}
+
+
+@pytest.mark.django_db
+def test_apply_damqu_enrichment_no_n_plus_one_on_category_slug() -> None:
+    """on_off control must not query product/category once per SKU."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    cat = Category.objects.create(name="Заслонки", slug="zaslonki-damqu-n1")
+    product = Product.objects.create(
+        category=cat,
+        name="old",
+        slug=PRODUCT_SLUG,
+        description="old",
+    )
+    for idx in range(4):
+        SKU.objects.create(
+            product=product,
+            name="old",
+            slug=f"da8mqu24-d-n1-{idx}",
+            sku_code=f"da8mqu24-d{idx}" if idx else "da8mqu24-d",
+            is_published=True,
+        )
+
+    with CaptureQueriesContext(connection) as ctx:
+        apply_damqu_enrichment()
+
+    # Lazy FK loads are JOIN-less SELECTs; select_related uses JOIN on first load.
+    lazy_category = [
+        q["sql"]
+        for q in ctx.captured_queries
+        if 'FROM "catalog_category"' in q["sql"] and "JOIN" not in q["sql"].upper()
+    ]
+    lazy_product = [
+        q["sql"]
+        for q in ctx.captured_queries
+        if q["sql"].lstrip().upper().startswith("SELECT")
+        and 'FROM "catalog_product"' in q["sql"]
+        and "JOIN" not in q["sql"].upper()
+    ]
+    assert lazy_category == []
+    assert lazy_product == []

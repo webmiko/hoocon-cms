@@ -73,6 +73,62 @@ def test_extract_categories_preserves_parent_id_zero() -> None:
     assert (10, "Child Of Zero", 0) in cats
 
 
+def test_extract_categories_skips_subparts_when_parent_id_missing() -> None:
+    """Subparts without a parent id must not become top-level categories."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "value": "Broken Parent",
+                            "subparts": [{"id": 20, "value": "Orphan Child"}],
+                        },
+                        {
+                            "id": 1,
+                            "value": "Good Parent",
+                            "subparts": [{"id": 21, "value": "Good Child"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert (20, "Orphan Child", None) not in cats
+    assert not any(c[0] == 20 for c in cats)
+    assert (1, "Good Parent", None) in cats
+    assert (21, "Good Child", 1) in cats
+
+
+def test_extract_categories_keeps_parent_id_when_parent_name_empty() -> None:
+    """Parent id without name is still passed so load can quarantine the child."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "id": 99,
+                            "value": "",
+                            "subparts": [{"id": 30, "value": "Child Of Nameless"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert not any(c[0] == 99 for c in cats)
+    assert (30, "Child Of Nameless", 99) in cats
+
+
 # ── normalize_slug ──────────────────────────────────────────────────
 
 
@@ -204,6 +260,80 @@ def test_normalize_edition_control_uses_sku_code_heuristics() -> None:
     )
     attrs = {a.title: a.value for a in sku.attributes}
     assert attrs["Управление"] == CONTROL_ON_OFF
+
+
+def test_normalize_edition_control_uses_category_slug_heuristics() -> None:
+    """Spring category slug maps «2-/3» to ON/OFF even without FU/SA in code."""
+    from catalog.etl.normalize import _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_FLOATING, CONTROL_ON_OFF
+
+    spring = _normalize_edition(
+        {
+            "sku": "da2mu24-d",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="spring-mu",
+        product_name="Spring MU",
+        category_slug="elektroprivody-s-pruzhinnym-vozvratom",
+    )
+    assert {a.title: a.value for a in spring.attributes}["Управление"] == CONTROL_ON_OFF
+
+    air = _normalize_edition(
+        {
+            "sku": "da2mu24-d",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="air-mu",
+        product_name="Air MU",
+        category_slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    assert {a.title: a.value for a in air.attributes}["Управление"] == CONTROL_FLOATING
+
+
+def test_normalize_product_passes_category_slug_from_map() -> None:
+    """normalize_product resolves leaf category slug for control heuristics."""
+    from catalog.etl.normalize import normalize_product
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    spring_id = 9001
+    np = normalize_product(
+        {
+            "uid": "1",
+            "title": "Пружинный привод",
+            "buttonlink": "/privod-pruzhinnyy",
+            "partuids": [spring_id],
+            "editions": [
+                {
+                    "sku": "da2mu24-d",
+                    "price": "",
+                    "Управление": "2-/3-позиционное",
+                },
+            ],
+        },
+        category_slugs={spring_id: "elektroprivody-s-pruzhinnym-vozvratom"},
+    )
+    assert np.skus[0].attributes[0].value == CONTROL_ON_OFF
+
+
+def test_normalize_edition_normalizes_product_level_attributes() -> None:
+    """Product characteristics must get the same control/tech-copy pass as editions."""
+    from catalog.etl.normalize import NormalizedAttribute, _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    sku = _normalize_edition(
+        {"sku": "HVD24-5", "price": ""},
+        product_slug="hvd-5",
+        product_name="HVD-5",
+        product_attributes=(
+            NormalizedAttribute(title="Управление", value="Открыто/Закрыто"),
+            NormalizedAttribute(title="Защита", value="класс защиты IP54"),
+        ),
+    )
+    attrs = {a.title: a.value for a in sku.attributes}
+    assert attrs["Управление"] == CONTROL_ON_OFF
+    assert attrs["Защита"] == "Степень защиты корпуса IP54"
 
 
 def test_normalize_edition_without_sku_quarantines() -> None:

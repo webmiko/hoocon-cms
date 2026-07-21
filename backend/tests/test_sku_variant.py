@@ -43,6 +43,21 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert v24.aux_switch is True
 
 
+def test_parse_sku_variant_ignores_non_terminal_suffix_lookalikes() -> None:
+    """Suffix tags must match only at the very end of sku_code."""
+    variant = parse_sku_variant("da3fu230-as1")
+    assert variant.control is None
+    assert variant.aux_switch is None
+
+    variant = parse_sku_variant("da3fu230-d5")
+    assert variant.control is None
+    assert variant.aux_switch is None
+
+    variant = parse_sku_variant("da3fu230-ds-extra")
+    assert variant.control is None
+    assert variant.aux_switch is None
+
+
 def test_filter_description_keeps_matching_electrical_block() -> None:
     """230 V SKU keeps only DA3FU230 block and 230 range bullet."""
     out = filter_description_for_variant(SAMPLE, parse_sku_variant("da3fu230-d"))

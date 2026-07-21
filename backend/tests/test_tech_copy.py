@@ -7,11 +7,19 @@ from unittest.mock import MagicMock
 
 from catalog.etl.tech_copy import normalize_control_attribute_value, normalize_tech_copy
 from catalog.management.commands.normalize_tech_copy import sku_category_slug
+from catalog.sku_access import (
+    sku_category_instructions,
+    sku_category_slug_or_empty,
+)
+from catalog.sku_access import (
+    sku_category_slug as sku_category_slug_shared,
+)
 
 
 def test_sku_category_slug_guards_missing_product_or_category() -> None:
     """Do not read ``.slug`` when product or category FK is missing."""
     assert sku_category_slug(None) is None
+    assert sku_category_slug_shared(None) is None
 
     sku_no_product = MagicMock()
     sku_no_product.product_id = None
@@ -22,13 +30,30 @@ def test_sku_category_slug_guards_missing_product_or_category() -> None:
     sku_no_category.product_id = 1
     sku_no_category.product = product
     assert sku_category_slug(sku_no_category) is None
+    assert sku_category_slug_or_empty(sku_no_category) == ""
+    assert sku_category_instructions(sku_no_category) == ""
 
-    category = SimpleNamespace(slug="elektroprivody-vozdushnye")
+    # product_id set but related object missing / None (stale FK / corruption).
+    sku_stale_product = MagicMock()
+    sku_stale_product.product_id = 99
+    sku_stale_product.product = None
+    assert sku_category_slug(sku_stale_product) is None
+    assert sku_category_instructions(sku_stale_product) == ""
+
+    sku_stale_category = MagicMock()
+    sku_stale_category.product_id = 1
+    sku_stale_category.product = SimpleNamespace(category_id=5, category=None)
+    assert sku_category_slug(sku_stale_category) is None
+    assert sku_category_instructions(sku_stale_category) == ""
+
+    category = SimpleNamespace(slug="elektroprivody-vozdushnye", instructions="Guide")
     product_ok = SimpleNamespace(category_id=2, category=category)
     sku_ok = MagicMock()
     sku_ok.product_id = 1
     sku_ok.product = product_ok
     assert sku_category_slug(sku_ok) == "elektroprivody-vozdushnye"
+    assert sku_category_slug_or_empty(sku_ok) == "elektroprivody-vozdushnye"
+    assert sku_category_instructions(sku_ok) == "Guide"
 
 
 def test_normalize_modulating_signal_drops_factory_dup() -> None:
@@ -126,6 +151,23 @@ def test_control_attribute_three_families() -> None:
             sku_code="sa3fu24-ds",
         )
         == CONTROL_ON_OFF
+    )
+    # Spring FU + on_off suffix: prefer ON/OFF even without category_slug
+    # (old order returned FLOATING via mapped «2-/3» before variant check).
+    assert (
+        normalize_control_attribute_value(
+            "2-/3-позиционное",
+            sku_code="da5fu24-d",
+        )
+        == CONTROL_ON_OFF
+    )
+    # Modulating FU edition must stay пропорциональное.
+    assert (
+        normalize_control_attribute_value(
+            "2-/3-позиционное",
+            sku_code="da5fu24-a",
+        )
+        == CONTROL_MODULATING
     )
 
 

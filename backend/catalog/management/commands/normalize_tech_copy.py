@@ -20,26 +20,10 @@ from catalog.facets import (
     normalize_aux_switch_value,
 )
 from catalog.models import SKU, AttributeValue, Category, Product
+from catalog.sku_access import sku_category_slug
 
-
-def sku_category_slug(sku: SKU | None) -> str | None:
-    """Return product category slug when SKU → Product → Category are set.
-
-    Guards against missing product/category FKs so callers do not hit
-    ``AttributeError`` on ``None.slug``.
-
-    Args:
-        sku: Catalog SKU or None.
-
-    Returns:
-        Category slug, or None when any link in the chain is missing.
-    """
-    if sku is None or not sku.product_id:
-        return None
-    product = sku.product
-    if not product.category_id:
-        return None
-    return product.category.slug
+# Re-export for existing imports (tests / callers).
+__all__ = ("Command", "sku_category_slug")
 
 
 class Command(BaseCommand):

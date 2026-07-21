@@ -6,11 +6,14 @@ import pytest
 from django.urls import reverse
 
 from catalog.etl.belimo_analogs import (
+    analogs_plain_text_for_sku,
+    belimo_code_is_thermal,
     belimo_codes_for_sku,
     extract_belimo_codes_from_text,
     infer_belimo_codes,
     normalize_belimo_code,
     primary_belimo_code_for_sku,
+    sku_code_is_thermal,
 )
 from catalog.models import (
     SKU,
@@ -25,6 +28,52 @@ def test_normalize_belimo_code_dashes() -> None:
     """Unicode dashes collapse to ASCII hyphen."""
     assert normalize_belimo_code("nf24a−s") == "NF24A-S"
     assert normalize_belimo_code(" LM24A-S. ") == "LM24A-S"
+
+
+def test_analogs_plain_text_for_sku_tolerates_missing_product() -> None:
+    """product_id set but product missing must not raise on analogs fallback."""
+    from unittest.mock import MagicMock
+
+    sku = MagicMock()
+    sku.sku_code = "HVD24-5"
+    sku.analogs_text = ""
+    sku.product_id = 99
+    sku.product = None
+    assert analogs_plain_text_for_sku(sku) == ""
+
+    sku.analogs_text = "– Belimo LM24A\n"
+    assert "LM24A" in extract_belimo_codes_from_text(analogs_plain_text_for_sku(sku))[0]
+
+
+def test_analogs_plain_text_empty_sku_does_not_inherit_product() -> None:
+    """Empty SKU analogs_text must not re-fetch / inherit product analogs."""
+    from unittest.mock import MagicMock, patch
+
+    sku = MagicMock()
+    sku.sku_code = "HVD24-5"
+    sku.analogs_text = ""
+    with patch(
+        "catalog.sku_access.sku_product_field",
+        return_value="– Belimo LM24A\n",
+    ) as product_field:
+        assert analogs_plain_text_for_sku(sku) == ""
+        product_field.assert_not_called()
+
+
+def test_analogs_plain_text_none_sku_inherits_product() -> None:
+    """Unset (None) SKU analogs_text falls back to product section text."""
+    from unittest.mock import MagicMock, patch
+
+    sku = MagicMock()
+    sku.sku_code = "HVD24-5"
+    sku.analogs_text = None
+    with patch(
+        "catalog.sku_access.sku_product_field",
+        return_value="– Belimo LF24-S\n",
+    ):
+        assert "LF24-S" in extract_belimo_codes_from_text(
+            analogs_plain_text_for_sku(sku),
+        )
 
 
 def test_extract_belimo_codes_from_analogs_block() -> None:
@@ -256,6 +305,65 @@ def test_sku_attr_map_keeps_first_slug_value() -> None:
     attrs = _sku_attr_map(sku)
     assert attrs["moment"] == "5 Нм"
     assert attrs["attr-dup"] == "first"
+
+
+def test_sku_code_is_thermal_suffix_only() -> None:
+    """Thermal detection requires DST / -T at the end, not a mid-string match."""
+    assert sku_code_is_thermal("SA5FU24-DST") is True
+    assert sku_code_is_thermal("sa5fu24-dst") is True
+    assert sku_code_is_thermal("BF24-T") is True
+    assert sku_code_is_thermal("SA5FU24DST") is True
+    assert sku_code_is_thermal("DSTXXX") is False
+    assert sku_code_is_thermal("XDSTX") is False
+    assert sku_code_is_thermal("SA5FU24") is False
+    assert sku_code_is_thermal("") is False
+    assert sku_code_is_thermal(None) is False
+
+
+def test_belimo_code_is_thermal_suffix_only() -> None:
+    """Belimo thermal codes end with FST / -T; mid-string -T is not thermal."""
+    assert belimo_code_is_thermal("BF24-T") is True
+    assert belimo_code_is_thermal("bf24-t") is True
+    assert belimo_code_is_thermal("BF24-FST") is True
+    assert belimo_code_is_thermal("X-T-Y") is False
+    assert belimo_code_is_thermal("BF24-S") is False
+    assert belimo_code_is_thermal("XFSTY") is False
+    assert belimo_code_is_thermal("") is False
+    assert belimo_code_is_thermal(None) is False
+
+
+@pytest.mark.django_db
+def test_primary_belimo_ignores_midstring_dst_as_thermal() -> None:
+    """Codes with mid-string DST must use the first Belimo code (non-thermal path)."""
+    cat = Category.objects.create(name="Air", slug="air-mid-dst")
+    product = Product.objects.create(name="SA", slug="sa-mid-dst", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DSTXXX",
+        slug="dstxxx-mid",
+        sku_code="DSTXXX",
+        is_published=True,
+        analogs_text="– Belimo LM24A\n– Belimo BF24-T\n",
+    )
+    assert primary_belimo_code_for_sku(sku) == "LM24A"
+
+
+@pytest.mark.django_db
+def test_primary_belimo_skips_midstring_dash_t_belimo_code() -> None:
+    """Thermal SKU must not treat mid-string -T Belimo tokens as thermal."""
+    cat = Category.objects.create(name="Fire", slug="fire-mid-t")
+    product = Product.objects.create(name="SA", slug="sa-mid-t", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="SA5FU24-DST",
+        slug="sa5fu24-dst-mid-t",
+        sku_code="SA5FU24-DST",
+        is_published=True,
+        analogs_text="– Belimo LM24A-T-S\n– Belimo BF24-S\n",
+    )
+    assert belimo_codes_for_sku(sku) == ["LM24A-T-S", "BF24-S"]
+    assert belimo_code_is_thermal("LM24A-T-S") is False
+    assert primary_belimo_code_for_sku(sku) is None
 
 
 @pytest.mark.django_db

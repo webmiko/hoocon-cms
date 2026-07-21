@@ -74,17 +74,17 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
 
     control: str | None = None
     aux: bool | None = None
-    # Suffixes are hyphen-prefixed edition tags at the end of the code.
-    if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):
+    # Suffixes are hyphen-prefixed edition tags strictly at the code end.
+    if code.endswith("-as"):
         control = "modulating"
         aux = True
-    elif re.search(r"-ds(?:$|[^a-z])", code) or code.endswith("-ds"):
+    elif code.endswith("-ds"):
         control = "on_off"
         aux = True
-    elif re.search(r"-a(?:$|[^a-z])", code) or code.endswith("-a"):
+    elif code.endswith("-a"):
         control = "modulating"
         aux = False
-    elif re.search(r"-d(?:$|[^a-z])", code) or code.endswith("-d"):
+    elif code.endswith("-d"):
         control = "on_off"
         aux = False
 

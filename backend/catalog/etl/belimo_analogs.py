@@ -8,13 +8,13 @@ from purpose (category), damper torque/area band, voltage, control, aux SPDT.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal
 
 from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.sku_variant import parse_sku_variant
 
 if TYPE_CHECKING:
-    from catalog.models import SKU, Category, Product
+    from catalog.models import SKU
 
 Purpose = Literal[
     "air_no_spring",
@@ -35,6 +35,10 @@ _HAS_230 = re.compile(r"(?:^|[^0-9])230(?:[^0-9]|$)")
 _HAS_24 = re.compile(r"(?:^|[^0-9])24(?:[^0-9]|$)")
 _MOMENT_NUM = re.compile(r"(\d+[.,]?\d*)")
 _AREA_NUM = re.compile(r"(\d+[.,]?\d*)")
+# Hoocon thermal edition: article ends with DST or -T (not a mid-string match).
+_THERMAL_SKU_SUFFIX = re.compile(r"dst$|-t$")
+# Belimo thermal article: ends with FST or -T (not mid-string "-T").
+_THERMAL_BELIMO_SUFFIX = re.compile(r"fst$|-t$")
 
 # Category slug fragments → purpose for inference.
 _PURPOSE_BY_CATEGORY: tuple[tuple[str, Purpose], ...] = (
@@ -280,9 +284,10 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
 
 def analogs_plain_text_for_sku(sku: SKU) -> str:
     """Edition-scoped analogs plain text (SKU or product tab)."""
-    # Bare ForeignKey annotations on SKU.product type as ``_ST`` in django-stubs.
-    product = cast("Product", sku.product)
-    raw = (sku.analogs_text or "") or (product.analogs_text or "")
+    from catalog.sku_access import sku_section_text
+
+    # Empty SKU analogs_text is intentional (do not re-inherit product block).
+    raw = sku_section_text(sku, "analogs_text")
     if not raw.strip():
         return ""
     return filter_analogs_for_sku(raw, sku.sku_code)
@@ -349,35 +354,55 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
     return [code for code in codes if code not in drop]
 
 
+def sku_code_is_thermal(sku_code: str | None) -> bool:
+    """True when the Hoocon article is a thermal edition (``DST`` / ``-T`` suffix).
+
+    Args:
+        sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``, ``BF24-T``).
+
+    Returns:
+        True only when the code ends with ``DST`` or ``-T`` (case-insensitive).
+        Mid-string ``DST`` (e.g. ``DSTXXX``, ``XDSTX``) is not thermal.
+    """
+    return bool(_THERMAL_SKU_SUFFIX.search((sku_code or "").casefold()))
+
+
+def belimo_code_is_thermal(code: str | None) -> bool:
+    """True when a Belimo article is a thermal edition (``FST`` / ``-T`` suffix).
+
+    Args:
+        code: Belimo article (e.g. ``BF24-T``, ``BF24-FST``).
+
+    Returns:
+        True only when the code ends with ``FST`` or ``-T``. Mid-string
+        ``-T`` (e.g. ``X-T-Y``) is not thermal.
+    """
+    return bool(_THERMAL_BELIMO_SUFFIX.search((code or "").casefold()))
+
+
 def primary_belimo_code_for_sku(sku: SKU) -> str | None:
     """First Belimo code for ``SKU.analog_belimo_code`` persistence.
 
-    Thermal editions (``DST`` / ``-T`` in the Hoocon article) must map to a
+    Thermal editions (``DST`` / ``-T`` suffix on the Hoocon article) must map to a
     thermal Belimo code (``FST`` / ``-T``). If none is present among resolved
     codes, return ``None`` rather than a non-thermal fallback.
     """
     codes = belimo_codes_for_sku(sku)
     if not codes:
         return None
-    code_l = (sku.sku_code or "").casefold()
-    thermal = "dst" in code_l or code_l.endswith("-t")
-    if not thermal:
+    if not sku_code_is_thermal(sku.sku_code):
         return codes[0]
     for code in codes:
-        upper = code.upper()
-        if "FST" in upper or upper.endswith("-T") or "-T" in upper:
+        if belimo_code_is_thermal(code):
             return code
     return None
 
 
 def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:
     """Build inference inputs from EAV / variant and call ``infer_belimo_codes``."""
-    category_slug = ""
-    if sku.product_id:
-        product = cast("Product", sku.product)
-        if product.category_id:
-            category = cast("Category", product.category)
-            category_slug = category.slug or ""
+    from catalog.sku_access import sku_category_slug_or_empty
+
+    category_slug = sku_category_slug_or_empty(sku)
     purpose = detect_purpose(category_slug=category_slug, sku_code=sku.sku_code)
     if purpose in {"valve", "unknown"}:
         return []
@@ -391,7 +416,7 @@ def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:
         aux = 1 if variant.aux_switch else 0
     moment = _parse_float(attrs.get("moment", ""))
     area = _parse_area(attrs.get("damper-area", ""))
-    thermal = bool(re.search(r"dst$|-t$", (sku.sku_code or "").casefold()))
+    thermal = sku_code_is_thermal(sku.sku_code)
     return infer_belimo_codes(
         purpose=purpose,
         moment_nm=moment,

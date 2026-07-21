@@ -17,7 +17,7 @@ from catalog.facets.defs import (
     attribute_matches_facet,
 )
 from catalog.facets.normalize import normalize_area_attribute_value
-from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+from catalog.models import SKU, Attribute, AttributeValue
 
 
 def highlights_for_sku(
@@ -197,6 +197,7 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         is_proportional_control,
         normalize_control_attribute_value,
     )
+    from catalog.sku_access import sku_category_slug_or_empty
 
     control_raw = ""
     for av in sku.attribute_values.select_related("attribute"):
@@ -204,15 +205,10 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         if attribute_matches_facet(attr, FACET_BY_KEY["control"]):
             control_raw = str(av.value or "")
             break
-    category_slug = ""
-    product = cast(Product | None, sku.product) if sku.product_id else None
-    if product is not None and product.category_id:
-        category = cast(Category, product.category)
-        category_slug = category.slug
     control = normalize_control_attribute_value(
         control_raw,
         sku_code=sku.sku_code,
-        category_slug=category_slug or None,
+        category_slug=sku_category_slug_or_empty(sku) or None,
     )
     if not is_proportional_control(control):
         return 0

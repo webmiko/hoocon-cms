@@ -221,7 +221,7 @@ def apply_damqu_enrichment() -> dict[str, int]:
     Returns:
         Counters: products, skus, attributes_touched.
     """
-    product = Product.objects.filter(slug=PRODUCT_SLUG).first()
+    product = Product.objects.filter(slug=PRODUCT_SLUG).select_related("category").first()
     if product is None:
         return {"products": 0, "skus": 0, "attributes": 0}
 
@@ -230,6 +230,7 @@ def apply_damqu_enrichment() -> dict[str, int]:
     product.specs_text = ""  # cards only — no prose duplicate
     product.save(update_fields=["name", "description", "specs_text"])
 
+    category_slug = product.category.slug if product.category_id else ""
     skus = list(SKU.objects.filter(product=product))
     attrs = 0
     for sku in skus:
@@ -314,7 +315,7 @@ def apply_damqu_enrichment() -> dict[str, int]:
                 normalize_control_attribute_value(
                     "2-/3-позиционное",
                     sku_code=sku.sku_code,
-                    category_slug=(sku.product.category.slug if sku.product_id and sku.product.category_id else ""),
+                    category_slug=category_slug,
                 ),
             )
         attrs += 1

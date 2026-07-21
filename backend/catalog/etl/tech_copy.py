@@ -226,11 +226,14 @@ def normalize_control_attribute_value(
 
     code = (sku_code or "").strip().upper()
     cat = (category_slug or "").strip().casefold()
+    # Spring/fire (FU/SA) and HVD: Tilda often stores «2-/3-позиционное» for
+    # what Belimo RU facets as Открыто/закрыто. Air no-spring (-d MU) stays floating.
     is_on_off_family = bool(
         cat in _CONTROL_ON_OFF_CATEGORY_SLUGS
         or code.startswith("HVD")
         or code.startswith("SA")
-        or re.match(r"SA\d", code),
+        or re.match(r"SA\d", code)
+        or "FU" in code
     )
 
     if (
@@ -241,11 +244,12 @@ def normalize_control_attribute_value(
         if variant.control != "modulating":
             return CONTROL_ON_OFF
 
-    if mapped == CONTROL_FLOATING or re.search(r"2\s*-?\s*/\s*3|позицион", low):
-        return CONTROL_FLOATING
-
+    # Prefer SKU-code control family over Tilda's «2-/3» label (see is_on_off_family).
     if variant.control == "on_off":
         return CONTROL_ON_OFF if is_on_off_family else CONTROL_FLOATING
+
+    if mapped == CONTROL_FLOATING or re.search(r"2\s*-?\s*/\s*3|позицион", low):
+        return CONTROL_FLOATING
 
     if mapped:
         return mapped

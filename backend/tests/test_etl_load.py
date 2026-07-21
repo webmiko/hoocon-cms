@@ -202,6 +202,49 @@ def test_load_product_creates_attributes_in_dictionary() -> None:
 
 
 @pytest.mark.django_db
+def test_load_product_uses_stable_attr_slug_fallback_for_cjk_titles() -> None:
+    """Unsluggable titles must map to one deterministic Attribute slug."""
+    from decimal import Decimal
+
+    from catalog.etl.load import _slugify_attr, load_product
+    from catalog.etl.normalize import (
+        NormalizedAttribute,
+        NormalizedProduct,
+        NormalizedSKU,
+    )
+    from catalog.models import Attribute, Category
+
+    cat = Category.objects.create(name="Test", slug="test-category")
+    title = "中文属性"
+    expected_slug = _slugify_attr(title)
+
+    np = NormalizedProduct(
+        tilda_uid="cjk-1",
+        name="CJK Product",
+        slug="cjk-product",
+        description="",
+        category_id=1,
+        skus=(
+            NormalizedSKU(
+                sku_code="CJK-1",
+                slug="cjk-product-cjk-1",
+                name="CJK Product (CJK-1)",
+                price=Decimal("0"),
+                description="",
+                attributes=(NormalizedAttribute(title=title, value="值"),),
+            ),
+        ),
+    )
+
+    load_product(np, category_map={1: cat})
+    load_product(np, category_map={1: cat})
+
+    assert expected_slug.startswith("attr-")
+    assert Attribute.objects.filter(slug=expected_slug).count() == 1
+    assert Attribute.objects.get(slug=expected_slug).name == title
+
+
+@pytest.mark.django_db
 def test_load_product_quarantines_when_category_missing() -> None:
     """If category_id is unknown, load_product raises QuarantineError.
 
