@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     # Brute-force protection for admin login (ПЛАН §6 Iter 1).
     "axes",
     # Project apps (с итерации 1)
+    "accounts.apps.AccountsConfig",
     "redirects",
     "sitesettings",
     "catalog",

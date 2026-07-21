@@ -42,7 +42,8 @@
 3. `leads` — Inquiry / RFQ / «замена привода» (без оплаты).
 4. `search` — индексация каталога + статей.
 5. `media` — файлы datasheet, изображения (S3/локально).
-6. `accounts` — staff/роли (контент / каталог / заявки).
+6. `accounts` — staff Groups **Админ / Менеджер / Аналитик**
+   (`manage.py sync_staff_groups`; матрица в `accounts/roles.py`).
 
 ### API
 
