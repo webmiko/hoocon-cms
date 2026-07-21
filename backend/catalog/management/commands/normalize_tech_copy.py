@@ -22,6 +22,26 @@ from catalog.facets import (
 from catalog.models import SKU, AttributeValue, Category, Product
 
 
+def sku_category_slug(sku: SKU | None) -> str | None:
+    """Return product category slug when SKU → Product → Category are set.
+
+    Guards against missing product/category FKs so callers do not hit
+    ``AttributeError`` on ``None.slug``.
+
+    Args:
+        sku: Catalog SKU or None.
+
+    Returns:
+        Category slug, or None when any link in the chain is missing.
+    """
+    if sku is None or not sku.product_id:
+        return None
+    product = sku.product
+    if not product.category_id:
+        return None
+    return product.category.slug
+
+
 class Command(BaseCommand):
     """Rewrite Category / Product / SKU / AttributeValue copy to glossary style."""
 
@@ -137,7 +157,7 @@ class Command(BaseCommand):
                 new = normalize_control_attribute_value(
                     raw,
                     sku_code=av.sku.sku_code if av.sku_id else None,
-                    category_slug=(av.sku.product.category.slug if av.sku_id and av.sku.product_id else None),
+                    category_slug=sku_category_slug(av.sku if av.sku_id else None),
                 )
             elif attribute_matches_facet(av.attribute, voltage_facet):
                 new = normalize_voltage_attribute_value(
@@ -187,7 +207,7 @@ class Command(BaseCommand):
                 control = normalize_control_attribute_value(
                     control_raw,
                     sku_code=sku.sku_code,
-                    category_slug=(sku.product.category.slug if sku.product_id else None),
+                    category_slug=sku_category_slug(sku),
                 )
                 if is_proportional_control(control):
                     count += 2

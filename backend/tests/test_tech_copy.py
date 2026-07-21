@@ -2,7 +2,33 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 from catalog.etl.tech_copy import normalize_control_attribute_value, normalize_tech_copy
+from catalog.management.commands.normalize_tech_copy import sku_category_slug
+
+
+def test_sku_category_slug_guards_missing_product_or_category() -> None:
+    """Do not read ``.slug`` when product or category FK is missing."""
+    assert sku_category_slug(None) is None
+
+    sku_no_product = MagicMock()
+    sku_no_product.product_id = None
+    assert sku_category_slug(sku_no_product) is None
+
+    product = SimpleNamespace(category_id=None, category=None)
+    sku_no_category = MagicMock()
+    sku_no_category.product_id = 1
+    sku_no_category.product = product
+    assert sku_category_slug(sku_no_category) is None
+
+    category = SimpleNamespace(slug="elektroprivody-vozdushnye")
+    product_ok = SimpleNamespace(category_id=2, category=category)
+    sku_ok = MagicMock()
+    sku_ok.product_id = 1
+    sku_ok.product = product_ok
+    assert sku_category_slug(sku_ok) == "elektroprivody-vozdushnye"
 
 
 def test_normalize_modulating_signal_drops_factory_dup() -> None:
