@@ -89,6 +89,53 @@ def test_sku_detail_by_slug(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sku_detail_ball_valve_kit_for_bv_sku(client) -> None:
+    """Ball-valve detail exposes RFQ kit options when drives are known."""
+    from catalog.etl.attr_write import set_sku_attribute
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(
+        name="BV220",
+        slug="sharovoy-kran-bv220",
+        category=cat,
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="BV220A",
+        slug="8100-bv220a",
+        sku_code="8100-BV220A",
+        is_published=True,
+    )
+    set_sku_attribute(
+        sku,
+        slug="compatible-actuators",
+        value="DA5FU24, DA6MU24 (−D/−DS/−A/−AS)",
+        name="Совместимый привод",
+        unit="",
+    )
+
+    url = reverse("catalog-sku-detail", kwargs={"slug": sku.slug})
+    response = client.get(url)
+    assert response.status_code == 200
+    kit = response.data["ball_valve_kit"]
+    assert kit is not None
+    assert kit["drive_families"] == ["DA5FU24", "DA6MU24"]
+    assert kit["bracket_by_drive"]["DA5FU24"] == "BR-ML"
+    assert kit["bracket_by_drive"]["DA6MU24"] == "BR-M"
+
+
+@pytest.mark.django_db
+def test_sku_detail_ball_valve_kit_null_for_actuator(client) -> None:
+    """Non ball-valve SKUs do not expose kit picker payload."""
+    seed = _seed_catalog()
+    url = reverse("catalog-sku-detail", kwargs={"slug": seed["sku"].slug})
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.data["ball_valve_kit"] is None
+
+
+@pytest.mark.django_db
 def test_sku_detail_includes_attributes_and_files(client) -> None:
     """Detail payload includes ТТХ and published PDF metadata."""
     seed = _seed_catalog()

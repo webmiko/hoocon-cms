@@ -42,7 +42,8 @@ class LeadSerializer(serializers.ModelSerializer):
         default="",
         help_text="Honeypot — leave empty (hidden from real users).",
     )
-    sku = serializers.PrimaryKeyRelatedField(
+    sku = serializers.SlugRelatedField(
+        slug_field="slug",
         queryset=SKU.objects.filter(is_published=True),
         required=False,
         allow_null=True,

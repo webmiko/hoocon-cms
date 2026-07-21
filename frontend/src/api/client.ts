@@ -51,6 +51,12 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
   category_name?: string;
   category_description?: string;
   category_instructions?: string;
+  ball_valve_kit?: {
+    drive_families: string[];
+    suffixes: string[];
+    bracket_by_drive: Record<string, string>;
+    bracket_hint: string;
+  } | null;
 };
 export type SKUListResponse =
   paths["/api/catalog/skus/"]["get"]["responses"]["200"]["content"]["application/json"];

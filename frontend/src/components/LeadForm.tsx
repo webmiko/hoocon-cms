@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
+import { BallValveKitFields } from "./BallValveKitFields";
+import type { BallValveKitOptions } from "../utils/ballValveKit";
 import styles from "./LeadForm.module.css";
 
 /**
@@ -20,6 +22,7 @@ interface LeadFormProps {
   leadType: LeadType;
   skuSlug?: string;
   skuName?: string;
+  ballValveKit?: BallValveKitOptions | null;
 }
 
 interface FormState {
@@ -44,15 +47,24 @@ const INITIAL_STATE: FormState = {
   website: "",
 };
 
-export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
+export function LeadForm({ leadType, skuSlug, skuName, ballValveKit }: LeadFormProps) {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [pdnConsent, setPdnConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const defaultMessage = useMemo(
+    () => (skuName ? `Прошу подготовить КП на ${skuName}.` : ""),
+    [skuName],
+  );
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleKitMessage(message: string) {
+    setForm((prev) => ({ ...prev, message }));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -72,7 +84,7 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
       email: form.email,
       phone: form.phone,
       company: form.company,
-      message: form.message,
+      message: (form.message || defaultMessage).trim(),
       website: form.website, // honeypot
     };
 
@@ -130,9 +142,8 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
     );
   }
 
-  const defaultMessage = skuName
-    ? `Прошу подготовить КП на ${skuName}.`
-    : "";
+  const messageValue = form.message || defaultMessage;
+  const showBallValveKit = leadType === "rfq" && ballValveKit;
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
@@ -246,6 +257,14 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
         </div>
       )}
 
+      {showBallValveKit ? (
+        <BallValveKitFields
+          kit={ballValveKit}
+          baseMessage={defaultMessage}
+          onMessageChange={handleKitMessage}
+        />
+      ) : null}
+
       <div className={styles.field}>
         <label htmlFor="message" className={styles.label}>
           Сообщение *
@@ -255,7 +274,7 @@ export function LeadForm({ leadType, skuSlug, skuName }: LeadFormProps) {
           name="message"
           required
           rows={4}
-          value={form.message || defaultMessage}
+          value={messageValue}
           onChange={(e) => update("message", e.target.value)}
           className={styles.textarea}
         />

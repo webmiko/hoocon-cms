@@ -530,7 +530,16 @@ export function SkuDetailPage() {
               Заявка уходит на sales@hoocon.ru. Публичного прайса нет — цена
               зависит от объёма.
             </p>
-            <LeadForm leadType="rfq" skuSlug={sku.slug} skuName={sku.name} />
+            <LeadForm
+              leadType="rfq"
+              skuSlug={sku.slug}
+              skuName={sku.name}
+              ballValveKit={
+                "ball_valve_kit" in sku && sku.ball_valve_kit
+                  ? sku.ball_valve_kit
+                  : null
+              }
+            />
           </section>
         </aside>
       </div>

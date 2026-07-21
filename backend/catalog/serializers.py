@@ -331,6 +331,7 @@ class SKUDetailSerializer(SKUListSerializer):
         read_only=True,
     )
     category_instructions = serializers.SerializerMethodField()
+    ball_valve_kit = serializers.SerializerMethodField()
 
     class Meta(SKUListSerializer.Meta):
         fields = (
@@ -342,6 +343,7 @@ class SKUDetailSerializer(SKUListSerializer):
             "category_name",
             "category_description",
             "category_instructions",
+            "ball_valve_kit",
             "attributes",
             "attribute_groups",
             "files",
@@ -405,6 +407,12 @@ class SKUDetailSerializer(SKUListSerializer):
         if cat.strip():
             return cat
         return sku_product_field(obj, "instructions")
+
+    def get_ball_valve_kit(self, obj: SKU) -> dict[str, Any] | None:
+        """Optional actuator + bracket picker for ball-valve RFQ."""
+        from catalog.ball_valve_kit import build_ball_valve_kit_options
+
+        return build_ball_valve_kit_options(obj)
 
     def get_attributes(self, obj: SKU) -> list[dict[str, Any]]:
         """ТТХ rows deduped and scoped to the SKU voltage/control variant."""

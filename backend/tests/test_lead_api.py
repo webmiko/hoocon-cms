@@ -271,7 +271,7 @@ def test_get_leads_not_allowed(client) -> None:
 
 @pytest.mark.django_db
 def test_post_lead_rejects_unpublished_sku(client) -> None:
-    """Public lead API accepts only published SKU ids."""
+    """Public lead API accepts only published SKU slugs."""
     from catalog.models import SKU, Category, Product
 
     cat = Category.objects.create(name="C", slug="c-unpub")
@@ -287,7 +287,7 @@ def test_post_lead_rejects_unpublished_sku(client) -> None:
         "name": "Buyer",
         "email": "buyer-sku@example.com",
         "message": "Нужен КП на скрытый артикул из каталога.",
-        "sku": sku.pk,
+        "sku": sku.slug,
     }
     response = client.post("/api/leads/", data=payload, content_type="application/json")
     assert response.status_code == 400
