@@ -13,12 +13,16 @@ from catalog.etl.manual_diagrams import (
     parse_dafu_series_nm,
     parse_hva_series,
     parse_safu_series_nm,
+    parse_samu_series_nm,
     pdf_source_series_nm,
     relabel_diagram_crops,
+    relabel_samu_diagram_crops,
     safu_pdf_source_series_nm,
+    samu_pdf_source_series_nm,
     source_url_for,
     source_url_for_hva,
     source_url_for_safu,
+    source_url_for_samu,
 )
 
 
@@ -88,6 +92,39 @@ def test_parse_safu_series_and_fallback() -> None:
     assert safu_pdf_source_series_nm(20) == 15
     assert safu_pdf_source_series_nm(15) == 15
     assert "sa5fu-ds-wiring" in source_url_for_safu(5, "wiring")
+
+
+def test_parse_samu_series_and_source_url() -> None:
+    assert parse_samu_series_nm("SA10MU24-DS") == 10
+    assert parse_samu_series_nm("sa15mu230-dst") == 15
+    assert samu_pdf_source_series_nm(15) == 15
+    assert "sa15mu-ds-wiring" in source_url_for_samu(15, "wiring")
+
+
+def test_relabel_samu_diagram_crops_for_borrowed_pdf() -> None:
+    """Fallback PDF crops must retarget source_url/alt to the SKU series."""
+    raw = [
+        DiagramCrop(
+            kind="wiring",
+            png_bytes=b"png",
+            alt="SA15MU | Схема подключения из инструкции",
+            sort_order=5,
+            source_url=source_url_for_samu(15, "wiring"),
+        ),
+        DiagramCrop(
+            kind="dimensions",
+            png_bytes=b"png",
+            alt="SA15MU | Габаритные размеры привода (мм), чертёж из инструкции",
+            sort_order=6,
+            source_url=source_url_for_samu(15, "dimensions"),
+        ),
+    ]
+    labeled = relabel_samu_diagram_crops(raw, series_nm=20)
+    assert labeled[0].source_url == source_url_for_samu(20, "wiring")
+    assert "SA20MU" in labeled[0].alt
+    assert "sa15mu" not in labeled[0].source_url
+    assert labeled[1].source_url == source_url_for_samu(20, "dimensions")
+    assert labeled[0].png_bytes == b"png"
 
 
 def test_crop_safu_uses_right_column() -> None:

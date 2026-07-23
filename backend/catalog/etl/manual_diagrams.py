@@ -57,6 +57,8 @@ _PDF_FALLBACK_NM: Final[dict[int, int]] = {
 _SAFU_PDF_FALLBACK_NM: Final[dict[int, int]] = {
     20: 15,
 }
+# SAMU: map Nm → PDF Nm when a series reuses another family's manual (like SAFU).
+_SAMU_PDF_FALLBACK_NM: Final[dict[int, int]] = {}
 
 _LEGACY_COMBINED_ALT = "размеры и способ подключения"
 _LEGACY_DIMENSION_URL = "https://hoocon.ru/.local-assets/dafu-dimensions-98x156x84.webp"
@@ -1026,6 +1028,11 @@ def parse_samu_series_nm(sku_code: str) -> int | None:
     return int(match.group("nm"))
 
 
+def samu_pdf_source_series_nm(series_nm: int) -> int:
+    """SAMU series whose PDF to crop when this family has no dedicated manual."""
+    return _SAMU_PDF_FALLBACK_NM.get(series_nm, series_nm)
+
+
 def source_url_for_samu(series_nm: int, kind: DiagramKind) -> str:
     """Stable local-asset key for a SAMU diagram row."""
     return _SAMU_SOURCE_URL.format(nm=series_nm, kind=kind)
@@ -1054,24 +1061,50 @@ def diagrams_from_samu_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCro
     ]
 
 
+def relabel_samu_diagram_crops(
+    crops: list[DiagramCrop],
+    *,
+    series_nm: int,
+) -> list[DiagramCrop]:
+    """Retarget crop alts / source_url to the SKU series (e.g. SA20 borrowing SA15)."""
+    series = f"SA{series_nm}MU"
+    out: list[DiagramCrop] = []
+    for crop in crops:
+        if crop.kind == "wiring":
+            alt = f"{series} | Схема подключения из инструкции"
+        else:
+            alt = f"{series} | Габаритные размеры привода (мм), чертёж из инструкции"
+        out.append(
+            DiagramCrop(
+                kind=crop.kind,
+                png_bytes=crop.png_bytes,
+                alt=alt,
+                sort_order=crop.sort_order,
+                source_url=source_url_for_samu(series_nm, crop.kind),
+            ),
+        )
+    return out
+
+
 def find_samu_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> Path | None:
-    """Locate a SAMU English manual PDF."""
+    """Locate a SAMU English manual PDF for the series (with fallback Nm)."""
     from catalog.etl.manual_pdfs import parse_samu_manual_stem
 
+    pdf_nm = samu_pdf_source_series_nm(series_nm)
     manuals_dir = manuals_dir or default_manuals_dir()
     file_qs = ProductFile.objects.filter(
         is_published=True,
-        sku__sku_code__iregex=rf"(?i)^sa{series_nm}mu",
+        sku__sku_code__iregex=rf"(?i)^sa{pdf_nm}mu",
         title__icontains="Инструкция",
     ).exclude(file="")
-    for pf in file_qs[:3]:
+    for pf in file_qs.select_related("sku")[:3]:
         if pf.file and Path(pf.file.path).is_file():
             return Path(pf.file.path)
     if not manuals_dir.is_dir():
         return None
     for path in sorted(manuals_dir.glob("*.pdf")):
         nm = parse_samu_manual_stem(path.name)
-        if nm == series_nm:
+        if nm == pdf_nm:
             return path
     return None
 
@@ -1092,27 +1125,35 @@ def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         if series_nm is None:
             summary["skipped"] += 1
             continue
-        if series_nm not in crop_cache:
+        pdf_nm = samu_pdf_source_series_nm(series_nm)
+        if pdf_nm not in crop_cache:
             pdf_path = find_samu_manual_pdf(series_nm=series_nm)
             if pdf_path is None:
-                crop_cache[series_nm] = None
+                logger.info(
+                    "samu_manual_diagram_pdf_missing series=%s pdf_nm=%s",
+                    series_nm,
+                    pdf_nm,
+                )
+                crop_cache[pdf_nm] = None
             else:
                 try:
-                    crop_cache[series_nm] = diagrams_from_samu_pdf(
+                    crop_cache[pdf_nm] = diagrams_from_samu_pdf(
                         pdf_path,
-                        series_nm=series_nm,
+                        series_nm=pdf_nm,
                     )
                 except Exception as exc:
                     logger.exception(
-                        "samu_manual_diagram_crop_failed pdf=%s err_type=%s",
+                        "samu_manual_diagram_crop_failed pdf=%s series=%s err_type=%s",
                         pdf_path,
+                        series_nm,
                         type(exc).__name__,
                     )
-                    crop_cache[series_nm] = None
-        crops = crop_cache[series_nm]
-        if not crops:
+                    crop_cache[pdf_nm] = None
+        raw_crops = crop_cache[pdf_nm]
+        if not raw_crops:
             summary["skipped"] += 1
             continue
+        crops = relabel_samu_diagram_crops(raw_crops, series_nm=series_nm)
         series_key = f"sa{series_nm}mu"
         series_stats = summary["series"].setdefault(
             series_key,
@@ -1120,7 +1161,6 @@ def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         )
         series_stats["skus"] += 1
         for crop in crops:
-            # Relabel source_url/alt for this nm (crops already labeled).
             action = _upsert_diagram(sku, crop, dry_run=dry_run)
             if action == "create":
                 summary["created"] += 1
@@ -1210,7 +1250,7 @@ def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
         sku__sku_code__iregex=rf"(?i)^hvd(24|230)st?-{series_nm}f$",
         title__icontains="Инструкция",
     ).exclude(file="")
-    for pf in file_qs[:3]:
+    for pf in file_qs.select_related("sku")[:3]:
         if pf.file and Path(pf.file.path).is_file():
             return Path(pf.file.path)
     if not manuals_dir.is_dir():
