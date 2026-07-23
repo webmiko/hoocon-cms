@@ -52,12 +52,13 @@ def test_spa_sku_injects_product_json_ld(client) -> None:
         price="1234.00",
         is_published=True,
     )
-    response = client.get("/privod-hva-5nm-seo")
+    response = client.get("/catalog/vozdushnie-seo/privod-hva-5nm-seo")
     assert response.status_code == 200
     body = response.content.decode()
     assert "Product" in body
     assert "HVA-5NM-SEO" in body
     assert "1234" not in body  # prices gated
+    assert 'rel="canonical" href="https://hoocon.ru/catalog/vozdushnie-seo/privod-hva-5nm-seo"' in body
 
 
 @pytest.mark.django_db

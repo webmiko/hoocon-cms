@@ -6,6 +6,7 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { softBreak } from "../utils/softBreak";
+import { catalogCategoryPath } from "../utils/catalogPaths";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import styles from "./HomePage.module.css";
 
@@ -316,7 +317,7 @@ export function HomePage() {
                 return (
                   <Link
                     key={cat.slug}
-                    to={`/catalog?category=${encodeURIComponent(cat.slug)}`}
+                    to={catalogCategoryPath(cat.slug)}
                     className={styles.directionBlock}
                     style={{ animationDelay: `${0.06 + index * 0.05}s` }}
                   >

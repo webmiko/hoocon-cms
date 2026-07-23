@@ -110,6 +110,7 @@ export type Article = components["schemas"]["Article"] & {
     name: string;
     slug: string;
     sku_code: string;
+    category_slug?: string;
     image: string | null;
   }>;
 };

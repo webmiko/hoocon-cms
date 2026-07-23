@@ -26,6 +26,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from catalog.models import SKU
+from catalog.urls_paths import catalog_path_for_sku
 from content.models import Article, News, Page
 from search.serializers import SearchResponseSerializer
 
@@ -78,7 +79,7 @@ class SearchView(APIView):
                     "type": "sku",
                     "slug": sku.slug,
                     "title": sku.name,
-                    "url": f"/{sku.slug}/",
+                    "url": catalog_path_for_sku(sku),
                     "rank": float(sku.rank),  # type: ignore[attr-defined]
                 },
             )
@@ -132,6 +133,7 @@ class SearchView(APIView):
         """FTS on published SKUs, ranked by SearchRank."""
         return (
             SKU.objects.filter(is_published=True, search_vector=query)
+            .select_related("product__category")
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "sku_code")
         )

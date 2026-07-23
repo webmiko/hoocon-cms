@@ -10,6 +10,7 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbJsonLd,
 } from "../utils/jsonLd";
+import { catalogPathForSku } from "../utils/catalogPaths";
 import styles from "./ArticlePage.module.css";
 
 /**
@@ -126,7 +127,10 @@ export function ArticlePage() {
             <ul className={styles.productsList}>
               {article.related_skus.map((sku) => (
                 <li key={sku.slug}>
-                  <Link to={`/${sku.slug}/`} className={styles.productLink}>
+                  <Link
+                    to={catalogPathForSku(sku)}
+                    className={styles.productLink}
+                  >
                     {sku.image ? (
                       <img
                         className={styles.productImage}

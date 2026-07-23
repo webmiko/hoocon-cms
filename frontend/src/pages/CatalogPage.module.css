@@ -448,10 +448,12 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  /* One card per row in the catalog content column (~sidebar + filters). */
+  grid-template-columns: 1fr;
   gap: var(--space-md);
   container-type: inline-size;
   container-name: catalog-grid;
+  align-items: start;
 }
 
 .card {
@@ -503,12 +505,42 @@
 }
 
 .card:hover {
-  border-color: rgba(220, 19, 19, 0.35);
-  background: var(--color-surface);
+  /* Gradient border from photo wash (radius-safe via background-clip). */
+  border-color: transparent;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    var(
+      --card-wash-gradient,
+      linear-gradient(
+        to right,
+        rgba(220, 19, 19, 0.45),
+        rgba(220, 19, 19, 0.2)
+      )
+    )
+      border-box;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
   box-shadow: var(--shadow);
   text-decoration: none;
   color: var(--color-text);
   transform: translateY(-2px);
+}
+
+/* Purpose fallbacks when photo sampling is unavailable. */
+.card[data-purpose="air"] {
+  --card-wash-gradient: var(--photo-wash-air);
+}
+
+.card[data-purpose="smoke"] {
+  --card-wash-gradient: var(--photo-wash-smoke);
+}
+
+.card[data-purpose="fire"] {
+  --card-wash-gradient: var(--photo-wash-fire);
+}
+
+.card[data-purpose="valve"] {
+  --card-wash-gradient: var(--photo-wash-valve);
 }
 
 .cardMedia,
@@ -522,7 +554,7 @@
   margin: 0;
   padding: 0;
   background: var(--photo-wash-valve);
-  border-right: 1px solid var(--color-border);
+  border-right: none;
   overflow: hidden;
   line-height: 0;
 }
@@ -873,24 +905,49 @@
     max-width: 9rem;
   }
 
-  /* Photo top / copy bottom, equal halves. */
+  /* Cards hug content — don't stretch to the tallest card in the row. */
+  .grid {
+    align-items: start;
+  }
+
+  /* Photo top / copy bottom — height follows content (no equal halves / 70vh). */
   .card {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
-    min-height: min(70vh, 420px);
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    min-height: 0;
+    height: auto;
   }
 
   .cardMedia,
   .cardMediaPlaceholder {
     min-height: 0;
-    height: 100%;
+    height: auto;
+    max-height: none;
+    width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: none;
+    padding: 0;
+  }
+
+  .cardMediaPlaceholder {
+    min-height: 7.5rem;
+  }
+
+  /* Full card width; height follows intrinsic photo aspect ratio. */
+  .cardImage {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    object-fit: contain;
+    object-position: center center;
+    display: block;
   }
 
   .cardBody {
     min-height: 0;
-    overflow: auto;
+    overflow: visible;
   }
 }
 

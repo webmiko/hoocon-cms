@@ -66,14 +66,18 @@
 .heroMedia {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
   min-height: 220px;
   height: 100%;
   border-radius: 0;
   overflow: hidden;
   border: 0;
-  border-right: 1px solid var(--color-border);
+  border-right: none;
   line-height: 0;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .heroZoomTrigger {
@@ -96,12 +100,12 @@
 .heroImage {
   width: 100%;
   height: auto;
+  max-height: 100%;
   margin: 0;
   padding: 0;
   object-fit: contain;
   object-position: center center;
   display: block;
-  flex-shrink: 0;
   pointer-events: none;
 }
 
@@ -189,12 +193,16 @@
 .galleryItem {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   overflow: hidden;
   aspect-ratio: 4 / 3;
   position: relative;
   line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Purpose washes behind transparent product WebP (PDP hero + thumbs). */
@@ -243,12 +251,12 @@
 .galleryImage {
   width: 100%;
   height: auto;
+  max-height: 100%;
   margin: 0;
   padding: 0;
   object-fit: contain;
   object-position: center center;
   display: block;
-  flex-shrink: 0;
   pointer-events: none;
 }
 
@@ -710,7 +718,7 @@
     width: 100%;
     position: relative;
     border-right: 0;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: none;
   }
 
   .heroMain {

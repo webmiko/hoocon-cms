@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/HomePage";
@@ -14,6 +14,9 @@ import { WhereToBuyPage } from "./pages/WhereToBuyPage";
 import { SearchPage } from "./pages/SearchPage";
 import { LeadPage } from "./pages/LeadPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { api } from "./api/client";
+import { useAsync } from "./hooks/useAsync";
+import { catalogPathForSku } from "./utils/catalogPaths";
 
 /**
  * Legacy Tilda /news/<a>/<b> → /novosti/<a>-<b>.
@@ -29,10 +32,35 @@ function NewsLegacyRedirect() {
 }
 
 /**
+ * Legacy flat ``/:skuSlug`` → nested ``/catalog/{category}/{skuSlug}``.
+ */
+function SkuLegacyRedirect() {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: sku, loading, error } = useAsync(
+    () => api.skuDetail(slug!),
+    [slug],
+  );
+
+  if (!slug) {
+    return <NotFoundPage />;
+  }
+  if (loading) {
+    return null;
+  }
+  if (error || !sku) {
+    return <NotFoundPage />;
+  }
+  const target = catalogPathForSku(sku);
+  if (target === "/catalog") {
+    return <NotFoundPage />;
+  }
+  return <Navigate to={target} replace />;
+}
+
+/**
  * App routes for Hoocon CMS SPA.
  *
- * Canonical CMS pages match docs/seo-url-migration.md:
- * /company, /gde-kupit, /oferta, /privacy-policy, /terms, /faq, /kontakty.
+ * Catalog: /catalog, /catalog/:category, /catalog/:category/:sku (one page per SKU).
  */
 export default function App() {
   return (
@@ -40,6 +68,11 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="catalog" element={<CatalogPage />} />
+        <Route path="catalog/:categorySlug" element={<CatalogPage />} />
+        <Route
+          path="catalog/:categorySlug/:skuSlug"
+          element={<SkuDetailPage />}
+        />
         <Route path="compare" element={<ComparePage />} />
         <Route path="search" element={<SearchPage />} />
         <Route
@@ -66,13 +99,12 @@ export default function App() {
           element={<PageView slug="privacy-policy" />}
         />
         <Route path="terms" element={<PageView slug="terms" />} />
-        {/* Legacy aliases → canonical SEO paths */}
         <Route path="o-kompanii" element={<Navigate to="/company" replace />} />
         <Route
           path="privacy"
           element={<Navigate to="/privacy-policy" replace />}
         />
-        <Route path=":slug" element={<SkuDetailPage />} />
+        <Route path=":slug" element={<SkuLegacyRedirect />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

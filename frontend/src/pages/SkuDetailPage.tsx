@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 
 import {
   ImageLightbox,
@@ -16,11 +16,17 @@ import {
   SignalSpecValue,
 } from "../components/SignalSpecValue";
 import { CompareToggle } from "../components/CompareToggle";
+import { PhotoWash } from "../components/PhotoWash";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import {
+  catalogCategoryPath,
+  catalogPathForSku,
+  catalogSkuPath,
+} from "../utils/catalogPaths";
 import { sizeDiagramSrcForTheme } from "../utils/sizeDiagramTheme";
 import { useTheme } from "../theme/ThemeContext";
 import { api } from "../api/client";
@@ -123,7 +129,11 @@ function descriptionsOverlap(a: string, b: string): boolean {
  * Series-level copy comes from the category; model-specific from the SKU.
  */
 export function SkuDetailPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { categorySlug, skuSlug } = useParams<{
+    categorySlug: string;
+    skuSlug: string;
+  }>();
+  const slug = skuSlug;
   const { resolved: theme } = useTheme();
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug!),
@@ -173,7 +183,15 @@ export function SkuDetailPage() {
   if (error || !sku) {
     return (
       <div className={styles.notFound}>
-        <Seo title="Товар не найден" path={`/${slug ?? ""}`} noindex />
+        <Seo
+          title="Товар не найден"
+          path={
+            categorySlug && slug
+              ? catalogSkuPath(categorySlug, slug)
+              : "/catalog"
+          }
+          noindex
+        />
         <h1>Товар не найден</h1>
         <p>Возможно, страница была перемещена или удалена.</p>
         <Link to="/catalog" className={styles.link}>
@@ -183,6 +201,15 @@ export function SkuDetailPage() {
     );
   }
 
+  const canonicalPath = catalogPathForSku(sku);
+  if (
+    categorySlug &&
+    sku.category_slug &&
+    categorySlug !== sku.category_slug
+  ) {
+    return <Navigate to={canonicalPath} replace />;
+  }
+
   const jsonLd = buildProductJsonLd({
     name: sku.name,
     slug: sku.slug,
@@ -190,7 +217,8 @@ export function SkuDetailPage() {
     description: sku.description,
     price: "price" in sku ? sku.price : null,
     price_on_request: sku.price_on_request,
-    category_name: sku.category_slug,
+    category_name: sku.category_name || sku.category_slug,
+    category_slug: sku.category_slug,
   });
 
   const tabs: Array<{ id: TabId; label: string; available: boolean }> = [
@@ -229,7 +257,7 @@ export function SkuDetailPage() {
       <Seo
         title={skuSeoTitlePartial(sku.sku_code, sku.highlights)}
         description={skuSeoDescription(sku.sku_code, sku.category_name)}
-        path={`/${sku.slug}`}
+        path={canonicalPath}
         jsonLd={[
           jsonLd,
           buildBreadcrumbJsonLd([
@@ -239,11 +267,11 @@ export function SkuDetailPage() {
               ? [
                   {
                     name: sku.category_name || sku.category_slug,
-                    path: `/catalog?category=${encodeURIComponent(sku.category_slug)}`,
+                    path: catalogCategoryPath(sku.category_slug),
                   },
                 ]
               : []),
-            { name: sku.name, path: `/${sku.slug}` },
+            { name: sku.name, path: canonicalPath },
           ]),
         ]}
         ogType="product"
@@ -256,7 +284,7 @@ export function SkuDetailPage() {
             ? [
                 {
                   label: sku.category_name || sku.category_slug,
-                  to: `/catalog?category=${encodeURIComponent(sku.category_slug)}`,
+                  to: catalogCategoryPath(sku.category_slug),
                 },
               ]
             : []),
@@ -265,7 +293,11 @@ export function SkuDetailPage() {
       />
 
       <div className={styles.hero}>
-        <div className={styles.heroMedia} data-purpose={mediaPurpose}>
+        <PhotoWash
+          className={styles.heroMedia}
+          data-purpose={mediaPurpose}
+          src={galleryImages[0]?.src}
+        >
           {galleryImages.length > 0 ? (
             <button
               type="button"
@@ -284,7 +316,7 @@ export function SkuDetailPage() {
           ) : (
             <div className={styles.heroPlaceholder} aria-hidden="true" />
           )}
-        </div>
+        </PhotoWash>
 
         <div className={styles.heroMain}>
           <h1 className={styles.title}>{softBreak(sku.name)}</h1>
@@ -353,10 +385,11 @@ export function SkuDetailPage() {
           {galleryImages.slice(1).map((item, offset) => {
             const fullIndex = offset + 1;
             return (
-              <figure
+              <PhotoWash
                 key={`${item.src}-${fullIndex}`}
                 className={styles.galleryItem}
                 data-purpose={mediaPurpose}
+                src={item.src}
               >
                 <button
                   type="button"
@@ -372,7 +405,7 @@ export function SkuDetailPage() {
                     decoding="async"
                   />
                 </button>
-              </figure>
+              </PhotoWash>
             );
           })}
         </div>

@@ -16,6 +16,7 @@ import {
 import { parseCompareSlugsParam } from "../compare/storage";
 import { useAsync } from "../hooks/useAsync";
 import { softBreak } from "../utils/softBreak";
+import { catalogPathForSku } from "../utils/catalogPaths";
 import styles from "./ComparePage.module.css";
 
 /**
@@ -205,7 +206,10 @@ export function ComparePage() {
                             aria-hidden="true"
                           />
                         )}
-                        <Link to={`/${sku.slug}`} className={styles.skuLink}>
+                        <Link
+                          to={catalogPathForSku(sku)}
+                          className={styles.skuLink}
+                        >
                           <span className={`${styles.skuCode} text-tech`}>
                             {softBreak(sku.sku_code)}
                           </span>
@@ -213,7 +217,10 @@ export function ComparePage() {
                             {softBreak(sku.name)}
                           </span>
                         </Link>
-                        <Link to={`/${sku.slug}#rfq`} className={styles.skuCta}>
+                        <Link
+                          to={`${catalogPathForSku(sku)}#rfq`}
+                          className={styles.skuCta}
+                        >
                           Запросить цену
                         </Link>
                       </div>

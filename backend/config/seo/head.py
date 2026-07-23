@@ -131,21 +131,38 @@ def _resolve_page(path: str) -> SeoHeadContext | None:
 
 
 def _resolve_sku(path: str) -> SeoHeadContext | None:
-    if path == "/" or path.count("/") != 1:
-        return None
-    # Reserved static / CMS / lead paths are handled elsewhere.
-    if path in PUBLIC_STATIC_ROUTES or _is_noindex_path(path):
-        return None
-    if path.startswith(("/statyi", "/novosti", "/catalog", "/search")):
-        return None
-    slug = validate_slug(path.lstrip("/"))
+    """Resolve nested ``/catalog/{category}/{sku}`` or legacy ``/{sku}``."""
     from catalog.models import SKU
+    from catalog.urls_paths import catalog_category_path, catalog_path_for_sku
+
+    slug: str | None = None
+
+    if path.startswith("/catalog/"):
+        parts = [p for p in path.removeprefix("/catalog/").split("/") if p]
+        if len(parts) == 2:
+            slug = parts[1]
+        else:
+            return None
+    else:
+        # Legacy flat /{sku} — still resolve for redirects / soft migration.
+        if path == "/" or path.count("/") != 1:
+            return None
+        if path in PUBLIC_STATIC_ROUTES or _is_noindex_path(path):
+            return None
+        if path.startswith(("/statyi", "/novosti", "/catalog", "/search")):
+            return None
+        slug = validate_slug(path.lstrip("/"))
+
+    if not slug:
+        return None
+    slug = validate_slug(slug)
 
     sku = SKU.objects.filter(slug=slug, is_published=True).select_related("product__category").first()
     if sku is None:
         return None
     cat = sku.product.category if sku.product_id else None  # type: ignore[attr-defined]
     cat_name = cat.name if cat else None
+    canonical = catalog_path_for_sku(sku)
     from catalog.facets import format_sku_heading_name, highlights_for_sku
 
     display_name = format_sku_heading_name(
@@ -184,7 +201,6 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         moment=by_key.get("moment", ""),
         voltage=by_key.get("voltage", ""),
     )
-    # Never leak prices into public HTML unless SiteSettings allows it.
     from sitesettings.models import SiteSettings
 
     show_prices = SiteSettings.load().show_prices_on_site
@@ -195,10 +211,10 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         on_request = False
     crumbs: list[tuple[str, str]] = [("/", "Главная"), ("/catalog", "Каталог")]
     if cat is not None:
-        crumbs.append((f"/catalog?category={cat.slug}", cat.name))
-    crumbs.append((path, display_name))
+        crumbs.append((catalog_category_path(cat.slug), cat.name))
+    crumbs.append((canonical, display_name))
     return SeoHeadContext(
-        canonical_path=path,
+        canonical_path=canonical,
         page_title=_format_page_title(title_partial),
         description=sku_meta_description(
             sku.sku_code or sku.slug,
@@ -211,6 +227,37 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         price_on_request=on_request,
         category_name=cat_name,
         breadcrumb=tuple(crumbs),
+    )
+
+
+def _resolve_catalog_category(path: str) -> SeoHeadContext | None:
+    """Resolve ``/catalog/{category_slug}`` listing pages."""
+    if not path.startswith("/catalog/") or path == "/catalog":
+        return None
+    parts = [p for p in path.removeprefix("/catalog/").split("/") if p]
+    if len(parts) != 1:
+        return None
+    slug = validate_slug(parts[0])
+    from catalog.models import Category
+    from catalog.urls_paths import catalog_category_path
+
+    cat = Category.objects.filter(slug=slug).first()
+    if cat is None:
+        return None
+    canonical = catalog_category_path(cat.slug)
+    desc = plain_text_for_meta(cat.description or cat.name, max_len=160)
+    return SeoHeadContext(
+        canonical_path=canonical,
+        page_title=_format_page_title(
+            plain_text_for_meta(cat.name, max_len=TITLE_PARTIAL_MAX),
+        ),
+        description=format_meta_description(desc or DEFAULT_DESCRIPTION),
+        noindex=False,
+        breadcrumb=(
+            ("/", "Главная"),
+            ("/catalog", "Каталог"),
+            (canonical, cat.name),
+        ),
     )
 
 
@@ -230,6 +277,10 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
         resolved = resolver(path)
         if resolved is not None:
             return resolved
+
+    cat_ctx = _resolve_catalog_category(path)
+    if cat_ctx is not None:
+        return cat_ctx
 
     static = PUBLIC_STATIC_ROUTES.get(path)
     if static is not None:

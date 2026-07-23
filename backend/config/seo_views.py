@@ -10,7 +10,8 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.views import View
 
-from catalog.models import SKU
+from catalog.models import SKU, Category
+from catalog.urls_paths import catalog_category_path, catalog_path_for_sku
 from config.seo.routes import PUBLIC_STATIC_ROUTES
 from content.models import Article, News, Page
 
@@ -158,8 +159,11 @@ class SitemapXmlView(View):
         for path in sorted(PUBLIC_STATIC_ROUTES.keys()):
             urls.append(f"{base}{path}" if path != "/" else f"{base}/")
 
-        for sku in SKU.objects.filter(is_published=True).order_by("slug"):
-            urls.append(f"{base}/{sku.slug}")
+        for cat in Category.objects.order_by("slug"):
+            urls.append(f"{base}{catalog_category_path(cat.slug)}")
+
+        for sku in SKU.objects.filter(is_published=True).select_related("product__category").order_by("slug"):
+            urls.append(f"{base}{catalog_path_for_sku(sku)}")
 
         for page in Page.objects.filter(is_published=True).order_by("slug"):
             path = f"/{page.slug}"

@@ -1,5 +1,5 @@
-import { Link, useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 
 import { Seo } from "../components/Seo";
 import { CatalogSkeleton } from "../components/CatalogSkeleton";
@@ -12,19 +12,14 @@ import {
 } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { facetLabelShort, facetValueShort } from "../utils/facetDisplay";
-import { cardHighlights } from "../utils/cardHighlights";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseProductDescription } from "../utils/parseDescription";
-import {
-  isModulatingSignalKey,
-  SignalSpecValue,
-} from "../components/SignalSpecValue";
-import { CompareToggle } from "../components/CompareToggle";
+import { CatalogSkuCard } from "../components/CatalogSkuCard";
 import { InstructionText } from "../components/InstructionText";
-import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
-import { specDisplayUnit } from "../utils/specDisplay";
-import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import {
+  catalogCategoryPath,
+} from "../utils/catalogPaths";
 import styles from "./CatalogPage.module.css";
 
 /** Facet query keys synced to the URL (backend catalog.facets). */
@@ -58,12 +53,30 @@ type LoadMoreUi = {
 /**
  * Catalog list: categories + ТТХ facets + compact SKU cards.
  *
- * Filters sync to query string so URLs are shareable.
- * Spec: docs/plan-detail-mvp.md S2; live PDP hero style (hoocon.ru).
+ * Category lives in the path (``/catalog/{slug}``); facets/q/page in the query.
+ * Legacy ``?category=`` redirects to the nested path.
  */
 export function CatalogPage() {
+  const { categorySlug: categoryFromPath = "" } = useParams<{
+    categorySlug?: string;
+  }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const category = searchParams.get("category") ?? "";
+  const navigate = useNavigate();
+
+  // Legacy share links: /catalog?category=… → /catalog/…
+  useEffect(() => {
+    const legacy = searchParams.get("category");
+    if (!legacy || categoryFromPath) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("category");
+    const qs = next.toString();
+    navigate(
+      `${catalogCategoryPath(legacy)}${qs ? `?${qs}` : ""}`,
+      { replace: true },
+    );
+  }, [searchParams, categoryFromPath, navigate]);
+
+  const category = categoryFromPath;
   const q = searchParams.get("q") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
 
@@ -173,6 +186,10 @@ export function CatalogPage() {
   }
 
   function clearAllFilters() {
+    if (category) {
+      navigate("/catalog");
+      return;
+    }
     setSearchParams(new URLSearchParams());
   }
 
@@ -224,18 +241,16 @@ export function CatalogPage() {
             className={
               category === "" ? styles.optionRowActive : styles.optionRow
             }
-            onClick={() => updateFilter("category", "")}
           >
             <span className={styles.optionText}>Все категории</span>
           </Link>
           {categories.map((cat) => (
             <Link
               key={cat.slug}
-              to={`/catalog?category=${encodeURIComponent(cat.slug)}`}
+              to={catalogCategoryPath(cat.slug)}
               className={
                 category === cat.slug ? styles.optionRowActive : styles.optionRow
               }
-              onClick={() => updateFilter("category", cat.slug)}
             >
               <span className={styles.optionText}>{softBreak(cat.name)}</span>
             </Link>
@@ -292,9 +307,9 @@ export function CatalogPage() {
   return (
     <div className={styles.page}>
       <Seo
-        title="Каталог электроприводов ОВК"
+        title={activeCategory ? activeCategory.name : "Каталог электроприводов ОВК"}
         description="Каталог электроприводов Hoocon для вентиляции и кондиционирования. Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
-        path="/catalog"
+        path={category ? catalogCategoryPath(category) : "/catalog"}
         jsonLd={[
           buildBreadcrumbJsonLd([
             { name: "Главная", path: "/" },
@@ -303,7 +318,7 @@ export function CatalogPage() {
               ? [
                   {
                     name: activeCategory.name,
-                    path: `/catalog?category=${encodeURIComponent(activeCategory.slug)}`,
+                    path: catalogCategoryPath(activeCategory.slug),
                   },
                 ]
               : []),
@@ -375,7 +390,7 @@ export function CatalogPage() {
               <button
                 type="button"
                 className={styles.activeTag}
-                onClick={() => updateFilter("category", "")}
+                onClick={() => navigate("/catalog")}
               >
                 <span className={styles.activeTagLabel}>Категория</span>
                 <span className={styles.activeTagValue}>
@@ -468,94 +483,7 @@ export function CatalogPage() {
           <>
             <div className={styles.grid}>
               {displayedSkus.map((sku) => (
-                <article key={sku.slug} className={styles.card}>
-                  <Link
-                    to={`/${sku.slug}`}
-                    className={styles.cardHit}
-                    aria-label={sku.name}
-                  />
-                  {sku.image?.image ? (
-                    <div
-                      className={styles.cardMedia}
-                      data-purpose={mediaPurposeFromCategory(sku.category_slug)}
-                    >
-                      <CompareToggle
-                        className={`${styles.cardCompare} ${styles.cardInteractive}`}
-                        item={{
-                          slug: sku.slug,
-                          sku_code: sku.sku_code,
-                          name: sku.name,
-                          image: sku.image.image,
-                        }}
-                      />
-                      <img
-                        src={sku.image.image}
-                        alt={sku.image.alt || sku.name}
-                        className={styles.cardImage}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className={styles.cardMediaPlaceholder}
-                      data-purpose={mediaPurposeFromCategory(sku.category_slug)}
-                    >
-                      <CompareToggle
-                        className={`${styles.cardCompare} ${styles.cardInteractive}`}
-                        item={{
-                          slug: sku.slug,
-                          sku_code: sku.sku_code,
-                          name: sku.name,
-                          image: null,
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div className={styles.cardBody}>
-                    <p className={`${styles.cardCode} text-tech`}>
-                      {softBreak(sku.sku_code)}
-                    </p>
-                    <h3 className={styles.cardTitle}>{softBreak(sku.name)}</h3>
-                    {sku.highlights && sku.highlights.length > 0 ? (
-                      <ul className={styles.cardSpecs}>
-                        {cardHighlights(sku.highlights).map((h) => {
-                          const unit = specDisplayUnit(h.value, h.unit);
-                          return (
-                            <li key={h.key}>
-                              <span className={styles.cardSpecName}>
-                                {h.name}
-                              </span>
-                              {isModulatingSignalKey(h.key) ? (
-                                <SignalSpecValue
-                                  value={`${h.value}${unit ? ` ${unit}` : ""}`}
-                                  className={`${styles.cardSpecValue} ${styles.cardInteractive}`}
-                                />
-                              ) : (
-                                <span className={styles.cardSpecValue}>
-                                  <SoftBreakText text={h.value} />
-                                  {unit ? ` ${unit}` : ""}
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : null}
-                    <div className={styles.cardFooter}>
-                      {sku.analog_belimo_code ? (
-                        <span className={`${styles.cardAnalog} text-tech`}>
-                          Belimo: {softBreak(sku.analog_belimo_code)}
-                        </span>
-                      ) : (
-                        <span className={styles.cardPriceOnRequest}>
-                          Цена по запросу
-                        </span>
-                      )}
-                      <span className={styles.cardCta}>Паспорт и ТТХ</span>
-                    </div>
-                  </div>
-                </article>
+                <CatalogSkuCard key={sku.slug} sku={sku} />
               ))}
             </div>
 

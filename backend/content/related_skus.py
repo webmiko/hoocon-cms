@@ -70,7 +70,10 @@ def mentioned_skus_for_article(
     # Longer tokens first so DA3FU230-DS beats DA3FU.
     tokens_sorted = sorted(tokens, key=len, reverse=True)
     qs = (
-        SKU.objects.filter(is_published=True).select_related("product").prefetch_related("images").order_by("sku_code")
+        SKU.objects.filter(is_published=True)
+        .select_related("product", "product__category")
+        .prefetch_related("images")
+        .order_by("sku_code")
     )
     picked: list[SKU] = []
     used_products: set[int] = set()

@@ -255,13 +255,14 @@ def test_search_result_item_has_required_fields(client) -> None:
 
 @pytest.mark.django_db
 def test_search_result_url_is_canonical_path(client) -> None:
-    """Result URL is the canonical path (sku: /<slug>, article: /statyi/<slug>, news: /novosti/<slug>)."""
+    """Result URL is nested catalog path for SKU; articles/news keep prefixes."""
     _seed_search_data()
     response = client.get("/api/search/", {"q": "привод"})
     body = response.json()
     for item in body["results"]:
         if item["type"] == "sku":
-            assert item["url"].startswith("/") and "/statyi/" not in item["url"] and "/novosti/" not in item["url"]
+            assert item["url"].startswith("/catalog/")
+            assert item["url"].count("/") >= 3
         elif item["type"] == "article":
             assert "/statyi/" in item["url"]
         elif item["type"] == "news":

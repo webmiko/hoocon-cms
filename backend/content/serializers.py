@@ -68,7 +68,14 @@ class ArticleRelatedSkuSerializer(serializers.Serializer):
     name = serializers.CharField()
     slug = serializers.CharField()
     sku_code = serializers.CharField()
+    category_slug = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+
+    def get_category_slug(self, obj: Any) -> str:
+        """Category path segment for nested catalog URLs."""
+        product = getattr(obj, "product", None)
+        category = getattr(product, "category", None) if product is not None else None
+        return getattr(category, "slug", None) or ""
 
     def get_image(self, obj: Any) -> str | None:
         """Primary published image path (root-relative ``/media/...``)."""

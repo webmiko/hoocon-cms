@@ -36,6 +36,13 @@
 
 ## Changelog
 
+### v0.0.6 beta — 2026-07-23
+
+- Nested catalog SKU URLs: `/catalog/{category}/{sku}` (one page per SKU);
+  legacy `?category=` and flat `/{sku}` redirect to the nested path.
+- Catalog cards: photo-edge wash, one card per row, gradient hover border;
+  no divider between photo and copy (list + PDP hero).
+
 ### v0.0.5 beta — 2026-07-21
 
 - Карточки приводов: единый набор ТТХ (момент, напряжение, управление,

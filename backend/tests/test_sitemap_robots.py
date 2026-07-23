@@ -110,8 +110,10 @@ def test_sitemap_includes_published_sku_slugs(client) -> None:
     _seed_for_sitemap()
     response = client.get("/sitemap.xml")
     body = response.content.decode()
-    assert "/privod-hva-5nm-sm" in body
-    assert "/privod-hva-10nm-sm" in body
+    assert "/catalog/vozdushnie-sm/privod-hva-5nm-sm" in body
+    assert "/catalog/vozdushnie-sm/privod-hva-10nm-sm" in body
+    assert "/catalog/vozdushnie-sm" in body
+    assert "/catalog/protivopozharnie-sm" in body
 
 
 @pytest.mark.django_db
@@ -121,6 +123,7 @@ def test_sitemap_excludes_unpublished_skus(client) -> None:
     response = client.get("/sitemap.xml")
     body = response.content.decode()
     assert "/draft-sm" not in body
+    assert "/catalog/protivopozharnie-sm/draft-sm" not in body
 
 
 @pytest.mark.django_db

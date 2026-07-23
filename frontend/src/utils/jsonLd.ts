@@ -15,6 +15,7 @@ interface SkuForJsonLd {
   price?: string | number | null;
   price_on_request?: boolean;
   category_name?: string;
+  category_slug?: string | null;
 }
 
 interface ArticleForJsonLd {
@@ -57,12 +58,16 @@ export const HOME_FAQ_ITEMS: Array<{ question: string; answer: string }> = [
  * Build a JSON-LD Product object from a SKU with a strict whitelist.
  */
 export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
+  const path =
+    sku.category_slug && sku.slug
+      ? `/catalog/${sku.category_slug}/${sku.slug}`
+      : `/${sku.slug}`;
   const ld: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: sku.name,
     sku: sku.sku_code ?? sku.slug,
-    url: `${SITE_URL}/${sku.slug}`,
+    url: `${SITE_URL}${path}`,
   };
 
   if (sku.description) {
