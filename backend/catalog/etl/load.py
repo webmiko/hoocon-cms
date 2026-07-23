@@ -35,19 +35,44 @@ class LoadStats:
 
 
 def _slugify_attr(title: str) -> str:
-    """Derive a stable slug for an Attribute from its Russian title.
+    """Derive a stable digest slug when the title is not a known ТТХ label.
 
-    Uses Django's slugify (handles transliteration via unicode). Falls back
-    to a stable digest if slugify produces empty (rare for non-Latin titles).
+    Django ``slugify`` without ``allow_unicode`` strips Cyrillic to empty, so
+    non-Latin unknown titles become ``attr-{sha1[:12]}`` for idempotent load.
+    Prefer :func:`_attribute_identity` for load — it maps known labels first.
     """
     from django.utils.text import slugify
 
     slug = slugify(title)
     if not slug:
-        # Last-resort: deterministic ascii-safe fallback for ETL idempotency.
         digest = hashlib.sha1(title.encode("utf-8")).hexdigest()[:12]
         slug = f"attr-{digest}"
     return slug[:100]
+
+
+def _attribute_identity(title: str, value: str) -> tuple[str, str, str]:
+    """Resolve Attribute slug/name/unit so load matches enricher slugs.
+
+    Known Russian ТТХ labels map via :func:`label_to_slug` / ``CANONICAL_ATTRS``
+    (same path as ``specs_to_attrs`` and series copy). Unknown titles fall back
+    to :func:`_slugify_attr` and keep the raw title as ``name``.
+
+    Args:
+        title: Normalized attribute title from Tilda / extract.
+        value: Attribute value (disambiguates «Мощность», «Управление», …).
+
+    Returns:
+        ``(slug, name, unit)`` for :func:`ensure_attribute`.
+    """
+    from catalog.etl.label_to_slug import canonical_meta, label_to_slug
+
+    mapped = label_to_slug(title, value=value)
+    if mapped is not None:
+        meta = canonical_meta(mapped)
+        if meta is not None:
+            name, unit, _group = meta
+            return mapped, name, unit
+    return _slugify_attr(title), title, ""
 
 
 @transaction.atomic
@@ -178,7 +203,8 @@ def load_product(
         stats.skus_created += int(sku_created)
 
         for nattr in nsku.attributes:
-            attr = ensure_attribute(_slugify_attr(nattr.title), nattr.title)
+            slug, name, unit = _attribute_identity(nattr.title, nattr.value)
+            attr = ensure_attribute(slug, name, unit)
             _, av_created = AttributeValue.objects.update_or_create(
                 sku=sku,
                 attribute=attr,

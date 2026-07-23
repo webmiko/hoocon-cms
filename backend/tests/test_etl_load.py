@@ -155,9 +155,10 @@ def test_load_product_creates_product_and_skus() -> None:
     assert SKU.objects.filter(product=product).count() == 2
     sku = SKU.objects.get(sku_code="sa3fu24-ds")
     assert sku.slug == "privod-protivopozharniy-3nm-sa3fu24-ds"
-    attrs = {av.attribute.name: av.value for av in sku.attribute_values.all()}
-    assert attrs["Мощность"] == "3 Нм"
-    assert attrs["Напряжение (В)"] == "24 В"
+    attrs = {av.attribute.slug: av.value for av in sku.attribute_values.all()}
+    assert attrs["moment"] == "3 Нм"
+    assert attrs["voltage"] == "24 В"
+    assert "control" in attrs
     assert AttributeValue.objects.count() >= 4
 
 
@@ -196,9 +197,68 @@ def test_load_product_creates_attributes_in_dictionary() -> None:
 
     np = normalize_product(raw["products"][0])
     load_product(np, category_map=cat_map)
-    assert Attribute.objects.filter(name="Мощность").exists()
-    assert Attribute.objects.filter(name="Напряжение (В)").exists()
-    assert Attribute.objects.filter(name="Управление").exists()
+    # Canonical display names from CANONICAL_ATTRS (not raw Tilda labels).
+    assert Attribute.objects.filter(slug="moment", name="Крутящий момент").exists()
+    assert Attribute.objects.filter(slug="voltage", name="Номинальное напряжение").exists()
+    assert Attribute.objects.filter(slug="control", name="Управление").exists()
+
+
+@pytest.mark.django_db
+def test_load_product_reuses_canonical_slugs_for_enrichers() -> None:
+    """Load must not create hash-slug Attributes that enrichers cannot update."""
+    from decimal import Decimal
+
+    from catalog.etl.attr_write import set_sku_attribute
+    from catalog.etl.load import load_product
+    from catalog.etl.normalize import (
+        NormalizedAttribute,
+        NormalizedProduct,
+        NormalizedSKU,
+    )
+    from catalog.models import Attribute, AttributeValue, Category
+
+    cat = Category.objects.create(name="Test", slug="test-canon-attr")
+    np = NormalizedProduct(
+        tilda_uid="canon-1",
+        name="Canon Product",
+        slug="canon-product",
+        description="",
+        category_id=1,
+        skus=(
+            NormalizedSKU(
+                sku_code="CANON-1",
+                slug="canon-product-canon-1",
+                name="Canon Product (CANON-1)",
+                price=Decimal("0"),
+                description="",
+                attributes=(
+                    NormalizedAttribute(title="Крутящий момент", value="5 Нм"),
+                    NormalizedAttribute(title="Напряжение (В)", value="24 В"),
+                    NormalizedAttribute(title="Управление", value="2-/3-позиционное"),
+                ),
+            ),
+        ),
+    )
+    load_product(np, category_map={1: cat})
+
+    assert Attribute.objects.filter(slug="moment").count() == 1
+    assert Attribute.objects.filter(slug="voltage").count() == 1
+    assert Attribute.objects.filter(slug="control").count() == 1
+    assert not Attribute.objects.filter(slug__startswith="attr-").exists()
+
+    from catalog.models import SKU
+
+    sku = SKU.objects.get(sku_code="CANON-1")
+    set_sku_attribute(
+        sku,
+        slug="moment",
+        value="8 Нм",
+        name="Крутящий момент",
+        unit="Нм",
+    )
+    av = AttributeValue.objects.get(sku=sku, attribute__slug="moment")
+    assert av.value == "8 Нм"
+    assert Attribute.objects.filter(slug="moment").count() == 1
 
 
 @pytest.mark.django_db
