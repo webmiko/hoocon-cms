@@ -16,8 +16,13 @@ from catalog.etl.html_text import dedupe_description_lines, filter_analogs_for_s
 from catalog.etl.sku_variant import (
     filter_attributes_for_variant,
     filter_description_for_variant,
+    filter_images_for_variant,
     parse_sku_variant,
     rewrite_series_tokens_for_variant,
+)
+from catalog.etl.tech_copy import (
+    is_control_mode_attribute,
+    normalize_manual_override_value,
 )
 from catalog.facets import (
     dedupe_attribute_values,
@@ -26,8 +31,10 @@ from catalog.facets import (
     format_sku_heading_name,
     highlights_for_sku,
     normalize_area_attribute_value,
+    paraphrase_sku_lead,
     strip_attribute_echo_from_text,
     strip_heading_echo_from_description,
+    strip_lead_duplicate_lines,
 )
 from catalog.media_urls import RelativeImageField
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
@@ -44,6 +51,16 @@ from sitesettings.models import SiteSettings
 def _prices_visible() -> bool:
     """Return True if public API may expose SKU.price."""
     return bool(SiteSettings.load().show_prices_on_site)
+
+
+def _sku_gallery_images(obj: SKU) -> list[ProductImage]:
+    """Published gallery photos scoped to the SKU control / torque edition."""
+    images = getattr(obj, "_prefetched_images", None)
+    if images is None:
+        images = list(
+            obj.images.filter(is_published=True).order_by("sort_order", "id"),
+        )
+    return filter_images_for_variant(list(images), parse_sku_variant(obj.sku_code))
 
 
 def _sku_kvs_value(obj: SKU) -> str:
@@ -102,7 +119,8 @@ def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any
     result: list[dict[str, Any]] = []
     for row in filtered:
         name = (row.get("name") or "").casefold()
-        if "управл" in name:
+        slug = (row.get("slug") or "").casefold()
+        if is_control_mode_attribute(name=name, slug=slug):
             from catalog.etl.tech_copy import normalize_control_attribute_value
 
             row = {
@@ -112,6 +130,11 @@ def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any
                     sku_code=obj.sku_code,
                     category_slug=sku_category_slug_or_empty(obj),
                 ),
+            }
+        elif slug == "manual-override" or "ручн" in name:
+            row = {
+                **row,
+                "value": normalize_manual_override_value(str(row.get("value") or "")),
             }
         if "напряж" in name and "диапазон" not in name:
             from catalog.etl.tech_copy import normalize_voltage_attribute_value
@@ -277,11 +300,7 @@ class SKUListSerializer(serializers.ModelSerializer):
 
     def get_image(self, obj: SKU) -> dict[str, Any] | None:
         """Primary published image for catalog cards (sort_order ASC)."""
-        images = getattr(obj, "_prefetched_images", None)
-        if images is None:
-            images = list(
-                obj.images.filter(is_published=True).order_by("sort_order", "id")[:1],
-            )
+        images = _sku_gallery_images(obj)
         if not images:
             return None
         return ProductImageSerializer(images[0], context=self.context).data
@@ -355,6 +374,8 @@ class SKUDetailSerializer(SKUListSerializer):
 
         Drops bullets that only restate AttributeValue rows already shown in
         ТТХ cards / highlights (e.g. «Управление: …», «Вспомогательный…»).
+        When nothing remains but a hero lead exists, return a light paraphrase
+        of that lead for the Описание tab (SEO-safe, not an exact duplicate).
         """
         text = _sku_description(obj)
         heading = _sku_heading(obj)
@@ -364,10 +385,16 @@ class SKUDetailSerializer(SKUListSerializer):
             heading=heading,
             lead=lead,
         )
-        return strip_attribute_echo_from_text(
+        cleaned = strip_attribute_echo_from_text(
             cleaned,
             _sku_attribute_rows(obj, self.context),
         )
+        cleaned = strip_lead_duplicate_lines(cleaned, lead)
+        if cleaned.strip():
+            return cleaned
+        if lead.strip():
+            return paraphrase_sku_lead(lead)
+        return ""
 
     def get_lead(self, obj: SKU) -> str:
         """Short prose blurb for PDP hero (application sentence)."""
@@ -432,10 +459,6 @@ class SKUDetailSerializer(SKUListSerializer):
         return ProductFileSerializer(qs, many=True, context=self.context).data
 
     def get_images(self, obj: SKU) -> list[dict[str, Any]]:
-        """Return published gallery images, ordered."""
-        images = getattr(obj, "_prefetched_images", None)
-        if images is None:
-            images = list(
-                obj.images.filter(is_published=True).order_by("sort_order", "id"),
-            )
+        """Return published gallery images for this edition only."""
+        images = _sku_gallery_images(obj)
         return ProductImageSerializer(images, many=True, context=self.context).data

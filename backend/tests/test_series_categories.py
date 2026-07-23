@@ -6,6 +6,7 @@ from catalog.series_categories import (
     classify_series_category,
     resolve_alias,
     spec_categories,
+    spec_order_case,
 )
 
 
@@ -43,3 +44,13 @@ def test_resolve_legacy_tilda_aliases() -> None:
     """Old Tilda subcategory slugs map onto the series table."""
     assert resolve_alias("elektroprivod-vozdushniy-s-vozvratnoy-pruzhinoy") == "elektroprivody-s-pruzhinnym-vozvratom"
     assert resolve_alias("sharoviy-kran-3-hodovoy") == "sharovye-krany"
+
+
+def test_spec_order_case_includes_tilda_aliases() -> None:
+    """Legacy and canonical slugs share the same sidebar sort index."""
+    from django.db.models import Case
+
+    expr = spec_order_case()
+    assert isinstance(expr, Case)
+    # When clauses: one per canonical + each alias that maps to a known spec.
+    assert len(expr.cases) >= len(spec_categories()) + 3

@@ -12,8 +12,11 @@ from catalog.series_categories import (
     SpecCategory,
     allowed_slugs,
     classify_series_category,
+    legacy_slug_aliases,
     spec_categories,
 )
+from redirects.models import Redirect
+from redirects.pathutils import normalize_path
 
 # Local test junk left from earlier scrapes / manual checks.
 _TEST_PRODUCT_SLUGS = frozenset({"hva-test"})
@@ -49,6 +52,7 @@ class Command(BaseCommand):
                 allowed=allowed,
                 dry_run=dry_run,
             )
+            redirects = self._ensure_category_redirects(dry_run=dry_run)
             deleted_products = self._delete_test_products(dry_run=dry_run)
             deleted_cats = self._delete_extra_categories(allowed=allowed, dry_run=dry_run)
             if dry_run:
@@ -57,8 +61,8 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"spec categories={len(specs)} moved={moved} "
-                f"deleted_products={deleted_products} deleted_categories={deleted_cats} "
-                f"dry_run={dry_run}",
+                f"redirects={redirects} deleted_products={deleted_products} "
+                f"deleted_categories={deleted_cats} dry_run={dry_run}",
             ),
         )
 
@@ -127,6 +131,28 @@ class Command(BaseCommand):
                 product.save(update_fields=["category", "updated_at"])
             moved += 1
         return moved
+
+    def _ensure_category_redirects(self, *, dry_run: bool) -> int:
+        """301 ``/catalog/<tilda-slug>`` → ``/catalog/<spec-slug>``."""
+        created = 0
+        for legacy, canonical in sorted(legacy_slug_aliases().items()):
+            if legacy == canonical:
+                continue
+            from_path = normalize_path(f"/catalog/{legacy}")
+            to_path = normalize_path(f"/catalog/{canonical}")
+            exists = Redirect.objects.filter(from_path=from_path).exists()
+            if exists:
+                continue
+            self.stdout.write(f"  redirect {from_path} → {to_path}")
+            if not dry_run:
+                Redirect.objects.create(
+                    from_path=from_path,
+                    to_path=to_path,
+                    status_code=Redirect.HTTP_MOVED_PERMANENTLY,
+                    is_active=True,
+                )
+            created += 1
+        return created
 
     def _delete_test_products(self, *, dry_run: bool) -> int:
         """Remove local test products that are not part of the catalog."""

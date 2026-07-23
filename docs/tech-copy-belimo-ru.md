@@ -219,6 +219,28 @@ Belimo (B2B HVAC).
 
 ---
 
+## Привод SA..FU (противопожарный / дымовой, пружинный возврат)
+
+Источник: англ. паспорта ``sa{n}fu-ds_dst.pdf`` (Nm 3 / 5 / 10 / 15).
+
+| Оригинал (англ.) | Перевод (рус.) |
+| :--- | :--- |
+| FIRE AND SMOKE DAMPER ACTUATOR | Электропривод противопожарного / дымового клапана |
+| This fire and smoke spring-return actuator is specially designed for small and medium-sized terminal air damper and air volume system control unit. It is often used in places where space is limited because its small size and flexible control. | Данный электропривод противопожарного / дымового клапана с пружинным возвратом специально разработан для малогабаритных и средних оконечных воздушных заслонок и узлов управления системой воздушного потока. Благодаря малым габаритам и гибкости управления он часто применяется в местах с ограниченным пространством. |
+| S type include 2 auxiliary switch | Исполнение «S» включает 2 вспомогательных переключателя |
+| Running time: <75s, Spring reset time: <25s | Время поворота: < 75 с, Время возврата пружины: < 25 с |
+| Damper size | Площадь заслонки |
+| Gearing latch disengaged by pushbutton, self-resetting | Редуктор выводится из зацепления при помощи кнопки с самовозвратом, ручная блокировка |
+| Machine instruction | Механический указатель |
+| Thermal Sensor SAF72 | Термодатчик SAF72 |
+| Consist of both Ambient(TS1) and Duct sensor(TS2) | Состоит из датчика окружающей среды (TS1) и датчика в канале (TS2) |
+| TS1 will trip open when the ambient temperature rise above 72° | TS1 размыкается при температуре окружающей среды выше 72 °C |
+| TS2 will trip open when the duct temperature rise above 72° | TS2 размыкается при температуре в канале выше 72 °C |
+| 12x12mm □ Can provide 8x8,10x10mm shaft sleeve | Квадратный 12×12 мм (доступны втулки 8×8, 10×10 мм) |
+| Shaft length >50mm / <90mm | Длина вала заслонки > 50 мм / < 90 мм |
+
+---
+
 ## Предупреждения (общие)
 
 | Оригинал (англ.) | Перевод (рус.) |

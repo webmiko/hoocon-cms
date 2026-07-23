@@ -266,6 +266,84 @@ def extract_sku_lead(description: str, *, max_len: int = 220) -> str:
     return f"{cut}…" if cut else lead[:max_len]
 
 
+_LEAD_FOR_PURPOSE = re.compile(
+    r"(?i)^(?:электро)?привод\s+(?P<head>.+?)\s+для\s+(?P<purpose>.+?)"
+    r"(?:\s+с\s+(?P<with>.+))?$",
+)
+
+
+def paraphrase_sku_lead(lead: str) -> str:
+    """Reword hero lead for the Описание tab (avoid exact SEO duplicate).
+
+    Args:
+        lead: Hero blurb already shown under H1.
+
+    Returns:
+        Slightly rephrased sentence(s), or empty when ``lead`` is blank.
+    """
+    text = " ".join((lead or "").split()).strip().rstrip(" .")
+    if not text:
+        return ""
+
+    match = _LEAD_FOR_PURPOSE.match(text)
+    if match is not None:
+        head = match.group("head").strip()
+        purpose = match.group("purpose").strip()
+        with_feat = (match.group("with") or "").strip()
+        bits = [f"Применяется для {purpose}"]
+        if with_feat:
+            bits.append(f"в исполнении с {with_feat}")
+        first = "; ".join(bits) + "."
+        if re.search(r"\d", head):
+            return f"{first} Номинальный крутящий момент — {head}."
+        rest = head[:1].upper() + head[1:] if head else ""
+        return f"{first} {rest}.".strip() if rest else first
+
+    # Generic: change surface form without inventing new specs.
+    body = text[:1].lower() + text[1:] if text else text
+    return f"Назначение модели: {body}."
+
+
+def strip_lead_duplicate_lines(description: str, lead: str) -> str:
+    """Remove description lines that only restate the hero lead.
+
+    Args:
+        description: SKU description body.
+        lead: Hero lead already rendered under H1.
+
+    Returns:
+        Description without exact / near-exact lead restatements.
+    """
+    if not description or not description.strip() or not lead.strip():
+        return description or ""
+    lead_n = _norm_heading_phrase(lead)
+    if not lead_n:
+        return description
+    out: list[str] = []
+    for raw in description.replace("\xa0", " ").splitlines():
+        stripped = " ".join(raw.split())
+        if not stripped:
+            out.append(raw)
+            continue
+        if _LEAD_SKIP.search(stripped) or stripped.endswith(":"):
+            out.append(raw)
+            continue
+        parts = re.split(r"(?<=[.!?…])\s+", stripped)
+        kept = [
+            part
+            for part in parts
+            if (pn := _norm_heading_phrase(part)) and not (pn == lead_n or lead_n in pn or pn in lead_n)
+        ]
+        if not kept:
+            continue
+        out.append(" ".join(kept))
+    while out and not out[0].strip():
+        out.pop(0)
+    while out and not out[-1].strip():
+        out.pop()
+    return "\n".join(out).strip()
+
+
 def strip_heading_echo_from_description(
     description: str,
     *,

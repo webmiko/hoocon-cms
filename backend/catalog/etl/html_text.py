@@ -411,6 +411,22 @@ _REC_BLOCK = re.compile(
     r'<div id="rec(?P<id>\d+)"(?P<body>.*?)(?=<div id="rec\d+"|$)',
     re.I | re.S,
 )
+# Newer Tilda t819 tabs: button aria-controls → content-tabN_recId panel.
+_TAB_BUTTON = re.compile(
+    r'<button[^>]*\baria-controls="(?P<panel>content-tab\d+_\d+)"[^>]*>\s*'
+    r"(?P<title>Описание|Инструкция|Характеристики|Аналоги)\s*</button>",
+    re.I,
+)
+_CONTENT_TAB_PANEL = re.compile(
+    r'<div[^>]*\bid="(?P<id>content-tab\d+_\d+)"[^>]*>(?P<body>.*?)'
+    r'(?=<div[^>]*\bid="content-tab\d+_|\Z)',
+    re.I | re.S,
+)
+_SAFETY_NOTICE = re.compile(
+    r"(?is)Оповещение\s+по\s+безопасности\s*(?:</(?:strong|b|span|p|div)>\s*)?"
+    r"(?P<body>(?:(?:<br\s*/?>|\s)*\d+\.\s*.+?){2,4})"
+    r"(?=<|$)",
+)
 _TAB_KEY = {
     "описание": "description",
     "инструкция": "instructions",
@@ -419,11 +435,22 @@ _TAB_KEY = {
 }
 
 
+def _plain_tab_text(chunk: str) -> str:
+    """Structured plain text for one tab body, or empty if too short."""
+    text = html_to_structured_text(chunk)
+    text = dedupe_description_lines(text)
+    if text and len(html_to_text(text)) >= 20:
+        return text
+    return ""
+
+
 def extract_tilda_tabs(page_html: str) -> dict[str, str]:
     """Extract structured text for the four Tilda product tabs.
 
-    Tabs are wired via ``<option value="{rec_id}">Описание</option>`` to
-    ``<div id="rec{rec_id}">`` blocks (see hoocon.ru product pages).
+    Supports:
+
+    - Legacy: ``<option value="{rec_id}">Описание</option>`` → ``#rec{id}``
+    - t819: ``aria-controls="content-tabN_…"`` → ``#content-tabN_…`` panels
 
     Args:
         page_html: Full product page HTML.
@@ -434,28 +461,115 @@ def extract_tilda_tabs(page_html: str) -> dict[str, str]:
     """
     if not page_html:
         return {}
+
+    out = _extract_tilda_tabs_rec(page_html)
+    if len(out) >= 2:
+        return out
+    t819 = _extract_tilda_tabs_t819(page_html)
+    # Prefer the richer parse when both partially match.
+    if len(t819) > len(out):
+        return t819
+    return out or t819
+
+
+def _extract_tilda_tabs_rec(page_html: str) -> dict[str, str]:
+    """Legacy rec-id tab wiring."""
     id_to_key: dict[str, str] = {}
     for match in _TAB_OPTION.finditer(page_html):
         title = match.group("title").casefold()
         key = _TAB_KEY.get(title)
         if key:
             id_to_key[match.group("id")] = key
-
     if not id_to_key:
         return {}
-
     out: dict[str, str] = {}
     for match in _REC_BLOCK.finditer(page_html):
         key = id_to_key.get(match.group("id"))
         if not key:
             continue
-        chunk = match.group("body")
-        # Whole record → structured text (nested </div> breaks field=text regex).
-        text = html_to_structured_text(chunk)
-        text = dedupe_description_lines(text)
-        if text and len(html_to_text(text)) >= 20:
+        text = _plain_tab_text(match.group("body"))
+        if text:
             out[key] = text
     return out
+
+
+def _extract_tilda_tabs_t819(page_html: str) -> dict[str, str]:
+    """t819 content-tab panels wired via aria-controls."""
+    panel_to_key: dict[str, str] = {}
+    for match in _TAB_BUTTON.finditer(page_html):
+        title = match.group("title").casefold()
+        key = _TAB_KEY.get(title)
+        if key:
+            panel_to_key[match.group("panel")] = key
+    if not panel_to_key:
+        return {}
+    out: dict[str, str] = {}
+    for match in _CONTENT_TAB_PANEL.finditer(page_html):
+        key = panel_to_key.get(match.group("id"))
+        if not key:
+            continue
+        text = _plain_tab_text(match.group("body"))
+        if text:
+            out[key] = text
+    return out
+
+
+def extract_safety_notice(page_html: str) -> str:
+    """Extract the live «Оповещение по безопасности» block as structured text.
+
+    Args:
+        page_html: Full product page HTML.
+
+    Returns:
+        Plain text starting with ``ВНИМАНИЕ:`` (empty if not found).
+    """
+    if not page_html:
+        return ""
+    match = _SAFETY_NOTICE.search(page_html)
+    if match is None:
+        return ""
+    body = html_to_text(match.group("body"))
+    lines: list[str] = ["ВНИМАНИЕ:"]
+    for part in re.split(r"(?=\d+\.\s)", body):
+        item = " ".join(part.split()).strip()
+        if not item:
+            continue
+        item = re.sub(r"^\d+\.\s*", "", item).strip()
+        if item:
+            lines.append(f"– {item}")
+    if len(lines) < 2:
+        return ""
+    return "\n".join(lines)
+
+
+def ensure_safety_in_instructions(instructions: str, safety: str) -> str:
+    """Prepend a safety notice when instructions lack an Attention block.
+
+    Args:
+        instructions: Install / operation tab text.
+        safety: ``ВНИМАНИЕ:`` block from the page or glossary.
+
+    Returns:
+        Instructions with safety near the top when needed.
+    """
+    body = (instructions or "").strip()
+    notice = (safety or "").strip()
+    if not notice:
+        return body
+    if re.search(
+        r"(?im)(?:^|\n)\s*ВНИМАНИЕ\b|Оповещение\s+по\s+безопасности",
+        body,
+    ):
+        return body
+    if not body:
+        return notice
+    # Keep lead title line, then safety, then the rest.
+    lines = body.splitlines()
+    if lines and re.search(r"(?i)^инструкция\b", lines[0]):
+        lead = lines[0]
+        rest = "\n".join(lines[1:]).lstrip()
+        return f"{lead}\n\n{notice}\n\n{rest}".strip()
+    return f"{notice}\n\n{body}".strip()
 
 
 def filter_analogs_for_sku(text: str, sku_code: str) -> str:

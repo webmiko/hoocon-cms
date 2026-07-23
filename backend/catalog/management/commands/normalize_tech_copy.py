@@ -6,7 +6,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from catalog.etl.tech_copy import (
+    is_control_mode_attribute,
     normalize_control_attribute_value,
+    normalize_manual_override_value,
     normalize_modulating_signal_value,
     normalize_running_time_value,
     normalize_tech_copy,
@@ -137,12 +139,14 @@ class Command(BaseCommand):
                 new = normalize_modulating_signal_value(raw)
             elif "управляющий сигнал" in name or "сигнал управления" in name:
                 new = normalize_modulating_signal_value(raw)
-            elif "управл" in name:
+            elif is_control_mode_attribute(name=name, slug=slug):
                 new = normalize_control_attribute_value(
                     raw,
                     sku_code=av.sku.sku_code if av.sku_id else None,
                     category_slug=sku_category_slug(av.sku if av.sku_id else None),
                 )
+            elif slug == "manual-override" or "ручн" in name:
+                new = normalize_manual_override_value(raw)
             elif attribute_matches_facet(av.attribute, voltage_facet):
                 new = normalize_voltage_attribute_value(
                     raw,

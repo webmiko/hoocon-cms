@@ -20,8 +20,10 @@ from catalog.facets.aux import (
 from catalog.facets.copy import (
     extract_sku_lead,
     format_sku_heading_name,
+    paraphrase_sku_lead,
     strip_attribute_echo_from_text,
     strip_heading_echo_from_description,
+    strip_lead_duplicate_lines,
 )
 from catalog.facets.dedupe import dedupe_attribute_values
 from catalog.facets.defs import (
@@ -73,8 +75,10 @@ __all__ = [
     "normalize_area_attribute_value",
     "normalize_aux_switch_value",
     "normalize_facet_value",
+    "paraphrase_sku_lead",
     "strip_attribute_echo_from_text",
     "strip_facet_parenthetical",
     "strip_heading_echo_from_description",
+    "strip_lead_duplicate_lines",
     "values_match",
 ]

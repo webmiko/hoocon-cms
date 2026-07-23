@@ -796,3 +796,21 @@ def test_extract_sku_lead_picks_prose() -> None:
     assert "воздушных клапанах" in lead
     assert "Крутящий момент" not in lead
     assert lead.startswith("Используется")
+
+
+def test_paraphrase_sku_lead_differs_from_hero() -> None:
+    """Описание fallback must not copy the hero lead verbatim."""
+    from catalog.facets import paraphrase_sku_lead, strip_lead_duplicate_lines
+
+    lead = "Электропривод 3 Нм для противопожарных клапанов с пружинным возвратом"
+    para = paraphrase_sku_lead(lead)
+    assert para
+    assert para != lead
+    assert "противопожарных клапанов" in para
+    assert "3 Нм" in para
+    assert "Применяется" in para or "Назначение" in para
+
+    body = f"– Включает в себя 2 вспомогательных переключателя\n\n{lead}\n"
+    stripped = strip_lead_duplicate_lines(body, lead)
+    assert lead not in stripped
+    assert "вспомогательных" in stripped

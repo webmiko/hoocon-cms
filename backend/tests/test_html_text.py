@@ -5,8 +5,10 @@ from __future__ import annotations
 from catalog.etl.html_text import (
     clean_polluted_description,
     compose_product_description,
+    ensure_safety_in_instructions,
     extract_embedded_store_html,
     extract_product_text_blocks,
+    extract_safety_notice,
     extract_tilda_tabs,
     filter_analogs_for_sku,
     html_to_structured_text,
@@ -122,6 +124,42 @@ def test_extract_tilda_tabs_maps_options_to_rec_blocks() -> None:
     assert "specs" in tabs
     assert "8 Нм" in tabs["specs"] or "момент" in tabs["specs"].casefold()
     assert extract_tilda_tabs("") == {}
+
+
+def test_extract_tilda_tabs_t819_content_panels() -> None:
+    html = """
+    <button aria-controls="content-tab1_99" type="button">Описание</button>
+    <button aria-controls="content-tab2_99" type="button">Характеристики</button>
+    <div id="content-tab1_99" class="t819__content">
+      <p>Приводы серии SA..FU для противопожарных клапанов 5 Нм.</p>
+    </div>
+    <div id="content-tab2_99" class="t819__content">
+      <p>Крутящий момент: 5 Нм. Площадь заслонки до 0,5 м² IP54.</p>
+    </div>
+    """
+    tabs = extract_tilda_tabs(html)
+    assert "description" in tabs
+    assert "specs" in tabs
+    assert "5 Нм" in tabs["specs"]
+
+
+def test_extract_safety_notice_and_ensure() -> None:
+    html = (
+        "<strong>Оповещение по безопасности</strong><br>"
+        "1. Привод нельзя использовать вне области применения, особенно в самолетах.<br><br>"
+        "2. Корпус может вскрываться только производителем.<br><br>"
+        "3. Нельзя утилизировать как бытовые отходы."
+    )
+    safety = extract_safety_notice(html)
+    assert safety.startswith("ВНИМАНИЕ:")
+    assert "самолет" in safety.casefold() or "авиац" in safety.casefold() or "самолет" in html.casefold()
+    assert safety.count("– ") >= 2
+    merged = ensure_safety_in_instructions(
+        "Инструкция по установке SA..FU\n\n1. Монтаж привода\n– Закрепите вал.",
+        safety,
+    )
+    assert merged.index("ВНИМАНИЕ:") < merged.index("1. Монтаж")
+    assert ensure_safety_in_instructions(merged, safety) == merged
 
 
 def test_filter_analogs_for_sku_keeps_matching_block() -> None:

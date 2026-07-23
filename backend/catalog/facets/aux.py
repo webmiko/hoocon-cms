@@ -39,6 +39,9 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
         return None
     if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):
         return 2
+    # SA..FU fire/smoke manuals: «S type include 2 auxiliary switch» (DS/DST).
+    if re.match(r"sa\d+fu", code) and (code.endswith("-dst") or code.endswith("-ds")):
+        return 2
     if re.search(r"-dst(?:$|[^a-z])", code) or code.endswith("-dst"):
         return 1
     if re.search(r"-ds(?:$|[^a-z])", code) or code.endswith("-ds"):

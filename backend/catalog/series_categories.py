@@ -90,13 +90,21 @@ def allowed_slugs(*, include_ball_valves: bool = True) -> frozenset[str]:
 def spec_order_case(*, slug_field: str = "slug") -> Case:
     """Django ``Case`` for series-table category order (filter + catalog cards).
 
+    Maps both canonical slugs and legacy Tilda aliases to the same
+    ``sort_order`` so sidebar / list order stays correct before or after
+    ``align_categories_to_spec``.
+
     Args:
         slug_field: Category slug ORM path (``slug`` or ``product__category__slug``).
 
     Returns:
         Annotation expression; unknown slugs sort last (999).
     """
-    whens = [When(**{slug_field: spec.slug}, then=Value(spec.sort_order)) for spec in spec_categories()]
+    order_by_slug: dict[str, int] = {spec.slug: spec.sort_order for spec in spec_categories()}
+    for legacy, canonical in _SLUG_ALIASES.items():
+        if canonical in order_by_slug:
+            order_by_slug[legacy] = order_by_slug[canonical]
+    whens = [When(**{slug_field: slug}, then=Value(order)) for slug, order in order_by_slug.items()]
     return Case(*whens, default=Value(999), output_field=IntegerField())
 
 
@@ -105,6 +113,11 @@ def resolve_alias(slug: str) -> str | None:
     if slug in allowed_slugs():
         return slug
     return _SLUG_ALIASES.get(slug)
+
+
+def legacy_slug_aliases() -> dict[str, str]:
+    """Return a copy of Tilda → specification category slug map."""
+    return dict(_SLUG_ALIASES)
 
 
 def classify_series_category(product_slug: str, sku_codes: list[str] | None = None) -> str:

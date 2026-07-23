@@ -90,6 +90,72 @@ CONTROL_ON_OFF = "Открыто/закрыто"
 CONTROL_FLOATING = "2-/3-позиционное"
 CONTROL_MODULATING = "Пропорциональное"
 
+# Belimo RU — spring-return DAFU (and similar): no hand crank / override.
+# Must never store control-type values (Открыто/закрыто) under this slug.
+MANUAL_OVERRIDE_NONE = "отсутствует / не предусмотрено"
+# SA..FU fire/smoke manuals: pushbutton gearing latch, self-resetting.
+MANUAL_OVERRIDE_BUTTON_SELF_RESET = (
+    "редуктор выводится из зацепления при помощи кнопки с самовозвратом, ручная блокировка"
+)
+
+# Manufacturer «Attention:» block — docs/tech-copy-belimo-ru.md § Предупреждения.
+# Lead with «ВНИМАНИЕ:» then one «–» bullet per point (instruction UI list parser).
+MANUAL_SAFETY_ATTENTION_LINES: tuple[str, ...] = (
+    "ВНИМАНИЕ:",
+    (
+        "– Запрещается использовать электропривод заслонки вне указанной области "
+        "применения, особенно в авиационной технике."
+    ),
+    (
+        "– Вскрытие корпуса привода разрешено только производителю. Внутри нет "
+        "компонентов, которые пользователь может заменять или ремонтировать."
+    ),
+    (
+        "– Устройство содержит электрические и электронные компоненты; утилизация "
+        "вместе с бытовыми отходами недопустима. Соблюдайте местные правила "
+        "утилизации электрооборудования."
+    ),
+)
+_MANUAL_OVERRIDE_CONTROL_LEAK = frozenset(
+    {
+        CONTROL_ON_OFF.casefold(),
+        CONTROL_FLOATING.casefold(),
+        CONTROL_MODULATING.casefold(),
+        "плавное управление",
+        "2/3-позиционное",
+        "on/off",
+    },
+)
+
+
+def normalize_manual_override_value(value: str) -> str:
+    """Canon cleanup for «Ручное управление» display values.
+
+    Rejects leaked «Управление» facet labels (``Открыто/закрыто``, etc.).
+    Does **not** force spring-return ``отсутствует`` onto series that have a
+    real hand crank (DAMU / DA8MQU) — empty / ``without`` / control leaks only.
+
+    Args:
+        value: Raw EAV / specs value.
+
+    Returns:
+        Cleaned value, or ``отсутствует / не предусмотрено`` for empty /
+        control-mode leaks / explicit without.
+    """
+    raw = " ".join((value or "").split()).strip()
+    if not raw:
+        return MANUAL_OVERRIDE_NONE
+    low = raw.casefold()
+    if low in _MANUAL_OVERRIDE_CONTROL_LEAK:
+        return MANUAL_OVERRIDE_NONE
+    if low in {"нет", "без", "without", "none"}:
+        return MANUAL_OVERRIDE_NONE
+    if "отсутств" in low or "не предусмотр" in low or low == "without":
+        return MANUAL_OVERRIDE_NONE
+    # «есть» / «кнопка…» stay as-is (no-spring series with a real override).
+    return raw
+
+
 # Belimo RU — modulating editions (docs/tech-copy-belimo-ru.md).
 # Voltage 0(2)...10 is factory default; current 0(4)...20 мА — special order only.
 CONTROL_SIGNAL_Y_LABEL = "Управляющий сигнал Y"
@@ -166,6 +232,41 @@ _CONTROL_ON_OFF_CATEGORY_SLUGS = frozenset(
         "elektroprivody-dlya-klapanov-dymoudaleniya",
     },
 )
+
+# Slugs that contain «управл» in the Russian name but are NOT control-mode.
+_NOT_CONTROL_MODE_SLUGS = frozenset(
+    {
+        "manual-override",
+        "control-signal",
+        "feedback-signal",
+    },
+)
+
+
+def is_control_mode_attribute(*, name: str = "", slug: str = "") -> bool:
+    """True for «Управление» (control mode), not manual override / Y / U signals.
+
+    Substring ``управл`` matches «Ручное управление» and «Управляющий сигнал»;
+    callers must use this helper instead of a bare ``\"управл\" in name`` check.
+
+    Args:
+        name: Attribute.name (any case).
+        slug: Attribute.slug when known.
+
+    Returns:
+        Whether the row is the control-mode facet/EAV.
+    """
+    s = (slug or "").casefold().strip()
+    if s in _NOT_CONTROL_MODE_SLUGS:
+        return False
+    if s == "control":
+        return True
+    n = (name or "").casefold().strip()
+    if not n or "ручн" in n:
+        return False
+    if "управляющ" in n or "сигнал" in n or "обратная связь" in n:
+        return False
+    return n == "управление" or n.startswith("управление ")
 
 
 def normalize_tech_copy(text: str) -> str:

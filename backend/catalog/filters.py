@@ -34,15 +34,26 @@ _RESERVED_QUERY_KEYS: frozenset[str] = frozenset(
 class SKUFilterSet(django_filters.FilterSet):
     """Base filters: category slug + free-text q."""
 
-    category = django_filters.CharFilter(
-        field_name="product__category__slug",
-        lookup_expr="exact",
-    )
+    category = django_filters.CharFilter(method="filter_category")
     q = django_filters.CharFilter(method="filter_q")
 
     class Meta:
         model = SKU
         fields = ("category",)
+
+    def filter_category(
+        self,
+        queryset: QuerySet[SKU],
+        _name: str,
+        value: str,
+    ) -> QuerySet[SKU]:
+        """Filter by category slug; accept legacy Tilda aliases."""
+        if not value:
+            return queryset
+        from catalog.series_categories import resolve_alias
+
+        slug = resolve_alias(value.strip()) or value.strip()
+        return queryset.filter(product__category__slug=slug)
 
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
         """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
@@ -65,7 +76,12 @@ class SKUFilterSet(django_filters.FilterSet):
                 Q(search_vector=query) | Q(sku_code__icontains=value) | Q(analog_belimo_code__icontains=value),
             )
             .annotate(rank=SearchRank("search_vector", query))
-            .order_by("-rank", F("moment_nm").asc(nulls_last=True), "sku_code")
+            .order_by(
+                "-rank",
+                F("moment_nm").asc(nulls_last=True),
+                F("sku_code_nm").asc(nulls_last=True),
+                "sku_code",
+            )
         )
 
 

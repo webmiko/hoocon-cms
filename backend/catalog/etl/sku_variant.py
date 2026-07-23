@@ -190,6 +190,12 @@ def filter_description_for_variant(text: str, variant: SkuVariant) -> str:
     Also rewrites ``24/230`` and ``D/DS`` series masks to the SKU edition
     (see rewrite_series_tokens_for_variant).
 
+    Edition blocks start at model headers (``DA3FU24-D/DS:``). While a
+    non-matching header is active, all following lines are dropped until the
+    next model header — including nested section titles like «Характеристики:».
+    Put shared series copy (voltage ranges, marketing bullets) *before*
+    edition blocks or under a matching header so it is not skipped.
+
     Args:
         text: Shared product-line description pasted onto a SKU.
         variant: Parsed edition of that SKU.
@@ -226,26 +232,9 @@ def filter_description_for_variant(text: str, variant: SkuVariant) -> str:
             continue
 
         if skipping:
-            if _is_model_header(stripped):
-                skipping = False
-                hv = _header_voltage(stripped)
-                hc = _header_control(stripped)
-                drop = False
-                if variant.voltage and hv and hv != variant.voltage:
-                    drop = True
-                if variant.control and hc and hc != variant.control:
-                    drop = True
-                skipping = drop
-                if drop:
-                    continue
-                header = rewrite_series_tokens_for_variant(stripped, variant)
-                out.append(header if header.endswith(":") else f"{header}:")
-                continue
-            if stripped.endswith(":") and not stripped.startswith(("–", "-", "—")):
-                if not _is_model_header(stripped):
-                    skipping = False
-                    out.append(rewrite_series_tokens_for_variant(stripped, variant))
-                    continue
+            # Stay skipped until the next model header (handled above). Generic
+            # section titles like «Характеристики:» must not end the skip —
+            # they belong to the dropped edition block.
             continue
 
         # Voltage-specific range bullets under «Диапазон напряжения».
@@ -308,6 +297,7 @@ def filter_attributes_for_variant(
     result: list[dict[str, str]] = []
     for row in rows:
         name = (row.get("name") or "").casefold()
+        slug = (row.get("slug") or "").casefold()
         value = (row.get("value") or "").strip()
         value_l = value.casefold()
 
@@ -326,12 +316,15 @@ def filter_attributes_for_variant(
             or name in {"сигнал управления", "сигнал обратной связи"}
         ):
             continue
-        if variant.control == "on_off" and "управл" in name:
+        from catalog.etl.tech_copy import is_control_mode_attribute
+
+        if variant.control == "on_off" and is_control_mode_attribute(name=name, slug=slug):
             if re.search(r"плавн|пропорциональн|модулир", value_l):
                 continue
-        if variant.control == "modulating" and "управл" in name:
+        if variant.control == "modulating" and is_control_mode_attribute(name=name, slug=slug):
             if ("открыто" in value_l or "2-/3-позицион" in value_l or "2/3-позицион" in value_l) and not re.search(
-                r"плавн|пропорциональн|модулир", value_l
+                r"плавн|пропорциональн|модулир",
+                value_l,
             ):
                 continue
 
@@ -343,4 +336,123 @@ def filter_attributes_for_variant(
                 continue
 
         result.append(row)
+    return result
+
+
+# Tilda gallery alts tag control type; series pages attach both A/AS and D/DS photos.
+_IMAGE_MODULATING = re.compile(
+    r"(?i)управлени[ея]\s+плавн|тип\w*\s+управления\s+плавн|"
+    r"плавное\s+управлени|пропорциональн|модулир",
+)
+_IMAGE_ON_OFF = re.compile(
+    r"(?i)управлени[ея]\s+открыто|тип\w*\s+управления\s+открыто|"
+    r"открыто\s*/\s*закрыто",
+)
+_NM_IN_ALT = re.compile(r"(?i)(\d+)\s*нм")
+_NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa|hva|hvd|hvq)?(\d+)")
+# SA fire/smoke: sibling DS↔DST photos share one product gallery.
+_IMAGE_THERMAL = re.compile(
+    r"(?i)термодатчик|термическ\w*\s+датчик|72\s*[℃°]|-?\s*72\s*c\b",
+)
+_ALT_SKU_IN_PARENS = re.compile(r"\(([a-z0-9._-]+)\)\s*$", re.IGNORECASE)
+_SA_CODE = re.compile(r"(?i)^sa\d")
+_THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
+
+
+def sku_code_is_thermal(sku_code: str | None) -> bool:
+    """True when the Hoocon article is a thermal edition (``DST`` / ``-T`` suffix).
+
+    Args:
+        sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``).
+
+    Returns:
+        True only when the code ends with ``DST`` or ``-T`` (case-insensitive).
+    """
+    return bool(_THERMAL_SKU_SUFFIX.search((sku_code or "").casefold()))
+
+
+def torque_nm_from_sku_code(sku_code: str) -> int | None:
+    """Extract leading torque (Нм) from a series SKU code, if present.
+
+    Args:
+        sku_code: e.g. ``da5fu24-d``, ``DA8MQU230-AS``.
+
+    Returns:
+        Integer Nm or None when the code has no leading series number.
+    """
+    code = (sku_code or "").strip().lower().replace(" ", "")
+    match = _NM_FROM_SKU.match(code)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _image_thermal_role(alt: str) -> str:
+    """Classify a gallery alt as ``thermal``, ``non_thermal``, or ``unknown``."""
+    text = (alt or "").strip()
+    if not text:
+        return "unknown"
+    if _IMAGE_THERMAL.search(text):
+        return "thermal"
+    paren = _ALT_SKU_IN_PARENS.search(text)
+    if paren is not None:
+        tagged = paren.group(1)
+        if sku_code_is_thermal(tagged):
+            return "thermal"
+        # Explicit non-thermal edition tag in alt (…-ds), not bare series.
+        if re.search(r"(?i)(?:-ds|-d)$", tagged) and not sku_code_is_thermal(tagged):
+            return "non_thermal"
+    # Descriptive area shot without thermal wording = non-DST body on SA cards.
+    if re.search(r"(?i)площад", text) and not _IMAGE_THERMAL.search(text):
+        return "non_thermal"
+    return "unknown"
+
+
+def filter_images_for_variant[T](images: list[T], variant: SkuVariant) -> list[T]:
+    """Drop gallery photos whose alt tags the opposite control / thermal / Nm.
+
+    Shared shots (монтаж, hero without control wording) are kept. Wrong-torque
+    alts from a sibling series (e.g. 3 Нм photo on DA5) are dropped when both
+    sides expose an explicit Nm. SA DS/DST sibling photos tagged with
+    термодатчик / opposite edition code are dropped.
+
+    Args:
+        images: ``ProductImage``-like objects with an ``alt`` attribute.
+        variant: Parsed SKU variant (control / code).
+
+    Returns:
+        Filtered list preserving input order.
+    """
+    expected_nm = torque_nm_from_sku_code(variant.code)
+    thermal_sku = sku_code_is_thermal(variant.code)
+    is_sa = bool(_SA_CODE.match((variant.code or "").strip()))
+
+    result: list[T] = []
+    for image in images:
+        alt = str(getattr(image, "alt", None) or "")
+        if variant.control == "on_off" and _IMAGE_MODULATING.search(alt):
+            continue
+        if variant.control == "modulating" and _IMAGE_ON_OFF.search(alt):
+            continue
+        if expected_nm is not None:
+            nm_match = _NM_IN_ALT.search(alt)
+            if nm_match is not None and int(nm_match.group(1)) != expected_nm:
+                continue
+        if is_sa:
+            role = _image_thermal_role(alt)
+            if thermal_sku and role == "non_thermal":
+                continue
+            if not thermal_sku and role == "thermal":
+                continue
+        result.append(image)
+
+    # When the gallery still mixes thermal + non-thermal roles, keep only the
+    # edition that matches the SKU (covers alts without explicit keywords).
+    if is_sa and len(result) > 1:
+        roles = [_image_thermal_role(str(getattr(img, "alt", None) or "")) for img in result]
+        if thermal_sku and "thermal" in roles:
+            result = [img for img, role in zip(result, roles, strict=True) if role != "non_thermal"]
+        elif not thermal_sku and "thermal" in roles:
+            result = [img for img, role in zip(result, roles, strict=True) if role != "thermal"]
+
     return result

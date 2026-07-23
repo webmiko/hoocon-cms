@@ -15,7 +15,7 @@ from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.label_to_slug import CANONICAL_ATTRS, canonical_meta, label_to_slug
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs
 from catalog.etl.sku_variant import filter_description_for_variant, parse_sku_variant
-from catalog.etl.tech_copy import normalize_tech_copy
+from catalog.etl.tech_copy import normalize_manual_override_value, normalize_tech_copy
 from catalog.models import SKU, Product
 
 logger = logging.getLogger(__name__)
@@ -113,6 +113,8 @@ def parse_specs_bullets(text: str) -> list[ParsedAttr]:
 def _normalize_value(slug: str, value: str) -> str:
     """Light Belimo-RU cleanup for stored values."""
     v = " ".join(value.split())
+    if slug == "manual-override":
+        return normalize_manual_override_value(v)
     v = v.replace("VDC", "В=").replace("vdc", "В=")
     v = re.sub(r"\b(\d)\s*V\b", r"\1 В", v)
     v = re.sub(r"\b(\d+[.,]?\d*)\s*W\b", r"\1 Вт", v, flags=re.I)
@@ -300,6 +302,12 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
 
     product = sku_product(sku)
     if product is not None and product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
+        result.skipped = True
+        result.reason = "canonical_series_copy"
+        return result
+    from catalog.etl.series_copy_dafu import is_dafu_sku
+
+    if is_dafu_sku(sku):
         result.skipped = True
         result.reason = "canonical_series_copy"
         return result

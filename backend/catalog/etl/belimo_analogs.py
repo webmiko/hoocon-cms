@@ -11,7 +11,7 @@ import re
 from typing import TYPE_CHECKING, Literal
 
 from catalog.etl.html_text import filter_analogs_for_sku
-from catalog.etl.sku_variant import parse_sku_variant
+from catalog.etl.sku_variant import parse_sku_variant, sku_code_is_thermal
 
 if TYPE_CHECKING:
     from catalog.models import SKU
@@ -35,8 +35,6 @@ _HAS_230 = re.compile(r"(?:^|[^0-9])230(?:[^0-9]|$)")
 _HAS_24 = re.compile(r"(?:^|[^0-9])24(?:[^0-9]|$)")
 _MOMENT_NUM = re.compile(r"(\d+[.,]?\d*)")
 _AREA_NUM = re.compile(r"(\d+[.,]?\d*)")
-# Hoocon thermal edition: article ends with DST or -T (not a mid-string match).
-_THERMAL_SKU_SUFFIX = re.compile(r"dst$|-t$")
 # Belimo thermal article: ends with FST or -T (not mid-string "-T").
 _THERMAL_BELIMO_SUFFIX = re.compile(r"fst$|-t$")
 
@@ -352,19 +350,6 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
     if not drop:
         return codes
     return [code for code in codes if code not in drop]
-
-
-def sku_code_is_thermal(sku_code: str | None) -> bool:
-    """True when the Hoocon article is a thermal edition (``DST`` / ``-T`` suffix).
-
-    Args:
-        sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``, ``BF24-T``).
-
-    Returns:
-        True only when the code ends with ``DST`` or ``-T`` (case-insensitive).
-        Mid-string ``DST`` (e.g. ``DSTXXX``, ``XDSTX``) is not thermal.
-    """
-    return bool(_THERMAL_SKU_SUFFIX.search((sku_code or "").casefold()))
 
 
 def belimo_code_is_thermal(code: str | None) -> bool:
