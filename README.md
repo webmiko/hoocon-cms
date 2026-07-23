@@ -20,6 +20,8 @@
 |------|------------|
 | [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md) | Цель, scope, декомпозиция, этапы |
 | [docs/admin-vs-wagtail.md](docs/admin-vs-wagtail.md) | Admin vs Wagtail |
+| [docs/admin-standard.md](docs/admin-standard.md) | Staff Admin: Unfold + бренд-цвета |
+| [docs/kb-patch-django-admin-standard/](docs/kb-patch-django-admin-standard/) | Патч канона БЗ (Admin стандарт) |
 | [docs/market-analysis.md](docs/market-analysis.md) | Рынок RU + EU/EN HVAC B2B |
 | [docs/stack-decision.md](docs/stack-decision.md) | Выбор стека backend/frontend |
 | [docs/kb-update-proposals.md](docs/kb-update-proposals.md) | Что вынести в базу знаний |

@@ -51,6 +51,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Коммит / push | `./scripts/pre-commit-checkup.sh` + канон §4 |
 | Новый код / модуль | БЗ ПРОМПТ + TDD; apps в `backend/` |
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |
+| Staff Admin (UI, цвета) | [admin-standard.md](docs/admin-standard.md); патч БЗ `docs/kb-patch-django-admin-standard/` |
 | SEO / редиректы | [seo-url-migration.md](docs/seo-url-migration.md) |
 | ETL / качество данных | [data-quality-etl.md](docs/data-quality-etl.md) |
 | UX / дизайн B2B | [readiness-backend-ux.md](docs/readiness-backend-ux.md); прототипы `../hoocon/docs/прототипы/` |

@@ -62,9 +62,33 @@
 
 ---
 
-## 5. Статус
+## 5. Статус (B2B-каталог)
 
 - [ ] Согласовать с пользователем перенос
 - [ ] Написать конспект ≤119 символов/строка
 - [ ] Обновить AGENTS.md / README / ИЗМЕНЕНИЯ.md канона
 - [ ] Добавить референс после появления кода в `hoocon-cms`
+
+---
+
+## 6. Стандарт Django Admin (2026-07-23) — готовый патч
+
+**Статус:** текст готов; в канон БЗ ещё не скопирован (в cloud-агенте
+симлинк `_Универсальная-база-знаний` → Mac-путь **битый**).
+
+**Патч в репо:** [kb-patch-django-admin-standard/](kb-patch-django-admin-standard/)  
+**Операционный эталон:** [admin-standard.md](admin-standard.md)  
+**APPLY:** [kb-patch-django-admin-standard/APPLY.md](kb-patch-django-admin-standard/APPLY.md)
+
+Содержание для канона:
+
+- путь БЗ: `02-Примеры-кода/django-admin-стандарт/`;
+- функционал ModelAdmin / sidebar / security (LMS + B2B CMS);
+- стиль django-unfold; `COLORS.primary` из brand hex проекта;
+- light-тема по умолчанию; примеры settings/admin/brand_colors;
+- snippets: AGENTS.md, веб-стек README, ИЗМЕНЕНИЯ.md.
+
+- [x] Согласовать вариант (Unfold + бренд-цвета) для Hoocon и LMS
+- [x] Написать конспект ≤119 символов/строка (в патче)
+- [ ] Скопировать в канон `/Users/niko/GitHub/Универсальная-база-знаний`
+- [ ] Обновить AGENTS.md / README / ИЗМЕНЕНИЯ.md **канона** БЗ

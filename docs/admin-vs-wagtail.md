@@ -48,6 +48,11 @@ Wagtail **не** подключаем, пока явно не решим ина�
 через модели + Django Admin (+ при необходимости позже React-admin
 для каталога).
 
+**UI-стандарт (2026-07-23):** Django Admin + **django-unfold**, палитра
+из brand-токенов проекта (`#dc1313` для Hoocon). Тот же вариант — для
+LMS-подобных проектов. Канон: [admin-standard.md](admin-standard.md),
+патч в БЗ `docs/kb-patch-django-admin-standard/`.
+
 Почему:
 
 1. Ядро — **каталог и фильтры**, не блочный CMS.

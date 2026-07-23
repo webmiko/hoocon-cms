@@ -12,7 +12,8 @@
 |------|--------|--------|
 | Backend | **Django + DRF** (Py 3.12+) | Стек БЗ и LMS; TDD, сервисный слой |
 | БД | **PostgreSQL** | FTS, JSONB для атрибутов SKU |
-| CMS-контент | **Django Admin** + свои apps | Решение 2026-07-19: без Wagtail в v1 |
+| CMS-контент | **Django Admin** + **django-unfold** + свои apps | Без Wagtail в v1; UI-стандарт 2026-07-23 |
+| Admin UI / цвета | Unfold `COLORS.primary` из brand hex | [admin-standard.md](admin-standard.md); как LMS |
 | Опция CMS | **Wagtail** (этап 2) | docs.wagtail.org — editor UX |
 | Поиск | Postgres FTS → **Meilisearch** | Простота → фасеты при росте |
 | Очереди | **Celery + Redis** | импорт, письма, превью PDF |
@@ -93,9 +94,10 @@
 | Сложность | +ещё одна система | проще старт |
 | API | Wagtail API | DRF единообразно |
 
-**v1:** свои apps + **Django Admin**.  
+**v1:** свои apps + **Django Admin** + **django-unfold** (бренд-цвета).  
 **v2:** Wagtail только для статей/лендингов — если Admin станет узким местом
 для редакторов ([docs.wagtail.org](https://docs.wagtail.org/)).
+См. [admin-standard.md](admin-standard.md).
 
 ### Цены
 
