@@ -308,7 +308,10 @@ export function CatalogPage() {
     <div className={styles.page}>
       <Seo
         title={activeCategory ? activeCategory.name : "Каталог электроприводов ОВК"}
-        description="Каталог электроприводов Hoocon для вентиляции и кондиционирования. Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
+        description={
+          "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
+          + "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
+        }
         path={category ? catalogCategoryPath(category) : "/catalog"}
         jsonLd={[
           buildBreadcrumbJsonLd([

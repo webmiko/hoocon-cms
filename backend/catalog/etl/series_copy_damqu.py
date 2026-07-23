@@ -6,7 +6,12 @@ Characteristics are stored as EAV rows with group keys for PDP cards.
 
 from __future__ import annotations
 
-from catalog.etl.attr_groups import ATTR_GROUP_ELECTRICAL, ATTR_GROUP_FUNCTIONAL, ATTR_GROUP_OPERATING, ATTR_GROUP_SIZE
+from catalog.etl.attr_groups import (
+    ATTR_GROUP_ELECTRICAL,
+    ATTR_GROUP_FUNCTIONAL,
+    ATTR_GROUP_OPERATING,
+    ATTR_GROUP_SIZE,
+)
 from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import normalize_tech_copy

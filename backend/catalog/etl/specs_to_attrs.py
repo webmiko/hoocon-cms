@@ -360,7 +360,8 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
                 )
             new_desc = stripped
             if extras:
-                new_desc = (stripped + "\n" + "\n".join(extras)).strip() if stripped else "\n".join(extras)
+                joined = "\n".join(extras)
+                new_desc = (stripped + "\n" + joined).strip() if stripped else joined
             if new_desc != desc:
                 sku.description = new_desc
                 sku.save(update_fields=["description"])
