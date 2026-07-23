@@ -6,6 +6,7 @@ import pytest
 
 from catalog.ball_valve_kit import (
     build_ball_valve_kit_options,
+    is_ball_valve_sku,
     parse_drive_families,
     resolve_bracket_for_drive,
 )
@@ -21,6 +22,18 @@ def test_parse_drive_families_from_compatible_actuators_text() -> None:
 def test_resolve_bracket_for_drive_fu_vs_mu() -> None:
     assert resolve_bracket_for_drive("DA5FU24") == "BR-ML"
     assert resolve_bracket_for_drive("DA6MU24") == "BR-M"
+
+
+def test_is_ball_valve_sku_via_product_when_category_missing() -> None:
+    """Incomplete category chain still matches known BV product slugs."""
+    product = Product(name="BV220", slug="sharovoy-kran-bv220", category=None)
+    sku = SKU(product=product, name="BV220A", slug="8100-bv220a", sku_code="8100-BV220A")
+    assert is_ball_valve_sku(sku) is True
+
+
+def test_is_ball_valve_sku_false_without_product_or_category() -> None:
+    sku = SKU(product=None, name="X", slug="x", sku_code="X")
+    assert is_ball_valve_sku(sku) is False
 
 
 @pytest.mark.django_db

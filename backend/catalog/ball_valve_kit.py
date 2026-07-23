@@ -7,7 +7,7 @@ from typing import Any, cast
 
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs, format_bracket
 from catalog.models import SKU, Attribute
-from catalog.sku_access import sku_attribute_values, sku_category_slug
+from catalog.sku_access import sku_attribute_values, sku_category_slug_or_empty
 
 _FU_DRIVE_RE = re.compile(r"(?i)da\d*fu")
 _DRIVE_FAMILY_RE = re.compile(r"(?i)\b(da[a-z0-9]+)\b")
@@ -50,9 +50,13 @@ def resolve_bracket_for_drive(drive_family: str) -> str:
 
 
 def is_ball_valve_sku(sku: SKU) -> bool:
-    """True when SKU belongs to the ball-valve category or BV product line."""
-    slug = sku_category_slug(sku)
-    if slug == _BALL_VALVE_CATEGORY:
+    """True when SKU belongs to the ball-valve category or BV product line.
+
+    Uses :func:`sku_category_slug_or_empty` so a missing product/category chain
+    yields ``""`` (never ``None``) before the category compare; BV product
+    slugs still match when the category FK is incomplete.
+    """
+    if sku_category_slug_or_empty(sku) == _BALL_VALVE_CATEGORY:
         return True
     product = getattr(sku, "product", None)
     if product is None:
