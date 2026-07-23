@@ -58,6 +58,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 |--------|------|
 | Коммит / push | `./scripts/pre-commit-checkup.sh` + канон §4 |
 | Релиз / версия | [docs/releases.md](docs/releases.md); `config/release.py` |
+| Admin / Unfold / CMS-панель | БЗ [ОПЫТ-UNFOLD-ADMIN-HOOCON][kb-unfold]; рецепты [ПАТТЕРНЫ][kb-unfold-patterns] |
 | Аудит / hardening backlog | [docs/audit-2026-07-20.md](docs/audit-2026-07-20.md); план Iter 4.5–5 |
 | Новый код / модуль | БЗ ПРОМПТ + TDD; apps в `backend/` |
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |
@@ -82,4 +83,6 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 
 [kb-agents]: _Универсальная-база-знаний/AGENTS.md
 [kb-update]: _Универсальная-база-знаний/ИНСТРУКЦИЯ-ПО-ОБНОВЛЕНИЮ-БАЗЫ-ЗНАНИЙ.md
+[kb-unfold]: _Универсальная-база-знаний/02-Примеры-кода/hoocon-cms/ОПЫТ-UNFOLD-ADMIN-HOOCON.md
+[kb-unfold-patterns]: _Универсальная-база-знаний/02-Примеры-кода/hoocon-cms/ПАТТЕРНЫ-UNFOLD-ADMIN.md
 [sec-baseline]: docs/security-baseline.md
