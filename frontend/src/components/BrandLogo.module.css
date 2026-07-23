@@ -1,0 +1,37 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  position: relative;
+}
+
+.root img {
+  display: block;
+  height: var(--brand-logo-height, 40px);
+  width: auto;
+}
+
+.light {
+  display: block;
+}
+
+.dark {
+  display: none;
+}
+
+:global(html[data-theme="dark"]) .root:not(.forceDark) .light {
+  display: none;
+}
+
+:global(html[data-theme="dark"]) .root:not(.forceDark) .dark {
+  display: block;
+}
+
+/* Dark surface (footer): always white tagline */
+.forceDark .light {
+  display: none;
+}
+
+.forceDark .dark {
+  display: block;
+}

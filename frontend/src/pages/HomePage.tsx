@@ -251,7 +251,7 @@ export function HomePage() {
             <Link to="/catalog" className={styles.ctaPrimary}>
               Смотреть каталог
             </Link>
-            <Link to="/consultation" className={styles.ctaSecondary}>
+            <Link to="/consultation" className={styles.ctaSecondary} id="hero-kp-cta">
               Запросить КП
             </Link>
           </div>

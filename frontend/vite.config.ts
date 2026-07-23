@@ -8,7 +8,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png", "og-image.svg"],
+      includeAssets: [
+        "favicon.svg",
+        "logo.svg",
+        "logo-on-dark.svg",
+        "apple-touch-icon.png",
+        "og-image.svg",
+      ],
       manifest: {
         name: "Hoocon — электроприводы ОВК",
         short_name: "Hoocon",

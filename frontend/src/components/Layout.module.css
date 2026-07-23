@@ -64,19 +64,16 @@
 }
 
 .logo {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--color-brand);
-  text-decoration: none;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  text-decoration: none;
+  line-height: 0;
 }
 
 .logo:hover {
-  color: var(--color-brand-hover);
   text-decoration: none;
+  opacity: 0.92;
 }
 
 .navDesktop {
@@ -372,12 +369,9 @@
 }
 
 .footerLogo {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.1rem;
-  letter-spacing: 0.04em;
-  color: #fff;
-  margin: 0;
+  --brand-logo-height: 40px;
+  margin: 0 0 var(--space-sm);
+  line-height: 0;
 }
 
 .footerHeading {
@@ -519,12 +513,11 @@
   }
 
   .mobilePanelBrand {
-    font-family: var(--font-display);
-    font-size: 1.2rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    color: var(--color-brand);
+    --brand-logo-height: 36px;
+    display: inline-flex;
+    align-items: center;
     padding-left: 4px;
+    line-height: 0;
   }
 
   .menuClose {
@@ -703,6 +696,18 @@
     border-radius: var(--radius);
     border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: var(--shadow);
+    animation: mobileStickyCtaIn 280ms var(--ease-out);
+  }
+
+  @keyframes mobileStickyCtaIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .mobileStickyCta:hover {

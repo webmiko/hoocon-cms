@@ -9,10 +9,14 @@ import { DesktopNav } from "./DesktopNav";
 import { ScrollProgress } from "./ScrollProgress";
 import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
+import { BrandLogo } from "./BrandLogo";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { releaseLabel } from "../release";
 import styles from "./Layout.module.css";
+
+/** Hero «Запросить КП» on the home page — sticky CTA waits until it leaves the viewport. */
+export const HERO_KP_CTA_ID = "hero-kp-cta";
 
 /**
  * App shell: utility masthead + brand header + main + dark footer.
@@ -30,6 +34,20 @@ export function Layout() {
   const hideMobileCta =
     location.pathname.startsWith("/statyi") ||
     location.pathname.startsWith("/novosti");
+  const isHome = location.pathname === "/";
+  /** True while home hero «Запросить КП» intersects the viewport (mobile sticky waits). */
+  const [heroKpVisible, setHeroKpVisible] = useState(true);
+  const [homeTrack, setHomeTrack] = useState(isHome);
+
+  // Reset hero visibility when navigating onto the home page.
+  if (isHome !== homeTrack) {
+    setHomeTrack(isHome);
+    if (isHome) {
+      setHeroKpVisible(true);
+    }
+  }
+
+  const showMobileStickyCta = !hideMobileCta && !(isHome && heroKpVisible);
 
   // Close mobile menu when the route changes (adjust state during render).
   if (menuRoute !== routeKey) {
@@ -39,7 +57,7 @@ export function Layout() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (hideMobileCta) {
+    if (!showMobileStickyCta) {
       root.dataset.stickyCta = "off";
     } else {
       delete root.dataset.stickyCta;
@@ -47,7 +65,51 @@ export function Layout() {
     return () => {
       delete root.dataset.stickyCta;
     };
-  }, [hideMobileCta]);
+  }, [showMobileStickyCta]);
+
+  useEffect(() => {
+    if (hideMobileCta || !isHome) {
+      return;
+    }
+
+    let cancelled = false;
+    let observer: IntersectionObserver | null = null;
+
+    function watch(el: Element) {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (!cancelled) {
+            setHeroKpVisible(entry.isIntersecting);
+          }
+        },
+        { threshold: 0, rootMargin: "0px" },
+      );
+      observer.observe(el);
+    }
+
+    const existing = document.getElementById(HERO_KP_CTA_ID);
+    if (existing) {
+      watch(existing);
+      return () => {
+        cancelled = true;
+        observer?.disconnect();
+      };
+    }
+
+    // Home outlet may mount one frame after Layout's effect.
+    const mo = new MutationObserver(() => {
+      const el = document.getElementById(HERO_KP_CTA_ID);
+      if (!el) return;
+      mo.disconnect();
+      watch(el);
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      cancelled = true;
+      mo.disconnect();
+      observer?.disconnect();
+    };
+  }, [hideMobileCta, isHome, routeKey]);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -114,7 +176,7 @@ export function Layout() {
         <div className={styles.siteHead}>
           <div className={`container ${styles.siteHeadRow}`}>
             <Link to="/" className={styles.logo} aria-label="Hoocon — на главную">
-              HOOCON
+              <BrandLogo />
             </Link>
 
             <DesktopNav />
@@ -172,7 +234,7 @@ export function Layout() {
       >
         <div className={styles.mobilePanelTop}>
           <span className={styles.mobilePanelBrand} aria-hidden="true">
-            HOOCON
+            <BrandLogo />
           </span>
           <button
             type="button"
@@ -219,6 +281,13 @@ export function Layout() {
               О компании
             </Link>
             <Link
+              to="/zavod"
+              className={styles.navMobileLink}
+              onClick={closeMenu}
+            >
+              Завод · OEM напрямую
+            </Link>
+            <Link
               to="/gde-kupit"
               className={styles.navMobileLink}
               onClick={closeMenu}
@@ -254,7 +323,9 @@ export function Layout() {
       <main
         id="main-content"
         className={
-          hideMobileCta ? `${styles.main} ${styles.mainNoStickyCta}` : styles.main
+          hideMobileCta || (isHome && heroKpVisible)
+            ? `${styles.main} ${styles.mainNoStickyCta}`
+            : styles.main
         }
       >
         <div className="container">
@@ -265,7 +336,9 @@ export function Layout() {
       <footer className={styles.footer}>
         <div className={`container ${styles.footerGrid}`}>
           <div className={styles.footerBrand}>
-            <p className={styles.footerLogo}>HOOCON</p>
+            <p className={styles.footerLogo}>
+              <BrandLogo onDark alt="Hoocon" />
+            </p>
             <p>Электроприводы для вентиляции, ПБ и дымоудаления.</p>
             <p>Склад в Москве · поставки по РФ</p>
           </div>
@@ -291,6 +364,9 @@ export function Layout() {
             <ul className={styles.footerList}>
               <li>
                 <Link to="/company">О компании</Link>
+              </li>
+              <li>
+                <Link to="/zavod">OEM · завод</Link>
               </li>
               <li>
                 <Link to="/gde-kupit">Где купить</Link>
@@ -346,7 +422,7 @@ export function Layout() {
 
       <CompareTray />
 
-      {!hideMobileCta ? (
+      {showMobileStickyCta ? (
         <Link to="/consultation" className={styles.mobileStickyCta}>
           Запросить КП
         </Link>
