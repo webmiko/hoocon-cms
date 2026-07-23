@@ -231,6 +231,12 @@
   background: var(--photo-wash-valve);
 }
 
+/* Wiring / dimension diagrams — paper white, not product wash. */
+.heroMedia[data-backdrop="white"],
+.galleryItem[data-backdrop="white"] {
+  background: #fff;
+}
+
 .galleryZoomTrigger {
   display: flex;
   align-items: center;
@@ -258,6 +264,15 @@
   object-position: center center;
   display: block;
   pointer-events: none;
+}
+
+/* Wiring / dimension crops: fill tile width (paper diagrams). */
+.galleryImageDiagram {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+  object-position: center center;
 }
 
 .header {

@@ -1,10 +1,12 @@
 /** Parse catalog description (lead + bullets + section titles) into semantic HTML. */
 
 const BULLET_RE = /^[–—\-•·*]\s+/;
+/** Soft-wrapped continuation of a previous ``–`` line (ETL / 119-char wrap). */
+const LIST_WRAP_INDENT_RE = /^[ \t]{2,}\S/;
 /** Strip decorative markers before matching section titles (``✅ Преимущества``). */
 const TITLE_DECOR_RE = /^[✅⚠❗●•]\s*/;
 /** ``Основные особенности:`` or colon-less titles like ``Преимущества``. */
-const SECTION_RE = /^(.{2,60}):\s*$/;
+const SECTION_RE = /^(.{2,120}):\s*$/;
 /** Major marketing / series sections → h2. */
 const SECTION_BARE_RE = new RegExp(
   "^(" +
@@ -92,15 +94,50 @@ function cleanTitle(line: string): string {
 }
 
 /**
+ * True when ``rawLine`` continues the previous list item (soft line wrap).
+ *
+ * Prefer source indent (``  continuation``). Also join lowercase / ``(`` leads
+ * when the previous item looks unfinished. Never swallow headings / chapters.
+ */
+export function isListItemContinuation(
+  rawLine: string,
+  prevItem: string,
+): boolean {
+  if (!prevItem.trim()) return false;
+
+  const line = rawLine.replace(/\u200b/g, "").trim();
+  if (!line || BULLET_RE.test(line)) return false;
+  if (INSTRUCTION_NESTED_RE.test(line) || INSTRUCTION_CHAPTER_RE.test(line)) {
+    return false;
+  }
+  if (INSTRUCTION_INTRO_RE.test(line)) return false;
+  if (SECTION_RE.test(line)) return false;
+  const bare = cleanTitle(line);
+  if (SECTION_BARE_RE.test(bare) || SECTION_SUB_BARE_RE.test(bare)) {
+    return false;
+  }
+
+  if (LIST_WRAP_INDENT_RE.test(rawLine)) return true;
+
+  const prev = prevItem.trim();
+  if (/[,;]$/.test(prev)) return true;
+  if (/^[a-zа-яё(«"']/.test(line)) return true;
+  return false;
+}
+
+/**
  * Parse category install instructions with h2/h3/h4 section levels.
  *
  * Reclassifies numbered chapter lines that ``parseDescription`` would emit
  * as plain paragraphs into section blocks with ``level``. Colon-only titles
  * (``Проверка совместимости:``) become h3 subsections. Intro ``Инструкция…``
  * remains a lead paragraph. Weak connective colon-lines stay paragraphs.
+ *
+ * Under a numbered h2 (``1. …``), bare h3 titles inherit ``1.1``, ``1.2``, …
+ * Existing ``3.1``-style titles are kept as-is.
  */
 export function parseInstructions(raw: string): DescriptionBlock[] {
-  return parseDescription(raw).map((block) => {
+  const leveled = parseDescription(raw).map((block) => {
     if (block.type === "section") {
       if (WEAK_CONNECTIVE_RE.test(cleanTitle(block.title))) {
         return { type: "paragraph" as const, text: block.title };
@@ -115,6 +152,67 @@ export function parseInstructions(raw: string): DescriptionBlock[] {
     }
     return block;
   });
+  return numberInstructionSubsections(leveled);
+}
+
+const CHAPTER_NUM_RE = /^(\d+)\.\s+(?!\d)/;
+const NESTED_NUM_RE = /^(\d+)\.(\d+)(?:\.\d+)*\s+/;
+
+/**
+ * Prefix bare h3 titles with ``N.M`` under the current numbered h2 chapter.
+ *
+ * Args:
+ *   blocks: Blocks already tagged with ``level`` 2/3/4.
+ *
+ * Returns:
+ *   New block list; h2 and pre-numbered ``3.1`` titles unchanged.
+ */
+export function numberInstructionSubsections(
+  blocks: DescriptionBlock[],
+): DescriptionBlock[] {
+  let chapter: number | null = null;
+  let sub = 0;
+  const out: DescriptionBlock[] = [];
+
+  for (const block of blocks) {
+    if (block.type !== "section") {
+      out.push(block);
+      continue;
+    }
+
+    const level = block.level ?? 3;
+    const title = block.title.trim();
+
+    if (level === 2) {
+      const m = title.match(CHAPTER_NUM_RE);
+      chapter = m ? Number(m[1]) : null;
+      sub = 0;
+      out.push(block);
+      continue;
+    }
+
+    if (level === 3 && chapter !== null) {
+      if (NESTED_NUM_RE.test(title)) {
+        const nested = title.match(NESTED_NUM_RE);
+        if (nested) {
+          sub = Math.max(sub, Number(nested[2]));
+        }
+        out.push(block);
+        continue;
+      }
+      sub += 1;
+      const bare = cleanTitle(title).replace(CHAPTER_NUM_RE, "").trim();
+      out.push({
+        ...block,
+        title: `${chapter}.${sub} ${bare}`,
+      });
+      continue;
+    }
+
+    out.push(block);
+  }
+
+  return out;
 }
 
 /**
@@ -255,6 +353,16 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     if (!line) {
       flushList();
       flushParagraph();
+      continue;
+    }
+
+    // Soft-wrapped bullet continuation (``– foo,\n  bar``) stays one list item.
+    if (
+      listBuf.length > 0 &&
+      isListItemContinuation(rawLine.replace(/\u200b/g, ""), listBuf[listBuf.length - 1])
+    ) {
+      const last = listBuf.length - 1;
+      listBuf[last] = `${listBuf[last]} ${line}`.replace(/\s+/g, " ").trim();
       continue;
     }
 

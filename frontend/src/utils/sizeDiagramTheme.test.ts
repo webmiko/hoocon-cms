@@ -1,18 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { isSizeDiagram, sizeDiagramSrcForTheme } from "./sizeDiagramTheme";
+import {
+  isSizeDiagram,
+  isTechnicalDiagram,
+  sizeDiagramSrcForTheme,
+} from "./sizeDiagramTheme";
 
 describe("sizeDiagramSrcForTheme", () => {
-  const light =
-    "/media/product_images/148/abc_8100-bv215a-size.webp";
-  const dark =
-    "/media/product_images/148/abc_8100-bv215a-size-dark.webp";
+  const light = "/media/product_images/148/abc_8100-bv215a-size.webp";
+  const dark = "/media/product_images/148/abc_8100-bv215a-size-dark.webp";
 
   it("detects size diagrams", () => {
     expect(isSizeDiagram(light)).toBe(true);
     expect(isSizeDiagram(dark)).toBe(true);
-    expect(isSizeDiagram(light, "8100-bv215a габариты")).toBe(true);
     expect(isSizeDiagram("/media/x-0.webp", "product")).toBe(false);
+  });
+
+  it("detects manual wiring and dimensions crops", () => {
+    expect(
+      isTechnicalDiagram(
+        "/media/x_da5fu24-d-wiring.webp",
+        "DA5FU | Схема подключения из инструкции",
+      ),
+    ).toBe(true);
+    expect(
+      isTechnicalDiagram(
+        "/media/x_da5fu24-d-dimensions.webp",
+        "DA5FU | Габаритные размеры привода (мм)",
+      ),
+    ).toBe(true);
+    expect(isTechnicalDiagram("/media/x-0.webp", "product photo")).toBe(false);
   });
 
   it("swaps to white-line clone in dark theme", () => {
@@ -25,9 +42,11 @@ describe("sizeDiagramSrcForTheme", () => {
     expect(sizeDiagramSrcForTheme(dark, "light")).toBe(light);
   });
 
-  it("leaves product photos unchanged", () => {
+  it("leaves product photos and PDF crops unchanged by theme swap", () => {
     const product = "/media/product_images/148/abc_8100-bv215a-0.webp";
+    const wiring = "/media/product_images/37/x_da5fu24-d-wiring.webp";
     expect(sizeDiagramSrcForTheme(product, "dark")).toBe(product);
     expect(sizeDiagramSrcForTheme(product, "light")).toBe(product);
+    expect(sizeDiagramSrcForTheme(wiring, "dark")).toBe(wiring);
   });
 });

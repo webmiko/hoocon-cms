@@ -9,6 +9,58 @@ import {
 } from "./parseDescription";
 
 describe("parseDescription", () => {
+  it("treats long colon titles (over 60 chars) as section headings", () => {
+    const title =
+      "Схема подключения (см. также чертёж «Схема подключения» в галерее и PDF):";
+    expect(title.replace(/:$/, "").length).toBeGreaterThan(60);
+    const blocks = parseDescription(
+      [title, "", "– Подключите провода к клеммам питания"].join("\n"),
+    );
+    expect(blocks[0]).toEqual({
+      type: "section",
+      title: title.replace(/:$/, ""),
+    });
+    expect(blocks[1]).toEqual({
+      type: "list",
+      items: ["Подключите провода к клеммам питания"],
+    });
+  });
+
+  it("joins soft-wrapped bullet continuations into one list item", () => {
+    const blocks = parseDescription(
+      [
+        "Инструменты:",
+        "– Ключи для фиксации адаптера, отвёртка для подключения проводов,",
+        "  мультиметр для проверки напряжения.",
+        "– Подберите модель по крутящему моменту (3–20 Нм) и площади заслонки",
+        "  (см. таблицу характеристик выбранного артикула).",
+      ].join("\n"),
+    );
+    expect(blocks).toEqual([
+      { type: "section", title: "Инструменты" },
+      {
+        type: "list",
+        items: [
+          "Ключи для фиксации адаптера, отвёртка для подключения проводов, мультиметр для проверки напряжения.",
+          "Подберите модель по крутящему моменту (3–20 Нм) и площади заслонки (см. таблицу характеристик выбранного артикула).",
+        ],
+      },
+    ]);
+  });
+
+  it("does not swallow nested chapter headings after a bullet", () => {
+    const blocks = parseDescription(
+      ["– Закрепите привод согласно схеме монтажа", "2.2 Подключение электропитания"].join(
+        "\n",
+      ),
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["list", "paragraph"]);
+    expect(blocks[0]).toEqual({
+      type: "list",
+      items: ["Закрепите привод согласно схеме монтажа"],
+    });
+  });
+
   it("treats bare section titles without colon as headings", () => {
     const blocks = parseDescription(
       [
@@ -114,7 +166,7 @@ describe("parseDescription", () => {
         text: "Для корректной работы соблюдайте рекомендации.",
       },
       { type: "section", title: "1. ПОДГОТОВКА К МОНТАЖУ", level: 2 },
-      { type: "section", title: "Проверка совместимости", level: 3 },
+      { type: "section", title: "1.1 Проверка совместимости", level: 3 },
       {
         type: "list",
         items: [
@@ -126,6 +178,37 @@ describe("parseDescription", () => {
       { type: "section", title: "3. ЭТАПЫ УСТАНОВКИ", level: 2 },
       { type: "section", title: "3.1 Монтаж на заслонку", level: 3 },
       { type: "list", items: ["Закрепите привод"] },
+    ]);
+  });
+
+  it("numbers bare h3 under numbered h2 as N.1 N.2", () => {
+    const blocks = parseInstructions(
+      [
+        "1. Подготовка к установке",
+        "",
+        "Проверка совместимости:",
+        "",
+        "– Длина вала: > 50 мм",
+        "",
+        "Инструменты:",
+        "",
+        "– Мультиметр",
+        "",
+        "2. Монтаж привода",
+        "",
+        "Крепление на вал:",
+        "",
+        "– Закрепите привод",
+      ].join("\n"),
+    );
+    expect(
+      blocks.filter((b) => b.type === "section").map((b) => (b as { title: string }).title),
+    ).toEqual([
+      "1. Подготовка к установке",
+      "1.1 Проверка совместимости",
+      "1.2 Инструменты",
+      "2. Монтаж привода",
+      "2.1 Крепление на вал",
     ]);
   });
 

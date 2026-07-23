@@ -19,6 +19,7 @@ import { CompareToggle } from "../components/CompareToggle";
 import { PhotoWash } from "../components/PhotoWash";
 import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
+import { paraphraseSkuLead } from "../utils/paraphraseSkuLead";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
@@ -27,7 +28,10 @@ import {
   catalogPathForSku,
   catalogSkuPath,
 } from "../utils/catalogPaths";
-import { sizeDiagramSrcForTheme } from "../utils/sizeDiagramTheme";
+import {
+  isTechnicalDiagram,
+  sizeDiagramSrcForTheme,
+} from "../utils/sizeDiagramTheme";
 import { useTheme } from "../theme/ThemeContext";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -221,11 +225,15 @@ export function SkuDetailPage() {
     category_slug: sku.category_slug,
   });
 
+  const descriptionBody =
+    (sku.description ?? "").trim() ||
+    ("lead" in sku && sku.lead ? paraphraseSkuLead(sku.lead) : "");
+
   const tabs: Array<{ id: TabId; label: string; available: boolean }> = [
     {
       id: "description",
       label: "Описание",
-      available: Boolean(sku.description || sku.category_description),
+      available: Boolean(descriptionBody || sku.category_description),
     },
     {
       id: "instructions",
@@ -297,6 +305,12 @@ export function SkuDetailPage() {
           className={styles.heroMedia}
           data-purpose={mediaPurpose}
           src={galleryImages[0]?.src}
+          backdrop={
+            galleryImages[0] &&
+            isTechnicalDiagram(galleryImages[0].src, galleryImages[0].alt)
+              ? "white"
+              : "auto"
+          }
         >
           {galleryImages.length > 0 ? (
             <button
@@ -390,6 +404,9 @@ export function SkuDetailPage() {
                 className={styles.galleryItem}
                 data-purpose={mediaPurpose}
                 src={item.src}
+                backdrop={
+                  isTechnicalDiagram(item.src, item.alt) ? "white" : "auto"
+                }
               >
                 <button
                   type="button"
@@ -400,7 +417,11 @@ export function SkuDetailPage() {
                   <img
                     src={item.src}
                     alt={item.alt}
-                    className={styles.galleryImage}
+                    className={
+                      isTechnicalDiagram(item.src, item.alt)
+                        ? `${styles.galleryImage} ${styles.galleryImageDiagram}`
+                        : styles.galleryImage
+                    }
                     loading="lazy"
                     decoding="async"
                   />
@@ -444,14 +465,14 @@ export function SkuDetailPage() {
               <div className={styles.tabPanel} role="tabpanel">
                 {activeTab === "description" ? (
                   <section className={styles.section}>
-                    {sku.description ? (
-                      <StructuredText text={sku.description} />
+                    {descriptionBody ? (
+                      <StructuredText text={descriptionBody} />
                     ) : null}
                     {sku.category_description &&
-                    sku.category_description !== sku.description &&
+                    sku.category_description !== descriptionBody &&
                     !descriptionsOverlap(
                       sku.category_description,
-                      sku.description ?? "",
+                      descriptionBody,
                     ) &&
                     categoryCopyFitsSku(
                       sku.category_description,
