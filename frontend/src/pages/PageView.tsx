@@ -7,6 +7,7 @@ import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
 import { buildBreadcrumbJsonLd, buildFaqJsonLd } from "../utils/jsonLd";
 import styles from "./PageView.module.css";
+import "../styles/cms-body-charts.css";
 
 interface PageViewProps {
   /** Explicit slug when route has no :slug param (e.g. /o-kompanii). */
@@ -65,26 +66,49 @@ export function PageView({ slug: slugProp }: PageViewProps) {
           ]),
         ];
 
+  const isLanding = page.slug === "zavod";
+  const seoDescription =
+    page.slug === "zavod"
+      ? "OEM электроприводов ОВК под вашим брендом напрямую с завода Ningbo Hoocon: CE, UL, EAC. Без посредников."
+      : desc;
+
+  const crumbs = (
+    <Breadcrumbs
+      items={[
+        { label: "Главная", to: "/" },
+        { label: page.title },
+      ]}
+    />
+  );
+  const heading = <h1 className={styles.title}>{page.title}</h1>;
+  const body = (
+    <div
+      className={`${styles.body} cms-rich-body${isLanding ? ` ${styles.bodyLanding}` : ""}`}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body) }}
+    />
+  );
+
   return (
-    <article className={styles.page}>
+    <article className={isLanding ? styles.pageLanding : styles.page}>
       <Seo
         title={page.title}
-        description={desc}
+        description={seoDescription}
         path={`/${page.slug}`}
         jsonLd={jsonLd}
       />
-      <Breadcrumbs
-        items={[
-          { label: "Главная", to: "/" },
-          { label: page.title },
-        ]}
-      />
-      <h1 className={styles.title}>{page.title}</h1>
-
-      <div
-        className={styles.body}
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body) }}
-      />
+      {isLanding ? (
+        <div className={styles.landingInner}>
+          {crumbs}
+          {heading}
+          {body}
+        </div>
+      ) : (
+        <>
+          {crumbs}
+          {heading}
+          {body}
+        </>
+      )}
     </article>
   );
 }

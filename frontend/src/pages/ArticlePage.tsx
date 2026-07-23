@@ -12,6 +12,7 @@ import {
 } from "../utils/jsonLd";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import styles from "./ArticlePage.module.css";
+import "../styles/cms-body-charts.css";
 
 /**
  * Article detail — readable column, scannable hierarchy, related links.
@@ -112,7 +113,7 @@ export function ArticlePage() {
 
         {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 */}
         <div
-          className={styles.body}
+          className={`${styles.body} cms-rich-body`}
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.body) }}
         />
 

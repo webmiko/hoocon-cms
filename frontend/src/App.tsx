@@ -90,6 +90,7 @@ export default function App() {
         <Route path="news" element={<Navigate to="/novosti" replace />} />
         <Route path="news/*" element={<NewsLegacyRedirect />} />
         <Route path="company" element={<PageView slug="company" />} />
+        <Route path="zavod" element={<PageView slug="zavod" />} />
         <Route path="gde-kupit" element={<WhereToBuyPage />} />
         <Route path="faq" element={<PageView slug="faq" />} />
         <Route path="kontakty" element={<PageView slug="kontakty" />} />

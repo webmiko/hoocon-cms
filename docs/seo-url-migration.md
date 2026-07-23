@@ -47,6 +47,7 @@ Legacy: `/catalog?category=…` → клиентский redirect на `/catalog
 | `/` | home | `/` |
 | `/catalog` | catalog list | `/catalog` |
 | `/company` | page | `/company` |
+| `/zavod` | page | `/zavod` (завод Ningbo Hoocon · OEM) |
 | `/gde-kupit` | page | `/gde-kupit` |
 | `/statyi` | article list | `/statyi` |
 | `/news` | news list | `/news` |

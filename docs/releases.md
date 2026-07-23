@@ -36,6 +36,11 @@
 
 ## Changelog
 
+### v0.0.7 beta — 2026-07-24
+
+- Страница завода `/zavod`: Ningbo Hoocon Automation, OEM / private label
+  и сотрудничество напрямую с заводом через ООО «Хогон».
+
 ### v0.0.6 beta — 2026-07-23
 
 - Nested catalog SKU URLs: `/catalog/{category}/{sku}` (one page per SKU);

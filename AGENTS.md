@@ -68,6 +68,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | ТТХ / инструкции / перевод | [tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) |
 | ETL / качество данных | [data-quality-etl.md](docs/data-quality-etl.md) |
 | UX / дизайн B2B | [readiness-backend-ux.md](docs/readiness-backend-ux.md); прототипы `../hoocon/docs/прототипы/` |
+| Статьи / лендинги (графики) | `.cursor/rules/cms-content-dashboards.mdc`; стили `frontend/src/styles/cms-body-charts.css`; референс `/zavod` |
 | Веб / SEO SPA | БЗ `ВЕБ-РАЗРАБОТКА-Кастомный-стек/` |
 | Безопасность | БЗ `безопасность/` + [security-baseline.md][sec-baseline] |
 | Деплой / VPS | [infra-reg-ru.md](docs/infra-reg-ru.md); LMS-референс в БЗ |

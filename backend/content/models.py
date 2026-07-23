@@ -25,14 +25,18 @@ from catalog.validators import sanitize_upload_filename, validate_image_upload
 
 def article_cover_upload_to(instance: Article, filename: str) -> str:
     """Store under article_covers/<slug>/<uuid>_<safe_basename>.webp."""
-    safe = sanitize_upload_filename(filename)
+    from catalog.etl.webp import webp_upload_basename
+
+    safe = webp_upload_basename(sanitize_upload_filename(filename))
     slug = instance.slug or "pending"
     return f"article_covers/{slug}/{uuid.uuid4().hex}_{safe}"
 
 
 def news_cover_upload_to(instance: News, filename: str) -> str:
     """Store under news_covers/<slug>/<uuid>_<safe_basename>.webp."""
-    safe = sanitize_upload_filename(filename)
+    from catalog.etl.webp import webp_upload_basename
+
+    safe = webp_upload_basename(sanitize_upload_filename(filename))
     slug = instance.slug or "pending"
     return f"news_covers/{slug}/{uuid.uuid4().hex}_{safe}"
 
@@ -147,6 +151,14 @@ class Article(_ContentBase):
         verbose_name = "статья"
         verbose_name_plural = "статьи"
 
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist article; re-encode cover JPEG/PNG to WebP when needed."""
+        from catalog.etl.webp import ensure_field_file_webp
+
+        if self.cover:
+            ensure_field_file_webp(self.cover)
+        super().save(*args, **kwargs)  # type: ignore[arg-type]
+
 
 class News(_ContentBase):
     """Company news item (/novosti/<slug>).
@@ -175,3 +187,11 @@ class News(_ContentBase):
     class Meta(_ContentBase.Meta):
         verbose_name = "новость"
         verbose_name_plural = "новости"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist news; re-encode cover JPEG/PNG to WebP when needed."""
+        from catalog.etl.webp import ensure_field_file_webp
+
+        if self.cover:
+            ensure_field_file_webp(self.cover)
+        super().save(*args, **kwargs)  # type: ignore[arg-type]

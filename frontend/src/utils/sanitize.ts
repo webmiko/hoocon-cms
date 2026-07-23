@@ -9,7 +9,19 @@ const ALLOWED_TAGS = [
   "div", "span",
 ];
 
-const ALLOWED_ATTR = ["href", "src", "alt", "title", "class", "target", "rel"];
+const ALLOWED_ATTR = [
+  "href",
+  "src",
+  "alt",
+  "title",
+  "class",
+  "target",
+  "rel",
+  "loading",
+  "decoding",
+  "width",
+  "height",
+];
 
 export function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {

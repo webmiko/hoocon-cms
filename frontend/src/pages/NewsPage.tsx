@@ -11,6 +11,7 @@ import {
   buildBreadcrumbJsonLd,
 } from "../utils/jsonLd";
 import styles from "./NewsPage.module.css";
+import "../styles/cms-body-charts.css";
 
 /**
  * News detail — same reading layout as articles.
@@ -107,7 +108,7 @@ export function NewsPage() {
         ) : null}
 
         <div
-          className={styles.body}
+          className={`${styles.body} cms-rich-body`}
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(news.body) }}
         />
 

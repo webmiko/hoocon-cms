@@ -11,6 +11,8 @@ Usage::
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -62,7 +64,7 @@ Co., Ltd. (Китай).</p>
 {_PHONE}.</li>
 </ol>
 <p>Партнёры и розница: <a href="/gde-kupit">где купить</a>.
-OEM-поставки под своим брендом — на {_EMAIL_INFO}.</p>
+OEM и завод: <a href="/zavod">/zavod</a> · {_EMAIL_INFO}.</p>
 <h2>Контакты ООО «Хогон»</h2>
 <ul>
 <li>Телефон: <a href="tel:+78003505898">{_PHONE}</a></li>
@@ -118,9 +120,17 @@ target="_blank">hoocon.by</a></li>
 </ul>
 <h2>OEM под своим брендом</h2>
 <p>Завод Ningbo Hoocon Automation Control Equipment Co., Ltd.:
-OEM-поставки, CE / UL / EAC. Запросы — на {_EMAIL_INFO} или
+OEM-поставки, CE / UL / EAC. Подробнее — на странице
+<a href="/zavod">завода и OEM</a>. Запросы —
+<a href="mailto:{_EMAIL_INFO}">{_EMAIL_INFO}</a> или
 hoocon@hoocon.com.cn.</p>
 """.strip(),
+    ),
+    "zavod": (
+        "Заказ приводов ОВК под своим брендом",
+        (Path(__file__).resolve().parents[2] / "fixtures" / "page_zavod.html").read_text(
+            encoding="utf-8",
+        ),
     ),
     "faq": (
         "Ответы на частые вопросы",

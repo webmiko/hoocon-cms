@@ -7,7 +7,6 @@ import styles from "./WhereToBuyPage.module.css";
 
 const PHONE = "8 800 350-58-98";
 const EMAIL_SALES = "sales@hoocon.ru";
-const EMAIL_INFO = "info@hoocon.ru";
 
 interface Partner {
   name: string;
@@ -93,7 +92,7 @@ export function WhereToBuyPage() {
         title="Где купить продукцию Hoocon"
         description={
           "Партнёры и прямые поставки электроприводов Hoocon: Москва, " +
-          "Санкт-Петербург, Минск. OEM под своим брендом."
+          "Санкт-Петербург, Минск. OEM напрямую с завода — /zavod."
         }
         path="/gde-kupit"
         jsonLd={jsonLd}
@@ -175,16 +174,18 @@ export function WhereToBuyPage() {
       <section className={styles.oemBand} aria-labelledby="oem-heading">
         <div className={styles.oemInner}>
           <article className={`${styles.card} ${styles.cardOem}`}>
-            <p className={styles.oemEyebrow}>OEM</p>
+            <p className={styles.oemEyebrow}>Завод · OEM</p>
             <h2 id="oem-heading" className={styles.oemTitle}>
-              Под своим брендом
+              Приводы под вашим брендом — напрямую с завода
             </h2>
             <p className={styles.oemText}>
-              Завод Ningbo Hoocon Automation Control Equipment Co., Ltd.:
-              OEM-поставки, CE / UL / EAC. Запросы — на{" "}
-              <a href={`mailto:${EMAIL_INFO}`}>{EMAIL_INFO}</a> или
-              hoocon@hoocon.com.cn.
+              Ningbo Hoocon Automation (Цыси, Китай): контракт, образцы и серия
+              без посредников. CE · UL · EAC · ISO&nbsp;9001. Контакты завода,
+              платформы и условия OEM — на отдельной странице.
             </p>
+            <Link to="/zavod" className={styles.oemCta}>
+              Страница завода →
+            </Link>
           </article>
         </div>
       </section>

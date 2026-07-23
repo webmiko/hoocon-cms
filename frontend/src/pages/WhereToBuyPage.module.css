@@ -214,14 +214,25 @@
   text-wrap: pretty;
 }
 
-.oemText a {
+.oemCta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-lg);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius);
+  background: var(--color-brand);
   color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background-color 200ms ease, border-color 200ms ease;
 }
 
-.oemText a:hover {
-  color: #ffc9c9;
+.oemCta:hover {
+  background: var(--color-brand-hover);
+  color: #fff;
+  text-decoration: none;
 }
 
 @media (max-width: 768px) {
