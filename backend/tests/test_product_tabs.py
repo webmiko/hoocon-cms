@@ -55,3 +55,72 @@ def test_filter_analogs_keeps_matching_edition() -> None:
     assert "TF230-S" in out
     assert "TF24-S" not in out
     assert "230" in out
+
+
+def test_filter_analogs_hoocon_dlya_headers() -> None:
+    """DAMU-style «Для Hoocon DA2MU230-…» blocks filter by voltage core."""
+    text = """
+Список аналогов для привода серии DA..MU 2 Нм
+
+Для Hoocon DA2MU230-DS/DA2MU230-AS (230В):
+
+– Belimo CM230-L/R
+
+Для Hoocon DA2MU24-D/DA2MU24-AS (24В)
+
+– Belimo CM24-L/R
+
+Основные характеристики аналогов
+
+Крутящий момент: 2−5 Нм
+""".strip()
+    out_230 = filter_analogs_for_sku(text, "DA2MU230-A")
+    assert "CM230-L/R" in out_230
+    assert "CM24-L/R" not in out_230
+    assert "Основные характеристики аналогов" in out_230
+
+    out_24 = filter_analogs_for_sku(text, "DA2MU24-DS")
+    assert "CM24-L/R" in out_24
+    assert "CM230-L/R" not in out_24
+
+
+def test_filter_analogs_da4mu_per_control_and_voltage() -> None:
+    """«Аналоги для DA4MU…-D/DS» vs «…-A/AS» keep only this SKU's block."""
+    text = """
+Список аналогов для привода заслонки Hoocon серии DA.MU 4Нм
+
+Аналоги для DA4MU24-D/DS (24 В, 4Нм):
+
+– Belimo LM24A-S (без возвратной пружины)
+
+Аналоги для DA4MU230-D/DS (230 В, 4Нм)
+
+– Belimo LM230A-S (без возвратной пружины)
+
+Аналоги для DA4MU24-A/AS (24 В, 4Нм)
+
+– AIRS LM24-SR
+
+Аналоги для DA4MU230-A/AS (230 В, 4Нм)
+
+– Dacond DAC-LMC230−04S
+
+Все перечисленные модели:
+Имеют крутящий момент 4Нм
+
+Важно: При выборе аналога проверьте параметры.
+""".strip()
+    out_24_d = filter_analogs_for_sku(text, "DA4MU24-D")
+    assert "LM24A-S" in out_24_d
+    assert "LM230A-S" not in out_24_d
+    assert "LM24-SR" not in out_24_d
+    assert "DAC-LMC230" not in out_24_d
+    assert "Все перечисленные" not in out_24_d
+    assert "Важно:" in out_24_d
+
+    out_230_a = filter_analogs_for_sku(text, "DA4MU230-AS")
+    assert "DAC-LMC230" in out_230_a
+    assert "LM24A-S" not in out_230_a
+    assert "LM230A-S" not in out_230_a
+    assert "LM24-SR" not in out_230_a
+    assert "Все перечисленные" not in out_230_a

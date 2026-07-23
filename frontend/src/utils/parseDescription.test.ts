@@ -181,6 +181,44 @@ describe("parseDescription", () => {
     ]);
   });
 
+  it("merges incomplete «… при:» lead with following bullets into full list items", () => {
+    const blocks = parseInstructions(
+      [
+        "2. Автоматические режимы работы",
+        "",
+        "Аварийное закрытие при пожаре:",
+        "",
+        "Срабатывание возвратной пружины (≤25 сек) при:",
+        "– Отключении питания.",
+        "– Сигнале от пожарной системы.",
+        "– Активации термодатчика +72°C (в моделях с суффиксом DST).",
+        "– Восстановление после пожара: Подача напряжения открывает заслонку.",
+      ].join("\n"),
+    );
+    const titles = blocks
+      .filter((b) => b.type === "section")
+      .map((b) => (b as { title: string }).title);
+    expect(titles).toEqual([
+      "2. Автоматические режимы работы",
+      "2.1 Аварийное закрытие при пожаре",
+    ]);
+    expect(titles.some((t) => t.includes("Срабатывание"))).toBe(false);
+    const list = blocks.find((b) => b.type === "list") as { items: string[] };
+    expect(list.items[0]).toBe(
+      "Срабатывание возвратной пружины (≤25 сек) при отключении питания.",
+    );
+    expect(list.items[1]).toBe(
+      "Срабатывание возвратной пружины (≤25 сек) при сигнале от пожарной системы.",
+    );
+    expect(list.items[2]).toContain("при активации термодатчика");
+    const restore = blocks.filter((b) => b.type === "list").flatMap((b) =>
+      b.type === "list" ? b.items : [],
+    );
+    expect(restore.some((i) => i.startsWith("Восстановление после пожара:"))).toBe(
+      true,
+    );
+  });
+
   it("numbers bare h3 under numbered h2 as N.1 N.2", () => {
     const blocks = parseInstructions(
       [

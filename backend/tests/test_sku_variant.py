@@ -47,6 +47,16 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert dst.control == "on_off"
     assert dst.aux_switch is True
 
+    hvdf = parse_sku_variant("HVD230ST-5F")
+    assert hvdf.voltage == "230"
+    assert hvdf.control == "on_off"
+    assert hvdf.aux_switch is True
+
+    hvdf_s = parse_sku_variant("hvd24s-3f")
+    assert hvdf_s.voltage == "24"
+    assert hvdf_s.control == "on_off"
+    assert hvdf_s.aux_switch is True
+
 
 def test_parse_sku_variant_ignores_non_terminal_suffix_lookalikes() -> None:
     """Suffix tags must match only at the very end of sku_code."""
@@ -103,6 +113,53 @@ DA3FU24-D/DS:
     assert "Утечка" not in out
     assert "DA3FU24" not in out
     assert "24 В" not in out
+
+
+def test_filter_description_drops_other_voltage_execution_bullets() -> None:
+    """Install-guide «Исполнения 24/230 В» lines keep only this SKU voltage."""
+    text = """
+3. Электрическое подключение
+
+– Исполнения 24 В: AC/DC 24 В, 50/60 Гц (класс защиты III).
+– Исполнения 230 В: AC 100…240 В, 50/60 Гц (класс защиты II).
+– Сечение провода: 0,5 мм².
+"""
+    out_24 = filter_description_for_variant(text, parse_sku_variant("da4mu24-d"))
+    assert "Исполнения 24 В" in out_24
+    assert "Исполнения 230 В" not in out_24
+    assert "Сечение провода" in out_24
+
+    out_230 = filter_description_for_variant(text, parse_sku_variant("da4mu230-a"))
+    assert "Исполнения 230 В" in out_230
+    assert "Исполнения 24 В" not in out_230
+
+
+def test_filter_description_drops_aux_chapter_for_plain_edition() -> None:
+    """Numbered aux-switch chapter is omitted for -D / -A without S."""
+    text = """
+4. Настройка направления вращения
+
+– Установите переключатель направления.
+
+5. Вспомогательные переключатели (-AS / -DS)
+
+– Настройте угол срабатывания.
+– Используйте контакты SPDT.
+
+6. Проверка
+
+– Проверьте ход заслонки.
+"""
+    out = filter_description_for_variant(text, parse_sku_variant("da4mu24-d"))
+    assert "Настройка направления" in out
+    assert "Вспомогательные переключатели" not in out
+    assert "угол срабатывания" not in out
+    assert "Проверка" in out
+    assert "ход заслонки" in out
+
+    out_as = filter_description_for_variant(text, parse_sku_variant("da4mu24-as"))
+    assert "Вспомогательные переключатели" in out_as
+    assert "угол срабатывания" in out_as
 
 
 def test_rewrite_dual_voltage_model_mask() -> None:
@@ -167,6 +224,35 @@ def test_filter_images_drops_wrong_torque_alt() -> None:
     ]
     kept = filter_images_for_variant(gallery, parse_sku_variant("da5fu24-d"))
     assert [img.alt for img in kept] == [gallery[1].alt]
+
+
+def test_torque_nm_from_hva_uses_trailing_nm_not_voltage() -> None:
+    """HVA24-5 → 5 Нм (not 24 from the voltage token)."""
+    from catalog.etl.sku_variant import torque_nm_from_sku_code
+
+    assert torque_nm_from_sku_code("HVA24-5") == 5
+    assert torque_nm_from_sku_code("HVA24S-5") == 5
+    assert torque_nm_from_sku_code("HVA230-5Q") == 5
+    assert torque_nm_from_sku_code("HVD24ST-3F") == 3
+    assert torque_nm_from_sku_code("DA5FU24-D") == 5
+
+
+def test_filter_images_keeps_hva5_photo() -> None:
+    """HVA gallery alts with «5 Нм» must not be dropped as wrong torque."""
+    from types import SimpleNamespace
+
+    from catalog.etl.sku_variant import filter_images_for_variant
+
+    gallery = [
+        SimpleNamespace(
+            alt=(
+                "HVA-5 | 5 НМ Привод воздушный без возвратной пружины "
+                "пропорциональное (модулирующее) управление (HVA24-5)"
+            ),
+        ),
+    ]
+    kept = filter_images_for_variant(gallery, parse_sku_variant("HVA24-5"))
+    assert len(kept) == 1
 
 
 def test_filter_images_drops_sa_thermal_sibling_alt() -> None:

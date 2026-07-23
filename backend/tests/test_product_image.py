@@ -52,3 +52,34 @@ def test_validate_image_upload_rejects_pdf() -> None:
     )
     with pytest.raises(ValidationError):
         validate_image_upload(uploaded)
+
+
+def test_webp_upload_basename_forces_webp() -> None:
+    """upload_to basenames always end with .webp."""
+    from catalog.etl.webp import webp_upload_basename
+
+    assert webp_upload_basename("photo.JPG") == "photo.webp"
+    assert webp_upload_basename("a.b.png") == "a.b.webp"
+
+
+def test_product_image_save_converts_png_to_webp(db: None) -> None:
+    """Admin/ETL PNG upload is stored as WebP on ProductImage.save."""
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    cat = Category.objects.create(name="T", slug="t-webp-save")
+    product = Product.objects.create(name="P", slug="p-webp-save", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="S",
+        slug="s-webp-save",
+        sku_code="WEBP-SAVE-1",
+    )
+    png = SimpleUploadedFile("shot.png", _png_bytes((120, 80)), content_type="image/png")
+    img = ProductImage(sku=sku, alt="t", sort_order=0, is_published=True)
+    img.image = png
+    img.save()
+    img.refresh_from_db()
+    assert img.image.name.lower().endswith(".webp")
+    with img.image.open("rb") as fh:
+        magic = fh.read(12)
+    assert magic[:4] == b"RIFF" and magic[8:12] == b"WEBP"

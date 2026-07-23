@@ -2,12 +2,18 @@
 
 Spec: docs/data-quality-etl.md — лёгкое сжатие без заметной потери качества.
 quality=90 ≈ visually lossless для фото продукции; method=6 — лучший encode.
+
+SVG и обязательные PNG (favicon / PWA / apple-touch) не конвертируем —
+они лежат в ``frontend/public``, не в media ImageField.
 """
 
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 
+from django.core.files.base import ContentFile
 from PIL import Image
 
 # Near-lossless for product photos (лёгкое сжатие, без видимой деградации).
@@ -59,3 +65,45 @@ def convert_bytes_to_webp(
             method=WEBP_METHOD,
         )
         return out.getvalue()
+
+
+def webp_upload_basename(filename: str) -> str:
+    """Force ``*.webp`` basename for ImageField ``upload_to`` paths."""
+    stem = Path(filename or "image").stem.strip() or "image"
+    return f"{stem}.webp"
+
+
+def ensure_field_file_webp(
+    field_file: Any,
+    *,
+    quality: int = DEFAULT_WEBP_QUALITY,
+    max_edge: int = MAX_EDGE_PX,
+) -> None:
+    """Re-encode an ImageField value to WebP in place when needed.
+
+    No-op when the field is empty or the current name already ends with
+    ``.webp``. JPEG/PNG (and other rasters accepted by the validator) are
+    converted before the model row is saved.
+
+    Args:
+        field_file: Django ``FieldFile`` / ``ImageFieldFile`` on the instance.
+        quality: WebP quality 1–100.
+        max_edge: Max long edge for downscale.
+
+    Raises:
+        OSError / PIL.UnidentifiedImageError: invalid image bytes.
+    """
+    if field_file is None or not getattr(field_file, "name", ""):
+        return
+    basename = Path(field_file.name).name
+    if basename.lower().endswith(".webp"):
+        return
+    raw = field_file.read()
+    if hasattr(field_file, "seek"):
+        field_file.seek(0)
+    webp = convert_bytes_to_webp(raw, quality=quality, max_edge=max_edge)
+    field_file.save(
+        webp_upload_basename(basename),
+        ContentFile(webp),
+        save=False,
+    )

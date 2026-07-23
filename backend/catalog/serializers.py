@@ -103,10 +103,12 @@ def _sku_analogs_text(obj: SKU) -> str:
     if obj.analogs_text is not None:
         if not obj.analogs_text.strip():
             return ""
-        return dedupe_description_lines(obj.analogs_text)
-    text = sku_product_field(obj, "analogs_text")
-    if not text.strip():
-        return ""
+        text = dedupe_description_lines(obj.analogs_text)
+    else:
+        text = sku_product_field(obj, "analogs_text")
+        if not text.strip():
+            return ""
+        text = dedupe_description_lines(text)
     return filter_analogs_for_sku(text, obj.sku_code)
 
 
@@ -433,11 +435,12 @@ class SKUDetailSerializer(SKUListSerializer):
         return _sku_analogs_text(obj)
 
     def get_category_instructions(self, obj: SKU) -> str:
-        """Install guide: category first, then product-level fallback."""
+        """Install guide scoped to this SKU edition (all series)."""
+        from catalog.etl.sku_instructions import instructions_for_sku
+
         cat = sku_category_instructions(obj)
-        if cat.strip():
-            return cat
-        return sku_product_field(obj, "instructions")
+        stored = cat if cat.strip() else sku_product_field(obj, "instructions")
+        return instructions_for_sku(obj.sku_code, stored_text=stored)
 
     def get_ball_valve_kit(self, obj: SKU) -> dict[str, Any] | None:
         """Optional actuator + bracket picker for ball-valve RFQ."""

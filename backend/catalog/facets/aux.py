@@ -42,10 +42,24 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
     # SA..FU fire/smoke manuals: «S type include 2 auxiliary switch» (DS/DST).
     if re.match(r"sa\d+fu", code) and (code.endswith("-dst") or code.endswith("-ds")):
         return 2
+    # SA..MU smoke (no spring): manuals «-DS Include 2 groups» (DS/DST).
+    if re.match(r"sa\d+mu", code) and (code.endswith("-dst") or code.endswith("-ds")):
+        return 2
+    # DA..MU (no spring): DA2 = 1 group; DA4+ = 2 groups (manual wiring a+b).
+    if re.match(r"da2mu(?!q)", code) and code.endswith("-ds"):
+        return 1
+    if re.match(r"da(?:4|6|8|16|24|32)mu(?!q)", code) and code.endswith("-ds"):
+        return 2
+    # DA..MQU fast: AS/DS manuals show 2 auxiliary switch groups.
+    if re.match(r"da\d+mqu", code) and code.endswith("-ds"):
+        return 2
     if re.search(r"-dst(?:$|[^a-z])", code) or code.endswith("-dst"):
         return 1
     if re.search(r"-ds(?:$|[^a-z])", code) or code.endswith("-ds"):
         return 1
+    # HVD24S-3F / HVD230ST-5F — fire/smoke F-series: S/ST = 2 aux groups.
+    if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
+        return 2
     # HVA24S-5 / HVD230S-10 — «S» edition = 2 auxiliary switches.
     if re.search(r"(?:hva|hvd)\d*s-?\d", code):
         return 2

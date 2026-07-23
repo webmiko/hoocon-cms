@@ -14,13 +14,21 @@ _VOLTAGE_230 = re.compile(
     re.I,
 )
 _VOLTAGE_24 = re.compile(r"(?:^|[^0-9])24(?:[^0-9]|$)", re.I)
-_MODEL_HEADER = re.compile(
-    r"^(?P<code>[A-Z]{1,6}\d{0,3}[A-Z]{0,4})(?P<body>[A-Z0-9/.\-]*)\s*:?\s*$",
+# Install-guide bullets: «– 24 В:…» or «– Исполнения 24 В:…».
+_BULLET_24 = re.compile(
+    r"^\s*[–—\-•]?\s*(?:исполнения\s+)?24\s*В\b",
     re.I,
 )
-_BULLET_24 = re.compile(r"^\s*[–—\-•]?\s*24\s*В\b", re.I)
 _BULLET_230 = re.compile(
-    r"^\s*[–—\-•]?\s*(?:230\s*В\b|100\s*\.\.\.\s*240|100\s*-\s*240)",
+    r"^\s*[–—\-•]?\s*(?:исполнения\s+)?"
+    r"(?:230\s*В\b|100\s*\.\.\.\s*240|100\s*-\s*240|100…240)",
+    re.I,
+)
+# Numbered chapter about auxiliary switches (drop for plain -D/-A).
+_AUX_CHAPTER_RE = re.compile(r"(?i)^\d+\.\s*вспомогательн")
+_CHAPTER_RE = re.compile(r"^\d+\.\s+\S")
+_MODEL_HEADER = re.compile(
+    r"^(?P<code>[A-Z]{1,6}\d{0,3}[A-Z]{0,4})(?P<body>[A-Z0-9/.\-]*)\s*:?\s*$",
     re.I,
 )
 _BOTH_VOLTAGES_SENTENCE = re.compile(
@@ -74,9 +82,17 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
 
     control: str | None = None
     aux: bool | None = None
+    # HVD24S-3F / HVD230ST-5F — fire/smoke spring-return (S / ST + NmF).
+    if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
+        control = "on_off"
+        aux = True
+    # HVA24-5 / HVA24S-5Q — air damper without spring (modulating on Tilda).
+    elif re.fullmatch(r"hva(?:24|230)s?-\d+q?", code):
+        control = "modulating"
+        aux = bool(re.match(r"hva(?:24|230)s-", code))
     # Suffixes are hyphen-prefixed edition tags strictly at the code end.
     # ``-dst`` before ``-ds`` (thermal ON/OFF with aux).
-    if code.endswith("-as"):
+    elif code.endswith("-as"):
         control = "modulating"
         aux = True
     elif code.endswith("-dst"):
@@ -211,10 +227,22 @@ def filter_description_for_variant(text: str, variant: SkuVariant) -> str:
     lines = text.replace("\xa0", " ").splitlines()
     out: list[str] = []
     skipping = False
+    skipping_aux_chapter = False
 
     for raw in lines:
         line = raw.rstrip()
         stripped = line.strip()
+
+        if _CHAPTER_RE.match(stripped):
+            # End any aux-chapter skip at the next numbered chapter.
+            if skipping_aux_chapter and not _AUX_CHAPTER_RE.match(stripped):
+                skipping_aux_chapter = False
+            if variant.aux_switch is False and _AUX_CHAPTER_RE.match(stripped):
+                skipping_aux_chapter = True
+                continue
+
+        if skipping_aux_chapter:
+            continue
 
         if _is_model_header(stripped):
             hv = _header_voltage(stripped)
@@ -349,7 +377,14 @@ _IMAGE_ON_OFF = re.compile(
     r"открыто\s*/\s*закрыто",
 )
 _NM_IN_ALT = re.compile(r"(?i)(\d+)\s*нм")
-_NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa|hva|hvd|hvq)?(\d+)")
+# DA5FU24-D / SA10MU — leading series torque.
+_NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa)(\d+)")
+# HVA24-5 / HVA24S-5Q / HVD24ST-3F — voltage first, torque after the hyphen.
+_NM_FROM_HV_SKU = re.compile(
+    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st?|s)?-(\d+)(?:q|f)?$",
+)
+# Fallback: any leading digits after an optional short alpha prefix.
+_NM_FROM_SKU_FALLBACK = re.compile(r"(?i)^(?:[a-z]{1,4})?(\d+)")
 # SA fire/smoke: sibling DS↔DST photos share one product gallery.
 _IMAGE_THERMAL = re.compile(
     r"(?i)термодатчик|термическ\w*\s+датчик|72\s*[℃°]|-?\s*72\s*c\b",
@@ -357,34 +392,48 @@ _IMAGE_THERMAL = re.compile(
 _ALT_SKU_IN_PARENS = re.compile(r"\(([a-z0-9._-]+)\)\s*$", re.IGNORECASE)
 _SA_CODE = re.compile(r"(?i)^sa\d")
 _THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
+# HVD24ST-3F — thermal is ``ST`` before ``-{nm}F`` (not a trailing -T).
+_THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)st-\d+f$")
 
 
 def sku_code_is_thermal(sku_code: str | None) -> bool:
-    """True when the Hoocon article is a thermal edition (``DST`` / ``-T`` suffix).
+    """True when the Hoocon article is a thermal edition.
+
+    Recognizes ``DST`` / ``-T`` suffixes and HVD-…F ``ST`` editions
+    (``HVD24ST-3F``).
 
     Args:
-        sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``).
+        sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``, ``HVD230ST-5F``).
 
     Returns:
-        True only when the code ends with ``DST`` or ``-T`` (case-insensitive).
+        True for thermal editions only.
     """
-    return bool(_THERMAL_SKU_SUFFIX.search((sku_code or "").casefold()))
+    code = (sku_code or "").casefold().replace(" ", "")
+    if _THERMAL_HVDF.fullmatch(code):
+        return True
+    return bool(_THERMAL_SKU_SUFFIX.search(code))
 
 
 def torque_nm_from_sku_code(sku_code: str) -> int | None:
-    """Extract leading torque (Нм) from a series SKU code, if present.
+    """Extract rated torque (Нм) from a series SKU code, if present.
 
     Args:
-        sku_code: e.g. ``da5fu24-d``, ``DA8MQU230-AS``.
+        sku_code: e.g. ``da5fu24-d``, ``HVA24-5``, ``HVD230ST-5F``.
 
     Returns:
-        Integer Nm or None when the code has no leading series number.
+        Integer Nm or None when the code has no torque number.
     """
     code = (sku_code or "").strip().lower().replace(" ", "")
+    hv = _NM_FROM_HV_SKU.match(code)
+    if hv is not None:
+        return int(hv.group(1))
     match = _NM_FROM_SKU.match(code)
-    if not match:
+    if match is not None:
+        return int(match.group(1))
+    fallback = _NM_FROM_SKU_FALLBACK.match(code)
+    if fallback is None:
         return None
-    return int(match.group(1))
+    return int(fallback.group(1))
 
 
 def _image_thermal_role(alt: str) -> str:
@@ -399,8 +448,10 @@ def _image_thermal_role(alt: str) -> str:
         tagged = paren.group(1)
         if sku_code_is_thermal(tagged):
             return "thermal"
-        # Explicit non-thermal edition tag in alt (…-ds), not bare series.
+        # Explicit non-thermal edition tag in alt (…-ds / HVD…S-…F), not bare series.
         if re.search(r"(?i)(?:-ds|-d)$", tagged) and not sku_code_is_thermal(tagged):
+            return "non_thermal"
+        if re.fullmatch(r"(?i)hvd(?:24|230)s-\d+f", tagged):
             return "non_thermal"
     # Descriptive area shot without thermal wording = non-DST body on SA cards.
     if re.search(r"(?i)площад", text) and not _IMAGE_THERMAL.search(text):

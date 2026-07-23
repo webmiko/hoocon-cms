@@ -11,6 +11,23 @@ Filename conventions (DAFU)::
 SAFU (fire/smoke)::
 
     sa3fu-ds_dst.pdf    → SA3FU …-DS / …-DST (24 В and 230 В)
+
+DAMU / DAMQU (no spring, English manuals)::
+
+    da2mu-a_as.pdf                 → DA2MU …-A / …-AS (24 В and 230 В)
+    da2mu-d_ds.pdf                 → DA2MU …-D / …-DS
+    da4_6mu-a_as.pdf               → DA4MU + DA6MU …-A / …-AS
+    da8_16_24_32mu24-d_ds.pdf      → DA8/16/24/32MU24 …-D / …-DS
+    da8_16_24mqu230-a_as.pdf       → DA8MQU230 …-A / …-AS (…16/24 if present)
+
+SAMU (smoke, no spring)::
+
+    sa10mu-ds_dst.pdf              → SA10MU …-DS / …-DST (24 В and 230 В)
+
+HVD fire/smoke F-series (spring return; not air HVD-5)::
+
+    hvd-3f-s_st.pdf                → HVD24/230 S/ST-3F
+    hvd-5f-s_st.pdf                → HVD24/230 S/ST-5F
 """
 
 from __future__ import annotations
@@ -34,6 +51,19 @@ _MOD_24_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fu24-a[:_\-]as?$")
 _DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
 _SAFU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?:-ds[_-]?dst)?$")
 _SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+# da2mu-a_as | da4_6mu-d_ds | da8_16_24_32mu24-a_as | da8_16_24mqu230-d_ds
+_DAMU_STEM = re.compile(
+    r"(?i)^da(?P<nms>\d+(?:_\d+)*)mu(?P<volt>24|230)?-(?P<kind>a_as|d_ds)$",
+)
+_DAMQU_STEM = re.compile(
+    r"(?i)^da(?P<nms>\d+(?:_\d+)*)mqu(?P<volt>24|230)?-(?P<kind>a_as|d_ds)$",
+)
+_DAMU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)mu(?!q)")
+_DAMQU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)mqu")
+_SAMU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)mu(?:-ds[_-]?dst)?$")
+_SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
+_HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
+_HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -436,5 +466,582 @@ def attach_safu_manuals(
         if dry_run:
             transaction.set_rollback(True)
 
+    summary["warnings"] = warnings
+    return summary
+
+
+def _parse_nm_list(raw: str) -> tuple[int, ...]:
+    """Parse ``8_16_24_32`` → ``(8, 16, 24, 32)``."""
+    return tuple(int(part) for part in raw.split("_") if part.isdigit())
+
+
+def parse_damu_manual_stem(
+    stem: str,
+) -> tuple[tuple[int, ...], str, int | None] | None:
+    """Parse ``da4_6mu-a_as`` / ``da8_16_24_32mu24-d_ds``.
+
+    Returns:
+        ``(nm_tuple, kind, voltage_or_None)`` or None.
+    """
+    clean = normalize_manual_stem(stem)
+    match = _DAMU_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    nms = _parse_nm_list(match.group("nms"))
+    if not nms:
+        return None
+    volt_raw = match.group("volt")
+    volt = int(volt_raw) if volt_raw else None
+    return nms, match.group("kind").casefold(), volt
+
+
+def parse_damqu_manual_stem(
+    stem: str,
+) -> tuple[tuple[int, ...], str, int | None] | None:
+    """Parse ``da5mqu-a_as`` / ``da8_16_24mqu230-d_ds``."""
+    clean = normalize_manual_stem(stem)
+    match = _DAMQU_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    nms = _parse_nm_list(match.group("nms"))
+    if not nms:
+        return None
+    volt_raw = match.group("volt")
+    volt = int(volt_raw) if volt_raw else None
+    return nms, match.group("kind").casefold(), volt
+
+
+def _sku_matches_control_kind(compact: str, kind: str) -> bool:
+    """Return True when SKU suffix matches ``a_as`` or ``d_ds``."""
+    if kind == "a_as":
+        return compact.endswith("-as") or compact.endswith("-a")
+    if kind == "d_ds":
+        return compact.endswith("-ds") or compact.endswith("-d")
+    return False
+
+
+def _sku_matches_voltage(compact: str, voltage: int | None) -> bool:
+    """Filter by embedded voltage token when the manual is voltage-specific."""
+    if voltage is None:
+        return True
+    return f"{voltage}-" in compact
+
+
+def sku_codes_for_damu_manual(
+    nms: tuple[int, ...],
+    kind: str,
+    voltage: int | None,
+    sku_codes: list[str],
+) -> list[str]:
+    """Filter DA..MU SKU codes covered by one English manual PDF."""
+    wanted = set(nms)
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _DAMU_CODE.match(compact)
+        if match is None or int(match.group("nm")) not in wanted:
+            continue
+        if not _sku_matches_control_kind(compact, kind):
+            continue
+        if not _sku_matches_voltage(compact, voltage):
+            continue
+        out.append(code)
+    return out
+
+
+def sku_codes_for_damqu_manual(
+    nms: tuple[int, ...],
+    kind: str,
+    voltage: int | None,
+    sku_codes: list[str],
+) -> list[str]:
+    """Filter DA..MQU SKU codes covered by one English manual PDF."""
+    wanted = set(nms)
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _DAMQU_CODE.match(compact)
+        if match is None or int(match.group("nm")) not in wanted:
+            continue
+        if not _sku_matches_control_kind(compact, kind):
+            continue
+        if not _sku_matches_voltage(compact, voltage):
+            continue
+        out.append(code)
+    return out
+
+
+def _damu_family_title(nms: tuple[int, ...], kind: str, voltage: int | None) -> str:
+    """Human title for a DAMU ProductFile row."""
+    nm_label = "/".join(str(n) for n in nms)
+    ctrl = "A/AS" if kind == "a_as" else "D/DS"
+    if voltage is None:
+        return f"Инструкция DA{nm_label}MU ({ctrl})"
+    return f"Инструкция DA{nm_label}MU{voltage} ({ctrl})"
+
+
+def _damqu_family_title(nms: tuple[int, ...], kind: str, voltage: int | None) -> str:
+    """Human title for a DAMQU ProductFile row."""
+    nm_label = "/".join(str(n) for n in nms)
+    ctrl = "A/AS" if kind == "a_as" else "D/DS"
+    if voltage is None:
+        return f"Инструкция DA{nm_label}MQU ({ctrl})"
+    return f"Инструкция DA{nm_label}MQU{voltage} ({ctrl})"
+
+
+def discover_damu_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan ``manuals_dir`` for DAMU English PDFs and map them to SKU codes."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^da[0-9]+mu")
+            .exclude(sku_code__iregex=r"(?i)^da[0-9]+mqu")
+            .values_list("sku_code", flat=True),
+        )
+    matches: list[ManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+
+    for path in sorted(manuals_dir.glob("*.pdf")):
+        parsed = parse_damu_manual_stem(path.name)
+        if parsed is None:
+            continue
+        nms, kind, volt = parsed
+        codes = sku_codes_for_damu_manual(nms, kind, volt, sku_codes)
+        if not codes:
+            warnings.append(
+                f"no SKU for {path.name!r} (nms={nms} kind={kind} volt={volt})",
+            )
+            continue
+        matches.append(
+            ManualMatch(
+                path=path,
+                torque_nm=nms[0],
+                kind=f"damu_{kind}" + (f"_{volt}" if volt else ""),
+                sku_codes=tuple(codes),
+            ),
+        )
+    return matches, warnings
+
+
+def discover_damqu_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan ``manuals_dir`` for DAMQU English PDFs and map them to SKU codes."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^da[0-9]+mqu").values_list(
+                "sku_code",
+                flat=True,
+            ),
+        )
+    matches: list[ManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+
+    for path in sorted(manuals_dir.glob("*.pdf")):
+        parsed = parse_damqu_manual_stem(path.name)
+        if parsed is None:
+            continue
+        nms, kind, volt = parsed
+        codes = sku_codes_for_damqu_manual(nms, kind, volt, sku_codes)
+        if not codes:
+            warnings.append(
+                f"no SKU for {path.name!r} (mqu nms={nms} kind={kind} volt={volt})",
+            )
+            continue
+        matches.append(
+            ManualMatch(
+                path=path,
+                torque_nm=nms[0],
+                kind=f"damqu_{kind}" + (f"_{volt}" if volt else ""),
+                sku_codes=tuple(codes),
+            ),
+        )
+    return matches, warnings
+
+
+def _attach_matches(
+    matches: list[ManualMatch],
+    warnings: list[str],
+    *,
+    dry_run: bool,
+) -> dict[str, Any]:
+    """Shared ProductFile upsert for DAMU/DAMQU manual matches."""
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": list(warnings),
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+
+    code_to_sku = {
+        s.sku_code.casefold(): s
+        for s in SKU.objects.filter(
+            sku_code__in=[c for m in matches for c in m.sku_codes],
+        )
+    }
+
+    with transaction.atomic():
+        for match in matches:
+            payload = match.path.read_bytes()
+            parsed_damu = parse_damu_manual_stem(match.path.name)
+            parsed_damqu = parse_damqu_manual_stem(match.path.name)
+            if parsed_damu is not None:
+                nms, kind, volt = parsed_damu
+                title = _damu_family_title(nms, kind, volt)
+            elif parsed_damqu is not None:
+                nms, kind, volt = parsed_damqu
+                title = _damqu_family_title(nms, kind, volt)
+            else:
+                title = f"Инструкция ({match.kind})"
+            # Fallback attach keeps 230 title semantics but labels 24 V SKUs clearly.
+            if match.kind.endswith("_fallback"):
+                title = "Инструкция DA8/16/24MQU (D/DS)"
+            basename = _storage_basename(match.path)
+            for code in match.sku_codes:
+                sku = code_to_sku.get(code.casefold())
+                if sku is None:
+                    summary["warnings"].append(f"SKU missing in DB: {code}")
+                    continue
+                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                if dry_run:
+                    summary["by_sku"].setdefault(code, []).append(title)
+                    if existing is None:
+                        summary["created"] += 1
+                    else:
+                        summary["updated"] += 1
+                    continue
+                if existing is None:
+                    pf = ProductFile(
+                        sku=sku,
+                        title=title,
+                        file_type=ProductFile.FileType.DATASHEET,
+                        is_published=True,
+                        sort_order=0,
+                    )
+                    pf.file.save(basename, ContentFile(payload), save=True)
+                    summary["created"] += 1
+                    logger.info(
+                        "manual_pdf_attached sku=%s title=%s",
+                        sku.sku_code,
+                        title,
+                    )
+                else:
+                    current_size = existing.file.size if existing.file else 0
+                    if current_size != len(payload):
+                        existing.file.save(basename, ContentFile(payload), save=True)
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+                summary["by_sku"].setdefault(code, []).append(title)
+        if dry_run:
+            transaction.set_rollback(True)
+    return summary
+
+
+def attach_damu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for DAMU SKUs from English PDFs."""
+    matches, warnings = discover_damu_manuals(manuals_dir)
+    return _attach_matches(matches, warnings, dry_run=dry_run)
+
+
+def attach_damqu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for DAMQU SKUs from English PDFs."""
+    matches, warnings = discover_damqu_manuals(manuals_dir)
+
+    # No da8_16_24mqu24-d_ds.pdf — reuse 230 V D/DS for catalog DA8MQU24-D/DS.
+    covered = {c.casefold() for m in matches for c in m.sku_codes}
+    sku_codes = list(
+        SKU.objects.filter(sku_code__iregex=r"(?i)^da[0-9]+mqu").values_list(
+            "sku_code",
+            flat=True,
+        ),
+    )
+    missing_24_d = [
+        c for c in sku_codes_for_damqu_manual((8, 16, 24), "d_ds", 24, sku_codes) if c.casefold() not in covered
+    ]
+    fallback = manuals_dir / "da8_16_24mqu230-d_ds.pdf"
+    if missing_24_d and fallback.is_file():
+        matches.append(
+            ManualMatch(
+                path=fallback,
+                torque_nm=8,
+                kind="damqu_d_ds_24_fallback",
+                sku_codes=tuple(missing_24_d),
+            ),
+        )
+        warnings.append(
+            f"DAMQU24 D/DS: fallback PDF {fallback.name} → {missing_24_d}",
+        )
+
+    return _attach_matches(matches, warnings, dry_run=dry_run)
+
+
+def parse_samu_manual_stem(stem: str) -> int | None:
+    """Parse ``sa10mu-ds_dst`` → ``10``."""
+    clean = normalize_manual_stem(stem)
+    match = _SAMU_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    return int(match.group("nm"))
+
+
+def sku_codes_for_samu_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
+    """Filter SA..MU DS/DST SKU codes for one manual."""
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _SAMU_CODE.match(compact)
+        if match is None or int(match.group("nm")) != torque_nm:
+            continue
+        if compact.endswith("-ds") or compact.endswith("-dst"):
+            out.append(code)
+    return out
+
+
+def discover_samu_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan ``manuals_dir`` for SAMU English PDFs."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^sa[0-9]+mu").values_list(
+                "sku_code",
+                flat=True,
+            ),
+        )
+    matches: list[ManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+    for path in sorted(manuals_dir.glob("*.pdf")):
+        torque_nm = parse_samu_manual_stem(path.name)
+        if torque_nm is None:
+            continue
+        codes = sku_codes_for_samu_manual(torque_nm, sku_codes)
+        if not codes:
+            warnings.append(f"no SKU for {path.name!r} (nm={torque_nm} samu)")
+            continue
+        matches.append(
+            ManualMatch(
+                path=path,
+                torque_nm=torque_nm,
+                kind="samu_ds_dst",
+                sku_codes=tuple(codes),
+            ),
+        )
+    return matches, warnings
+
+
+def attach_samu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for SAMU SKUs."""
+    matches, warnings = discover_samu_manuals(manuals_dir)
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": warnings,
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+    code_to_sku = {
+        s.sku_code.casefold(): s
+        for s in SKU.objects.filter(
+            sku_code__in=[c for m in matches for c in m.sku_codes],
+        )
+    }
+    with transaction.atomic():
+        for match in matches:
+            payload = match.path.read_bytes()
+            title = f"Инструкция SA{match.torque_nm}MU (DS/DST)"
+            basename = _storage_basename(match.path)
+            for code in match.sku_codes:
+                sku = code_to_sku.get(code.casefold())
+                if sku is None:
+                    warnings.append(f"SKU missing in DB: {code}")
+                    continue
+                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                if dry_run:
+                    summary["by_sku"].setdefault(code, []).append(title)
+                    summary["created" if existing is None else "updated"] += 1
+                    continue
+                if existing is None:
+                    pf = ProductFile(
+                        sku=sku,
+                        title=title,
+                        file_type=ProductFile.FileType.DATASHEET,
+                        is_published=True,
+                        sort_order=0,
+                    )
+                    pf.file.save(basename, ContentFile(payload), save=True)
+                    summary["created"] += 1
+                else:
+                    current_size = existing.file.size if existing.file else 0
+                    if current_size != len(payload):
+                        existing.file.save(basename, ContentFile(payload), save=True)
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+                summary["by_sku"].setdefault(code, []).append(title)
+        if dry_run:
+            transaction.set_rollback(True)
+    summary["warnings"] = warnings
+    return summary
+
+
+def parse_hvd_f_manual_stem(stem: str) -> int | None:
+    """Parse ``hvd-5f-s_st`` → ``5``."""
+    clean = normalize_manual_stem(stem)
+    match = _HVD_F_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    return int(match.group("nm"))
+
+
+def sku_codes_for_hvd_f_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
+    """Map HVD *F manuals onto catalog ``HVD*S-{nm}F`` / ``HVD*ST-{nm}F`` only."""
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _HVD_F_CODE.fullmatch(compact)
+        if match is None:
+            continue
+        if int(match.group("nm")) == torque_nm:
+            out.append(code)
+    return out
+
+
+def discover_hvd_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan for HVD *F English PDFs and map to HVD-…F catalog SKUs."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^hvd(24|230)st?-\d+f$").values_list(
+                "sku_code",
+                flat=True,
+            ),
+        )
+    matches: list[ManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+    for path in sorted(manuals_dir.glob("hvd-*.pdf")):
+        torque_nm = parse_hvd_f_manual_stem(path.name)
+        if torque_nm is None:
+            warnings.append(f"unrecognized HVD filename: {path.name!r}")
+            continue
+        codes = sku_codes_for_hvd_f_manual(torque_nm, sku_codes)
+        if not codes:
+            warnings.append(
+                f"no catalog SKU for {path.name!r} (expected HVD*S-{torque_nm}F / HVD*ST-{torque_nm}F)",
+            )
+            continue
+        matches.append(
+            ManualMatch(
+                path=path,
+                torque_nm=torque_nm,
+                kind="hvd_f_s_st",
+                sku_codes=tuple(codes),
+            ),
+        )
+    return matches, warnings
+
+
+def attach_hvd_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for matching HVD SKUs."""
+    matches, warnings = discover_hvd_manuals(manuals_dir)
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": warnings,
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+    code_to_sku = {
+        s.sku_code.casefold(): s
+        for s in SKU.objects.filter(
+            sku_code__in=[c for m in matches for c in m.sku_codes],
+        )
+    }
+    with transaction.atomic():
+        for match in matches:
+            payload = match.path.read_bytes()
+            title = f"Инструкция HVD-{match.torque_nm}F (S/ST)"
+            basename = _storage_basename(match.path)
+            for code in match.sku_codes:
+                sku = code_to_sku.get(code.casefold())
+                if sku is None:
+                    warnings.append(f"SKU missing in DB: {code}")
+                    continue
+                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                if dry_run:
+                    summary["by_sku"].setdefault(code, []).append(title)
+                    summary["created" if existing is None else "updated"] += 1
+                    continue
+                if existing is None:
+                    pf = ProductFile(
+                        sku=sku,
+                        title=title,
+                        file_type=ProductFile.FileType.DATASHEET,
+                        is_published=True,
+                        sort_order=0,
+                    )
+                    pf.file.save(basename, ContentFile(payload), save=True)
+                    summary["created"] += 1
+                else:
+                    current_size = existing.file.size if existing.file else 0
+                    if current_size != len(payload):
+                        existing.file.save(basename, ContentFile(payload), save=True)
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+                summary["by_sku"].setdefault(code, []).append(title)
+        if dry_run:
+            transaction.set_rollback(True)
     summary["warnings"] = warnings
     return summary

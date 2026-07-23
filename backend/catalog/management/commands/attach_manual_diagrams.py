@@ -1,11 +1,11 @@
-"""Attach wiring + dimensions diagrams from DAFU / SAFU instruction PDFs.
+"""Attach wiring + dimensions diagrams from manuals / HVA catalog.
 
 Unpublishes legacy Tilda «Размеры и способ подключения» gallery shots (DAFU).
 
 Usage::
 
     poetry run python manage.py attach_manual_diagrams
-    poetry run python manage.py attach_manual_diagrams --series safu
+    poetry run python manage.py attach_manual_diagrams --series hva
     poetry run python manage.py attach_manual_diagrams --dry-run
 """
 
@@ -15,11 +15,18 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from catalog.etl.manual_diagrams import apply_manual_diagrams, apply_safu_manual_diagrams
+from catalog.etl.manual_diagrams import (
+    apply_damu_manual_diagrams,
+    apply_hva_manual_diagrams,
+    apply_hvdf_manual_diagrams,
+    apply_manual_diagrams,
+    apply_safu_manual_diagrams,
+    apply_samu_manual_diagrams,
+)
 
 
 class Command(BaseCommand):
-    """Crop PDF diagrams and attach them to matching DAFU/SAFU SKU galleries."""
+    """Crop PDF diagrams and attach them to matching DAFU/SAFU/DAMU SKU galleries."""
 
     help = "Attach wiring/dimensions diagrams from manuals to product galleries."
 
@@ -32,7 +39,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--series",
-            choices=("all", "dafu", "safu"),
+            choices=("all", "dafu", "safu", "damu", "samu", "hvdf", "hva"),
             default="all",
             help="Which series diagrams to attach (default: all).",
         )
@@ -48,6 +55,14 @@ class Command(BaseCommand):
             jobs.append(("DAFU", apply_manual_diagrams(dry_run=dry_run)))
         if series in {"all", "safu"}:
             jobs.append(("SAFU", apply_safu_manual_diagrams(dry_run=dry_run)))
+        if series in {"all", "damu"}:
+            jobs.append(("DAMU", apply_damu_manual_diagrams(dry_run=dry_run)))
+        if series in {"all", "samu"}:
+            jobs.append(("SAMU", apply_samu_manual_diagrams(dry_run=dry_run)))
+        if series in {"all", "hvdf"}:
+            jobs.append(("HVDF", apply_hvdf_manual_diagrams(dry_run=dry_run)))
+        if series in {"all", "hva"}:
+            jobs.append(("HVA", apply_hva_manual_diagrams(dry_run=dry_run)))
 
         for label, summary in jobs:
             for series_key, stats in sorted(summary["series"].items()):

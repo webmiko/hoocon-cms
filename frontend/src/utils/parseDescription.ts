@@ -85,12 +85,42 @@ const WEAK_CONNECTIVE_RE = new RegExp(
   "i",
 );
 
+/**
+ * Incomplete colon-titles ending with a preposition (``… при:``, ``… для:``).
+ * These introduce following bullets and must not become h3.
+ */
+const CONNECTIVE_PREPOSITION_END_RE =
+  /(?:^|[\s(])(при|для|в|во|на|по|к|ко|от|со|об|обо|из|через|между|над|под|перед|после)$/iu;
+
+/** Mid-line ``Title: rest`` — new topic, not a fragment under ``при:``. */
+const NEW_TOPIC_BULLET_RE = /^[^:]{2,60}:\s+\S/;
+
 /** Numbered marketing feature ``1. Крутящий момент`` (not ``1.1`` nested). */
 const NUMBERED_FEATURE_RE = /^\d+\.\s+(?!\d).{2,80}$/;
 
 /** Normalize a title line for regex matching (drop colon / emoji). */
 function cleanTitle(line: string): string {
   return line.replace(TITLE_DECOR_RE, "").replace(/:$/, "").trim();
+}
+
+/**
+ * True when a colon-title is an unfinished lead (weak connective / ends with prep).
+ */
+export function isWeakConnectiveTitle(title: string): boolean {
+  const cleaned = cleanTitle(title);
+  if (!cleaned) return false;
+  if (WEAK_CONNECTIVE_RE.test(cleaned)) return true;
+  return CONNECTIVE_PREPOSITION_END_RE.test(cleaned);
+}
+
+/**
+ * Merge ``Срабатывание … при`` + ``Отключении питания.`` → one list item.
+ */
+export function mergeConnectiveStem(stem: string, item: string): string {
+  const body = item.trim();
+  if (!body) return stem.trim();
+  const joined = body.replace(/^([А-ЯЁA-Z])/, (ch) => ch.toLocaleLowerCase("ru-RU"));
+  return `${stem.trim()} ${joined}`.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -139,7 +169,7 @@ export function isListItemContinuation(
 export function parseInstructions(raw: string): DescriptionBlock[] {
   const leveled = parseDescription(raw).map((block) => {
     if (block.type === "section") {
-      if (WEAK_CONNECTIVE_RE.test(cleanTitle(block.title))) {
+      if (isWeakConnectiveTitle(block.title)) {
         return { type: "paragraph" as const, text: block.title };
       }
       return { ...block, level: instructionHeadingLevel(block.title) ?? 3 };
@@ -226,7 +256,7 @@ export function numberInstructionSubsections(
 export function descriptionHeadingLevel(line: string): InstructionSectionLevel | null {
   const cleaned = cleanTitle(line);
   if (!cleaned || BULLET_RE.test(cleaned)) return null;
-  if (WEAK_CONNECTIVE_RE.test(cleaned)) return null;
+  if (isWeakConnectiveTitle(cleaned)) return null;
   if (INSTRUCTION_NESTED_RE.test(cleaned)) return 4;
   if (NUMBERED_FEATURE_RE.test(cleaned)) return 3;
   if (SECTION_BARE_RE.test(cleaned)) return 2;
@@ -305,6 +335,8 @@ export function parseDescription(raw: string): DescriptionBlock[] {
   const blocks: DescriptionBlock[] = [];
   let paragraphBuf: string[] = [];
   let listBuf: string[] = [];
+  /** Open ``… при:`` stem — following bullets merge into full list items. */
+  let connectiveStem: string | null = null;
   const seen = new Set<string>();
 
   const lineKey = (line: string) =>
@@ -335,12 +367,20 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     if (!listBuf.length) return;
     const items = listBuf.filter((item) => remember(item));
     listBuf = [];
+    connectiveStem = null;
     if (!items.length) return;
     blocks.push({ type: "list", items });
   };
 
+  const flushUnusedStem = () => {
+    if (!connectiveStem) return;
+    paragraphBuf.push(connectiveStem);
+    connectiveStem = null;
+  };
+
   const pushSection = (title: string) => {
     flushList();
+    flushUnusedStem();
     flushParagraph();
     const cleaned = cleanTitle(title);
     if (remember(cleaned)) {
@@ -352,6 +392,7 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     const line = rawLine.replace(/\u200b/g, "").trim();
     if (!line) {
       flushList();
+      flushUnusedStem();
       flushParagraph();
       continue;
     }
@@ -369,7 +410,17 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     // Bullets before section titles — «– Убедитесь…:» is a list item, not h2.
     if (BULLET_RE.test(line)) {
       flushParagraph();
-      listBuf.push(line.replace(BULLET_RE, "").trim());
+      const item = line.replace(BULLET_RE, "").trim();
+      if (connectiveStem && NEW_TOPIC_BULLET_RE.test(item)) {
+        flushList();
+        listBuf.push(item);
+        continue;
+      }
+      if (connectiveStem) {
+        listBuf.push(mergeConnectiveStem(connectiveStem, item));
+        continue;
+      }
+      listBuf.push(item);
       continue;
     }
 
@@ -377,6 +428,7 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     // the following description line when the source omits a blank line.
     if (INSTRUCTION_INTRO_RE.test(line)) {
       flushList();
+      flushUnusedStem();
       flushParagraph();
       if (remember(line)) {
         blocks.push({ type: "paragraph", text: line });
@@ -386,6 +438,15 @@ export function parseDescription(raw: string): DescriptionBlock[] {
 
     const section = line.match(SECTION_RE);
     if (section) {
+      if (isWeakConnectiveTitle(section[1])) {
+        flushParagraph();
+        // Keep an open stem for the following ``–`` fragments.
+        if (listBuf.length > 0) {
+          flushList();
+        }
+        connectiveStem = cleanTitle(section[1]);
+        continue;
+      }
       pushSection(section[1]);
       continue;
     }
@@ -397,10 +458,12 @@ export function parseDescription(raw: string): DescriptionBlock[] {
     }
 
     flushList();
+    flushUnusedStem();
     paragraphBuf.push(line);
   }
 
   flushList();
+  flushUnusedStem();
   flushParagraph();
   return blocks;
 }

@@ -175,25 +175,34 @@ def format_sku_heading_name(
             body,
             flags=re.IGNORECASE,
         ).strip()
-        body = _strip_control_tail(body)
     else:
         body = _HEADING_EDITION_TRAILER.sub("", text).strip()
         body = _HEADING_VALVE_TRAILER.sub("", body).strip()
-        body = _strip_control_tail(body)
 
     article = _heading_article(sku_code, code)
-    # Drop accidental article echo inside body.
+    # Drop edition echo inside body (``(HVA230-5)`` or bare code) *before*
+    # stripping the control-type tail — otherwise ``…управление (HVA230-5)``
+    # leaves empty ``()`` after the code is removed.
     if article and body:
+        body = re.sub(
+            rf"\s*\(\s*{re.escape(article)}\s*\)",
+            "",
+            body,
+            flags=re.IGNORECASE,
+        )
         body = re.sub(
             re.escape(article),
             "",
             body,
             flags=re.IGNORECASE,
         ).strip(" |-–—")
+    body = _strip_control_tail(body)
+    body = re.sub(r"\(\s*\)", "", body)
 
     # Torque belongs in highlights — never echo «N Нм» in the display title.
+    # Also drop a preceding comma from canon titles like «…пружины, 2 Нм».
     body = re.sub(
-        r"(?:^|\s)\d+[.,]?\d*\s*нм\b",
+        r"(?:,\s*|\s+|^)\d+[.,]?\d*\s*нм\b",
         "",
         body,
         flags=re.IGNORECASE,
@@ -203,7 +212,7 @@ def format_sku_heading_name(
         body,
     )
     body = _HEADING_PRIVOD_TO_ELEKTRO.sub("Электропривод", body, count=1)
-    body = " ".join(body.split()).strip(" |-–—")
+    body = " ".join(body.split()).strip(" |-–—,")
 
     kvs_val = " ".join((kvs or "").split())
     if kvs_val and body and "kvs" not in body.casefold():

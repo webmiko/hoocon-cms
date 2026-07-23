@@ -372,11 +372,13 @@ def test_category_list_includes_preview_image(client) -> None:
     from catalog.models import ProductImage
 
     seed = _seed_catalog()
-    png = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
-        b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    from io import BytesIO
+
+    from PIL import Image
+
+    _buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 40, 40)).save(_buf, format="PNG")
+    png = _buf.getvalue()
     ProductImage.objects.create(
         sku=seed["sku"],
         image=SimpleUploadedFile("t.png", png, content_type="image/png"),
@@ -395,15 +397,16 @@ def test_category_list_includes_preview_image(client) -> None:
 @pytest.mark.django_db
 def test_ball_valves_category_prefers_dn40_preview(client) -> None:
     """Homepage tile for шаровые краны uses DN 40 (BV240), not the first DN 15."""
+    from io import BytesIO
+
     from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
 
     from catalog.models import SKU, Category, Product, ProductImage
 
-    png = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
-        b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    _buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 40, 40)).save(_buf, format="PNG")
+    png = _buf.getvalue()
     cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
     product = Product.objects.create(name="BV", slug="bv-series", category=cat)
     sku_dn15 = SKU.objects.create(

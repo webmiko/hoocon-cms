@@ -572,18 +572,44 @@ def ensure_safety_in_instructions(instructions: str, safety: str) -> str:
     return f"{notice}\n\n{body}".strip()
 
 
+def _analogs_edition_needles(sku_code: str) -> tuple[str, ...]:
+    """Compact edition tokens for matching analog headers.
+
+    Keeps voltage + control letter so ``DA4MU24-A`` does not pick ``…24-D/DS``
+    blocks. ``-DS`` / ``-AS`` also match slash headers like ``DA4MU24-D/DS``.
+    """
+    raw = (sku_code or "").strip().casefold()
+    if not raw:
+        return ()
+    compact = re.sub(r"[\s_\-]+", "", raw)
+    needles = [compact]
+    # Header ``DA4MU24-D/DS`` → blob ``da4mu24dds``; SKU ``…-DS`` → ``da4mu24ds``.
+    if compact.endswith("dst"):
+        needles.append(compact[:-3] + "ds")
+        needles.append(compact[:-3] + "d")
+    elif compact.endswith("ds"):
+        needles.append(compact[:-1])  # …d
+    elif compact.endswith("as"):
+        needles.append(compact[:-1])  # …a
+    elif compact.endswith("t") and len(compact) > 1:
+        needles.append(compact[:-1])
+    # Unique, longest first so ``da4mu24ds`` is tried before ``da4mu24d``.
+    return tuple(sorted(dict.fromkeys(needles), key=len, reverse=True))
+
+
 def filter_analogs_for_sku(text: str, sku_code: str) -> str:
     """Keep analog blocks that mention this SKU edition.
 
-    Tilda pages list analogs per edition (``DA3FU230-DS``, ``DA3FU24-DS``).
-    When no edition marker matches, return the full text unchanged.
+    Tilda pages list analogs per edition (``DA3FU230-DS``, ``DA3FU24-DS``,
+    ``Аналоги для DA4MU24-A/AS``, or ``Для Hoocon DA2MU230-DS/…``). When no
+    edition marker matches, return the full text unchanged.
 
     Args:
         text: Full «Аналоги» tab text.
         sku_code: Edition code, e.g. ``da3fu230-ds``.
 
     Returns:
-        Filtered plain text.
+        Filtered plain text (one edition + shared footnotes).
     """
     if not text or not text.strip():
         return ""
@@ -591,33 +617,55 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
     if not code:
         return text.strip()
 
-    # Match by series+voltage core so ``da3fu230-d`` picks ``DA3FU230-DS`` blocks.
-    raw = code.casefold()
-    core = re.sub(r"-(?:ds|as|dst|d|a|t)$", "", raw)
-    needle = re.sub(r"[\s_\-]+", "", core or raw)
-    if not needle:
+    needles = _analogs_edition_needles(code)
+    if not needles:
         return text.strip()
 
     lines = text.replace("\xa0", " ").splitlines()
     blocks: list[list[str]] = [[]]
     header_re = re.compile(
-        r"(?i)^(основные характеристики|аналоги привода|важные параметры)\b"
+        r"(?i)^(основные характеристики|аналоги привода|аналоги для|важные параметры)\b"
+        r"|^для\s+(?:hoocon\s+)?[a-z]{2,}\d"
         r"|^[A-Z]{2,}\d+[A-Z]*\d*(?:-|\s|$)",
     )
+    shared_re = re.compile(
+        r"(?i)^(основные характеристики аналогов|важно)\b",
+    )
+    # Series-wide blurb after edition lists — not SKU-specific.
+    drop_re = re.compile(r"(?i)^все перечисленные модели\b")
     for line in lines:
         stripped = line.strip()
-        starts = bool(header_re.search(stripped))
+        starts = bool(header_re.search(stripped)) or bool(shared_re.match(stripped)) or bool(drop_re.match(stripped))
         if starts and blocks[-1] and any(x.strip() for x in blocks[-1]):
             blocks.append([])
         blocks[-1].append(line)
 
     matched: list[str] = []
+    preamble: list[str] = []
+    shared: list[str] = []
+    saw_edition = False
     for block in blocks:
-        blob = re.sub(r"[\s_\-]+", "", "\n".join(block).casefold())
-        if needle in blob:
+        # Strip slash so ``DA4MU24-D/DS`` → ``da4mu24dds``.
+        blob = re.sub(r"[\s_\-/]+", "", "\n".join(block).casefold())
+        first = next((ln.strip() for ln in block if ln.strip()), "")
+        if drop_re.match(first):
+            continue
+        if shared_re.match(first):
+            shared.extend(block)
+            shared.append("")
+            continue
+        if any(needle in blob for needle in needles):
+            saw_edition = True
             matched.extend(block)
             matched.append("")
+            continue
+        # Intro before the first edition header (title without SKU codes).
+        if not saw_edition and not header_re.match(first):
+            preamble.extend(block)
+            preamble.append("")
 
-    if matched:
-        return dedupe_description_lines("\n".join(matched).strip())
-    return text.strip()
+    if not matched:
+        return text.strip()
+
+    out_lines = [*preamble, *matched, *shared]
+    return dedupe_description_lines("\n".join(out_lines).strip())

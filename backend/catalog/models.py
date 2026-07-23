@@ -35,7 +35,9 @@ def product_file_upload_to(instance: ProductFile, filename: str) -> str:
 
 def product_image_upload_to(instance: ProductImage, filename: str) -> str:
     """Store under product_images/<sku_id>/<uuid>_<safe_basename>.webp."""
-    safe = sanitize_upload_filename(filename)
+    from catalog.etl.webp import webp_upload_basename
+
+    safe = webp_upload_basename(sanitize_upload_filename(filename))
     sku_part = instance.sku_id if instance.sku_id is not None else "pending"
     return f"product_images/{sku_part}/{uuid.uuid4().hex}_{safe}"
 
@@ -503,3 +505,11 @@ class ProductImage(models.Model):
             if name:
                 sanitize_upload_filename(name)
             validate_image_upload(self.image)
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist row; re-encode JPEG/PNG uploads to WebP first."""
+        from catalog.etl.webp import ensure_field_file_webp
+
+        if self.image:
+            ensure_field_file_webp(self.image)
+        super().save(*args, **kwargs)  # type: ignore[arg-type]

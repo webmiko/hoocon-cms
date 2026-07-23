@@ -8,11 +8,18 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from catalog.etl.sa_gallery import prune_sa_cross_edition_images
 from catalog.models import SKU, Category, Product, ProductImage
 
-_PNG = (
-    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
-    b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
-)
+
+def _png_bytes(size: tuple[int, int] = (8, 8)) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", size, color=(200, 40, 40)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+_PNG = _png_bytes()
 
 
 @pytest.mark.django_db

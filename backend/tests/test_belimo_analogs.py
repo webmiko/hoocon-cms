@@ -308,11 +308,14 @@ def test_sku_attr_map_keeps_first_slug_value() -> None:
 
 
 def test_sku_code_is_thermal_suffix_only() -> None:
-    """Thermal detection requires DST / -T at the end, not a mid-string match."""
+    """Thermal detection requires DST / -T / HVD…ST-…F, not a mid-string match."""
     assert sku_code_is_thermal("SA5FU24-DST") is True
     assert sku_code_is_thermal("sa5fu24-dst") is True
     assert sku_code_is_thermal("BF24-T") is True
     assert sku_code_is_thermal("SA5FU24DST") is True
+    assert sku_code_is_thermal("HVD24ST-3F") is True
+    assert sku_code_is_thermal("HVD230ST-5F") is True
+    assert sku_code_is_thermal("HVD24S-3F") is False
     assert sku_code_is_thermal("DSTXXX") is False
     assert sku_code_is_thermal("XDSTX") is False
     assert sku_code_is_thermal("SA5FU24") is False

@@ -11,11 +11,13 @@ from catalog.etl.manual_diagrams import (
     crop_safu_diagrams,
     edition_for_sku,
     parse_dafu_series_nm,
+    parse_hva_series,
     parse_safu_series_nm,
     pdf_source_series_nm,
     relabel_diagram_crops,
     safu_pdf_source_series_nm,
     source_url_for,
+    source_url_for_hva,
     source_url_for_safu,
 )
 
@@ -95,3 +97,70 @@ def test_crop_safu_uses_right_column() -> None:
     assert dims.size[0] == wiring.size[0]
     assert wiring.size[1] > 0
     assert dims.size[1] > wiring.size[1]
+
+
+def test_crop_damu_skips_black_section_titles() -> None:
+    """Wiring/dimensions crops exclude black title bars and stay between them."""
+    from catalog.etl.manual_diagrams import crop_damu_diagrams
+
+    width, height = 2000, 1600
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    # Three black section titles in the right column.
+    for y0, y1 in ((160, 200), (560, 600), (1100, 1140)):
+        for y in range(y0, y1):
+            for x in range(int(width * 0.48), width):
+                page.putpixel((x, y), (0, 0, 0))
+    # Mark content pixels just below first and second bars.
+    page.putpixel((int(width * 0.7), 220), (12, 34, 56))
+    page.putpixel((int(width * 0.7), 620), (78, 90, 12))
+
+    wiring, dims = crop_damu_diagrams(page)
+    assert wiring.size[0] < width * 0.6
+    assert dims.size[0] == wiring.size[0]
+    wire_colors = set(wiring.getdata())
+    dim_colors = set(dims.getdata())
+    assert (12, 34, 56) in wire_colors
+    assert (78, 90, 12) in dim_colors
+    assert (0, 0, 0) not in wire_colors
+    assert (0, 0, 0) not in dim_colors
+
+
+def test_patch_damu_wiring_labels_ru_replaces_english_titles() -> None:
+    """Title ink spans are wiped and redrawn as Belimo RU glossary terms."""
+    from catalog.etl.manual_diagrams import (
+        _WIRING_LABEL_ACTUATOR_RU,
+        _WIRING_LABEL_AUX_RU,
+        patch_damu_wiring_labels_ru,
+    )
+
+    width, height = 1300, 400
+    image = Image.new("RGB", (width, height), color=(255, 255, 255))
+    # Synthetic title bars sized like PDF "Actuator" (~98px) and
+    # "Auxiliary switch" (~176px) at render scale 3.
+    actuator_box = (474, 46, 572, 64)
+    aux_box = (908, 39, 1084, 64)
+    for box in (actuator_box, aux_box):
+        for y in range(box[1], box[3]):
+            for x in range(box[0], box[2]):
+                image.putpixel((x, y), (20, 20, 20))
+
+    patched = patch_damu_wiring_labels_ru(image)
+    assert patched.size == image.size
+    # Original solid bars must not remain as continuous black rectangles.
+    for box in (actuator_box, aux_box):
+        crop = patched.crop(box)
+        dark = sum(1 for px in crop.getdata() if sum(px) // 3 < 40)
+        assert dark < (box[2] - box[0]) * (box[3] - box[1]) * 0.5
+    title_band = patched.crop((0, int(0.08 * height), width, int(0.18 * height)))
+    assert sum(1 for px in title_band.getdata() if sum(px) // 3 < 80) > 40
+    assert _WIRING_LABEL_ACTUATOR_RU == "Привод"
+    assert _WIRING_LABEL_AUX_RU == "Вспомогательный переключатель"
+
+
+def test_parse_hva_series_and_source_url() -> None:
+    assert parse_hva_series("HVA24-5") == (5, False)
+    assert parse_hva_series("HVA230S-5Q") == (5, True)
+    assert parse_hva_series("HVA24-5QX") == (5, True)
+    assert parse_hva_series("da5fu24-ds") is None
+    assert "hva5-dimensions" in source_url_for_hva(5, fast=False, kind="dimensions")
+    assert "hva5q-dimensions" in source_url_for_hva(5, fast=True, kind="dimensions")

@@ -73,6 +73,79 @@ def test_sku_codes_for_manual_modulating_24() -> None:
     assert got == ["DA5FU24-A", "DA5FU24-AS"]
 
 
+def test_parse_damu_manual_stem() -> None:
+    from catalog.etl.manual_pdfs import parse_damu_manual_stem
+
+    assert parse_damu_manual_stem("da2mu-a_as") == ((2,), "a_as", None)
+    assert parse_damu_manual_stem("da4_6mu-d_ds.pdf") == ((4, 6), "d_ds", None)
+    assert parse_damu_manual_stem("da8_16_24_32mu24-a_as") == (
+        (8, 16, 24, 32),
+        "a_as",
+        24,
+    )
+    assert parse_damu_manual_stem("da5fu-d:ds") is None
+
+
+def test_sku_codes_for_damu_manual() -> None:
+    from catalog.etl.manual_pdfs import sku_codes_for_damu_manual
+
+    codes = [
+        "DA2MU24-A",
+        "DA2MU24-AS",
+        "DA2MU230-D",
+        "DA2MU24-D",
+        "DA8MU24-A",
+        "DA8MQU24-A",
+    ]
+    assert sku_codes_for_damu_manual((2,), "a_as", None, codes) == [
+        "DA2MU24-A",
+        "DA2MU24-AS",
+    ]
+    assert sku_codes_for_damu_manual((8, 16, 24, 32), "a_as", 24, codes) == [
+        "DA8MU24-A",
+    ]
+
+
+def test_sku_codes_for_damqu_manual() -> None:
+    from catalog.etl.manual_pdfs import sku_codes_for_damqu_manual
+
+    codes = ["DA8MQU24-A", "DA8MQU230-DS", "DA8MU24-A", "DA5MQU24-A"]
+    assert sku_codes_for_damqu_manual((8, 16, 24), "a_as", 24, codes) == [
+        "DA8MQU24-A",
+    ]
+    assert sku_codes_for_damqu_manual((8, 16, 24), "d_ds", 230, codes) == [
+        "DA8MQU230-DS",
+    ]
+
+
+def test_sku_codes_for_hvd_f_manual_only_f_editions() -> None:
+    """HVD *F PDFs must not attach to air HVD-5 (no spring) SKUs."""
+    from catalog.etl.manual_pdfs import (
+        parse_hvd_f_manual_stem,
+        sku_codes_for_hvd_f_manual,
+    )
+
+    assert parse_hvd_f_manual_stem("hvd-5f-s_st.pdf") == 5
+    assert parse_hvd_f_manual_stem("hvd-3f-s_st.pdf") == 3
+    codes = [
+        "HVD24-5",
+        "HVD24S-5",
+        "HVD230S-5",
+        "HVD24S-5F",
+        "HVD24ST-5F",
+        "HVD230S-5F",
+        "HVD230ST-5F",
+        "HVD24S-3F",
+    ]
+    assert sku_codes_for_hvd_f_manual(5, codes) == [
+        "HVD24S-5F",
+        "HVD24ST-5F",
+        "HVD230S-5F",
+        "HVD230ST-5F",
+    ]
+    assert sku_codes_for_hvd_f_manual(3, codes) == ["HVD24S-3F"]
+
+
 def test_discover_ignores_damu(tmp_path: Path) -> None:
     from catalog.etl.manual_pdfs import discover_dafu_manuals
 

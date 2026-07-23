@@ -316,6 +316,97 @@ def parse_safu_torque_nm(sku_code: str) -> int | None:
     return int(match.group("nm"))
 
 
+def instructions_for_safu_sku(sku_code: str) -> str | None:
+    """Build install guide scoped to one SA..FU edition."""
+    from catalog.etl.sku_instructions import format_damper_area, power_supply_bullets
+
+    torque_nm = parse_safu_torque_nm(sku_code)
+    if torque_nm is None:
+        return None
+    row = TORQUE_SPECS.get(torque_nm)
+    if row is None:
+        return None
+    variant = parse_sku_variant(sku_code)
+    thermal = sku_code_is_thermal(sku_code)
+    series = f"SA{torque_nm}FU"
+    lines: list[str] = [
+        (f"Инструкция по установке и управлению приводом противопожарного клапана Hoocon {series}"),
+        (f"Для корректной работы привода {series} соблюдайте рекомендации по монтажу, подключению и настройке."),
+        "",
+        *MANUAL_SAFETY_ATTENTION_LINES,
+        "",
+        "1. Подготовка к установке",
+        "",
+        "Проверка совместимости:",
+        f"– Длина вала заслонки: {row['shaft-length']}.",
+        "– Диаметр вала: квадратный 12×12 мм (доступны втулки 8×8 и 10×10 мм).",
+        (f"– Крутящий момент: {row['moment']}; площадь заслонки {format_damper_area(row['damper-area'])}."),
+        f"– Габаритные размеры: {row['dimensions']}.",
+        "",
+        "2. Монтаж привода",
+        "",
+        ("– Закрепите привод на валу заслонки, соблюдая направление вращения (монтаж с противоположной стороны)."),
+        "– Убедитесь в отсутствии перекоса: затяните крепёжные винты равномерно.",
+        "– Ограничьте угол поворота при необходимости (макс. 95°).",
+        (
+            "– Ручное управление: редуктор выводится из зацепления при помощи кнопки "
+            "с самовозвратом, ручная блокировка."
+        ),
+        "",
+        "3. Электрическое подключение",
+        "",
+        *power_supply_bullets(variant, class_ii_detail=True),
+        "– Сечение провода: 0,5 мм².",
+        "– Схемы подключения — в галерее («Схема подключения») и PDF инструкции.",
+    ]
+    if variant.voltage == "230":
+        lines.append(
+            "– Защитный проводник PE к приводу не подключается: класс II "
+            "(полная изоляция), отдельной клеммы заземления на корпусе нет.",
+        )
+    lines.extend(
+        [
+            "",
+            "4. Двухпозиционное управление",
+            "",
+            ("– Подключите провода к клеммам питания: L и N для 230 В либо «+» и «−» для 24 В."),
+        ],
+    )
+    next_ch = 5
+    if variant.aux_switch is True:
+        lines.extend(
+            [
+                "",
+                f"{next_ch}. Вспомогательные переключатели",
+                "",
+                ("– Две группы (S1–S3 и S4–S6). Используйте контакты для индикации положения в системе управления."),
+            ],
+        )
+        next_ch += 1
+    if thermal:
+        lines.extend(
+            [
+                "",
+                f"{next_ch}. Термодатчик SAF72",
+                "",
+                (
+                    "– TS1 размыкается при температуре окружающей среды выше 72 °C; "
+                    "TS2 — при температуре в канале выше 72 °C."
+                ),
+            ],
+        )
+        next_ch += 1
+    lines.extend(
+        [
+            "",
+            f"{next_ch}. Аварийный возврат пружиной",
+            "",
+            (f"– При отключении питания пружина возвращает клапан в исходное положение ({row['running-time']})."),
+        ],
+    )
+    return normalize_tech_copy("\n".join(lines))
+
+
 def safu_product_queryset() -> QuerySet[Product]:
     """Products that own at least one SA..FU SKU."""
     return Product.objects.filter(skus__sku_code__iregex=r"(?i)^sa\d+fu").distinct()

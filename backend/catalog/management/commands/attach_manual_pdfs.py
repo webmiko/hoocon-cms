@@ -16,16 +16,20 @@ from django.core.management.base import BaseCommand, CommandError
 
 from catalog.etl.manual_pdfs import (
     attach_dafu_manuals,
+    attach_damqu_manuals,
+    attach_damu_manuals,
+    attach_hvd_manuals,
     attach_safu_manuals,
+    attach_samu_manuals,
     default_manuals_dir,
     ensure_dafu_spring_category,
 )
 
 
 class Command(BaseCommand):
-    """Link local DAFU/SAFU manuals to catalog SKUs; fix spring-return category."""
+    """Link local DAFU/SAFU/DAMU manuals to catalog SKUs; fix spring-return category."""
 
-    help = "Attach DAFU/SAFU instruction PDFs and place DAFU products under spring-return."
+    help = "Attach DAFU/SAFU/DAMU/DAMQU instruction PDFs; place DAFU under spring-return."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
@@ -47,7 +51,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--series",
-            choices=("all", "dafu", "safu"),
+            choices=("all", "dafu", "safu", "damu", "damqu", "samu", "hvd"),
             default="all",
             help="Which series manuals to attach (default: all).",
         )
@@ -70,11 +74,19 @@ class Command(BaseCommand):
             raise CommandError(f"Manuals directory not found: {manuals_dir}")
 
         prefix = "[dry-run] " if dry_run else ""
-        summaries = []
+        summaries: list[tuple[str, dict[str, Any]]] = []
         if series in {"all", "dafu"}:
             summaries.append(("DAFU", attach_dafu_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "safu"}:
             summaries.append(("SAFU", attach_safu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "damu"}:
+            summaries.append(("DAMU", attach_damu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "damqu"}:
+            summaries.append(("DAMQU", attach_damqu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "samu"}:
+            summaries.append(("SAMU", attach_samu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "hvd"}:
+            summaries.append(("HVD", attach_hvd_manuals(manuals_dir, dry_run=dry_run)))
 
         for label, summary in summaries:
             self.stdout.write(

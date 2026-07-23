@@ -497,7 +497,7 @@ def test_highlights_control_injected_from_dst_suffix() -> None:
     rows = highlights_for_sku([], limit=8, sku_code=sku.sku_code, category_slug=cat.slug)
     by_key = {r["key"]: r for r in rows}
     assert by_key["control"]["value"] == "Открыто/закрыто"
-    assert by_key["aux_switch"]["value"] == "SPDT-1"
+    assert by_key["aux_switch"]["value"] == "SPDT-2"
 
 
 @pytest.mark.django_db
@@ -621,6 +621,18 @@ def test_format_sku_heading_never_keeps_torque_unit() -> None:
     assert out == "da5fu24-d | Электропривод воздушный с возвратной пружиной"
 
 
+def test_format_sku_heading_drops_trailing_comma_after_torque() -> None:
+    """Canon «…пружины, N Нм» must not leave a dangling comma in H1."""
+    from catalog.facets import format_sku_heading_name
+
+    out = format_sku_heading_name(
+        "DA2MU | Электропривод воздушный без возвратной пружины, 2 Нм",
+        sku_code="DA2MU230-A",
+    )
+    assert out == "DA2MU230-A | Электропривод воздушный без возвратной пружины"
+    assert not out.rstrip().endswith(",")
+
+
 def test_format_sku_heading_strips_valve_facet_trailer() -> None:
     """Valve CSV trailers stripped; Kvs appended for uniqueness on cards."""
     from catalog.facets import format_sku_heading_name
@@ -662,6 +674,18 @@ def test_format_sku_heading_strips_baked_control_tail() -> None:
         sku_code="HVD230-40Q",
     )
     assert fast_positional == ("HVD230-40Q | Электропривод воздушный без возвратной пружины ускоренный")
+
+
+def test_format_sku_heading_drops_parenthesized_edition_echo() -> None:
+    """Trailing ``(HVA230-5)`` must not leave empty ``()`` in H1."""
+    from catalog.facets import format_sku_heading_name
+
+    out = format_sku_heading_name(
+        "HVA-5 | 5 НМ Привод воздушный без возвратной пружины пропорциональное (модулирующее) управление (HVA230-5)",
+        sku_code="HVA230-5",
+    )
+    assert "()" not in out
+    assert out == "HVA230-5 | Электропривод воздушный без возвратной пружины"
 
 
 def test_format_sku_heading_unifies_fast_actuator_word_order() -> None:
