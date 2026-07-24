@@ -24,7 +24,7 @@
 }
 
 .navBtn:hover {
-  border-color: rgba(220, 19, 19, 0.35);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
   color: var(--color-link-hover);
 }
 
@@ -83,7 +83,7 @@
 
 .card:hover {
   text-decoration: none;
-  border-color: rgba(220, 19, 19, 0.35);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
 }
 
 .card:hover .cardTitle {

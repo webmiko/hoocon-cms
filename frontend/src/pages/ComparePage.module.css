@@ -246,11 +246,11 @@
 
 .diffRow td,
 .diffRow th {
-  background: rgba(220, 19, 19, 0.06);
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
 }
 
 .diffRow .stickyCol {
-  background: rgba(220, 19, 19, 0.06);
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
 }
 
 .noDiff {
@@ -263,12 +263,12 @@
   .diffRow td,
   .diffRow th,
   .diffRow .stickyCol {
-    background: rgba(220, 19, 19, 0.12);
+    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
   }
 }
 
 :global([data-theme="dark"]) .diffRow td,
 :global([data-theme="dark"]) .diffRow th,
 :global([data-theme="dark"]) .diffRow .stickyCol {
-  background: rgba(220, 19, 19, 0.12);
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
 }

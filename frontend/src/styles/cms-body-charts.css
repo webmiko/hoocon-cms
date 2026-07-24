@@ -73,29 +73,29 @@
 
 .cms-rich-body .donut--platforms {
   background: conic-gradient(
-    #dc1313 0 42%,
-    #b01010 42% 65%,
+    var(--color-brand) 0 42%,
+    var(--color-brand-deep) 42% 65%,
     #6b7280 65% 87%,
     #d1d5db 87% 100%
   );
 }
 
 .cms-rich-body .donut--half {
-  background: conic-gradient(#dc1313 0 50%, #6b7280 50% 100%);
+  background: conic-gradient(var(--color-brand) 0 50%, #6b7280 50% 100%);
 }
 
 .cms-rich-body .donut--thirds {
   background: conic-gradient(
-    #dc1313 0 34%,
-    #b01010 34% 67%,
+    var(--color-brand) 0 34%,
+    var(--color-brand-deep) 34% 67%,
     #6b7280 67% 100%
   );
 }
 
 .cms-rich-body .donut--drives {
   background: conic-gradient(
-    #dc1313 0 40%,
-    #b01010 40% 70%,
+    var(--color-brand) 0 40%,
+    var(--color-brand-deep) 40% 70%,
     #6b7280 70% 90%,
     #d1d5db 90% 100%
   );
@@ -103,8 +103,8 @@
 
 .cms-rich-body .donut--torque {
   background: conic-gradient(
-    #dc1313 0 25%,
-    #b01010 25% 55%,
+    var(--color-brand) 0 25%,
+    var(--color-brand-deep) 25% 55%,
     #6b7280 55% 100%
   );
 }
@@ -139,11 +139,11 @@
 }
 
 .cms-rich-body .swatch--a {
-  background: #dc1313;
+  background: var(--color-brand);
 }
 
 .cms-rich-body .swatch--b {
-  background: #b01010;
+  background: var(--color-brand-deep);
 }
 
 .cms-rich-body .swatch--c {
@@ -209,7 +209,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #b01010, #dc1313);
+  background: linear-gradient(90deg, var(--color-brand-deep), var(--color-brand));
 }
 
 .cms-rich-body .meter__fill--100,
@@ -334,7 +334,7 @@
   width: 100%;
   max-width: 2.75rem;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, #dc1313 0%, #8f0d0d 100%);
+  background: linear-gradient(180deg, var(--color-brand) 0%, var(--color-brand-deeper) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
@@ -434,7 +434,7 @@
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--color-brand);
+  color: var(--color-brand-ink);
 }
 
 .cms-rich-body .kpi-tiles__lab {
@@ -464,7 +464,7 @@
   display: block;
   height: 1.65rem;
   border-radius: var(--radius-xs);
-  background: linear-gradient(90deg, #8f0d0d, #dc1313);
+  background: linear-gradient(90deg, var(--color-brand-deeper), var(--color-brand));
 }
 
 .cms-rich-body .funnel__bar--1 {

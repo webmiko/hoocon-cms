@@ -169,7 +169,7 @@
   padding: 10px 18px;
   border-radius: var(--radius);
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-on-brand);
   font-weight: 600;
   font-size: var(--font-size-sm);
   text-decoration: none;
@@ -178,7 +178,7 @@
 
 .heroCta:hover {
   background: var(--color-brand-hover);
-  color: #fff;
+  color: var(--color-on-brand);
   text-decoration: none;
   transform: translateY(-1px);
 }
@@ -531,7 +531,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-brand, #dc1313);
+  background: var(--color-brand);
 }
 
 /* Характеристики: карточки по категориям на всех ширинах. */
@@ -651,7 +651,7 @@
   width: 40px;
   height: 40px;
   background: var(--color-brand);
-  color: white;
+  color: var(--color-on-brand);
   border-radius: var(--radius);
   font-size: 12px;
   font-weight: 700;

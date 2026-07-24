@@ -115,7 +115,7 @@
 
 .badge_sku {
   background: var(--color-badge-sku);
-  color: var(--color-on-badge);
+  color: var(--color-on-brand);
 }
 
 .badge_article {

@@ -287,7 +287,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--color-brand);
+  color: var(--color-brand-ink);
 }
 
 .body :global(.card-grid) {
@@ -485,7 +485,7 @@
 
 .productLink:hover {
   text-decoration: none;
-  border-color: rgba(220, 19, 19, 0.35);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
 }
 
 .productLink:hover .productName {
@@ -578,7 +578,7 @@
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-brand);
-  color: white;
+  color: var(--color-on-brand);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 600;
@@ -586,7 +586,7 @@
 
 .link:hover {
   background: var(--color-brand-hover);
-  color: white;
+  color: var(--color-on-brand);
   text-decoration: none;
 }
 

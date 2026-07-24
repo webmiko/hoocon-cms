@@ -127,7 +127,7 @@
   padding: 0.65rem 1.15rem;
   border-radius: var(--radius);
   background: var(--color-brand);
-  color: #fff !important;
+  color: var(--color-on-brand) !important;
   font-weight: 700;
   font-size: 0.95rem;
   text-decoration: none !important;
@@ -136,7 +136,7 @@
 
 .body :global(.cta-btn:hover) {
   background: var(--color-brand-hover);
-  color: #fff !important;
+  color: var(--color-on-brand) !important;
 }
 
 .body :global(.cta-btn--ghost) {
@@ -147,7 +147,7 @@
 
 .body :global(.cta-btn--ghost:hover) {
   border-color: var(--color-brand);
-  color: var(--color-brand) !important;
+  color: var(--color-brand-ink) !important;
   background: transparent;
 }
 
@@ -399,7 +399,7 @@
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-brand);
-  color: white;
+  color: var(--color-on-brand);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 600;
@@ -407,7 +407,7 @@
 
 .link:hover {
   background: var(--color-brand-hover);
-  color: white;
+  color: var(--color-on-brand);
   text-decoration: none;
 }
 

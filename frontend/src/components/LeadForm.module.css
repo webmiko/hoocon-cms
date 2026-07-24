@@ -50,7 +50,7 @@
 .input:focus,
 .textarea:focus {
   outline: none;
-  border-color: rgba(220, 19, 19, 0.35);
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
   box-shadow: 0 0 0 3px var(--color-brand-soft);
 }
 
