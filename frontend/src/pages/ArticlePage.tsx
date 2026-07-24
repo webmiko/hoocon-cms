@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { RelatedArticlesCarousel } from "../components/RelatedArticlesCarousel";
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -11,6 +12,7 @@ import {
   buildBreadcrumbJsonLd,
 } from "../utils/jsonLd";
 import { catalogPathForSku } from "../utils/catalogPaths";
+import { protectedContentHandlers } from "../utils/contentProtection";
 import styles from "./ArticlePage.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -119,8 +121,9 @@ export function ArticlePage() {
 
         {article.related_skus && article.related_skus.length > 0 ? (
           <section
-            className={styles.products}
+            className={`${styles.products} u-protect-content`}
             aria-labelledby="article-products-heading"
+            {...protectedContentHandlers}
           >
             <h2 id="article-products-heading" className={styles.productsTitle}>
               Упомянутые товары
@@ -133,8 +136,8 @@ export function ArticlePage() {
                     className={styles.productLink}
                   >
                     {sku.image ? (
-                      <img
-                        className={styles.productImage}
+                      <ProtectedProductImage
+                        className={`${styles.productImage} u-protect-media`}
                         src={sku.image}
                         alt=""
                         loading="lazy"

@@ -8,6 +8,7 @@ import {
   isModulatingSignalKey,
   SignalSpecValue,
 } from "../components/SignalSpecValue";
+import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { useCompare } from "../compare/CompareContext";
 import {
   COMPARE_MAX_SKUS,
@@ -17,6 +18,7 @@ import { parseCompareSlugsParam } from "../compare/storage";
 import { useAsync } from "../hooks/useAsync";
 import { softBreak } from "../utils/softBreak";
 import { catalogPathForSku } from "../utils/catalogPaths";
+import { protectedContentHandlers } from "../utils/contentProtection";
 import styles from "./ComparePage.module.css";
 
 /**
@@ -172,7 +174,10 @@ export function ComparePage() {
             </button>
           </div>
 
-          <div className={styles.scroll}>
+          <div
+            className={`${styles.scroll} u-protect-content`}
+            {...protectedContentHandlers}
+          >
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -191,14 +196,13 @@ export function ComparePage() {
                           ×
                         </button>
                         {sku.image?.image ? (
-                          <img
+                          <ProtectedProductImage
                             src={sku.image.image}
                             alt=""
-                            className={styles.skuImage}
+                            className={`${styles.skuImage} u-protect-media`}
                             width={72}
                             height={72}
                             loading="lazy"
-                            decoding="async"
                           />
                         ) : (
                           <span

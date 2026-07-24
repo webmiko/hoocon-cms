@@ -7,7 +7,9 @@ import {
   COMPARE_MIN_FOR_PAGE,
 } from "../compare/constants";
 import { buildCompareSearch } from "../compare/storage";
+import { ProtectedProductImage } from "./ProtectedProductImage";
 import { softBreak } from "../utils/softBreak";
+import { protectedContentHandlers } from "../utils/contentProtection";
 import styles from "./CompareTray.module.css";
 
 /**
@@ -57,18 +59,20 @@ export function CompareTray() {
             </p>
           ) : null}
         </div>
-        <ul className={styles.list}>
+        <ul
+          className={`${styles.list} u-protect-content`}
+          {...protectedContentHandlers}
+        >
           {items.map((item) => (
             <li key={item.slug} className={styles.item}>
               {item.image ? (
-                <img
+                <ProtectedProductImage
                   src={item.image}
                   alt=""
-                  className={styles.thumb}
+                  className={`${styles.thumb} u-protect-media`}
                   width={40}
                   height={40}
                   loading="lazy"
-                  decoding="async"
                 />
               ) : (
                 <span className={styles.thumbPlaceholder} aria-hidden="true" />

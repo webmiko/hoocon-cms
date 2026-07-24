@@ -7,6 +7,7 @@ import {
 } from "../components/ImageLightbox";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { LeadForm } from "../components/LeadForm";
+import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { Seo } from "../components/Seo";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseProductDescription } from "../utils/parseDescription";
@@ -35,6 +36,10 @@ import {
   catalogPathForSku,
   catalogSkuPath,
 } from "../utils/catalogPaths";
+import {
+  protectedContentHandlers,
+  protectedMediaImgProps,
+} from "../utils/contentProtection";
 import {
   isTechnicalDiagram,
   sizeDiagramSrcForTheme,
@@ -366,9 +371,12 @@ export function SkuDetailPage() {
         ]}
       />
 
-      <div className={styles.hero}>
+      <div
+        className={`${styles.hero} u-protect-content`}
+        {...protectedContentHandlers}
+      >
         <PhotoWash
-          className={styles.heroMedia}
+          className={`${styles.heroMedia} u-protect-media`}
           data-purpose={mediaPurpose}
           src={galleryImages[0]?.src}
           backdrop={
@@ -383,14 +391,14 @@ export function SkuDetailPage() {
               type="button"
               className={styles.heroZoomTrigger}
               onClick={() => setLightboxIndex(0)}
+              onContextMenu={protectedMediaImgProps.onContextMenu}
               aria-label="Увеличить фото"
             >
-              <img
+              <ProtectedProductImage
                 src={galleryImages[0].src}
                 alt={galleryImages[0].alt}
                 className={styles.heroImage}
                 loading="eager"
-                decoding="async"
               />
             </button>
           ) : (
@@ -476,7 +484,11 @@ export function SkuDetailPage() {
       </div>
 
       {galleryImages.length > 1 ? (
-        <div className={styles.gallery} aria-label="Дополнительные фотографии">
+        <div
+          className={`${styles.gallery} u-protect-media`}
+          aria-label="Дополнительные фотографии"
+          onContextMenu={protectedMediaImgProps.onContextMenu}
+        >
           {galleryImages.slice(1).map((item, offset) => {
             const fullIndex = offset + 1;
             return (
@@ -493,9 +505,10 @@ export function SkuDetailPage() {
                   type="button"
                   className={styles.galleryZoomTrigger}
                   onClick={() => setLightboxIndex(fullIndex)}
+                  onContextMenu={protectedMediaImgProps.onContextMenu}
                   aria-label={`Увеличить фото ${fullIndex + 1}`}
                 >
-                  <img
+                  <ProtectedProductImage
                     src={item.src}
                     alt={item.alt}
                     className={
@@ -504,7 +517,6 @@ export function SkuDetailPage() {
                         : styles.galleryImage
                     }
                     loading="lazy"
-                    decoding="async"
                   />
                 </button>
               </PhotoWash>
@@ -523,7 +535,10 @@ export function SkuDetailPage() {
       ) : null}
 
       <div className={styles.contentGrid}>
-        <div className={styles.contentPrimary}>
+        <div
+          className={`${styles.contentPrimary} u-protect-content`}
+          {...protectedContentHandlers}
+        >
           {visibleTabs.length > 0 ? (
             <div className={styles.tabs}>
               <div className={styles.tabList} role="tablist" aria-label="Разделы">

@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import type { SKUList } from "../api/client";
 import { CompareToggle } from "./CompareToggle";
+import { ProtectedProductImage } from "./ProtectedProductImage";
 import {
   isModulatingSignalKey,
   SignalSpecValue,
@@ -11,6 +12,10 @@ import { SoftBreakText } from "./SoftBreakText";
 import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
 import { cardHighlights, compactCardSpecName } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
+import {
+  protectedContentHandlers,
+  protectedMediaImgProps,
+} from "../utils/contentProtection";
 import { formatEditionCountLabel } from "../utils/editionCountLabel";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import { softBreak } from "../utils/softBreak";
@@ -28,6 +33,7 @@ type CatalogSkuCardProps = {
  * Samples the studio backdrop into a L→R gradient for the media cell only;
  * the text block keeps the default card surface. Family Products
  * (``edition_count > 1``) show a variants line and CTA «Выбрать вариант».
+ * Photo save / text copy are deterred via contentProtection helpers.
  */
 export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
   const purpose = mediaPurposeFromCategory(sku.category_slug);
@@ -44,9 +50,10 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
 
   return (
     <article
-      className={styles.card}
+      className={`${styles.card} u-protect-content`}
       data-purpose={purpose}
       style={cardStyle}
+      {...protectedContentHandlers}
     >
       <Link
         to={catalogPathForSku(sku)}
@@ -55,9 +62,10 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
       />
       {imageSrc ? (
         <div
-          className={styles.cardMedia}
+          className={`${styles.cardMedia} u-protect-media`}
           data-purpose={purpose}
           style={washStyle}
+          onContextMenu={protectedMediaImgProps.onContextMenu}
         >
           <CompareToggle
             className={`${styles.cardCompare} ${styles.cardInteractive}`}
@@ -68,12 +76,11 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
               image: imageSrc,
             }}
           />
-          <img
+          <ProtectedProductImage
             src={imageSrc}
             alt={sku.image?.alt || sku.name}
             className={styles.cardImage}
             loading="lazy"
-            decoding="async"
           />
         </div>
       ) : (

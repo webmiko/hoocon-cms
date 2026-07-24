@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { ProtectedProductImage } from "./ProtectedProductImage";
 import styles from "./ImageLightbox.module.css";
 
 export interface LightboxImage {
@@ -38,10 +39,10 @@ function ZoomablePhoto({ src, alt }: { src: string; alt: string }) {
 
   return (
     <>
-      <img
+      <ProtectedProductImage
         src={src}
         alt={alt}
-        className={zoomed ? styles.imageZoomed : styles.image}
+        className={`${zoomed ? styles.imageZoomed : styles.image} u-protect-media`}
         style={
           zoomed
             ? {
@@ -51,7 +52,7 @@ function ZoomablePhoto({ src, alt }: { src: string; alt: string }) {
             : undefined
         }
         onClick={toggleZoom}
-        draggable={false}
+        loading="eager"
       />
       <p className={styles.hint}>
         {zoomed
