@@ -29,7 +29,7 @@
     "valve_od": "25",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv215"
+    "product_slug": "8100-bv215"
   },
   {
     "code": "BV220",
@@ -60,7 +60,7 @@
     "valve_od": "32",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv220"
+    "product_slug": "8100-bv220"
   },
   {
     "code": "BV225",
@@ -88,7 +88,7 @@
     "valve_od": "39",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv225"
+    "product_slug": "8100-bv225"
   },
   {
     "code": "BV232",
@@ -116,7 +116,7 @@
     "valve_od": "48",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv232"
+    "product_slug": "8100-bv232"
   },
   {
     "code": "BV240",
@@ -144,7 +144,7 @@
     "valve_od": "56",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv240"
+    "product_slug": "8100-bv240"
   },
   {
     "code": "BV250",
@@ -172,7 +172,7 @@
     "valve_od": "70",
     "diff_pressure": "0,35",
     "center_edge": "",
-    "product_slug": "sharovoy-kran-bv250"
+    "product_slug": "8100-bv250"
   },
   {
     "code": "BV315",
@@ -205,7 +205,7 @@
     "valve_od": "25",
     "diff_pressure": "0,35",
     "center_edge": "30 мм",
-    "product_slug": "sharovoy-kran-bv315"
+    "product_slug": "8100-bv315"
   },
   {
     "code": "BV320",
@@ -236,7 +236,7 @@
     "valve_od": "32",
     "diff_pressure": "0,35",
     "center_edge": "33 мм",
-    "product_slug": "sharovoy-kran-bv320"
+    "product_slug": "8100-bv320"
   },
   {
     "code": "BV325",
@@ -264,7 +264,7 @@
     "valve_od": "39",
     "diff_pressure": "0,35",
     "center_edge": "47 мм",
-    "product_slug": "sharovoy-kran-bv325"
+    "product_slug": "8100-bv325"
   },
   {
     "code": "BV332",
@@ -292,7 +292,7 @@
     "valve_od": "48",
     "diff_pressure": "0,35",
     "center_edge": "50 мм",
-    "product_slug": "sharovoy-kran-bv332"
+    "product_slug": "8100-bv332"
   },
   {
     "code": "BV340",
@@ -320,7 +320,7 @@
     "valve_od": "55",
     "diff_pressure": "0,35",
     "center_edge": "53 мм",
-    "product_slug": "sharovoy-kran-bv340"
+    "product_slug": "8100-bv340"
   },
   {
     "code": "BV350",
@@ -348,6 +348,6 @@
     "valve_od": "70",
     "diff_pressure": "0,35",
     "center_edge": "70 мм",
-    "product_slug": "sharovoy-kran-bv350"
+    "product_slug": "8100-bv350"
   }
 ]

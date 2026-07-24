@@ -40,6 +40,7 @@ def test_classify_series_by_sku_codes() -> None:
     assert classify_series_category("x", ["SA10MU230-DST"]) == "elektroprivody-dlya-klapanov-dymoudaleniya"
     assert classify_series_category("sharovoy-kran-bv215", ["8100-bv215a"]) == "sharovye-krany"
     assert classify_series_category("sharovoy-kran-h8101-bv215a", ["H8101-BV215A-24A"]) == "komplekty"
+    assert classify_series_category("h8101", ["H8101-BV215A-24A"]) == "komplekty"
     assert classify_series_category("sharovoy-kran-h8205-lav232", ["H8205-LAV232-24A"]) == "komplekty"
 
 

@@ -57,14 +57,21 @@ def is_ball_valve_sku(sku: SKU) -> bool:
 
     Uses :func:`sku_category_slug_or_empty` so a missing product/category chain
     yields ``""`` (never ``None``) before the category compare; BV product
-    slugs still match when the category FK is incomplete.
+    slugs (canonical ``8100-bv*`` and legacy ``sharovoy-kran-bv*``) still match
+    when the category FK is incomplete.
     """
     if sku_category_slug_or_empty(sku) == _BALL_VALVE_CATEGORY:
         return True
     product = getattr(sku, "product", None)
     if product is None:
         return False
-    return (product.slug or "") in ball_valve_product_slugs()
+    slug = (product.slug or "").casefold()
+    if slug in {s.casefold() for s in ball_valve_product_slugs()}:
+        return True
+    if slug.startswith("8100-bv") or slug.startswith("sharovoy-kran-bv"):
+        return True
+    code = (sku.sku_code or "").casefold().replace(" ", "")
+    return code.startswith("8100-bv")
 
 
 def _compatible_actuators_text(sku: SKU) -> str:
@@ -104,8 +111,10 @@ def build_ball_valve_kit_options(sku: SKU) -> dict[str, Any] | None:
     if not is_ball_valve_sku(sku):
         return None
     from catalog.etl.h81_kits import is_h81_kit_sku_code
+    from catalog.etl.h8205_lav import is_h8205_sku_code
 
-    if is_h81_kit_sku_code(sku.sku_code or ""):
+    code = sku.sku_code or ""
+    if is_h81_kit_sku_code(code) or is_h8205_sku_code(code):
         return None
     families = parse_drive_families(_compatible_actuators_text(sku))
     if not families:

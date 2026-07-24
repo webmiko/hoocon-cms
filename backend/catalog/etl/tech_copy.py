@@ -85,10 +85,11 @@ _REPLACEMENTS: tuple[tuple[re.Pattern[str], _Repl], ...] = (
     ),
 )
 
-# Canonical «Управление» facet / EAV labels (three families).
+# Canonical «Управление» facet / EAV labels (four families).
 CONTROL_ON_OFF = "Открыто/закрыто"
 CONTROL_FLOATING = "2-/3-позиционное"
 CONTROL_MODULATING = "Пропорциональное"
+CONTROL_MODBUS = "Modbus RS-485"
 
 # Belimo RU — spring-return DAFU (and similar): no hand crank / override.
 # Must never store control-type values (Открыто/закрыто) under this slug.
@@ -121,9 +122,12 @@ _MANUAL_OVERRIDE_CONTROL_LEAK = frozenset(
         CONTROL_ON_OFF.casefold(),
         CONTROL_FLOATING.casefold(),
         CONTROL_MODULATING.casefold(),
+        CONTROL_MODBUS.casefold(),
         "плавное управление",
         "2/3-позиционное",
         "on/off",
+        "modbus",
+        "rs-485",
     },
 )
 
@@ -222,6 +226,10 @@ _CONTROL_VALUE_MAP: dict[str, str] = {
     "2/3-позиционное": CONTROL_FLOATING,
     "2/3-позиционный": CONTROL_FLOATING,
     "2-/3-позиционное": CONTROL_FLOATING,
+    "modbus rs-485": CONTROL_MODBUS,
+    "modbus": CONTROL_MODBUS,
+    "rs-485": CONTROL_MODBUS,
+    "связь по интерфейсу rs-485 (modbus)": CONTROL_MODBUS,
 }
 
 # Spring-return / fire / smoke — typically ON/OFF (открыто/закрыто).
@@ -295,17 +303,18 @@ def normalize_control_attribute_value(
     sku_code: str | None = None,
     category_slug: str | None = None,
 ) -> str:
-    """Normalize «Управление» to one of three facet labels.
+    """Normalize «Управление» to a canonical facet label.
 
-    Canonical set: ``Открыто/закрыто``, ``2-/3-позиционное``, ``Пропорциональное``.
+    Canonical set: ``Открыто/закрыто``, ``2-/3-позиционное``, ``Пропорциональное``,
+    ``Modbus RS-485``.
 
     Args:
         value: Raw EAV value.
-        sku_code: Edition code (``da5fu24-d``, ``HVD24-5``, ``sa3fu24-ds``).
+        sku_code: Edition code (``da5fu24-d``, ``HVD24-5``, ``H8205-LAV280-24M``).
         category_slug: Product category slug for spring/fire ON/OFF heuristics.
 
     Returns:
-        One of the three canonical labels (or lightly cleaned original).
+        One of the canonical labels (or lightly cleaned original).
     """
     raw = " ".join((value or "").split())
     if not raw:
@@ -313,6 +322,9 @@ def normalize_control_attribute_value(
     low = raw.casefold()
 
     mapped = _CONTROL_VALUE_MAP.get(low)
+    if mapped == CONTROL_MODBUS or re.search(r"modbus|rs\s*-?\s*485", low):
+        return CONTROL_MODBUS
+
     if mapped == CONTROL_MODULATING or re.search(
         r"пропорциональн|модулир|плавн",
         low,
@@ -322,6 +334,8 @@ def normalize_control_attribute_value(
     from catalog.etl.sku_variant import parse_sku_variant
 
     variant = parse_sku_variant(sku_code or "")
+    if variant.control == "modbus":
+        return CONTROL_MODBUS
     if variant.control == "modulating":
         return CONTROL_MODULATING
 
@@ -342,7 +356,7 @@ def normalize_control_attribute_value(
         or re.search(r"открыто|закрыто|вкл\.?\s*/\s*выкл|on\s*/\s*off", low)
         or is_on_off_family
     ):
-        if variant.control != "modulating":
+        if variant.control not in {"modulating", "modbus"}:
             return CONTROL_ON_OFF
 
     # Prefer SKU-code control family over Tilda's «2-/3» label (see is_on_off_family).

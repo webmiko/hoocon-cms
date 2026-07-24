@@ -32,6 +32,8 @@ _BV_BODY_RE = re.compile(
 )
 # Factory kits H8101…H8122-BV… — not the bare valve body (series 81 cards).
 _H81_KIT_RE = re.compile(r"(?i)^h81")
+# H8205-LAV regulating valves — distinct from BV bodies / H81 kits.
+_H8205_RE = re.compile(r"(?i)^h8205")
 # Full electrical edition → body key for 1C bare articles (``H8121-BV265``).
 _H81_EDITION_RE = re.compile(
     r"(?i)^(?P<body>h81(?:01|02|03|04|05|06|07|08|21|22)-bv\d{3,4}[a-e]?)"
@@ -39,6 +41,13 @@ _H81_EDITION_RE = re.compile(
 )
 _H81_BARE_RE = re.compile(
     r"(?i)^h81(?:01|02|03|04|05|06|07|08|21|22)-bv\d{3,4}[a-e]?$",
+)
+_H8205_EDITION_RE = re.compile(
+    r"(?i)^(?P<body>h8205-lav[23](?:32|40|50|65|80|100|125|150|200|250|300)"
+    r"(?:st|s|t)?)-(?P<tail>24|230)[adm]$",
+)
+_H8205_BARE_RE = re.compile(
+    r"(?i)^h8205-lav[23](?:32|40|50|65|80|100|125|150|200|250|300)(?:st|s|t)?$",
 )
 _TRAILING_NOTE_RE = re.compile(
     r"(?i)\s+(?:DN\s*\d+|\d+\s*[.…\-−–—]+\s*\d+\s*mA.*)$",
@@ -94,6 +103,9 @@ def normalize_stock_article_key(raw: str) -> str:
     Bare 1C kit codes (``H8121-BV265``) fan out to all electrical editions
     in :func:`apply_stock_rows`.
 
+    H8205-LAV editions keep a distinct key (never mapped onto BV bodies).
+    Bare ``H8205-LAV280`` / ``H8205-LAV280ST`` fan out to matching editions.
+
     Other articles: casefold, strip ``8100-``, drop trailing notes
     (``4-20 mA``, ``DN65``).
 
@@ -107,7 +119,7 @@ def normalize_stock_article_key(raw: str) -> str:
     if not text:
         return ""
     text = _TRAILING_NOTE_RE.sub("", text).strip()
-    if _H81_KIT_RE.match(text):
+    if _H81_KIT_RE.match(text) or _H8205_RE.match(text):
         return re.sub(r"[\s_]+", "-", text).upper()
 
     match = _BV_BODY_RE.search(f" {text} ")
@@ -118,8 +130,7 @@ def normalize_stock_article_key(raw: str) -> str:
     key = text.casefold()
     if key.startswith("8100-"):
         key = key[5:]
-    key = re.sub(r"[\s_]+", "", key)
-    return key.upper()
+    return re.sub(r"[\s_]+", "-", key).upper()
 
 
 def h81_kit_bare_stock_key(normalized_key: str) -> str | None:
@@ -139,6 +150,27 @@ def h81_kit_bare_stock_key(normalized_key: str) -> str | None:
     if edition is not None:
         return edition.group("body").upper()
     if _H81_BARE_RE.fullmatch(key):
+        return key
+    return None
+
+
+def h8205_lav_bare_stock_key(normalized_key: str) -> str | None:
+    """Return bare H8205 body key (``H8205-LAV280`` / ``…ST``) for fan-out.
+
+    Args:
+        normalized_key: Output of :func:`normalize_stock_article_key`.
+
+    Returns:
+        Uppercase bare LAV key when the article is an H8205 body or edition;
+        otherwise ``None``.
+    """
+    key = (normalized_key or "").strip().upper()
+    if not key:
+        return None
+    edition = _H8205_EDITION_RE.fullmatch(key)
+    if edition is not None:
+        return edition.group("body").upper()
+    if _H8205_BARE_RE.fullmatch(key):
         return key
     return None
 
@@ -246,7 +278,8 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
     Matching: exact / casefold, plus BV body aliases
     (``BV232-A`` → ``8100-bv232a``). H81xx-BV* kit codes do not alias to
     bare BV bodies. Bare 1C kit articles (``H8121-BV265``) update **all**
-    electrical editions (``…-24A`` … ``…-230DS``).
+    electrical editions (``…-24A`` … ``…-230DS``). Same for bare
+    ``H8205-LAV280`` / ``H8205-LAV280ST`` → all matching electrical editions.
 
     Args:
         rows: Parsed ``(sku_code, qty_or_None)`` pairs.
@@ -272,23 +305,24 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
 
     skus = list(SKU.objects.only("id", "sku_code", "stock_qty", "stock_updated_at"))
     sku_by_key: dict[str, SKU] = {}
-    skus_by_bare_h81: dict[str, list[SKU]] = {}
+    skus_by_bare: dict[str, list[SKU]] = {}
     for sku in skus:
         key = normalize_stock_article_key(sku.sku_code)
         if not key:
             continue
         # Prefer first SKU for a key; identical aliases should be unique.
         sku_by_key.setdefault(key, sku)
-        bare = h81_kit_bare_stock_key(key)
-        if bare is not None and bare != key:
-            skus_by_bare_h81.setdefault(bare, []).append(sku)
+        for bare_fn in (h81_kit_bare_stock_key, h8205_lav_bare_stock_key):
+            bare = bare_fn(key)
+            if bare is not None and bare != key:
+                skus_by_bare.setdefault(bare, []).append(sku)
 
     now = timezone.now()
     to_update: list[SKU] = []
     seen_ids: set[int] = set()
 
     for key, (raw_code, qty) in by_key.items():
-        targets = _resolve_stock_target_skus(key, sku_by_key, skus_by_bare_h81)
+        targets = _resolve_stock_target_skus(key, sku_by_key, skus_by_bare)
         if not targets:
             report.ignored_unknown += 1
             if len(report.unknown_codes) < 20:
@@ -321,14 +355,15 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
 def _resolve_stock_target_skus(
     key: str,
     sku_by_key: dict[str, SKU],
-    skus_by_bare_h81: dict[str, list[SKU]],
+    skus_by_bare: dict[str, list[SKU]],
 ) -> list[SKU]:
-    """Map one stock key to one SKU or all H81 electrical editions."""
-    bare = h81_kit_bare_stock_key(key)
-    if bare is not None and key == bare:
-        editions = skus_by_bare_h81.get(bare)
-        if editions:
-            return list(editions)
+    """Map one stock key to one SKU or all H81/H8205 electrical editions."""
+    for bare_fn in (h81_kit_bare_stock_key, h8205_lav_bare_stock_key):
+        bare = bare_fn(key)
+        if bare is not None and key == bare:
+            editions = skus_by_bare.get(bare)
+            if editions:
+                return list(editions)
     sku = sku_by_key.get(key)
     return [sku] if sku is not None else []
 

@@ -2,7 +2,8 @@
 
 * Brass bodies (``8100-bv*``): valve only + RFQ kit picker.
 * H81 factory kits (**H8101…H8122**): complete valve+actuator editions
-  ``H8101-BV215A-24AS`` … ``H8122-BV2150-230DS`` (H8205 LAV is separate).
+  ``H8101-BV215A-24AS`` … ``H8122-BV2150-230DS``.
+* H8205 LAV regulating valves: ``H8205-LAV232-24A`` … ``H8205-LAV3300ST-230M``.
 
 Source: sibling Tilda store CSV, catalog 2026 шаровые, PDP pages.
 Style: docs/tech-copy-belimo-ru.md.
@@ -38,8 +39,48 @@ from catalog.etl.h81_kits import (
     h81_kit_edition_sku_codes,
     is_h81_kit_sku_code,
 )
+from catalog.etl.h8205_lav import (
+    CONNECTION as LAV_CONNECTION,
+)
+from catalog.etl.h8205_lav import (
+    FLOW_CHAR as LAV_FLOW_CHAR,
+)
+from catalog.etl.h8205_lav import (
+    LEAKAGE as LAV_LEAKAGE,
+)
+from catalog.etl.h8205_lav import (
+    MATERIAL_BODY as LAV_MATERIAL_BODY,
+)
+from catalog.etl.h8205_lav import (
+    MATERIAL_PLUG as LAV_MATERIAL_PLUG,
+)
+from catalog.etl.h8205_lav import (
+    MATERIAL_SEAL as LAV_MATERIAL_SEAL,
+)
+from catalog.etl.h8205_lav import (
+    MATERIAL_SEAT as LAV_MATERIAL_SEAT,
+)
+from catalog.etl.h8205_lav import (
+    MATERIAL_STEM as LAV_MATERIAL_STEM,
+)
+from catalog.etl.h8205_lav import (
+    MEDIUM as LAV_MEDIUM,
+)
+from catalog.etl.h8205_lav import (
+    MEDIUM_TEMP as LAV_MEDIUM_TEMP,
+)
+from catalog.etl.h8205_lav import (
+    PRESSURE_RATING as LAV_PRESSURE,
+)
+from catalog.etl.h8205_lav import (
+    H8205LavSeries,
+    all_h8205_series,
+    h8205_edition_sku_codes,
+    is_h8205_sku_code,
+)
 from catalog.etl.sku_variant import parse_sku_variant
 from catalog.etl.tech_copy import (
+    CONTROL_MODBUS,
     CONTROL_MODULATING,
     CONTROL_SIGNAL_Y_CANON,
     CONTROL_SIGNAL_Y_LABEL,
@@ -101,17 +142,58 @@ def format_bracket(series: tuple[str, ...]) -> str:
 
 
 def product_slug_for_series(series: str) -> str:
-    """Return CMS product slug for a BV code (e.g. BV220 → sharovoy-kran-bv220)."""
-    return f"sharovoy-kran-{series.casefold()}"
+    """Return CMS product slug for a BV code (``BV220`` → ``8100-bv220``)."""
+    code = (series or "").strip().casefold()
+    if code.startswith("bv"):
+        return f"8100-{code}"
+    return f"8100-bv{code}"
+
+
+def brass_sku_slug(product_slug: str, sku_code: str) -> str:
+    """Stable SKU.slug under a brass DN Product (``8100-bv215-8100-bv215a``)."""
+    return f"{product_slug}-{(sku_code or '').strip().lower()}"
+
+
+def legacy_brass_product_slug(series: str) -> str:
+    """Pre-rename Product slug (``BV220`` → ``sharovoy-kran-bv220``)."""
+    code = (series or "").strip().casefold()
+    if not code.startswith("bv"):
+        code = f"bv{code}"
+    return f"sharovoy-kran-{code}"
+
+
+def brass_body_code_from_sku(sku_code: str) -> str | None:
+    """Map ``8100-bv215a`` → ``BV215A`` (None when not a brass body SKU)."""
+    match = _SKU_BODY_RE.fullmatch((sku_code or "").strip())
+    if match is None:
+        return None
+    letter = (match.group("ed") or "").upper()
+    return f"BV{match.group('num')}{letter}"
+
+
+def body_meta_for_brass(body: str) -> tuple[str, str, str] | None:
+    """Return ``(dn, kvs, ways)`` for a brass body code like ``BV215A``."""
+    from catalog.etl.h81_kits import BRASS_KIT_BODIES
+
+    body_u = (body or "").strip().upper()
+    for row_body, dn, kvs, ways in BRASS_KIT_BODIES:
+        if row_body == body_u:
+            return dn, kvs, ways
+    return None
 
 
 def product_slug_for_flanged_kit(kit: str, body: str) -> str:
-    """Return product slug for an H81 kit card (``sharovoy-kran-h8103-bv265``)."""
-    return f"sharovoy-kran-{kit.casefold()}-{body.casefold()}"
+    """Return family Product slug for an H81 kit (``h8103``); body ignored."""
+    _ = body
+    from catalog.etl.h81_kits import h81_family_product_slug
+
+    return h81_family_product_slug(kit)
 
 
 def ball_valve_product_slugs() -> frozenset[str]:
-    """All known ball-valve product slugs (brass bodies + H81 kits)."""
+    """All known ball-valve product slugs (brass bodies + H81 family cards)."""
+    from catalog.etl.h81_kits import h81_family_prefixes, h81_family_product_slug
+
     brass = (
         215,
         220,
@@ -126,15 +208,15 @@ def ball_valve_product_slugs() -> frozenset[str]:
         340,
         350,
     )
-    kit_slugs = (card.product_slug for card in all_h81_kit_series())
+    kit_slugs = (h81_family_product_slug(p) for p in h81_family_prefixes())
     return frozenset(
         (*(product_slug_for_series(f"BV{n}") for n in brass), *kit_slugs),
     )
 
 
 def is_flanged_kit_sku_code(sku_code: str) -> bool:
-    """True for complete H8101…H8122 valve+actuator article codes."""
-    return is_h81_kit_sku_code(sku_code)
+    """True for complete H81 / H8205 valve+actuator article codes."""
+    return is_h81_kit_sku_code(sku_code) or is_h8205_sku_code(sku_code)
 
 
 @dataclass(frozen=True)
@@ -733,6 +815,299 @@ def _kit_body_attrs(kit: H81KitSeries) -> tuple[AttrRow, ...]:
     return tuple(rows)
 
 
+def _lav_series_description(series: H8205LavSeries) -> str:
+    """Product-level description for one H8205 LAV body card."""
+    return normalize_tech_copy(
+        f"""
+Электрический регулирующий клапан {series.ways} DN {series.dn} серии H8205
+(корпус {series.body}) для систем автоматического управления HVAC и
+смежных отраслей. Изменяет степень открытия по сигналу управления,
+регулируя расход среды (температура, уровень, давление).
+
+Назначение и особенности:
+– Рабочая среда: {LAV_MEDIUM}.
+– Рабочая температура среды: {LAV_MEDIUM_TEMP}.
+– Номинальное давление: {LAV_PRESSURE}.
+– Соединение: {LAV_CONNECTION}.
+– Материал корпуса: {LAV_MATERIAL_BODY}.
+– Вид: {series.ways}.
+– Расходная характеристика: {LAV_FLOW_CHAR}.
+– Утечка: {LAV_LEAKAGE}.
+– Гарантия: 24 месяца.
+
+Область применения:
+– Системы отопления, вентиляции и кондиционирования (HVAC).
+– Нефтехимическая, металлургическая, электроэнергетическая отрасли.
+– Природоохранные и другие промышленные АСУ ТП.
+""".strip(),
+    )
+
+
+def _lav_sku_description(series: H8205LavSeries, sku_code: str) -> str:
+    """Edition description with voltage / control / S / T from the SKU code."""
+    variant = parse_sku_variant(sku_code)
+    if variant.voltage == "230":
+        volt_label = "AC 100…240 В"
+    else:
+        volt_label = "AC/DC 24 В"
+    if variant.control == "modulating":
+        control_label = "аналоговое (пропорциональное)"
+    elif variant.control == "modbus":
+        control_label = "Modbus RS-485"
+    else:
+        control_label = "дискретное (открыто/закрыто)"
+    extras: list[str] = []
+    if variant.aux_switch:
+        extras.append("вспомогательный переключатель")
+    if variant.fault_alarm:
+        extras.append("аварийный сигнал")
+    extra_label = f" ({', '.join(extras)})" if extras else ""
+    lines = [
+        f"Исполнение {sku_code}: питание {volt_label}, управление: {control_label}{extra_label}.",
+        "",
+        "Область применения:",
+        "– Системы отопления, вентиляции и кондиционирования (HVAC).",
+        "– Промышленные АСУ ТП.",
+        "",
+        "Гарантия: 24 месяца.",
+    ]
+    return normalize_tech_copy("\n".join(lines))
+
+
+def _lav_body_attrs(series: H8205LavSeries) -> tuple[AttrRow, ...]:
+    """Shared ТТХ rows for one LAV body (all electrical editions)."""
+    rows: list[AttrRow] = [
+        ("DN", "dn", "", series.dn, ATTR_GROUP_VALVE),
+        ("Вид", "ways", "", series.ways, ATTR_GROUP_VALVE),
+        ("Номинальное давление", "pressure-rating", "", LAV_PRESSURE, ATTR_GROUP_OPERATING),
+        ("Соединение", "connection", "", LAV_CONNECTION, ATTR_GROUP_VALVE),
+        ("Рабочая среда", "medium", "", LAV_MEDIUM, ATTR_GROUP_OPERATING),
+        ("Температура среды", "media-temp", "", LAV_MEDIUM_TEMP, ATTR_GROUP_OPERATING),
+        ("Утечка", "leakage", "", LAV_LEAKAGE, ATTR_GROUP_HYDRAULIC),
+        ("Расходная характеристика", "flow-characteristic", "", LAV_FLOW_CHAR, ATTR_GROUP_HYDRAULIC),
+        ("Материал корпуса", "material", "", LAV_MATERIAL_BODY, ATTR_GROUP_MATERIALS),
+        ("Материал штока", "material-stem", "", LAV_MATERIAL_STEM, ATTR_GROUP_MATERIALS),
+        ("Материал затвора", "material-plug", "", LAV_MATERIAL_PLUG, ATTR_GROUP_MATERIALS),
+        ("Материал седла", "material-seat", "", LAV_MATERIAL_SEAT, ATTR_GROUP_MATERIALS),
+        ("Уплотнительное кольцо", "material-seal", "", LAV_MATERIAL_SEAL, ATTR_GROUP_MATERIALS),
+        ("Строительная длина C", "face-to-face", "мм", series.face_to_face_c, ATTR_GROUP_SIZE),
+        ("Длина L", "valve-length", "мм", series.length_l, ATTR_GROUP_SIZE),
+        ("Высота H", "height", "мм", series.height_h, ATTR_GROUP_SIZE),
+        ("Фланец PN16 ØD", "flange-od-pn16", "мм", series.pn16_od, ATTR_GROUP_SIZE),
+        ("Фланец PN16 D1", "flange-pcd-pn16", "мм", series.pn16_pcd, ATTR_GROUP_SIZE),
+        ("Болты PN16", "flange-bolts-pn16", "", series.pn16_bolts, ATTR_GROUP_SIZE),
+        ("Фланец PN25 ØD", "flange-od-pn25", "мм", series.pn25_od, ATTR_GROUP_SIZE),
+        ("Фланец PN25 D1", "flange-pcd-pn25", "мм", series.pn25_pcd, ATTR_GROUP_SIZE),
+        ("Болты PN25", "flange-bolts-pn25", "", series.pn25_bolts, ATTR_GROUP_SIZE),
+        ("Высота фланца f", "flange-face", "мм", series.flange_face_f, ATTR_GROUP_SIZE),
+    ]
+    if series.height_h1:
+        rows.append(
+            ("Высота H1", "height-h1", "мм", series.height_h1, ATTR_GROUP_SIZE),
+        )
+    if series.height_h2:
+        rows.append(
+            ("Высота H2", "height-h2", "мм", series.height_h2, ATTR_GROUP_SIZE),
+        )
+    return tuple(rows)
+
+
+def _apply_lav_variant_attrs(sku: SKU) -> int:
+    """Write voltage / control / aux / fault from an H8205 edition code."""
+    variant = parse_sku_variant(sku.sku_code)
+    written = 0
+    if variant.voltage == "24":
+        _set_attr(
+            sku,
+            "Номинальное напряжение",
+            "voltage",
+            "",
+            "AC/DC 24 В, 50/60 Гц",
+        )
+        written += 1
+    elif variant.voltage == "230":
+        _set_attr(
+            sku,
+            "Номинальное напряжение",
+            "voltage",
+            "",
+            "AC 100…240 В, 50/60 Гц",
+        )
+        written += 1
+    if variant.control == "modulating":
+        _set_attr(sku, "Управление", "control", "", CONTROL_MODULATING)
+        _set_attr(
+            sku,
+            CONTROL_SIGNAL_Y_LABEL,
+            "control-signal-y",
+            "",
+            CONTROL_SIGNAL_Y_CANON,
+        )
+        _set_attr(
+            sku,
+            FEEDBACK_SIGNAL_U_LABEL,
+            "feedback-signal-u",
+            "",
+            FEEDBACK_SIGNAL_U_CANON,
+        )
+        written += 3
+    elif variant.control == "modbus":
+        _set_attr(sku, "Управление", "control", "", CONTROL_MODBUS)
+        written += 1
+    elif variant.control == "on_off":
+        _set_attr(
+            sku,
+            "Управление",
+            "control",
+            "",
+            normalize_control_attribute_value("открыто/закрыто", sku_code=sku.sku_code),
+        )
+        written += 1
+    if variant.aux_switch is True:
+        aux_val = normalize_aux_switch_value("SPDT-2", sku_code=sku.sku_code)
+        _set_attr(
+            sku,
+            "Вспомогательный переключатель",
+            "aux-switch",
+            "",
+            aux_val,
+        )
+        written += 1
+    elif variant.aux_switch is False:
+        _set_attr(
+            sku,
+            "Вспомогательный переключатель",
+            "aux-switch",
+            "",
+            normalize_aux_switch_value("Нет", sku_code=sku.sku_code),
+        )
+        written += 1
+    if variant.fault_alarm is True:
+        _set_attr(sku, "Аварийный сигнал", "fault-alarm", "", "есть")
+        written += 1
+    elif variant.fault_alarm is False:
+        _set_attr(sku, "Аварийный сигнал", "fault-alarm", "", "нет")
+        written += 1
+    return written
+
+
+def ensure_h8205_lav_series(series: H8205LavSeries) -> dict[str, int]:
+    """Create missing Product + 24 electrical SKUs for one H8205 LAV card."""
+    from catalog.series_categories import kits_category_slug
+
+    slug = kits_category_slug()
+    category = Category.objects.filter(slug=slug).first()
+    if category is None:
+        category = Category.objects.create(slug=slug, name="Комплекты")
+        logger.info("Created category %s", slug)
+
+    products_created = 0
+    skus_created = 0
+    product = Product.objects.filter(slug=series.product_slug).first()
+    if product is None:
+        product = Product.objects.create(
+            category=category,
+            name=series.product_name[:200],
+            slug=series.product_slug,
+            description=_lav_series_description(series),
+        )
+        products_created = 1
+    else:
+        product.category = category
+        product.save(update_fields=["category"])
+
+    for sku_code in h8205_edition_sku_codes(series):
+        if SKU.objects.filter(sku_code__iexact=sku_code).exists():
+            continue
+        slug_sku = f"{series.product_slug}-{sku_code.lower()}"
+        if SKU.objects.filter(slug=slug_sku).exists():
+            slug_sku = f"{slug_sku}-{SKU.objects.count()}"
+        SKU.objects.create(
+            product=product,
+            name=series.product_name[:300],
+            slug=slug_sku[:300],
+            sku_code=sku_code,
+            description="",
+            is_published=True,
+        )
+        skus_created += 1
+    return {"products_created": products_created, "skus_created": skus_created}
+
+
+def apply_h8205_lav_enrichment(
+    series: H8205LavSeries,
+    *,
+    attach_pdf: bool = True,
+) -> dict[str, int]:
+    """Seed + rewrite one H8205 LAV product (24 electrical editions)."""
+    ensure_h8205_lav_series(series)
+    product = Product.objects.filter(slug=series.product_slug).first()
+    if product is None:
+        return {
+            "products": 0,
+            "skus": 0,
+            "attributes": 0,
+            "images_created": 0,
+            "images_failed": 0,
+            "pdf_attached": 0,
+        }
+
+    product.name = series.product_name[:200]
+    product.description = _lav_series_description(series)
+    product.specs_text = ""
+    product.save(update_fields=["name", "description", "specs_text"])
+
+    wanted = {c.upper() for c in h8205_edition_sku_codes(series)}
+    skus = [
+        sku
+        for sku in SKU.objects.filter(product=product).order_by("sku_code")
+        if (sku.sku_code or "").upper() in wanted
+    ]
+    attrs = 0
+    pdf_attached = 0
+    body_attrs = _lav_body_attrs(series)
+
+    for sku in skus:
+        sku.name = series.product_name[:300]
+        sku.description = _lav_sku_description(series, sku.sku_code)
+        sku.is_published = True
+        sku.specs_text = ""
+        sku.save(update_fields=["name", "description", "specs_text", "is_published"])
+
+        AttributeValue.objects.filter(sku=sku).delete()
+        for name, slug, unit, value, _group in body_attrs:
+            if not value:
+                continue
+            _set_attr(sku, name, slug, unit, value)
+            attrs += 1
+        attrs += _apply_lav_variant_attrs(sku)
+
+        if attach_pdf and attach_catalog_pdf(sku):
+            pdf_attached += 1
+
+    return {
+        "products": 1,
+        "skus": len(skus),
+        "attributes": attrs,
+        "images_created": 0,
+        "images_failed": 0,
+        "pdf_attached": pdf_attached,
+    }
+
+
+def _lav_matches_filter(series: H8205LavSeries, wanted: set[str]) -> bool:
+    """Match ``--series H8205`` / ``LAV280`` / ``H8205-LAV232``."""
+    code = series.code.upper()
+    body = series.body.upper()
+    return (
+        code in wanted
+        or body in wanted
+        or "H8205" in wanted
+        or f"H8205-{body}" in wanted
+        or f"BV{series.dn}" in wanted
+    )
+
+
 def _apply_kit_variant_attrs(sku: SKU, kit: H81KitSeries) -> int:
     """Write voltage / control / aux / power from the edition sku_code."""
     variant = parse_sku_variant(sku.sku_code)
@@ -887,9 +1262,13 @@ def ensure_ball_valve_series(series: BallValveSeries) -> dict[str, int]:
         product.save(update_fields=["category"])
 
     for sku_code in edition_sku_codes(series):
-        if SKU.objects.filter(sku_code__iexact=sku_code).exists():
+        existing = SKU.objects.filter(sku_code__iexact=sku_code).first()
+        if existing is not None:
+            if existing.product_id != product.pk:
+                existing.product = product
+                existing.save(update_fields=["product"])
             continue
-        slug = f"{series.product_slug}-{sku_code.lower()}"
+        slug = brass_sku_slug(series.product_slug, sku_code)
         if SKU.objects.filter(slug=slug).exists():
             slug = f"{slug}-{SKU.objects.count()}"
         SKU.objects.create(
@@ -974,7 +1353,8 @@ def _kit_sku_description(kit: H81KitSeries, sku_code: str) -> str:
 
 
 def ensure_flanged_kit_series(kit: FlangedKitSeries) -> dict[str, int]:
-    """Create missing Product + 8 electrical SKUs for one H81 kit card."""
+    """Create missing family Product + 8 electrical SKUs for one body row."""
+    from catalog.etl.h81_kits import h81_sku_slug
     from catalog.series_categories import kits_category_slug
 
     slug = kits_category_slug()
@@ -991,7 +1371,7 @@ def ensure_flanged_kit_series(kit: FlangedKitSeries) -> dict[str, int]:
             category=category,
             name=kit.product_name[:200],
             slug=kit.product_slug,
-            description=_kit_series_description(kit),
+            description=_kit_family_description(kit),
         )
         products_created = 1
     else:
@@ -999,14 +1379,18 @@ def ensure_flanged_kit_series(kit: FlangedKitSeries) -> dict[str, int]:
         product.save(update_fields=["category"])
 
     for sku_code in flanged_kit_edition_sku_codes(kit):
-        if SKU.objects.filter(sku_code__iexact=sku_code).exists():
+        existing = SKU.objects.filter(sku_code__iexact=sku_code).first()
+        if existing is not None:
+            if existing.product_id != product.pk:
+                existing.product = product
+                existing.save(update_fields=["product"])
             continue
-        slug_sku = f"{kit.product_slug}-{sku_code.lower()}"
+        slug_sku = h81_sku_slug(kit.product_slug, sku_code)
         if SKU.objects.filter(slug=slug_sku).exists():
             slug_sku = f"{slug_sku}-{SKU.objects.count()}"
         SKU.objects.create(
             product=product,
-            name=kit.product_name[:300],
+            name=kit.sku_display_name[:300],
             slug=slug_sku[:300],
             sku_code=sku_code,
             description="",
@@ -1014,6 +1398,35 @@ def ensure_flanged_kit_series(kit: FlangedKitSeries) -> dict[str, int]:
         )
         skus_created += 1
     return {"products_created": products_created, "skus_created": skus_created}
+
+
+def _kit_family_description(kit: H81KitSeries) -> str:
+    """Shared Product description for one H81xx series card."""
+    kind = "латунный резьбовой" if kit.is_brass else "фланцевый ВЧШГ"
+    return normalize_tech_copy(
+        f"""
+Электрические шаровые краны серии {kit.kit} ({kit.speed_label} серия,
+{kind}) — заводские комплекты корпус + электропривод для систем HVAC.
+
+Назначение и особенности:
+– Рабочая среда (по умолчанию): холодная и горячая вода;
+  по спецзаказу — с содержанием этиленгликоля не более 50 %.
+– Рабочая температура среды: –9…+95 °C.
+– Материал корпуса: {kit.material}.
+– Время срабатывания: {kit.run_time} (зависит от DN у части серий).
+– Степень защиты привода: {kit.family.ip_rating}.
+– Ручное управление: есть.
+– Гарантия: 24 месяца.
+
+Область применения:
+– Системы обработки воздуха.
+– VAV-системы вентиляции и осушения (фанкойлы).
+– Вентиляционные установки.
+– Воздухоподогреватели.
+– Крышные кондиционеры.
+– Бойлерные системы (чиллеры).
+""".strip(),
+    )
 
 
 def attach_local_gallery_images(
@@ -1207,7 +1620,7 @@ def apply_flanged_kit_enrichment(
     import_images: bool = True,
     attach_pdf: bool = True,
 ) -> dict[str, int]:
-    """Seed + rewrite one H81 kit product (8 electrical editions).
+    """Seed + rewrite one H81 body row (8 electrical editions on family Product).
 
     Gallery photo/dims are attached once via :func:`apply_h81_catalog_media`
     (``import_images`` kept for API compatibility; ignored here).
@@ -1226,7 +1639,7 @@ def apply_flanged_kit_enrichment(
         }
 
     product.name = kit.product_name[:200]
-    product.description = _kit_series_description(kit)
+    product.description = _kit_family_description(kit)
     product.specs_text = ""
     product.save(update_fields=["name", "description", "specs_text"])
 
@@ -1243,7 +1656,7 @@ def apply_flanged_kit_enrichment(
     body_attrs = _kit_body_attrs(kit)
 
     for sku in skus:
-        sku.name = kit.product_name[:300]
+        sku.name = kit.sku_display_name[:300]
         sku.description = _kit_sku_description(kit, sku.sku_code)
         sku.is_published = True
         sku.specs_text = ""
@@ -1328,6 +1741,286 @@ def ensure_h81_kit_category_redirects(*, dry_run: bool = False) -> int:
     return created
 
 
+def merge_brass_bv_onto_dn_products(
+    *,
+    series_codes: tuple[str, ...] | None = None,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Move brass SKUs onto ``8100-bv*`` DN Products; 301 from legacy slugs.
+
+    Legacy cards used ``sharovoy-kran-bv215``; target is ``8100-bv215`` with
+    SKU slug ``8100-bv215-8100-bv215a`` (Kvs editions as siblings).
+
+    Args:
+        series_codes: Optional filter like ``("BV215", "BV220")``.
+        dry_run: Count without writing.
+
+    Returns:
+        Counters ``skus_moved``, ``slugs_renamed``, ``redirects``,
+        ``products_retired``.
+    """
+    from catalog.urls_paths import catalog_sku_path
+    from redirects.models import Redirect
+    from redirects.pathutils import normalize_path
+
+    wanted = {c.upper() for c in series_codes} if series_codes else None
+    category = Category.objects.filter(slug="sharovye-krany").first()
+    stats = {
+        "skus_moved": 0,
+        "slugs_renamed": 0,
+        "redirects": 0,
+        "products_retired": 0,
+    }
+    if category is None and not dry_run:
+        logger.error("Category sharovye-krany missing — cannot merge brass DN cards")
+        return stats
+
+    cat_slug = "sharovye-krany"
+    for series in load_all_ball_valve_series():
+        if wanted is not None and series.code not in wanted:
+            continue
+        product_slug = series.product_slug
+        legacy_slug = legacy_brass_product_slug(series.code)
+        if dry_run:
+            product = Product.objects.filter(slug=product_slug).first()
+        else:
+            assert category is not None
+            product, _created = Product.objects.get_or_create(
+                slug=product_slug,
+                defaults={
+                    "category": category,
+                    "name": series.product_name[:200],
+                    "description": _series_description(series),
+                },
+            )
+            if product.category_id != category.pk:
+                product.category = category
+                product.save(update_fields=["category"])
+            product.name = series.product_name[:200]
+            product.description = _series_description(series)
+            product.save(update_fields=["name", "description"])
+
+        sku_by_pk: dict[int, SKU] = {}
+        for code in edition_sku_codes(series):
+            for row in SKU.objects.filter(sku_code__iexact=code).select_related(
+                "product",
+                "product__category",
+            ):
+                sku_by_pk[row.pk] = row
+        legacy_product = Product.objects.filter(slug=legacy_slug).first()
+        if legacy_product is not None:
+            for row in SKU.objects.filter(product_id=legacy_product.pk).select_related(
+                "product",
+                "product__category",
+            ):
+                sku_by_pk[row.pk] = row
+
+        for sku in sku_by_pk.values():
+            old_slug = (sku.slug or "").strip()
+            new_slug = brass_sku_slug(product_slug, sku.sku_code or "")
+            old_cat = ""
+            if sku.product_id and sku.product.category_id:
+                old_cat = sku.product.category.slug or ""
+
+            if dry_run:
+                if product is None or sku.product_id != getattr(product, "pk", None):
+                    stats["skus_moved"] += 1
+                if old_slug != new_slug:
+                    stats["slugs_renamed"] += 1
+                if old_slug and old_cat:
+                    old_path = normalize_path(catalog_sku_path(old_cat, old_slug))
+                    new_path = normalize_path(catalog_sku_path(cat_slug, new_slug))
+                    if old_path and new_path and old_path != new_path:
+                        stats["redirects"] += 1
+                continue
+
+            assert product is not None
+            changed: list[str] = []
+            if sku.product_id != product.pk:
+                sku.product = product
+                changed.append("product")
+                stats["skus_moved"] += 1
+            if old_slug != new_slug:
+                if SKU.objects.filter(slug=new_slug).exclude(pk=sku.pk).exists():
+                    new_slug = f"{new_slug}-{sku.pk}"
+                sku.slug = new_slug[:300]
+                changed.append("slug")
+                stats["slugs_renamed"] += 1
+            if changed:
+                sku.save(update_fields=changed)
+
+            if old_slug and old_cat:
+                old_path = normalize_path(catalog_sku_path(old_cat, old_slug))
+                to_path = normalize_path(catalog_sku_path(cat_slug, sku.slug))
+                if old_path and to_path and old_path != to_path:
+                    _, was_created = Redirect.objects.update_or_create(
+                        from_path=old_path,
+                        defaults={
+                            "to_path": to_path,
+                            "status_code": 301,
+                            "is_active": True,
+                        },
+                    )
+                    if was_created:
+                        stats["redirects"] += 1
+
+        if legacy_product is not None and not legacy_product.skus.exists():
+            if dry_run:
+                stats["products_retired"] += 1
+            else:
+                legacy_product.delete()
+                stats["products_retired"] += 1
+
+    return stats
+
+
+def merge_h81_kits_onto_family_products(
+    *,
+    prefixes: tuple[str, ...] | None = None,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Move H81 SKUs onto one Product per series; rename slugs; 301 old URLs.
+
+    Legacy body cards used ``sharovoy-kran-h8101-bv215a``; target is ``h8101``
+    with SKU slug ``h8101-h8101-bv215a-24as``.
+
+    Args:
+        prefixes: Optional filter like ``("H8101", "H8121")``.
+        dry_run: Count without writing.
+
+    Returns:
+        Counters ``skus_moved``, ``slugs_renamed``, ``redirects``,
+        ``products_retired``.
+    """
+    from catalog.etl.h81_kits import (
+        KIT_FAMILIES,
+        h81_family_prefixes,
+        h81_family_product_name,
+        h81_family_product_slug,
+        h81_sku_slug,
+        parse_h81_kit_parts,
+    )
+    from catalog.series_categories import kits_category_slug
+    from catalog.urls_paths import catalog_sku_path
+    from redirects.models import Redirect
+    from redirects.pathutils import normalize_path
+
+    wanted = {p.upper() for p in prefixes} if prefixes else None
+    cat_slug = kits_category_slug()
+    category = Category.objects.filter(slug=cat_slug).first()
+    if category is None and not dry_run:
+        category = Category.objects.create(slug=cat_slug, name="Комплекты")
+
+    stats = {
+        "skus_moved": 0,
+        "slugs_renamed": 0,
+        "redirects": 0,
+        "products_retired": 0,
+    }
+    family_by_prefix = {f.prefix: f for f in KIT_FAMILIES}
+
+    for prefix in h81_family_prefixes():
+        if wanted is not None and prefix not in wanted:
+            continue
+        family = family_by_prefix[prefix]
+        product_slug = h81_family_product_slug(prefix)
+        if dry_run:
+            product = Product.objects.filter(slug=product_slug).first()
+        else:
+            if category is None:
+                category = Category.objects.create(slug=cat_slug, name="Комплекты")
+            product, _created = Product.objects.get_or_create(
+                slug=product_slug,
+                defaults={
+                    "category": category,
+                    "name": h81_family_product_name(family)[:200],
+                    "description": "",
+                },
+            )
+            if product.category_id != category.pk:
+                product.category = category
+                product.save(update_fields=["category"])
+            product.name = h81_family_product_name(family)[:200]
+            product.save(update_fields=["name"])
+
+        skus = list(
+            SKU.objects.filter(sku_code__istartswith=f"{prefix}-").select_related(
+                "product",
+                "product__category",
+            ),
+        )
+        for sku in skus:
+            parts = parse_h81_kit_parts(sku.sku_code or "")
+            if parts is None:
+                continue
+            old_slug = (sku.slug or "").strip()
+            new_slug = h81_sku_slug(product_slug, sku.sku_code)
+            old_cat = ""
+            if sku.product_id and sku.product.category_id:
+                old_cat = sku.product.category.slug or ""
+            new_path = normalize_path(catalog_sku_path(cat_slug, new_slug))
+
+            if dry_run:
+                if product is None or sku.product_id != getattr(product, "pk", None):
+                    stats["skus_moved"] += 1
+                if old_slug != new_slug:
+                    stats["slugs_renamed"] += 1
+                if old_slug and old_cat:
+                    old_path = normalize_path(catalog_sku_path(old_cat, old_slug))
+                    if old_path and new_path and old_path != new_path:
+                        stats["redirects"] += 1
+                continue
+
+            assert product is not None
+            changed: list[str] = []
+            if sku.product_id != product.pk:
+                sku.product = product
+                changed.append("product")
+                stats["skus_moved"] += 1
+            if old_slug != new_slug:
+                # Avoid unique collisions when another row already has new_slug.
+                if SKU.objects.filter(slug=new_slug).exclude(pk=sku.pk).exists():
+                    new_slug = f"{new_slug}-{sku.pk}"
+                sku.slug = new_slug[:300]
+                changed.append("slug")
+                stats["slugs_renamed"] += 1
+            if changed:
+                sku.save(update_fields=changed)
+
+            if old_slug and old_cat:
+                old_path = normalize_path(catalog_sku_path(old_cat, old_slug))
+                to_path = normalize_path(catalog_sku_path(cat_slug, sku.slug))
+                if old_path and to_path and old_path != to_path:
+                    _, was_created = Redirect.objects.update_or_create(
+                        from_path=old_path,
+                        defaults={
+                            "to_path": to_path,
+                            "status_code": 301,
+                            "is_active": True,
+                        },
+                    )
+                    if was_created:
+                        stats["redirects"] += 1
+                # Also redirect old komplekty path if slug changed under same cat.
+                if old_cat == cat_slug and old_slug != sku.slug:
+                    pass  # already handled via old_path above
+
+        # Retire empty legacy body Products for this prefix.
+        legacy = Product.objects.filter(
+            slug__startswith=f"sharovoy-kran-{prefix.casefold()}-",
+        )
+        for legacy_product in legacy:
+            if legacy_product.skus.exists():
+                continue
+            if dry_run:
+                stats["products_retired"] += 1
+                continue
+            legacy_product.delete()
+            stats["products_retired"] += 1
+
+    return stats
+
+
 def retire_legacy_flanged_body_skus() -> dict[str, int]:
     """Unpublish mistaken ``8100-bv265…2150`` bodies and add 301 to H8103-*-24A.
 
@@ -1394,14 +2087,14 @@ def apply_all_ball_valve_enrichment(
     csv_path: Path | None = None,
     attach_pdf: bool = True,
 ) -> dict[str, int]:
-    """Enrich brass body series + H8101…H8122 factory kits.
+    """Enrich brass bodies, H8101…H8122 kits, and H8205 LAV cards.
 
     Creates missing Product/SKU rows, rewrites copy / ТТХ / media, then retires
     mistaken ``8100-bv265…2150`` body cards (not brass ``8100-bv215*``).
 
     Args:
         import_images: Download Tilda galleries / attach local catalog photos.
-        series_codes: Optional filter like ``("BV220", "H8101", "H8121")``.
+        series_codes: Optional filter like ``("BV220", "H8101", "H8205")``.
         csv_path: Optional CSV override for brass series.
         attach_pdf: Attach 2026 catalog PDF to each SKU once.
 
@@ -1428,6 +2121,7 @@ def apply_all_ball_valve_enrichment(
         if CATALOG_PDF_PATH.stat().st_size > MAX_PRODUCT_FILE_SIZE_BYTES:
             do_pdf = False
 
+    brass_touched: list[str] = []
     for series in load_all_ball_valve_series(csv_path):
         if wanted is not None and series.code not in wanted:
             continue
@@ -1439,6 +2133,7 @@ def apply_all_ball_valve_enrichment(
         if stats["products"] == 0:
             logger.warning("Product missing for %s (%s)", series.code, series.product_slug)
             continue
+        brass_touched.append(series.code)
         totals["series"] += 1
         for key in (
             "products",
@@ -1449,6 +2144,13 @@ def apply_all_ball_valve_enrichment(
             "pdf_attached",
         ):
             totals[key] += stats.get(key, 0)
+
+    if brass_touched:
+        brass_merge = merge_brass_bv_onto_dn_products(
+            series_codes=tuple(brass_touched),
+        )
+        totals["redirects"] += int(brass_merge.get("redirects", 0))
+        totals["legacy_unpublished"] += int(brass_merge.get("products_retired", 0))
 
     kit_prefixes: set[str] = set()
     for kit in flanged_kit_series():
@@ -1481,6 +2183,41 @@ def apply_all_ball_valve_enrichment(
         totals["images_created"] += int(media.get("created", 0))
 
     if kit_prefixes:
+        merge = merge_h81_kits_onto_family_products(
+            prefixes=tuple(sorted(kit_prefixes)),
+        )
+        totals["redirects"] = totals.get("redirects", 0) + int(merge.get("redirects", 0))
+        totals["legacy_unpublished"] = totals.get("legacy_unpublished", 0) + int(
+            merge.get("products_retired", 0),
+        )
+
+    lav_seeded = False
+    for lav in all_h8205_series():
+        if wanted is not None and not _lav_matches_filter(lav, wanted):
+            continue
+        stats = apply_h8205_lav_enrichment(lav, attach_pdf=do_pdf)
+        if stats["products"] == 0:
+            logger.warning("H8205 product missing for %s", lav.code)
+            continue
+        lav_seeded = True
+        totals["series"] += 1
+        for key in (
+            "products",
+            "skus",
+            "attributes",
+            "images_created",
+            "images_failed",
+            "pdf_attached",
+        ):
+            totals[key] += stats.get(key, 0)
+
+    if import_images and lav_seeded:
+        from catalog.etl.h8205_catalog_media import apply_h8205_catalog_media
+
+        media = apply_h8205_catalog_media()
+        totals["images_created"] += int(media.get("created", 0))
+
+    if kit_prefixes or lav_seeded:
         totals["redirects"] = totals.get("redirects", 0) + ensure_h81_kit_category_redirects()
 
     run_retire = wanted is None or any(
@@ -1488,6 +2225,6 @@ def apply_all_ball_valve_enrichment(
     )
     if run_retire:
         retired = retire_legacy_flanged_body_skus()
-        totals["legacy_unpublished"] = retired["skus_unpublished"]
+        totals["legacy_unpublished"] = totals.get("legacy_unpublished", 0) + retired["skus_unpublished"]
         totals["redirects"] = totals.get("redirects", 0) + retired["redirects"]
     return totals

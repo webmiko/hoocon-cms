@@ -157,6 +157,7 @@ def classify_series_category(product_slug: str, sku_codes: list[str] | None = No
         _H81_KIT_BLOB.search(blob)
         or _H8205_BLOB.search(blob)
         or "sharovoy-kran-h81" in slug
+        or bool(re.fullmatch(r"h81(?:01|02|03|04|05|06|07|08|21|22)", slug))
         or "sharovoy-kran-h82" in slug
     ):
         return _KITS[0]

@@ -57,6 +57,21 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert hvdf_s.control == "on_off"
     assert hvdf_s.aux_switch is True
 
+    hvd_air = parse_sku_variant("HVD24-5")
+    assert hvd_air.voltage == "24"
+    assert hvd_air.control == "on_off"
+    assert hvd_air.aux_switch is False
+
+    hvd_air_s = parse_sku_variant("HVD230S-40Q")
+    assert hvd_air_s.voltage == "230"
+    assert hvd_air_s.control == "on_off"
+    assert hvd_air_s.aux_switch is True
+
+    hva = parse_sku_variant("HVA24S-5")
+    assert hva.voltage == "24"
+    assert hva.control == "modulating"
+    assert hva.aux_switch is True
+
 
 def test_parse_sku_variant_flanged_h81_kits() -> None:
     """H8103/H8104 kit codes expose voltage / control / aux like actuators."""

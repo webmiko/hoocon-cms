@@ -55,6 +55,7 @@ DEFAULT_ATTR_GROUP_BY_SLUG: dict[str, str] = {
     "position-indication": ATTR_GROUP_FUNCTIONAL,
     "control": ATTR_GROUP_FUNCTIONAL,
     "aux-switch": ATTR_GROUP_FUNCTIONAL,
+    "fault-alarm": ATTR_GROUP_FUNCTIONAL,
     "running-time": ATTR_GROUP_FUNCTIONAL,
     "temp-sensor": ATTR_GROUP_FUNCTIONAL,
     "protection-class": ATTR_GROUP_OPERATING,

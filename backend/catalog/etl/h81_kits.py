@@ -8,6 +8,7 @@ Brass bodies keep separate ``8100-bv*`` cards; kits are additional SKUs.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 KIT_VOLTAGES: tuple[str, ...] = ("24", "230")
@@ -255,7 +256,7 @@ KIT_FAMILIES: tuple[KitFamily, ...] = (
 
 @dataclass(frozen=True)
 class H81KitSeries:
-    """One H81xx × body product card with eight electrical editions."""
+    """One H81xx × body matrix row (SKU editions share one family Product)."""
 
     family: KitFamily
     body: str
@@ -280,7 +281,8 @@ class H81KitSeries:
 
     @property
     def product_slug(self) -> str:
-        return f"sharovoy-kran-{self.kit.casefold()}-{self.body.casefold()}"
+        """One Product per H81xx series (``h8101``), not per body."""
+        return h81_family_product_slug(self.kit)
 
     @property
     def speed_label(self) -> str:
@@ -304,6 +306,12 @@ class H81KitSeries:
 
     @property
     def product_name(self) -> str:
+        """Family-level Product title (shared by all bodies of this series)."""
+        return h81_family_product_name(self.family)
+
+    @property
+    def sku_display_name(self) -> str:
+        """Per-body SKU title shown on PDP for one edition."""
         text = f"{self.kit}-{self.body} | Электрический шаровой кран {self.ways} DN {self.dn}"
         return " ".join(text.split())
 
@@ -320,6 +328,74 @@ class H81KitSeries:
         return fam.power_fast_large or fam.power_fast_small
 
 
+def h81_family_product_slug(prefix: str) -> str:
+    """Canonical Product.slug for an H81xx series (``h8101``)."""
+    return (prefix or "").strip().casefold()
+
+
+def h81_family_product_name(family: KitFamily) -> str:
+    """Human Product name for one H81xx series card."""
+    text = f"{family.prefix} | Электрический шаровой кран ({family.speed_label} серия)"
+    return " ".join(text.split())
+
+
+def h81_sku_slug(product_slug: str, sku_code: str) -> str:
+    """Stable SKU.slug under a family Product (``h8101-h8101-bv215a-24as``)."""
+    return f"{product_slug}-{(sku_code or '').strip().lower()}"
+
+
+_H81_PARTS_RE = re.compile(
+    r"(?i)^(?P<kit>h81(?:01|02|03|04|05|06|07|08|21|22))-"
+    r"(?P<body>bv\d{3,4}[a-e]?)-"
+    r"(?P<volt>24|230)(?P<ctrl>as|a|ds|d)$",
+)
+
+
+def parse_h81_kit_parts(sku_code: str) -> dict[str, str] | None:
+    """Parse kit / body / voltage / control from an H81 factory SKU code.
+
+    Returns:
+        Dict with ``kit``, ``body``, ``volt``, ``ctrl`` (uppercase kit/body),
+        or ``None`` when the code is not an H81 edition.
+    """
+    match = _H81_PARTS_RE.fullmatch((sku_code or "").strip())
+    if match is None:
+        return None
+    return {
+        "kit": match.group("kit").upper(),
+        "body": match.group("body").upper(),
+        "volt": match.group("volt"),
+        "ctrl": match.group("ctrl").lower(),
+    }
+
+
+def body_meta_for_h81(kit_prefix: str, body: str) -> tuple[str, str, str] | None:
+    """Return ``(dn, kvs, ways)`` for a kit body code, or ``None``.
+
+    Args:
+        kit_prefix: ``H8101`` … ``H8122``.
+        body: ``BV215A`` / ``BV265`` / …
+
+    Returns:
+        DN, Kvs, ways label when the body belongs to that family's matrix.
+    """
+    prefix = (kit_prefix or "").strip().upper()
+    body_u = (body or "").strip().upper()
+    family = next((f for f in KIT_FAMILIES if f.prefix == prefix), None)
+    if family is None:
+        return None
+    if family.body_kind == "brass":
+        for row_body, dn, kvs, ways in BRASS_KIT_BODIES:
+            if row_body == body_u:
+                return dn, kvs, ways
+        return None
+    rows = FLANGED_H8121_BODY_ROWS if family.body_kind == "flanged_h8121" else FLANGED_STD_BODY_ROWS
+    for row_body, dn, kvs, *_rest in rows:
+        if row_body == body_u:
+            return dn, kvs, "2-ходовый"
+    return None
+
+
 def _band_value(bands: tuple[tuple[int, int, str], ...], dn: int) -> str:
     """Return the first band text whose inclusive DN range covers ``dn``."""
     for lo, hi, text in bands:
@@ -329,7 +405,7 @@ def _band_value(bands: tuple[tuple[int, int, str], ...], dn: int) -> str:
 
 
 def h81_kit_edition_sku_codes(kit: H81KitSeries) -> list[str]:
-    """Eight electrical editions for one kit product card."""
+    """Eight electrical editions for one kit × body row."""
     return [f"{kit.kit}-{kit.body}-{voltage}{suffix}" for voltage in KIT_VOLTAGES for suffix in KIT_CONTROL_SUFFIXES]
 
 
@@ -337,7 +413,7 @@ def all_h81_kit_series(
     *,
     gallery_flanged: tuple[str, ...] = (),
 ) -> list[H81KitSeries]:
-    """Build all H8101…H8122 kit product cards (not H8205)."""
+    """Build all H8101…H8122 body rows (SKU matrix; Product is per family)."""
     out: list[H81KitSeries] = []
     for family in KIT_FAMILIES:
         if family.body_kind == "brass":
@@ -396,15 +472,11 @@ def all_h81_kit_series(
     return out
 
 
+def h81_family_prefixes() -> tuple[str, ...]:
+    """Ordered H8101…H8122 prefixes (one Product each)."""
+    return tuple(family.prefix for family in KIT_FAMILIES)
+
+
 def is_h81_kit_sku_code(sku_code: str) -> bool:
     """True for complete H8101…H8122 valve+actuator articles (not H8205)."""
-    import re
-
-    code = (sku_code or "").strip()
-    return bool(
-        re.match(
-            r"(?i)^h81(?:01|02|03|04|05|06|07|08|21|22)-bv\d{3,4}[a-e]?"
-            r"-(?:24|230)(?:as|a|ds|d)$",
-            code,
-        ),
-    )
+    return parse_h81_kit_parts(sku_code) is not None

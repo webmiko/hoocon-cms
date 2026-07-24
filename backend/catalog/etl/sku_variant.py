@@ -57,9 +57,10 @@ class SkuVariant:
     """Electrical / control variant inferred from SKU code."""
 
     voltage: str | None  # "24" | "230" | None
-    control: str | None  # "on_off" | "modulating" | None
+    control: str | None  # "on_off" | "modulating" | "modbus" | None
     aux_switch: bool | None
     code: str
+    fault_alarm: bool | None = None  # H8205 ``T`` / ``ST`` emergency signal
 
 
 def parse_sku_variant(sku_code: str) -> SkuVariant:
@@ -82,6 +83,28 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
 
     control: str | None = None
     aux: bool | None = None
+    # H8205-LAV280ST-230A — opts S/T/ST before voltage; A/D/M control.
+    from catalog.etl.h8205_lav import parse_h8205_sku_parts
+
+    h8205 = parse_h8205_sku_parts(sku_code)
+    if h8205 is not None:
+        voltage = h8205["volt"]
+        ctrl = h8205["ctrl"]
+        opts = h8205["opts"]
+        if ctrl == "a":
+            control = "modulating"
+        elif ctrl == "m":
+            control = "modbus"
+        else:
+            control = "on_off"
+        return SkuVariant(
+            voltage=voltage,
+            control=control,
+            aux_switch="S" in opts,
+            code=code,
+            fault_alarm="T" in opts,
+        )
+
     # H8103-BV265-24AS / H8101-BV215A-24AS — voltage+control glued (no «-A»).
     h81 = re.fullmatch(
         r"h81(?:01|02|03|04|05|06|07|08|21|22)-bv\d{3,4}[a-e]?-"
@@ -103,6 +126,10 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
         control = "on_off"
         aux = True
+    # HVD24-5 / HVD24S-10 / HVD230S-40Q — air on/off (+ optional aux S).
+    elif re.fullmatch(r"hvd(?:24|230)s?-\d+q?", code):
+        control = "on_off"
+        aux = bool(re.match(r"hvd(?:24|230)s-", code))
     # HVA24-5 / HVA24S-5Q — air damper without spring (modulating on Tilda).
     elif re.fullmatch(r"hva(?:24|230)s?-\d+q?", code):
         control = "modulating"

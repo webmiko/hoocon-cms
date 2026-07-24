@@ -36,6 +36,12 @@ requires_store_csv = pytest.mark.skipif(
 )
 
 
+def test_product_slug_for_series_is_8100_bv() -> None:
+    """Brass DN cards use ``8100-bv215`` (not ``sharovoy-kran-bv215``)."""
+    assert product_slug_for_series("BV215") == "8100-bv215"
+    assert product_slug_for_series("bv220") == "8100-bv220"
+
+
 @requires_store_csv
 def test_kvs_for_sku_code_editions() -> None:
     """Edition letters a–e map to Tilda Kvs values for BV215."""
@@ -48,7 +54,7 @@ def test_kvs_for_sku_matches_full_series_number() -> None:
     """BV prefix strip compares full 3-digit series (BV215 → «215», not «15»)."""
     series = BallValveSeries(
         code="BV215",
-        product_slug="sharovoy-kran-bv215",
+        product_slug="8100-bv215",
         product_name="BV215",
         ways="2-ходовый",
         dn="15",
@@ -76,7 +82,8 @@ def test_kvs_for_flanged_kit_body_kvs() -> None:
     assert kit.kvs == "160"
     assert kit.run_time == "< 150 с"
     assert kit.material == "ВЧШГ"
-    assert kit.product_slug == "sharovoy-kran-h8103-bv2100"
+    assert kit.product_slug == "h8103"
+    assert kit.sku_display_name.startswith("H8103-BV2100")
 
 
 def test_flanged_kit_edition_matrix_has_80_unique_codes() -> None:
@@ -93,17 +100,25 @@ def test_flanged_kit_edition_matrix_has_80_unique_codes() -> None:
     assert len(set(codes)) == 80
     assert "H8103-BV265-24A" in codes
     assert "H8104-BV2150-230DS" in codes
+    assert {k.product_slug for k in kits} == {"h8103", "h8104"}
 
 
 def test_h81_full_kit_matrix_counts() -> None:
-    """H8101…H8122: 174 cards × 8 = 1392 unique SKU codes (no H8205)."""
-    from catalog.etl.h81_kits import all_h81_kit_series, h81_kit_edition_sku_codes
+    """H8101…H8122: 174 body rows × 8 = 1392 SKU; 10 family Product slugs."""
+    from catalog.etl.h81_kits import (
+        all_h81_kit_series,
+        h81_family_prefixes,
+        h81_kit_edition_sku_codes,
+    )
 
     cards = all_h81_kit_series()
     assert len(cards) == 174
     codes = [c for kit in cards for c in h81_kit_edition_sku_codes(kit)]
     assert len(codes) == 1392
     assert len(set(codes)) == 1392
+    slugs = {kit.product_slug for kit in cards}
+    assert slugs == {p.casefold() for p in h81_family_prefixes()}
+    assert len(slugs) == 10
     assert "H8101-BV215A-24AS" in codes
     assert "H8105-BV350B-230D" in codes
     assert "H8107-BV265-24A" in codes
@@ -293,19 +308,23 @@ def test_kvs_for_sku_code_returns_none_when_series_missing() -> None:
 
 @pytest.mark.django_db
 def test_ensure_and_enrich_brass_h8101_bv215a() -> None:
-    """H8101-BV215A seeds 8 electrical SKUs; brass 8100 body stays separate."""
+    """H8101-BV215A seeds 8 electrical SKUs on family Product ``h8101``."""
     from catalog.ball_valve_kit import build_ball_valve_kit_options
     from catalog.etl.series_copy_ball_valves import (
         apply_flanged_kit_enrichment,
         flanged_kit_series,
     )
 
-    Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    Category.objects.create(name="Комплекты", slug="komplekty")
     kit = next(k for k in flanged_kit_series() if k.code == "H8101-BV215A")
     stats = apply_flanged_kit_enrichment(kit, import_images=False, attach_pdf=False)
     assert stats["products"] == 1
     assert stats["skus"] == 8
+    product = Product.objects.get(slug="h8101")
+    assert product.skus.count() == 8
     sku = SKU.objects.get(sku_code="H8101-BV215A-24AS")
+    assert sku.product_id == product.pk
+    assert sku.slug.startswith("h8101-")
     by_slug = {
         av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")
     }
@@ -326,6 +345,11 @@ def test_ensure_and_enrich_brass_h8101_bv215a() -> None:
     ds = SKU.objects.get(sku_code="H8101-BV215A-24DS")
     ds_aux = AttributeValue.objects.get(sku=ds, attribute__slug="aux-switch").value
     assert ds_aux == "SPDT-2"
+
+    kit_b = next(k for k in flanged_kit_series() if k.code == "H8101-BV215B")
+    apply_flanged_kit_enrichment(kit_b, import_images=False, attach_pdf=False)
+    assert Product.objects.filter(slug="h8101").count() == 1
+    assert SKU.objects.filter(product__slug="h8101").count() == 16
 
 
 @pytest.mark.django_db
@@ -388,5 +412,39 @@ def test_retire_legacy_8100_flanged_redirects_to_h8103() -> None:
     assert Redirect.objects.filter(
         from_path__contains=legacy.slug,
         to_path__contains=target.slug,
+        is_active=True,
+    ).exists()
+
+
+@pytest.mark.django_db
+@requires_store_csv
+def test_merge_brass_bv_onto_8100_dn_products() -> None:
+    """Legacy ``sharovoy-kran-bv215`` SKUs move to ``8100-bv215`` + 301."""
+    from catalog.etl.series_copy_ball_valves import merge_brass_bv_onto_dn_products
+    from redirects.models import Redirect
+
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    legacy = Product.objects.create(
+        name="BV215 old",
+        slug="sharovoy-kran-bv215",
+        category=cat,
+    )
+    sku = SKU.objects.create(
+        product=legacy,
+        name="8100-bv215a",
+        slug="sharovoy-kran-bv215-8100-bv215a",
+        sku_code="8100-bv215a",
+        is_published=True,
+    )
+    stats = merge_brass_bv_onto_dn_products(series_codes=("BV215",))
+    sku.refresh_from_db()
+    assert sku.product.slug == "8100-bv215"
+    assert sku.slug == "8100-bv215-8100-bv215a"
+    assert stats["skus_moved"] >= 1
+    assert stats["slugs_renamed"] >= 1
+    assert not Product.objects.filter(slug="sharovoy-kran-bv215").exists()
+    assert Redirect.objects.filter(
+        from_path="/catalog/sharovye-krany/sharovoy-kran-bv215-8100-bv215a",
+        to_path="/catalog/sharovye-krany/8100-bv215-8100-bv215a",
         is_active=True,
     ).exists()
