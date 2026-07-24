@@ -68,6 +68,68 @@ def test_catalog_order_moment_numeric_not_lexicographic() -> None:
     connection.vendor != "postgresql",
     reason="REGEXP_REPLACE ordering requires Postgres",
 )
+def test_catalog_order_series_before_moment() -> None:
+    """Within a category, DAMU stays contiguous before HVA at overlapping Нм."""
+    cat = Category.objects.create(
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+        name="Без пружины",
+    )
+    _sku("HVA230S-5", category=cat, moment="5 Нм")
+    _sku("DA6MU230-AS", category=cat, moment="6 Нм")
+    _sku("DA2MU230-AS", category=cat, moment="2 Нм")
+    _sku("HVD230S-5", category=cat, moment="5 Нм")
+
+    codes = list(
+        annotate_moment_nm(
+            SKU.objects.filter(is_published=True).annotate(
+                category_spec_order=spec_order_case(
+                    slug_field="product__category__slug",
+                ),
+            ),
+        )
+        .order_by(*catalog_list_order_by())
+        .values_list("sku_code", flat=True),
+    )
+    assert codes == [
+        "DA2MU230-AS",
+        "DA6MU230-AS",
+        "HVA230S-5",
+        "HVD230S-5",
+    ]
+
+
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="REGEXP_REPLACE ordering requires Postgres",
+)
+def test_catalog_order_voltage_24_before_230() -> None:
+    """Same series/Nm: 24 V editions before 230 V (not lexicographic sku_code)."""
+    cat = Category.objects.create(
+        slug="elektroprivody-s-pruzhinnym-vozvratom",
+        name="Пружина",
+    )
+    _sku("da5fu230-d", category=cat, moment="5 Нм")
+    _sku("da5fu24-d", category=cat, moment="5 Нм")
+    _sku("da5fu24-as", category=cat, moment="5 Нм")
+
+    codes = list(
+        annotate_moment_nm(
+            SKU.objects.filter(is_published=True).annotate(
+                category_spec_order=spec_order_case(
+                    slug_field="product__category__slug",
+                ),
+            ),
+        )
+        .order_by(*catalog_list_order_by())
+        .values_list("sku_code", flat=True),
+    )
+    assert codes == ["da5fu24-as", "da5fu24-d", "da5fu230-d"]
+
+
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="REGEXP_REPLACE ordering requires Postgres",
+)
 def test_catalog_order_sku_code_nm_for_ball_valves() -> None:
     """Without moment, DN digits in sku_code sort numerically (bv32 before bv215)."""
     cat = Category.objects.create(slug="sharovye-krany", name="Краны")
