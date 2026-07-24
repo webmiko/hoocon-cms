@@ -1,6 +1,6 @@
 /** App release label (keep in sync with backend/config/release.py). */
 
-export const RELEASE_VERSION = "0.0.8";
+export const RELEASE_VERSION = "0.0.9";
 export const RELEASE_CHANNEL = "beta";
 
 /** Display string, e.g. ``v0.0.8 beta``. */

@@ -36,6 +36,12 @@
 
 ## Changelog
 
+### v0.0.9 beta — 2026-07-24
+
+- DAMU (DA*) и SAMU (SA*): в каталоге одна плитка на Nm-линейку, издания
+  на PDP через picker (V / управление; у SA отдельно DS и DST).
+- Шаблоны карточек серий: [series-card-templates.md](series-card-templates.md).
+
 ### v0.0.8 beta — 2026-07-24
 
 - Admin: загрузка остатков из выгрузки 1С; на карточках и PDP лейбл
