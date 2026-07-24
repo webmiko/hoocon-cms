@@ -298,7 +298,8 @@
   color: var(--color-text-soft);
   font-size: var(--font-size-sm);
   line-height: 1.55;
-  max-width: 42ch;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .skuCode {
