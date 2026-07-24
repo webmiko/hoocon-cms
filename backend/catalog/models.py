@@ -180,6 +180,8 @@ class SKU(models.Model):
         sku_code: артикул (уникален, не пуст), напр. `HVA-5NM` или `BV215`.
         analog_belimo_code: опц. код аналога Belimo (задел для AnalogMap P1).
         price: опц. цена (Decimal); null = по запросу. Скрыт в публичном API.
+        stock_qty: остаток со склада (выгрузка 1С); витрина видит только in_stock.
+        stock_updated_at: когда последний раз обновили остаток из выгрузки.
         description: опц. описание для карточки.
         is_published: видимость в каталоге (default True).
         created_at / updated_at: авто-таймстампы.
@@ -221,6 +223,18 @@ class SKU(models.Model):
         null=True,
         blank=True,
         help_text=("Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»)."),
+    )
+    stock_qty: models.IntegerField = models.IntegerField(
+        "остаток",
+        default=0,
+        help_text="Количество на складе (из выгрузки 1С). На сайте только «есть / нет».",
+    )
+    stock_updated_at: models.DateTimeField | None = models.DateTimeField(
+        "остаток обновлён",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Время последней загрузки остатков из выгрузки 1С.",
     )
     description: models.TextField = models.TextField(
         "описание",
@@ -265,6 +279,11 @@ class SKU(models.Model):
     def __str__(self) -> str:
         """Return the SKU name for Admin and logs."""
         return self.name
+
+    @property
+    def in_stock(self) -> bool:
+        """True when warehouse quantity is positive (public availability label)."""
+        return int(self.stock_qty or 0) > 0
 
 
 class Attribute(models.Model):

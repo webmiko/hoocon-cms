@@ -5,9 +5,21 @@ Spec: ПЛАН §6 Iter 1; docs/admin-vs-wagtail.md — редактор v1 = Dj
 
 from __future__ import annotations
 
-from django.contrib import admin
+from typing import Any
+
+from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.shortcuts import render
+from django.urls import path, reverse
 from unfold.admin import ModelAdmin, TabularInline
 
+from catalog.etl.stock_import import (
+    StockImportError,
+    build_stock_template_xlsx,
+    import_stock_xlsx,
+)
+from catalog.forms import StockUploadForm
 from catalog.models import (
     SKU,
     Attribute,
@@ -18,6 +30,30 @@ from catalog.models import (
     ProductImage,
 )
 from config.admin_mixins import OpenChangeLinkMixin
+
+
+class InStockListFilter(admin.SimpleListFilter):
+    """Filter SKUs by public availability label (qty > 0)."""
+
+    title = "наличие"
+    parameter_name = "in_stock"
+
+    def lookups(
+        self,
+        request: HttpRequest,
+        model_admin: admin.ModelAdmin,
+    ) -> list[tuple[str, str]]:
+        return [
+            ("1", "Есть в наличии"),
+            ("0", "Нет в наличии"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: Any) -> Any:
+        if self.value() == "1":
+            return queryset.filter(stock_qty__gt=0)
+        if self.value() == "0":
+            return queryset.filter(stock_qty__lte=0)
+        return queryset
 
 
 @admin.register(Category)
@@ -73,22 +109,104 @@ class ProductImageInline(TabularInline):
 class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Admin for SKU — артикул, slug, цена (скрыта в публичном API)."""
 
+    change_list_template = "admin/catalog/sku/change_list.html"
     list_display = (
         "sku_code",
         "name",
         "slug",
         "product",
+        "stock_qty",
+        "in_stock_label",
         "is_published",
         "price",
+        "stock_updated_at",
         "updated_at",
     )
     list_display_links = ("sku_code", "name")
-    list_filter = ("is_published", "product__category", "product")
+    list_filter = ("is_published", InStockListFilter, "product__category", "product")
     search_fields = ("sku_code", "name", "slug", "analog_belimo_code")
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("product",)
+    readonly_fields = ("stock_updated_at",)
     inlines = (AttributeValueInline, ProductImageInline, ProductFileInline)
     ordering = ("sku_code",)
+
+    @admin.display(description="наличие", boolean=True)
+    def in_stock_label(self, obj: SKU) -> bool:
+        """Admin column: True when stock_qty > 0."""
+        return obj.in_stock
+
+    def get_urls(self) -> list:
+        """Add stock upload + template download endpoints."""
+        info = self.opts.app_label, self.opts.model_name
+        custom = [
+            path(
+                "import-stock/",
+                self.admin_site.admin_view(self.stock_upload_view),
+                name=f"{info[0]}_{info[1]}_import_stock",
+            ),
+            path(
+                "import-stock/template.xlsx",
+                self.admin_site.admin_view(self.stock_template_view),
+                name=f"{info[0]}_{info[1]}_stock_template",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Inject stock-upload URL into the changelist object-tools."""
+        extra = dict(extra_context or {})
+        if self.has_change_permission(request):
+            extra["stock_upload_url"] = reverse("admin:catalog_sku_import_stock")
+        return super().changelist_view(request, extra_context=extra)
+
+    def stock_template_view(self, request: HttpRequest) -> HttpResponse:
+        """Download a minimal Артикул | Остатки workbook."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        payload = build_stock_template_xlsx()
+        response = HttpResponse(
+            payload,
+            content_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        )
+        response["Content-Disposition"] = 'attachment; filename="ostatki-shablon.xlsx"'
+        return response
+
+    def stock_upload_view(self, request: HttpRequest) -> HttpResponse:
+        """Staff form: upload 1C Excel and apply stock quantities."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        changelist_url = reverse("admin:catalog_sku_changelist")
+        template_url = reverse("admin:catalog_sku_stock_template")
+
+        if request.method == "POST":
+            form = StockUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                uploaded = form.cleaned_data["file"]
+                try:
+                    report = import_stock_xlsx(uploaded)
+                except StockImportError as exc:
+                    self.message_user(request, str(exc), messages.ERROR)
+                else:
+                    level = messages.SUCCESS if report.updated else messages.WARNING
+                    self.message_user(request, report.summary(), level)
+                    return HttpResponseRedirect(changelist_url)
+        else:
+            form = StockUploadForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "title": "Загрузить остатки",
+            "form": form,
+            "template_url": template_url,
+            "media": self.media,
+        }
+        return render(request, "admin/catalog/stock_upload.html", context)
 
 
 @admin.register(Attribute)

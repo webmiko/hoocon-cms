@@ -267,6 +267,7 @@ class SKUListSerializer(serializers.ModelSerializer):
 
     name = serializers.SerializerMethodField()
     price_on_request = serializers.SerializerMethodField()
+    in_stock = serializers.SerializerMethodField()
     category_slug = serializers.CharField(
         source="product.category.slug",
         read_only=True,
@@ -287,6 +288,7 @@ class SKUListSerializer(serializers.ModelSerializer):
             "product_slug",
             "price",
             "price_on_request",
+            "in_stock",
             "image",
             "highlights",
         )
@@ -299,6 +301,10 @@ class SKUListSerializer(serializers.ModelSerializer):
     def get_price_on_request(self, _obj: SKU) -> bool:
         """True when prices are hidden (RFQ policy)."""
         return not _prices_visible()
+
+    def get_in_stock(self, obj: SKU) -> bool:
+        """True when warehouse quantity is positive (no raw qty in public API)."""
+        return obj.in_stock
 
     def get_image(self, obj: SKU) -> dict[str, Any] | None:
         """Primary published image for catalog cards (sort_order ASC)."""

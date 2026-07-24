@@ -310,6 +310,20 @@
   hyphens: none;
 }
 
+.stockLabel {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.stockIn {
+  color: var(--color-success, #1a7f4e);
+}
+
+.stockOut {
+  color: var(--color-text-muted);
+}
+
 .analog {
   color: var(--color-link);
   font-size: var(--font-size-sm);

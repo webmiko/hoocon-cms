@@ -14,6 +14,7 @@ import { catalogPathForSku } from "../utils/catalogPaths";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
+import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import styles from "../pages/CatalogPage.module.css";
 
 type CatalogSkuCardProps = {
@@ -85,6 +86,13 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
         </div>
       )}
       <div className={styles.cardBody}>
+        <p
+          className={`${styles.cardStock} ${
+            sku.in_stock ? styles.cardStockIn : styles.cardStockOut
+          }`}
+        >
+          {stockAvailabilityLabel(sku.in_stock)}
+        </p>
         <p className={`${styles.cardCode} text-tech`}>
           {softBreak(sku.sku_code)}
         </p>

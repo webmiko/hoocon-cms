@@ -643,6 +643,22 @@
   text-transform: uppercase;
 }
 
+.cardStock {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.cardStockIn {
+  color: var(--color-success, #1a7f4e);
+}
+
+.cardStockOut {
+  color: var(--color-text-muted);
+}
+
 .cardSpecs {
   list-style: none;
   margin: 6px 0 0;

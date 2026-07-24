@@ -160,3 +160,41 @@ def validate_image_upload(uploaded: Any) -> None:
     is_webp = len(magic) >= 12 and magic[:4] == b"RIFF" and magic[8:12] == b"WEBP"
     if not (is_jpeg or is_png or is_webp):
         raise ValidationError("Файл не является JPEG/PNG/WebP (magic bytes).")
+
+
+# --- Stock Excel (OOXML .xlsx = ZIP) ----------------------------------------
+
+MAX_STOCK_XLSX_SIZE_BYTES: int = 5 * 1024 * 1024
+ALLOWED_STOCK_XLSX_EXTENSION: str = ".xlsx"
+# ZIP local file header — XLSX is a ZIP package.
+XLSX_ZIP_MAGIC: bytes = b"PK\x03\x04"
+
+
+def validate_stock_xlsx_upload(uploaded: Any) -> None:
+    """Validate stock Excel upload: extension, size, ZIP magic bytes.
+
+    Args:
+        uploaded: Django UploadedFile or file-like with ``.name``.
+
+    Raises:
+        ValidationError: empty, wrong type, spoofed content, or oversize.
+    """
+    name = getattr(uploaded, "name", "") or ""
+    safe_name = sanitize_upload_filename(name)
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext != ALLOWED_STOCK_XLSX_EXTENSION:
+        raise ValidationError(
+            f"Допустимо расширение {ALLOWED_STOCK_XLSX_EXTENSION}, получено: {ext!r}.",
+        )
+
+    size = _upload_size(uploaded)
+    if size <= 0:
+        raise ValidationError("Файл пуст (size must be > 0).")
+    if size > MAX_STOCK_XLSX_SIZE_BYTES:
+        raise ValidationError(
+            f"Файл превышает лимит {MAX_STOCK_XLSX_SIZE_BYTES} байт (получено {size}).",
+        )
+
+    magic = _read_magic(uploaded, len(XLSX_ZIP_MAGIC))
+    if not magic.startswith(XLSX_ZIP_MAGIC):
+        raise ValidationError("Файл не является Excel .xlsx (magic bytes).")

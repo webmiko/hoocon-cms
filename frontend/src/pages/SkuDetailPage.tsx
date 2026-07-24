@@ -21,6 +21,7 @@ import { SoftBreakText } from "../components/SoftBreakText";
 import { softBreak } from "../utils/softBreak";
 import { paraphraseSkuLead } from "../utils/paraphraseSkuLead";
 import { specDisplayUnit } from "../utils/specDisplay";
+import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import {
@@ -339,6 +340,13 @@ export function SkuDetailPage() {
           ) : null}
           <p className={`${styles.skuCode} text-tech`}>
             Артикул: {softBreak(sku.sku_code)}
+          </p>
+          <p
+            className={`${styles.stockLabel} ${
+              sku.in_stock ? styles.stockIn : styles.stockOut
+            }`}
+          >
+            {stockAvailabilityLabel(sku.in_stock)}
           </p>
           {sku.analog_belimo_code ? (
             <p className={`${styles.analog} text-tech`}>

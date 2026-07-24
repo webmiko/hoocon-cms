@@ -79,6 +79,9 @@ export function CatalogPage() {
   const category = categoryFromPath;
   const q = searchParams.get("q") ?? "";
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
+  const inStockOnly = ["1", "true", "yes", "on"].includes(
+    (searchParams.get("in_stock") ?? "").toLowerCase(),
+  );
 
   const activeFacets: Partial<Record<FacetKey, string>> = {};
   for (const key of FACET_KEYS) {
@@ -96,21 +99,25 @@ export function CatalogPage() {
   if (category) params.category = category;
   if (q) params.q = q;
   if (page > 1) params.page = String(page);
+  if (inStockOnly) params.in_stock = "1";
   for (const [key, value] of Object.entries(activeFacets)) {
     if (value) params[key] = value;
   }
 
   const facetKey = FACET_KEYS.map((k) => activeFacets[k] ?? "").join("|");
-  const listKey = `${category}|${q}|${page}|${facetKey}`;
+  const listKey = `${category}|${q}|${page}|${facetKey}|${inStockOnly ? "1" : "0"}`;
   const { data: skusData, loading, error } = useAsync(
     () => api.skus(params),
-    [category, q, page, facetKey],
+    [category, q, page, facetKey, inStockOnly],
   );
 
   const categories: Category[] = categoriesData?.results ?? [];
   const facets: CatalogFacet[] = facetsData?.results ?? [];
   const activeCount =
-    Object.keys(activeFacets).length + (q ? 1 : 0) + (category ? 1 : 0);
+    Object.keys(activeFacets).length +
+    (q ? 1 : 0) +
+    (category ? 1 : 0) +
+    (inStockOnly ? 1 : 0);
   const activeCategory = categories.find((c) => c.slug === category);
 
   // «Показать ещё»: append next DRF pages (PAGE_SIZE=20) without replacing.
@@ -257,6 +264,19 @@ export function CatalogPage() {
           ))}
         </nav>
       </details>
+
+      <div className={styles.filterSection}>
+        <button
+          type="button"
+          className={
+            inStockOnly ? styles.optionRowActive : styles.optionRow
+          }
+          aria-pressed={inStockOnly}
+          onClick={() => updateFilter("in_stock", inStockOnly ? "" : "1")}
+        >
+          <span className={styles.optionText}>Только в наличии</span>
+        </button>
+      </div>
 
       {facets.map((facet) => {
         const selected = activeFacets[facet.key as FacetKey];
@@ -412,6 +432,19 @@ export function CatalogPage() {
               >
                 <span className={styles.activeTagLabel}>Поиск</span>
                 <span className={styles.activeTagValue}>{q}</span>
+                <span className={styles.activeTagRemove} aria-hidden="true">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            {inStockOnly ? (
+              <button
+                type="button"
+                className={styles.activeTag}
+                onClick={() => updateFilter("in_stock", "")}
+              >
+                <span className={styles.activeTagLabel}>Наличие</span>
+                <span className={styles.activeTagValue}>Есть в наличии</span>
                 <span className={styles.activeTagRemove} aria-hidden="true">
                   ×
                 </span>

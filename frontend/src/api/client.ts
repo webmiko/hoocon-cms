@@ -24,6 +24,7 @@ export type CategoryListResponse =
 export type SKUList = components["schemas"]["SKUList"] & {
   highlights?: CatalogHighlight[];
   image?: { id: number; image: string; alt?: string } | null;
+  in_stock?: boolean;
 };
 export type CatalogAttribute = {
   name: string;

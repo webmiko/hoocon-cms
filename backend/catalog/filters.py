@@ -27,15 +27,19 @@ _RESERVED_QUERY_KEYS: frozenset[str] = frozenset(
         "ordering",
         "format",
         "search",
+        "in_stock",
     },
 )
 
+_IN_STOCK_TRUE: frozenset[str] = frozenset({"1", "true", "yes", "on"})
+
 
 class SKUFilterSet(django_filters.FilterSet):
-    """Base filters: category slug + free-text q."""
+    """Base filters: category slug + free-text q + in-stock."""
 
     category = django_filters.CharFilter(method="filter_category")
     q = django_filters.CharFilter(method="filter_q")
+    in_stock = django_filters.CharFilter(method="filter_in_stock")
 
     class Meta:
         model = SKU
@@ -54,6 +58,17 @@ class SKUFilterSet(django_filters.FilterSet):
 
         slug = resolve_alias(value.strip()) or value.strip()
         return queryset.filter(product__category__slug=slug)
+
+    def filter_in_stock(
+        self,
+        queryset: QuerySet[SKU],
+        _name: str,
+        value: str,
+    ) -> QuerySet[SKU]:
+        """When truthy (``1`` / ``true`` / ``yes``), keep only ``stock_qty > 0``."""
+        if not value or value.strip().casefold() not in _IN_STOCK_TRUE:
+            return queryset
+        return queryset.filter(stock_qty__gt=0)
 
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
         """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
@@ -99,6 +114,14 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
                 "schema": {"type": "string"},
             }
             for key in sorted(FACET_KEYS)
+        ] + [
+            {
+                "name": "in_stock",
+                "required": False,
+                "in": "query",
+                "description": "Только товары в наличии (stock_qty > 0). Значения: 1 / true / yes.",
+                "schema": {"type": "string", "enum": ["1", "true", "yes"]},
+            },
         ]
 
     def filter_queryset(

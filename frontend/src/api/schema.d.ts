@@ -512,6 +512,8 @@ export interface components {
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
+            /** @description True when warehouse quantity is positive. */
+            readonly in_stock: boolean;
             readonly description: string;
             readonly specs_text: string;
             readonly analogs_text: string;
@@ -542,6 +544,8 @@ export interface components {
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
+            /** @description True when warehouse quantity is positive. */
+            readonly in_stock: boolean;
         };
         /** @description Paginated search response (DRF PageNumberPagination shape). */
         SearchResponse: {

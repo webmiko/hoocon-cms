@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:catalog_sku_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <span>Загрузить остатки</span>
+</nav>
+
+<h1>{{ title }}</h1>
+<p>
+  Выгрузка из 1С (1–2 раза в неделю). Обновляются только артикулы из каталога;
+  неизвестные строки игнорируются; SKU без строки в файле не меняются.
+</p>
+<p>
+  <a href="{{ template_url }}">Скачать шаблон Excel</a>
+  (заголовки: Артикул | Свободно; также подходят Остатки / Остаток).
+</p>
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    {% for field in form %}
+      <div class="form-row">
+        {{ field.errors }}
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <div class="help">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </fieldset>
+  <div class="submit-row">
+    <input type="submit" value="Загрузить" class="default">
+    <a href="{% url 'admin:catalog_sku_changelist' %}" class="button cancel-link">
+      {% trans "Отмена" %}
+    </a>
+  </div>
+</form>
+{% endblock %}
