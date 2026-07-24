@@ -32,6 +32,7 @@ const FACET_KEYS = [
   "temp_sensor",
   "dn",
   "ways",
+  "material",
   "kvs",
   "analog",
 ] as const;
