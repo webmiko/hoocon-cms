@@ -24,6 +24,7 @@ from catalog.etl.tech_copy import (
     normalize_tech_copy,
 )
 from catalog.facets import normalize_aux_switch_value
+from catalog.facets.temp_sensor import TEMP_SENSOR_NONE, TEMP_SENSOR_SAF72
 from catalog.models import SKU, AttributeValue, Product
 
 _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
@@ -137,7 +138,7 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 Назначение и особенности серии SA..MU:
 – Управление: открыто/закрыто, 2-/3-позиционное.
 – Вспомогательные переключатели: 2 SPDT (исполнения -DS / -DST).
-– Исполнение -DST: с термодатчиком.
+– Исполнение -DST: термодатчик SAF72 (окружающая среда TS1 и канал TS2, 72 °C).
 – Степень защиты корпуса: IP54.
 – Температура окружающей среды: –30…+50 °C.
 """.strip(),
@@ -277,7 +278,9 @@ def _sku_description(variant: SkuVariant, row: dict[str, str]) -> str:
         "Вспомогательные переключатели: 2 SPDT.",
     ]
     if sku_code_is_thermal(variant.code):
-        lines.append("Термодатчик: исполнение -DST.")
+        lines.append(
+            "Термодатчик: SAF72 (TS1 — окружающая среда, TS2 — канал, срабатывание при 72 °C).",
+        )
     else:
         lines.append("Термодатчик: без датчика (исполнение -DS).")
     if variant.voltage == "24":
@@ -413,7 +416,9 @@ def apply_samu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     "",
                     normalize_aux_switch_value("SPDT-2", sku_code=sku.sku_code),
                 )
-            attrs += 2
+                temp_value = TEMP_SENSOR_SAF72 if sku_code_is_thermal(sku.sku_code) else TEMP_SENSOR_NONE
+                _set_attr(sku, "Датчик температуры", "temp-sensor", "", temp_value)
+            attrs += 3
             skus_done += 1
 
     return {
