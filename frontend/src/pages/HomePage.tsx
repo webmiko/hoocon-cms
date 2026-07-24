@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { DirectionsCategoryGrid } from "../components/DirectionsCategoryGrid";
 import { HomeSkeleton } from "../components/HomeSkeleton";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
-import { softBreak } from "../utils/softBreak";
-import { catalogCategoryPath } from "../utils/catalogPaths";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import styles from "./HomePage.module.css";
 
@@ -315,36 +314,11 @@ export function HomePage() {
           {loading && <HomeSkeleton />}
           {error && <p className={styles.status}>Ошибка загрузки категорий.</p>}
           {categoriesData && (
-            <div className={styles.directionGrid}>
-              {categoriesData.results.map((cat, index) => {
-                const lead = categoryLead(cat.description ?? "");
-                return (
-                  <Link
-                    key={cat.slug}
-                    to={catalogCategoryPath(cat.slug)}
-                    className={styles.directionBlock}
-                    style={{ animationDelay: `${0.06 + index * 0.05}s` }}
-                  >
-                    <span className={styles.directionMedia}>
-                      <DirectionCardImage
-                        apiSrc={cat.image?.image}
-                        className={styles.directionImage}
-                        placeholderClassName={styles.directionImagePlaceholder}
-                      />
-                    </span>
-                    <span className={styles.directionBody}>
-                      <span className={styles.directionName}>
-                        {softBreak(cat.name)}
-                      </span>
-                      {lead ? (
-                        <span className={styles.directionDesc}>{lead}</span>
-                      ) : null}
-                      <span className={styles.directionMore}>В каталог →</span>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+            <DirectionsCategoryGrid
+              categories={categoriesData.results}
+              categoryLead={categoryLead}
+              DirectionCardImage={DirectionCardImage}
+            />
           )}
         </div>
       </section>

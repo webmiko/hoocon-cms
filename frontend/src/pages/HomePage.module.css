@@ -351,12 +351,25 @@
 .directionsInner {
   max-width: var(--max-width);
   margin: 0 auto;
+  container-type: inline-size;
+  container-name: directions-inner;
 }
 
 .directionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-lg);
+}
+
+/* Wide home band (~1114px+): three product pillars per row. */
+@container directions-inner (min-width: 1114px) {
+  .directionGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .directionBlock {
+    min-height: 300px;
+  }
 }
 
 .directionBlock {
@@ -825,12 +838,53 @@
     padding: var(--space-xl) var(--space-md);
   }
 
+  .directionBlock {
+    min-height: 280px;
+  }
+
+  .directionMedia {
+    min-height: 140px;
+  }
+}
+
+/* Snap carousel: one active card + translucent side peeks. */
+@media (max-width: 649px) {
   .directionGrid {
-    grid-template-columns: 1fr;
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 11%;
+    gap: var(--space-md);
+    padding-block: var(--space-xs);
+    padding-inline: 11%;
+    margin-inline: calc(-1 * var(--space-md));
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .directionGrid::-webkit-scrollbar {
+    display: none;
   }
 
   .directionBlock {
+    flex: 0 0 78%;
+    width: 78%;
+    max-width: 78%;
     min-height: 280px;
+    scroll-snap-align: center;
+    opacity: 1;
+    transition: opacity 0.28s var(--ease-out, ease),
+      transform var(--transition-fast), border-color var(--transition),
+      box-shadow var(--transition), background-color var(--transition);
+  }
+
+  .directionBlockPeek {
+    opacity: 0.42;
+  }
+
+  .directionBlockActive {
+    opacity: 1;
   }
 
   .directionMedia {
@@ -852,6 +906,10 @@
   .directions,
   .directionBlock {
     animation: none;
+  }
+
+  .directionBlock {
+    transition: none;
   }
 
   .heroSlide {
