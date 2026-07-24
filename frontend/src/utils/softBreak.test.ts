@@ -25,8 +25,18 @@ describe("softBreak", () => {
   it("uses NBSP inside nowrap for plain-string softBreak", () => {
     const out = softBreak("x (Заводская установка 0...10 В=)");
     expect(out.includes("Заводская\u00A0установка")).toBe(true);
-    expect(out.replaceAll("\u00A0", " ").replaceAll("\u200B", "")).toBe(
+    expect(out.replaceAll("\u00A0", " ").replaceAll("\u200B", "").replaceAll("\u2060", "")).toBe(
       "x (Заводская установка 0...10 В=)",
     );
+  });
+
+  it("does not soft-break after opening parenthesis", () => {
+    const out = softBreak(
+      "Электрический шаровой кран 2-ходовый DN 25 H8101-BV225A (стандартная серия) для HVAC.",
+    );
+    expect(out.includes("(\u200B")).toBe(false);
+    expect(out.includes("(\u2060") || out.includes("(стандартная")).toBe(true);
+    // Parenthetical stays one nowrap token (NBSP between words).
+    expect(out.includes("стандартная\u00A0серия")).toBe(true);
   });
 });

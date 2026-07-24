@@ -19,6 +19,8 @@ describe("facetDisplay", () => {
     expect(facetLabelShort("temp_sensor", "Термодатчик")).toBe("Термодатчик");
     expect(facetLabelShort("analog", "Аналоги")).toBe("Аналоги");
     expect(facetLabelShort("material", "Материал корпуса")).toBe("Материал корпуса");
+    expect(facetLabelShort("ways", "Тип крана")).toBe("Тип крана");
+    expect(facetLabelShort("kvs", "Kvs (м³/ч)")).toBe("Kvs (м³/ч)");
   });
 
   it("normalizes area to always «до N м²»", () => {

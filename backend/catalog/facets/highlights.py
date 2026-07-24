@@ -172,6 +172,7 @@ def _ensure_control_highlight(
     from catalog.etl.sku_variant import parse_sku_variant
     from catalog.etl.tech_copy import (
         CONTROL_FLOATING,
+        CONTROL_MODBUS,
         CONTROL_MODULATING,
         CONTROL_ON_OFF,
         normalize_control_attribute_value,
@@ -182,6 +183,8 @@ def _ensure_control_highlight(
         return
     if variant.control == "modulating":
         seed = CONTROL_MODULATING
+    elif variant.control == "modbus":
+        seed = CONTROL_MODBUS
     elif variant.control == "on_off":
         seed = CONTROL_ON_OFF
     else:

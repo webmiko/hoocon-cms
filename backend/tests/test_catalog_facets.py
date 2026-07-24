@@ -962,3 +962,53 @@ def test_material_facet_for_kit_category(client) -> None:
         {"category": "komplekty", "material": "ВЧШГ"},
     )
     assert {row["slug"] for row in iron_only.data["results"]} == {"komplekt-h8105-iron"}
+
+
+@pytest.mark.django_db
+def test_ball_valve_8100_facet_order_and_labels(client) -> None:
+    """Category sharovye-krany: DN → Тип крана → Kvs → материал корпуса."""
+    from catalog.facets import BALL_VALVE_8100_FACET_KEYS, facet_defs_for_category
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    assert [f.key for f in facet_defs_for_category("sharovye-krany")] == list(
+        BALL_VALVE_8100_FACET_KEYS,
+    )
+
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(name="BV215", slug="8100-bv215", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="8100-bv215a",
+        slug="8100-bv215-8100-bv215a",
+        sku_code="8100-bv215a",
+        is_published=True,
+    )
+    attrs = {
+        "dn": ("DN", "15"),
+        "ways": ("Вид крана", "2-ходовый"),
+        "kvs": ("Kvs", "1,6"),
+        "material": ("Материал корпуса", "Латунь"),
+        "moment": ("Крутящий момент", "5 Нм"),
+    }
+    for slug, (name, value) in attrs.items():
+        attr = Attribute.objects.create(name=name, slug=slug)
+        AttributeValue.objects.create(sku=sku, attribute=attr, value=value)
+
+    response = client.get(
+        reverse("catalog-facet-list"),
+        {"category": "sharovye-krany"},
+    )
+    assert response.status_code == 200
+    keys = [row["key"] for row in response.data["results"]]
+    labels = {row["key"]: row["label"] for row in response.data["results"]}
+    assert keys == ["dn", "ways", "kvs", "material"]
+    assert "moment" not in keys
+    assert labels["ways"] == "Тип крана"
+    assert labels["material"] == "Материал корпуса"
+    assert labels["kvs"] == "Kvs (м³/ч)"

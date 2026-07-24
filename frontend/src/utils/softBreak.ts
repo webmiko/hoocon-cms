@@ -4,14 +4,18 @@
  * Inserts zero-width spaces (U+200B) after natural separators so the browser
  * wraps at `|`, `/`, `-`, etc. instead of mid-word or overflowing the layout.
  * Edition suffixes and factory notes stay on one line via nowrap parts.
+ * Opening/closing parentheses stay glued to adjacent text (never alone on a line).
  */
 
-const BREAK_AFTER = /([|/\\·•—–_()[\],;:])/g;
+/** Soft wrap *after* these marks — never ``(`` / ``)`` / brackets (glued separately). */
+const BREAK_AFTER = /([|/\\·•—–_,;:])/g;
 const BREAK_AFTER_HYPHEN = /(-)(?=[^\s-])/g;
 
-/** Chunks that must wrap as a single token (edition suffix, factory note). */
-const NO_WRAP_CHUNK =
-  /\((?:[−-]?[A-Z]{1,4})(?:\s*\/\s*[−-]?[A-Z]{1,4})+\)|\(\s*Заводская установка[^)]*\)|\(\s*спецзаказ\s*\)/gi;
+/** Zero-width Word Joiner — keeps ``(`` / ``)`` attached to neighboring text. */
+const WORD_JOINER = "\u2060";
+
+/** Chunks that must wrap as a single token (paren groups with text, not ``(2)``). */
+const NO_WRAP_CHUNK = /\(\s*(?!\d)[^)]{1,80}\)/gi;
 
 export type SoftBreakPart = {
   text: string;
@@ -20,18 +24,37 @@ export type SoftBreakPart = {
 };
 
 /**
+ * Glue parentheses/brackets to adjacent non-space characters.
+ *
+ * Args:
+ *   text: Segment after punctuation soft-breaks.
+ *
+ * Returns:
+ *   Text with U+2060 so ``(`` / ``)`` never sit alone at a line edge.
+ */
+function glueParenMarks(text: string): string {
+  return text
+    .replace(/\((?=\S)/g, `(${WORD_JOINER}`)
+    .replace(/(?<=\S)\)/g, `${WORD_JOINER})`)
+    .replace(/\[(?=\S)/g, `[${WORD_JOINER}`)
+    .replace(/(?<=\S)\]/g, `${WORD_JOINER}]`);
+}
+
+/**
  * Apply soft-wrap markers (ZWSP) after punctuation / hyphens.
  *
  * Args:
  *   text: Segment that may wrap at separators.
  *
  * Returns:
- *   Text with U+200B after safe break points.
+ *   Text with U+200B after safe break points; parens glued to neighbors.
  */
 function applySoftBreak(text: string): string {
-  return text
-    .replace(BREAK_AFTER, "$1\u200B")
-    .replace(BREAK_AFTER_HYPHEN, "$1\u200B");
+  return glueParenMarks(
+    text
+      .replace(BREAK_AFTER, "$1\u200B")
+      .replace(BREAK_AFTER_HYPHEN, "$1\u200B"),
+  );
 }
 
 /**

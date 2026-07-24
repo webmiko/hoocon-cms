@@ -67,20 +67,20 @@ FACET_DEFS: tuple[FacetDef, ...] = (
     ),
     FacetDef(
         key="ways",
-        label="Вид крана",
-        name_substrings=("вид крана",),
-    ),
-    FacetDef(
-        key="material",
-        label="Материал корпуса",
-        name_substrings=("материал корпуса",),
-        legacy_slugs=("material",),
+        label="Тип крана",
+        name_substrings=("вид крана", "тип крана"),
     ),
     FacetDef(
         key="kvs",
         label="Kvs (м³/ч)",
         name_substrings=("kvs",),
         legacy_slugs=("kvs",),
+    ),
+    FacetDef(
+        key="material",
+        label="Материал корпуса",
+        name_substrings=("материал корпуса",),
+        legacy_slugs=("material",),
     ),
     # Belimo codes: card «Аналоги» text, SKU.analog_belimo_code, or ТТХ inference.
     FacetDef(
@@ -93,6 +93,19 @@ FACET_DEFS: tuple[FacetDef, ...] = (
 
 FACET_BY_KEY: dict[str, FacetDef] = {f.key: f for f in FACET_DEFS}
 FACET_KEYS: frozenset[str] = frozenset(FACET_BY_KEY)
+
+# Brass series 8100 (category ``sharovye-krany``): fixed filter set + order.
+BALL_VALVE_8100_FACET_KEYS: tuple[str, ...] = (
+    "dn",
+    "ways",
+    "kvs",
+    "material",
+)
+
+# Category slug → ordered facet keys (strict subset of FACET_DEFS).
+CATEGORY_FACET_KEYS: dict[str, tuple[str, ...]] = {
+    "sharovye-krany": BALL_VALVE_8100_FACET_KEYS,
+}
 
 # Extra PDP/card rows (not catalog filters): after primary facets.
 EXTRA_HIGHLIGHT_DEFS: tuple[FacetDef, ...] = (

@@ -12,9 +12,9 @@ const FACET_LABEL_SHORT: Record<string, string> = {
   aux_switch: "Вспом. перекл.",
   temp_sensor: "Термодатчик",
   dn: "DN",
-  ways: "Вид крана",
-  material: "Материал корпуса",
+  ways: "Тип крана",
   kvs: "Kvs (м³/ч)",
+  material: "Материал корпуса",
   analog: "Аналоги",
 };
 

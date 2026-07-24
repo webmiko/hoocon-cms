@@ -40,6 +40,13 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
     code = (sku_code or "").strip().lower().replace(" ", "")
     if not code:
         return None
+    # H8205-LAV: ``S`` / ``ST`` before voltage → aux present (catalog wiring a+b).
+    if re.match(r"h8205-lav", code):
+        if re.search(r"lav\d+(?:st|s)-(?:24|230)[adm]$", code):
+            return 2
+        if re.search(r"lav\d+(?:t)?-(?:24|230)[adm]$", code):
+            return 0
+        return None
     # H81 factory kits: catalog shows two aux limit switches (a + b) on -AS/-DS.
     # Edition is glued to voltage (…-24AS / …-230DS), not a bare «-as» suffix.
     if re.match(r"h81(?:01|02|03|04|05|06|07|08|21|22)-bv", code):

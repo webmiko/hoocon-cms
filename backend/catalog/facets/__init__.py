@@ -27,6 +27,8 @@ from catalog.facets.copy import (
 )
 from catalog.facets.dedupe import dedupe_attribute_values
 from catalog.facets.defs import (
+    BALL_VALVE_8100_FACET_KEYS,
+    CATEGORY_FACET_KEYS,
     EXTRA_HIGHLIGHT_DEFS,
     FACET_BY_KEY,
     FACET_DEFS,
@@ -38,6 +40,7 @@ from catalog.facets.defs import (
 from catalog.facets.filter_options import (
     _facet_sort_key,
     collect_facet_options,
+    facet_defs_for_category,
     filter_skus_by_facet,
 )
 from catalog.facets.highlights import (
@@ -60,6 +63,8 @@ __all__ = [
     "AUX_SWITCH_NONE",
     "AUX_SWITCH_SPDT_1",
     "AUX_SWITCH_SPDT_2",
+    "BALL_VALVE_8100_FACET_KEYS",
+    "CATEGORY_FACET_KEYS",
     "EXTRA_HIGHLIGHT_DEFS",
     "FACET_BY_KEY",
     "FACET_DEFS",
@@ -75,6 +80,7 @@ __all__ = [
     "dedupe_attribute_values",
     "ensure_modulating_signal_attributes",
     "extract_sku_lead",
+    "facet_defs_for_category",
     "filter_skus_by_facet",
     "format_aux_switch_display",
     "format_sku_heading_name",
