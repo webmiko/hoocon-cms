@@ -36,12 +36,15 @@ export function isTechnicalDiagram(src: string, alt?: string): boolean {
   if (isSizeDiagram(src, alt)) {
     return true;
   }
-  if (/-(?:dimensions|wiring)\./i.test(src)) {
+  if (/-(?:dimensions|wiring|aux[_-]switch|settings)\./i.test(src)) {
     return true;
   }
   const label = (alt || "").toLowerCase();
   return (
     label.includes("схема подключения") ||
+    label.includes("вспомогательн") ||
+    label.includes("dip") ||
+    label.includes("настройка") ||
     label.includes("габаритные размеры") ||
     label.includes("чертёж") ||
     label.includes("чертеж")

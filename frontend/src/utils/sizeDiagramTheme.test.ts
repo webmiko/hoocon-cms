@@ -29,6 +29,18 @@ describe("sizeDiagramSrcForTheme", () => {
         "DA5FU | Габаритные размеры привода (мм)",
       ),
     ).toBe(true);
+    expect(
+      isTechnicalDiagram(
+        "/media/x_h8101-aux_switch.webp",
+        "H8101 | Вспомогательные концевые выключатели",
+      ),
+    ).toBe(true);
+    expect(
+      isTechnicalDiagram(
+        "/media/x_h8101-settings.webp",
+        "H8101 | Настройка DIP-переключателей",
+      ),
+    ).toBe(true);
     expect(isTechnicalDiagram("/media/x-0.webp", "product photo")).toBe(false);
   });
 

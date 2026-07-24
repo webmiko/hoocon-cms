@@ -34,7 +34,14 @@ from catalog.models import SKU, ProductFile, ProductImage
 
 logger = logging.getLogger(__name__)
 
-DiagramKind = Literal["wiring", "dimensions", "photo", "photo_thermal"]
+DiagramKind = Literal[
+    "wiring",
+    "dimensions",
+    "photo",
+    "photo_thermal",
+    "aux_switch",
+    "settings",
+]
 Edition = Literal["on_off", "modulating_24"]
 
 _DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
@@ -47,7 +54,9 @@ _SAFU_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/sa{nm}fu-ds-
 
 SORT_PHOTO = 0
 SORT_WIRING = 5
-SORT_DIMENSIONS = 6
+SORT_AUX_SWITCH = 6
+SORT_SETTINGS = 7
+SORT_DIMENSIONS = 8
 
 # Small spring-return bodies without a dedicated PDF reuse DA5 drawings for now.
 _PDF_FALLBACK_NM: Final[dict[int, int]] = {
