@@ -597,12 +597,217 @@ def _analogs_edition_needles(sku_code: str) -> tuple[str, ...]:
     return tuple(sorted(dict.fromkeys(needles), key=len, reverse=True))
 
 
+_ANALOGS_FULL_CODE_RE = re.compile(
+    r"(?i)\b([a-z]{2,}\d+[a-z]*\d*-[a-z]{1,3})\b",
+)
+_ANALOGS_EDITION_HEADER_RE = re.compile(
+    r"(?i)^(?P<prefix>для\s+(?:hoocon\s+)?|аналоги\s+для\s+)"
+    r"(?P<body>.+?)"
+    r"(?P<tail>\s*\([^)]*\))?\s*:?\s*$",
+)
+# SAMU: «Аналоги 24В (SA10MU24-DS/DST):» / «Аналоги 230В (SA10MU230-DS/DST)»
+_ANALOGS_VOLTAGE_HEADER_RE = re.compile(
+    r"(?i)^аналоги\s+(?P<volt>24|230)\s*в\s*"
+    r"(?:\((?P<body>[^)]*)\))?\s*:?\s*$",
+)
+_ANALOGS_SHORT_SLASH_RE = re.compile(
+    r"(?i)(?P<stem>[a-z]{2,}\d+[a-z]*\d*)-(?P<a>[ads]{1,3})\s*/\s*(?P<b>[ads]{1,3})\b",
+)
+_ANALOGS_MULTI_VOLT_OVERVIEW_RE = re.compile(
+    r"(?i)^аналоги\s+.+\s+и\s+[a-z]{2,}\d",
+)
+
+
+def _compact_sku_token(code: str) -> str:
+    """Lowercase SKU token without spaces / underscores / hyphens."""
+    return re.sub(r"[\s_\-]+", "", (code or "").casefold())
+
+
+def _control_suffix_family(suffix: str) -> str:
+    """Map edition suffix to control family for slash-header matching."""
+    suf = (suffix or "").casefold()
+    if suf in {"a", "as"}:
+        return "modulating"
+    if suf in {"d", "ds", "dst"}:
+        return "on_off"
+    if suf == "m":
+        return "modbus"
+    return suf
+
+
+def _sku_control_suffix(compact: str) -> str:
+    """Trailing control letters from a compacted article (``da2mu230ds`` → ``ds``)."""
+    for suf in ("dst", "ds", "as", "st", "a", "d", "m", "t", "s"):
+        if compact.endswith(suf) and len(compact) > len(suf):
+            return suf
+    return ""
+
+
+def _sku_voltage_token(sku_code: str) -> str | None:
+    """Return ``24`` / ``230`` encoded in the article, if present."""
+    match = re.search(r"(?i)(?:mu|fu|qu|hvd|hva)?(230|24)(?:-|$)", sku_code or "")
+    if match:
+        return match.group(1)
+    match = re.search(r"(230|24)", sku_code or "")
+    return match.group(1) if match else None
+
+
+def _listed_editions_in_header(header: str) -> list[str]:
+    """Full SKU codes listed in an analogs heading (slash groups)."""
+    return [m.group(1) for m in _ANALOGS_FULL_CODE_RE.finditer(header)]
+
+
+def _header_voltage_token(header: str) -> str | None:
+    """Return ``24`` / ``230`` from an analogs heading, if present."""
+    match = re.search(r"(?i)\b(230|24)\s*в\b", header or "")
+    if match:
+        return match.group(1)
+    codes = _listed_editions_in_header(header)
+    volts = {_sku_voltage_token(c) for c in codes}
+    volts.discard(None)
+    if len(volts) == 1:
+        return next(iter(volts))  # type: ignore[arg-type]
+    return None
+
+
+def _sku_matches_analogs_header(sku_code: str, header: str) -> bool | None:
+    """Whether ``sku_code`` belongs to this edition heading.
+
+    Returns:
+        True / False when the heading lists concrete editions or a voltage
+        band; None when the line is not an edition list (fall back to blob
+        needles).
+    """
+    volt_header = _ANALOGS_VOLTAGE_HEADER_RE.match(header.strip())
+    listed = _listed_editions_in_header(header)
+    short = _ANALOGS_SHORT_SLASH_RE.search(header.replace(" ", ""))
+    header_volt = _header_voltage_token(header)
+    sku_volt = _sku_voltage_token(sku_code)
+
+    if volt_header is not None:
+        band = volt_header.group("volt")
+        if sku_volt and sku_volt != band:
+            return False
+        body = volt_header.group("body") or ""
+        if body.strip():
+            return _sku_matches_listed_or_slash(sku_code, body) is not False
+        return True
+
+    if not listed and short is None:
+        return None
+
+    if header_volt and sku_volt and header_volt != sku_volt:
+        return False
+
+    return _sku_matches_listed_or_slash(sku_code, header)
+
+
+def _sku_matches_listed_or_slash(sku_code: str, header: str) -> bool | None:
+    """Match SKU against full codes and ``STEM-D/DS`` slash groups in ``header``."""
+    listed = _listed_editions_in_header(header)
+    short = _ANALOGS_SHORT_SLASH_RE.search(header.replace(" ", ""))
+    if not listed and short is None:
+        return None
+
+    sku_compact = _compact_sku_token(sku_code)
+    sku_suf = _sku_control_suffix(sku_compact)
+    sku_fam = _control_suffix_family(sku_suf)
+    sku_stem = sku_compact[: -len(sku_suf)] if sku_suf else sku_compact
+
+    if listed:
+        for raw in listed:
+            item = _compact_sku_token(raw)
+            if item == sku_compact:
+                return True
+            item_suf = _sku_control_suffix(item)
+            item_stem = item[: -len(item_suf)] if item_suf else item
+            # Same stem + same control family (D↔DS, A↔AS, DS↔DST).
+            if item_stem == sku_stem and item_suf and sku_suf and _control_suffix_family(item_suf) == sku_fam:
+                return True
+            # Paren ``SA10MU24-DS/DST`` lists DS; DST is same stem family.
+            if (
+                item_stem == sku_stem
+                and item_suf in {"ds", "dst"}
+                and sku_suf
+                in {
+                    "ds",
+                    "dst",
+                }
+            ):
+                return True
+        return False
+
+    if short is not None:
+        stem = short.group("stem").casefold()
+        sufs = {short.group("a").casefold(), short.group("b").casefold()}
+        if sku_stem != _compact_sku_token(stem):
+            return False
+        if sku_suf in sufs:
+            return True
+        return any(_control_suffix_family(s) == sku_fam for s in sufs)
+    return None
+
+
+def rewrite_analogs_headings_for_sku(text: str, sku_code: str) -> str:
+    """Rewrite edition headings to the current article only.
+
+    ``Для Hoocon DA2MU230-DS/DA2MU230-AS (230В):`` →
+    ``Для Hoocon DA2MU230-DS (230В):`` when ``sku_code`` is ``DA2MU230-DS``.
+
+    ``Аналоги 24В (SA10MU24-DS/DST):`` → ``Аналоги для SA10MU24-DS (24В):``.
+    """
+    code = (sku_code or "").strip()
+    if not text or not code:
+        return text
+    volt = _sku_voltage_token(code)
+    out: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        volt_match = _ANALOGS_VOLTAGE_HEADER_RE.match(stripped)
+        if volt_match is not None:
+            band = volt_match.group("volt")
+            rebuilt = f"Аналоги для {code} ({band}В)"
+            if stripped.endswith(":"):
+                rebuilt = f"{rebuilt}:"
+            out.append(rebuilt)
+            continue
+        match = _ANALOGS_EDITION_HEADER_RE.match(stripped)
+        if match is None:
+            out.append(line)
+            continue
+        body = match.group("body")
+        # Skip non-edition titles («Список аналогов для привода…»).
+        if not _ANALOGS_FULL_CODE_RE.search(body) and not _ANALOGS_SHORT_SLASH_RE.search(
+            re.sub(r"\s+", "", body),
+        ):
+            out.append(line)
+            continue
+        prefix = match.group("prefix")
+        tail = match.group("tail") or ""
+        if not tail and volt:
+            tail = f" ({volt}В)"
+        if prefix.casefold().startswith("аналоги"):
+            rebuilt = f"Аналоги для {code}{tail}"
+        elif "hoocon" in prefix.casefold():
+            rebuilt = f"Для Hoocon {code}{tail}"
+        else:
+            rebuilt = f"Для {code}{tail}"
+        if stripped.endswith(":"):
+            rebuilt = f"{rebuilt}:"
+        out.append(rebuilt)
+    return "\n".join(out)
+
+
 def filter_analogs_for_sku(text: str, sku_code: str) -> str:
     """Keep analog blocks that mention this SKU edition.
 
     Tilda pages list analogs per edition (``DA3FU230-DS``, ``DA3FU24-DS``,
-    ``Аналоги для DA4MU24-A/AS``, or ``Для Hoocon DA2MU230-DS/…``). When no
-    edition marker matches, return the full text unchanged.
+    ``Аналоги для DA4MU24-A/AS``, ``Для Hoocon DA2MU230-DS/…``, or SAMU
+    ``Аналоги 24В (SA10MU24-DS/DST)``). When no edition marker matches, return
+    the full text unchanged.
+
+    Headings that list several articles are rewritten to the current
+    ``sku_code`` so each PDP shows «свои» аналоги.
 
     Args:
         text: Full «Аналоги» tab text.
@@ -624,18 +829,27 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
     lines = text.replace("\xa0", " ").splitlines()
     blocks: list[list[str]] = [[]]
     header_re = re.compile(
-        r"(?i)^(основные характеристики|аналоги привода|аналоги для|важные параметры)\b"
+        r"(?i)^(основные характеристики|общие характеристики|аналоги привода|"
+        r"аналоги для|аналоги\s+\d|аналоги\s+[a-z]|важные параметры)\b"
         r"|^для\s+(?:hoocon\s+)?[a-z]{2,}\d"
         r"|^[A-Z]{2,}\d+[A-Z]*\d*(?:-|\s|$)",
     )
     shared_re = re.compile(
-        r"(?i)^(основные характеристики аналогов|важно)\b",
+        r"(?i)^(основные характеристики аналогов|общие характеристики аналогов|важно)\b",
     )
     # Series-wide blurb after edition lists — not SKU-specific.
-    drop_re = re.compile(r"(?i)^все перечисленные модели\b")
+    drop_re = re.compile(
+        r"(?i)^все перечисленные модели\b|^аналоги\s+.+\s+и\s+[a-z]{2,}\d",
+    )
     for line in lines:
         stripped = line.strip()
-        starts = bool(header_re.search(stripped)) or bool(shared_re.match(stripped)) or bool(drop_re.match(stripped))
+        starts = (
+            bool(header_re.search(stripped))
+            or bool(shared_re.match(stripped))
+            or bool(drop_re.match(stripped))
+            or bool(_ANALOGS_VOLTAGE_HEADER_RE.match(stripped))
+            or bool(_ANALOGS_MULTI_VOLT_OVERVIEW_RE.match(stripped))
+        )
         if starts and blocks[-1] and any(x.strip() for x in blocks[-1]):
             blocks.append([])
         blocks[-1].append(line)
@@ -645,15 +859,23 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
     shared: list[str] = []
     saw_edition = False
     for block in blocks:
-        # Strip slash so ``DA4MU24-D/DS`` → ``da4mu24dds``.
-        blob = re.sub(r"[\s_\-/]+", "", "\n".join(block).casefold())
         first = next((ln.strip() for ln in block if ln.strip()), "")
-        if drop_re.match(first):
+        if drop_re.match(first) or _ANALOGS_MULTI_VOLT_OVERVIEW_RE.match(first):
             continue
         if shared_re.match(first):
             shared.extend(block)
             shared.append("")
             continue
+        header_match = _sku_matches_analogs_header(code, first)
+        if header_match is True:
+            saw_edition = True
+            matched.extend(block)
+            matched.append("")
+            continue
+        if header_match is False:
+            continue
+        # No concrete edition list — legacy blob needle match.
+        blob = re.sub(r"[\s_\-/]+", "", "\n".join(block).casefold())
         if any(needle in blob for needle in needles):
             saw_edition = True
             matched.extend(block)
@@ -665,7 +887,8 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
             preamble.append("")
 
     if not matched:
-        return text.strip()
+        return rewrite_analogs_headings_for_sku(text.strip(), code)
 
     out_lines = [*preamble, *matched, *shared]
-    return dedupe_description_lines("\n".join(out_lines).strip())
+    filtered = dedupe_description_lines("\n".join(out_lines).strip())
+    return rewrite_analogs_headings_for_sku(filtered, code)

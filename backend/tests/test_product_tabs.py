@@ -58,7 +58,7 @@ def test_filter_analogs_keeps_matching_edition() -> None:
 
 
 def test_filter_analogs_hoocon_dlya_headers() -> None:
-    """DAMU-style «Для Hoocon DA2MU230-…» blocks filter by voltage core."""
+    """DAMU-style «Для Hoocon DA2MU230-…» blocks filter by edition + rewrite heading."""
     text = """
 Список аналогов для привода серии DA..MU 2 Нм
 
@@ -78,10 +78,51 @@ def test_filter_analogs_hoocon_dlya_headers() -> None:
     assert "CM230-L/R" in out_230
     assert "CM24-L/R" not in out_230
     assert "Основные характеристики аналогов" in out_230
+    assert "Для Hoocon DA2MU230-A (230В):" in out_230
+    assert "DA2MU230-DS/DA2MU230-AS" not in out_230
+
+    out_ds = filter_analogs_for_sku(text, "DA2MU230-DS")
+    assert "CM230-L/R" in out_ds
+    assert "Для Hoocon DA2MU230-DS (230В):" in out_ds
+    assert "DA2MU230-AS" not in out_ds
 
     out_24 = filter_analogs_for_sku(text, "DA2MU24-DS")
     assert "CM24-L/R" in out_24
     assert "CM230-L/R" not in out_24
+    assert "Для Hoocon DA2MU24-DS (24В)" in out_24
+
+
+def test_filter_analogs_samu_voltage_headers() -> None:
+    """SAMU «Аналоги 24В (SA…-DS/DST)» keeps one voltage and rewrites heading."""
+    text = """
+Список аналогов для привода заслонки Hoocon серии SA10MU:
+
+Аналоги SA10MU24-DS/DST и SA10MU230-DS/DST:
+
+Аналоги 24В (SA10MU24-DS/DST):
+
+– Belimo EMF-24-10
+
+Аналоги 230В (SA10MU230-DS/DST)
+
+– Belimo EMF-230-10
+
+Общие характеристики аналогов
+
+Крутящий момент: 5-10 Нм
+""".strip()
+    out_24 = filter_analogs_for_sku(text, "SA10MU24-DS")
+    assert "EMF-24-10" in out_24
+    assert "EMF-230-10" not in out_24
+    assert "Аналоги для SA10MU24-DS (24В):" in out_24
+    assert "DS/DST" not in out_24
+    assert "и SA10MU230" not in out_24
+    assert "Общие характеристики аналогов" in out_24
+
+    out_dst = filter_analogs_for_sku(text, "SA10MU230-DST")
+    assert "EMF-230-10" in out_dst
+    assert "EMF-24-10" not in out_dst
+    assert "Аналоги для SA10MU230-DST (230В)" in out_dst
 
 
 def test_filter_analogs_da4mu_per_control_and_voltage() -> None:
@@ -117,6 +158,8 @@ def test_filter_analogs_da4mu_per_control_and_voltage() -> None:
     assert "DAC-LMC230" not in out_24_d
     assert "Все перечисленные" not in out_24_d
     assert "Важно:" in out_24_d
+    assert "Аналоги для DA4MU24-D (24 В, 4Нм):" in out_24_d
+    assert "D/DS" not in out_24_d
 
     out_230_a = filter_analogs_for_sku(text, "DA4MU230-AS")
     assert "DAC-LMC230" in out_230_a
@@ -124,3 +167,4 @@ def test_filter_analogs_da4mu_per_control_and_voltage() -> None:
     assert "LM230A-S" not in out_230_a
     assert "LM24-SR" not in out_230_a
     assert "Все перечисленные" not in out_230_a
+    assert "Аналоги для DA4MU230-AS (230 В, 4Нм)" in out_230_a
