@@ -11,7 +11,7 @@ from catalog.series_categories import (
 
 
 def test_spec_categories_match_article_families() -> None:
-    """Six actuator families from the series table, plus ball valves."""
+    """Six actuator families from the series table, plus ball valves and kits."""
     slugs = [c.slug for c in spec_categories()]
     assert slugs == [
         "elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
@@ -21,6 +21,7 @@ def test_spec_categories_match_article_families() -> None:
         "elektroprivody-protivopozharnye-i-dymovye",
         "elektroprivody-dlya-klapanov-dymoudaleniya",
         "sharovye-krany",
+        "komplekty",
     ]
 
 
@@ -38,6 +39,8 @@ def test_classify_series_by_sku_codes() -> None:
     assert classify_series_category("x", ["SA5FU24-DS"]) == "elektroprivody-protivopozharnye-i-dymovye"
     assert classify_series_category("x", ["SA10MU230-DST"]) == "elektroprivody-dlya-klapanov-dymoudaleniya"
     assert classify_series_category("sharovoy-kran-bv215", ["8100-bv215a"]) == "sharovye-krany"
+    assert classify_series_category("sharovoy-kran-h8101-bv215a", ["H8101-BV215A-24A"]) == "komplekty"
+    assert classify_series_category("sharovoy-kran-h8205-lav232", ["H8205-LAV232-24A"]) == "komplekty"
 
 
 def test_resolve_legacy_tilda_aliases() -> None:

@@ -66,7 +66,7 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     """Infer voltage / control / aux-switch from a Tilda edition SKU code.
 
     Args:
-        sku_code: e.g. ``da3fu230-d``, ``da10fu24-as``, ``8100-bv215a``.
+        sku_code: e.g. ``da3fu230-d``, ``da10fu24-as``, ``H8103-BV265-24AS``.
 
     Returns:
         Parsed variant (fields may be None when code is ambiguous).
@@ -82,6 +82,23 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
 
     control: str | None = None
     aux: bool | None = None
+    # H8103-BV265-24AS / H8101-BV215A-24AS — voltage+control glued (no «-A»).
+    h81 = re.fullmatch(
+        r"h81(?:01|02|03|04|05|06|07|08|21|22)-bv\d{3,4}[a-e]?-"
+        r"(?P<volt>24|230)(?P<ctrl>as|a|ds|d)",
+        code,
+    )
+    if h81 is not None:
+        voltage = h81.group("volt")
+        ctrl = h81.group("ctrl")
+        if ctrl in {"a", "as"}:
+            control = "modulating"
+            aux = ctrl == "as"
+        else:
+            control = "on_off"
+            aux = ctrl == "ds"
+        return SkuVariant(voltage=voltage, control=control, aux_switch=aux, code=code)
+
     # HVD24S-3F / HVD230ST-5F — fire/smoke spring-return (S / ST + NmF).
     if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
         control = "on_off"

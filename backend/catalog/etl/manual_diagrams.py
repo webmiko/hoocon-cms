@@ -109,6 +109,70 @@ def _pil_to_png_bytes(image: Image.Image) -> bytes:
     return buf.getvalue()
 
 
+def punch_near_white_background(
+    image: Image.Image,
+    *,
+    luma_min: int = 220,
+) -> Image.Image:
+    """Make edge-connected near-white pixels transparent (studio cutout).
+
+    Flood-fills from the image border so white dials / labels on the product
+    face stay opaque. Soft grey vignette from PDF pages is treated as backdrop
+    when luminance is high enough and connected to the edge.
+
+    Args:
+        image: RGB/RGBA crop.
+        luma_min: Minimum average channel value to treat as backdrop.
+
+    Returns:
+        RGBA image with transparent backdrop.
+    """
+    from collections import deque
+
+    rgba = image.convert("RGBA")
+    pixels = cast(Any, rgba.load())
+    width, height = rgba.size
+    if width < 2 or height < 2 or pixels is None:
+        return rgba
+
+    def is_backdrop(x: int, y: int) -> bool:
+        r, g, b, a = pixels[x, y]
+        if a < 16:
+            return True
+        return (r + g + b) / 3 >= luma_min and min(r, g, b) >= luma_min - 15
+
+    seen = bytearray(width * height)
+    queue: deque[tuple[int, int]] = deque()
+
+    def try_enqueue(x: int, y: int) -> None:
+        if x < 0 or y < 0 or x >= width or y >= height:
+            return
+        index = y * width + x
+        if seen[index]:
+            return
+        if not is_backdrop(x, y):
+            return
+        seen[index] = 1
+        queue.append((x, y))
+
+    for x in range(width):
+        try_enqueue(x, 0)
+        try_enqueue(x, height - 1)
+    for y in range(height):
+        try_enqueue(0, y)
+        try_enqueue(width - 1, y)
+
+    while queue:
+        x, y = queue.popleft()
+        pixels[x, y] = (255, 255, 255, 0)
+        try_enqueue(x + 1, y)
+        try_enqueue(x - 1, y)
+        try_enqueue(x, y + 1)
+        try_enqueue(x, y - 1)
+
+    return rgba
+
+
 def crop_on_off_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
     """Crop wiring and dimensions from a D/DS page-3 raster.
 
@@ -392,9 +456,23 @@ def unpublish_legacy_static_dimension(*, dry_run: bool = False) -> int:
     return qs.update(is_published=False)
 
 
-def _upsert_diagram(sku: SKU, crop: DiagramCrop, *, dry_run: bool) -> str:
+def _upsert_diagram(
+    sku: SKU,
+    crop: DiagramCrop,
+    *,
+    dry_run: bool,
+    webp_bytes: bytes | None = None,
+) -> str:
     """Create or refresh one diagram image. Returns ``create`` / ``update`` / ``skip``."""
-    webp = convert_bytes_to_webp(crop.png_bytes, quality=92, max_edge=1600)
+    webp = (
+        webp_bytes
+        if webp_bytes is not None
+        else convert_bytes_to_webp(
+            crop.png_bytes,
+            quality=92,
+            max_edge=1600,
+        )
+    )
     existing = ProductImage.objects.filter(sku=sku, source_url=crop.source_url).first()
     if dry_run:
         return "update" if existing else "create"
@@ -1189,14 +1267,29 @@ def source_url_for_hvdf(series_nm: int, kind: DiagramKind) -> str:
 
 
 def crop_hvdf_product_photos(page: Image.Image) -> tuple[Image.Image, Image.Image]:
-    """Crop actuator-only and actuator+SAF72 photos from HVD-…F page 2 (index 1)."""
+    """Crop actuator-only and actuator+SAF72 photos from HVD-…F page 2 (index 1).
+
+    Page layout (English manual): product shot top-left, feature bullets to the
+    right (~0.21×), «Technical specification» table from ~0.27× height. Crops must
+    stay above the table and left of the bullets so gallery photos are hardware-only.
+
+    Both outputs share the same pixel size so S (no sensor) and ST (with SAF72)
+    render the actuator at the same visual scale in catalog cards / PDP.
+    """
     width, height = page.size
-    body = page.crop(
-        (int(0.02 * width), int(0.10 * height), int(0.28 * width), int(0.42 * height)),
-    )
-    with_sensor = page.crop(
-        (int(0.02 * width), int(0.10 * height), int(0.38 * width), int(0.42 * height)),
-    )
+    left = int(0.042 * width)
+    top = int(0.085 * height)
+    bottom = int(0.264 * height)
+    # Actuator body ends before the orange SAF72 (~0.149…0.169×).
+    body_right = int(0.140 * width)
+    # Include SAF72; stop before the «3Nm ON/OFF» title (~0.21×).
+    frame_right = int(0.200 * width)
+
+    with_sensor = page.crop((left, top, frame_right, bottom))
+    body_tight = page.crop((left, top, body_right, bottom))
+    # Same canvas as ST: pad the right (sensor) column with white → punched later.
+    body = Image.new("RGB", with_sensor.size, (255, 255, 255))
+    body.paste(body_tight, (0, 0))
     return body, with_sensor
 
 
@@ -1204,6 +1297,10 @@ def diagrams_from_hvdf_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCro
     """Build photo + wiring + dimensions crops from an HVD-…F English manual."""
     page = render_pdf_page(pdf_path, 1)
     body_img, thermal_img = crop_hvdf_product_photos(page)
+    # Opaque PDF studio white + grey vignette → transparent cutout so PDP/catalog
+    # PhotoWash purpose gradient (smoke) shows through instead of sampled grey.
+    body_img = punch_near_white_background(body_img)
+    thermal_img = punch_near_white_background(thermal_img)
     wiring_img, dims_img = crop_safu_diagrams(page)
     series = f"HVD-{series_nm}F"
     s_code = f"HVD24S-{series_nm}F"

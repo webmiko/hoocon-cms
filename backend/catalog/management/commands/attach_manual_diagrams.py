@@ -1,4 +1,4 @@
-"""Attach wiring + dimensions diagrams from manuals / HVA catalog.
+"""Attach wiring + dimensions diagrams from manuals / HVA / H81 catalogs.
 
 Unpublishes legacy Tilda «Размеры и способ подключения» gallery shots (DAFU).
 
@@ -6,6 +6,7 @@ Usage::
 
     poetry run python manage.py attach_manual_diagrams
     poetry run python manage.py attach_manual_diagrams --series hva
+    poetry run python manage.py attach_manual_diagrams --series h81
     poetry run python manage.py attach_manual_diagrams --dry-run
 """
 
@@ -15,6 +16,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
+from catalog.etl.h81_catalog_media import apply_h81_catalog_media
 from catalog.etl.manual_diagrams import (
     apply_damu_manual_diagrams,
     apply_hva_manual_diagrams,
@@ -39,7 +41,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--series",
-            choices=("all", "dafu", "safu", "damu", "samu", "hvdf", "hva"),
+            choices=("all", "dafu", "safu", "damu", "samu", "hvdf", "hva", "h81"),
             default="all",
             help="Which series diagrams to attach (default: all).",
         )
@@ -63,6 +65,8 @@ class Command(BaseCommand):
             jobs.append(("HVDF", apply_hvdf_manual_diagrams(dry_run=dry_run)))
         if series in {"all", "hva"}:
             jobs.append(("HVA", apply_hva_manual_diagrams(dry_run=dry_run)))
+        if series in {"all", "h81"}:
+            jobs.append(("H81", apply_h81_catalog_media(dry_run=dry_run)))
 
         for label, summary in jobs:
             for series_key, stats in sorted(summary["series"].items()):
@@ -74,6 +78,8 @@ class Command(BaseCommand):
                 extra = (
                     f" unpub_combined={summary['unpublished_combined']} unpub_static={summary['unpublished_static']}"
                 )
+            if "unpublished_legacy" in summary:
+                extra += f" unpub_legacy={summary['unpublished_legacy']}"
             self.stdout.write(
                 self.style.SUCCESS(
                     f"{prefix}{label} diagrams: created={summary['created']} "

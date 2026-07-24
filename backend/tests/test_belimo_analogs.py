@@ -166,15 +166,31 @@ def test_infer_air_no_spring_by_moment_voltage_aux_control() -> None:
 
 
 def test_infer_fire_spring_family() -> None:
-    """Fire SA*FU without card text → Belimo BF/BFN/BFS by torque."""
+    """Fire/smoke spring-return → Belimo BFL/BLF/BFN by torque band."""
+    assert infer_belimo_codes(
+        purpose="fire_spring",
+        moment_nm=3.0,
+        voltage="24",
+        control="on_off",
+        aux_spdt=2,
+        thermal=False,
+    ) == ["BFL24"]
     assert infer_belimo_codes(
         purpose="fire_spring",
         moment_nm=5.0,
         voltage="24",
         control="on_off",
-        aux_spdt=1,
+        aux_spdt=2,
         thermal=False,
-    ) == ["BF24-S"]
+    ) == ["BLF24"]
+    assert infer_belimo_codes(
+        purpose="fire_spring",
+        moment_nm=5.0,
+        voltage="230",
+        control="on_off",
+        aux_spdt=2,
+        thermal=True,
+    ) == ["BLF230-T"]
     assert infer_belimo_codes(
         purpose="fire_spring",
         moment_nm=10.0,
@@ -183,6 +199,16 @@ def test_infer_fire_spring_family() -> None:
         aux_spdt=0,
         thermal=True,
     ) == ["BFN230-T"]
+
+
+def test_detect_purpose_hvd_is_fire_spring() -> None:
+    """HVD-…F must not inherit category smoke→CM (SA..MU lives in same category)."""
+    from catalog.etl.belimo_analogs import detect_purpose
+
+    slug = "elektroprivody-dlya-klapanov-dymoudaleniya"
+    assert detect_purpose(category_slug=slug, sku_code="HVD24S-3F") == "fire_spring"
+    assert detect_purpose(category_slug=slug, sku_code="HVD230ST-5F") == "fire_spring"
+    assert detect_purpose(category_slug=slug, sku_code="SA10MU24-DS") == "smoke"
 
 
 def test_infer_fast_actuator() -> None:
@@ -227,12 +253,12 @@ def test_belimo_codes_for_sku_infers_when_text_empty() -> None:
         name="Air no spring",
         slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
     )
-    product = Product.objects.create(name="HVD", slug="hvd-analog-test", category=cat)
+    product = Product.objects.create(name="DA5MU", slug="da5mu-analog-test", category=cat)
     sku = SKU.objects.create(
         product=product,
-        name="HVD24-5",
-        slug="hvd24-5-analog-test",
-        sku_code="HVD24-5",
+        name="DA5MU24-D",
+        slug="da5mu24-d-analog-test",
+        sku_code="DA5MU24-D",
         is_published=True,
     )
     moment = Attribute.objects.create(name="Крутящий момент", slug="moment")

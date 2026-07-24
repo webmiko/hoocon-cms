@@ -58,6 +58,42 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert hvdf_s.aux_switch is True
 
 
+def test_parse_sku_variant_flanged_h81_kits() -> None:
+    """H8103/H8104 kit codes expose voltage / control / aux like actuators."""
+    as24 = parse_sku_variant("H8103-BV265-24AS")
+    assert as24.voltage == "24"
+    assert as24.control == "modulating"
+    assert as24.aux_switch is True
+
+    d230 = parse_sku_variant("H8104-BV2100-230D")
+    assert d230.voltage == "230"
+    assert d230.control == "on_off"
+    assert d230.aux_switch is False
+
+    a24 = parse_sku_variant("H8103-BV280-24A")
+    assert a24.voltage == "24"
+    assert a24.control == "modulating"
+    assert a24.aux_switch is False
+
+
+def test_parse_sku_variant_brass_h81_kits() -> None:
+    """H8101/H8105 brass kit codes include Kvs letter before voltage."""
+    as24 = parse_sku_variant("H8101-BV215A-24AS")
+    assert as24.voltage == "24"
+    assert as24.control == "modulating"
+    assert as24.aux_switch is True
+
+    d230 = parse_sku_variant("H8105-BV350B-230D")
+    assert d230.voltage == "230"
+    assert d230.control == "on_off"
+    assert d230.aux_switch is False
+
+    h8121 = parse_sku_variant("H8121-BV2150-230DS")
+    assert h8121.voltage == "230"
+    assert h8121.control == "on_off"
+    assert h8121.aux_switch is True
+
+
 def test_parse_sku_variant_ignores_non_terminal_suffix_lookalikes() -> None:
     """Suffix tags must match only at the very end of sku_code."""
     variant = parse_sku_variant("da3fu230-as1")

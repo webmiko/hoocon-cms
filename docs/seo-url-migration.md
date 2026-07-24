@@ -111,6 +111,7 @@ privod-vozdushniy-pruzhina-dafu-20nm
 | `/tproduct/…-bv215-…` | `/sharovoy-kran-bv215` |
 | `/tproduct/…-bv220-…` | `/sharovoy-kran-bv220` |
 | … BV225…BV350 | `/sharovoy-kran-bv{NNN}` |
+| Фланцевые DN65–150 | `/sharovoy-kran-bv265`, `…-bv280`, `…-bv2100`, `…-bv2125`, `…-bv2150` |
 | `/tproduct/…-hvd-40q-…` | `/privod-vozdushniy-hvd-40q` |
 | `/tproduct/…-da8mqu-…` | `/privod-vozdushniy-da8mqu-8nm` |
 

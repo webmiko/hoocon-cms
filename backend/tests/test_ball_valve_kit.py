@@ -71,6 +71,32 @@ def test_build_ball_valve_kit_options_for_bv_sku() -> None:
 
 
 @pytest.mark.django_db
+def test_build_ball_valve_kit_options_none_for_h81_kit() -> None:
+    """Complete H8103 kits do not expose the brass RFQ drive picker."""
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(
+        name="H8103-BV265",
+        slug="sharovoy-kran-h8103-bv265",
+        category=cat,
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="H8103-BV265",
+        slug="sharovoy-kran-h8103-bv265-h8103-bv265-24a",
+        sku_code="H8103-BV265-24A",
+        is_published=True,
+    )
+    set_sku_attribute(
+        sku,
+        slug="compatible-actuators",
+        value="DA16MU24 (−D/−DS/−A/−AS)",
+        name="Совместимый привод",
+        unit="",
+    )
+    assert build_ball_valve_kit_options(sku) is None
+
+
+@pytest.mark.django_db
 def test_build_ball_valve_kit_options_none_for_actuator() -> None:
     cat = Category.objects.create(name="Воздушные", slug="elektroprivody-vozdushnye")
     product = Product.objects.create(name="DA5", slug="p-da5", category=cat)

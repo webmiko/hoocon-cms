@@ -201,3 +201,34 @@ def test_parse_hva_series_and_source_url() -> None:
     assert parse_hva_series("da5fu24-ds") is None
     assert "hva5-dimensions" in source_url_for_hva(5, fast=False, kind="dimensions")
     assert "hva5q-dimensions" in source_url_for_hva(5, fast=True, kind="dimensions")
+
+
+def test_crop_hvdf_product_photos_excludes_datasheet_chrome() -> None:
+    """Product crops stay left of feature bullets and above the spec table."""
+    from catalog.etl.manual_diagrams import crop_hvdf_product_photos
+
+    width, height = 2523, 1786
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    body, thermal = crop_hvdf_product_photos(page)
+    assert body.size == thermal.size
+    assert thermal.size[0] < width * 0.18
+    assert thermal.size[1] < height * 0.20
+
+
+def test_punch_near_white_background_keeps_interior() -> None:
+    """Edge white becomes alpha; dark product body stays opaque."""
+    from catalog.etl.manual_diagrams import punch_near_white_background
+
+    img = Image.new("RGB", (80, 60), color=(250, 250, 250))
+    for y in range(15, 45):
+        for x in range(20, 55):
+            img.putpixel((x, y), (40, 40, 40))
+    # Interior near-white “dial” not connected to edge.
+    for y in range(22, 28):
+        for x in range(30, 40):
+            img.putpixel((x, y), (255, 255, 255))
+    out = punch_near_white_background(img)
+    assert out.mode == "RGBA"
+    assert out.getpixel((0, 0))[3] == 0
+    assert out.getpixel((40, 30))[3] == 255
+    assert out.getpixel((35, 25))[3] == 255

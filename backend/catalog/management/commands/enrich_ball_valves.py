@@ -13,8 +13,8 @@ class Command(BaseCommand):
     """Apply BV215-style cards, copy, and galleries to every BV* series."""
 
     help = (
-        "Enrich all ball-valve series (BV215…BV350): description, "
-        "attribute cards, compatible drives, bracket, gallery photos."
+        "Enrich ball-valve series (brass BV215…BV350 + H8101…H8122 kits): "
+        "seed missing Product/SKU, copy, ТТХ, galleries; retire legacy 8100-bv265…."
     )
 
     def add_arguments(self, parser) -> None:  # type: ignore[no-untyped-def]
@@ -27,7 +27,7 @@ class Command(BaseCommand):
             "--series",
             action="append",
             default=[],
-            help="Limit to series code(s), e.g. --series BV220 --series BV315.",
+            help="Limit to series code(s), e.g. --series BV220 --series H8103 --series BV265.",
         )
         parser.add_argument(
             "--csv",
@@ -58,6 +58,9 @@ class Command(BaseCommand):
                 f"products={stats['products']}, skus={stats['skus']}, "
                 f"attr_writes={stats['attributes']}, "
                 f"images_created={stats['images_created']}, "
-                f"images_failed={stats['images_failed']}",
+                f"images_failed={stats['images_failed']}, "
+                f"pdf_attached={stats.get('pdf_attached', 0)}, "
+                f"legacy_unpublished={stats.get('legacy_unpublished', 0)}, "
+                f"redirects={stats.get('redirects', 0)}",
             ),
         )

@@ -68,6 +68,49 @@ def test_kvs_for_sku_matches_full_series_number() -> None:
     assert kvs_for_sku(series, "8100-bv220a") is None
 
 
+def test_kvs_for_flanged_kit_body_kvs() -> None:
+    """Flanged kit bodies keep a single Kvs; editions are electrical, not a–e."""
+    from catalog.etl.series_copy_ball_valves import flanged_kit_series
+
+    kit = next(k for k in flanged_kit_series() if k.code == "H8103-BV2100")
+    assert kit.kvs == "160"
+    assert kit.run_time == "< 150 с"
+    assert kit.material == "ВЧШГ"
+    assert kit.product_slug == "sharovoy-kran-h8103-bv2100"
+
+
+def test_flanged_kit_edition_matrix_has_80_unique_codes() -> None:
+    """H8103/H8104 alone: 2 × 5 bodies × 8 editions = 80 SKU codes."""
+    from catalog.etl.series_copy_ball_valves import (
+        flanged_kit_edition_sku_codes,
+        flanged_kit_series,
+    )
+
+    kits = [k for k in flanged_kit_series() if k.kit in {"H8103", "H8104"}]
+    assert len(kits) == 10
+    codes = [c for kit in kits for c in flanged_kit_edition_sku_codes(kit)]
+    assert len(codes) == 80
+    assert len(set(codes)) == 80
+    assert "H8103-BV265-24A" in codes
+    assert "H8104-BV2150-230DS" in codes
+
+
+def test_h81_full_kit_matrix_counts() -> None:
+    """H8101…H8122: 174 cards × 8 = 1392 unique SKU codes (no H8205)."""
+    from catalog.etl.h81_kits import all_h81_kit_series, h81_kit_edition_sku_codes
+
+    cards = all_h81_kit_series()
+    assert len(cards) == 174
+    codes = [c for kit in cards for c in h81_kit_edition_sku_codes(kit)]
+    assert len(codes) == 1392
+    assert len(set(codes)) == 1392
+    assert "H8101-BV215A-24AS" in codes
+    assert "H8105-BV350B-230D" in codes
+    assert "H8107-BV265-24A" in codes
+    assert "H8121-BV2150-230DS" in codes
+    assert not any(c.startswith("H8205") for c in codes)
+
+
 def test_diff_pressure_mpa_defaults_only_when_blank() -> None:
     """Default 0,35 applies only for missing/blank; unit strip keeps numeric body."""
     assert _diff_pressure_mpa(None) == "0,35"
@@ -246,3 +289,94 @@ def test_kvs_for_sku_code_returns_none_when_series_missing() -> None:
         return_value=[],
     ):
         assert kvs_for_sku_code("8100-bv215a") is None
+
+
+@pytest.mark.django_db
+def test_ensure_and_enrich_brass_h8101_bv215a() -> None:
+    """H8101-BV215A seeds 8 electrical SKUs; brass 8100 body stays separate."""
+    from catalog.ball_valve_kit import build_ball_valve_kit_options
+    from catalog.etl.series_copy_ball_valves import (
+        apply_flanged_kit_enrichment,
+        flanged_kit_series,
+    )
+
+    Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    kit = next(k for k in flanged_kit_series() if k.code == "H8101-BV215A")
+    stats = apply_flanged_kit_enrichment(kit, import_images=False, attach_pdf=False)
+    assert stats["products"] == 1
+    assert stats["skus"] == 8
+    sku = SKU.objects.get(sku_code="H8101-BV215A-24AS")
+    by_slug = {
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")
+    }
+    assert by_slug["dn"] == "15"
+    assert by_slug["kvs"] == "1,6"
+    assert by_slug["material"] == "Латунь"
+    assert by_slug["power-consumption"] == ("В рабочем режиме: 3 Вт / В режиме ожидания: 1 Вт")
+    assert "thread" in by_slug
+    assert "24" in by_slug["voltage"]
+    assert build_ball_valve_kit_options(sku) is None
+
+
+@pytest.mark.django_db
+def test_ensure_and_enrich_flanged_h8103_bv265() -> None:
+    """H8103-BV265 seeds 8 electrical SKUs with voltage/control, no RFQ drives."""
+    from catalog.ball_valve_kit import build_ball_valve_kit_options
+    from catalog.etl.series_copy_ball_valves import (
+        apply_flanged_kit_enrichment,
+        flanged_kit_series,
+    )
+
+    Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    kit = next(k for k in flanged_kit_series() if k.code == "H8103-BV265")
+    stats = apply_flanged_kit_enrichment(kit, import_images=False, attach_pdf=False)
+    assert stats["products"] == 1
+    assert stats["skus"] == 8
+    sku = SKU.objects.get(sku_code="H8103-BV265-24AS")
+    by_slug = {
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")
+    }
+    assert by_slug["dn"] == "65"
+    assert by_slug["kvs"] == "63"
+    assert by_slug["material"] == "ВЧШГ"
+    assert "фланц" in by_slug["connection"].casefold()
+    assert "24" in by_slug["voltage"]
+    assert "compatible-actuators" not in by_slug
+    assert build_ball_valve_kit_options(sku) is None
+
+
+@pytest.mark.django_db
+def test_retire_legacy_8100_flanged_redirects_to_h8103() -> None:
+    """Legacy 8100-bv265 is unpublished and 301'd to H8103-BV265-24A."""
+    from catalog.etl.series_copy_ball_valves import (
+        apply_flanged_kit_enrichment,
+        flanged_kit_series,
+        retire_legacy_flanged_body_skus,
+    )
+    from redirects.models import Redirect
+
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(
+        name="BV265",
+        slug="sharovoy-kran-bv265",
+        category=cat,
+    )
+    legacy = SKU.objects.create(
+        product=product,
+        name="BV265",
+        slug="sharovoy-kran-bv265-8100-bv265",
+        sku_code="8100-bv265",
+        is_published=True,
+    )
+    kit = next(k for k in flanged_kit_series() if k.code == "H8103-BV265")
+    apply_flanged_kit_enrichment(kit, import_images=False, attach_pdf=False)
+    retired = retire_legacy_flanged_body_skus()
+    legacy.refresh_from_db()
+    assert legacy.is_published is False
+    assert retired["skus_unpublished"] >= 1
+    target = SKU.objects.get(sku_code="H8103-BV265-24A")
+    assert Redirect.objects.filter(
+        from_path__contains=legacy.slug,
+        to_path__contains=target.slug,
+        is_active=True,
+    ).exists()

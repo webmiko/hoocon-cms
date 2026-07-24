@@ -187,8 +187,11 @@ def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
             return "NF"
         return "SF"
     if purpose == "fire_spring":
-        if moment_nm <= 6:
-            return "BF"
+        # Compact fire/smoke spring-return: BFL 4/3 → BLF 6/4 → BFN 9/7.
+        if moment_nm <= 4:
+            return "BFL"
+        if moment_nm <= 6.5:
+            return "BLF"
         if moment_nm <= 12:
             return "BFN"
         return "BFS"
@@ -230,8 +233,9 @@ def _compose_belimo_article(
         return code
 
     if purpose == "fire_spring":
+        # BFL/BLF ship with 2× SPDT; classic BF/BFN/BFS use optional -S.
         code = f"{family}{voltage}"
-        if aux_spdt >= 1:
+        if family in {"BF", "BFN", "BFS"} and aux_spdt >= 1:
             code += "-S"
         if thermal:
             code += "-T"
@@ -264,6 +268,10 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
     """Infer actuator purpose from category slug and SKU code."""
     slug = (category_slug or "").casefold()
     code = (sku_code or "").casefold()
+    # HVD-…F: spring-return smoke/fire compact (same Belimo BFL/BLF class as SA..FU).
+    # Must win over category ``…dymoudalen…`` which also hosts SA..MU (no spring).
+    if code.startswith("hvd"):
+        return "fire_spring"
     for fragment, purpose in _PURPOSE_BY_CATEGORY:
         if fragment in slug:
             return purpose
@@ -271,7 +279,10 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
         return "fire_spring"
     if "mqu" in code or code.startswith("hva"):
         return "fast"
-    if code.startswith("hvd") or "mu" in code:
+    # DA..MU / SA..MU — no spring return (not HVD).
+    if re.search(r"(?i)(?:^|[^a-z])(?:da|sa)\d*mu", code) or (
+        "mu" in code and "fu" not in code and not code.startswith("hvd")
+    ):
         return "air_no_spring"
     if "fu" in code:
         return "air_spring"
