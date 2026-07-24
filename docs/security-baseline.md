@@ -25,7 +25,7 @@ Admin, файлы, SPA, VPS.
 | Staff Admin / сессии | Брутфорс, CSRF, XSS в Admin | HTTPS, CSRF, rate limit login, сильные пароли |
 | Публичный RFQ `POST /api/leads/` | Спам, injection, PII scrape | Serializer validate, honeypot, throttle, CSRF/API |
 | Каталог / цены в БД | Утечка цен через API | `show_prices` + serializer; нет цены по умолчанию |
-| PDF / media | Path traversal, malware upload | allowlist MIME, size, storage вне URL-угадывания |
+| PDF / media | Path traversal, malware upload, hotlink | allowlist MIME, size; nginx+Django Referer allowlist on `/media/` |
 | SEO head / JSON-LD | XSS через контент | whitelist полей, `html.escape`, без сырого HTML |
 | SMTP / `.env` | Утечка секретов | только env; не в логах; `.gitignore` |
 | Зависимости | Supply chain | poetry.lock, npm lock, `pip-audit` в CI |
@@ -83,6 +83,9 @@ Admin, файлы, SPA, VPS.
 
 - Upload: max size, allowlist `pdf/jpeg/png/webp`; имя генерировать сервером.
 - Path: resolve + `is_relative_to(MEDIA_ROOT)`.
+- Hotlink: Referer allowlist на `/media/` (nginx `valid_referers` +
+  `MediaHotlinkMiddleware`); пустой Referer разрешён (прямая вкладка / PDF в
+  почте). Чужой сайт с `<img src="https://hoocon…/media/…">` → 403.
 - ETL: не исполнять код из CSV/HTML; quarantine (см. data-quality-etl).
 
 ### 3.4 Frontend (React)

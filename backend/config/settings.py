@@ -10,6 +10,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
+from config.media_hotlink import build_media_hotlink_hosts
 from config.release import RELEASE_VERSION, release_label
 
 # Load project-root .env; do not call load_dotenv() twice (avoid CWD-anchored
@@ -84,6 +85,21 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", _DEFAULT_CORS).split(",") if origin.strip()
 ]
 
+# Hotlink: foreign <img src="https://ours/media/..."> gets 403 (Referer allowlist).
+# Empty Referer allowed (direct tab, mail PDF). Prod nginx mirrors this — see
+# deploy/nginx/hoocon.conf. Disable with MEDIA_HOTLINK_ENABLED=false.
+MEDIA_HOTLINK_ENABLED = _env_bool("MEDIA_HOTLINK_ENABLED", default=True)
+MEDIA_HOTLINK_ALLOW_EMPTY_REFERER = _env_bool(
+    "MEDIA_HOTLINK_ALLOW_EMPTY_REFERER",
+    default=True,
+)
+_MEDIA_HOTLINK_EXTRA = [host.strip() for host in os.getenv("MEDIA_HOTLINK_EXTRA_HOSTS", "").split(",") if host.strip()]
+MEDIA_HOTLINK_ALLOWED_HOSTS = build_media_hotlink_hosts(
+    allowed_hosts=ALLOWED_HOSTS,
+    cors_origins=[*CORS_ALLOWED_ORIGINS, *CSRF_TRUSTED_ORIGINS],
+    extra_hosts=_MEDIA_HOTLINK_EXTRA,
+)
+
 INSTALLED_APPS = [
     # django-unfold must precede django.contrib.admin (template/override order).
     "unfold",
@@ -120,6 +136,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Block foreign-site <img>/<embed> of /media/ (DEBUG media + any proxied path).
+    "config.media_hotlink_middleware.MediaHotlinkMiddleware",
     # SEO redirects before CommonMiddleware so typo/legacy paths never hit views.
     "redirects.middleware.RedirectMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
