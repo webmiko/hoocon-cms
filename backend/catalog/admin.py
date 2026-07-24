@@ -79,6 +79,33 @@ class ProductAdmin(OpenChangeLinkMixin, ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("category",)
     ordering = ("name",)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("name", "slug", "category"),
+                "description": (
+                    "Канон сборки карточек серий (артикул, адрес страницы, "
+                    "одна плитка на линейку, выбор издания, заявка) — документ "
+                    "«Шаблоны карточек по сериям» в репозитории. Семейные "
+                    "линейки: латунные краны, комплекты, воздушные без пружины, "
+                    "дымоудаление и противопожарные."
+                ),
+            },
+        ),
+        (
+            "Тексты линейки",
+            {
+                "fields": (
+                    "description",
+                    "instructions",
+                    "specs_text",
+                    "analogs_text",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
 
 
 class AttributeValueInline(TabularInline):
@@ -130,6 +157,40 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
     readonly_fields = ("stock_updated_at",)
     inlines = (AttributeValueInline, ProductImageInline, ProductFileInline)
     ordering = ("sku_code",)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "product",
+                    "sku_code",
+                    "name",
+                    "slug",
+                    "is_published",
+                    "analog_belimo_code",
+                ),
+                "description": (
+                    "Формат артикула и адрес страницы — по шаблону серии "
+                    "линейки (документ «Шаблоны карточек по сериям»). "
+                    "Издания одной семейной линейки должны быть привязаны "
+                    "к одной карточке линейки."
+                ),
+            },
+        ),
+        (
+            "Склад и цена",
+            {
+                "fields": ("stock_qty", "stock_updated_at", "price"),
+            },
+        ),
+        (
+            "Тексты издания",
+            {
+                "fields": ("description", "specs_text", "analogs_text"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
 
     @admin.display(description="наличие", boolean=True)
     def in_stock_label(self, obj: SKU) -> bool:
