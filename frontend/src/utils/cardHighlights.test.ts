@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_HIGHLIGHT_MAX,
   cardHighlights,
+  compactCardSpecName,
 } from "./cardHighlights";
 
 describe("cardHighlights", () => {
@@ -48,5 +49,13 @@ describe("cardHighlights", () => {
       "area",
       "aux_switch",
     ]);
+  });
+});
+
+describe("compactCardSpecName", () => {
+  it("shortens Управляющий on Y-signal labels", () => {
+    expect(compactCardSpecName("Управляющий сигнал Y")).toBe("Упр. сигнал Y");
+    expect(compactCardSpecName("Напряжение")).toBe("Напряжение");
+    expect(compactCardSpecName("Обратная связь U")).toBe("Обратная связь U");
   });
 });

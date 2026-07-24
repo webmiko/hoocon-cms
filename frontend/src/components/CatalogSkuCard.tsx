@@ -9,7 +9,7 @@ import {
 } from "./SignalSpecValue";
 import { SoftBreakText } from "./SoftBreakText";
 import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
-import { cardHighlights } from "../utils/cardHighlights";
+import { cardHighlights, compactCardSpecName } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { formatEditionCountLabel } from "../utils/editionCountLabel";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
@@ -108,9 +108,10 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
           <ul className={styles.cardSpecs}>
             {cardHighlights(sku.highlights).map((h) => {
               const unit = specDisplayUnit(h.value, h.unit);
+              const label = compactCardSpecName(h.name);
               return (
                 <li key={h.key}>
-                  <span className={styles.cardSpecName}>{h.name}</span>
+                  <span className={styles.cardSpecName}>{label}</span>
                   {isModulatingSignalKey(h.key) ? (
                     <SignalSpecValue
                       value={`${h.value}${unit ? ` ${unit}` : ""}`}

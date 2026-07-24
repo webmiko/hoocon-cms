@@ -56,3 +56,21 @@ export function cardHighlights(
   }
   return ordered;
 }
+
+/**
+ * Card ТТХ label: shorten «Управляющий …» so the value stays one line.
+ *
+ * Catalog cards give width priority to the value column; the full Belimo
+ * label does not fit beside long Y-signal strings. PDP keeps the full name.
+ *
+ * Args:
+ *   name: Full highlight label from the API.
+ *
+ * Returns:
+ *   Compact label (``Упр. сигнал Y``) or the original name.
+ */
+export function compactCardSpecName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.replace(/^Управляющий(?=\s)/u, "Упр.");
+}

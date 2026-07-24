@@ -678,7 +678,9 @@
 
 .cardSpecs li {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  /* Value prefers max-content (one line); label takes leftover and wraps first.
+     minmax(0, …) lets the value column shrink and wrap only if still tight. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
   gap: 8px;
   align-items: baseline;
   font-size: 12px;
@@ -687,7 +689,9 @@
 
 .cardSpecName {
   color: var(--color-text-muted);
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cardSpecValue {
@@ -696,8 +700,26 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  /* Wrap only after the label column has already given up space. */
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/*
+ * Narrow phone (.container ≲ 391px → viewport ~420px with --space-md):
+ * value may wrap; label and value share vertical center.
+ */
+@media (max-width: 420px) {
+  .cardSpecs li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .cardSpecName,
+  .cardSpecValue {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 .cardFooter {
@@ -880,7 +902,68 @@
   }
 }
 
-@media (max-width: 768px) {
+/*
+ * Vertical cards when .container ≲ 906px
+ * (container width ≈ viewport − 2×--space-lg → ~960px viewport).
+ */
+@media (max-width: 960px) {
+  /* Keep filter rail beside vertical cards; narrower so the grid still fits. */
+  .catalog {
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    gap: var(--space-md);
+  }
+
+  /* Cards hug content — don't stretch to the tallest card in the row. */
+  .grid {
+    align-items: start;
+  }
+
+  /* Photo top / copy bottom — height follows content (no equal halves / 70vh). */
+  .card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    min-height: 0;
+    height: auto;
+  }
+
+  .cardMedia,
+  .cardMediaPlaceholder {
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    width: 100%;
+    border-right: none;
+    border-bottom: none;
+    padding: 0;
+  }
+
+  .cardMediaPlaceholder {
+    min-height: 7.5rem;
+  }
+
+  /* Full card width; height follows intrinsic photo aspect ratio. */
+  .cardImage {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    object-fit: contain;
+    object-position: center center;
+    display: block;
+  }
+
+  .cardBody {
+    min-height: 0;
+    overflow: visible;
+  }
+}
+
+/*
+ * Stack filters under the toolbar at viewport ≤700px
+ * (.container ≲ 668px with --space-md padding).
+ */
+@media (max-width: 700px) {
   .catalog {
     grid-template-columns: 1fr;
     gap: var(--space-md);
@@ -928,51 +1011,6 @@
 
   .activeTagValue {
     max-width: 9rem;
-  }
-
-  /* Cards hug content — don't stretch to the tallest card in the row. */
-  .grid {
-    align-items: start;
-  }
-
-  /* Photo top / copy bottom — height follows content (no equal halves / 70vh). */
-  .card {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    align-items: stretch;
-    min-height: 0;
-    height: auto;
-  }
-
-  .cardMedia,
-  .cardMediaPlaceholder {
-    min-height: 0;
-    height: auto;
-    max-height: none;
-    width: 100%;
-    border-right: none;
-    border-bottom: none;
-    padding: 0;
-  }
-
-  .cardMediaPlaceholder {
-    min-height: 7.5rem;
-  }
-
-  /* Full card width; height follows intrinsic photo aspect ratio. */
-  .cardImage {
-    position: relative;
-    width: 100%;
-    height: auto;
-    max-height: none;
-    object-fit: contain;
-    object-position: center center;
-    display: block;
-  }
-
-  .cardBody {
-    min-height: 0;
-    overflow: visible;
   }
 }
 
