@@ -85,7 +85,7 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
       priceCurrency: "RUB",
       availability:
         sku.in_stock === false
-          ? "https://schema.org/OutOfStock"
+          ? "https://schema.org/PreOrder"
           : "https://schema.org/InStock",
     };
   } else {
@@ -93,7 +93,7 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
       "@type": "Offer",
       availability:
         sku.in_stock === false
-          ? "https://schema.org/OutOfStock"
+          ? "https://schema.org/PreOrder"
           : "https://schema.org/InStock",
       priceSpecification: {
         "@type": "PriceSpecification",

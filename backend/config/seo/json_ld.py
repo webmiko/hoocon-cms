@@ -111,7 +111,8 @@ def _article(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
 
 def _product(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
     name = context.page_title.split(" — ")[0]
-    availability = "https://schema.org/InStock" if context.in_stock else "https://schema.org/OutOfStock"
+    # Storefront: zero stock = made-to-order (never «out of stock» UX).
+    availability = "https://schema.org/InStock" if context.in_stock else "https://schema.org/PreOrder"
     offer: dict[str, Any] = {
         "@type": "Offer",
         "availability": availability,
