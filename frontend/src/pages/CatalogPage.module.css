@@ -628,6 +628,15 @@
   line-height: 1.35;
 }
 
+.cardEditions {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-link);
+  letter-spacing: 0.01em;
+}
+
 .cardCode,
 .cardAnalog {
   font-size: 11px;

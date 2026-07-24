@@ -20,6 +20,7 @@ import { softBreak } from "../utils/softBreak";
 import {
   catalogCategoryPath,
 } from "../utils/catalogPaths";
+import { collapseH81CatalogSkus } from "../utils/h81CatalogCollapse";
 import styles from "./CatalogPage.module.css";
 
 /** Facet query keys synced to the URL (backend catalog.facets). */
@@ -32,8 +33,8 @@ const FACET_KEYS = [
   "temp_sensor",
   "dn",
   "ways",
-  "material",
   "kvs",
+  "material",
   "analog",
 ] as const;
 
@@ -145,15 +146,18 @@ export function CatalogPage() {
   const displayedSkus = useMemo(() => {
     const base = (skusData?.results ?? []) as SKUList[];
     const extras = append.key === listKey ? append.items : [];
-    if (extras.length === 0) return base;
-    const seen = new Set(base.map((s) => s.slug));
-    const out = [...base];
-    for (const sku of extras) {
-      if (seen.has(sku.slug)) continue;
-      seen.add(sku.slug);
-      out.push(sku);
+    let merged = base;
+    if (extras.length > 0) {
+      const seen = new Set(base.map((s) => s.slug));
+      const out = [...base];
+      for (const sku of extras) {
+        if (seen.has(sku.slug)) continue;
+        seen.add(sku.slug);
+        out.push(sku);
+      }
+      merged = out;
     }
-    return out;
+    return collapseH81CatalogSkus(merged);
   }, [skusData?.results, append, listKey]);
 
   async function handleShowMore() {
@@ -491,8 +495,8 @@ export function CatalogPage() {
           />
         ) : null}
 
-        {loading && <CatalogSkeleton />}
-        {error && (
+        {loading && displayedSkus.length === 0 && <CatalogSkeleton />}
+        {error && displayedSkus.length === 0 && (
           <p className={styles.error}>Ошибка загрузки каталога. Попробуйте позже.</p>
         )}
 
@@ -519,7 +523,10 @@ export function CatalogPage() {
 
         {displayedSkus.length > 0 && (
           <>
-            <div className={styles.grid}>
+            <div
+              className={styles.grid}
+              aria-busy={loading || undefined}
+            >
               {displayedSkus.map((sku) => (
                 <CatalogSkuCard key={sku.slug} sku={sku} />
               ))}

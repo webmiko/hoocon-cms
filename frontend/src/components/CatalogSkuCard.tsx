@@ -11,6 +11,7 @@ import { SoftBreakText } from "./SoftBreakText";
 import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
 import { cardHighlights } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
+import { formatEditionCountLabel } from "../utils/editionCountLabel";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
@@ -25,7 +26,8 @@ type CatalogSkuCardProps = {
  * Catalog grid card with photo-edge wash behind the product cutout.
  *
  * Samples the studio backdrop into a L→R gradient for the media cell only;
- * the text block keeps the default card surface.
+ * the text block keeps the default card surface. Family Products
+ * (``edition_count > 1``) show a variants line and CTA «Выбрать вариант».
  */
 export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
   const purpose = mediaPurposeFromCategory(sku.category_slug);
@@ -37,6 +39,8 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
   const cardStyle: CSSProperties | undefined = wash
     ? ({ "--card-wash-gradient": wash.css } as CSSProperties)
     : undefined;
+  const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
+  const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и ТТХ";
 
   return (
     <article
@@ -97,6 +101,9 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
           {softBreak(sku.sku_code)}
         </p>
         <h3 className={styles.cardTitle}>{softBreak(sku.name)}</h3>
+        {editionsLabel ? (
+          <p className={styles.cardEditions}>{editionsLabel}</p>
+        ) : null}
         {sku.highlights && sku.highlights.length > 0 ? (
           <ul className={styles.cardSpecs}>
             {cardHighlights(sku.highlights).map((h) => {
@@ -128,7 +135,7 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
           ) : (
             <span className={styles.cardPriceOnRequest}>Цена по запросу</span>
           )}
-          <span className={styles.cardCta}>Паспорт и ТТХ</span>
+          <span className={styles.cardCta}>{ctaLabel}</span>
         </div>
       </div>
     </article>

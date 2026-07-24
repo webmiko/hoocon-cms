@@ -24,7 +24,7 @@ void api.fetchCsrfToken().catch((err) => {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <HelmetProvider>
-      <BrowserRouter>
+      <BrowserRouter useTransitions={false}>
         <ThemeProvider>
           <PullToRefresh>
             <App />

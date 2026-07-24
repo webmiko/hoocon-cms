@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 
 import {
   ImageLightbox,
@@ -18,8 +18,14 @@ import {
 import { CompareToggle } from "../components/CompareToggle";
 import { PhotoWash } from "../components/PhotoWash";
 import { SoftBreakText } from "../components/SoftBreakText";
+import { SkuVariantPicker } from "../components/SkuVariantPicker";
 import { softBreak } from "../utils/softBreak";
 import { paraphraseSkuLead } from "../utils/paraphraseSkuLead";
+import {
+  overlayAttributesForSibling,
+  overlayCopyForSibling,
+  overlayHighlightsForSibling,
+} from "../utils/skuSiblingOverlay";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
@@ -138,14 +144,62 @@ export function SkuDetailPage() {
     categorySlug: string;
     skuSlug: string;
   }>();
-  const slug = skuSlug;
+  const location = useLocation();
+  // Prefer pathname segment — useParams can lag behind soft replace navigations.
+  const routeSlug =
+    location.pathname.split("/").filter(Boolean).pop() || skuSlug || "";
+  // Local edition override: RR 7 may defer location via startTransition; the
+  // picker sets this synchronously so ТТХ update even if the URL races ahead.
+  const [softSlug, setSoftSlug] = useState<string | null>(null);
+  const [softRoute, setSoftRoute] = useState(routeSlug);
+  // Clear picker override when the URL catches up or the user leaves the SKU.
+  if (softRoute !== routeSlug) {
+    setSoftRoute(routeSlug);
+    setSoftSlug(null);
+  }
+  const slug = softSlug || routeSlug;
   const { resolved: theme } = useTheme();
   const { data: sku, loading, error } = useAsync(
-    () => api.skuDetail(slug!),
+    () => api.skuDetail(slug),
     [slug],
   );
   const [tab, setTab] = useState<TabId>("description");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const activeSibling = useMemo(() => {
+    if (!sku?.siblings?.length || !slug) return null;
+    return sku.siblings.find((row) => row.slug === slug) ?? null;
+  }, [sku, slug]);
+
+  const displayHighlights = useMemo(
+    () => overlayHighlightsForSibling(sku?.highlights, activeSibling),
+    [sku?.highlights, activeSibling],
+  );
+  const displayAttributes = useMemo(
+    () => overlayAttributesForSibling(sku?.attributes, activeSibling),
+    [sku?.attributes, activeSibling],
+  );
+  const displayAttributeGroups = useMemo(() => {
+    if (!sku?.attribute_groups?.length) return sku?.attribute_groups;
+    if (!activeSibling || activeSibling.slug === sku.slug) {
+      return sku.attribute_groups;
+    }
+    return sku.attribute_groups.map((group) => ({
+      ...group,
+      items: overlayAttributesForSibling(group.items, activeSibling),
+    }));
+  }, [sku, activeSibling]);
+
+  const displaySkuCode = activeSibling?.sku_code || sku?.sku_code || "";
+  const displayName = useMemo(() => {
+    if (!sku) return "";
+    return overlayCopyForSibling(sku.name, sku.sku_code, activeSibling);
+  }, [sku, activeSibling]);
+  const displayLead = useMemo(() => {
+    if (!sku || !("lead" in sku) || !sku.lead) return "";
+    return overlayCopyForSibling(sku.lead, sku.sku_code, activeSibling);
+  }, [sku, activeSibling]);
+  const displayInStock = activeSibling?.in_stock ?? sku?.in_stock;
 
   const files: SkuFile[] = useMemo(
     () => ((sku?.files ?? []) as unknown[] as SkuFile[]),
@@ -181,11 +235,11 @@ export function SkuDetailPage() {
     return [];
   }, [sku, theme]);
 
-  if (loading) {
+  if (loading && !sku) {
     return <p className={styles.status}>Загрузка…</p>;
   }
 
-  if (error || !sku) {
+  if ((error && !sku) || !sku) {
     return (
       <div className={styles.notFound}>
         <Seo
@@ -206,7 +260,10 @@ export function SkuDetailPage() {
     );
   }
 
-  const canonicalPath = catalogPathForSku(sku);
+  const displaySlug = activeSibling?.slug || slug || sku.slug;
+  const canonicalPath = sku.category_slug
+    ? catalogSkuPath(sku.category_slug, displaySlug)
+    : catalogPathForSku(sku);
   if (
     categorySlug &&
     sku.category_slug &&
@@ -215,10 +272,12 @@ export function SkuDetailPage() {
     return <Navigate to={canonicalPath} replace />;
   }
 
+  const isSoftRefreshing = Boolean(loading && slug && slug !== sku.slug);
+
   const jsonLd = buildProductJsonLd({
-    name: sku.name,
-    slug: sku.slug,
-    sku_code: sku.sku_code,
+    name: displayName || sku.name,
+    slug: displaySlug,
+    sku_code: displaySkuCode || sku.sku_code,
     description: sku.description,
     price: "price" in sku ? sku.price : null,
     price_on_request: sku.price_on_request,
@@ -226,9 +285,12 @@ export function SkuDetailPage() {
     category_slug: sku.category_slug,
   });
 
-  const descriptionBody =
+  const descriptionBody = overlayCopyForSibling(
     (sku.description ?? "").trim() ||
-    ("lead" in sku && sku.lead ? paraphraseSkuLead(sku.lead) : "");
+      ("lead" in sku && sku.lead ? paraphraseSkuLead(sku.lead) : ""),
+    sku.sku_code,
+    activeSibling,
+  );
 
   const tabs: Array<{ id: TabId; label: string; available: boolean }> = [
     {
@@ -246,8 +308,8 @@ export function SkuDetailPage() {
       label: "Характеристики",
       available: Boolean(
         sku.specs_text ||
-          (sku.attribute_groups && sku.attribute_groups.length > 0) ||
-          (sku.attributes && sku.attributes.length > 0),
+          (displayAttributeGroups && displayAttributeGroups.length > 0) ||
+          (displayAttributes && displayAttributes.length > 0),
       ),
     },
     {
@@ -262,10 +324,13 @@ export function SkuDetailPage() {
     : (visibleTabs[0]?.id ?? "description");
 
   return (
-    <div className={styles.detail}>
+    <div className={styles.detail} aria-busy={isSoftRefreshing || undefined}>
       <Seo
-        title={skuSeoTitlePartial(sku.sku_code, sku.highlights)}
-        description={skuSeoDescription(sku.sku_code, sku.category_name)}
+        title={skuSeoTitlePartial(displaySkuCode || sku.sku_code, displayHighlights)}
+        description={skuSeoDescription(
+          displaySkuCode || sku.sku_code,
+          sku.category_name,
+        )}
         path={canonicalPath}
         jsonLd={[
           jsonLd,
@@ -280,7 +345,7 @@ export function SkuDetailPage() {
                   },
                 ]
               : []),
-            { name: sku.name, path: canonicalPath },
+            { name: displayName || sku.name, path: canonicalPath },
           ]),
         ]}
         ogType="product"
@@ -297,7 +362,7 @@ export function SkuDetailPage() {
                 },
               ]
             : []),
-          { label: sku.sku_code, tech: true },
+          { label: displaySkuCode || sku.sku_code, tech: true },
         ]}
       />
 
@@ -334,19 +399,27 @@ export function SkuDetailPage() {
         </PhotoWash>
 
         <div className={styles.heroMain}>
-          <h1 className={styles.title}>{softBreak(sku.name)}</h1>
-          {"lead" in sku && sku.lead ? (
-            <p className={styles.heroLead}>{softBreak(sku.lead)}</p>
+          <h1 className={styles.title}>{softBreak(displayName || sku.name)}</h1>
+          {displayLead ? (
+            <p className={styles.heroLead}>{softBreak(displayLead)}</p>
           ) : null}
           <p className={`${styles.skuCode} text-tech`}>
-            Артикул: {softBreak(sku.sku_code)}
+            Артикул: {softBreak(displaySkuCode || sku.sku_code)}
           </p>
+          {sku.siblings && sku.siblings.length > 1 && sku.category_slug ? (
+            <SkuVariantPicker
+              siblings={sku.siblings}
+              currentSlug={displaySlug}
+              categorySlug={sku.category_slug}
+              onEditionChange={setSoftSlug}
+            />
+          ) : null}
           <p
             className={`${styles.stockLabel} ${
-              sku.in_stock ? styles.stockIn : styles.stockOut
+              displayInStock ? styles.stockIn : styles.stockOut
             }`}
           >
-            {stockAvailabilityLabel(sku.in_stock)}
+            {stockAvailabilityLabel(Boolean(displayInStock))}
           </p>
           {sku.analog_belimo_code ? (
             <p className={`${styles.analog} text-tech`}>
@@ -354,9 +427,9 @@ export function SkuDetailPage() {
             </p>
           ) : null}
 
-          {sku.highlights && sku.highlights.length > 0 ? (
+          {displayHighlights && displayHighlights.length > 0 ? (
             <ul className={styles.heroSpecs}>
-              {sku.highlights.map((h) => {
+              {displayHighlights.map((h) => {
                 const unit = specDisplayUnit(h.value, h.unit);
                 const display = `${h.value}${unit ? ` ${unit}` : ""}`;
                 return (
@@ -389,9 +462,9 @@ export function SkuDetailPage() {
             <CompareToggle
               variant="button"
               item={{
-                slug: sku.slug,
-                sku_code: sku.sku_code,
-                name: sku.name,
+                slug: displaySlug,
+                sku_code: displaySkuCode || sku.sku_code,
+                name: displayName || sku.name,
                 image: sku.images?.[0]?.image ?? sku.image?.image ?? null,
               }}
             />
@@ -512,8 +585,8 @@ export function SkuDetailPage() {
 
                 {activeTab === "specs" ? (
                   <section className={styles.section}>
-                    {(sku.attribute_groups && sku.attribute_groups.length > 0
-                      ? sku.attribute_groups
+                    {(displayAttributeGroups && displayAttributeGroups.length > 0
+                      ? displayAttributeGroups
                       : null
                     )?.map((group) => (
                       <div key={group.key} className={styles.specGroup}>
@@ -550,11 +623,11 @@ export function SkuDetailPage() {
                         </ul>
                       </div>
                     ))}
-                    {!sku.attribute_groups?.length &&
-                    sku.attributes &&
-                    sku.attributes.length > 0 ? (
+                    {!displayAttributeGroups?.length &&
+                    displayAttributes &&
+                    displayAttributes.length > 0 ? (
                       <ul className={styles.specCards}>
-                        {sku.attributes
+                        {displayAttributes
                           .filter((attr, index, all) => {
                             const key = `${attr.name}|${attr.value}`.toLowerCase();
                             return (
@@ -585,10 +658,16 @@ export function SkuDetailPage() {
                       </ul>
                     ) : null}
                     {sku.specs_text &&
-                    !sku.attribute_groups?.length &&
-                    !(sku.attributes && sku.attributes.length > 0) ? (
+                    !displayAttributeGroups?.length &&
+                    !(displayAttributes && displayAttributes.length > 0) ? (
                       <div className={styles.specsProse}>
-                        <StructuredText text={sku.specs_text} />
+                        <StructuredText
+                          text={overlayCopyForSibling(
+                            sku.specs_text,
+                            sku.sku_code,
+                            activeSibling,
+                          )}
+                        />
                       </div>
                     ) : null}
                   </section>
@@ -625,10 +704,10 @@ export function SkuDetailPage() {
           <section id="rfq" className={styles.ctaSection}>
             <h2 className={styles.ctaTitle}>Запросить коммерческое предложение</h2>
             <p className={styles.ctaText}>
-              Отправьте заявку — подготовим КП на {sku.name}
+              Отправьте заявку — подготовим КП на {displayName || sku.name}
               {" "}
-              (арт. {sku.sku_code}). Ответим до 2 рабочих часов с ценой и сроком
-              или уточняющими вопросами по ТТХ.
+              (арт. {displaySkuCode || sku.sku_code}). Ответим до 2 рабочих часов
+              с ценой и сроком или уточняющими вопросами по ТТХ.
             </p>
             <p className={styles.ctaSla}>
               Заявка уходит на sales@hoocon.ru. Публичного прайса нет — цена
@@ -636,8 +715,8 @@ export function SkuDetailPage() {
             </p>
             <LeadForm
               leadType="rfq"
-              skuSlug={sku.slug}
-              skuName={sku.name}
+              skuSlug={displaySlug}
+              skuName={displayName || sku.name}
               ballValveKit={
                 "ball_valve_kit" in sku && sku.ball_valve_kit
                   ? sku.ball_valve_kit

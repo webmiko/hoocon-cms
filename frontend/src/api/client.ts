@@ -25,6 +25,8 @@ export type SKUList = components["schemas"]["SKUList"] & {
   highlights?: CatalogHighlight[];
   image?: { id: number; image: string; alt?: string } | null;
   in_stock?: boolean;
+  /** Published SKU count on the same Product (family cards). */
+  edition_count?: number;
 };
 export type CatalogAttribute = {
   name: string;
@@ -58,6 +60,20 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
     bracket_by_drive: Record<string, string>;
     bracket_hint: string;
   } | null;
+  siblings?: Array<{
+    slug: string;
+    sku_code: string;
+    body: string;
+    dn: string;
+    ways: string;
+    kvs: string;
+    voltage: string;
+    control: string;
+    aux_switch: boolean;
+    fault_alarm?: boolean;
+    in_stock: boolean;
+  }>;
+  variant_axes?: Record<string, string[]>;
 };
 export type SKUListResponse =
   paths["/api/catalog/skus/"]["get"]["responses"]["200"]["content"]["application/json"];
