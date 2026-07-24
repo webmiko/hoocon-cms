@@ -171,7 +171,7 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
         payload = build_stock_template_xlsx()
         response = HttpResponse(
             payload,
-            content_type=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         response["Content-Disposition"] = 'attachment; filename="ostatki-shablon.xlsx"'
         return response
