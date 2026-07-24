@@ -31,10 +31,14 @@ describe("collapseH81CatalogSkus", () => {
     expect(out.map((r) => r.slug)).toEqual(["a", "c", "d"]);
   });
 
-  it("keeps one row per DAMU / SAMU / SAFU / HVA / HVD product_slug", () => {
+  it("keeps one row per DAMU / DAMQU / DAFU / SAMU product_slug", () => {
     const rows = [
       { slug: "da-a", product_slug: "privod-vozdushniy-bez-pruzhini-damu-8nm" },
       { slug: "da-b", product_slug: "privod-vozdushniy-bez-pruzhini-damu-8nm" },
+      { slug: "daq", product_slug: "privod-vozdushniy-da8mqu-8nm" },
+      { slug: "daq-b", product_slug: "privod-vozdushniy-da8mqu-8nm" },
+      { slug: "dafu", product_slug: "privod-vozdushniy-pruzhina-dafu-10nm" },
+      { slug: "dafu-b", product_slug: "privod-vozdushniy-pruzhina-dafu-10nm" },
       { slug: "sa-a", product_slug: "privod-dimoudaleniya-10nm" },
       { slug: "sa-b", product_slug: "privod-dimoudaleniya-10nm" },
       { slug: "safu-a", product_slug: "privod-protivopozharniy-3nm" },
@@ -49,6 +53,8 @@ describe("collapseH81CatalogSkus", () => {
     const out = collapseH81CatalogSkus(rows);
     expect(out.map((r) => r.slug)).toEqual([
       "da-a",
+      "daq",
+      "dafu",
       "sa-a",
       "safu-a",
       "hva-a",
@@ -58,7 +64,6 @@ describe("collapseH81CatalogSkus", () => {
     ]);
   });
 });
-
 describe("resolveSiblingSlug", () => {
   const siblings: SiblingEdition[] = [
     {

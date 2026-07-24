@@ -23,6 +23,10 @@ def test_is_collapsible_family_product_slug() -> None:
     assert is_collapsible_family_product_slug(
         "privod-vozdushniy-bez-pruzhini-damu-8nm",
     )
+    assert is_collapsible_family_product_slug("privod-vozdushniy-da8mqu-8nm")
+    assert is_collapsible_family_product_slug(
+        "privod-vozdushniy-pruzhina-dafu-10nm",
+    )
     assert is_collapsible_family_product_slug("privod-dimoudaleniya-10nm")
     assert is_collapsible_family_product_slug("privod-protivopozharniy-3nm")
     assert is_collapsible_family_product_slug("privod-vozdushniy-hva-5nm")
@@ -36,6 +40,48 @@ def test_is_collapsible_family_product_slug() -> None:
     assert not is_collapsible_family_product_slug("sharovoy-kran-bv215")
     # Bare prefix must not swallow HVD-F into SAMU Nm.
     assert not is_collapsible_family_product_slug("privod-dimoudaleniya-hvd")
+    # Prefix-only matches must not accept stray Product.slug suffixes.
+    assert not is_collapsible_family_product_slug("h8205-lav232-variant")
+    assert not is_collapsible_family_product_slug("8100-bv215-extra")
+
+
+@pytest.mark.django_db
+def test_collapse_ignores_h8205_and_brass_slug_suffixes() -> None:
+    """ORM family_product_q must not treat stray slug suffixes as families."""
+    cat = Category.objects.create(name="Комплекты", slug="komplekty")
+    weird_lav = Product.objects.create(
+        name="LAV stray",
+        slug="h8205-lav232-variant",
+        category=cat,
+    )
+    weird_bv = Product.objects.create(
+        name="BV stray",
+        slug="8100-bv215-extra",
+        category=cat,
+    )
+    canon_lav = Product.objects.create(
+        name="LAV canon",
+        slug="h8205-lav232",
+        category=cat,
+    )
+    for product, codes in (
+        (weird_lav, ("W-LAV-A", "W-LAV-B")),
+        (weird_bv, ("W-BV-A", "W-BV-B")),
+        (canon_lav, ("H8205-LAV232-24A", "H8205-LAV232-24AS")),
+    ):
+        for code in codes:
+            SKU.objects.create(
+                product=product,
+                name=code,
+                slug=code.lower(),
+                sku_code=code,
+                is_published=True,
+            )
+
+    qs = collapse_family_skus_for_list(SKU.objects.filter(is_published=True))
+    codes = sorted(qs.values_list("sku_code", flat=True))
+    # Stray-suffix products keep every SKU; canonical LAV collapses to one.
+    assert codes == ["H8205-LAV232-24A", "W-BV-A", "W-BV-B", "W-LAV-A", "W-LAV-B"]
 
 
 @pytest.mark.django_db

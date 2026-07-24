@@ -1,6 +1,7 @@
 """Collapse multi-edition Product cards to one SKU row in catalog lists.
 
 H81 kits (``h8101``…``h8122``), brass ``8100-bv*``, H8205 LAV, DAMU,
+DAMQU (``privod-vozdushniy-da8mqu-*``), DAFU (``…-pruzhina-dafu-*nm``),
 SAMU, SAFU (``privod-protivopozharniy-*nm``), HVA, HVD (air + smoke
 ``…-hvd-*f``) keep many published SKUs under one Product. Paginated list APIs
 must return a single representative per family Product (within the current
@@ -31,6 +32,13 @@ H81_FAMILY_PRODUCT_SLUGS: frozenset[str] = frozenset(
     },
 )
 
+# Shared slug bodies (no anchors) — used by both fullmatch and ORM iregex.
+_H81_SLUG = "|".join(re.escape(s) for s in sorted(H81_FAMILY_PRODUCT_SLUGS))
+_BRASS_DN_SLUG = r"8100-bv\d+"
+_H8205_LAV_SLUG = r"h8205-lav\d+[st]*"
+_DAMU_SLUG = r"privod-vozdushniy-bez-pruzhini-damu-\d+nm"
+_DAMQU_SLUG = r"privod-vozdushniy-da8mqu-\d+nm"
+_DAFU_SLUG = r"privod-vozdushniy-pruzhina-dafu-\d+nm"
 # SAMU Nm only (``…-10nm``); HVD-F uses ``…-hvd-3f`` and must not share this.
 _SAMU_NM_SLUG = r"privod-dimoudaleniya-\d+nm"
 _SAFU_NM_SLUG = r"privod-protivopozharniy-\d+nm"
@@ -42,11 +50,12 @@ _HVD_AIR_SLUG = r"privod-vozdushniy-hvd-(?:\d+nm|\d+q)"
 _HVD_SMOKE_SLUG = r"privod-dimoudaleniya-hvd-\d+f"
 
 _FAMILY_PRODUCT_SLUG_RE = re.compile(
-    r"(?i)^("
-    r"h81(?:01|02|03|04|05|06|07|08|21|22)"
-    r"|8100-bv\d+"
-    r"|h8205-lav\d+[st]*"
-    r"|privod-vozdushniy-bez-pruzhini-damu-\d+nm"
+    rf"(?i)^(?:{_H81_SLUG}"
+    rf"|{_BRASS_DN_SLUG}"
+    rf"|{_H8205_LAV_SLUG}"
+    rf"|{_DAMU_SLUG}"
+    rf"|{_DAMQU_SLUG}"
+    rf"|{_DAFU_SLUG}"
     rf"|{_SAMU_NM_SLUG}"
     rf"|{_SAFU_NM_SLUG}"
     rf"|{_HVA_SLUG}"
@@ -62,18 +71,13 @@ def is_collapsible_family_product_slug(slug: str | None) -> bool:
 
 
 def family_product_q() -> Q:
-    """ORM filter for SKUs belonging to collapsible family Products."""
-    return (
-        Q(product__slug__in=H81_FAMILY_PRODUCT_SLUGS)
-        | Q(product__slug__istartswith="8100-bv")
-        | Q(product__slug__istartswith="h8205-lav")
-        | Q(product__slug__iregex=r"(?i)^privod-vozdushniy-bez-pruzhini-damu-\d+nm$")
-        | Q(product__slug__iregex=rf"(?i)^{_SAMU_NM_SLUG}$")
-        | Q(product__slug__iregex=rf"(?i)^{_SAFU_NM_SLUG}$")
-        | Q(product__slug__iregex=rf"(?i)^(?:{_HVA_SLUG})$")
-        | Q(product__slug__iregex=rf"(?i)^{_HVD_AIR_SLUG}$")
-        | Q(product__slug__iregex=rf"(?i)^{_HVD_SMOKE_SLUG}$")
-    )
+    """ORM filter for SKUs belonging to collapsible family Products.
+
+    Anchored the same way as :func:`is_collapsible_family_product_slug` —
+    never ``istartswith``, which would accept stray suffixes
+    (``h8205-lav232-variant``, ``8100-bv215-extra``).
+    """
+    return Q(product__slug__iregex=_FAMILY_PRODUCT_SLUG_RE.pattern)
 
 
 def collapse_family_skus_for_list(queryset: QuerySet[SKU]) -> QuerySet[SKU]:

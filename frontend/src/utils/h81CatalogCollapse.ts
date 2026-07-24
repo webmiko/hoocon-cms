@@ -4,6 +4,8 @@ const H81_PRODUCT_SLUG_RE = /^h81(?:01|02|03|04|05|06|07|08|21|22)$/i;
 const BRASS_DN_PRODUCT_SLUG_RE = /^8100-bv\d+$/i;
 const H8205_LAV_PRODUCT_SLUG_RE = /^h8205-lav\d+[st]*$/i;
 const DAMU_PRODUCT_SLUG_RE = /^privod-vozdushniy-bez-pruzhini-damu-\d+nm$/i;
+const DAMQU_PRODUCT_SLUG_RE = /^privod-vozdushniy-da8mqu-\d+nm$/i;
+const DAFU_PRODUCT_SLUG_RE = /^privod-vozdushniy-pruzhina-dafu-\d+nm$/i;
 /** SAMU Nm only — not ``privod-dimoudaleniya-hvd-*f``. */
 const SAMU_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-\d+nm$/i;
 const SAFU_PRODUCT_SLUG_RE = /^privod-protivopozharniy-\d+nm$/i;
@@ -26,6 +28,14 @@ export function isH8205LavProductSlug(productSlug: string | undefined | null): b
 
 export function isDamuFamilyProductSlug(productSlug: string | undefined | null): boolean {
   return DAMU_PRODUCT_SLUG_RE.test((productSlug || "").trim());
+}
+
+export function isDamquFamilyProductSlug(productSlug: string | undefined | null): boolean {
+  return DAMQU_PRODUCT_SLUG_RE.test((productSlug || "").trim());
+}
+
+export function isDafuFamilyProductSlug(productSlug: string | undefined | null): boolean {
+  return DAFU_PRODUCT_SLUG_RE.test((productSlug || "").trim());
 }
 
 export function isSamuFamilyProductSlug(productSlug: string | undefined | null): boolean {
@@ -53,6 +63,8 @@ function isCollapsibleFamilyProductSlug(
     isBrassDnProductSlug(productSlug) ||
     isH8205LavProductSlug(productSlug) ||
     isDamuFamilyProductSlug(productSlug) ||
+    isDamquFamilyProductSlug(productSlug) ||
+    isDafuFamilyProductSlug(productSlug) ||
     isSamuFamilyProductSlug(productSlug) ||
     isSafuFamilyProductSlug(productSlug) ||
     isHvaFamilyProductSlug(productSlug) ||
@@ -63,7 +75,7 @@ function isCollapsibleFamilyProductSlug(
 /**
  * Keep the first SKU of each family Product; leave other series unchanged.
  *
- * Families: H81 / brass 8100-bv* / H8205 LAV / DAMU / SAMU / SAFU / HVA / HVD.
+ * Families: H81 / brass / H8205 / DAMU / DAMQU / DAFU / SAMU / SAFU / HVA / HVD.
  *
  * Args:
  *   skus: Catalog list rows (already filtered/sorted by API).
