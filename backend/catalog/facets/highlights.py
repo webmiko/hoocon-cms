@@ -91,6 +91,11 @@ def highlights_for_sku(
                     sku_code=sku_code,
                 )
                 label = FACET_BY_KEY["aux_switch"].label
+            if facet.key == "temp_sensor":
+                from catalog.facets.temp_sensor import normalize_temp_sensor_value
+
+                display = normalize_temp_sensor_value(display, sku_code=sku_code)
+                label = FACET_BY_KEY["temp_sensor"].label
 
             if facet.key in {"control_signal", "feedback_signal"}:
                 from catalog.etl.tech_copy import (

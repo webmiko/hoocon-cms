@@ -104,6 +104,55 @@ def test_analog_facet_from_belimo_code(client) -> None:
 
 
 @pytest.mark.django_db
+def test_temp_sensor_facet_none_and_saf72(client) -> None:
+    """«Термодатчик» facet exposes Нет / SAF72 and filters ST editions."""
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(name="Дым", slug="elektroprivody-dlya-klapanov-dymoudaleniya")
+    product = Product.objects.create(name="HVD-3F", slug="hvd-3f-facet", category=cat)
+    sku_s = SKU.objects.create(
+        product=product,
+        name="HVD24S-3F",
+        slug="hvd24s-3f-facet",
+        sku_code="HVD24S-3F",
+        is_published=True,
+    )
+    sku_st = SKU.objects.create(
+        product=product,
+        name="HVD24ST-3F",
+        slug="hvd24st-3f-facet",
+        sku_code="HVD24ST-3F",
+        is_published=True,
+    )
+    attr = Attribute.objects.create(name="Датчик температуры", slug="temp-sensor")
+    AttributeValue.objects.create(sku=sku_s, attribute=attr, value="Без датчика")
+    AttributeValue.objects.create(
+        sku=sku_st,
+        attribute=attr,
+        value="SAF72 (срабатывание при 72 °C, TS1/TS2)",
+    )
+
+    facets = client.get(reverse("catalog-facet-list"))
+    assert facets.status_code == 200
+    by_key = {row["key"]: row for row in facets.data["results"]}
+    assert "temp_sensor" in by_key
+    assert by_key["temp_sensor"]["label"] == "Термодатчик"
+    values = {v["value"] for v in by_key["temp_sensor"]["values"]}
+    assert values == {"Нет", "SAF72"}
+
+    only_st = client.get(reverse("catalog-sku-list"), {"temp_sensor": "SAF72"})
+    assert {row["slug"] for row in only_st.data["results"]} == {"hvd24st-3f-facet"}
+    only_s = client.get(reverse("catalog-sku-list"), {"temp_sensor": "Нет"})
+    assert {row["slug"] for row in only_s.data["results"]} == {"hvd24s-3f-facet"}
+
+
+@pytest.mark.django_db
 def test_sku_list_includes_highlights(client) -> None:
     """List cards expose compact highlights for moment/voltage."""
     _seed_with_attrs()
@@ -219,6 +268,7 @@ def test_facets_area_normalizes_unit_and_spacing(client) -> None:
         ("da-area-c", "da-area-c", "3, 2 м²"),
         ("da-area-d", "da-area-d", "0,3 м² (для огнезадерживающих клапанов НО)"),
         ("da-area-e", "da-area-e", "0,5 м²"),
+        ("da-area-f", "da-area-f", "< 0,5 м²"),
     )
     for slug, code, raw in specs:
         sku = SKU.objects.create(
@@ -236,8 +286,9 @@ def test_facets_area_normalizes_unit_and_spacing(client) -> None:
     assert "area" in by_key
     values = {v["value"]: v["count"] for v in by_key["area"]["values"]}
     assert "до 0,5 м²" in values
-    assert values["до 0,5 м²"] == 3
+    assert values["до 0,5 м²"] == 4
     assert "до 0,5" not in values
+    assert not any(ch in v for v in values for ch in "<>≤≥")
     assert "до 3,2 м²" in values
     assert "3,2 м²" not in values
     assert "3, 2 м²" not in values
@@ -256,15 +307,20 @@ def test_facets_area_normalizes_unit_and_spacing(client) -> None:
 
 
 def test_normalize_area_attribute_value() -> None:
-    """All damper-area labels become «до N м²»."""
+    """All damper-area labels become «до N м²» without inequality signs."""
     from catalog.facets import normalize_area_attribute_value
 
     assert normalize_area_attribute_value("до 0,5") == "до 0,5 м²"
-    assert normalize_area_attribute_value("до 1") == "до 1 м²"
+    assert normalize_area_attribute_value("до 1") == "до 1,0 м²"
+    assert normalize_area_attribute_value("до 1,0") == "до 1,0 м²"
     assert normalize_area_attribute_value("3, 2 м²") == "до 3,2 м²"
     assert normalize_area_attribute_value("1,6 м²") == "до 1,6 м²"
     assert normalize_area_attribute_value("0,5 м²") == "до 0,5 м²"
     assert normalize_area_attribute_value("0,3 м² (для огнезадерживающих клапанов НО)") == "до 0,3 м²"
+    assert normalize_area_attribute_value("< 0,5 м²") == "до 0,5 м²"
+    assert normalize_area_attribute_value("≤ 0,3") == "до 0,3 м²"
+    assert normalize_area_attribute_value("до < 0,5 м²") == "до 0,5 м²"
+    assert normalize_area_attribute_value("> 1,0 м²") == "до 1,0 м²"
 
 
 def test_facet_sort_key_kvs_numeric() -> None:
@@ -838,3 +894,63 @@ def test_paraphrase_sku_lead_differs_from_hero() -> None:
     stripped = strip_lead_duplicate_lines(body, lead)
     assert lead not in stripped
     assert "вспомогательных" in stripped
+
+
+@pytest.mark.django_db
+def test_material_facet_for_kit_category(client) -> None:
+    """GET facets/?category=komplekty lists body material; ?material= filters."""
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(name="Комплекты", slug="komplekty")
+    brass_product = Product.objects.create(name="H8101", slug="h8101", category=cat)
+    iron_product = Product.objects.create(name="H8105", slug="h8105", category=cat)
+    brass = SKU.objects.create(
+        product=brass_product,
+        name="H8101 brass",
+        slug="komplekt-h8101-brass",
+        sku_code="H8101-BV215",
+        is_published=True,
+    )
+    iron = SKU.objects.create(
+        product=iron_product,
+        name="H8105 iron",
+        slug="komplekt-h8105-iron",
+        sku_code="H8105-BV265",
+        is_published=True,
+    )
+    material = Attribute.objects.create(name="Материал корпуса", slug="material")
+    stem = Attribute.objects.create(
+        name="Золотниковый шток и шар",
+        slug="ball-stem-material",
+    )
+    AttributeValue.objects.create(sku=brass, attribute=material, value="Латунь")
+    AttributeValue.objects.create(sku=iron, attribute=material, value="ВЧШГ")
+    AttributeValue.objects.create(sku=brass, attribute=stem, value="латунь хромированная")
+    AttributeValue.objects.create(sku=iron, attribute=stem, value="нержавеющая сталь")
+
+    facets = client.get(reverse("catalog-facet-list"), {"category": "komplekty"})
+    assert facets.status_code == 200
+    by_key = {row["key"]: row for row in facets.data["results"]}
+    assert "material" in by_key
+    assert by_key["material"]["label"] == "Материал корпуса"
+    materials = {v["value"] for v in by_key["material"]["values"]}
+    assert materials == {"Латунь", "ВЧШГ"}
+
+    brass_only = client.get(
+        reverse("catalog-sku-list"),
+        {"category": "komplekty", "material": "Латунь"},
+    )
+    assert brass_only.status_code == 200
+    assert {row["slug"] for row in brass_only.data["results"]} == {"komplekt-h8101-brass"}
+
+    iron_only = client.get(
+        reverse("catalog-sku-list"),
+        {"category": "komplekty", "material": "ВЧШГ"},
+    )
+    assert {row["slug"] for row in iron_only.data["results"]} == {"komplekt-h8105-iron"}

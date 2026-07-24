@@ -10,8 +10,10 @@ const FACET_LABEL_SHORT: Record<string, string> = {
   control: "Управление",
   area: "Площадь",
   aux_switch: "Вспом. перекл.",
+  temp_sensor: "Термодатчик",
   dn: "DN",
   ways: "Вид крана",
+  material: "Материал корпуса",
   kvs: "Kvs (м³/ч)",
   analog: "Аналоги",
 };
@@ -53,10 +55,13 @@ export function facetValueShort(key: string, value: string): string {
     return raw
       .replace(/\s*\([^)]*\)\s*/g, " ")
       .replace(/(\d),\s+(\d)/g, "$1,$2")
+      .replace(/(?:<=|>=|≤|≥|<|>)/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .replace(/^(до\s+)?(\d+(?:[.,]\d+)?)\s*(?:м²|m²|м2|m2)?$/i, (_m, _upto, num) => {
-        return `до ${String(num).replace(".", ",")} м²`;
+        let n = String(num).replace(".", ",");
+        if (/^\d+$/.test(n)) n = `${n},0`;
+        return `до ${n} м²`;
       });
   }
 

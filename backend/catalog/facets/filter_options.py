@@ -37,8 +37,8 @@ def filter_skus_by_facet(
         return queryset.none()
 
     # Prefer exact DB filter when possible; fall back to Python match for loose.
-    # Area / voltage / control / aux need canon match (legacy spellings in DB).
-    if facet.key not in {"aux_switch", "voltage", "control", "area"}:
+    # Area / voltage / control / aux / temp_sensor need canon match (legacy spellings).
+    if facet.key not in {"aux_switch", "voltage", "control", "area", "temp_sensor"}:
         exact = queryset.filter(
             attribute_values__attribute_id__in=ids,
             attribute_values__value=value,
@@ -47,7 +47,7 @@ def filter_skus_by_facet(
             return exact.distinct()
 
     matching_sku_ids: set[int] = set()
-    if facet.key in {"aux_switch", "voltage", "control", "area"}:
+    if facet.key in {"aux_switch", "voltage", "control", "area", "temp_sensor"}:
         detailed_rows = AttributeValue.objects.filter(
             attribute_id__in=ids,
         ).values_list(
@@ -215,6 +215,9 @@ def _facet_sort_key(facet_key: str, value: str) -> tuple:
     """Sort numeric-ish facets by number, else alphabetically."""
     if facet_key == "aux_switch":
         order = {"нет": 0, "spdt-1": 1, "spdt-2": 2}
+        return (order.get(value.casefold(), 9), value.casefold())
+    if facet_key == "temp_sensor":
+        order = {"нет": 0, "saf72": 1}
         return (order.get(value.casefold(), 9), value.casefold())
     if facet_key == "control":
         order = {

@@ -29,6 +29,7 @@ const FACET_KEYS = [
   "control",
   "area",
   "aux_switch",
+  "temp_sensor",
   "dn",
   "ways",
   "kvs",

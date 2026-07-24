@@ -54,6 +54,12 @@ FACET_DEFS: tuple[FacetDef, ...] = (
         name_substrings=("вспомогательн",),
     ),
     FacetDef(
+        key="temp_sensor",
+        label="Термодатчик",
+        name_substrings=("термодатчик", "датчик температуры"),
+        legacy_slugs=("temp-sensor",),
+    ),
+    FacetDef(
         key="dn",
         label="DN",
         name_substrings=("dn",),
@@ -63,6 +69,12 @@ FACET_DEFS: tuple[FacetDef, ...] = (
         key="ways",
         label="Вид крана",
         name_substrings=("вид крана",),
+    ),
+    FacetDef(
+        key="material",
+        label="Материал корпуса",
+        name_substrings=("материал корпуса",),
+        legacy_slugs=("material",),
     ),
     FacetDef(
         key="kvs",
@@ -162,6 +174,10 @@ def attribute_matches_facet(attr: Attribute, facet: FacetDef) -> bool:
     # Nominal voltage only — not «Диапазон напряжения».
     if facet.key == "voltage":
         if slug == "voltage-range" or "диапазон" in name:
+            return False
+    # Body material only — not «Золотниковый шток и шар» (ball-stem-material).
+    if facet.key == "material":
+        if slug == "ball-stem-material" or "золотников" in name:
             return False
     if not facet.name_substrings:
         return False

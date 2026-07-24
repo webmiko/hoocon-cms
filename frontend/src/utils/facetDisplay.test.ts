@@ -16,13 +16,18 @@ describe("facetDisplay", () => {
     expect(facetLabelShort("aux_switch", "Вспомогательный переключатель")).toBe(
       "Вспом. перекл.",
     );
+    expect(facetLabelShort("temp_sensor", "Термодатчик")).toBe("Термодатчик");
     expect(facetLabelShort("analog", "Аналоги")).toBe("Аналоги");
+    expect(facetLabelShort("material", "Материал корпуса")).toBe("Материал корпуса");
   });
 
   it("normalizes area to always «до N м²»", () => {
     expect(facetValueShort("area", "до 0,5")).toBe("до 0,5 м²");
     expect(facetValueShort("area", "3, 2 м²")).toBe("до 3,2 м²");
     expect(facetValueShort("area", "0,5 м²")).toBe("до 0,5 м²");
-    expect(facetValueShort("area", "до 1")).toBe("до 1 м²");
+    expect(facetValueShort("area", "до 1")).toBe("до 1,0 м²");
+    expect(facetValueShort("area", "до 1,0")).toBe("до 1,0 м²");
+    expect(facetValueShort("area", "< 0,5 м²")).toBe("до 0,5 м²");
+    expect(facetValueShort("area", "до < 0,5 м²")).toBe("до 0,5 м²");
   });
 });

@@ -8,9 +8,15 @@ from __future__ import annotations
 import re
 
 from catalog.facets.aux import _looks_like_aux_value, normalize_aux_switch_value
+from catalog.facets.temp_sensor import (
+    _looks_like_temp_sensor_value,
+    normalize_temp_sensor_value,
+)
 
 # Marketing notes in Tilda EAV, e.g. «0,3 м² (для огнезадерживающих клапанов НО)».
 _FACET_PARENTHETICAL_RE = re.compile(r"\s*\([^)]*\)\s*")
+# Datasheet inequalities («< 0,5», «≤0,3 м²») → plain number for «до N».
+_AREA_COMPARE_RE = re.compile(r"(?:<=|>=|≤|≥|<|>)")
 _AREA_VALUE_RE = re.compile(
     r"^(до\s+)?(\d+(?:[.,]\d+)?)\s*(?:м²|m²|м2|m2)?\s*$",
     re.IGNORECASE,
@@ -26,11 +32,13 @@ def strip_facet_parenthetical(value: str) -> str:
 def normalize_area_attribute_value(value: str) -> str:
     """Canonical damper-area label: always ``до N м²``.
 
-    Exact Tilda values (``0,5 м²``) and ``до 0,5`` collapse to the same
-    chip so the facet stays uniform.
+    Exact Tilda values (``0,5 м²``), inequalities (``< 0,5 м²``), and
+    ``до 0,5`` collapse to the same chip so the facet stays uniform —
+    never ``>``, ``<``, ``≥``, or ``≤`` in the label.
 
     Examples:
         ``до 0,5`` → ``до 0,5 м²``;
+        ``< 0,5 м²`` → ``до 0,5 м²``;
         ``0,5 м²`` → ``до 0,5 м²``;
         ``3, 2 м²`` → ``до 3,2 м²``.
 
@@ -45,6 +53,7 @@ def normalize_area_attribute_value(value: str) -> str:
         return raw
     # Tilda typo: «3, 2 м²» → «3,2 м²».
     raw = re.sub(r"(\d),\s+(\d)", r"\1,\2", raw)
+    raw = " ".join(_AREA_COMPARE_RE.sub(" ", raw).split())
     match = _AREA_VALUE_RE.match(raw)
     if not match:
         # Keep unknown forms but unify unit spelling; still prefer «до».
@@ -53,6 +62,9 @@ def normalize_area_attribute_value(value: str) -> str:
             return cleaned
         return f"до {cleaned}"
     number = match.group(2).replace(".", ",")
+    # Merge «1» / «1,0» chips; datasheets use one decimal place.
+    if re.fullmatch(r"\d+", number):
+        number = f"{number},0"
     return f"до {number} м²"
 
 
@@ -62,6 +74,7 @@ def _looks_like_area_value(value: str) -> bool:
     if not raw:
         return False
     raw = re.sub(r"(\d),\s+(\d)", r"\1,\2", raw)
+    raw = " ".join(_AREA_COMPARE_RE.sub(" ", raw).split())
     if _AREA_VALUE_RE.match(raw):
         return True
     return bool(re.search(r"м²|m²|м2|m2", raw, re.I))
@@ -102,6 +115,8 @@ def normalize_facet_value(
             sku_code=sku_code,
             description=description or "",
         )
+    if facet_key == "temp_sensor":
+        return normalize_temp_sensor_value(val, sku_code=sku_code)
     return val
 
 
@@ -132,6 +147,12 @@ def values_match(stored: str, requested: str) -> bool:
         if detect_voltage_family(stored) or detect_voltage_family(requested):
             return True
     # Aux: Да/Нет/1 SPDT ↔ Нет / SPDT-1 / SPDT-2 (without SKU context).
+    # Thermal: «Без датчика» / SAF72… ↔ Нет / SAF72 (both sides must look thermal
+    # so aux «Нет» vs «SPDT-1» does not enter this branch).
+    if _looks_like_temp_sensor_value(stored) and _looks_like_temp_sensor_value(requested):
+        return normalize_temp_sensor_value(stored) == normalize_temp_sensor_value(
+            requested,
+        )
     if _looks_like_aux_value(stored) or _looks_like_aux_value(requested):
         if normalize_aux_switch_value(stored) == normalize_aux_switch_value(requested):
             return True

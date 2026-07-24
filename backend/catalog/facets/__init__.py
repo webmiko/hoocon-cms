@@ -50,6 +50,11 @@ from catalog.facets.normalize import (
     strip_facet_parenthetical,
     values_match,
 )
+from catalog.facets.temp_sensor import (
+    TEMP_SENSOR_NONE,
+    TEMP_SENSOR_SAF72,
+    normalize_temp_sensor_value,
+)
 
 __all__ = [
     "AUX_SWITCH_NONE",
@@ -60,6 +65,8 @@ __all__ = [
     "FACET_DEFS",
     "FACET_KEYS",
     "FacetDef",
+    "TEMP_SENSOR_NONE",
+    "TEMP_SENSOR_SAF72",
     "_facet_sort_key",
     "attribute_ids_for_facet",
     "attribute_matches_facet",
@@ -75,6 +82,7 @@ __all__ = [
     "normalize_area_attribute_value",
     "normalize_aux_switch_value",
     "normalize_facet_value",
+    "normalize_temp_sensor_value",
     "paraphrase_sku_lead",
     "strip_attribute_echo_from_text",
     "strip_facet_parenthetical",

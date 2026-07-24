@@ -28,6 +28,7 @@ export const CARD_HIGHLIGHT_ORDER = [
   "aux_switch",
   "dn",
   "ways",
+  "material",
   "kvs",
 ] as const;
 
