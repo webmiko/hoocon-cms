@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from django.db.models import Count, Prefetch, QuerySet
+from django.db.models import Count, Prefetch, Q, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
@@ -23,8 +23,12 @@ from catalog.compare import (
     resolve_compare_skus,
 )
 from catalog.facets import collect_facet_options
-from catalog.filters import AttributeQueryFilterBackend, SKUFilterSet
-from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
+from catalog.filters import (
+    AttributeQueryFilterBackend,
+    FamilyCardCollapseFilterBackend,
+    SKUFilterSet,
+)
+from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
 from catalog.ordering import annotate_moment_nm, catalog_list_order_by
 from catalog.serializers import (
     CategorySerializer,
@@ -44,7 +48,8 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
     """Return one published ProductImage per category id.
 
     Prefers ``CATEGORY_PREVIEW_SKU_CODES`` when that SKU has a published photo;
-    otherwise the first image by sort_order / id.
+    otherwise the first image by sort_order / id (subquery — does not scan the
+    full gallery for large categories like ``komplekty``).
 
     Args:
         category_ids: Category primary keys to resolve.
@@ -54,6 +59,8 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
     """
     if not category_ids:
         return {}
+
+    from django.db.models import OuterRef, Subquery
 
     result: dict[int, ProductImage] = {}
     slug_by_id = dict(
@@ -83,20 +90,34 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
             if code and code in by_code:
                 result[cat_id] = by_code[code]
 
-    images = (
+    missing = [cid for cid in category_ids if cid not in result]
+    if not missing:
+        return result
+
+    first_image_pk = (
         ProductImage.objects.filter(
             is_published=True,
             sku__is_published=True,
-            sku__product__category_id__in=category_ids,
+            sku__product__category_id=OuterRef("pk"),
         )
-        .select_related("sku__product")
-        .order_by("sku__product__category_id", "sort_order", "id")
+        .order_by("sort_order", "id")
+        .values("pk")[:1]
     )
-    for img in images:
-        product = cast(Product, cast(SKU, img.sku).product)
-        cat_id = product.category_id
-        if cat_id not in result:
-            result[cat_id] = img
+    preview_rows = list(
+        Category.objects.filter(pk__in=missing)
+        .annotate(_preview_pk=Subquery(first_image_pk))
+        .values_list("pk", "_preview_pk"),
+    )
+    image_ids = [img_id for _, img_id in preview_rows if img_id]
+    images_by_pk = {
+        img.pk: img
+        for img in ProductImage.objects.filter(pk__in=image_ids).select_related(
+            "sku__product",
+        )
+    }
+    for cat_id, img_id in preview_rows:
+        if img_id and img_id in images_by_pk:
+            result[cat_id] = images_by_pk[img_id]
     return result
 
 
@@ -144,7 +165,14 @@ class FacetViewSet(viewsets.ViewSet):
         category = request.query_params.get("category", "").strip()
         if category:
             qs = qs.filter(product__category__slug=category)
-        return Response({"results": collect_facet_options(base_queryset=qs)})
+        return Response(
+            {
+                "results": collect_facet_options(
+                    base_queryset=qs,
+                    category_slug=category or None,
+                ),
+            },
+        )
 
 
 class CompareViewSet(viewsets.ViewSet):
@@ -195,7 +223,11 @@ class SKUViewSet(
 
     permission_classes = (AllowAny,)
     lookup_field = "slug"
-    filter_backends = (DjangoFilterBackend, AttributeQueryFilterBackend)
+    filter_backends = (
+        DjangoFilterBackend,
+        AttributeQueryFilterBackend,
+        FamilyCardCollapseFilterBackend,
+    )
     filterset_class = SKUFilterSet
     http_method_names = ["get", "head", "options"]
 
@@ -221,6 +253,11 @@ class SKUViewSet(
             .annotate(
                 category_spec_order=spec_order_case(
                     slug_field="product__category__slug",
+                ),
+                edition_count=Count(
+                    "product__skus",
+                    filter=Q(product__skus__is_published=True),
+                    distinct=True,
                 ),
             ),
         ).order_by(*catalog_list_order_by())

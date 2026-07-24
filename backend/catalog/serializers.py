@@ -83,6 +83,19 @@ def _sku_heading(obj: SKU) -> str:
     )
 
 
+def _family_list_heading(obj: SKU) -> str | None:
+    """Series Product title for collapsed catalog cards, or None."""
+    from catalog.family_cards import is_collapsible_family_product_slug
+
+    if not obj.product_id:
+        return None
+    product = obj.product
+    if product is None or not is_collapsible_family_product_slug(product.slug):
+        return None
+    name = (product.name or "").strip()
+    return name or None
+
+
 def _sku_description(obj: SKU) -> str:
     """Description scoped to this SKU edition (no foreign 24/230 blocks)."""
     text = dedupe_description_lines(obj.description or "")
@@ -275,6 +288,7 @@ class SKUListSerializer(serializers.ModelSerializer):
     product_slug = serializers.CharField(source="product.slug", read_only=True)
     image = serializers.SerializerMethodField()
     highlights = serializers.SerializerMethodField()
+    edition_count = serializers.SerializerMethodField()
 
     class Meta:
         model = SKU
@@ -289,13 +303,19 @@ class SKUListSerializer(serializers.ModelSerializer):
             "price",
             "price_on_request",
             "in_stock",
+            "edition_count",
             "image",
             "highlights",
         )
         read_only_fields = fields
 
     def get_name(self, obj: SKU) -> str:
-        """H1/card title: unique article + cleaned product type."""
+        """H1/card title: series Product name on family list cards, else edition."""
+        view = self.context.get("view")
+        if view is not None and getattr(view, "action", None) == "list":
+            family_title = _family_list_heading(obj)
+            if family_title:
+                return family_title
         return _sku_heading(obj)
 
     def get_price_on_request(self, _obj: SKU) -> bool:
@@ -305,6 +325,19 @@ class SKUListSerializer(serializers.ModelSerializer):
     def get_in_stock(self, obj: SKU) -> bool:
         """True when warehouse quantity is positive (no raw qty in public API)."""
         return obj.in_stock
+
+    def get_edition_count(self, obj: SKU) -> int:
+        """Published SKU count on the same Product (family card signal)."""
+        annotated = getattr(obj, "edition_count", None)
+        if annotated is not None:
+            return max(1, int(annotated))
+        if not obj.product_id:
+            return 1
+        count = SKU.objects.filter(
+            product_id=obj.product_id,
+            is_published=True,
+        ).count()
+        return max(1, count)
 
     def get_image(self, obj: SKU) -> dict[str, Any] | None:
         """Primary published image for catalog cards (sort_order ASC)."""
@@ -359,6 +392,8 @@ class SKUDetailSerializer(SKUListSerializer):
     )
     category_instructions = serializers.SerializerMethodField()
     ball_valve_kit = serializers.SerializerMethodField()
+    siblings = serializers.SerializerMethodField()
+    variant_axes = serializers.SerializerMethodField()
 
     class Meta(SKUListSerializer.Meta):
         fields = (
@@ -371,6 +406,8 @@ class SKUDetailSerializer(SKUListSerializer):
             "category_description",
             "category_instructions",
             "ball_valve_kit",
+            "siblings",
+            "variant_axes",
             "attributes",
             "attribute_groups",
             "files",
@@ -453,6 +490,37 @@ class SKUDetailSerializer(SKUListSerializer):
         from catalog.ball_valve_kit import build_ball_valve_kit_options
 
         return build_ball_valve_kit_options(obj)
+
+    def _siblings_payload(self, obj: SKU) -> list[dict[str, Any]]:
+        """Memoized siblings list for this serializer instance."""
+        from catalog.siblings import siblings_for_sku
+
+        cache: dict[int, list[dict[str, Any]]] = self.context.setdefault(
+            "_siblings_cache",
+            {},
+        )
+        key = int(obj.pk or 0)
+        if key in cache:
+            return cache[key]
+        if not obj.product_id:
+            cache[key] = []
+            return cache[key]
+        count = SKU.objects.filter(product_id=obj.product_id, is_published=True).count()
+        cache[key] = [] if count <= 1 else siblings_for_sku(obj)
+        return cache[key]
+
+    def get_siblings(self, obj: SKU) -> list[dict[str, Any]]:
+        """Same-product editions for the PDP variant picker (empty if alone)."""
+        return self._siblings_payload(obj)
+
+    def get_variant_axes(self, obj: SKU) -> dict[str, list[str]]:
+        """Unique DN / Kvs / voltage / control values among siblings."""
+        from catalog.siblings import variant_axes_from_siblings
+
+        rows = self._siblings_payload(obj)
+        if not rows:
+            return {}
+        return variant_axes_from_siblings(rows)
 
     def get_attributes(self, obj: SKU) -> list[dict[str, Any]]:
         """ТТХ rows deduped and scoped to the SKU voltage/control variant."""

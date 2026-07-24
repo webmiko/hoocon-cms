@@ -161,3 +161,25 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
                 attribute_values__value=value,
             )
         return queryset.distinct()
+
+
+class FamilyCardCollapseFilterBackend(BaseFilterBackend):
+    """Collapse H81 / brass / LAV multi-SKU Products to one list row.
+
+    Must run after facet filters so the representative is chosen among
+    matching editions (e.g. voltage=230 → a 230 SKU of that series).
+    """
+
+    def filter_queryset(
+        self,
+        request: Request,
+        queryset: QuerySet[Any],
+        view: APIView,
+    ) -> QuerySet[Any]:
+        """Apply family collapse on list actions only."""
+        _ = request
+        if getattr(view, "action", None) != "list":
+            return queryset
+        from catalog.family_cards import collapse_family_skus_for_list
+
+        return collapse_family_skus_for_list(queryset)
