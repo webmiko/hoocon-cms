@@ -791,8 +791,15 @@ def _apply_kit_variant_attrs(sku: SKU, kit: H81KitSeries) -> int:
         )
         written += 1
     if variant.aux_switch is True:
-        aux_val = normalize_aux_switch_value("SPDT-1")
-        _set_attr(sku, "Вспомогательный переключатель", "aux-switch", "", aux_val)
+        # Catalog «Подключение…»: два концевых выключателя (a + b) → SPDT-2.
+        aux_val = normalize_aux_switch_value("SPDT-2", sku_code=sku.sku_code)
+        _set_attr(
+            sku,
+            "Вспомогательный переключатель",
+            "aux-switch",
+            "",
+            aux_val,
+        )
         written += 1
     return written
 
@@ -931,7 +938,9 @@ def _kit_series_description(kit: H81KitSeries) -> str:
 def _kit_sku_description(kit: H81KitSeries, sku_code: str) -> str:
     variant = parse_sku_variant(sku_code)
     control_label = "плавное (аналоговое)" if variant.control == "modulating" else "открыто/закрыто"
-    aux_label = "с вспомогательным переключателем" if variant.aux_switch else ("без вспомогательного переключателя")
+    aux_label = (
+        "с двумя вспомогательными переключателями" if variant.aux_switch else "без вспомогательных переключателей"
+    )
     volt = variant.voltage or "?"
     join_word = "резьба" if kit.is_brass else "соединение"
     lines = [

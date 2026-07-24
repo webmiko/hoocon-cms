@@ -452,6 +452,7 @@ def test_format_aux_switch_display_hides_absent() -> None:
         format_aux_switch_display,
         normalize_aux_switch_value,
     )
+    from catalog.facets.aux import aux_spdt_count_from_sku
 
     assert format_aux_switch_display("Нет") is None
     assert format_aux_switch_display("Да", sku_code="da5fu24-as") == AUX_SWITCH_SPDT_2
@@ -460,6 +461,13 @@ def test_format_aux_switch_display_hides_absent() -> None:
     assert format_aux_switch_display("2 SPDT") == AUX_SWITCH_SPDT_2
     assert normalize_aux_switch_value("Да", sku_code="da5fu24-d") == "Нет"
     assert normalize_aux_switch_value("Нет") == "Нет"
+    # H81 kits: catalog shows two aux limit switches on -AS and -DS.
+    assert aux_spdt_count_from_sku("H8101-BV215A-24AS") == 2
+    assert aux_spdt_count_from_sku("H8101-BV215A-24DS") == 2
+    assert aux_spdt_count_from_sku("H8103-BV265-230AS") == 2
+    assert aux_spdt_count_from_sku("H8101-BV215A-24A") == 0
+    assert normalize_aux_switch_value("SPDT-1", sku_code="H8101-BV215A-24AS") == AUX_SWITCH_SPDT_2
+    assert format_aux_switch_display("Да", sku_code="H8121-BV2100E-24DS") == AUX_SWITCH_SPDT_2
 
 
 @pytest.mark.django_db

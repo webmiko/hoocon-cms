@@ -313,9 +313,19 @@ def test_ensure_and_enrich_brass_h8101_bv215a() -> None:
     assert by_slug["kvs"] == "1,6"
     assert by_slug["material"] == "Латунь"
     assert by_slug["power-consumption"] == ("В рабочем режиме: 3 Вт / В режиме ожидания: 1 Вт")
+    assert by_slug["aux-switch"] == "SPDT-2"
     assert "thread" in by_slug
     assert "24" in by_slug["voltage"]
+    assert "двумя вспомогательными переключателями" in sku.description
     assert build_ball_valve_kit_options(sku) is None
+
+    plain = SKU.objects.get(sku_code="H8101-BV215A-24A")
+    plain_slugs = {av.attribute.slug for av in AttributeValue.objects.filter(sku=plain).select_related("attribute")}
+    assert "aux-switch" not in plain_slugs
+    assert "без вспомогательных переключателей" in plain.description
+    ds = SKU.objects.get(sku_code="H8101-BV215A-24DS")
+    ds_aux = AttributeValue.objects.get(sku=ds, attribute__slug="aux-switch").value
+    assert ds_aux == "SPDT-2"
 
 
 @pytest.mark.django_db

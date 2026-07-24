@@ -28,14 +28,25 @@ def _looks_like_aux_value(value: str) -> bool:
 def aux_spdt_count_from_sku(sku_code: str) -> int | None:
     """Infer SPDT count from edition suffix (Belimo DS=1, AS/S=2).
 
+    H81 factory kits are an exception: catalog wiring shows two limit switches
+    (a + b) on both ``-AS`` and ``-DS``.
+
     Args:
-        sku_code: Edition code, e.g. ``da5fu24-ds``, ``HVA24S-5``.
+        sku_code: Edition code, e.g. ``da5fu24-ds``, ``H8101-BV215A-24AS``.
 
     Returns:
         ``0`` (none), ``1``, ``2``, or ``None`` if unknown.
     """
     code = (sku_code or "").strip().lower().replace(" ", "")
     if not code:
+        return None
+    # H81 factory kits: catalog shows two aux limit switches (a + b) on -AS/-DS.
+    # Edition is glued to voltage (…-24AS / …-230DS), not a bare «-as» suffix.
+    if re.match(r"h81(?:01|02|03|04|05|06|07|08|21|22)-bv", code):
+        if re.search(r"(?:24|230)(?:as|ds)$", code):
+            return 2
+        if re.search(r"(?:24|230)(?:a|d)$", code):
+            return 0
         return None
     if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):
         return 2
