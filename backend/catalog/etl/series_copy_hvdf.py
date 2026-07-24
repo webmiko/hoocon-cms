@@ -118,7 +118,7 @@ _HVDF_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
         "moment": "3 Нм",
-        "damper-area": "< 0,5 м²",
+        "damper-area": "до 0,5 м²",
         "power": "5 Вт под нагрузкой / 2 Вт в режиме удержания",
         "running-time": "< 75 с / возврат пружины < 25 с",
         "weight": "< 1,3 кг",
@@ -128,7 +128,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     5: {
         "moment": "5 Нм",
-        "damper-area": "< 0,5 м²",
+        "damper-area": "до 0,5 м²",
         "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
         "running-time": "< 70 с / возврат пружины < 20 с",
         "weight": "< 1,5 кг",
@@ -138,8 +138,8 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
 }
 
-TEMP_SENSOR_NONE = "Без датчика"
-TEMP_SENSOR_SAF72 = "SAF72 (срабатывание при 72 °C, TS1/TS2)"
+TEMP_SENSOR_NONE = "Нет"
+TEMP_SENSOR_SAF72 = "SAF72"
 
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
@@ -208,6 +208,70 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
         ],
     ),
 )
+
+# Belimo BFL ≈ 4/3 Нм (HVD-3F); BLF ≈ 6/4 Нм (HVD-5F). ST ↔ Belimo …-T (BAT 72 °C).
+_ANALOGS_BY_NM: dict[int, str] = {
+    3: normalize_tech_copy(
+        """
+Список аналогов электропривода Hoocon HVD-3F с такими же или близкими характеристиками
+(пружинный возврат, открыто/закрыто, ~3 Нм, 2×SPDT, IP54, вал 12×12 мм)
+
+HVD24S-3F:
+– Belimo BFL24
+– BVM BFL24-03
+– Nanotek BFL 24 B
+
+HVD24ST-3F: (с термодатчиком)
+– Belimo BFL24-T
+– BVM BFL24-03-T
+– Nanotek BFL 24 B-T
+
+HVD230S-3F:
+– Belimo BFL230
+– BVM BFL230-03
+– Nanotek BFL 230 B
+
+HVD230ST-3F: (с термодатчиком)
+– Belimo BFL230-T
+– BVM BFL230-03-T
+– Nanotek BFL 230 B-T
+""".strip(),
+    ),
+    5: normalize_tech_copy(
+        """
+Список аналогов электропривода Hoocon HVD-5F с такими же или близкими характеристиками
+(пружинный возврат, открыто/закрыто, ~5 Нм, 2×SPDT, IP54, вал 12×12 мм)
+
+HVD24S-5F:
+– Belimo BLF24
+– Nanotek BLF 24 B
+– Sputnik FS24-5
+– BVM BLF24-05
+– Vilmann TAFA2-05S24
+
+HVD24ST-5F: (с термодатчиком)
+– Belimo BLF24-T
+– Nanotek BLF 24 B-T
+– Sputnik FS24-5-ST
+– BVM BLF24-05-T
+– Vilmann TAFA2-05ST24
+
+HVD230S-5F:
+– Belimo BLF230
+– Nanotek BLF 230 B
+– Sputnik FS230-5
+– BVM BLF230-05
+– AIRS BLF230A
+
+HVD230ST-5F: (с термодатчиком)
+– Belimo BLF230-T
+– Nanotek BLF 230 B-T
+– Sputnik FS230-5-ST
+– BVM BLF230-05-T
+– AIRS BLF230A-T
+""".strip(),
+    ),
+}
 
 # (voltage, thermal) → sku_code suffix pattern already full code
 _EDITIONS: tuple[tuple[str, bool], ...] = (
@@ -434,13 +498,21 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             continue
         row = TORQUE_SPECS[torque_nm]
         title = _product_title(torque_nm)
+        analogs = _ANALOGS_BY_NM.get(torque_nm, "")
         if not dry_run:
             product.name = title[:200]
             product.description = SERIES_DESCRIPTION
             product.instructions = SERIES_INSTRUCTIONS
             product.specs_text = ""
+            product.analogs_text = analogs
             product.save(
-                update_fields=["name", "description", "instructions", "specs_text"],
+                update_fields=[
+                    "name",
+                    "description",
+                    "instructions",
+                    "specs_text",
+                    "analogs_text",
+                ],
             )
 
         category_slug = product.category.slug if product.category_id else ""
@@ -452,7 +524,10 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 sku.name = title[:300]
                 sku.description = _sku_description(variant, spec)
                 sku.specs_text = ""
-                sku.save(update_fields=["name", "description", "specs_text"])
+                sku.analogs_text = analogs
+                sku.save(
+                    update_fields=["name", "description", "specs_text", "analogs_text"],
+                )
                 _clear_sku_attributes(sku)
 
             for name, slug, unit, value, _g in SHARED_ATTRS:

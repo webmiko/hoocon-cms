@@ -5,8 +5,8 @@
   position: relative;
 }
 
+/* Do not set display here — it beats .dark { display: none } (0,1,1 vs 0,1,0). */
 .root img {
-  display: block;
   height: var(--brand-logo-height, 40px);
   width: auto;
 }

@@ -112,7 +112,7 @@ _DAMU_DIMS_8_32: Final[str] = "100 × 180 × 68 мм"
 TORQUE_SPECS: dict[int, dict[str, str]] = {
     2: {
         "moment": "2 Нм",
-        "damper-area": "< 0,2",
+        "damper-area": "до 0,2 м²",
         "running-time": "< 30 с (95°)",
         "ip-rating": "IP54",
         "shaft-diameter": "круглый 8…16 мм или квадратный 8×8 — 12×12 мм",
@@ -124,7 +124,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     4: {
         "moment": "4 Нм",
-        "damper-area": "< 0,4",
+        "damper-area": "до 0,4 м²",
         "running-time": "< 50 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 8…16 мм / квадратный 8×8…12×12 мм",
@@ -136,7 +136,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     6: {
         "moment": "6 Нм",
-        "damper-area": "< 0,6",
+        "damper-area": "до 0,6 м²",
         "running-time": "< 70 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 8…16 мм / квадратный 8×8…12×12 мм",
@@ -148,7 +148,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     8: {
         "moment": "8 Нм",
-        "damper-area": "< 0,8",
+        "damper-area": "до 0,8 м²",
         "running-time": "< 55 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 10…20 мм / квадратный 10×10…16×16 мм",
@@ -160,7 +160,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     16: {
         "moment": "16 Нм",
-        "damper-area": "< 1,6",
+        "damper-area": "до 1,6 м²",
         "running-time": "< 100 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 10…20 мм / квадратный 10×10…16×16 мм",
@@ -172,7 +172,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     24: {
         "moment": "24 Нм",
-        "damper-area": "< 2,4",
+        "damper-area": "до 2,4 м²",
         "running-time": "< 160 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 10…20 мм / квадратный 10×10…16×16 мм",
@@ -184,7 +184,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     32: {
         "moment": "32 Нм",
-        "damper-area": "< 3,2",
+        "damper-area": "до 3,2 м²",
         "running-time": "< 180 с (95°)",
         "ip-rating": "IP44",
         "shaft-diameter": "круглый 10…20 мм / квадратный 10×10…16×16 мм",
@@ -405,10 +405,12 @@ def _product_title(torque_nm: int) -> str:
 
 
 def _sku_description(variant: SkuVariant, torque_nm: int, row: dict[str, str]) -> str:
+    from catalog.etl.sku_instructions import format_damper_area
+
     lines = [
         (
             "Электропривод воздушной заслонки без возвратной пружины "
-            f"({row['moment']}, площадь заслонки {row['damper-area']} м²). "
+            f"({row['moment']}, площадь заслонки {format_damper_area(row['damper-area'])}). "
             "Используется для управления воздушными регулирующими заслонками "
             "в системах ОВК (отопления, вентиляции и кондиционирования)."
         ),

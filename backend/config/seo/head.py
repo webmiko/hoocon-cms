@@ -38,6 +38,7 @@ class SeoHeadContext:
     sku_code: str | None = None
     sku_price: str | None = None
     price_on_request: bool = True
+    in_stock: bool = True
     category_name: str | None = None
     breadcrumb: tuple[tuple[str, str], ...] = ()
 
@@ -225,6 +226,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         sku_code=sku.sku_code or sku.slug,
         sku_price=price,
         price_on_request=on_request,
+        in_stock=sku.in_stock,
         category_name=cat_name,
         breadcrumb=tuple(crumbs),
     )

@@ -142,7 +142,7 @@ _DAFU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
         "moment": "3 Нм",
-        "damper-area": "< 0,3 м²",
+        "damper-area": "до 0,3 м²",
         "power": "5 Вт под нагрузкой / 2 Вт в режиме удержания",
         "running-time": "≤ 20 с",
         "weight": "< 1,3 кг",
@@ -151,7 +151,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     5: {
         "moment": "5 Нм",
-        "damper-area": "< 0,5 м²",
+        "damper-area": "до 0,5 м²",
         "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
         "running-time": "≤ 20 с",
         "weight": "< 1,5 кг",
@@ -160,7 +160,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     10: {
         "moment": "10 Нм",
-        "damper-area": "< 1,0 м²",
+        "damper-area": "до 1,0 м²",
         "power": "6 Вт под нагрузкой / 1,5 Вт в режиме удержания",
         "running-time": "≤ 25 с",
         "weight": "< 2,6 кг",
@@ -169,7 +169,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     15: {
         "moment": "15 Нм",
-        "damper-area": "< 1,5 м²",
+        "damper-area": "до 1,5 м²",
         "power": "7 Вт под нагрузкой / 2 Вт в режиме удержания",
         "running-time": "≤ 25 с",
         "weight": "< 2,6 кг",
@@ -178,7 +178,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     20: {
         "moment": "20 Нм",
-        "damper-area": "< 2,0 м²",
+        "damper-area": "до 2,0 м²",
         "power": "10 Вт под нагрузкой / 3,5 Вт в режиме удержания",
         "running-time": "≤ 25 с",
         "weight": "< 2,8 кг",

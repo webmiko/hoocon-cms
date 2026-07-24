@@ -18,13 +18,13 @@ _Builder = Callable[[str], str | None]
 
 
 def format_damper_area(raw: str) -> str:
-    """Ensure damper-area phrase includes ``м²`` once."""
+    """Canonical damper-area phrase for prose: always ``до N м²``."""
+    from catalog.facets.normalize import normalize_area_attribute_value
+
     text = (raw or "").strip()
     if not text:
         return text
-    if "м²" in text or "м2" in text.casefold():
-        return text
-    return f"{text} м²"
+    return normalize_area_attribute_value(text)
 
 
 def power_supply_bullets(variant: SkuVariant, *, class_ii_detail: bool = False) -> list[str]:

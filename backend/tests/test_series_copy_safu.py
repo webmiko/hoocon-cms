@@ -40,7 +40,7 @@ def test_shared_attrs_manual_override_button() -> None:
 
 def test_sa3_specs_from_manual() -> None:
     row = TORQUE_SPECS[3]
-    assert row["damper-area"] == "< 0,3 м²"
+    assert row["damper-area"] == "до 0,3 м²"
     assert "< 75 с" in row["running-time"]
     assert "50 дБ" in row["noise"]
     assert row["dimensions"] == "132 × 87 × 59 мм"

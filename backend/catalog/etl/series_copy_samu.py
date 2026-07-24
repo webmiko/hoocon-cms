@@ -99,7 +99,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 TORQUE_SPECS: dict[int, dict[str, str]] = {
     10: {
         "moment": "10 Нм",
-        "damper-area": "< 1,0",
+        "damper-area": "до 1,0 м²",
         "running-time": "< 45 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
@@ -109,7 +109,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     15: {
         "moment": "15 Нм",
-        "damper-area": "< 1,5",
+        "damper-area": "до 1,5 м²",
         "running-time": "< 30 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
@@ -119,7 +119,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
     30: {
         "moment": "30 Нм",
-        "damper-area": "< 3,0",
+        "damper-area": "до 3,0 м²",
         "running-time": "< 115 с (95°)",
         "shaft-length": "≥ 90",
         "weight": "≈ 2,2 кг",
@@ -265,10 +265,12 @@ def _product_title(torque_nm: int) -> str:
 
 
 def _sku_description(variant: SkuVariant, row: dict[str, str]) -> str:
+    from catalog.etl.sku_instructions import format_damper_area
+
     lines = [
         (
             "Электропривод дымового клапана без возвратной пружины. "
-            f"Крутящий момент {row['moment']}, площадь заслонки {row['damper-area']} м²."
+            f"Крутящий момент {row['moment']}, площадь заслонки {format_damper_area(row['damper-area'])}."
         ),
         f"Время поворота: {row['running-time']}.",
         "Управление: открыто/закрыто, 2-/3-позиционное.",

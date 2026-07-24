@@ -14,6 +14,7 @@ interface SkuForJsonLd {
   description?: string;
   price?: string | number | null;
   price_on_request?: boolean;
+  in_stock?: boolean;
   category_name?: string;
   category_slug?: string | null;
 }
@@ -82,12 +83,18 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
       "@type": "Offer",
       price: String(sku.price),
       priceCurrency: "RUB",
-      availability: "https://schema.org/InStock",
+      availability:
+        sku.in_stock === false
+          ? "https://schema.org/OutOfStock"
+          : "https://schema.org/InStock",
     };
   } else {
     ld.offers = {
       "@type": "Offer",
-      availability: "https://schema.org/InStock",
+      availability:
+        sku.in_stock === false
+          ? "https://schema.org/OutOfStock"
+          : "https://schema.org/InStock",
       priceSpecification: {
         "@type": "PriceSpecification",
         priceCurrency: "RUB",
