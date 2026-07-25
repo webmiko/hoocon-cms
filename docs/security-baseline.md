@@ -62,6 +62,9 @@ Admin, файлы, SPA, VPS.
   только аварийный/ограниченный режим; полный локальный стек — Postgres.
 - Prod cookies: `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, HSTS,
   `SECURE_SSL_REDIRECT` (за reverse proxy — `SECURE_PROXY_SSL_HEADER`).
+- **COOP** (`SECURE_CROSS_ORIGIN_OPENER_POLICY`): default off на HTTP IP
+  (браузер игнорирует заголовок → шум в консоли/Lighthouse). После домена+TLS:
+  `DJANGO_SECURE_CROSS_ORIGIN_OPENER_POLICY=same-origin`.
 - Prod: Redis `CACHES` для DRF throttle (не LocMem per-worker).
 - OpenAPI `/api/schema/`, `/api/docs/` — только staff при `DEBUG=False`.
 

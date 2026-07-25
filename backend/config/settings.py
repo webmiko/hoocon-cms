@@ -70,6 +70,11 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
+    # COOP needs a trustworthy origin (HTTPS). On http://IP the browser ignores
+    # the header and Lighthouse logs a console error. Default off until TLS;
+    # then set DJANGO_SECURE_CROSS_ORIGIN_OPENER_POLICY=same-origin.
+    _coop = os.getenv("DJANGO_SECURE_CROSS_ORIGIN_OPENER_POLICY", "none").strip()
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None if _coop.lower() in ("", "none", "off") else _coop
     if _env_bool("DJANGO_BEHIND_HTTPS_PROXY", default=True):
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
