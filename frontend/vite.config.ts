@@ -4,6 +4,9 @@ import { VitePWA } from "vite-plugin-pwa";
 
 import { asyncEntryCssPlugin } from "./vite.async-css.ts";
 
+/** Bump when replacing public/pwa-*.png so installed PWAs refetch icons. */
+const PWA_ICON_REV = "20260725b";
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -35,10 +38,20 @@ export default defineConfig({
         lang: "ru",
         categories: ["business"],
         icons: [
-          { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
           {
-            src: "pwa-512-maskable.png",
+            src: `pwa-192.png?v=${PWA_ICON_REV}`,
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: `pwa-512.png?v=${PWA_ICON_REV}`,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: `pwa-512-maskable.png?v=${PWA_ICON_REV}`,
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
