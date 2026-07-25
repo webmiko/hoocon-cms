@@ -13,7 +13,10 @@ alwaysApply: true
 5. Перед любым commit/push — `./scripts/pre-commit-checkup.sh`
    (правило `pre-commit-checkup.mdc`), включая ревью diff
    баги/БЗ/security (`scripts/diff-quality-review.py`).
-6. Карточки серий DA / SA / 8100 / H81 / H8205 — канон
+6. Команда пользователя **`чкд`** («чек комит деплой») —
+   checkup → atomic commit(s) → push `develop` (правило
+   `chkd-checkup-commit-deploy.mdc`).
+7. Карточки серий DA / SA / 8100 / H81 / H8205 — канон
    [docs/series-card-templates.md](docs/series-card-templates.md);
    при смене UX серии обновлять шаблон вместе с кодом
    (правило `series-card-templates.mdc`).
