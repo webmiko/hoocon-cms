@@ -1,6 +1,6 @@
 /**
- * Font subsets for ru-RU (latin + cyrillic). Full @fontsource/*.css also
- * pulls greek/vietnamese faces — unused CSS and extra unicode-range noise.
+ * Font subsets for ru-RU (latin + cyrillic).
+ * Skip cyrillic-ext / greek / vietnamese to cut critical font requests.
  */
 @import "@fontsource/ibm-plex-sans/latin-400.css";
 @import "@fontsource/ibm-plex-sans/latin-500.css";
@@ -10,10 +10,6 @@
 @import "@fontsource/ibm-plex-sans/cyrillic-500.css";
 @import "@fontsource/ibm-plex-sans/cyrillic-600.css";
 @import "@fontsource/ibm-plex-sans/cyrillic-700.css";
-@import "@fontsource/ibm-plex-sans/cyrillic-ext-400.css";
-@import "@fontsource/ibm-plex-sans/cyrillic-ext-500.css";
-@import "@fontsource/ibm-plex-sans/cyrillic-ext-600.css";
-@import "@fontsource/ibm-plex-sans/cyrillic-ext-700.css";
 
 @import "@fontsource/montserrat/latin-600.css";
 @import "@fontsource/montserrat/latin-700.css";
@@ -21,6 +17,3 @@
 @import "@fontsource/montserrat/cyrillic-600.css";
 @import "@fontsource/montserrat/cyrillic-700.css";
 @import "@fontsource/montserrat/cyrillic-800.css";
-@import "@fontsource/montserrat/cyrillic-ext-600.css";
-@import "@fontsource/montserrat/cyrillic-ext-700.css";
-@import "@fontsource/montserrat/cyrillic-ext-800.css";

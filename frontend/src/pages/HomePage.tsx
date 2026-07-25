@@ -78,49 +78,49 @@ const HOME_PARTNERS: ReadonlyArray<{
   {
     name: "Завод НЗВЗ",
     logo: "/home/partners/nzvz.webp",
-    width: 480,
-    height: 209,
+    width: 260,
+    height: 113,
   },
   {
     name: "Завод ВОК",
     logo: "/home/partners/vok.webp",
-    width: 480,
-    height: 206,
+    width: 260,
+    height: 112,
   },
   {
     name: "ТД Панорамавент",
     logo: "/home/partners/panoramavent.webp",
-    width: 480,
-    height: 207,
+    width: 260,
+    height: 112,
     href: "https://panoramavent.com",
   },
   {
     name: "АэроГрупп",
     logo: "/home/partners/aerogrupp.webp",
-    width: 480,
-    height: 97,
+    width: 260,
+    height: 53,
   },
 ];
 
-/** Reference installations — products in service on major sites. */
+/** Reference installations — products in service on major sites (~960w for LCP). */
 const HOME_PROJECTS = [
   {
     name: "Пекинское метро",
     image: "/home/projects/beijing-metro.webp",
-    width: 1600,
-    height: 1067,
+    width: 960,
+    height: 640,
   },
   {
     name: "АЭС Даявань, Шэньчжэнь",
     image: "/home/projects/dayawan-npp.webp",
-    width: 1600,
-    height: 1067,
+    width: 960,
+    height: 640,
   },
   {
     name: "БЦ SOHO",
     image: "/home/projects/soho-bc.webp",
-    width: 1600,
-    height: 1067,
+    width: 960,
+    height: 640,
   },
 ] as const;
 
@@ -133,6 +133,17 @@ export function HomePage() {
   const partnersRef = useRef<HTMLElement>(null);
   const partnersParallaxRef = useRef<HTMLDivElement>(null);
   const [heroSlide, setHeroSlide] = useState(0);
+  /** Only decode slides once shown — keeps inactive hero WebPs off first paint. */
+  const [loadedHeroSlides, setLoadedHeroSlides] = useState<ReadonlySet<number>>(
+    () => new Set([0]),
+  );
+
+  // Adjust loaded set during render (same pattern as Layout menuRoute).
+  if (!loadedHeroSlides.has(heroSlide)) {
+    const next = new Set(loadedHeroSlides);
+    next.add(heroSlide);
+    setLoadedHeroSlides(next);
+  }
 
   useEffect(() => {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -229,6 +240,7 @@ export function HomePage() {
           + "Belimo, запрос КП."
         }
         path="/"
+        preloadImage={HOME_PROJECTS[0].image}
         jsonLd={buildHomeJsonLd()}
       />
 
@@ -244,16 +256,18 @@ export function HomePage() {
                     : styles.heroSlide
                 }
               >
-                <img
-                  className={styles.heroSlideImg}
-                  src={project.image}
-                  alt=""
-                  width={project.width}
-                  height={project.height}
-                  loading={index === 0 ? "eager" : "lazy"}
-                  decoding="async"
-                  fetchPriority={index === 0 ? "high" : "auto"}
-                />
+                {loadedHeroSlides.has(index) ? (
+                  <img
+                    className={styles.heroSlideImg}
+                    src={project.image}
+                    alt=""
+                    width={project.width}
+                    height={project.height}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    fetchPriority={index === 0 ? "high" : "auto"}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -451,8 +465,8 @@ export function HomePage() {
               className={styles.deliveryImg}
               src="/home/delivery.webp"
               alt=""
-              width={1000}
-              height={562}
+              width={720}
+              height={405}
               loading="lazy"
               decoding="async"
             />

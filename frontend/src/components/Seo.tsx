@@ -17,6 +17,8 @@ interface SeoProps {
   ogType?: "website" | "article" | "product";
   /** When true, emit robots noindex,nofollow. */
   noindex?: boolean;
+  /** Optional image URL to ``<link rel="preload" as="image">`` (LCP). */
+  preloadImage?: string;
 }
 
 function cspNonce(): string | undefined {
@@ -41,6 +43,7 @@ export function Seo({
   jsonLd,
   ogType = "website",
   noindex = false,
+  preloadImage,
 }: SeoProps) {
   const fullTitle = brandedTitle(title);
   const canonicalPath = path ? canonicalizePath(path) : "/";
@@ -61,6 +64,14 @@ export function Seo({
       {description && <meta name="description" content={description} />}
       <meta name="robots" content={robots} />
       <link rel="canonical" href={canonical} />
+      {preloadImage ? (
+        <link
+          rel="preload"
+          as="image"
+          href={preloadImage}
+          fetchPriority="high"
+        />
+      ) : null}
 
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:title" content={fullTitle} />
