@@ -148,26 +148,39 @@
 
 .heroDots {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
+/* Visual 8px dot; ≥44px touch target (WCAG 2.5.5 / Lighthouse). */
 .heroDot {
-  width: 8px;
-  height: 8px;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
+  background: transparent;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--transition-fast);
+}
+
+.heroDot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
   transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.heroDot:hover {
+.heroDot:hover::before {
   background: rgba(255, 255, 255, 0.65);
 }
 
-.heroDotActive {
+.heroDotActive::before {
   background: var(--color-brand);
   transform: scale(1.2);
 }
@@ -330,6 +343,17 @@
   color: var(--color-text-soft);
   max-width: 48ch;
   line-height: 1.6;
+}
+
+/* In-prose links: color + underline (not color-only). */
+.sectionLead a {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.sectionLead a:hover {
+  color: var(--color-link-hover);
 }
 
 .status {
@@ -937,7 +961,7 @@
   .directionBlock:hover .directionMore,
   .ctaPrimary:hover,
   .ctaSecondary:hover,
-  .heroDotActive {
+  .heroDotActive::before {
     transform: none;
   }
 }
