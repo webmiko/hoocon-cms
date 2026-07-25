@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 import { asyncEntryCssPlugin } from "./vite.async-css.ts";
+import { COLOR_BG, COLOR_BRAND } from "./src/styles/brandColors.ts";
 
 /** Bump when replacing public/pwa-*.png so installed PWAs refetch icons. */
 const PWA_ICON_REV = "20260725b";
@@ -28,8 +29,8 @@ export default defineConfig({
         short_name: "Hoocon",
         description:
           "B2B-каталог электроприводов Hoocon для ОВК: подбор, документы, запрос КП.",
-        theme_color: "#dc1313",
-        background_color: "#f3f4f7",
+        theme_color: COLOR_BRAND,
+        background_color: COLOR_BG,
         display: "standalone",
         orientation: "portrait-primary",
         start_url: "/",

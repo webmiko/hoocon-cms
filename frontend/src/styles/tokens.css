@@ -8,7 +8,7 @@
 :root {
   color-scheme: light;
 
-  /* Brand */
+  /* Brand — hexes synced with styles/brandColors.ts (PWA theme_color / meta). */
   --color-brand: #dc1313;
   --color-brand-hover: #b01010;
   --color-brand-deep: #b01010;

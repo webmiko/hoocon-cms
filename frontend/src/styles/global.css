@@ -81,6 +81,30 @@ a:visited:hover {
   text-decoration: underline;
 }
 
+/*
+ * Brand-fill CTAs (Link): beat a:visited / a:visited:hover so the label stays
+ * on-brand. Without this, visited /consultation turns sticky «Запросить КП»
+ * into --color-link-visited (looks like a “different PWA palette”).
+ */
+a[data-brand-cta]:link,
+a[data-brand-cta]:visited,
+a[data-brand-cta]:hover,
+a[data-brand-cta]:active,
+a[data-brand-cta]:visited:hover {
+  color: var(--color-on-brand);
+  text-decoration: none;
+}
+
+/* Hero / on-dark glass CTAs — keep white label vs a:visited. */
+a[data-on-dark-cta]:link,
+a[data-on-dark-cta]:visited,
+a[data-on-dark-cta]:hover,
+a[data-on-dark-cta]:active,
+a[data-on-dark-cta]:visited:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,

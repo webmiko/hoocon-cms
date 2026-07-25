@@ -131,7 +131,7 @@ export function WhereToBuyPage() {
               <a href={`mailto:${EMAIL_SALES}`}>{EMAIL_SALES}</a>
             </li>
           </ul>
-          <Link to="/consultation" className={styles.cardCta}>
+          <Link to="/consultation" className={styles.cardCta} data-brand-cta>
             Запросить КП
           </Link>
         </article>
@@ -183,7 +183,7 @@ export function WhereToBuyPage() {
               без посредников. CE · UL · EAC · ISO&nbsp;9001. Контакты завода,
               платформы и условия OEM — на отдельной странице.
             </p>
-            <Link to="/zavod" className={styles.oemCta}>
+            <Link to="/zavod" className={styles.oemCta} data-brand-cta>
               Страница завода →
             </Link>
           </article>

@@ -201,7 +201,7 @@ export function Layout() {
 
               <ThemeToggle />
 
-              <Link to="/consultation" className={styles.ctaButton}>
+              <Link to="/consultation" className={styles.ctaButton} data-brand-cta>
                 Запросить КП
               </Link>
 
@@ -310,6 +310,7 @@ export function Layout() {
             <Link
               to="/consultation"
               className={styles.navMobileCta}
+              data-brand-cta
               onClick={closeMenu}
             >
               Запросить КП
@@ -423,7 +424,11 @@ export function Layout() {
       <CompareTray />
 
       {showMobileStickyCta ? (
-        <Link to="/consultation" className={styles.mobileStickyCta}>
+        <Link
+          to="/consultation"
+          className={styles.mobileStickyCta}
+          data-brand-cta
+        >
           Запросить КП
         </Link>
       ) : null}

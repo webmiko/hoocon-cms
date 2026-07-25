@@ -284,10 +284,15 @@ export function HomePage() {
             РФ. КП по запросу.
           </p>
           <div className={styles.heroActions}>
-            <Link to="/catalog" className={styles.ctaPrimary}>
+            <Link to="/catalog" className={styles.ctaPrimary} data-brand-cta>
               Смотреть каталог
             </Link>
-            <Link to="/consultation" className={styles.ctaSecondary} id="hero-kp-cta">
+            <Link
+              to="/consultation"
+              className={styles.ctaSecondary}
+              id="hero-kp-cta"
+              data-on-dark-cta
+            >
               Запросить КП
             </Link>
           </div>
@@ -481,7 +486,7 @@ export function HomePage() {
               оплате до 12:00 возможна срочная отгрузка в тот же день; в
               остальных случаях отправим на следующий рабочий день.
             </p>
-            <Link to="/consultation" className={styles.deliveryCta}>
+            <Link to="/consultation" className={styles.deliveryCta} data-brand-cta>
               Запросить КП
             </Link>
           </div>

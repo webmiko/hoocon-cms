@@ -131,7 +131,7 @@ export function ComparePage() {
       {slugs.length === 0 ? (
         <div className={styles.empty}>
           <p>Пока нечего сравнивать.</p>
-          <Link to="/catalog" className={styles.emptyCta}>
+          <Link to="/catalog" className={styles.emptyCta} data-on-dark-cta>
             Перейти в каталог
           </Link>
         </div>

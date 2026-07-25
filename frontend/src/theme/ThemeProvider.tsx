@@ -11,6 +11,7 @@ import {
   writeStoredThemePreference,
 } from "../utils/theme";
 import { ThemeContext, type ThemeContextValue } from "./ThemeContext";
+import { COLOR_BRAND } from "../styles/brandColors";
 
 /**
  * Provides theme preference + resolved light/dark for the app shell.
@@ -26,6 +27,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     applyThemeToDocument(resolved, preference);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      // Same brand token as PWA manifest / tokens.css (not a separate palette).
+      meta.setAttribute("content", COLOR_BRAND);
+    }
   }, [resolved, preference]);
 
   useEffect(() => {
