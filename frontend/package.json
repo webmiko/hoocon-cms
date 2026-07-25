@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",
-    "@fontsource/ibm-plex-sans-condensed": "^5.3.0",
     "@fontsource/montserrat": "^5.3.0",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.4.12",

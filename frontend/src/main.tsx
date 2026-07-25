@@ -12,13 +12,20 @@ import App from "./App";
 
 registerSW({ immediate: true });
 
-// Fetch the CSRF token cookie once on app load so that POST /api/leads/
-// can send the X-CSRFToken header. Spec: ПЛАН §6 Iter 4 — F8 (CSRF).
-void api.fetchCsrfToken().catch((err) => {
-  // Non-fatal: the leads endpoint will still work via honeypot + throttle
-  // for anonymous users; CSRF is enforced only for session-authenticated
-  // requests. Log to console for dev visibility.
-  console.warn("CSRF token fetch failed:", err);
+// CSRF after first paint — keeps /api/csrf/ off the critical request chain
+// (Lighthouse). Spec: ПЛАН §6 Iter 4 — F8 (CSRF).
+function scheduleIdle(task: () => void): void {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => task(), { timeout: 2500 });
+    return;
+  }
+  window.setTimeout(task, 1);
+}
+
+scheduleIdle(() => {
+  void api.fetchCsrfToken().catch((err) => {
+    console.warn("CSRF token fetch failed:", err);
+  });
 });
 
 createRoot(document.getElementById("root")!).render(

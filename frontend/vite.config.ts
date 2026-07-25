@@ -52,6 +52,30 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+          if (id.includes("dompurify")) {
+            return "vendor-dompurify";
+          }
+          if (
+            id.includes("react-dom") ||
+            id.includes("/react/") ||
+            id.includes("react-router") ||
+            id.includes("react-helmet-async") ||
+            id.includes("scheduler")
+          ) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

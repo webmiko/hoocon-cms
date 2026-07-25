@@ -159,19 +159,30 @@ export function HomePage() {
     let current = 0;
     let frame = 0;
     let running = false;
+    /** Cached geometry — avoid getBoundingClientRect on every scroll frame. */
+    let sectionTop = 0;
+    let sectionHeight = 1;
 
-    const tick = () => {
+    const measure = () => {
       const section = partnersRef.current;
-      const layer = partnersParallaxRef.current;
-      if (!section || !layer) {
-        running = false;
+      if (!section) {
         return;
       }
       const rect = section.getBoundingClientRect();
+      sectionTop = rect.top + window.scrollY;
+      sectionHeight = rect.height || 1;
+    };
+
+    const tick = () => {
+      const layer = partnersParallaxRef.current;
+      if (!layer) {
+        running = false;
+        return;
+      }
       const viewH = window.innerHeight || 1;
-      const mid = rect.top + rect.height / 2;
+      const mid = sectionTop - window.scrollY + sectionHeight / 2;
       const raw = (mid - viewH / 2) * PARALLAX_FACTOR;
-      const maxShift = rect.height * 0.35;
+      const maxShift = sectionHeight * 0.35;
       const target = Math.max(-maxShift, Math.min(maxShift, raw));
       current += (target - current) * PARALLAX_EASE;
       layer.style.transform = `translate3d(0, ${current.toFixed(2)}px, 0)`;
@@ -192,13 +203,19 @@ export function HomePage() {
       }
     };
 
+    const onResize = () => {
+      measure();
+      onScroll();
+    };
+
+    measure();
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 

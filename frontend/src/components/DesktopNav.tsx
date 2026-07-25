@@ -49,17 +49,33 @@ export function DesktopNav() {
       const itemEls = Array.from(
         measure.querySelectorAll<HTMLElement>("[data-nav-measure]"),
       );
-      const widths = itemEls.map((el) => el.getBoundingClientRect().width);
-      const moreWidth = moreMeasure.getBoundingClientRect().width;
-      setVisibleCount(countVisibleNavItems(nav.clientWidth, widths, moreWidth));
+      // Read all geometry in one frame, then setState once (avoid layout thrash).
+      const navWidth = nav.clientWidth;
+      const widths = itemEls.map((el) => el.offsetWidth);
+      const moreWidth = moreMeasure.offsetWidth;
+      setVisibleCount(countVisibleNavItems(navWidth, widths, moreWidth));
     }
 
-    recalc();
-    const observer = new ResizeObserver(recalc);
+    let raf = 0;
+    const scheduleRecalc = () => {
+      if (raf) {
+        return;
+      }
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        recalc();
+      });
+    };
+
+    scheduleRecalc();
+    const observer = new ResizeObserver(scheduleRecalc);
     observer.observe(nav);
-    void document.fonts?.ready.then(recalc);
+    void document.fonts?.ready.then(scheduleRecalc);
 
     return () => {
+      if (raf) {
+        cancelAnimationFrame(raf);
+      }
       observer.disconnect();
     };
   }, []);
