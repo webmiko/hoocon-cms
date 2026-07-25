@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
@@ -53,6 +53,13 @@ export function LeadForm({ leadType, skuSlug, skuName, ballValveKit }: LeadFormP
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // CSRF only when the form is mounted — not on every page (home Lighthouse).
+  useEffect(() => {
+    void api.fetchCsrfToken().catch((err) => {
+      console.warn("CSRF token fetch failed:", err);
+    });
+  }, []);
 
   const defaultMessage = useMemo(
     () => (skuName ? `Прошу подготовить КП на ${skuName}.` : ""),

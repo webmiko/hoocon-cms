@@ -255,11 +255,10 @@ export const api = {
 
   // ── CSRF ──────────────────────────────────────────────────────────
   /**
-   * Fetch the CSRF token cookie from the backend.
+   * Fetch the CSRF cookie before POST /api/leads/.
    *
-   * Call once on app load (e.g. in main.tsx) so that subsequent POST
-   * requests can include the X-CSRFToken header. The token is also
-   * set as the `csrftoken` cookie by Django's CSRF middleware.
+   * Prefer calling from LeadForm mount (not app bootstrap) so home/catalog
+   * keep /api/csrf/ off the Lighthouse critical path.
    */
   fetchCsrfToken(): Promise<{ csrfToken: string }> {
     return apiFetch<{ csrfToken: string }>("/api/csrf/");
