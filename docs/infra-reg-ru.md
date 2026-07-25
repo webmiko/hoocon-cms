@@ -40,21 +40,29 @@
 6. **Бэкапы** — дамп Postgres + media на диск VPS / объектное хранилище
    reg.ru по расписанию (скрипт + cron на хосте).
 7. **Секреты** — только `.env` на сервере; в git — `.env.example`.
-8. **CI** — GitHub Actions: lint/test/build; deploy по SSH на VPS
-   (как LMS), без привязки к другому облаку.
+8. **CI/CD** — единственный путь деплоя: GitHub Actions на push в
+   `develop` / `main` (не с локалки). Pipeline: test → lint → build
+   (образ в **GHCR** + `frontend/dist`) → deploy SSH
+   (`scripts/deploy-remote.sh`). Секреты репо: `SSH_PRIVATE_KEY`,
+   `SSH_USER`, `SERVER_HOST`, `DEPLOY_PATH`. `.env` на VPS не
+   перезаписывается CI. Локальный `scripts/deploy-to-vps.sh` — stub
+   (exit 1). Одноразовый перенос БД: `scripts/sync-db-to-vps.sh`.
 
 ---
 
-## 3. Целевой compose на VPS (эскиз)
+## 3. Compose на VPS
 
 ```
-nginx (443) → gunicorn (Django + SPA static)
-            → /media
-db (Postgres), redis, celery_worker [, celery_beat]
+host nginx (:80/:443) → 127.0.0.1:8000 (gunicorn)
+                      → /var/www/hoocon/{frontend/dist,media,staticfiles}
+Compose: db, redis, web, celery_worker
+Образ web/celery: GHCR (ghcr.io/<owner>/hoocon-cms:<sha>)
+  docker-compose.yml + docker-compose.hub.yml
 ```
 
-Локально уже есть `docker-compose.yml` (db + redis). На prod —
-расширить сервисами web/worker/nginx по образцу LMS, с env под reg.ru.
+Локально: `docker-compose.yml` (только db + redis). Prod-файлы:
+`docker-compose.prod.yml` (копируется на сервер как `docker-compose.yml`),
+`docker-compose.hub.yml`.
 
 ---
 
