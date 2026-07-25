@@ -55,6 +55,27 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
         if re.search(r"(?:24|230)(?:a|d)$", code):
             return 0
         return None
+    # DA..MU (no spring): manuals — DA2 = 1 group on AS/DS; DA4+ = 2 groups.
+    # Must run before the generic «-as → 2» Belimo rule (DA2MU*-AS is SPDT-1).
+    if re.match(r"da2mu(?!q)", code):
+        if code.endswith("-as") or code.endswith("-ds"):
+            return 1
+        if code.endswith("-a") or code.endswith("-d"):
+            return 0
+        return None
+    if re.match(r"da(?:4|6|8|16|24|32)mu(?!q)", code):
+        if code.endswith("-as") or code.endswith("-ds"):
+            return 2
+        if code.endswith("-a") or code.endswith("-d"):
+            return 0
+        return None
+    # DA..MQU fast: AS/DS manuals show 2 auxiliary switch groups.
+    if re.match(r"da\d+mqu", code):
+        if code.endswith("-as") or code.endswith("-ds"):
+            return 2
+        if code.endswith("-a") or code.endswith("-d"):
+            return 0
+        return None
     if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):
         return 2
     # SA..FU fire/smoke manuals: «S type include 2 auxiliary switch» (DS/DST).
@@ -62,14 +83,6 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
         return 2
     # SA..MU smoke (no spring): manuals «-DS Include 2 groups» (DS/DST).
     if re.match(r"sa\d+mu", code) and (code.endswith("-dst") or code.endswith("-ds")):
-        return 2
-    # DA..MU (no spring): DA2 = 1 group; DA4+ = 2 groups (manual wiring a+b).
-    if re.match(r"da2mu(?!q)", code) and code.endswith("-ds"):
-        return 1
-    if re.match(r"da(?:4|6|8|16|24|32)mu(?!q)", code) and code.endswith("-ds"):
-        return 2
-    # DA..MQU fast: AS/DS manuals show 2 auxiliary switch groups.
-    if re.match(r"da\d+mqu", code) and code.endswith("-ds"):
         return 2
     if re.search(r"-dst(?:$|[^a-z])", code) or code.endswith("-dst"):
         return 1

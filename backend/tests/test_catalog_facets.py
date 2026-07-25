@@ -468,6 +468,14 @@ def test_format_aux_switch_display_hides_absent() -> None:
     assert aux_spdt_count_from_sku("H8101-BV215A-24A") == 0
     assert normalize_aux_switch_value("SPDT-1", sku_code="H8101-BV215A-24AS") == AUX_SWITCH_SPDT_2
     assert format_aux_switch_display("Да", sku_code="H8121-BV2100E-24DS") == AUX_SWITCH_SPDT_2
+    # DAMU manuals: DA2 = 1 SPDT on AS/DS; DA4+ = 2 (not Belimo AS=2 for DA2).
+    assert aux_spdt_count_from_sku("DA2MU230-AS") == 1
+    assert aux_spdt_count_from_sku("DA2MU24-DS") == 1
+    assert aux_spdt_count_from_sku("DA2MU230-A") == 0
+    assert aux_spdt_count_from_sku("DA4MU230-AS") == 2
+    assert aux_spdt_count_from_sku("DA16MU24-DS") == 2
+    assert normalize_aux_switch_value("SPDT-2", sku_code="DA2MU230-AS") == AUX_SWITCH_SPDT_1
+    assert normalize_aux_switch_value("SPDT-1", sku_code="DA8MU24-AS") == AUX_SWITCH_SPDT_2
 
 
 @pytest.mark.django_db
