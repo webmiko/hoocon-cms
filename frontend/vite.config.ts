@@ -11,7 +11,6 @@ const PWA_ICON_REV = "20260725b";
 export default defineConfig({
   plugins: [
     react(),
-    asyncEntryCssPlugin(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: [
@@ -67,6 +66,8 @@ export default defineConfig({
         enabled: true,
       },
     }),
+    // After PWA HTML inject — last transformIndexHtml wins for stylesheet links.
+    asyncEntryCssPlugin(),
   ],
   build: {
     cssCodeSplit: true,
