@@ -39,9 +39,17 @@ else
 fi
 
 if [[ -d deploy/nginx ]]; then
-  echo "Sync nginx site stub (host nginx; apply manually if changed)"
+  echo "Sync and apply host nginx site"
   rsync -az -e "${RSYNC_SSH}" deploy/nginx/ \
     "${SSH_TARGET}:${DEPLOY_PATH}/deploy/nginx/"
+  if [[ "${DEPLOY_APPLY_NGINX:-1}" == "1" ]]; then
+    ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+      "cp -a /etc/nginx/sites-available/hoocon \
+         /etc/nginx/sites-available/hoocon.bak.\$(date +%Y%m%d%H%M%S) 2>/dev/null || true; \
+       cp '${DEPLOY_PATH}/deploy/nginx/hoocon.conf' /etc/nginx/sites-available/hoocon; \
+       ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
+       nginx -t && systemctl reload nginx && echo 'nginx reloaded'"
+  fi
 fi
 
 echo "Pull image and restart stack (${DOCKER_IMAGE})"
