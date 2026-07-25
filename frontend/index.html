@@ -51,6 +51,24 @@
     />
     <meta name="twitter:image" content="https://hoocon.ru/og-image.svg" />
     <meta name="robots" content="index, follow" />
+    <!-- Shell paint before async entry CSS (media=print → all in main.tsx). -->
+    <style id="hoocon-critical">
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #f3f4f7;
+        color: #2a2a2a;
+      }
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #0f0f0f;
+        color: #e8e8ec;
+      }
+      #root {
+        min-height: 100vh;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
