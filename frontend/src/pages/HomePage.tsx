@@ -68,7 +68,13 @@ function DirectionCardImage({
 }
 
 /** Partner logos from live hoocon.ru «Наша профессиональная среда». */
-const HOME_PARTNERS = [
+const HOME_PARTNERS: ReadonlyArray<{
+  name: string;
+  logo: string;
+  width: number;
+  height: number;
+  href?: string;
+}> = [
   {
     name: "Завод НЗВЗ",
     logo: "/home/partners/nzvz.webp",
@@ -94,7 +100,7 @@ const HOME_PARTNERS = [
     width: 480,
     height: 97,
   },
-] as const;
+];
 
 /** Reference installations — products in service on major sites. */
 const HOME_PROJECTS = [

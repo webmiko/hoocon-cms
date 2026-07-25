@@ -77,8 +77,8 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
 };
 export type SKUListResponse =
   paths["/api/catalog/skus/"]["get"]["responses"]["200"]["content"]["application/json"];
-export type SKUDetailResponse =
-  paths["/api/catalog/skus/{slug}/"]["get"]["responses"]["200"]["content"]["application/json"];
+/** Detail payload with app-side fields not yet in OpenAPI schema.d.ts. */
+export type SKUDetailResponse = SKUDetail;
 
 export interface CatalogHighlight {
   key: string;

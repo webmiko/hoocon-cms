@@ -473,7 +473,7 @@ export function SkuDetailPage() {
                 slug: displaySlug,
                 sku_code: displaySkuCode || sku.sku_code,
                 name: displayName || sku.name,
-                image: sku.images?.[0]?.image ?? sku.image?.image ?? null,
+                image: sku.images?.[0]?.image ?? null,
               }}
             />
             <a href="#rfq" className={styles.heroCta}>

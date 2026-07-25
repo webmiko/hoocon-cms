@@ -1,7 +1,6 @@
 import type {
   ClipboardEventHandler,
   DragEventHandler,
-  ImgHTMLAttributes,
   MouseEventHandler,
   SyntheticEvent,
 } from "react";
@@ -18,16 +17,17 @@ export function preventContentTheft(event: SyntheticEvent): void {
   event.preventDefault();
 }
 
-type ProtectedMediaImgProps = Pick<
-  ImgHTMLAttributes<HTMLImageElement>,
-  "draggable" | "onContextMenu" | "onDragStart"
->;
+type ProtectedMediaImgProps = {
+  draggable: false;
+  onContextMenu: MouseEventHandler<Element>;
+  onDragStart: DragEventHandler<Element>;
+};
 
-/** Spread onto product `<img>` elements. */
+/** Spread onto product `<img>` / media containers (button wrappers OK). */
 export const protectedMediaImgProps: ProtectedMediaImgProps = {
   draggable: false,
-  onContextMenu: preventContentTheft as MouseEventHandler<HTMLImageElement>,
-  onDragStart: preventContentTheft as DragEventHandler<HTMLImageElement>,
+  onContextMenu: preventContentTheft as MouseEventHandler<Element>,
+  onDragStart: preventContentTheft as DragEventHandler<Element>,
 };
 
 type ProtectedContentHandlers = {
