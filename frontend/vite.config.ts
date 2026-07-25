@@ -13,6 +13,9 @@ export default defineConfig({
         "logo.svg",
         "logo-on-dark.svg",
         "apple-touch-icon.png",
+        "pwa-192.png",
+        "pwa-512.png",
+        "pwa-512-maskable.png",
         "og-image.svg",
       ],
       manifest: {
@@ -32,7 +35,7 @@ export default defineConfig({
           { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
           {
-            src: "pwa-512.png",
+            src: "pwa-512-maskable.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
