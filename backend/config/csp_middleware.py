@@ -45,7 +45,8 @@ def build_csp(*, nonce: str | None = None) -> str:
     if nonce:
         script_parts.insert(0, f"'nonce-{nonce}'")
     connect_parts = ["'self'"]
-    img_parts = ["'self'", "data:"]
+    # data: placeholders; blob: product photos (ProtectedProductImage object URLs).
+    img_parts = ["'self'", "data:", "blob:"]
 
     ym_id, ga_id = _analytics_counter_ids()
     if ym_id:

@@ -78,12 +78,13 @@ def test_csp_includes_font_sources() -> None:
 
 @pytest.mark.django_db
 def test_csp_includes_img_data_uri() -> None:
-    """CSP allows images from 'self' and data: (inline images, SVGs)."""
+    """CSP allows images from 'self', data:, and blob: (product object URLs)."""
     client = Client()
     response = client.get("/api/health/")
     csp = _csp_value(response)
     assert "img-src" in csp
     assert "data:" in csp
+    assert "blob:" in csp
 
 
 @pytest.mark.django_db
