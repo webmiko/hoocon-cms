@@ -51,6 +51,9 @@ docker-compose.local.yml
 .env.*.local
 !.env.example
 
+# Локальные дампы / артефакты деплоя (не коммитить)
+.deploy-tmp/
+
 # Загрузки (media) и collectstatic
 media/
 backend/media/
