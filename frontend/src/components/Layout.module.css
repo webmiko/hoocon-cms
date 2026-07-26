@@ -590,6 +590,8 @@
     width: auto;
     min-width: 0;
     max-width: calc(100% - 6.75rem);
+    /* ≥16px — prevent iOS focus zoom (see global.css). */
+    font-size: 16px;
   }
 
   .searchFormMobile .searchButton {

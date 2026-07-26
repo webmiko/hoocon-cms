@@ -1007,6 +1007,8 @@
   .searchInput {
     width: 100%;
     min-width: 0;
+    /* ≥16px — prevent iOS focus zoom (see global.css). */
+    font-size: 16px;
   }
 
   .activeTagValue {
