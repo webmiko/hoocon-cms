@@ -14,14 +14,42 @@ const BREAK_AFTER_HYPHEN = /(-)(?=[^\s-])/g;
 /** Zero-width Word Joiner — keeps ``(`` / ``)`` attached to neighboring text. */
 const WORD_JOINER = "\u2060";
 
-/** Chunks that must wrap as a single token (paren groups with text, not ``(2)``). */
-const NO_WRAP_CHUNK = /\(\s*(?!\d)[^)]{1,80}\)/gi;
+/**
+ * Candidate parenthetical spans (not bare ``(2)``).
+ * Only a subset become nowrap — see :func:`parenChunkIsNowrap`.
+ */
+const PAREN_CHUNK = /\(\s*(?!\d)[^)]{1,80}\)/gi;
+
+/**
+ * Short prose labels kept on one line (e.g. «стандартная серия»).
+ * Longer notes like «с шаровидным графитом» must wrap inside narrow ТТХ cards.
+ */
+const NOWRAP_PAREN_MAX_INNER = 18;
 
 export type SoftBreakPart = {
   text: string;
   /** When true, render with ``white-space: nowrap`` (survives word-break). */
   nowrap: boolean;
 };
+
+/**
+ * Whether a ``(…)`` span must stay atomic (factory note, edition list, short label).
+ *
+ * Args:
+ *   chunk: Full match including parentheses.
+ *
+ * Returns:
+ *   True when the span should use nowrap / NBSP.
+ */
+export function parenChunkIsNowrap(chunk: string): boolean {
+  const inner = chunk.replace(/^\(\s*|\s*\)$/gu, "").trim();
+  if (!inner) return false;
+  if (/^Заводская\b/iu.test(inner)) return true;
+  if (/В=|мА|\.\.\.|…/u.test(inner)) return true;
+  // Edition suffixes: (−D/−DS/−A/−AS), not prose with a slash.
+  if (/[−]/.test(inner) || /\/(?:−|[A-Z]{1,4}\d)/.test(inner)) return true;
+  return [...inner].length <= NOWRAP_PAREN_MAX_INNER;
+}
 
 /**
  * Glue parentheses/brackets to adjacent non-space characters.
@@ -73,15 +101,21 @@ export function softBreakParts(text: string): SoftBreakPart[] {
 
   const parts: SoftBreakPart[] = [];
   let last = 0;
-  for (const match of text.matchAll(NO_WRAP_CHUNK)) {
+  for (const match of text.matchAll(PAREN_CHUNK)) {
     const start = match.index ?? 0;
+    const chunk = match[0] ?? "";
+    if (!chunk) continue;
     if (start > last) {
       parts.push({ text: applySoftBreak(text.slice(last, start)), nowrap: false });
     }
-    // Prefer wrapping *before* the whole group.
-    parts.push({ text: "\u200B", nowrap: false });
-    parts.push({ text: match[0], nowrap: true });
-    last = start + match[0].length;
+    if (parenChunkIsNowrap(chunk)) {
+      // Prefer wrapping *before* the whole group.
+      parts.push({ text: "\u200B", nowrap: false });
+      parts.push({ text: chunk, nowrap: true });
+    } else {
+      parts.push({ text: applySoftBreak(chunk), nowrap: false });
+    }
+    last = start + chunk.length;
   }
   if (last < text.length) {
     parts.push({ text: applySoftBreak(text.slice(last)), nowrap: false });

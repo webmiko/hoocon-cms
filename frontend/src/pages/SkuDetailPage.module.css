@@ -567,6 +567,8 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: var(--space-lg);
   background: var(--glass-bg);
   backdrop-filter: blur(10px);
@@ -588,7 +590,9 @@
   font-weight: 500;
   color: var(--color-text-muted);
   line-height: 1.35;
-  overflow-wrap: break-word;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
   hyphens: none;
 }
@@ -599,7 +603,9 @@
   font-weight: 600;
   color: var(--color-text);
   line-height: 1.4;
-  overflow-wrap: break-word;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
   hyphens: none;
 }
@@ -840,9 +846,16 @@
   }
 }
 
-/* Широкий экран: до 3 карточек в ряд. */
-@media (min-width: 1024px) {
+/* Полная ширина контента (без боковой КП): до 3 карточек. */
+@media (min-width: 1024px) and (max-width: 1199px) {
   .specCards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Широкий экран: форма справа — уже primary, только 2 колонки ТТХ. */
+@media (min-width: 1200px) {
+  .specCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

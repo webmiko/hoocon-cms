@@ -36,7 +36,19 @@ describe("softBreak", () => {
     );
     expect(out.includes("(\u200B")).toBe(false);
     expect(out.includes("(\u2060") || out.includes("(стандартная")).toBe(true);
-    // Parenthetical stays one nowrap token (NBSP between words).
+    // Short parenthetical stays one nowrap token (NBSP between words).
     expect(out.includes("стандартная\u00A0серия")).toBe(true);
+  });
+
+  it("lets long material notes wrap inside narrow ТТХ cards", () => {
+    const raw = "Ковкий чугун (с шаровидным графитом)";
+    const parts = softBreakParts(raw);
+    expect(parts.some((p) => p.nowrap && p.text.includes("шаровидным"))).toBe(
+      false,
+    );
+    const joined = softBreak(raw);
+    // Spaces stay breakable (no NBSP lock on the long note).
+    expect(joined.includes("шаровидным\u00A0графитом")).toBe(false);
+    expect(joined.replaceAll("\u200B", "").replaceAll("\u2060", "")).toBe(raw);
   });
 });
