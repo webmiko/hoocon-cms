@@ -113,13 +113,30 @@ alwaysApply: true
 - [ ] Одобренный код не изменён без явного запроса.
 - [ ] Коммит **только** по явной просьбе пользователя.
 
-## 6. Перед деплоем (дополнительно)
+## 6. Публичный UI / Lighthouse (если diff затрагивает фронт)
+
+Срабатывает при изменениях в `frontend/`, `*.html`, `*.css`, `*.scss`, шаблонах,
+публичных страницах. Канон БЗ: золотое правило **12**,
+`_Универсальная-база-знаний/…/Lighthouse-HTML-CSS-архитектура.md`,
+`CWV-WCAG-и-чеклисты.md`.
+
+- [ ] **HTML** — landmarks, один `h1`, `lang`, `alt`, размеры media,
+      skip link / `:focus-visible`.
+- [ ] **CSS** — tokens → layers; нет лишнего render-blocking; CLS не ухудшен.
+- [ ] **SPA/SSR head** — title/description/canonical в исходном HTML.
+- [ ] **CWV** — LCP &lt; 2.0 s, INP &lt; 200 ms, CLS &lt; 0.08 не ухудшать.
+- [ ] **Профиль** — Standard LH ≥ 90; Perfect 100 — только по явному KPI.
+- [ ] **CSP** — не ослаблять ради метрик ([security-baseline.md](docs/security-baseline.md)).
+- [ ] Затронут публичный URL — сверка с playbook; блокер a11y/CWV → **не коммить**.
+
+## 7. Перед деплоем (дополнительно)
 
 - [ ] CI/CD pipeline **green** (test → lint → build → deploy).
 - [ ] `manage.py check --deploy` — без критичных предупреждений.
 - [ ] Prod `.env` на VPS reg.ru актуален (SMTP, `DJANGO_SECRET_KEY`, Redis, DB).
 - [ ] Smoke: `/`, `/catalog`, SKU, RFQ, `/api/health/` (когда появится).
 - [ ] URL inventory 200/301 ([seo-url-migration.md](docs/seo-url-migration.md)).
+- [ ] Публичный фронт: Lighthouse mobile ≥ 90 (или Perfect 100 по KPI) — см. §6.
 - [ ] **Покрытие:** целевой порог **≥ 90%** на apps каталога/leads — включить
       `--cov-fail-under=90` в `backend/pyproject.toml` после появления тестов;
       красный coverage — **не деплоить**.
