@@ -76,7 +76,7 @@ const PARTNERS: Partner[] = [
 ];
 
 /**
- * «Где купить» — партнёры карточками, OEM-полоса на всю ширину внизу.
+ * «Где купить» — прямые поставки, представительство в РБ, партнёры, OEM.
  */
 export function WhereToBuyPage() {
   const jsonLd = [
@@ -91,8 +91,9 @@ export function WhereToBuyPage() {
       <Seo
         title="Где купить продукцию Hoocon"
         description={
-          "Партнёры и прямые поставки электроприводов Hoocon: Москва, " +
-          "Санкт-Петербург, Минск. OEM напрямую с завода — /zavod."
+          "Прямые поставки и партнёры Hoocon: Москва, Санкт-Петербург, " +
+          "Минск. Представительство завода в Беларуси — ООО «Чемпион-Тэк». " +
+          "OEM напрямую с завода — /zavod."
         }
         path="/gde-kupit"
         jsonLd={jsonLd}
@@ -134,6 +135,31 @@ export function WhereToBuyPage() {
           <Link to="/consultation" className={styles.cardCta} data-brand-cta>
             Запросить КП
           </Link>
+        </article>
+      </section>
+
+      <section className={styles.section} aria-labelledby="belarus-rep-heading">
+        <h2 id="belarus-rep-heading" className={styles.sectionTitle}>
+          Представительство завода в Беларуси
+        </h2>
+        <article className={`${styles.card} ${styles.cardFeatured}`}>
+          <p className={styles.cardCity}>Минск</p>
+          <h3 className={styles.cardTitle}>ООО «Чемпион-Тэк»</h3>
+          <ul className={styles.cardMeta}>
+            <li>
+              Юридический адрес: 220030 Минск, пр-т Независимости 32А, пом.&nbsp;11
+            </li>
+            <li>
+              Многоканальный телефон:{" "}
+              <a href="tel:+375293726888">+375 29 372 6888</a>
+            </li>
+            <li>
+              По вопросам сотрудничества:{" "}
+              <a href="mailto:ichampiontech@yandex.ru">
+                ichampiontech@yandex.ru
+              </a>
+            </li>
+          </ul>
         </article>
       </section>
 

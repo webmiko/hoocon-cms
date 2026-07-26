@@ -78,7 +78,9 @@ PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
     },
     "/gde-kupit": {
         "title": "Где купить",
-        "description": "Партнёры и каналы поставок электроприводов Hoocon по РФ.",
+        "description": (
+            "Прямые поставки и партнёры Hoocon по РФ; представительство завода в Беларуси — ООО «Чемпион-Тэк»."
+        ),
     },
     "/faq": {
         "title": "Ответы на частые вопросы",
