@@ -129,7 +129,7 @@ const HOME_PROJECTS = [
  * Spec: docs/readiness-backend-ux.md §4.3; БЗ маркетинг/UX industrial B2B.
  */
 export function HomePage() {
-  const { data: categoriesData, loading, error } = useAsync(() => api.categories(), []);
+  const { data: categoriesData, loading, error } = useAsync(() => api.categories());
   const partnersRef = useRef<HTMLElement>(null);
   const partnersParallaxRef = useRef<HTMLDivElement>(null);
   const [heroSlide, setHeroSlide] = useState(0);

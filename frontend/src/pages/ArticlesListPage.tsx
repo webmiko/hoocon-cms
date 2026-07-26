@@ -13,7 +13,7 @@ import styles from "./ArticlesListPage.module.css";
  * Spec: docs/readiness-backend-ux.md §4.3 (контент как у OEM, не lifestyle-блог).
  */
 export function ArticlesListPage() {
-  const { data, loading, error } = useAsync(() => api.articles(), []);
+  const { data, loading, error } = useAsync(() => api.articles());
   const articles: Article[] = data?.results ?? [];
   const [featured, ...rest] = articles;
 

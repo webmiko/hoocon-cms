@@ -1,13 +1,12 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 
 import { COMPARE_MAX_SKUS } from "./constants";
+import { CompareContext, type CompareAddResult } from "./compareContextBase";
 import {
   mergeSlugsWithItems,
   readCompareStorage,
@@ -15,29 +14,7 @@ import {
   type CompareItem,
 } from "./storage";
 
-export type CompareAddResult = "added" | "removed" | "limit";
-
-interface CompareContextValue {
-  items: CompareItem[];
-  count: number;
-  isInCompare: (slug: string) => boolean;
-  toggle: (item: CompareItem) => CompareAddResult;
-  remove: (slug: string) => void;
-  clear: () => void;
-  /** Replace set from URL slugs (shareable link); keeps known meta. */
-  hydrateFromSlugs: (slugs: string[]) => void;
-  /** Enrich stub rows after compare API returns. */
-  enrichFromSkus: (
-    skus: Array<{
-      slug: string;
-      sku_code: string;
-      name: string;
-      image?: { image?: string } | null;
-    }>,
-  ) => void;
-}
-
-const CompareContext = createContext<CompareContextValue | null>(null);
+export type { CompareAddResult };
 
 /**
  * Provider for catalog compare tray (localStorage-backed, max 4).
@@ -153,15 +130,4 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   return (
     <CompareContext.Provider value={value}>{children}</CompareContext.Provider>
   );
-}
-
-/**
- * Access compare tray state. Must be under CompareProvider.
- */
-export function useCompare(): CompareContextValue {
-  const ctx = useContext(CompareContext);
-  if (!ctx) {
-    throw new Error("useCompare must be used within CompareProvider");
-  }
-  return ctx;
 }

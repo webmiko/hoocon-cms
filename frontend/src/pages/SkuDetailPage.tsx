@@ -12,10 +12,8 @@ import { Seo } from "../components/Seo";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { parseProductDescription } from "../utils/parseDescription";
 import { InstructionText } from "../components/InstructionText";
-import {
-  isModulatingSignalKey,
-  SignalSpecValue,
-} from "../components/SignalSpecValue";
+import { SignalSpecValue } from "../components/SignalSpecValue";
+import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { CompareToggle } from "../components/CompareToggle";
 import { PhotoWash } from "../components/PhotoWash";
 import { SoftBreakText } from "../components/SoftBreakText";
@@ -167,7 +165,7 @@ export function SkuDetailPage() {
   const { resolved: theme } = useTheme();
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug),
-    [slug],
+    slug,
   );
   const [tab, setTab] = useState<TabId>("description");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);

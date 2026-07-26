@@ -23,7 +23,7 @@ export function PageView({ slug: slugProp }: PageViewProps) {
   const slug = slugProp ?? params.slug ?? "";
   const { data: page, loading, error } = useAsync(
     () => api.pageDetail(slug),
-    [slug],
+    slug,
   );
 
   if (!slug) {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useCompare } from "../compare/CompareContext";
+import { useCompare } from "../compare/useCompare";
 import { COMPARE_MAX_SKUS } from "../compare/constants";
 import {
   buildCompareSearch,

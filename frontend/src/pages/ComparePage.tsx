@@ -4,12 +4,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, type CompareResponse } from "../api/client";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
-import {
-  isModulatingSignalKey,
-  SignalSpecValue,
-} from "../components/SignalSpecValue";
+import { SignalSpecValue } from "../components/SignalSpecValue";
+import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { ProtectedProductImage } from "../components/ProtectedProductImage";
-import { useCompare } from "../compare/CompareContext";
+import { useCompare } from "../compare/useCompare";
 import {
   COMPARE_MAX_SKUS,
   COMPARE_MIN_FOR_PAGE,
@@ -60,7 +58,7 @@ export function ComparePage() {
       slugs.length > 0
         ? api.compare(slugs.slice(0, COMPARE_MAX_SKUS))
         : Promise.resolve({ skus: [], rows: [] }),
-    [slugs.join(",")],
+    slugs.join(","),
   );
 
   useEffect(() => {

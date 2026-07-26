@@ -69,7 +69,7 @@ function SkuLegacyRedirect() {
   const { slug } = useParams<{ slug: string }>();
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug!),
-    [slug],
+    slug,
   );
 
   if (!slug) {

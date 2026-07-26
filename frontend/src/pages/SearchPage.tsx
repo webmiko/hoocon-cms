@@ -46,7 +46,7 @@ export function SearchPage() {
 
   const { data, loading, error } = useAsync(
     () => (q ? api.search(q, page) : Promise.resolve(null)),
-    [q, page],
+    `${q}\0${page}`,
   );
 
   const [append, setAppend] = useState<AppendState>({

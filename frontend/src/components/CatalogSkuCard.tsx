@@ -4,13 +4,11 @@ import type { CSSProperties } from "react";
 import type { SKUList } from "../api/client";
 import { CompareToggle } from "./CompareToggle";
 import { ProtectedProductImage } from "./ProtectedProductImage";
-import {
-  isModulatingSignalKey,
-  SignalSpecValue,
-} from "./SignalSpecValue";
+import { SignalSpecValue } from "./SignalSpecValue";
 import { SoftBreakText } from "./SoftBreakText";
 import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
 import { cardHighlights, compactCardSpecName } from "../utils/cardHighlights";
+import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import {
   protectedContentHandlers,

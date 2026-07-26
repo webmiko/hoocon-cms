@@ -1,18 +1,24 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useEffectEvent, useReducer } from "react";
+
+/** Primitive key that triggers a refetch when it changes (Object.is). */
+export type AsyncRefreshKey = string | number | boolean | null | undefined;
 
 /**
  * Async data hook for fetching API data in components.
  *
- * Spec: ПЛАН §6 Iter 4; docs/readiness-backend-ux.md.
+ * Spec: план Iter 4; docs/readiness-backend-ux.md.
  *
  * Args:
- *   asyncFn: function returning a Promise<T>.
- *   deps: dependency array (re-fetches when these change).
+ *   asyncFn: function returning a Promise<T> (latest via useEffectEvent).
+ *   refreshKey: change to re-fetch (compose multi-deps with a string).
  *
  * Returns:
  *   { data, loading, error } — standard async state.
  */
-export function useAsync<T>(asyncFn: () => Promise<T>, deps: unknown[]): {
+export function useAsync<T>(
+  asyncFn: () => Promise<T>,
+  refreshKey: AsyncRefreshKey = 0,
+): {
   data: T | undefined;
   loading: boolean;
   error: Error | undefined;
@@ -37,21 +43,27 @@ export function useAsync<T>(asyncFn: () => Promise<T>, deps: unknown[]): {
     { data: undefined, loading: true, error: undefined },
   );
 
+  const load = useEffectEvent(asyncFn);
+
   useEffect(() => {
     let cancelled = false;
     dispatch({ type: "loading" });
-    asyncFn()
+    void load()
       .then((result) => {
         if (!cancelled) dispatch({ type: "success", data: result });
       })
-      .catch((err: Error) => {
-        if (!cancelled) dispatch({ type: "error", error: err });
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          dispatch({
+            type: "error",
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
+        }
       });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [refreshKey]);
 
   return state;
 }

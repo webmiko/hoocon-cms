@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { useCompare } from "../compare/CompareContext";
+import { useCompare } from "../compare/useCompare";
 import {
   COMPARE_MAX_SKUS,
   COMPARE_MIN_FOR_PAGE,

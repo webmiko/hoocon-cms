@@ -25,9 +25,9 @@ export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: article, loading, error } = useAsync(
     () => api.articleDetail(slug!),
-    [slug],
+    slug,
   );
-  const { data: listData } = useAsync(() => api.articles(), []);
+  const { data: listData } = useAsync(() => api.articles());
 
   if (loading) {
     return <p className={styles.status}>Загрузка…</p>;

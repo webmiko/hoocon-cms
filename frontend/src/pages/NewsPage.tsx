@@ -22,9 +22,9 @@ export function NewsPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: news, loading, error } = useAsync(
     () => api.newsDetail(slug!),
-    [slug],
+    slug,
   );
-  const { data: listData } = useAsync(() => api.news(), []);
+  const { data: listData } = useAsync(() => api.news());
 
   if (loading) {
     return <p className={styles.status}>Загрузка…</p>;

@@ -14,7 +14,7 @@ import styles from "./NewsListPage.module.css";
  * Spec: docs/readiness-backend-ux.md §4.3.
  */
 export function NewsListPage() {
-  const { data, loading, error } = useAsync(() => api.news(), []);
+  const { data, loading, error } = useAsync(() => api.news());
   const items: News[] = data?.results ?? [];
   const [featured, ...rest] = items;
   const featuredExcerpt = featured ? excerptOf(featured) : "";
