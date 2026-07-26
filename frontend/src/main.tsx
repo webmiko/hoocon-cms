@@ -10,6 +10,7 @@ import {
   HOOCON_MAIN_CSS_ID,
   HOOCON_SPLASH_FADE_MS,
   HOOCON_SPLASH_ID,
+  isSplashViewport,
   splashRemainingDwellMs,
 } from "./hooconMainCss";
 import "./styles/global.css";
@@ -48,13 +49,17 @@ function whenDocumentFullyLoaded(): Promise<void> {
 }
 
 /**
- * Keep splash until content is loaded and at least min dwell elapsed, then fade.
- *
- * Min dwell avoids a flash when the shell boots in under ~1s; max is load time.
+ * Mobile only: keep splash until loaded + min dwell, then fade.
+ * Desktop: remove immediately (CSS already hides it ≥961px).
  */
 function dismissBootSplash(): void {
   const splash = document.getElementById(HOOCON_SPLASH_ID);
   if (!(splash instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!isSplashViewport()) {
+    splash.remove();
     return;
   }
 

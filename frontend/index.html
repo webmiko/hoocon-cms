@@ -69,7 +69,7 @@
       #root {
         min-height: 100vh;
       }
-      /* Boot splash: brand while JS/CSS load (cold PWA / slow network). */
+      /* Boot splash: mobile / PWA only (≤960px; desktop skips). */
       #hoocon-splash {
         position: fixed;
         inset: 0;
@@ -80,6 +80,11 @@
         margin: 0;
         background: #f3f4f7;
         transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      @media (min-width: 961px) {
+        #hoocon-splash {
+          display: none !important;
+        }
       }
       html[data-theme="dark"] #hoocon-splash {
         background: #0f0f0f;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   HOOCON_SPLASH_MIN_MS,
+  HOOCON_SPLASH_MOBILE_MQ,
   splashRemainingDwellMs,
 } from "./hooconMainCss";
 
@@ -19,5 +20,11 @@ describe("splashRemainingDwellMs", () => {
   it("treats invalid elapsed as full min dwell", () => {
     expect(splashRemainingDwellMs(Number.NaN)).toBe(HOOCON_SPLASH_MIN_MS);
     expect(splashRemainingDwellMs(-10)).toBe(HOOCON_SPLASH_MIN_MS);
+  });
+});
+
+describe("HOOCON_SPLASH_MOBILE_MQ", () => {
+  it("matches the mobile layout breakpoint (≤960px)", () => {
+    expect(HOOCON_SPLASH_MOBILE_MQ).toBe("(max-width: 960px)");
   });
 });
