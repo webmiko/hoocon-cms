@@ -7,18 +7,38 @@ from pathlib import Path
 
 import pytest
 
-from config.release import RELEASE_CHANNEL, RELEASE_VERSION, release_label
+from config.release import (
+    RELEASE_CHANNEL,
+    RELEASE_VERSION,
+    display_version,
+    package_version,
+    release_label,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+_VERSION_CORE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
 
 def test_release_label_beta_format() -> None:
-    """Display string matches ``v0.0.N beta`` while channel is beta."""
+    """Display string matches ``vX.Y.Z beta`` while channel is beta."""
     assert RELEASE_CHANNEL == "beta"
-    assert _SEMVER.match(RELEASE_VERSION)
-    assert release_label() == f"v{RELEASE_VERSION} beta"
-    assert release_label(with_v=False) == f"{RELEASE_VERSION} beta"
+    assert _VERSION_CORE.match(RELEASE_VERSION)
+    assert release_label() == f"v{display_version()} beta"
+    assert release_label(with_v=False) == f"{display_version()} beta"
+
+
+def test_package_version_pads_two_part() -> None:
+    """After GA, packaging SemVer gets patch ``0``."""
+    assert package_version("1.0") == "1.0.0"
+    assert package_version("1.99") == "1.99.0"
+    assert package_version("0.1.0") == "0.1.0"
+
+
+def test_display_version_drops_patch_after_ga() -> None:
+    """Stable channel shows two-part ``MAJOR.MINOR``."""
+    assert display_version("1.0", channel="") == "1.0"
+    assert display_version("1.0.0", channel="") == "1.0"
+    assert display_version("0.1.0", channel="beta") == "0.1.0"
 
 
 def test_pyproject_and_package_json_match_release_module() -> None:
@@ -28,15 +48,16 @@ def test_pyproject_and_package_json_match_release_module() -> None:
     frontend_ts = (_REPO_ROOT / "frontend" / "src" / "release.ts").read_text(
         encoding="utf-8",
     )
-    assert f'version = "{RELEASE_VERSION}"' in pyproject
-    assert f'"version": "{RELEASE_VERSION}"' in package
+    pkg = package_version()
+    assert f'version = "{pkg}"' in pyproject
+    assert f'"version": "{pkg}"' in package
     assert f'RELEASE_VERSION = "{RELEASE_VERSION}"' in frontend_ts
     assert f'RELEASE_CHANNEL = "{RELEASE_CHANNEL}"' in frontend_ts
 
 
 @pytest.mark.django_db
 def test_health_exposes_version_and_channel(client) -> None:
-    """GET /api/health/ returns SemVer + channel for smoke probes."""
+    """GET /api/health/ returns version + channel for smoke probes."""
     body = client.get("/api/health/").json()
     assert body["version"] == RELEASE_VERSION
     assert body["channel"] == RELEASE_CHANNEL
