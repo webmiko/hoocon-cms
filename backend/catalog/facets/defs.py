@@ -111,8 +111,8 @@ CATEGORY_FACET_KEYS: dict[str, tuple[str, ...]] = {
 EXTRA_HIGHLIGHT_DEFS: tuple[FacetDef, ...] = (
     FacetDef(
         key="control_signal",
-        label="Управляющий сигнал Y",
-        name_substrings=("управляющий сигнал", "сигнал управления"),
+        label="Упр. сигнал Y",
+        name_substrings=("управляющий сигнал", "упр. сигнал", "сигнал управления"),
         legacy_slugs=("control-signal",),
     ),
     FacetDef(
@@ -182,7 +182,9 @@ def attribute_matches_facet(attr: Attribute, facet: FacetDef) -> bool:
         if slug == "feedback-signal" or "обратная связь" in name:
             return False
     if facet.key == "feedback_signal":
-        if slug == "control-signal" or ("управляющ" in name and "обратн" not in name):
+        if slug == "control-signal":
+            return False
+        if "обратн" not in name and ("управляющ" in name or "упр. сигнал" in name):
             return False
     # Nominal voltage only — not «Диапазон напряжения».
     if facet.key == "voltage":

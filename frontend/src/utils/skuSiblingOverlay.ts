@@ -49,7 +49,7 @@ const CONTROL_PICKER_TO_HIGHLIGHT: Record<string, string> = {
 /** Belimo RU Y/U rows — only for пропорциональное (A/AS); mirror backend tech_copy. */
 const CONTROL_SIGNAL_Y_HIGHLIGHT: OverlayHighlight = {
   key: "control_signal",
-  name: "Управляющий сигнал Y",
+  name: "Упр. сигнал Y",
   value: "0(2)...10 В= / 0(4)...20 мА (спецзаказ)",
   unit: "",
 };
@@ -62,7 +62,7 @@ const FEEDBACK_SIGNAL_U_HIGHLIGHT: OverlayHighlight = {
 };
 
 const CONTROL_SIGNAL_Y_ATTR: OverlayAttribute = {
-  name: "Управляющий сигнал Y",
+  name: "Упр. сигнал Y",
   slug: "control-signal",
   unit: "",
   value: CONTROL_SIGNAL_Y_HIGHLIGHT.value,

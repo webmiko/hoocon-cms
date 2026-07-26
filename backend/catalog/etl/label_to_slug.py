@@ -21,7 +21,7 @@ CANONICAL_ATTRS: dict[str, tuple[str, str, str]] = {
     "power-consumption": ("Потребляемая мощность", "", ATTR_GROUP_ELECTRICAL),
     "transformer-va": ("Мощность трансформатора", "В·А", ATTR_GROUP_ELECTRICAL),
     "wire-cross-section": ("Сечение провода", "мм²", ATTR_GROUP_ELECTRICAL),
-    "control-signal": ("Управляющий сигнал Y", "", ATTR_GROUP_ELECTRICAL),
+    "control-signal": ("Упр. сигнал Y", "", ATTR_GROUP_ELECTRICAL),
     "feedback-signal": ("Обратная связь U", "", ATTR_GROUP_ELECTRICAL),
     "moment": ("Крутящий момент", "Нм", ATTR_GROUP_FUNCTIONAL),
     "damper-area": ("Площадь заслонки", "м²", ATTR_GROUP_FUNCTIONAL),

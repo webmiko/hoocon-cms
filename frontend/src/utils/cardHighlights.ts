@@ -58,19 +58,22 @@ export function cardHighlights(
 }
 
 /**
- * Card ТТХ label: shorten «Управляющий …» so the value stays one line.
+ * Card/PDP ТТХ label: normalize legacy full Belimo name to the short canon.
  *
- * Catalog cards give width priority to the value column; the full Belimo
- * label does not fit beside long Y-signal strings. PDP keeps the full name.
+ * Canon is ``Упр. сигнал Y`` (same length band as ``Обратная связь U``).
+ * Older payloads may still send ``Управляющий сигнал Y``.
  *
  * Args:
- *   name: Full highlight label from the API.
+ *   name: Highlight label from the API.
  *
  * Returns:
- *   Compact label (``Упр. сигнал Y``) or the original name.
+ *   Canonical short label, or the original name when unrelated.
  */
 export function compactCardSpecName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return trimmed;
+  if (/^Управляющий\s+сигнал\s+Y$/iu.test(trimmed)) {
+    return "Упр. сигнал Y";
+  }
   return trimmed.replace(/^Управляющий(?=\s)/u, "Упр.");
 }

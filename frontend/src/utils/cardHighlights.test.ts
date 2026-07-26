@@ -55,6 +55,7 @@ describe("cardHighlights", () => {
 describe("compactCardSpecName", () => {
   it("shortens Управляющий on Y-signal labels", () => {
     expect(compactCardSpecName("Управляющий сигнал Y")).toBe("Упр. сигнал Y");
+    expect(compactCardSpecName("Упр. сигнал Y")).toBe("Упр. сигнал Y");
     expect(compactCardSpecName("Напряжение")).toBe("Напряжение");
     expect(compactCardSpecName("Обратная связь U")).toBe("Обратная связь U");
   });

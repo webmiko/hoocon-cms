@@ -17,6 +17,7 @@ import {
 import { parseCompareSlugsParam } from "../compare/storage";
 import { useAsync } from "../hooks/useAsync";
 import { softBreak } from "../utils/softBreak";
+import { compactCardSpecName } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
 import styles from "./ComparePage.module.css";
@@ -247,7 +248,7 @@ export function ComparePage() {
                       className={row.diff ? styles.diffRow : undefined}
                     >
                       <th scope="row" className={styles.stickyCol}>
-                        {row.name}
+                        {compactCardSpecName(row.name)}
                       </th>
                       {row.values.map((value, index) => (
                         <td key={`${row.key}-${skus[index]?.slug ?? index}`}>

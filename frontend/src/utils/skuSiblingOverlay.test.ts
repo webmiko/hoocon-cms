@@ -96,7 +96,7 @@ describe("skuSiblingOverlay", () => {
         },
         {
           key: "control_signal",
-          name: "Управляющий сигнал Y",
+          name: "Упр. сигнал Y",
           value: "0(2)...10 В= / 0(4)...20 мА (спецзаказ)",
           unit: "",
         },
@@ -124,7 +124,7 @@ describe("skuSiblingOverlay", () => {
           value: "Пропорциональное",
         },
         {
-          name: "Управляющий сигнал Y",
+          name: "Упр. сигнал Y",
           slug: "control-signal",
           unit: "",
           value: "0(2)...10 В=",

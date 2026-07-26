@@ -27,6 +27,7 @@ import {
   overlayCopyForSibling,
   overlayHighlightsForSibling,
 } from "../utils/skuSiblingOverlay";
+import { compactCardSpecName } from "../utils/cardHighlights";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
@@ -442,7 +443,9 @@ export function SkuDetailPage() {
                 const display = `${h.value}${unit ? ` ${unit}` : ""}`;
                 return (
                   <li key={h.key}>
-                    <span className={styles.heroSpecLabel}>{h.name}:</span>{" "}
+                    <span className={styles.heroSpecLabel}>
+                      {compactCardSpecName(h.name)}:
+                    </span>{" "}
                     <strong>
                       {isModulatingSignalKey(h.key) ? (
                         <SignalSpecValue value={display} />
@@ -624,7 +627,7 @@ export function SkuDetailPage() {
                                 className={styles.specCard}
                               >
                                 <span className={styles.specName}>
-                                  {softBreak(attr.name)}
+                                  {softBreak(compactCardSpecName(attr.name))}
                                 </span>
                                 <SpecAttrValue
                                   slug={attr.slug}
@@ -659,7 +662,7 @@ export function SkuDetailPage() {
                               className={styles.specCard}
                             >
                               <span className={styles.specName}>
-                                {softBreak(attr.name)}
+                                {softBreak(compactCardSpecName(attr.name))}
                               </span>
                               <SpecAttrValue
                                 slug={attr.slug}

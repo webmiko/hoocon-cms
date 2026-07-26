@@ -162,7 +162,7 @@ def normalize_manual_override_value(value: str) -> str:
 
 # Belimo RU — modulating editions (docs/tech-copy-belimo-ru.md).
 # Voltage 0(2)...10 is factory default; current 0(4)...20 мА — special order only.
-CONTROL_SIGNAL_Y_LABEL = "Управляющий сигнал Y"
+CONTROL_SIGNAL_Y_LABEL = "Упр. сигнал Y"
 FEEDBACK_SIGNAL_U_LABEL = "Обратная связь U"
 CONTROL_SIGNAL_Y_CANON = "0(2)...10 В= / 0(4)...20 мА (спецзаказ)"
 FEEDBACK_SIGNAL_U_CANON = CONTROL_SIGNAL_Y_CANON
