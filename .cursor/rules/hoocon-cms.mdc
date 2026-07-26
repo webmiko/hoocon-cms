@@ -1,25 +1,14 @@
 ---
-description: Hoocon CMS — приоритет базы знаний и плана проекта
+description: Hoocon CMS — scope, checkup, без лишнего UI-контекста на бэкенде
 alwaysApply: true
 ---
 
 # Hoocon CMS
 
-1. Сначала `_Универсальная-база-знаний/AGENTS.md`, затем
-   [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md).
-2. Не копировать базу знаний; канон только через симлинк.
-3. Без онлайн-корзины в v1; заявки RFQ вместо checkout.
-4. Переносимые паттерны — в канон по инструкции обновления БЗ.
-5. Перед любым commit/push — `./scripts/pre-commit-checkup.sh`
-   (правило `pre-commit-checkup.mdc`), включая ревью diff
-   баги/БЗ/security (`scripts/diff-quality-review.py`).
-6. Команда пользователя **`чкд`** («чек комит деплой») —
-   checkup → atomic commit(s) → push `develop` (правило
-   `chkd-checkup-commit-deploy.mdc`).
-7. Карточки серий DA / SA / 8100 / H81 / H8205 — канон
-   [docs/series-card-templates.md](docs/series-card-templates.md);
-   при смене UX серии обновлять шаблон вместе с кодом
-   (правило `series-card-templates.mdc`).
-8. Русский текст сайта — буква **ё** обязательна (не заменять на е);
-   правило `russian-yo.mdc`, канон в
-   [docs/tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md).
+1. Вход: корневой [AGENTS.md](AGENTS.md) — **таблица «Как грузить контекст»**.
+   Не читай весь канон БЗ и не открывай Lighthouse на чисто бэкенд-задачах.
+2. Канон стиля/security — симлинк `_Универсальная-база-знаний/` (не копировать).
+3. Без корзины/оплаты в v1 — RFQ вместо checkout.
+4. Commit / push / **`чкд`**: `./scripts/pre-commit-checkup.sh`
+   (`pre-commit-checkup.mdc`, `chkd-checkup-commit-deploy.mdc`).
+5. Переносимые паттерны — в канон БЗ по инструкции обновления.

@@ -1,147 +1,34 @@
 ---
-description: Pre-commit checkup — обязательная проверка перед коммитом
+description: Pre-commit — скрипт обязателен; UI/Lighthouse только при фронт-diff
 alwaysApply: true
 ---
 
-# Pre-commit checkup — обязательная проверка перед коммитом
+# Pre-commit checkup
 
-> **КРИТИЧНО.** Перед **каждым** `git add` / `git commit` / `git push` агент **обязан**
-> пройти весь чек-ап ниже. Пропуск пункта = риск утечки секретов, IDOR, регрессий.
->
-> Если хотя бы один **критичный** пункт не выполнен — **не коммить**. Исправь или сообщи
-> пользователю блокер с доказательством.
->
-> Канон проекта: [docs/security-baseline.md](docs/security-baseline.md),
-> БЗ `безопасность/`, AGENTS.md §4. **Без корзины/оплаты в v1** — RFQ вместо checkout.
-
-## 1. Автоматические проверки (запусти скрипт)
+Перед **каждым** `git commit` / `git push` (и по команде **`чкд`**):
 
 ```bash
 ./scripts/pre-commit-checkup.sh
 ```
 
-Скрипт: ruff, ruff format, mypy, pytest, pip-audit, секреты в diff, запрет
-`.env` / `db.sqlite3` / `media/` / `.venv` в staging, длина строк ≤ 119,
-`print()`, security hotspots, **ревью diff (баги / стандарты БЗ / security)**
-(`scripts/diff-quality-review.py`), frontend lint при изменениях в `frontend/`.
-Если скрипт красный — **не коммить**.
+Красный скрипт → **не коммить**. Канон security: [docs/security-baseline.md](docs/security-baseline.md),
+БЗ §4. Без корзины/оплаты в v1.
 
-## 1b. Ревью баги · БЗ · безопасность (обязательно)
+Скрипт уже делает: ruff, mypy, pytest, pip-audit, секреты, hotspots,
+`diff-quality-review.py`, **frontend lint только если менялся `frontend/`**.
 
-Статическая часть входит в `./scripts/pre-commit-checkup.sh` (шаг
-`diff-quality-review.py`). Агент **дополнительно** проходит рукописное
-ревью по diff (канон БЗ §4.1–4.3 + ниже). Кратко зафиксируй итог в ответе
-пользователю перед коммитом: «ревью: чисто» или список блокеров.
+## Рукописное ревью (по поверхности diff)
 
-### Баги и регрессии
+Кратко в ответе: «ревью: чисто» или блокеры.
 
-- [ ] Happy path + границы (пустой ввод, duplicate, race, throttle, 403/404).
-- [ ] Нет N+1 на list/detail (`select_related` / `prefetch_related`).
-- [ ] Пагинация list-эндпоинтов; Celery — retry + `transaction.on_commit`.
-- [ ] Admin/API: чужой ресурс / anon → 403/404, не утечка данных.
-- [ ] Счётчики/сообщения Admin правдивы (не «успех» при no-op).
-- [ ] ETL — quarantine плохих строк ([data-quality-etl.md](docs/data-quality-etl.md)).
+**Всегда (если есть код в diff):** баги/регрессии на затронутом пути;
+секреты/PII в diff; IDOR на затронутых Admin/API; минимальный diff.
 
-### Стандарты БЗ (стиль / типы / модуль)
+**Только `backend/` (Python):** PEP 585/604, без `print`, ETL quarantine
+если трогали ETL. **Не** чеклист Lighthouse / CWV / HTML landmarks.
 
-- [ ] PEP 585/604: `list[str]`, `dict[str, Any]`, `str | None` (не `Optional`/`List`).
-- [ ] Докстринги Google style на публичных функциях; константы `UPPER_SNAKE`.
-- [ ] Нет `print` / голого `except:`; логи через `logger`, без PII/секретов.
-- [ ] Длина строк ≤ 119; структура модуля по БЗ; DRY.
+**Только если в diff есть `frontend/`, `*.html`, `*.css`, `*.scss`, публичные
+шаблоны:** чеклист UI — правило `frontend-public-ui.mdc` (не дублировать здесь).
 
-### Безопасность
-
-- [ ] Секреты только в `.env`; в diff — placeholder.
-- [ ] AuthN + AuthZ + **владелец/скоуп** (IDOR): Admin queryset, custom
-      `admin_view`, compose-email/stats, публичный API.
-- [ ] Ввод валидируется; SQL только ORM/params; нет `eval`/`exec`/`shell=True`.
-- [ ] Mass assignment — whitelist полей; throttle на login и публичные POST.
-- [ ] Open redirect — allowlist; CORS не `*` + credentials; цены не утекают
-      при `show_prices=False`.
-- [ ] Файлы — лимит типа/размера, нет path traversal.
-- [ ] CSP (итерация 5): `object-src 'none'`, `frame-ancestors 'none'`.
-
-Красный `diff-quality-review` или неснятый пункт ревью — **не коммить**.
-
-## 2. Безопасность (расширенный чеклист)
-
-- [ ] **Секреты** — в diff нет `DJANGO_SECRET_KEY` с реальным значением,
-      `EMAIL_HOST_PASSWORD`, токенов, паролей БД. Только `.env.example`
-      с placeholder.
-- [ ] **Ввод валидируется** — тип, длина, формат на публичных эндпоинтах
-      (в т.ч. `POST /api/leads/`).
-- [ ] **SQL параметризованный** — нет f-string SQL, только ORM / `raw()` с params.
-- [ ] **AuthN + AuthZ** — Admin/staff write; публичный API read-only;
-      проверка прав на защищённых эндпоинтах.
-- [ ] **Mass assignment** — явный whitelist полей в сериализаторах.
-- [ ] **Rate limiting** — throttle на login Admin и публичные POST (leads).
-- [ ] **Open redirect** — redirect/callback только из allowlist.
-- [ ] **Файлы** — лимит размера/типа (PDF/изображения), нет path traversal.
-- [ ] **CORS** — whitelist, не `*` с credentials.
-- [ ] **Цены** — не утекают в публичный JSON при `show_prices=False`.
-- [ ] **Логи** — без PII (телефон, email целиком), без паролей SMTP.
-- [ ] **Docker** (когда появится web-образ) — non-root, multi-stage, `.dockerignore`.
-- [ ] **CSP** — к итерации 5: `object-src 'none'`, `frame-ancestors 'none'`
-      в nginx / middleware ([security-baseline.md](docs/security-baseline.md)).
-
-## 3. Код и типизация
-
-- [ ] **Длина строк ≤ 119** (включая пробелы).
-- [ ] **Типизация PEP 585/604** — `list[str]`, `dict[str, Any]`, `str | None`.
-- [ ] **Докстринги** на публичных функциях (Google style: Args/Returns/Raises).
-- [ ] **Нет `print`** для логов — только `logger`.
-- [ ] **Нет магических значений** — константы `UPPER_SNAKE_CASE` в начале модуля.
-- [ ] **Ошибки обрабатываются явно** — `except SpecificError`, не голый `except`.
-- [ ] **DRY** — общие хелперы не копировать по apps.
-
-## 4. Баги и регрессии
-
-- [ ] **Race** — `select_for_update()` на конкурентных записях где нужно.
-- [ ] **N+1** — `select_related` / `prefetch_related` на list SKU/файлов.
-- [ ] **Пагинация** на всех list-эндпоинтах.
-- [ ] **Celery** — retry/backoff; side-effects через `transaction.on_commit`.
-- [ ] **Тесты** — happy path и границы: пустой ввод, duplicate lead, throttle,
-      чужой/anon write → 403; нет утечки цен.
-- [ ] **Миграции** — nullable/default, backfill; откат продуман.
-- [ ] **ETL** — quarantine плохих строк ([data-quality-etl.md](docs/data-quality-etl.md)).
-
-## 5. Git-гигиена
-
-- [ ] В staging **нет** `.env`, `db.sqlite3`, `media/`, `*.sqlite3`, `.venv/`.
-- [ ] Коммит-сообщение — **прошедшее время** (Added/Fixed/Updated…).
-- [ ] Diff минимален — нет «заодно» рефакторинга.
-- [ ] Одобренный код не изменён без явного запроса.
-- [ ] Коммит **только** по явной просьбе пользователя.
-
-## 6. Публичный UI / Lighthouse (если diff затрагивает фронт)
-
-Срабатывает при изменениях в `frontend/`, `*.html`, `*.css`, `*.scss`, шаблонах,
-публичных страницах. Канон БЗ: золотое правило **12**,
-`_Универсальная-база-знаний/…/Lighthouse-HTML-CSS-архитектура.md`,
-`CWV-WCAG-и-чеклисты.md`.
-
-- [ ] **HTML** — landmarks, один `h1`, `lang`, `alt`, размеры media,
-      skip link / `:focus-visible`.
-- [ ] **CSS** — tokens → layers; нет лишнего render-blocking; CLS не ухудшен.
-- [ ] **SPA/SSR head** — title/description/canonical в исходном HTML.
-- [ ] **CWV** — LCP &lt; 2.0 s, INP &lt; 200 ms, CLS &lt; 0.08 не ухудшать.
-- [ ] **Профиль** — Standard LH ≥ 90; Perfect 100 — только по явному KPI.
-- [ ] **CSP** — не ослаблять ради метрик ([security-baseline.md](docs/security-baseline.md)).
-- [ ] Затронут публичный URL — сверка с playbook; блокер a11y/CWV → **не коммить**.
-
-## 7. Перед деплоем (дополнительно)
-
-- [ ] CI/CD pipeline **green** (test → lint → build → deploy).
-- [ ] `manage.py check --deploy` — без критичных предупреждений.
-- [ ] Prod `.env` на VPS reg.ru актуален (SMTP, `DJANGO_SECRET_KEY`, Redis, DB).
-- [ ] Smoke: `/`, `/catalog`, SKU, RFQ, `/api/health/` (когда появится).
-- [ ] URL inventory 200/301 ([seo-url-migration.md](docs/seo-url-migration.md)).
-- [ ] Публичный фронт: Lighthouse mobile ≥ 90 (или Perfect 100 по KPI) — см. §6.
-- [ ] **Покрытие:** целевой порог **≥ 90%** на apps каталога/leads — включить
-      `--cov-fail-under=90` в `backend/pyproject.toml` после появления тестов;
-      красный coverage — **не деплоить**.
-- [ ] **SemVer / релиз** — [docs/releases.md](docs/releases.md): фича →
-      bump по эпохе (beta `0.x.y`; после GA `MAJOR.MINOR`, MINOR 0–99;
-      MAJOR только по явной команде). Синхронно `config/release.py`,
-      `pyproject.toml`, `frontend/package.json`, `frontend/src/release.ts`.
-      Косметика/docs — не поднимать. **Не** версионировать под оплату.
+**Только перед деплоем / после `чкд` push:** CI green; smoke по желанию пользователя.
+Релиз-бамп — `release-version.mdc` / [docs/releases.md](docs/releases.md), не из checkup.

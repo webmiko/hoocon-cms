@@ -1,5 +1,5 @@
 ---
-description: Нумерация релизов Admin/фронт (beta → vMAJOR.MINOR после GA)
+description: Нумерация релизов при новой фиче (канон docs/releases.md)
 alwaysApply: true
 ---
 

@@ -1,6 +1,7 @@
 ---
-description: Русский текст — буква ё обязательна, не заменять на е
-alwaysApply: true
+description: Русский текст — буква ё (контент/UI/ETL copy, не идентификаторы)
+globs: backend/catalog/etl/**/*,backend/content/**/*,frontend/src/**/*.{tsx,ts,css},docs/**/*.md
+alwaysApply: false
 ---
 
 # Русский текст: буква ё
