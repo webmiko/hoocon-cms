@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { News } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
+import { stripHtmlToText } from "../utils/stripHtml";
 import styles from "./NewsListPage.module.css";
 
 /**
@@ -147,12 +148,8 @@ function Meta({ item }: { item: News }) {
   );
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
 function excerptOf(item: News): string {
-  const plain = stripHtml(item.body ?? "");
+  const plain = stripHtmlToText(item.body ?? "");
   if (!plain) return "";
   if (plain.length <= 180) return plain;
   const cut = plain.slice(0, 179);
@@ -161,7 +158,7 @@ function excerptOf(item: News): string {
 }
 
 function readingMinutes(item: News): number {
-  const words = stripHtml(item.body ?? "").split(/\s+/).filter(Boolean).length;
+  const words = stripHtmlToText(item.body ?? "").split(/\s+/).filter(Boolean).length;
   if (words < 40) return 0;
   return Math.max(1, Math.round(words / 180));
 }

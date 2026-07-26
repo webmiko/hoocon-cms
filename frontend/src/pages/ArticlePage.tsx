@@ -7,6 +7,7 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
+import { stripHtmlToText } from "../utils/stripHtml";
 import {
   buildArticleJsonLd,
   buildBreadcrumbJsonLd,
@@ -43,7 +44,7 @@ export function ArticlePage() {
     );
   }
 
-  const plain = stripHtml(article.excerpt || article.body);
+  const plain = stripHtmlToText(article.excerpt || article.body);
   const minutes = readingMinutes(article.body);
   const related = (listData?.results ?? [])
     .filter((item) => item.slug !== article.slug)
@@ -189,12 +190,8 @@ export function ArticlePage() {
   );
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
 function readingMinutes(html: string): number {
-  const words = stripHtml(html).split(/\s+/).filter(Boolean).length;
+  const words = stripHtmlToText(html).split(/\s+/).filter(Boolean).length;
   if (words < 40) return 0;
   return Math.max(1, Math.round(words / 180));
 }
