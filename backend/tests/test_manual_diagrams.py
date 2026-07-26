@@ -154,8 +154,8 @@ def test_crop_damu_skips_black_section_titles() -> None:
     wiring, dims = crop_damu_diagrams(page)
     assert wiring.size[0] < width * 0.6
     assert dims.size[0] == wiring.size[0]
-    wire_colors = set(wiring.getdata())
-    dim_colors = set(dims.getdata())
+    wire_colors = set(wiring.get_flattened_data())
+    dim_colors = set(dims.get_flattened_data())
     assert (12, 34, 56) in wire_colors
     assert (78, 90, 12) in dim_colors
     assert (0, 0, 0) not in wire_colors
@@ -186,10 +186,10 @@ def test_patch_damu_wiring_labels_ru_replaces_english_titles() -> None:
     # Original solid bars must not remain as continuous black rectangles.
     for box in (actuator_box, aux_box):
         crop = patched.crop(box)
-        dark = sum(1 for px in crop.getdata() if sum(px) // 3 < 40)
+        dark = sum(1 for px in crop.get_flattened_data() if sum(px) // 3 < 40)
         assert dark < (box[2] - box[0]) * (box[3] - box[1]) * 0.5
     title_band = patched.crop((0, int(0.08 * height), width, int(0.18 * height)))
-    assert sum(1 for px in title_band.getdata() if sum(px) // 3 < 80) > 40
+    assert sum(1 for px in title_band.get_flattened_data() if sum(px) // 3 < 80) > 40
     assert _WIRING_LABEL_ACTUATOR_RU == "Привод"
     assert _WIRING_LABEL_AUX_RU == "Вспомогательный переключатель"
 
