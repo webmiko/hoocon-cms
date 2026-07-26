@@ -1,6 +1,6 @@
 # Security baseline: Hoocon CMS (secure by default)
 
-Дата: 2026-07-19  
+Дата: 2026-07-19 (обновлено 2026-07-26: антиспам без сторонней CAPTCHA)  
 Опора БЗ (канон): `_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/`
 — прежде всего [Безопасность-кода.md][kb-sec], [OWASP Top 10:2025][kb-owasp],
 [Django-DRF][kb-drf], [Frontend SPA][kb-fe], [Инфра TLS/Docker][kb-infra],
@@ -71,11 +71,22 @@ Admin, файлы, SPA, VPS.
 ### 3.2 Django / DRF
 
 - CSRF включён для session; CORS — whitelist origin (Vite/prod domain), не `*`.
-- Публичные POST (leads): `AnonRateThrottle` + honeypot-поле.
+- Публичные POST (leads и будущие auth/чат-формы): `AnonRateThrottle` +
+  honeypot-поле.
   **Политика CSRF (v1):** SPA берёт токен через `GET /api/csrf/` и шлёт
   `X-CSRFToken` на `POST /api/leads/` (см. `frontend/src/api/client.ts`).
   Throttle shared через Redis `CACHES` в prod (`DJANGO_CACHE_URL` / DB 2).
-  CAPTCHA — опционально позже, не вместо honeypot+throttle+CSRF.
+  **Антиспам без сторонних сервисов:** не подключаем reCAPTCHA, hCaptcha,
+  Turnstile и аналоги (ни виджет, ни серверный SDK). Защита — свой стек:
+  honeypot, throttle, CSRF, валидация длины/полей; при эскалации спама —
+  усилить timing/min-submit и лимиты, не внешний CAPTCHA.
+  **Эталон:** `lms-backend` `config/form_protection.py` (+ challenge,
+  Origin) и `config/admin_otp.py` (6-значный код на email). В БЗ-каноне
+  паттерн ещё не оформлен — кандидат в
+  [kb-update-proposals.md](kb-update-proposals.md) §5.
+  **Яндекс ID** (OAuth) — отдельный IdP для входа клиентов, не CAPTCHA;
+  план: [plan-client-auth.md](plan-client-auth.md) §7; `client_secret` только
+  backend; после callback — session, не JWT в localStorage.
 - **Соцсети / боты:** токены и chat ID — только Admin (`SiteSettings`) или
   `.env` (fallback). В `GET /api/settings/public/` — только analytics IDs.
 - Сериализаторы: explicit fields; mass assignment закрыт.

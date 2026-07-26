@@ -65,6 +65,8 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Каталог / SKU / фильтры | План итерация 1; [plan-detail-mvp.md](docs/plan-detail-mvp.md) |
 | Карточка серии (DA/SA/8100/H81/H8205) | [series-card-templates.md](docs/series-card-templates.md) |
 | Чат поддержки (TG/VK/MAX) | [plan-support-chat-social.md](docs/plan-support-chat-social.md) |
+| Регистрация клиентов (пароль / OTP / Яндекс ID) | [plan-client-auth.md](docs/plan-client-auth.md) |
+| Личный кабинет (КП / обращения / статусы) | [plan-client-cabinet.md](docs/plan-client-cabinet.md) |
 | SEO / редиректы | [seo-url-migration.md](docs/seo-url-migration.md) |
 | Title / description (Яндекс, Google) | [seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) |
 | ТТХ / инструкции / перевод | [tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) |
