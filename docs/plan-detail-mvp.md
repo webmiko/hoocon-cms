@@ -1,7 +1,7 @@
 # Детализация плана MVP: боль → фича → тест
 
 Дата: 2026-07-19  
-Базовый план: [ПЛАН-ПРОЕКТА.md](../ПЛАН-ПРОЕКТА.md)  
+Базовый план: план проекта (scope / MVP-критерии).  
 Контекст: [market-analysis.md](market-analysis.md),
 [seo-url-migration.md](seo-url-migration.md),
 [infra-reg-ru.md](infra-reg-ru.md).  

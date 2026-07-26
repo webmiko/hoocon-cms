@@ -20,7 +20,7 @@
 
 | Блок | Статус | Где |
 |------|--------|-----|
-| Цель, scope, MVP-критерии | Готово | `ПЛАН-ПРОЕКТА.md` |
+| Цель, scope, MVP-критерии | Готово | план проекта |
 | Рынок + боли клиентов | Готово | `market-analysis.md` |
 | Стек Django/DRF + React | Готово | `stack-decision.md` |
 | SEO URL + 301 + BV ЧПУ | Готово | `seo-url-migration.md`, seed CSV |
@@ -169,7 +169,7 @@ skip-link; performance budget CWV.
    «Запрос КП» (SLA в подписи).
 5. **Контент:** статьи/новости как у OEM support, не блог-lifestyle.
    Числа, доли, сроки, KPI — **графики и дашборды** (HTML/CSS-классы,
-   `cms-body-charts.css`; правило `.cursor/rules/cms-content-dashboards.mdc`),
+   `cms-body-charts.css`),
    не стена текста. Референс: `/zavod`.
 
 ### 4.4 Соответствие «направлению» HVAC

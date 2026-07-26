@@ -7,7 +7,8 @@
 `../hoocon/docs/прототипы/РЕФЕРЕНСЫ_OVK_B2B.md`; официальные сайты
 Belimo / Dastech / дилеры (Panoramavent и др.).  
 Опора БЗ: `ВЕБ-РАЗРАБОТКА-Кастомный-стек/` (SEO SPA, CWV, WCAG);
-`lms-backend` (VPS + nginx + Celery + SMTP); безопасность форм AGENTS §4.
+`lms-backend` (VPS + nginx + Celery + SMTP); безопасность форм — чеклист
+стандартов разработки.
 
 Инфра prod (зафиксировано): **VPS + домен + почта на reg.ru** —
 см. [infra-reg-ru.md](infra-reg-ru.md).
@@ -200,7 +201,7 @@ INP &lt; 200 ms, CLS &lt; 0.08, WCAG 2.2 AA.
 |--------------|-------------|
 | SEO каталога/SKU, canonical, JSON-LD | `ВЕБ-РАЗРАБОТКА/SEO-индексация-SPA.md` |
 | CWV, Lighthouse, a11y | `ВЕБ-РАЗРАБОТКА/CWV-WCAG-и-чеклисты.md` |
-| Формы, rate limit, honeypot | AGENTS §4 + `безопасность/` |
+| Формы, rate limit, honeypot | стандарты разработки + security-baseline |
 | Письма по заявке, Celery | `lms-backend` Celery + SMTP |
 | nginx, Docker на VPS | `lms-backend` §17–18, [infra-reg-ru.md](infra-reg-ru.md) |
 | Декомпозиция задач | `11-Декомпозиция/Декомпозиция-задач.md` |

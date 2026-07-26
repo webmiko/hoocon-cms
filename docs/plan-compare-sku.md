@@ -260,7 +260,7 @@ Diff: строковое сравнение после `casefold` + схлопы
 
 ## 8. Связанные документы
 
-- [ПЛАН-ПРОЕКТА.md](../ПЛАН-ПРОЕКТА.md) §6 итерация 6
+- план проекта, итерация 6
 - [plan-detail-mvp.md](plan-detail-mvp.md) — сравнение в post-MVP
 - [readiness-backend-ux.md](readiness-backend-ux.md) — подбор P1
 - [tech-copy-belimo-ru.md](tech-copy-belimo-ru.md) — канон ТТХ

@@ -1,20 +1,12 @@
 # Security baseline: Hoocon CMS (secure by default)
 
 Дата: 2026-07-19 (обновлено 2026-07-26: антиспам без сторонней CAPTCHA)  
-Опора БЗ (канон): `_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/`
-— прежде всего [Безопасность-кода.md][kb-sec], [OWASP Top 10:2025][kb-owasp],
-[Django-DRF][kb-drf], [Frontend SPA][kb-fe], [Инфра TLS/Docker][kb-infra],
-AGENTS.md §0 и §4.
+Опора: внутренняя база знаний (безопасность кода, OWASP Top 10:2025,
+Django/DRF, Frontend SPA, инфра TLS/Docker) и стандарты разработки §0 / §4.
 
 Принцип: **безопасность с итерации 1**, не «потом на prod».  
 Нет корзины/оплаты в v1 — поверхность уже уже; остаются: публичные формы,
 Admin, файлы, SPA, VPS.
-
-[kb-sec]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Безопасность-кода.md
-[kb-owasp]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/OWASP-Top-10-2025.md
-[kb-drf]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Django-DRF-безопасность.md
-[kb-fe]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Frontend-безопасность-SPA-и-JS.md
-[kb-infra]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Инфраструктура-TLS-Docker-секреты.md
 
 ---
 
@@ -131,7 +123,7 @@ Admin, файлы, SPA, VPS.
 | **3** | Lead: validate + honeypot + throttle; маскировка PII в логах Celery |
 | **4** | CSP headers (draft); нет DOM XSS; consent для Метрики |
 | **5** | `check --deploy`; TLS/HSTS; CSP prod; nginx admin harden; CI pip-audit + npm audit |
-| **Всегда** | AGENTS §4 перед коммитом/деплоем; ruff; mypy |
+| **Всегда** | чеклист стандартов перед коммитом/деплоем; ruff; mypy |
 
 ---
 
@@ -176,10 +168,10 @@ frontend build
 - [ ] `poetry run pip-audit` / CI green
 - [ ] Для UI: нет `dangerouslySetInnerHTML` на user/CMS HTML без sanitize
 
-Полный pre-deploy: AGENTS.md §4 + [infra-reg-ru.md](infra-reg-ru.md) cutover.
+Полный pre-deploy: стандарты разработки (чеклист коммита/деплоя) +
+[infra-reg-ru.md](infra-reg-ru.md) cutover.
 
-Перед каждым коммитом: `./scripts/pre-commit-checkup.sh`
-(правило `.cursor/rules/pre-commit-checkup.mdc`).
+Перед каждым коммитом: `./scripts/pre-commit-checkup.sh`.
 
 ---
 

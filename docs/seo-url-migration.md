@@ -191,4 +191,4 @@ http / www    → 301 https://hoocon.ru
 не заменяя старые path без 301.
 
 Связано: [market-analysis.md](market-analysis.md),
-[infra-reg-ru.md](infra-reg-ru.md), [ПЛАН-ПРОЕКТА.md](../ПЛАН-ПРОЕКТА.md).
+[infra-reg-ru.md](infra-reg-ru.md), план проекта (итерации / scope).

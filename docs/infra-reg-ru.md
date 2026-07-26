@@ -88,4 +88,4 @@ Compose: db, redis, web, celery_worker
 | Downtime cutover | параллельный прогон, низкий TTL, rollback DNS |
 | DDoS-Guard у Tilda сейчас | на VPS — fail2ban / лимиты nginx, при необходимости защита reg.ru |
 
-Связано: [market-analysis.md](market-analysis.md), [ПЛАН-ПРОЕКТА.md](../ПЛАН-ПРОЕКТА.md).
+Связано: [market-analysis.md](market-analysis.md), план проекта (scope / infra).
