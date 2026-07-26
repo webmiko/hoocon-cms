@@ -9,6 +9,8 @@ docs/readiness-backend-ux.md §2.3 (`GET /api/search/?q=`).
 - Ищет по search_vector (FTS) на SKU, Article, News, Page (published).
 - Результаты объединяются, ранжируются по релевантности (SearchRank).
 - Каждый результат: type, slug, title, url (канонический path).
+- Для SKU title = ``format_sku_heading_name`` (полный ``sku_code``, не
+  только семейное имя) — издания в поиске различимы.
 - PII: Lead НЕ участвует в поиске; никаких email/phone в выдаче.
 - Пагинация стандартная (DRF PageNumberPagination).
 """
@@ -25,10 +27,30 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from catalog.facets.copy import format_sku_heading_name
 from catalog.models import SKU
 from catalog.urls_paths import catalog_path_for_sku
 from content.models import Article, News, Page
 from search.serializers import SearchResponseSerializer
+
+
+def search_title_for_sku(sku: SKU) -> str:
+    """Build search result title with unique article (family editions differ).
+
+    Catalog cards collapse by family; search lists each published SKU. Shared
+    ``SKU.name`` often starts with the body code only (e.g. ``H8205-LAV2100``),
+    so we prefix with ``sku_code`` via the same helper as PDP/list headings.
+
+    Args:
+        sku: published SKU row (needs ``name`` and ``sku_code``).
+
+    Returns:
+        Display title, e.g. ``H8205-LAV2100-230A | Электрический…``.
+    """
+    return format_sku_heading_name(
+        sku.name or "",
+        sku_code=sku.sku_code or "",
+    )
 
 
 class SearchView(APIView):
@@ -78,7 +100,7 @@ class SearchView(APIView):
                 {
                     "type": "sku",
                     "slug": sku.slug,
-                    "title": sku.name,
+                    "title": search_title_for_sku(sku),
                     "url": catalog_path_for_sku(sku),
                     "rank": float(sku.rank),  # type: ignore[attr-defined]
                 },

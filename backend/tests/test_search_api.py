@@ -269,6 +269,59 @@ def test_search_result_url_is_canonical_path(client) -> None:
             assert "/novosti/" in item["url"]
 
 
+def test_search_title_for_sku_uses_full_article_code() -> None:
+    """Family-shared name must still show full sku_code in search title."""
+    from catalog.models import SKU
+    from search.views import search_title_for_sku
+
+    sku = SKU(
+        name="H8205-LAV2100 | Электрический регулирующий клапан 2-ходовый DN 100",
+        sku_code="H8205-LAV2100-230A",
+        slug="h8205-lav2100-230a",
+    )
+    title = search_title_for_sku(sku)
+    assert title.startswith("H8205-LAV2100-230A")
+    assert "H8205-LAV2100 |" not in title.split("|")[0]
+    assert "клапан" in title.casefold()
+
+
+@pytest.mark.django_db
+def test_search_sku_title_includes_edition_code(client) -> None:
+    """Search lists each SKU with edition code, not only shared family name."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Комплекты", slug="komplekty-search-ed")
+    prod = Product.objects.create(
+        name="H8205-LAV2100",
+        slug="h8205-lav2100-search-ed",
+        category=cat,
+    )
+    shared = "H8205-LAV2100 | Электрический регулирующий клапан 2-ходовый DN 100"
+    SKU.objects.create(
+        product=prod,
+        name=shared,
+        slug="h8205-lav2100-230a-search-ed",
+        sku_code="H8205-LAV2100-230A",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=prod,
+        name=shared,
+        slug="h8205-lav2100-24a-search-ed",
+        sku_code="H8205-LAV2100-24A",
+        is_published=True,
+    )
+
+    response = client.get("/api/search/", {"q": "H8205-LAV2100"})
+    body = response.json()
+    sku_titles = [r["title"] for r in body["results"] if r.get("type") == "sku"]
+    assert any(t.startswith("H8205-LAV2100-230A") for t in sku_titles)
+    assert any(t.startswith("H8205-LAV2100-24A") for t in sku_titles)
+    # Shared body-only prefix without edition must not be the sole left side.
+    left_sides = [t.split("|", 1)[0].strip() for t in sku_titles]
+    assert "H8205-LAV2100" not in left_sides
+
+
 # ── Read-only / method ────────────────────────────────────────────────
 
 
