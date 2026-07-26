@@ -150,9 +150,9 @@ if out:
   fi
 fi
 
-# ── 8. print() вне tests/ ────────────────────────────────────
+# ── 8. print() вне tests/ (не CLI scripts/) ───────────────────
 if [ -n "$PY_FILES" ]; then
-  NON_TEST_PY=$(echo "$PY_FILES" | grep -vE '(^|/)tests/' || true)
+  NON_TEST_PY=$(echo "$PY_FILES" | grep -vE '(^|/)tests/|(^|/)scripts/' || true)
   if [ -n "$NON_TEST_PY" ]; then
     # shellcheck disable=SC2086
     PRINTS=$(echo "$NON_TEST_PY" | xargs grep -lE '^\s*print\(' 2>/dev/null | grep -v '__pycache__' || true)
@@ -161,6 +161,8 @@ if [ -n "$PY_FILES" ]; then
     else
       fail "print() найден (используй logger): $PRINTS"
     fi
+  else
+    ok "Нет print() вне tests/"
   fi
 fi
 

@@ -95,6 +95,35 @@ _BUG_ADDED: list[tuple[re.Pattern[str], str, str]] = [
     ),
 ]
 
+# Russian ё: high-confidence е-forms that must use ё in site/copy text.
+# Do not list ambiguous «все» (all) here.
+_YO_ADDED: list[tuple[re.Pattern[str], str, str]] = [
+    (re.compile(r"\bеще\b", re.I), "YO001", "Пиши «ещё», не «еще»"),
+    (re.compile(r"\bобъем"), "YO002", "Пиши «объём…», не «объем…»"),
+    (re.compile(r"\bпартнер"), "YO003", "Пиши «партнёр…», не «партнер…»"),
+    (re.compile(r"\bнадежн", re.I), "YO004", "Пиши «надёжн…», не «надежн…»"),
+    (re.compile(r"\bрасчет"), "YO005", "Пиши «расчёт…», не «расчет…»"),
+    (re.compile(r"\bсчетчик"), "YO006", "Пиши «счётчик…», не «счетчик…»"),
+    (re.compile(r"\bтрех"), "YO007", "Пиши «трёх…», не «трех…»"),
+    (re.compile(r"\bчетырех"), "YO008", "Пиши «четырёх…», не «четырех…»"),
+    (re.compile(r"\bприем\b"), "YO009", "Пиши «приём», не «прием»"),
+    (re.compile(r"\bучет\b"), "YO010", "Пиши «учёт», не «учет»"),
+    (re.compile(r"\bучета\b"), "YO011", "Пиши «учёта», не «учета»"),
+    (re.compile(r"\bучетн"), "YO012", "Пиши «учётн…», не «учетн…»"),
+    (re.compile(r"\bсчет\b"), "YO013", "Пиши «счёт», не «счет»"),
+    (re.compile(r"\bсчета\b"), "YO014", "Пиши «счёта», не «счета»"),
+    (re.compile(r"\bсчете\b"), "YO015", "Пиши «счёте», не «счете»"),
+    (re.compile(r"\bсчету\b"), "YO016", "Пиши «счёту», не «счету»"),
+    (re.compile(r"\bсчетом\b"), "YO017", "Пиши «счётом», не «счетом»"),
+    (re.compile(r"\bчертеж\b"), "YO018", "Пиши «чертёж» (ед.ч.), не «чертеж»"),
+    (re.compile(r"\bлегк"), "YO019", "Пиши «лёгк…», не «легк…»"),
+    (re.compile(r"\bжестк"), "YO020", "Пиши «жёстк…», не «жестк…»"),
+    (re.compile(r"\bчетк"), "YO021", "Пиши «чётк…», не «четк…»"),
+    (re.compile(r"\bидет\b"), "YO022", "Пиши «идёт», не «идет»"),
+    (re.compile(r"\bдает\b"), "YO023", "Пиши «даёт», не «дает»"),
+    (re.compile(r"\bведется\b"), "YO024", "Пиши «ведётся», не «ведется»"),
+]
+
 # Whole-file heuristics on changed admin modules.
 _SKIP_PATH_PARTS = (
     "/migrations/",
@@ -124,11 +153,12 @@ class Report:
     security: list[Finding] = field(default_factory=list)
     kb: list[Finding] = field(default_factory=list)
     bugs: list[Finding] = field(default_factory=list)
+    yo: list[Finding] = field(default_factory=list)
 
     @property
     def total(self) -> int:
         """Count of all findings."""
-        return len(self.security) + len(self.kb) + len(self.bugs)
+        return len(self.security) + len(self.kb) + len(self.bugs) + len(self.yo)
 
 
 def _changed_paths() -> list[str]:
@@ -187,10 +217,11 @@ def _should_skip(path: str) -> bool:
     return any(part in f"/{norm}/" or part in norm for part in _SKIP_PATH_PARTS)
 
 
+_YO_TEXT_SUFFIXES = (".py", ".tsx", ".ts", ".html", ".md", ".css")
+
+
 def _scan_added(path: str, report: Report) -> None:
     """Apply line-level rules to added lines."""
-    if not path.endswith(".py"):
-        return
     if _should_skip(path):
         return
     try:
@@ -199,22 +230,36 @@ def _scan_added(path: str, report: Report) -> None:
         return
 
     allow_todo = any(token in path for token in _ALLOW_TODO_IN)
+    is_py = path.endswith(".py")
+    is_yo_text = path.endswith(_YO_TEXT_SUFFIXES)
     for lineno, text in added:
         stripped = text.strip()
         if stripped.startswith("#") and "TODO" not in stripped.upper():
             # comments: still scan TODO via BUG001
             pass
-        for pattern, code, msg in _SECURITY_ADDED:
-            if pattern.search(text):
-                report.security.append(Finding(code, path, lineno, msg, text.strip()))
-        for pattern, code, msg in _KB_ADDED:
-            if pattern.search(text):
-                report.kb.append(Finding(code, path, lineno, msg, text.strip()))
-        for pattern, code, msg in _BUG_ADDED:
-            if code == "BUG001" and allow_todo:
+        if is_py:
+            for pattern, code, msg in _SECURITY_ADDED:
+                if pattern.search(text):
+                    report.security.append(
+                        Finding(code, path, lineno, msg, text.strip())
+                    )
+            for pattern, code, msg in _KB_ADDED:
+                if pattern.search(text):
+                    report.kb.append(Finding(code, path, lineno, msg, text.strip()))
+            for pattern, code, msg in _BUG_ADDED:
+                if code == "BUG001" and allow_todo:
+                    continue
+                if pattern.search(text):
+                    report.bugs.append(Finding(code, path, lineno, msg, text.strip()))
+        if is_yo_text:
+            # Skip the rule table itself (patterns contain forbidden е-forms).
+            if path.replace("\\", "/").endswith("scripts/diff-quality-review.py"):
                 continue
-            if pattern.search(text):
-                report.bugs.append(Finding(code, path, lineno, msg, text.strip()))
+            if "re.compile(" in text and ("YO0" in text or "Пиши" in text):
+                continue
+            for pattern, code, msg in _YO_ADDED:
+                if pattern.search(text):
+                    report.yo.append(Finding(code, path, lineno, msg, text.strip()))
 
 
 def _scan_admin_views(path: str, report: Report) -> None:
@@ -299,11 +344,12 @@ def main() -> int:
         _scan_added(path, report)
         _scan_admin_views(path, report)
 
-    print("Ревью diff: баги · стандарты БЗ · безопасность")
+    print("Ревью diff: баги · стандарты БЗ · безопасность · буква ё")
     print(f"Файлов в diff: {len(paths)}")
     _print_section("Безопасность", report.security)
     _print_section("Стандарты БЗ (стиль/типы/ошибки)", report.kb)
     _print_section("Баги / долги в diff", report.bugs)
+    _print_section("Русский текст (буква ё)", report.yo)
 
     print("")
     if report.total == 0:

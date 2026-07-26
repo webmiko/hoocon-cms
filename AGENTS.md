@@ -70,6 +70,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | SEO / редиректы | [seo-url-migration.md](docs/seo-url-migration.md) |
 | Title / description (Яндекс, Google) | [seo-meta-yandex-google.md](docs/seo-meta-yandex-google.md) |
 | ТТХ / инструкции / перевод | [tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md) |
+| Русский текст / буква ё | `.cursor/rules/russian-yo.mdc`; § правил в tech-copy |
 | ETL / качество данных | [data-quality-etl.md](docs/data-quality-etl.md) |
 | UX / дизайн B2B | [readiness-backend-ux.md](docs/readiness-backend-ux.md); прототипы `../hoocon/docs/прототипы/` |
 | Статьи / лендинги (графики) | `.cursor/rules/cms-content-dashboards.mdc`; стили `frontend/src/styles/cms-body-charts.css`; референс `/zavod` |

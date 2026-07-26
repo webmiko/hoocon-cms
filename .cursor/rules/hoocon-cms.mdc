@@ -20,3 +20,6 @@ alwaysApply: true
    [docs/series-card-templates.md](docs/series-card-templates.md);
    при смене UX серии обновлять шаблон вместе с кодом
    (правило `series-card-templates.mdc`).
+8. Русский текст сайта — буква **ё** обязательна (не заменять на е);
+   правило `russian-yo.mdc`, канон в
+   [docs/tech-copy-belimo-ru.md](docs/tech-copy-belimo-ru.md).
