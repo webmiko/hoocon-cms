@@ -4,6 +4,9 @@ import { Link, useLocation } from "react-router-dom";
 import { countVisibleNavItems, DESKTOP_NAV_ITEMS } from "../utils/navOverflow";
 import styles from "./Layout.module.css";
 
+/** Keep in sync with ``Layout.module.css`` ``@media (max-width: 960px)``. */
+const DESKTOP_NAV_MQ = "(min-width: 961px)";
+
 function pathMatches(pathname: string, to: string): boolean {
   if (to === "/") {
     return pathname === "/";
@@ -14,6 +17,7 @@ function pathMatches(pathname: string, to: string): boolean {
 /**
  * Desktop primary nav with Priority+ overflow into «Ещё».
  * Keeps a single row; items that do not fit move into a dropdown.
+ * Geometry is skipped on mobile (nav is ``display: none`` under 961px).
  */
 export function DesktopNav() {
   const location = useLocation();
@@ -42,8 +46,17 @@ export function DesktopNav() {
       return;
     }
 
+    const mq =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia(DESKTOP_NAV_MQ)
+        : null;
+
     function recalc() {
       if (!nav || !measure || !moreMeasure) {
+        return;
+      }
+      // Hidden nav still reports geometry; skip on mobile to avoid forced layout.
+      if (mq && !mq.matches) {
         return;
       }
       const itemEls = Array.from(
@@ -71,12 +84,14 @@ export function DesktopNav() {
     const observer = new ResizeObserver(scheduleRecalc);
     observer.observe(nav);
     void document.fonts?.ready.then(scheduleRecalc);
+    mq?.addEventListener("change", scheduleRecalc);
 
     return () => {
       if (raf) {
         cancelAnimationFrame(raf);
       }
       observer.disconnect();
+      mq?.removeEventListener("change", scheduleRecalc);
     };
   }, []);
 

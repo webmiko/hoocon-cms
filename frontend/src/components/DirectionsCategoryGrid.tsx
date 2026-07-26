@@ -68,12 +68,22 @@ export function DirectionsCategoryGrid({
       setActiveIndex(best);
     };
 
+    let raf = 0;
+    const scheduleUpdate = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateActive();
+      });
+    };
+
     updateActive();
-    root.addEventListener("scroll", updateActive, { passive: true });
-    const ro = new ResizeObserver(updateActive);
+    root.addEventListener("scroll", scheduleUpdate, { passive: true });
+    const ro = new ResizeObserver(scheduleUpdate);
     ro.observe(root);
     return () => {
-      root.removeEventListener("scroll", updateActive);
+      if (raf) cancelAnimationFrame(raf);
+      root.removeEventListener("scroll", scheduleUpdate);
       ro.disconnect();
     };
   }, [carousel, categories.length]);
