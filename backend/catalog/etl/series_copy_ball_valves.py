@@ -93,6 +93,7 @@ from catalog.etl.webp import DEFAULT_WEBP_QUALITY, convert_bytes_to_webp
 from catalog.facets import normalize_aux_switch_value
 from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
 from catalog.urls_paths import catalog_path_for_sku
+from config.warranty import WARRANTY_BULLET, WARRANTY_LINE
 
 # Compat aliases for older imports / tests.
 FlangedKitSeries = H81KitSeries
@@ -546,7 +547,7 @@ def _series_description(series: BallValveSeries) -> str:
 – Вид: {series.ways}.
 – Совместимый привод {series.voltage_label}: {series.compatible_actuators}.
 – Кронштейн: {series.bracket}.
-– Гарантия: 24 месяца.
+{WARRANTY_BULLET}
 
 Область применения:
 – Системы обработки воздуха.
@@ -585,7 +586,7 @@ def _sku_description(series: BallValveSeries, kvs: str) -> str:
         "",
         f"Совместимый привод: {series.compatible_actuators}.",
         f"Кронштейн: {series.bracket}.",
-        "Гарантия: 24 месяца.",
+        WARRANTY_LINE,
     ]
     return normalize_tech_copy("\n".join(lines))
 
@@ -833,7 +834,7 @@ def _lav_series_description(series: H8205LavSeries) -> str:
 – Вид: {series.ways}.
 – Расходная характеристика: {LAV_FLOW_CHAR}.
 – Утечка: {LAV_LEAKAGE}.
-– Гарантия: 24 месяца.
+{WARRANTY_BULLET}
 
 Область применения:
 – Системы отопления, вентиляции и кондиционирования (HVAC).
@@ -869,7 +870,7 @@ def _lav_sku_description(series: H8205LavSeries, sku_code: str) -> str:
         "– Системы отопления, вентиляции и кондиционирования (HVAC).",
         "– Промышленные АСУ ТП.",
         "",
-        "Гарантия: 24 месяца.",
+        WARRANTY_LINE,
     ]
     return normalize_tech_copy("\n".join(lines))
 
@@ -1301,7 +1302,7 @@ def _kit_series_description(kit: H81KitSeries) -> str:
 – Время срабатывания: {kit.run_time}.
 – Степень защиты привода: {kit.family.ip_rating}.
 – Ручное управление: есть.
-– Гарантия: 24 месяца.
+{WARRANTY_BULLET}
 
 Область применения:
 – Системы обработки воздуха.
@@ -1347,7 +1348,7 @@ def _kit_sku_description(kit: H81KitSeries, sku_code: str) -> str:
         "– Крышные кондиционеры.",
         "– Бойлерные системы (чиллеры).",
         "",
-        "Гарантия: 24 месяца.",
+        WARRANTY_LINE,
     ]
     return normalize_tech_copy("\n".join(lines))
 
@@ -1416,7 +1417,7 @@ def _kit_family_description(kit: H81KitSeries) -> str:
 – Время срабатывания: {kit.run_time} (зависит от DN у части серий).
 – Степень защиты привода: {kit.family.ip_rating}.
 – Ручное управление: есть.
-– Гарантия: 24 месяца.
+{WARRANTY_BULLET}
 
 Область применения:
 – Системы обработки воздуха.

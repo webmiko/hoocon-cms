@@ -16,6 +16,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from config.warranty import WARRANTY_COMPANY_LI
 from content.models import Article, News, Page
 
 _PHONE = "8 800 350-58-98"
@@ -53,7 +54,7 @@ Co., Ltd. (Китай).</p>
 <li>Система менеджмента качества ISO 9001:2015 (CQC).</li>
 <li>Сертификаты CE, UL, BV и российские сертификаты соответствия —
 файлы в карточке SKU.</li>
-<li>Гарантия 3 года на приводы линейки.</li>
+<li>{WARRANTY_COMPANY_LI}</li>
 <li>Ответ на заявку — до 2 рабочих часов в рабочие дни.</li>
 </ul>
 <h2>Как заказать</h2>
@@ -87,6 +88,15 @@ OEM и завод: <a href="/zavod">/zavod</a> · {_EMAIL_INFO}.</p>
 <p>Телефон <a href="tel:+78003505898">{_PHONE}</a>, email
 <a href="mailto:{_EMAIL_SALES}">{_EMAIL_SALES}</a>.
 <a href="/consultation">Запросить КП</a> — ответим до 2 рабочих часов.</p>
+<h2>Представительство завода в Беларуси</h2>
+<h3>ООО «Чемпион-Тэк» — Минск</h3>
+<ul>
+<li>Юридический адрес: 220030 Минск, пр-т Независимости 32А, пом.&nbsp;11</li>
+<li>Многоканальный телефон:
+<a href="tel:+375293726888">+375 29 372 6888</a></li>
+<li>По вопросам сотрудничества:
+<a href="mailto:ichampiontech@yandex.ru">ichampiontech@yandex.ru</a></li>
+</ul>
 <h2>Партнёры</h2>
 <h3>«ТД Панорамавент» — Москва</h3>
 <ul>
