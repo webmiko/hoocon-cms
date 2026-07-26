@@ -499,8 +499,34 @@ NEWS_BODY = f"""
 <p><a href="/catalog">Перейти в каталог</a></p>
 """.strip()
 
+_NEWS_LAUNCH_SLUG = "launch-hva-5nm"
+_NEWS_LAUNCH_TITLE = "В каталоге: электропривод HVA-5NM (5 Н·м)"
+
+_NEWS_H8205_SLUG = "launch-h8205-lav"
+_NEWS_H8205_TITLE = "Доступен заказ: регулирующие клапаны H8205-LAV"
+_NEWS_H8205_COVER_SKU = "H8205-LAV232-24A"
+
+NEWS_H8205_BODY = f"""
+<p>В каталоге открыт заказ линейки <strong>H8205-LAV</strong> — электрических
+регулирующих клапанов (серия&nbsp;82) для автоматического управления расходом
+среды в системах ОВК и промышленных АСУ&nbsp;ТП.</p>
+<p><strong>Применение.</strong> Клапан изменяет степень открытия по сигналу
+управления и регулирует расход (температура, уровень, давление) в контурах
+отопления, вентиляции и кондиционирования, а также в смежных отраслях:
+нефтехимия, металлургия, электроэнергетика, природоохранные системы.</p>
+<p><strong>Что в серии.</strong> 2- и 3-ходовые корпуса DN&nbsp;32…300,
+фланец PN16/PN25, рабочая среда — вода и раствор этиленгликоля (&lt;50&nbsp;%),
+температура среды –20…+150&nbsp;°C. На карточке — питания 24/230&nbsp;В,
+управление открыто/закрыто, пропорциональное или Modbus, опции
+вспомогательного переключателя и аварийного сигнала.</p>
+<p>Паспорт, габариты и схемы подключения — в карточке комплекта. Для расчёта
+цены и срока отгрузки оставьте <a href="/consultation">заявку на КП</a> или
+позвоните {_PHONE}.</p>
+<p><a href="/catalog/komplekty">Смотреть H8205-LAV в каталоге</a></p>
+""".strip()
+
 # News from Tilda /news are imported by ``scrape_hoocon_news`` (covers + body).
-# Seed only fills a placeholder when the table is empty (local bootstrap).
+# Seed creates a bootstrap HVA item when empty and upserts H8205-LAV + covers.
 
 
 class Command(BaseCommand):
@@ -510,6 +536,8 @@ class Command(BaseCommand):
 
     def handle(self, *args: object, **options: object) -> None:
         """Write canonical copy into the database."""
+        from content.news_cover_from_sku import attach_sku_cover_to_news
+
         now = timezone.now()
         pages_done = 0
         for slug, (title, body) in PAGES.items():
@@ -542,9 +570,9 @@ class Command(BaseCommand):
         news_action = "skipped"
         if not News.objects.exists():
             news, news_created = News.objects.update_or_create(
-                slug="launch-hva-5nm",
+                slug=_NEWS_LAUNCH_SLUG,
                 defaults={
-                    "title": "В каталоге: электропривод HVA-5NM (5 Н·м)",
+                    "title": _NEWS_LAUNCH_TITLE,
                     "body": NEWS_BODY,
                     "is_published": True,
                     "published_at": now,
@@ -553,7 +581,41 @@ class Command(BaseCommand):
             news_action = "created" if news_created else "updated"
             self.stdout.write(f"news {news.slug}: {news_action}")
         else:
-            self.stdout.write("news: skipped (use scrape_hoocon_news)")
+            self.stdout.write("news: skipped create (use scrape_hoocon_news)")
+
+        h8205, h8205_created = News.objects.update_or_create(
+            slug=_NEWS_H8205_SLUG,
+            defaults={
+                "title": _NEWS_H8205_TITLE,
+                "body": NEWS_H8205_BODY,
+                "is_published": True,
+            },
+        )
+        if h8205.published_at is None:
+            h8205.published_at = now
+            h8205.save(update_fields=["published_at", "updated_at"])
+        self.stdout.write(f"news {h8205.slug}: {'created' if h8205_created else 'updated'}")
+
+        if attach_sku_cover_to_news(news_slug=_NEWS_LAUNCH_SLUG):
+            self.stdout.write(f"news {_NEWS_LAUNCH_SLUG}: cover from HVA230-5")
+        else:
+            existing = News.objects.filter(slug=_NEWS_LAUNCH_SLUG).first()
+            if existing is None:
+                self.stdout.write(self.style.WARNING(f"news cover: {_NEWS_LAUNCH_SLUG} missing"))
+            elif existing.cover:
+                self.stdout.write(f"news {_NEWS_LAUNCH_SLUG}: cover already set")
+            else:
+                self.stdout.write(self.style.WARNING(f"news {_NEWS_LAUNCH_SLUG}: cover not attached (SKU image?)"))
+
+        if attach_sku_cover_to_news(
+            news_slug=_NEWS_H8205_SLUG,
+            sku_code=_NEWS_H8205_COVER_SKU,
+        ):
+            self.stdout.write(f"news {_NEWS_H8205_SLUG}: cover from {_NEWS_H8205_COVER_SKU}")
+        elif h8205.cover:
+            self.stdout.write(f"news {_NEWS_H8205_SLUG}: cover already set")
+        else:
+            self.stdout.write(self.style.WARNING(f"news {_NEWS_H8205_SLUG}: cover not attached (SKU image?)"))
 
         self.stdout.write(
             self.style.SUCCESS(f"Done: pages={pages_done}, articles={excerpts_done}, news={news_action}")
