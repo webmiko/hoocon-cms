@@ -1513,10 +1513,15 @@
                     "url": {
                         "type": "string",
                         "description": "Канонический path (напр. /<slug>/, /statyi/<slug>/)."
+                    },
+                    "snippet": {
+                        "type": "string",
+                        "description": "Краткое описание (для SKU — lead с PDP; для CMS — начало body)."
                     }
                 },
                 "required": [
                     "slug",
+                    "snippet",
                     "title",
                     "type",
                     "url"

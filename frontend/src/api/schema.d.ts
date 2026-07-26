@@ -566,6 +566,10 @@ export interface components {
             title: string;
             /** @description Канонический path (напр. /<slug>/, /statyi/<slug>/). */
             url: string;
+            /**
+             * @description Краткое описание (для SKU — lead с PDP; для CMS — начало body).
+             */
+            snippet: string;
         };
         /**
          * @description * `new` - Новая

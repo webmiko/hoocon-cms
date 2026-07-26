@@ -241,7 +241,7 @@ def test_search_missing_q_param_returns_empty(client) -> None:
 
 @pytest.mark.django_db
 def test_search_result_item_has_required_fields(client) -> None:
-    """Each result item has type, slug, title, and url."""
+    """Each result item has type, slug, title, url, and snippet."""
     _seed_search_data()
     response = client.get("/api/search/", {"q": "привод"})
     body = response.json()
@@ -251,6 +251,8 @@ def test_search_result_item_has_required_fields(client) -> None:
         assert "slug" in item
         assert "title" in item
         assert "url" in item
+        assert "snippet" in item
+        assert isinstance(item["snippet"], str)
 
 
 @pytest.mark.django_db
@@ -283,6 +285,26 @@ def test_search_title_for_sku_uses_full_article_code() -> None:
     assert title.startswith("H8205-LAV2100-230A")
     assert "H8205-LAV2100 |" not in title.split("|")[0]
     assert "клапан" in title.casefold()
+
+
+def test_search_snippet_for_sku_uses_pdp_lead() -> None:
+    """Search snippet matches the short lead shown under the PDP H1."""
+    from catalog.models import SKU
+    from search.views import search_snippet_for_sku
+
+    sku = SKU(
+        name="H8205-LAV2100-230A | Клапан",
+        sku_code="H8205-LAV2100-230A",
+        slug="h8205-lav2100-230a-snip",
+        description=(
+            "H8205-LAV2100 | Электрический регулирующий клапан.\n"
+            "Используется для регулирования потока тепло-/хладоносителя "
+            "в системах отопления и вентиляции зданий."
+        ),
+    )
+    snippet = search_snippet_for_sku(sku)
+    assert "используется" in snippet.casefold()
+    assert len(snippet) >= 40
 
 
 @pytest.mark.django_db

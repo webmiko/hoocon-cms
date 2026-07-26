@@ -8,9 +8,10 @@ docs/readiness-backend-ux.md §2.3 (`GET /api/search/?q=`).
 - Параметр `q` — текст запроса; пустой/короткий → пустой список (не 400).
 - Ищет по search_vector (FTS) на SKU, Article, News, Page (published).
 - Результаты объединяются, ранжируются по релевантности (SearchRank).
-- Каждый результат: type, slug, title, url (канонический path).
+- Каждый результат: type, slug, title, url, snippet (канонический path).
 - Для SKU title = ``format_sku_heading_name`` (полный ``sku_code``, не
   только семейное имя) — издания в поиске различимы.
+- Для SKU snippet = ``extract_sku_lead`` (тот же lead, что под H1 на PDP).
 - PII: Lead НЕ участвует в поиске; никаких email/phone в выдаче.
 - Пагинация стандартная (DRF PageNumberPagination).
 """
@@ -27,11 +28,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from catalog.facets.copy import format_sku_heading_name
+from catalog.facets.copy import extract_sku_lead, format_sku_heading_name
 from catalog.models import SKU
 from catalog.urls_paths import catalog_path_for_sku
 from content.models import Article, News, Page
 from search.serializers import SearchResponseSerializer
+
+_SNIPPET_MAX_LEN = 220
 
 
 def search_title_for_sku(sku: SKU) -> str:
@@ -51,6 +54,31 @@ def search_title_for_sku(sku: SKU) -> str:
         sku.name or "",
         sku_code=sku.sku_code or "",
     )
+
+
+def search_snippet_for_sku(sku: SKU) -> str:
+    """Short prose under the search title — same lead as on the SKU PDP hero.
+
+    Args:
+        sku: published SKU (uses ``description``).
+
+    Returns:
+        Application blurb from ``extract_sku_lead``, or empty string.
+    """
+    return extract_sku_lead(sku.description or "", max_len=_SNIPPET_MAX_LEN)
+
+
+def _content_snippet(body: str, *, max_len: int = _SNIPPET_MAX_LEN) -> str:
+    """First plain sentence(s) from CMS body for search list (optional)."""
+    text = " ".join((body or "").replace("\xa0", " ").split()).strip()
+    if not text:
+        return ""
+    if len(text) <= max_len:
+        return text
+    cut = text[: max_len - 1]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return f"{cut}…"
 
 
 class SearchView(APIView):
@@ -74,7 +102,7 @@ class SearchView(APIView):
 
         Returns:
             200 with paginated results: {count, next, previous, results}.
-            Each result: {type, slug, title, url}.
+            Each result: {type, slug, title, url, snippet}.
         """
         q = (request.query_params.get("q") or "").strip()
         if not q:
@@ -91,7 +119,7 @@ class SearchView(APIView):
             query: pre-built SearchQuery (russian config).
 
         Returns:
-            List of dicts: {type, slug, title, url}, sorted by rank desc.
+            List of dicts: {type, slug, title, url, snippet}, sorted by rank.
         """
         results: list[dict[str, str | float]] = []
 
@@ -102,6 +130,7 @@ class SearchView(APIView):
                     "slug": sku.slug,
                     "title": search_title_for_sku(sku),
                     "url": catalog_path_for_sku(sku),
+                    "snippet": search_snippet_for_sku(sku),
                     "rank": float(sku.rank),  # type: ignore[attr-defined]
                 },
             )
@@ -113,6 +142,7 @@ class SearchView(APIView):
                     "slug": art.slug,
                     "title": art.title,
                     "url": f"/statyi/{art.slug}/",
+                    "snippet": _content_snippet(art.body or ""),
                     "rank": float(art.rank),  # type: ignore[attr-defined]
                 },
             )
@@ -124,6 +154,7 @@ class SearchView(APIView):
                     "slug": news.slug,
                     "title": news.title,
                     "url": f"/novosti/{news.slug}/",
+                    "snippet": _content_snippet(news.body or ""),
                     "rank": float(news.rank),  # type: ignore[attr-defined]
                 },
             )
@@ -135,6 +166,7 @@ class SearchView(APIView):
                     "slug": page.slug,
                     "title": page.title,
                     "url": f"/{page.slug}/",
+                    "snippet": _content_snippet(page.body or ""),
                     "rank": float(page.rank),  # type: ignore[attr-defined]
                 },
             )
@@ -146,6 +178,7 @@ class SearchView(APIView):
                 "slug": str(r["slug"]),
                 "title": str(r["title"]),
                 "url": str(r["url"]),
+                "snippet": str(r.get("snippet") or ""),
             }
             for r in results
         ]

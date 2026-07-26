@@ -17,6 +17,10 @@ class SearchResultItemSerializer(serializers.Serializer):
     slug = serializers.CharField(help_text="Slug (path-сегмент) найденной записи.")
     title = serializers.CharField(help_text="Заголовок (H1) найденной записи.")
     url = serializers.CharField(help_text="Канонический path (напр. /<slug>/, /statyi/<slug>/).")
+    snippet = serializers.CharField(
+        allow_blank=True,
+        help_text="Краткое описание (для SKU — lead с PDP; для CMS — начало body).",
+    )
 
 
 class SearchResponseSerializer(serializers.Serializer):

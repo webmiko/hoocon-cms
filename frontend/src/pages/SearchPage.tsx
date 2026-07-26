@@ -199,7 +199,14 @@ export function SearchPage() {
                   <span className={`${styles.badge} ${styles[`badge_${item.type}`] ?? ""}`}>
                     {TYPE_LABEL[item.type] ?? item.type}
                   </span>
-                  <span className={styles.itemTitle}>{softBreak(item.title)}</span>
+                  <span className={styles.itemMain}>
+                    <span className={styles.itemTitle}>{softBreak(item.title)}</span>
+                    {item.snippet ? (
+                      <span className={styles.itemSnippet}>
+                        {softBreak(item.snippet)}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className={`${styles.itemUrl} text-tech`}>
                     {softBreak(item.url)}
                   </span>
