@@ -342,31 +342,52 @@
 
 .searchForm {
   display: flex;
-  gap: var(--space-xs);
+  align-items: stretch;
+  gap: 0;
+  width: min(100%, 22rem);
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.searchForm:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
 }
 
 .searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
   padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: none;
+  border-radius: 0;
   font-size: var(--font-size-sm);
-  width: 240px;
   font-family: inherit;
+  background: transparent;
+  color: var(--color-text);
 }
 
 .searchInput:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -1px;
+  outline: none;
+  box-shadow: none;
 }
 
 .searchButton {
+  flex: 0 0 auto;
+  margin: 0;
   padding: var(--space-sm) var(--space-md);
   background: var(--color-primary);
-  color: white;
+  color: var(--color-on-primary);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   font-size: var(--font-size-sm);
   font-weight: 500;
+  white-space: nowrap;
+  transition: background-color var(--transition);
 }
 
 .searchButton:hover {
@@ -1005,8 +1026,6 @@
   }
 
   .searchInput {
-    width: 100%;
-    min-width: 0;
     /* ≥16px — prevent iOS focus zoom (see global.css). */
     font-size: 16px;
   }

@@ -211,46 +211,61 @@
   margin-left: auto;
 }
 
-.searchFormDesktop {
+.searchFormDesktop,
+.searchFormMobile {
   display: flex;
-  align-items: center;
-  gap: var(--space-xs);
+  align-items: stretch;
+  gap: 0;
   flex-shrink: 0;
-}
-
-.searchInput {
-  padding: 10px 16px;
+  max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
-  width: 200px;
-  max-width: 100%;
-  font-family: inherit;
   background: var(--glass-bg-strong);
-  color: var(--color-text);
+  overflow: hidden;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.searchInput:focus {
+.searchFormDesktop:focus-within,
+.searchFormMobile:focus-within {
   border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
   box-shadow: 0 0 0 3px var(--color-brand-soft);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 200px;
+  max-width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 0;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.searchInput:focus {
   outline: none;
+  box-shadow: none;
 }
 
 .searchButton {
+  flex: 0 0 auto;
+  margin: 0;
   padding: 10px 16px;
   background: var(--color-inverse);
   color: var(--color-on-inverse);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   font-size: var(--font-size-sm);
   font-weight: 600;
-  transition: background-color var(--transition), transform var(--transition-fast);
+  white-space: nowrap;
+  transition: background-color var(--transition);
 }
 
 .searchButton:hover {
   background: var(--color-inverse-hover);
-  transform: translateY(-1px);
 }
 
 .ctaButton {
@@ -579,27 +594,19 @@
   }
 
   .searchFormMobile {
-    display: flex;
-    gap: var(--space-xs);
+    width: 100%;
     margin-bottom: var(--space-lg);
-    align-items: stretch;
   }
 
   .searchFormMobile .searchInput {
-    flex: 1 1 auto;
     width: auto;
-    min-width: 0;
-    max-width: calc(100% - 6.75rem);
     /* ≥16px — prevent iOS focus zoom (see global.css). */
     font-size: 16px;
   }
 
   .searchFormMobile .searchButton {
-    flex: 0 0 auto;
-    min-width: 6.25rem;
     padding-left: 1.15rem;
     padding-right: 1.15rem;
-    white-space: nowrap;
   }
 
   .navMobile {
