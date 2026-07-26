@@ -307,6 +307,19 @@ def test_search_snippet_for_sku_uses_pdp_lead() -> None:
     assert len(snippet) >= 40
 
 
+def test_content_snippet_strips_html_markup() -> None:
+    """CMS bodies are HTML; search snippets must be plain text only."""
+    from search.views import _content_snippet
+
+    raw = '<h2>Как работает вентиляция</h2> <p class="dash-note">Цифры по метро — <strong>ориентиры</strong>.</p>'
+    snippet = _content_snippet(raw)
+    assert "<" not in snippet
+    assert ">" not in snippet
+    assert "Как работает вентиляция" in snippet
+    assert "ориентиры" in snippet
+    assert "dash-note" not in snippet
+
+
 @pytest.mark.django_db
 def test_search_sku_title_includes_edition_code(client) -> None:
     """Search lists each SKU with edition code, not only shared family name."""

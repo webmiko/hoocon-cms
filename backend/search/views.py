@@ -31,6 +31,7 @@ from rest_framework.views import APIView
 from catalog.facets.copy import extract_sku_lead, format_sku_heading_name
 from catalog.models import SKU
 from catalog.urls_paths import catalog_path_for_sku
+from content.etl.tilda_articles import strip_html_to_text
 from content.models import Article, News, Page
 from search.serializers import SearchResponseSerializer
 
@@ -69,8 +70,16 @@ def search_snippet_for_sku(sku: SKU) -> str:
 
 
 def _content_snippet(body: str, *, max_len: int = _SNIPPET_MAX_LEN) -> str:
-    """First plain sentence(s) from CMS body for search list (optional)."""
-    text = " ".join((body or "").replace("\xa0", " ").split()).strip()
+    """First plain sentence(s) from CMS HTML body for the search list.
+
+    Args:
+        body: Raw CMS HTML (article / news / page).
+        max_len: Soft max length; truncate on a word boundary.
+
+    Returns:
+        Plain text without tags, or empty string.
+    """
+    text = strip_html_to_text(body or "")
     if not text:
         return ""
     if len(text) <= max_len:

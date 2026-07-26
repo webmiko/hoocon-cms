@@ -2,10 +2,12 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { HighlightQuery } from "../components/HighlightQuery";
 import { Seo } from "../components/Seo";
 import { api, type SearchResultItem } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { softBreak } from "../utils/softBreak";
+import { stripHtmlToText } from "../utils/stripHtml";
 import styles from "./SearchPage.module.css";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -193,17 +195,29 @@ export function SearchPage() {
       {displayedResults.length > 0 && (
         <>
           <ul className={styles.list}>
-            {displayedResults.map((item) => (
+            {displayedResults.map((item) => {
+              const snippet = stripHtmlToText(item.snippet || "");
+              return (
               <li key={`${item.type}-${item.slug}`} className={styles.item}>
                 <Link to={item.url} className={styles.itemLink}>
                   <span className={`${styles.badge} ${styles[`badge_${item.type}`] ?? ""}`}>
                     {TYPE_LABEL[item.type] ?? item.type}
                   </span>
                   <span className={styles.itemMain}>
-                    <span className={styles.itemTitle}>{softBreak(item.title)}</span>
-                    {item.snippet ? (
+                    <span className={styles.itemTitle}>
+                      <HighlightQuery
+                        text={item.title}
+                        query={q}
+                        markClassName={styles.mark}
+                      />
+                    </span>
+                    {snippet ? (
                       <span className={styles.itemSnippet}>
-                        {softBreak(item.snippet)}
+                        <HighlightQuery
+                          text={snippet}
+                          query={q}
+                          markClassName={styles.mark}
+                        />
                       </span>
                     ) : null}
                   </span>
@@ -212,7 +226,8 @@ export function SearchPage() {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           <div className={styles.listFooter}>

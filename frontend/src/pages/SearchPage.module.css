@@ -166,6 +166,23 @@
   overflow: hidden;
 }
 
+/** Query hit — brand-tinted wash; keeps muted snippet readable. */
+.mark {
+  padding: 0 0.12em;
+  margin: 0 -0.02em;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-brand) 22%, #ffe566 78%);
+  color: inherit;
+  font-weight: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+:global(html[data-theme="dark"]) .mark {
+  background: color-mix(in srgb, var(--color-brand) 35%, #5a4a00 65%);
+  color: var(--color-text);
+}
+
 .itemUrl {
   flex-shrink: 1;
   min-width: 0;
