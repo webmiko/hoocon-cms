@@ -146,8 +146,45 @@ img {
 button {
   font-family: inherit;
   cursor: pointer;
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   transition: transform var(--transition-fast), background-color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+/*
+ * Brand / on-dark CTA links (often over hero media or sticky chrome).
+ * Semi-opaque fill + strong blur so underlying text/images stay quiet.
+ */
+a[data-brand-cta],
+a[data-on-dark-cta] {
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+}
+
+a[data-brand-cta] {
+  background-color: var(--color-brand-control);
+}
+
+a[data-brand-cta]:hover {
+  background-color: var(--color-brand-control-hover);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  button,
+  a[data-brand-cta],
+  a[data-on-dark-cta] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  a[data-brand-cta] {
+    background-color: var(--color-brand);
+  }
+
+  a[data-brand-cta]:hover {
+    background-color: var(--color-brand-hover);
+  }
 }
 
 button:active,

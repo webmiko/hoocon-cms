@@ -76,7 +76,7 @@
 .submitButton {
   padding: var(--space-md) var(--space-xl);
   min-height: 48px;
-  background: var(--color-brand);
+  background: var(--color-brand-control);
   color: var(--color-on-brand);
   border: none;
   border-radius: var(--radius-sm);
@@ -88,7 +88,7 @@
 }
 
 .submitButton:hover:not(:disabled) {
-  background: var(--color-brand-hover);
+  background: var(--color-brand-control-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-soft);
 }

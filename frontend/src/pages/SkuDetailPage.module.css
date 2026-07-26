@@ -168,7 +168,9 @@
   justify-content: center;
   padding: 10px 18px;
   border-radius: var(--radius);
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand);
   font-weight: 600;
   font-size: var(--font-size-sm);
@@ -650,7 +652,9 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand);
   border-radius: var(--radius);
   font-size: 12px;
@@ -720,7 +724,9 @@
 .link {
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--color-primary);
+  background: var(--color-primary-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: white;
   border-radius: var(--radius);
   text-decoration: none;

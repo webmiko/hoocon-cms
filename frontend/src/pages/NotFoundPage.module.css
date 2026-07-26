@@ -18,7 +18,9 @@
 .link {
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--color-primary);
+  background: var(--color-primary-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: white;
   border-radius: var(--radius);
   text-decoration: none;

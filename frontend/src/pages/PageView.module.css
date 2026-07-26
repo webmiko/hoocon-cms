@@ -126,7 +126,9 @@
   min-height: 2.75rem;
   padding: 0.65rem 1.15rem;
   border-radius: var(--radius);
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand) !important;
   font-weight: 700;
   font-size: 0.95rem;
@@ -135,7 +137,7 @@
 }
 
 .body :global(.cta-btn:hover) {
-  background: var(--color-brand-hover);
+  background: var(--color-brand-control-hover);
   color: var(--color-on-brand) !important;
 }
 
@@ -398,7 +400,9 @@
 .link {
   display: inline-block;
   padding: var(--space-sm) var(--space-lg);
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand);
   border-radius: var(--radius);
   text-decoration: none;

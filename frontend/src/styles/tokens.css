@@ -54,6 +54,27 @@
   --glass-blur: 18px;
   --glass-saturate: 1.2;
 
+  /*
+   * Controls (кнопки / CTA): сильный blur + слегка прозрачная заливка,
+   * чтобы текст/фото под кнопкой не конкурировали с подписью.
+   */
+  --control-blur: 32px;
+  --control-saturate: 1.35;
+  --color-brand-control: color-mix(in srgb, var(--color-brand) 86%, transparent);
+  --color-brand-control-hover: color-mix(
+    in srgb,
+    var(--color-brand-hover) 92%,
+    transparent
+  );
+  --color-inverse-control: color-mix(in srgb, var(--color-inverse) 88%, transparent);
+  --color-inverse-control-hover: color-mix(
+    in srgb,
+    var(--color-inverse-hover) 94%,
+    transparent
+  );
+  --color-primary-control: var(--color-brand-control);
+  --color-primary-control-hover: var(--color-brand-control-hover);
+
   /* Soft page wash */
   --gradient-page:
     radial-gradient(ellipse 80% 55% at 8% -5%, color-mix(in srgb, var(--color-brand) 7%, transparent), transparent 52%),

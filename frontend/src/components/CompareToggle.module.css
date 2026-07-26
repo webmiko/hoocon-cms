@@ -90,7 +90,9 @@
 
 .button {
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-text);
 }
 

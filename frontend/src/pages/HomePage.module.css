@@ -242,14 +242,16 @@
 }
 
 .ctaPrimary {
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand);
   border: 1px solid transparent;
   box-shadow: 0 8px 28px color-mix(in srgb, var(--color-brand) 28%, transparent);
 }
 
 .ctaPrimary:hover {
-  background: var(--color-brand-hover);
+  background: var(--color-brand-control-hover);
   color: var(--color-on-brand);
   text-decoration: none;
   transform: translateY(-2px);
@@ -257,9 +259,9 @@
 }
 
 .ctaSecondary {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
@@ -744,7 +746,9 @@
   min-height: 48px;
   padding: 12px 22px;
   border-radius: var(--radius-sm);
-  background: var(--color-brand);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   color: var(--color-on-brand);
   font-weight: 700;
   text-decoration: none;
