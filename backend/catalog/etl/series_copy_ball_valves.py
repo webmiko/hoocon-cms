@@ -32,6 +32,11 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_VALVE,
 )
 from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.ball_valve_medium import (
+    WORKING_MEDIUM_ATTR,
+    WORKING_MEDIUM_BULLET,
+    WORKING_MEDIUM_INLINE,
+)
 from catalog.etl.h81_kits import (
     FLANGED_STD_BODY_ROWS,
     H81KitSeries,
@@ -62,9 +67,6 @@ from catalog.etl.h8205_lav import (
 )
 from catalog.etl.h8205_lav import (
     MATERIAL_STEM as LAV_MATERIAL_STEM,
-)
-from catalog.etl.h8205_lav import (
-    MEDIUM as LAV_MEDIUM,
 )
 from catalog.etl.h8205_lav import (
     MEDIUM_TEMP as LAV_MEDIUM_TEMP,
@@ -539,8 +541,7 @@ def _series_description(series: BallValveSeries) -> str:
 отопления, вентиляции и кондиционирования (HVAC).
 
 Назначение и особенности:
-– Рабочая среда (по умолчанию): холодная и горячая вода;
-  по спецзаказу — с содержанием этиленгликоля не более 50 %.
+{WORKING_MEDIUM_BULLET}
 – Рабочая температура среды: –9…+95 °C.
 – {join_label}: {series.thread}.
 – Материал корпуса: {series.material}.
@@ -569,12 +570,7 @@ def _sku_description(series: BallValveSeries, kvs: str) -> str:
             "и кондиционирования (HVAC)."
         ),
         f"Пропускная способность: Kvs {kvs} м³/ч.",
-        (
-            "Рабочая среда — холодная и горячая вода "
-            "(этиленгликоль ≤ 50 % по спецзаказу); "
-            f"температура среды –9…+95 °C; "
-            f"{join_label} {series.thread}."
-        ),
+        (f"{WORKING_MEDIUM_INLINE}; температура среды –9…+95 °C; {join_label} {series.thread}."),
         "",
         "Область применения:",
         "– Системы обработки воздуха.",
@@ -607,7 +603,7 @@ def _shared_attrs(series: BallValveSeries) -> tuple[AttrRow, ...]:
             "Рабочая среда",
             "medium",
             "",
-            "холодная и горячая вода (этиленгликоль ≤ 50 % по спецзаказу)",
+            WORKING_MEDIUM_ATTR,
             ATTR_GROUP_OPERATING,
         ),
         (
@@ -711,7 +707,7 @@ def _kit_body_attrs(kit: H81KitSeries) -> tuple[AttrRow, ...]:
             "Рабочая среда",
             "medium",
             "",
-            "холодная и горячая вода (этиленгликоль ≤ 50 % по спецзаказу)",
+            WORKING_MEDIUM_ATTR,
             ATTR_GROUP_OPERATING,
         ),
         (
@@ -826,7 +822,7 @@ def _lav_series_description(series: H8205LavSeries) -> str:
 регулируя расход среды (температура, уровень, давление).
 
 Назначение и особенности:
-– Рабочая среда: {LAV_MEDIUM}.
+{WORKING_MEDIUM_BULLET}
 – Рабочая температура среды: {LAV_MEDIUM_TEMP}.
 – Номинальное давление: {LAV_PRESSURE}.
 – Соединение: {LAV_CONNECTION}.
@@ -882,7 +878,7 @@ def _lav_body_attrs(series: H8205LavSeries) -> tuple[AttrRow, ...]:
         ("Вид", "ways", "", series.ways, ATTR_GROUP_VALVE),
         ("Номинальное давление", "pressure-rating", "", LAV_PRESSURE, ATTR_GROUP_OPERATING),
         ("Соединение", "connection", "", LAV_CONNECTION, ATTR_GROUP_VALVE),
-        ("Рабочая среда", "medium", "", LAV_MEDIUM, ATTR_GROUP_OPERATING),
+        ("Рабочая среда", "medium", "", WORKING_MEDIUM_ATTR, ATTR_GROUP_OPERATING),
         ("Температура среды", "media-temp", "", LAV_MEDIUM_TEMP, ATTR_GROUP_OPERATING),
         ("Утечка", "leakage", "", LAV_LEAKAGE, ATTR_GROUP_HYDRAULIC),
         ("Расходная характеристика", "flow-characteristic", "", LAV_FLOW_CHAR, ATTR_GROUP_HYDRAULIC),
@@ -1293,8 +1289,7 @@ def _kit_series_description(kit: H81KitSeries) -> str:
 кондиционирования (HVAC). Комплект: корпус {kit.body} + электропривод.
 
 Назначение и особенности:
-– Рабочая среда (по умолчанию): холодная и горячая вода;
-  по спецзаказу — с содержанием этиленгликоля не более 50 %.
+{WORKING_MEDIUM_BULLET}
 – Рабочая температура среды: –9…+95 °C.
 – {join_label}: {kit.thread}.
 – Материал корпуса: {kit.material}.
@@ -1330,12 +1325,7 @@ def _kit_sku_description(kit: H81KitSeries, sku_code: str) -> str:
             "отопления, вентиляции и кондиционирования (HVAC)."
         ),
         f"Пропускная способность: Kvs {kit.kvs} м³/ч.",
-        (
-            "Рабочая среда — холодная и горячая вода "
-            "(этиленгликоль ≤ 50 % по спецзаказу); "
-            f"температура среды –9…+95 °C; "
-            f"{join_word} {kit.thread}."
-        ),
+        (f"{WORKING_MEDIUM_INLINE}; температура среды –9…+95 °C; {join_word} {kit.thread}."),
         f"Номинальное напряжение: {volt} В.",
         f"Управление: {control_label} ({aux_label}).",
         f"Время срабатывания: {kit.run_time}.",
@@ -1410,8 +1400,7 @@ def _kit_family_description(kit: H81KitSeries) -> str:
 {kind}) — заводские комплекты корпус + электропривод для систем HVAC.
 
 Назначение и особенности:
-– Рабочая среда (по умолчанию): холодная и горячая вода;
-  по спецзаказу — с содержанием этиленгликоля не более 50 %.
+{WORKING_MEDIUM_BULLET}
 – Рабочая температура среды: –9…+95 °C.
 – Материал корпуса: {kit.material}.
 – Время срабатывания: {kit.run_time} (зависит от DN у части серий).

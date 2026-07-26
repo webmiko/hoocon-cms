@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from catalog.etl.ball_valve_medium import WORKING_MEDIUM_ATTR
+
 LAV_VOLTAGES: tuple[str, ...] = ("24", "230")
 LAV_CONTROLS: tuple[str, ...] = ("A", "D", "M")
 LAV_OPTION_SUFFIXES: tuple[str, ...] = ("", "S", "T", "ST")
@@ -491,7 +493,7 @@ MATERIAL_SEAL = "EPDM"
 CONNECTION = "Фланцевое (GB/T17241.6)"
 PRESSURE_RATING = "PN16, PN25"
 MEDIUM_TEMP = "–20 … +150 °C"
-MEDIUM = "Вода, раствор этиленгликоля концентрацией менее 50%"
+MEDIUM = WORKING_MEDIUM_ATTR
 LEAKAGE = "0…0,02% от Kvs"
 FLOW_CHAR = "Равнопроцентная, линейная"
 

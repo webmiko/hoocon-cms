@@ -186,6 +186,26 @@ def test_label_to_slug_valve_fields() -> None:
     assert label_to_slug("Длина от центра до края крана") == "center-to-edge"
 
 
+def test_working_medium_canon_water_default_glycol_special_order() -> None:
+    """BV / H81 / H8205 share one medium: water default, glycol on order."""
+    from catalog.etl.ball_valve_medium import (
+        WORKING_MEDIUM_ATTR,
+        WORKING_MEDIUM_BULLET,
+        WORKING_MEDIUM_INLINE,
+    )
+    from catalog.etl.h8205_lav import MEDIUM as LAV_MEDIUM
+
+    assert LAV_MEDIUM == WORKING_MEDIUM_ATTR
+    assert "холодная и горячая вода" in WORKING_MEDIUM_ATTR
+    assert "по спецзаказу" in WORKING_MEDIUM_ATTR
+    assert "раствор этиленгликоля" in WORKING_MEDIUM_ATTR
+    assert "по умолчанию" in WORKING_MEDIUM_BULLET
+    assert "по специальному заказу" in WORKING_MEDIUM_BULLET
+    assert WORKING_MEDIUM_INLINE.startswith("Рабочая среда —")
+    # Must not list glycol as an equal default (old H8205 wording).
+    assert not WORKING_MEDIUM_ATTR.startswith("Вода, раствор")
+
+
 @pytest.mark.django_db
 @requires_store_csv
 def test_apply_bv220_enrichment_cards_and_gallery() -> None:
