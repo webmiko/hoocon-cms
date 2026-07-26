@@ -14,6 +14,11 @@
   min-width: 0;
 }
 
+.contentPrimary {
+  container-type: inline-size;
+  container-name: pdp-main;
+}
+
 .contentAside {
   display: flex;
   flex-direction: column;
@@ -610,6 +615,13 @@
   hyphens: none;
 }
 
+/* В узких ТТХ-карточках nowrap-фрагменты не должны раздувать колонку. */
+.specCard :global(.u-nowrap) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .specUnit {
   font-weight: 500;
   color: var(--color-text-muted);
@@ -839,23 +851,23 @@
   }
 }
 
-/* Планшет+: 2 колонки карточек внутри категории. */
-@media (min-width: 641px) {
+/* ТТХ: колонки от ширины primary (с боковой КП primary уже), не viewport. */
+@container pdp-main (min-width: 420px) {
   .specCards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* Полная ширина контента (без боковой КП): до 3 карточек. */
-@media (min-width: 1024px) and (max-width: 1199px) {
+/* 3 колонки только когда primary на всю ширину (КП снизу, <1200px). */
+@container pdp-main (min-width: 900px) {
   .specCards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Широкий экран: форма справа — уже primary, только 2 колонки ТТХ. */
+/* С боковой формой: primary < ~900px → максимум 2 колонки (см. container выше). */
 @media (min-width: 1200px) {
-  .specCards {
+  .contentGrid:has(.contentAside) .specCards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
