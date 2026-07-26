@@ -59,7 +59,8 @@ alwaysApply: true
 ✅ Fixed select_related on find_samu/find_hvdf manual PDF lookup.
 ✅ Added DAMU manuals wiring/dimensions ETL.
 ✅ Added /zavod OEM landing page and fixture.
-✅ Bumped release to v0.0.7 beta.
+✅ Bumped release to v0.1.0 beta.
+✅ Bumped release to v1.2.
 
 ❌ Added DAMU/HVDF/control gallery, BrandLogo, /zavod, and v0.0.7.
 ❌ Added factory page and also fixed N+1 in manual_diagrams.

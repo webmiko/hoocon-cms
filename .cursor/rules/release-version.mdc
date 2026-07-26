@@ -1,5 +1,5 @@
 ---
-description: Нумерация релизов Admin/фронт при фичах (0.0.x beta → 1.0.0)
+description: Нумерация релизов Admin/фронт (beta → vMAJOR.MINOR после GA)
 alwaysApply: true
 ---
 
@@ -10,17 +10,24 @@ alwaysApply: true
 
 ## Когда поднимать
 
-1. **Новая фича** (Admin или публичный фронт) → PATCH `0.0.N` → `0.0.N+1`
-   (диапазон beta `0.0.1`…`0.0.9`). Отображение: `v0.0.N beta`.
+1. **Новая фича** (Admin или публичный фронт) → поднять версию по эпохе:
+   - **beta** (`RELEASE_CHANNEL = "beta"`): три числа, сейчас `0.1.x`
+     → `v0.1.N beta`;
+   - **после GA**: два числа `MAJOR.MINOR` → отображение `v1.0`, `v1.1`, …
+     Автоматически только **MINOR** (`+1`, диапазон **0…99**).
 2. **Косметика / docs / только тесты** → версию не трогать.
-3. **Глобальное обновление (GA)** → `1.0.0`, канал пустой (`""`).
+3. **GA** → только по явной команде: `RELEASE_VERSION = "1.0"`,
+   `RELEASE_CHANNEL = ""`, UI `v1.0`.
+4. **MAJOR** после GA → **только по явной команде** («подними major»,
+   «v2», …). При MINOR = 99 без команды MAJOR — спросить, не угадывать.
 
 ## Что синхронизировать в одном коммите с бампом
 
 - `backend/config/release.py` (`RELEASE_VERSION`, `RELEASE_CHANNEL`)
 - `backend/pyproject.toml` → `[project].version`
-- `frontend/package.json` → `version`
-- `frontend/src/release.ts` (те же константы)
+  (после GA: `{MAJOR}.{MINOR}.0`)
+- `frontend/package.json` → `version` (то же)
+- `frontend/src/release.ts` (те же константы, что в `release.py`)
 - Строка в changelog [docs/releases.md](docs/releases.md)
 
 Перед коммитом — `./scripts/pre-commit-checkup.sh`. Не версионировать

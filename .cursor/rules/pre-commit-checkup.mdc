@@ -140,7 +140,8 @@ alwaysApply: true
 - [ ] **Покрытие:** целевой порог **≥ 90%** на apps каталога/leads — включить
       `--cov-fail-under=90` в `backend/pyproject.toml` после появления тестов;
       красный coverage — **не деплоить**.
-- [ ] **SemVer** — [docs/releases.md](docs/releases.md): фича → `0.0.N+1`
-      (beta до `0.0.9`); GA → `1.0.0`. Синхронно `config/release.py`,
+- [ ] **SemVer / релиз** — [docs/releases.md](docs/releases.md): фича →
+      bump по эпохе (beta `0.x.y`; после GA `MAJOR.MINOR`, MINOR 0–99;
+      MAJOR только по явной команде). Синхронно `config/release.py`,
       `pyproject.toml`, `frontend/package.json`, `frontend/src/release.ts`.
       Косметика/docs — не поднимать. **Не** версионировать под оплату.
