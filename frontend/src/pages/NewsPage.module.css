@@ -204,6 +204,17 @@
   min-width: 100%;
 }
 
+.body :global(.table-scroll:has(.series-table)) {
+  overflow-x: visible;
+  -webkit-overflow-scrolling: auto;
+}
+
+.body :global(.table-scroll table.series-table) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .body :global(th),
 .body :global(td) {
   border: 1px solid var(--color-border);
@@ -216,6 +227,12 @@
   background: var(--color-subtle);
   font-weight: 600;
   color: var(--color-text);
+}
+
+.body :global(.series-table th),
+.body :global(.series-table td) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .body :global(tr:nth-child(even) td) {

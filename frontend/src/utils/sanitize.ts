@@ -1,5 +1,7 @@
 import DOMPurify from "dompurify";
 
+import { wrapCmsTables } from "./wrapCmsTables";
+
 const ALLOWED_TAGS = [
   "p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li",
   "h1", "h2", "h3", "h4", "h5", "h6",
@@ -25,9 +27,10 @@ const ALLOWED_ATTR = [
 ];
 
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
+  const clean = DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
   });
+  return wrapCmsTables(clean);
 }

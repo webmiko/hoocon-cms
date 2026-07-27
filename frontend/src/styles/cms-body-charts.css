@@ -546,7 +546,7 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
 }
 
 /* Narrow viewports: series rows → dl-like cards (no horizontal scroll). */
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .cms-rich-body .table-scroll:has(.series-table--map),
   .cms-rich-body .table-scroll:has(.series-table--spec),
   .cms-rich-body .table-scroll:has(.series-table--mass) {
@@ -667,5 +667,164 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
   .cms-rich-body .series-table--spec td:nth-child(3),
   .cms-rich-body .series-table--map td:nth-child(4) {
     overflow-wrap: anywhere;
+  }
+}
+
+/* Application / matrix compare tables → cards on narrow screens. */
+@media (max-width: 720px) {
+  .cms-rich-body .table-scroll:has(.series-table--compare) {
+    overflow-x: visible;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  .cms-rich-body .table-scroll:has(.series-table--compare) table {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cms-rich-body .series-table--compare thead {
+    display: none;
+  }
+
+  .cms-rich-body .series-table--compare tbody,
+  .cms-rich-body .series-table--compare tr,
+  .cms-rich-body .series-table--compare td {
+    display: block;
+    width: 100%;
+  }
+
+  .cms-rich-body .series-table--compare tr {
+    margin: 0 0 0.65rem;
+    padding: 0.7rem 0.85rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface);
+  }
+
+  .cms-rich-body .series-table--compare tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .cms-rich-body .series-table--compare td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.25rem 0.65rem;
+    align-items: baseline;
+    border: none;
+    padding: 0.28rem 0;
+    background: transparent;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .cms-rich-body .series-table--compare tr:nth-child(even) td {
+    background: transparent;
+  }
+
+  .cms-rich-body .series-table--compare td:nth-child(1) {
+    display: block;
+    margin: 0 0 0.35rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid var(--color-border);
+    font-weight: 600;
+  }
+
+  .cms-rich-body .series-table--compare td::before {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .cms-rich-body .series-table--compare td:nth-child(1)::before {
+    content: none;
+    display: none;
+  }
+
+  .cms-rich-body .series-table--compare td:nth-child(2)::before {
+    content: "Стандартные";
+  }
+
+  .cms-rich-body .series-table--compare td:nth-child(3)::before {
+    content: "Противопожарные";
+  }
+
+  .cms-rich-body .series-table--compare td:nth-child(4)::before {
+    content: "Промышленные";
+  }
+}
+
+/* Company platforms matrix → cards on narrow screens. */
+@media (max-width: 720px) {
+  .cms-rich-body .table-scroll:has(.series-table--platforms) {
+    overflow-x: visible;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  .cms-rich-body .table-scroll:has(.series-table--platforms) table {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cms-rich-body .series-table--platforms thead {
+    display: none;
+  }
+
+  .cms-rich-body .series-table--platforms tbody,
+  .cms-rich-body .series-table--platforms tr,
+  .cms-rich-body .series-table--platforms td {
+    display: block;
+    width: 100%;
+  }
+
+  .cms-rich-body .series-table--platforms tr {
+    margin: 0 0 0.65rem;
+    padding: 0.7rem 0.85rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface);
+  }
+
+  .cms-rich-body .series-table--platforms tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .cms-rich-body .series-table--platforms td {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 0.25rem 0.65rem;
+    align-items: baseline;
+    border: none;
+    padding: 0.28rem 0;
+    background: transparent;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .cms-rich-body .series-table--platforms tr:nth-child(even) td {
+    background: transparent;
+  }
+
+  .cms-rich-body .series-table--platforms td::before {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .cms-rich-body .series-table--platforms td:nth-child(1)::before {
+    content: "Серия";
+  }
+
+  .cms-rich-body .series-table--platforms td:nth-child(2)::before {
+    content: "Задача";
+  }
+
+  .cms-rich-body .series-table--platforms td:nth-child(3)::before {
+    content: "Конструктив";
+  }
+
+  .cms-rich-body .series-table--platforms td:nth-child(4)::before {
+    content: "Коды";
   }
 }

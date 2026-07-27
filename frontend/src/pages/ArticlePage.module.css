@@ -272,7 +272,7 @@
   color: var(--color-text-muted);
 }
 
-/* Tables: real table layout; scroll via wrapper (not display:block on <table>). */
+/* Tables: real table layout; scroll via wrapper for wide non-series tables. */
 .body :global(.table-scroll) {
   display: block;
   width: 100%;
@@ -296,6 +296,18 @@
   min-width: 100%;
 }
 
+/* Series matrices: fit column, wrap cells — no sideways scroll. */
+.body :global(.table-scroll:has(.series-table)) {
+  overflow-x: visible;
+  -webkit-overflow-scrolling: auto;
+}
+
+.body :global(.table-scroll table.series-table) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .body :global(th),
 .body :global(td) {
   border: 1px solid var(--color-border);
@@ -309,6 +321,12 @@
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
+}
+
+.body :global(.series-table th),
+.body :global(.series-table td) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .body :global(tr:nth-child(even) td) {
@@ -467,7 +485,7 @@
 .body :global(.series-table th:first-child),
 .body :global(.series-table td:first-child) {
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .body :global(.hero-dek) {
