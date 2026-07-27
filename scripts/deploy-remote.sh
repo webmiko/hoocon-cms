@@ -82,7 +82,7 @@ test -f .env || { echo "ERROR: ${DEPLOY_PATH}/.env missing on server" >&2; exit 
 
 if [[ "${IMAGE_TRANSFER}" == "pull" ]]; then
   if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USER:-}" ]]; then
-    echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+    echo "${GHCR_TOKEN:-}" | docker login ghcr.io -u "${GHCR_USER:-}" --password-stdin
   fi
 fi
 
