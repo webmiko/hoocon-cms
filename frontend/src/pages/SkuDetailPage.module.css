@@ -359,6 +359,10 @@
 
 .tabs {
   margin-bottom: var(--space-xl);
+  /* Keep section title/tabs under sticky chrome after tab switch scroll. */
+  scroll-margin-top: calc(
+    var(--masthead-height) + var(--header-height) + var(--space-sm)
+  );
 }
 
 .tabList {
@@ -376,6 +380,12 @@
 }
 
 @media (max-width: 768px) {
+  .tabs {
+    scroll-margin-top: calc(
+      var(--header-height) + env(safe-area-inset-top, 0px) + var(--space-sm)
+    );
+  }
+
   .tabList {
     top: var(--header-height);
   }

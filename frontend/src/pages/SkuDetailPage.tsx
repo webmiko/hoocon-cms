@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 
 import {
@@ -169,6 +169,25 @@ export function SkuDetailPage() {
   );
   const [tab, setTab] = useState<TabId>("description");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  /** Scroll tabs into view after user switches section (mobile long panels). */
+  const scrollTabsAfterChange = useRef(false);
+
+  useEffect(() => {
+    if (!scrollTabsAfterChange.current) return;
+    scrollTabsAfterChange.current = false;
+    tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [tab]);
+
+  const selectTab = (next: TabId) => {
+    scrollTabsAfterChange.current = true;
+    if (next === tab) {
+      scrollTabsAfterChange.current = false;
+      tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    setTab(next);
+  };
 
   const activeSibling = useMemo(() => {
     if (!sku?.siblings?.length || !slug) return null;
@@ -541,7 +560,7 @@ export function SkuDetailPage() {
           {...protectedContentHandlers}
         >
           {visibleTabs.length > 0 ? (
-            <div className={styles.tabs}>
+            <div className={styles.tabs} ref={tabsRef}>
               <div className={styles.tabList} role="tablist" aria-label="Разделы">
                 {visibleTabs.map((item) => (
                   <button
@@ -552,7 +571,7 @@ export function SkuDetailPage() {
                     className={
                       activeTab === item.id ? styles.tabActive : styles.tab
                     }
-                    onClick={() => setTab(item.id)}
+                    onClick={() => selectTab(item.id)}
                   >
                     {item.label}
                   </button>
