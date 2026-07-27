@@ -71,7 +71,7 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
       - run: poetry install --with dev
       - run: poetry run python manage.py migrate --noinput
-      - run: poetry run pytest -q
+      - run: poetry run pytest -q --cov --cov-fail-under=90
 
   lint:
     name: lint (ruff + mypy + pip-audit + npm)

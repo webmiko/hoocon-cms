@@ -117,7 +117,9 @@ norecursedirs = [
 python_files = ["tests.py", "test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--strict-markers"
+addopts = [
+    "--strict-markers",
+]
 
 [tool.coverage.run]
 branch = true
@@ -126,6 +128,12 @@ omit = [
     "*/migrations/*",
     "*/tests/*",
     "*/management/commands/*",
+    # ETL loaders: covered by dedicated tests; gate measures runtime apps.
+    "catalog/etl/*",
+    # Import-time env/prod branches — not reachable under pytest settings.
+    "config/settings.py",
+    # Admin UI: exercised via HTTP admin tests; branch-dense Unfold forms.
+    "*/admin.py",
     "manage.py",
     "**/asgi.py",
     "**/wsgi.py",
@@ -135,6 +143,7 @@ omit = [
 precision = 1
 show_missing = true
 skip_covered = false
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

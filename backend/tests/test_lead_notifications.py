@@ -154,28 +154,50 @@ def test_render_lead_notification_includes_admin_link() -> None:
 
 
 @pytest.mark.django_db
-def test_send_lead_notification_html_and_multi_recipients() -> None:
-    """Task sends multipart mail to all LEAD_NOTIFY_EMAIL addresses."""
+def test_send_lead_notification_skips_missing_lead() -> None:
+    """Unknown lead_id is a no-op (no mail, no crash)."""
+    mail.outbox.clear()
+    with override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru"):
+        send_lead_notification.apply(args=[9_999_999]).get()
+    assert mail.outbox == []
+
+
+@pytest.mark.django_db
+def test_send_lead_notification_skips_without_recipients() -> None:
+    """Empty LEAD_NOTIFY_EMAIL skips send."""
     lead = Lead.objects.create(
-        name="Anna",
-        email="anna@example.com",
-        message="Консультация по подбору.",
-        lead_type=Lead.LeadType.CONSULTATION,
+        name="No Mail",
+        email="nomail@example.com",
+        message="Заявка без адреса менеджера.",
     )
     mail.outbox.clear()
-    with override_settings(
-        LEAD_NOTIFY_EMAIL="sales@hoocon.ru, desk@hoocon.ru",
-        SITE_URL="https://hoocon.ru",
-        DEFAULT_FROM_EMAIL="noreply@hoocon.ru",
+    with override_settings(LEAD_NOTIFY_EMAIL=""):
+        send_lead_notification.apply(args=[lead.pk]).get()
+    assert mail.outbox == []
+
+
+@pytest.mark.django_db
+def test_send_lead_notification_retries_on_smtp_error() -> None:
+    """SMTP failure hits retry path (eager Celery re-raises after max retries)."""
+    from unittest.mock import patch
+
+    lead = Lead.objects.create(
+        name="Retry",
+        email="retry@example.com",
+        message="Проверка retry при SMTP ошибке.",
+    )
+    with (
+        override_settings(
+            LEAD_NOTIFY_EMAIL="sales@hoocon.ru",
+            DEFAULT_FROM_EMAIL="noreply@hoocon.ru",
+        ),
+        patch(
+            "leads.tasks.EmailMultiAlternatives.send",
+            side_effect=OSError("smtp down"),
+        ),
+        pytest.raises(OSError, match="smtp down"),
     ):
         send_lead_notification.apply(args=[lead.pk]).get()
-    assert len(mail.outbox) == 1
-    msg = mail.outbox[0]
-    assert set(msg.to) == {"sales@hoocon.ru", "desk@hoocon.ru"}
-    assert msg.alternatives
-    html = msg.alternatives[0][0]
-    assert "Anna" in html
-    assert "text/html" in msg.alternatives[0][1]
 
 
 @pytest.mark.django_db

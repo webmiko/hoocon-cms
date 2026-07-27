@@ -58,18 +58,19 @@ else
   fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content manage.py)"
 fi
 
-# ── 4. pytest (exit 5 = нет тестов — допустимо на каркасе) ───
+# ── 4. pytest + coverage ≥ 90% (exit 5 = нет тестов — допустимо на каркасе) ───
 set +e
-(cd "$BACKEND" && poetry run pytest -q)
+(cd "$BACKEND" && poetry run pytest -q \
+  --cov --cov-report=term-missing:skip-covered --cov-fail-under=90)
 PYTEST_CODE=$?
 set -e
 if [ "$PYTEST_CODE" -eq 0 ]; then
-  ok "pytest — тесты прошли"
+  ok "pytest — тесты прошли (coverage ≥ 90%)"
 elif [ "$PYTEST_CODE" -eq 5 ]; then
   warn "pytest — тестов пока нет (exit 5); после catalog — обязательны"
   ok "pytest — каркас без тестов принят"
 else
-  fail "pytest — ошибки (cd backend && poetry run pytest -q)"
+  fail "pytest — ошибки или coverage < 90% (cd backend && poetry run pytest -q --cov --cov-fail-under=90)"
 fi
 
 # ── 5. pip-audit ─────────────────────────────────────────────
