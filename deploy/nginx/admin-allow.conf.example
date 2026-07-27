@@ -1,0 +1,16 @@
+# IP allowlist for Django Admin (/admin/).
+# Spec: docs/security-baseline.md §3.5; ПЛАН Iter 5.
+#
+# Deploy:
+#   1. Copy to the host: /etc/nginx/admin-allow.conf
+#   2. Replace PLACEHOLDER with your office / VPN egress IP(s).
+#   3. Uncomment `include /etc/nginx/admin-allow.conf;` in
+#      deploy/nginx/hoocon.conf → location /admin/.
+#   4. nginx -t && systemctl reload nginx
+#
+# Until cutover, leave the include commented so Admin stays reachable
+# from the VPS public IP for ops.
+
+# allow 203.0.113.10;   # PLACEHOLDER — your office / VPN IP
+# allow 198.51.100.20;  # optional second IP
+deny all;

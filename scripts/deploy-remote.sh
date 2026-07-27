@@ -69,6 +69,14 @@ if [[ -d deploy/nginx ]]; then
       "cp -a /etc/nginx/sites-available/hoocon \
          /etc/nginx/sites-available/hoocon.bak.\$(date +%Y%m%d%H%M%S) 2>/dev/null || true; \
        cp '${DEPLOY_PATH}/deploy/nginx/hoocon.conf' /etc/nginx/sites-available/hoocon; \
+       if [[ -f '${DEPLOY_PATH}/deploy/nginx/redirects.map' ]]; then \
+         cp '${DEPLOY_PATH}/deploy/nginx/redirects.map' /etc/nginx/redirects.map; \
+       fi; \
+       if [[ -f '${DEPLOY_PATH}/deploy/nginx/admin-allow.conf.example' \
+             && ! -f /etc/nginx/admin-allow.conf ]]; then \
+         cp '${DEPLOY_PATH}/deploy/nginx/admin-allow.conf.example' \
+           /etc/nginx/admin-allow.conf.example; \
+       fi; \
        ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
        nginx -t && systemctl reload nginx && echo 'nginx reloaded'"
   fi
