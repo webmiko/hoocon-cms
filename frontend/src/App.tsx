@@ -70,6 +70,7 @@ function SkuLegacyRedirect() {
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug!),
     slug,
+    slug ? `catalog:sku:${slug}` : undefined,
   );
 
   if (!slug) {

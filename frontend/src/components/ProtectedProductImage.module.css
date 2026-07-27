@@ -1,16 +1,91 @@
-/* Soft reveal — avoids a hard pop when blob URL replaces the placeholder. */
+/* Soft reveal + shimmer while blob/session bytes resolve. */
+
+.frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  line-height: 0;
+  overflow: hidden;
+}
+
+/* Reserve space without letting the 1×1 GIF force a square aspect jump. */
+.frame[data-ready="false"] {
+  min-height: 10rem;
+  align-self: stretch;
+}
+
+.shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--color-placeholder, #e8eaef) 88%, transparent) 0%,
+    color-mix(in srgb, var(--color-placeholder, #e8eaef) 55%, #fff) 45%,
+    color-mix(in srgb, var(--color-placeholder, #e8eaef) 88%, transparent) 90%
+  );
+  background-size: 200% 100%;
+  animation: mediaShimmer 1.1s ease-in-out infinite;
+}
+
 .media {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
   opacity: 0;
-  transition: opacity 200ms var(--ease-out, ease-out);
+  transition: opacity 280ms var(--ease-out, ease-out);
+}
+
+.frame[data-ready="false"] .media {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .mediaReady {
   opacity: 1;
 }
 
+@keyframes mediaShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background: var(--color-placeholder, #e8eaef);
+  }
+
   .media {
     opacity: 1;
     transition: none;
   }
+
+  .frame[data-ready="false"] .media {
+    clip: auto;
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+}
+
+:global([data-theme="dark"]) .shimmer {
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--color-placeholder, #2a2a32) 90%, transparent) 0%,
+    color-mix(in srgb, var(--color-placeholder, #2a2a32) 50%, #3a3a44) 45%,
+    color-mix(in srgb, var(--color-placeholder, #2a2a32) 90%, transparent) 90%
+  );
+  background-size: 200% 100%;
 }

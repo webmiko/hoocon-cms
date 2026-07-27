@@ -22,12 +22,15 @@ type ProtectedProductImageProps = Omit<
   src: string;
 };
 
+function initialAllowFetch(src: string, loading: string | undefined): boolean {
+  return loading !== "lazy" || Boolean(peekProtectedMediaSrc(src));
+}
+
 /**
  * Product photo via session ``blob:`` URL so Inspect does not show ``/media/...``.
  *
- * Keeps contentProtection drag/context-menu guards. ``loading="lazy"`` defers the
- * fetch until near the viewport. Remounts reuse the session blob cache without a
- * transparent flash; first paint fades in when the display URL is ready.
+ * Shows a soft shimmer while bytes resolve, then fades the photo in. Remounts
+ * reuse the session blob cache without a blank flash.
  */
 export function ProtectedProductImage({
   src,
@@ -38,9 +41,21 @@ export function ProtectedProductImage({
   ...rest
 }: ProtectedProductImageProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const [allowFetch, setAllowFetch] = useState(
-    () => loading !== "lazy" || Boolean(peekProtectedMediaSrc(src)),
+  const [trackedSrc, setTrackedSrc] = useState(src);
+  const [allowFetch, setAllowFetch] = useState(() =>
+    initialAllowFetch(src, loading),
   );
+  const [revealed, setRevealed] = useState(() =>
+    Boolean(peekProtectedMediaSrc(src)),
+  );
+
+  // Reset reveal/fetch gates when the media path changes (render-time adjust).
+  if (src !== trackedSrc) {
+    setTrackedSrc(src);
+    setAllowFetch(initialAllowFetch(src, loading));
+    setRevealed(Boolean(peekProtectedMediaSrc(src)));
+  }
+
   const displaySrc = useProtectedMediaSrc(allowFetch ? src : null);
 
   useEffect(() => {
@@ -63,27 +78,38 @@ export function ProtectedProductImage({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [allowFetch, loading]);
+  }, [allowFetch, loading, src]);
 
+  const showShimmer = !revealed;
   const mediaClass = [
-    className,
     styles.media,
-    displaySrc ? styles.mediaReady : null,
+    revealed ? styles.mediaReady : null,
+    className,
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <img
-      ref={imgRef}
-      src={displaySrc ?? PLACEHOLDER_SRC}
-      alt={alt}
-      className={mediaClass}
-      loading={loading}
-      decoding="async"
-      {...protectedMediaImgProps}
-      {...rest}
-      onLoad={onLoad}
-    />
+    <span className={styles.frame} data-ready={revealed ? "true" : "false"}>
+      {showShimmer ? (
+        <span className={styles.shimmer} aria-hidden="true" />
+      ) : null}
+      <img
+        ref={imgRef}
+        src={displaySrc ?? PLACEHOLDER_SRC}
+        alt={alt}
+        className={mediaClass}
+        loading={loading}
+        decoding="async"
+        {...protectedMediaImgProps}
+        {...rest}
+        onLoad={(event) => {
+          if (displaySrc) {
+            setRevealed(true);
+          }
+          onLoad?.(event);
+        }}
+      />
+    </span>
   );
 }

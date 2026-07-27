@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useReducer } from "react";
 
+import { peekAsyncCache, setAsyncCache } from "../utils/asyncDataCache";
+
 /** Primitive key that triggers a refetch when it changes (Object.is). */
 export type AsyncRefreshKey = string | number | boolean | null | undefined;
 
@@ -11,6 +13,8 @@ export type AsyncRefreshKey = string | number | boolean | null | undefined;
  * Args:
  *   asyncFn: function returning a Promise<T> (latest via useEffectEvent).
  *   refreshKey: change to re-fetch (compose multi-deps with a string).
+ *   cacheKey: optional session cache key — remounts reuse last success so
+ *     catalog/PDP do not flash an empty skeleton on back-navigation.
  *
  * Returns:
  *   { data, loading, error } — standard async state.
@@ -18,6 +22,7 @@ export type AsyncRefreshKey = string | number | boolean | null | undefined;
 export function useAsync<T>(
   asyncFn: () => Promise<T>,
   refreshKey: AsyncRefreshKey = 0,
+  cacheKey?: string,
 ): {
   data: T | undefined;
   loading: boolean;
@@ -40,17 +45,33 @@ export function useAsync<T>(
           return { data: prev.data, loading: false, error: action.error };
       }
     },
-    { data: undefined, loading: true, error: undefined },
+    undefined,
+    () => {
+      const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
+      return {
+        data: cached,
+        loading: cached === undefined,
+        error: undefined,
+      };
+    },
   );
 
   const load = useEffectEvent(asyncFn);
 
   useEffect(() => {
     let cancelled = false;
-    dispatch({ type: "loading" });
+    const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
+    // Keep painted data on remount; only show loading when nothing to show.
+    if (cached === undefined) {
+      dispatch({ type: "loading" });
+    }
     void load()
       .then((result) => {
-        if (!cancelled) dispatch({ type: "success", data: result });
+        if (cancelled) return;
+        if (cacheKey) {
+          setAsyncCache(cacheKey, result);
+        }
+        dispatch({ type: "success", data: result });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -63,7 +84,7 @@ export function useAsync<T>(
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, cacheKey]);
 
   return state;
 }

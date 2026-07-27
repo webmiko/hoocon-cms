@@ -107,10 +107,15 @@ export function CatalogPage() {
     if (value) activeFacets[key] = value;
   }
 
-  const { data: categoriesData } = useAsync(() => api.categories());
+  const { data: categoriesData } = useAsync(
+    () => api.categories(),
+    0,
+    "catalog:categories",
+  );
   const { data: facetsData } = useAsync(
     () => api.facets(category ? { category } : undefined),
     category,
+    `catalog:facets:${category || "all"}`,
   );
 
   const params: Record<string, string> = {};
@@ -127,6 +132,7 @@ export function CatalogPage() {
   const { data: skusData, loading, error } = useAsync(
     () => api.skus(params),
     listKey,
+    `catalog:skus:${listKey}`,
   );
 
   const categories: Category[] = categoriesData?.results ?? [];

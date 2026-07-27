@@ -166,6 +166,7 @@ export function SkuDetailPage() {
   const { data: sku, loading, error } = useAsync(
     () => api.skuDetail(slug),
     slug,
+    slug ? `catalog:sku:${slug}` : undefined,
   );
   const [tab, setTab] = useState<TabId>("description");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
