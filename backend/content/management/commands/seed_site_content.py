@@ -471,32 +471,36 @@ Email отдела продаж: <a href="mailto:{_EMAIL_SALES}">{_EMAIL_SALES}<
 _FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures"
 
 ARTICLE_EXCERPTS: dict[str, str] = {
+    "hoocon-kompaniya-i-produktsiya": (
+        "Технический обзор DA / SA / HV: fail-safe, BLDC, момент 5–20 Нм, "
+        "сигналы управления. Завод и OEM — на странице /zavod."
+    ),
     "ispolnitelnoe-oborudovanie-ovk": (
         "Какое исполнительное оборудование нужно для ОВК: электроприводы и "
         "шаровые краны Hoocon с CE, UL, EAC — для вентиляции, дымоудаления и "
         "отопления."
     ),
-    "2zbgj89cp1-primenenie-privodov-v-sistemah-ventilyat": (
+    "primenenie-privodov-v-sistemah-ventilyatsii": (
         "Где ставят электроприводы в вентиляции: расчёт момента, требования "
         "к промышленным, противопожарным и энергоэффективным системам."
     ),
-    "85zdfbzso1-protivopozharnie-vs-vzrivozaschischennie": (
+    "protivopozharnye-vs-vzryvozashchishchennye-privody": (
         "Чем отличаются противопожарные и взрывозащищённые приводы ОВК: "
         "когда нужен каждый тип и на что смотреть в спецификации."
     ),
     "spetsifikatsiya-modelnogo-ryada-privodov": (
         "Спецификация модельного ряда приводов вентиляции Hoocon: серии, моменты и типичные задачи подбора."
     ),
-    "j1en0umao1-sharovie-krani-vidi-konstruktsiya-primen": (
+    "sharovye-krany-vidy-konstruktsiya": (
         "Шаровые краны: виды, конструкция и комплектация с приводом — как выбрать узел под давление и среду."
     ),
-    "62uel9kue1-ventilyatsiya-v-metro": (
+    "ventilyatsiya-v-metro": (
         "Как устроена вентиляция московского метро и какую роль играют приводы клапанов в обновлении воздуха."
     ),
-    "vvme9fxcy1-ognezaderzhivayuschii-klapan-printsip-ra": (
+    "ognezaderzhivayushchii-klapan": (
         "Огнезадерживающий клапан: принцип работы и где применяют — роль электропривода в противопожарной вентиляции."
     ),
-    "gu8x3sz4e1-osobennosti-elektroprivodov-ventilyatsii": (
+    "protivopozharnye-vs-dymoudaleniya-privody": (
         "Противопожарные клапаны vs клапаны дымоудаления: какие приводы "
         "нужны и чем отличаются требования к управлению."
     ),
@@ -505,6 +509,16 @@ ARTICLE_EXCERPTS: dict[str, str] = {
 # Full body rewrite (replaces Tilda scrape). Excerpt still from ARTICLE_EXCERPTS.
 ARTICLE_BODIES: dict[str, Path] = {
     "spetsifikatsiya-modelnogo-ryada-privodov": (_FIXTURES_DIR / "article_spetsifikatsiya_modelnogo_ryada.html"),
+    "primenenie-privodov-v-sistemah-ventilyatsii": (_FIXTURES_DIR / "article_primenenie_privodov_ventilyatsii.html"),
+    "hoocon-kompaniya-i-produktsiya": (_FIXTURES_DIR / "article_hoocon_company_products.html"),
+    "ispolnitelnoe-oborudovanie-ovk": (_FIXTURES_DIR / "article_ispolnitelnoe_oborudovanie_ovk.html"),
+    "protivopozharnye-vs-vzryvozashchishchennye-privody": (
+        _FIXTURES_DIR / "article_protivopozharnye_vs_vzryvozashchishchennye.html"
+    ),
+    "protivopozharnye-vs-dymoudaleniya-privody": (_FIXTURES_DIR / "article_protivopozharnye_vs_dymoudaleniya.html"),
+    "ognezaderzhivayushchii-klapan": (_FIXTURES_DIR / "article_ognezaderzhivayushchii_klapan.html"),
+    "sharovye-krany-vidy-konstruktsiya": (_FIXTURES_DIR / "article_sharovye_krany.html"),
+    "ventilyatsiya-v-metro": (_FIXTURES_DIR / "article_ventilyatsiya_v_metro.html"),
 }
 
 _LEAD_MARKER = 'data-hoocon-lead="1"'

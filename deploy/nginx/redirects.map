@@ -1,11 +1,6 @@
 # Generated from Redirect seeds — typo slugs + Tilda /tproduct/.
 # Format: $uri $redirect_uri;
 
-/8100-bv2100 /catalog/komplekty/h8103-h8103-bv2100-24a;
-/8100-bv2125 /catalog/komplekty/h8103-h8103-bv2125-24a;
-/8100-bv2150 /catalog/komplekty/h8103-h8103-bv2150-24a;
-/8100-bv265 /catalog/komplekty/h8103-h8103-bv265-24a;
-/8100-bv280 /catalog/komplekty/h8103-h8103-bv280-24a;
 /catalog/elektroprivod-klapana-dymoudaleniya /catalog/elektroprivody-dlya-klapanov-dymoudaleniya;
 /catalog/elektroprivod-protivopozharnogo-klapana /catalog/elektroprivody-protivopozharnye-i-dymovye;
 /catalog/elektroprivod-vozdushniy-bez-vozvratnoy-pruzhiny /catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata;
@@ -4985,7 +4980,13 @@
 /sharovoy-kran-bv325 /catalog/sharovye-krany/sharovoy-kran-bv325;
 /sharovoy-kran-bv325-8100-bv325a /catalog/sharovye-krany/sharovoy-kran-bv325;
 /sharovoy-kran-bv325-8100-bv325b /catalog/sharovye-krany/sharovoy-kran-bv325;
+/statyi/2zbgj89cp1-primenenie-privodov-v-sistemah-ventilyat /statyi/primenenie-privodov-v-sistemah-ventilyatsii;
 /statyi/4uicugaoh1-spetsifikatsiya-modelnogo-ryada-privodov /statyi/spetsifikatsiya-modelnogo-ryada-privodov;
+/statyi/62uel9kue1-ventilyatsiya-v-metro /statyi/ventilyatsiya-v-metro;
+/statyi/85zdfbzso1-protivopozharnie-vs-vzrivozaschischennie /statyi/protivopozharnye-vs-vzryvozashchishchennye-privody;
+/statyi/gu8x3sz4e1-osobennosti-elektroprivodov-ventilyatsii /statyi/protivopozharnye-vs-dymoudaleniya-privody;
+/statyi/j1en0umao1-sharovie-krani-vidi-konstruktsiya-primen /statyi/sharovye-krany-vidy-konstruktsiya;
+/statyi/vvme9fxcy1-ognezaderzhivayuschii-klapan-printsip-ra /statyi/ognezaderzhivayushchii-klapan;
 /tproduct/269932116952-bv250-sharovoi-kran-2-hodovii-dn-50 /catalog/sharovye-krany/sharovoy-kran-bv250;
 /tproduct/402444508282-hvd-40q-40-nm-privod-vozdushnii-bez-vozv /catalog/elektroprivod-vozdushnoy-zaslonki/privod-vozdushniy-hvd-40q;
 /tproduct/437694431492-bv240-sharovoi-kran-2-hodovii-dn-40 /catalog/sharovye-krany/sharovoy-kran-bv240;

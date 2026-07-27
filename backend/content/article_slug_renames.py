@@ -12,6 +12,12 @@ from redirects.pathutils import normalize_path
 # old slug (Tilda / scrape) → canonical public slug
 ARTICLE_SLUG_RENAMES: dict[str, str] = {
     "4uicugaoh1-spetsifikatsiya-modelnogo-ryada-privodov": ("spetsifikatsiya-modelnogo-ryada-privodov"),
+    "2zbgj89cp1-primenenie-privodov-v-sistemah-ventilyat": ("primenenie-privodov-v-sistemah-ventilyatsii"),
+    "85zdfbzso1-protivopozharnie-vs-vzrivozaschischennie": ("protivopozharnye-vs-vzryvozashchishchennye-privody"),
+    "gu8x3sz4e1-osobennosti-elektroprivodov-ventilyatsii": ("protivopozharnye-vs-dymoudaleniya-privody"),
+    "vvme9fxcy1-ognezaderzhivayuschii-klapan-printsip-ra": ("ognezaderzhivayushchii-klapan"),
+    "j1en0umao1-sharovie-krani-vidi-konstruktsiya-primen": ("sharovye-krany-vidy-konstruktsiya"),
+    "62uel9kue1-ventilyatsiya-v-metro": ("ventilyatsiya-v-metro"),
 }
 
 

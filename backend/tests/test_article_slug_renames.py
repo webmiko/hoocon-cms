@@ -15,7 +15,8 @@ from redirects.models import Redirect
 @pytest.mark.django_db
 def test_apply_article_slug_renames_renames_and_redirects() -> None:
     """Old Tilda-prefixed slug becomes canonical; 301 maps /statyi paths."""
-    old_slug, new_slug = next(iter(ARTICLE_SLUG_RENAMES.items()))
+    old_slug = "4uicugaoh1-spetsifikatsiya-modelnogo-ryada-privodov"
+    new_slug = ARTICLE_SLUG_RENAMES[old_slug]
     Article.objects.create(
         title="Спецификация",
         slug=old_slug,
@@ -35,9 +36,53 @@ def test_apply_article_slug_renames_renames_and_redirects() -> None:
 
 
 @pytest.mark.django_db
+def test_apply_application_article_slug_rename() -> None:
+    """Application article drops Tilda prefix; 301 from old /statyi path."""
+    old_slug = "2zbgj89cp1-primenenie-privodov-v-sistemah-ventilyat"
+    new_slug = ARTICLE_SLUG_RENAMES[old_slug]
+    Article.objects.create(
+        title="Применение",
+        slug=old_slug,
+        body="<p>x</p>",
+        is_published=True,
+    )
+
+    apply_article_slug_renames()
+
+    assert not Article.objects.filter(slug=old_slug).exists()
+    assert Article.objects.filter(slug=new_slug).exists()
+    redir = Redirect.objects.get(from_path=f"/statyi/{old_slug}")
+    assert redir.to_path == f"/statyi/{new_slug}"
+    assert redir.status_code == 301
+
+
+@pytest.mark.django_db
+def test_apply_all_tilda_article_slug_renames() -> None:
+    """Every mapped Tilda-prefixed slug gets a 301 to the canonical ЧПУ."""
+    for old_slug, new_slug in ARTICLE_SLUG_RENAMES.items():
+        if Article.objects.filter(slug=new_slug).exists():
+            continue
+        Article.objects.create(
+            title=new_slug,
+            slug=old_slug,
+            body="<p>x</p>",
+            is_published=True,
+        )
+
+    apply_article_slug_renames()
+
+    for old_slug, new_slug in ARTICLE_SLUG_RENAMES.items():
+        assert not Article.objects.filter(slug=old_slug).exists()
+        assert Article.objects.filter(slug=new_slug).exists()
+        redir = Redirect.objects.get(from_path=f"/statyi/{old_slug}")
+        assert redir.to_path == f"/statyi/{new_slug}"
+        assert redir.status_code == 301
+
+
+@pytest.mark.django_db
 def test_apply_article_slug_renames_idempotent_when_already_canonical() -> None:
     """Second run keeps the canonical article and refreshes the redirect."""
-    _old_slug, new_slug = next(iter(ARTICLE_SLUG_RENAMES.items()))
+    new_slug = "spetsifikatsiya-modelnogo-ryada-privodov"
     Article.objects.create(
         title="Спецификация",
         slug=new_slug,

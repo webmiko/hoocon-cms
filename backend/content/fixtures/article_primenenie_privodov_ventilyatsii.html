@@ -1,0 +1,249 @@
+<p class="hero-dek">
+  Где ставят электроприводы воздушных заслонок: противопожарные контуры, энергоэффективные
+  установки и промышленные объекты. Ниже — критерии выбора и ориентир по параметрам;
+  точные коды и паспорта — в <a href="/catalog">каталоге</a>.
+</p>
+
+<p class="dash-note">
+  Дашборд — быстрый обзор. Детали и расчёт — в секциях ниже; запас момента сверяйте с
+  паспортом заслонки.
+</p>
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Время хода · жёсткость требований</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">Стандарт ОВК</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--40"></span></span>
+        <span class="hbar__val">30–150&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">Противопожар</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--85"></span></span>
+        <span class="hbar__val">≤25&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">Промышленность</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">≤15&nbsp;с</span>
+      </li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Ресурс циклов</p>
+    <ul class="vbar">
+      <li><span class="vbar__col vbar__col--h60"></span><span class="vbar__label">Станд.<br />≥60k</span></li>
+      <li><span class="vbar__col vbar__col--h80"></span><span class="vbar__label">ПБ<br />≥80k</span></li>
+      <li><span class="vbar__col vbar__col--h95"></span><span class="vbar__label">Пром<br />≥100k</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Защита / среды</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">IP54</span><span class="kpi-tiles__lab">стандарт</span></li>
+      <li><span class="kpi-tiles__num">IP54+</span><span class="kpi-tiles__lab">ПБ + огонь</span></li>
+      <li><span class="kpi-tiles__num">IP65</span><span class="kpi-tiles__lab">пром / влага</span></li>
+      <li><span class="kpi-tiles__num">ATEX</span><span class="kpi-tiles__lab">взрывзоны</span></li>
+      <li><span class="kpi-tiles__num">0…10&nbsp;В=</span><span class="kpi-tiles__lab">пропорц. Y</span></li>
+      <li><span class="kpi-tiles__num">−40…+80</span><span class="kpi-tiles__lab">°C ориентир</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Расчёт момента · коэффициенты Kтип</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">Круглые · 1,0</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--55"></span></span>
+        <span class="hbar__val">база</span>
+      </li>
+      <li>
+        <span class="hbar__label">Прямоуг. · 1,4</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--75"></span></span>
+        <span class="hbar__val">+40%</span>
+      </li>
+      <li>
+        <span class="hbar__label">Шибер · 1,8</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">+80%</span>
+      </li>
+      <li>
+        <span class="hbar__label">Kзапас</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--65"></span></span>
+        <span class="hbar__val">×1,3</span>
+      </li>
+    </ul>
+    <p class="dash-panel__foot">
+      Пример: 0,96&nbsp;м² × 450&nbsp;Па × 1,4 × 1,3 ≈ 7,9&nbsp;Нм → ряд 10&nbsp;Нм.
+    </p>
+  </div>
+</div>
+
+<h2>Где применяют</h2>
+<p>
+  Электроприводы воздушных заслонок — исполнительные устройства в системах управления
+  микроклиматом. Типовые зоны:
+</p>
+
+<div class="family-block">
+<h3>Противопожарные системы</h3>
+<p>
+  Управление огнезадерживающими (нормально открытыми) и дымовыми клапанами
+  (нормально закрытыми) по СП&nbsp;7.13130. Обычно нужны:
+  время возврата пружины ≤&nbsp;25&nbsp;с, термостойкость по паспорту ОЗК,
+  <strong>пружинный возврат</strong> (fail-safe FU). Семейство —
+  <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU в каталоге</a>.
+  Не путать с DA: для ОЗК SA нельзя заменять на DA —
+  см. <a href="/faq">вопросы и ответы</a>.
+</p>
+</div>
+
+<div class="family-block">
+<h3>Энергоэффективные установки</h3>
+<p>
+  Точное регулирование потоков в рекуперации: управление
+  <strong>пропорциональное</strong> (модулирующее), сигнал Y
+  <strong>0(2)…10&nbsp;В=</strong>. Типовой ориентир погрешности позиционирования —
+  порядка ±5&nbsp;% при корректной настройке контура. Семейства без пружины —
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">MU</a>
+  и ускоренные
+  <a href="/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata">MQU</a>.
+</p>
+</div>
+
+<div class="family-block">
+<h3>Промышленные объекты</h3>
+<p>
+  Жёстче требования к среде: взрывозащита (ATEX / IECEx — по проекту),
+  защита корпуса IP65, ориентир температуры −40…+80&nbsp;°C. Скорость хода и
+  протокол (в т.&nbsp;ч. промышленные шины) — по карточке SKU и ТЗ объекта.
+</p>
+</div>
+
+<h2>Расчёт крутящего момента</h2>
+<p>
+  Ориентир с учётом конструкции заслонки и запаса:
+</p>
+<p>
+  <strong>Mтреб = S × P × Kтип × Kзапас</strong>, где
+  <strong>S</strong> — площадь заслонки (м²),
+  <strong>P</strong> — рабочее давление (Па),
+  <strong>Kтип</strong> — коэффициент конструкции (круглые ≈&nbsp;1,0;
+  прямоугольные ≈&nbsp;1,4; шиберные ≈&nbsp;1,8),
+  <strong>Kзапас</strong> ≈&nbsp;1,3 (около 30&nbsp;% резерва).
+</p>
+<p>
+  Пример: прямоугольная противопожарная заслонка 0,96&nbsp;м² при 450&nbsp;Па —
+  Mтреб ≈ 0,96 × 450 × 1,4 × 1,3 ≈ 7,9&nbsp;Нм → ряд <strong>10&nbsp;Нм</strong>.
+  Для объекта сверяйте таблицы производителя заслонки и паспорт привода;
+  краткая формула также в <a href="/faq">FAQ</a>.
+</p>
+<p>
+  При рабочем давлении &gt;&nbsp;1000&nbsp;Па увеличивайте расчётный запас
+  крутящего момента (ориентир до ~40&nbsp;%).
+</p>
+
+<h2>Параметры по типу объекта</h2>
+<p>
+  Сводка ориентиров (не замена паспорта). Управление в каталоге:
+  <strong>Открыто/закрыто</strong>, <strong>2-/3-позиционное</strong> или
+  <strong>пропорциональное</strong>; для ОЗК чаще Открыто/закрыто + пружина.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--compare">
+<thead>
+<tr>
+  <th>Параметр</th>
+  <th>Стандартные системы</th>
+  <th>Противопожарные системы</th>
+  <th>Промышленные объекты</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Время хода / возврата</strong></td>
+  <td>30–150&nbsp;с</td>
+  <td>пружина ≤&nbsp;25&nbsp;с</td>
+  <td>≤&nbsp;15&nbsp;с (по ТЗ)</td>
+</tr>
+<tr>
+  <td><strong>Защита корпуса</strong></td>
+  <td>IP54</td>
+  <td>IP54 + огнестойкость по паспорту</td>
+  <td>IP65 / ATEX (по зоне)</td>
+</tr>
+<tr>
+  <td><strong>Ресурс циклов</strong></td>
+  <td>≥&nbsp;60&nbsp;000</td>
+  <td>≥&nbsp;80&nbsp;000</td>
+  <td>≥&nbsp;100&nbsp;000</td>
+</tr>
+<tr>
+  <td><strong>Управление</strong></td>
+  <td>пропорциональное 0(2)…10&nbsp;В= · Modbus</td>
+  <td>Открыто/закрыто + пружинный возврат</td>
+  <td>по протоколу объекта (в т.&nbsp;ч. HART)</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Нормативы и документы</h2>
+<p>
+  Ориентиры сертификации для проекта: ТР&nbsp;ТС 010/2011, 012/2011;
+  для огнезадерживающих клапанов — ГОСТ&nbsp;Р&nbsp;53301. В комплекте к приводу —
+  паспорт (крутящий момент, время хода / возврата, климатика), схемы подключения
+  и при необходимости протоколы испытаний. Интеграция с АСУ&nbsp;ТП — через
+  стандартные сигналы и промышленные протоколы, совместимые с типовыми контроллерами.
+</p>
+
+<h2>Что смотреть в каталоге</h2>
+<p>
+  Свод по семействам MU / MQU / EU / FU / SA —
+  в
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации модельного ряда</a>.
+  Пример для ОЗК: привод
+  <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye/privod-protivopozharniy-10nm-sa10fu230-ds">SA10FU230-DS</a>
+  (10&nbsp;Нм) — серия SA FU. Подбор и КП —
+  <a href="/consultation">заявка на консультацию</a>.
+</p>
+<ul>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">
+      Воздушные без пружины (MU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">
+      С пружинным возвратом (FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-protivopozharnye-i-dymovye">
+      Противопожарные и дымовые (SA FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">
+      Клапаны дымоудаления (SA MU) →
+    </a>
+  </li>
+</ul>
+
+<h2>Рекомендации по проектированию</h2>
+<ol>
+  <li>
+    Для заслонок с ручным дублированием — приводы с механическим разъединением
+    (ручное управление по паспорту).
+  </li>
+  <li>
+    В дымоудалении и ОЗК — пружинный возврат (fail-safe) и исполнение по требованиям
+    клапана; см. <a href="/faq#fail-safe">что такое fail-safe</a>.
+  </li>
+  <li>
+    Не смешивать серии SA и DA на огнезадерживающих клапанах.
+  </li>
+</ol>
+<p>
+  Итог: выбор привода — это условия эксплуатации, нормативы объекта и конструкция
+  заслонки. Семейство и артикул фиксируйте по карточке SKU в каталоге.
+</p>
