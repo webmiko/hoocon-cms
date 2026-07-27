@@ -460,6 +460,8 @@ Email отдела продаж: <a href="mailto:{_EMAIL_SALES}">{_EMAIL_SALES}<
     ),
 }
 
+_FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures"
+
 ARTICLE_EXCERPTS: dict[str, str] = {
     "ispolnitelnoe-oborudovanie-ovk": (
         "Какое исполнительное оборудование нужно для ОВК: электроприводы и "
@@ -474,7 +476,7 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "Чем отличаются противопожарные и взрывозащищённые приводы ОВК: "
         "когда нужен каждый тип и на что смотреть в спецификации."
     ),
-    "4uicugaoh1-spetsifikatsiya-modelnogo-ryada-privodov": (
+    "spetsifikatsiya-modelnogo-ryada-privodov": (
         "Спецификация модельного ряда приводов вентиляции Hoocon: серии, моменты и типичные задачи подбора."
     ),
     "j1en0umao1-sharovie-krani-vidi-konstruktsiya-primen": (
@@ -490,6 +492,11 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "Противопожарные клапаны vs клапаны дымоудаления: какие приводы "
         "нужны и чем отличаются требования к управлению."
     ),
+}
+
+# Full body rewrite (replaces Tilda scrape). Excerpt still from ARTICLE_EXCERPTS.
+ARTICLE_BODIES: dict[str, Path] = {
+    "spetsifikatsiya-modelnogo-ryada-privodov": (_FIXTURES_DIR / "article_spetsifikatsiya_modelnogo_ryada.html"),
 }
 
 _LEAD_MARKER = 'data-hoocon-lead="1"'
@@ -547,9 +554,13 @@ class Command(BaseCommand):
 
     def handle(self, *args: object, **options: object) -> None:
         """Write canonical copy into the database."""
+        from content.article_slug_renames import apply_article_slug_renames
         from content.news_cover_from_sku import attach_sku_cover_to_news
 
         now = timezone.now()
+        for old_slug, new_slug in apply_article_slug_renames():
+            self.stdout.write(f"article slug: {old_slug} → {new_slug} (+301)")
+
         pages_done = 0
         for slug, (title, body) in PAGES.items():
             _, created = Page.objects.update_or_create(
@@ -566,7 +577,22 @@ class Command(BaseCommand):
             self.stdout.write(f"page {slug}: {action}")
 
         excerpts_done = 0
+        bodies_done = 0
+        for slug, body_path in ARTICLE_BODIES.items():
+            article = Article.objects.filter(slug=slug).first()
+            if article is None:
+                self.stdout.write(self.style.WARNING(f"article missing: {slug}"))
+                continue
+            article.body = body_path.read_text(encoding="utf-8")
+            if slug in ARTICLE_EXCERPTS:
+                article.excerpt = ARTICLE_EXCERPTS[slug]
+            article.save(update_fields=["excerpt", "body", "updated_at"])
+            bodies_done += 1
+            self.stdout.write(f"article body: {slug}")
+
         for slug, excerpt in ARTICLE_EXCERPTS.items():
+            if slug in ARTICLE_BODIES:
+                continue
             article = Article.objects.filter(slug=slug).first()
             if article is None:
                 self.stdout.write(self.style.WARNING(f"article missing: {slug}"))
@@ -629,5 +655,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"news {_NEWS_H8205_SLUG}: cover not attached (SKU image?)"))
 
         self.stdout.write(
-            self.style.SUCCESS(f"Done: pages={pages_done}, articles={excerpts_done}, news={news_action}")
+            self.style.SUCCESS(
+                f"Done: pages={pages_done}, article_bodies={bodies_done}, articles={excerpts_done}, news={news_action}"
+            )
         )
