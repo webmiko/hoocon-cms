@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import { Seo } from "../components/Seo";
@@ -21,6 +21,14 @@ import {
   catalogCategoryPath,
 } from "../utils/catalogPaths";
 import { collapseH81CatalogSkus } from "../utils/h81CatalogCollapse";
+import {
+  readCatalogAppend,
+  saveCatalogAppend,
+} from "../utils/catalogAppendStorage";
+import {
+  readScrollPosition,
+  restoreScrollPosition,
+} from "../utils/scrollPositions";
 import styles from "./CatalogPage.module.css";
 
 /** Facet query keys synced to the URL (backend catalog.facets). */
@@ -65,6 +73,8 @@ export function CatalogPage() {
   }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
+  const location = useLocation();
 
   // Legacy share links: /catalog?category=… → /catalog/…
   useEffect(() => {
@@ -159,6 +169,96 @@ export function CatalogPage() {
     }
     return collapseH81CatalogSkus(merged);
   }, [skusData?.results, append, listKey]);
+
+  // Persist «Показать ещё» depth so back from PDP can rebuild the list.
+  useEffect(() => {
+    if (append.key !== listKey) return;
+    saveCatalogAppend({
+      listKey,
+      lastPage: append.lastPage,
+      hasNext: append.hasNext,
+    });
+  }, [append, listKey]);
+
+  // After list paint on back: re-apply scroll (content was short during ScrollToTop).
+  useEffect(() => {
+    if (navigationType !== "POP") return;
+    if (loading || displayedSkus.length === 0) return;
+    const y = readScrollPosition(location.key);
+    if (y === undefined || y <= 0) return;
+    return restoreScrollPosition(y, 2500);
+  }, [navigationType, loading, displayedSkus.length, location.key]);
+
+  // On back/forward: reload pages 2..N that were open before leaving.
+  useEffect(() => {
+    if (navigationType !== "POP") return;
+    if (loading || !skusData) return;
+    const saved = readCatalogAppend(listKey);
+    if (!saved || saved.lastPage <= page) return;
+    if (append.key === listKey && append.lastPage >= saved.lastPage) return;
+
+    let cancelled = false;
+    const categoryParam = category;
+    const qParam = q;
+    const inStockParam = inStockOnly;
+    const basePage = page;
+    const facetPairs = FACET_KEYS.map(
+      (key) => [key, searchParams.get(key) ?? ""] as const,
+    ).filter(([, value]) => Boolean(value));
+
+    void (async () => {
+      const collected: SKUList[] = [];
+      let lastLoaded = basePage;
+      let hasNext = Boolean(skusData.next);
+      for (let p = basePage + 1; p <= saved.lastPage; p += 1) {
+        const request: Record<string, string> = { page: String(p) };
+        if (categoryParam) request.category = categoryParam;
+        if (qParam) request.q = qParam;
+        if (inStockParam) request.in_stock = "1";
+        for (const [key, value] of facetPairs) {
+          request[key] = value;
+        }
+        try {
+          const data = await api.skus(request);
+          if (cancelled) return;
+          collected.push(...((data.results ?? []) as SKUList[]));
+          lastLoaded = p;
+          hasNext = Boolean(data.next);
+        } catch {
+          break;
+        }
+      }
+      if (cancelled || collected.length === 0) return;
+      setAppend({
+        key: listKey,
+        items: collected,
+        lastPage: lastLoaded,
+        hasNext,
+      });
+      const y = readScrollPosition(location.key);
+      if (y !== undefined && y > 0) {
+        restoreScrollPosition(y, 3000);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    navigationType,
+    loading,
+    skusData,
+    listKey,
+    page,
+    append.key,
+    append.lastPage,
+    category,
+    q,
+    inStockOnly,
+    facetKey,
+    searchParams,
+    location.key,
+  ]);
 
   async function handleShowMore() {
     if (loadingMore || !appendHasNext) return;
