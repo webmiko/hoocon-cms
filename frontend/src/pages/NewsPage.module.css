@@ -181,24 +181,27 @@
   color: var(--color-text-muted);
 }
 
-/* Tables: scroll on narrow; readable cells */
+.body :global(.table-scroll) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1.25rem 0 1.5rem;
+}
+
 .body :global(table) {
   width: 100%;
   border-collapse: collapse;
   margin: 1.5rem 0;
   font-size: 0.9rem;
   line-height: 1.4;
-  display: block;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.body :global(thead),
-.body :global(tbody),
-.body :global(tr) {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
+.body :global(.table-scroll table) {
+  margin: 0;
+  width: max-content;
+  min-width: 100%;
 }
 
 .body :global(th),
@@ -306,15 +309,25 @@
 
 .productImage,
 .productImagePh {
+  grid-column: 1;
   grid-row: 1 / span 2;
   width: 64px;
   height: 64px;
-  object-fit: contain;
+  min-height: 0;
+  align-self: center;
+  overflow: hidden;
   background: var(--color-subtle);
   border-radius: var(--radius-sm);
 }
 
+.productImagePh {
+  display: block;
+}
+
 .productCode {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
   font-size: 0.75rem;
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -325,6 +338,10 @@
 }
 
 .productName {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  align-self: start;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.3;

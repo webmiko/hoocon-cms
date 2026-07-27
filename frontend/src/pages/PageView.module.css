@@ -256,23 +256,27 @@
   color: var(--color-text-muted);
 }
 
+.body :global(.table-scroll) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1.25rem 0 1.5rem;
+}
+
 .body :global(table) {
   width: 100%;
   border-collapse: collapse;
   margin: 1.5rem 0;
   font-size: 0.9rem;
   line-height: 1.4;
-  display: block;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.body :global(thead),
-.body :global(tbody),
-.body :global(tr) {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
+.body :global(.table-scroll table) {
+  margin: 0;
+  width: max-content;
+  min-width: 100%;
 }
 
 .body :global(th),

@@ -544,3 +544,128 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Narrow viewports: series rows → dl-like cards (no horizontal scroll). */
+@media (max-width: 640px) {
+  .cms-rich-body .table-scroll:has(.series-table--map),
+  .cms-rich-body .table-scroll:has(.series-table--spec),
+  .cms-rich-body .table-scroll:has(.series-table--mass) {
+    overflow-x: visible;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  .cms-rich-body .table-scroll:has(.series-table--map) table,
+  .cms-rich-body .table-scroll:has(.series-table--spec) table,
+  .cms-rich-body .table-scroll:has(.series-table--mass) table {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cms-rich-body .series-table--map thead,
+  .cms-rich-body .series-table--spec thead,
+  .cms-rich-body .series-table--mass thead {
+    display: none;
+  }
+
+  .cms-rich-body .series-table--map tbody,
+  .cms-rich-body .series-table--spec tbody,
+  .cms-rich-body .series-table--mass tbody,
+  .cms-rich-body .series-table--map tr,
+  .cms-rich-body .series-table--spec tr,
+  .cms-rich-body .series-table--mass tr,
+  .cms-rich-body .series-table--map td,
+  .cms-rich-body .series-table--spec td,
+  .cms-rich-body .series-table--mass td {
+    display: block;
+    width: 100%;
+  }
+
+  .cms-rich-body .series-table--map tr,
+  .cms-rich-body .series-table--spec tr,
+  .cms-rich-body .series-table--mass tr {
+    margin: 0 0 0.65rem;
+    padding: 0.7rem 0.85rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface);
+  }
+
+  .cms-rich-body .series-table--map tr:last-child,
+  .cms-rich-body .series-table--spec tr:last-child,
+  .cms-rich-body .series-table--mass tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .cms-rich-body .series-table--map td,
+  .cms-rich-body .series-table--spec td,
+  .cms-rich-body .series-table--mass td {
+    display: grid;
+    grid-template-columns: 6.75rem minmax(0, 1fr);
+    gap: 0.25rem 0.65rem;
+    align-items: baseline;
+    border: none;
+    padding: 0.28rem 0;
+    background: transparent;
+    white-space: normal;
+  }
+
+  .cms-rich-body .series-table--map tr:nth-child(even) td,
+  .cms-rich-body .series-table--spec tr:nth-child(even) td,
+  .cms-rich-body .series-table--mass tr:nth-child(even) td {
+    background: transparent;
+  }
+
+  .cms-rich-body .series-table--map td::before,
+  .cms-rich-body .series-table--spec td::before,
+  .cms-rich-body .series-table--mass td::before {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--color-text-muted);
+  }
+
+  .cms-rich-body .series-table--map td:nth-child(1)::before {
+    content: "Семейство";
+  }
+
+  .cms-rich-body .series-table--map td:nth-child(2)::before {
+    content: "Задача";
+  }
+
+  .cms-rich-body .series-table--map td:nth-child(3)::before {
+    content: "Момент";
+  }
+
+  .cms-rich-body .series-table--map td:nth-child(4)::before {
+    content: "Особенность";
+  }
+
+  .cms-rich-body .series-table--spec td:nth-child(1)::before {
+    content: "Н·м";
+  }
+
+  .cms-rich-body .series-table--spec td:nth-child(2)::before {
+    content: "Ход";
+  }
+
+  .cms-rich-body .series-table--spec td:nth-child(3)::before {
+    content: "Модель";
+  }
+
+  .cms-rich-body .series-table--mass td:nth-child(1)::before {
+    content: "Семейство";
+  }
+
+  .cms-rich-body .series-table--mass td:nth-child(2)::before {
+    content: "Н·м";
+  }
+
+  .cms-rich-body .series-table--mass td:nth-child(3)::before {
+    content: "Вес";
+  }
+
+  .cms-rich-body .series-table--spec td:nth-child(3),
+  .cms-rich-body .series-table--map td:nth-child(4) {
+    overflow-wrap: anywhere;
+  }
+}
