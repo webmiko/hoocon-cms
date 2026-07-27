@@ -69,7 +69,9 @@ export function CompareTray() {
                 <ProtectedProductImage
                   src={item.image}
                   alt=""
-                  className={`${styles.thumb} u-protect-media`}
+                  frameClassName={styles.thumb}
+                  className="u-protect-media"
+                  compact
                   width={40}
                   height={40}
                   loading="lazy"

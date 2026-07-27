@@ -20,6 +20,13 @@ type ProtectedProductImageProps = Omit<
 > & {
   /** Real media path (``/media/...``); not written to ``img.src`` when blob works. */
   src: string;
+  /** Layout classes for the outer frame (grid cell, thumb size). */
+  frameClassName?: string;
+  /**
+   * Skip the tall shimmer reservation (``min-height: 10rem``).
+   * Use for 40–72px thumbs in lists/trays so the frame does not stretch.
+   */
+  compact?: boolean;
 };
 
 function initialAllowFetch(src: string, loading: string | undefined): boolean {
@@ -36,6 +43,8 @@ export function ProtectedProductImage({
   src,
   alt = "",
   className,
+  frameClassName,
+  compact = false,
   loading = "lazy",
   onLoad,
   ...rest
@@ -81,6 +90,13 @@ export function ProtectedProductImage({
   }, [allowFetch, loading, src]);
 
   const showShimmer = !revealed;
+  const frameClass = [
+    styles.frame,
+    compact ? styles.frameCompact : null,
+    frameClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const mediaClass = [
     styles.media,
     revealed ? styles.mediaReady : null,
@@ -90,7 +106,7 @@ export function ProtectedProductImage({
     .join(" ");
 
   return (
-    <span className={styles.frame} data-ready={revealed ? "true" : "false"}>
+    <span className={frameClass} data-ready={revealed ? "true" : "false"}>
       {showShimmer ? (
         <span className={styles.shimmer} aria-hidden="true" />
       ) : null}

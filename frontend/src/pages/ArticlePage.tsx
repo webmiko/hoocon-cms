@@ -187,7 +187,9 @@ export function ArticlePage() {
                   >
                     {sku.image ? (
                       <ProtectedProductImage
-                        className={`${styles.productImage} u-protect-media`}
+                        frameClassName={styles.productImage}
+                        className="u-protect-media"
+                        compact
                         src={sku.image}
                         alt=""
                         loading="lazy"

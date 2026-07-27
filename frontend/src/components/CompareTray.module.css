@@ -76,8 +76,14 @@
   height: 36px;
   flex-shrink: 0;
   border-radius: 4px;
-  object-fit: cover;
+  overflow: hidden;
   background: var(--color-subtle);
+}
+
+.thumb :global(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .thumbPlaceholder {

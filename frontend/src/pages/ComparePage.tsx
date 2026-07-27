@@ -316,7 +316,9 @@ export function ComparePage() {
                           <ProtectedProductImage
                             src={sku.image.image}
                             alt=""
-                            className={`${styles.skuImage} u-protect-media`}
+                            frameClassName={styles.skuImage}
+                            className="u-protect-media"
+                            compact
                             width={72}
                             height={72}
                             loading="lazy"
