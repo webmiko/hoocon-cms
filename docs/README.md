@@ -10,6 +10,8 @@
 ## Оглавление
 
 - [Django Admin vs Wagtail — для Hoocon CMS](admin-vs-wagtail.md)
+- [Счётчик минут GitHub Actions (2000/мес → 500/нед)](actions-minutes.md)
+- [Ручной деплой (без GitHub Actions)](manual-deploy.md)
 - [Аудит Hoocon CMS — баги, БЗ, безопасность](audit-2026-07-20.md)
 - [Качество данных при переносе (Tilda → CMS)](data-quality-etl.md)
 - [Аудит дизайна Hoocon SPA (2026-07-19)](design-audit-2026-07.md)

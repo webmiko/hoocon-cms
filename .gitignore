@@ -55,6 +55,7 @@ docker-compose.local.yml
 
 # Локальные дампы / артефакты деплоя (не коммитить)
 .deploy-tmp/
+.local/
 
 # Загрузки (media) и collectstatic
 media/

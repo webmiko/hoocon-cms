@@ -40,13 +40,16 @@
 6. **Бэкапы** — дамп Postgres + media на диск VPS / объектное хранилище
    reg.ru по расписанию (скрипт + cron на хосте).
 7. **Секреты** — только `.env` на сервере; в git — `.env.example`.
-8. **CI/CD** — единственный путь деплоя: GitHub Actions на push в
-   `develop` / `main` (не с локалки). Pipeline: test → lint → build
-   (образ в **GHCR** + `frontend/dist`) → deploy SSH
-   (`scripts/deploy-remote.sh`). Секреты репо: `SSH_PRIVATE_KEY`,
-   `SSH_USER`, `SERVER_HOST`, `DEPLOY_PATH`. `.env` на VPS не
-   перезаписывается CI. Локальный `scripts/deploy-to-vps.sh` — stub
-   (exit 1). Одноразовый перенос БД: `scripts/sync-db-to-vps.sh`.
+8. **CI/CD** — основной путь: GitHub Actions на push в `develop` /
+   `main`. Pipeline: test → lint → build (образ в **GHCR** +
+   `frontend/dist`) → deploy SSH (`scripts/deploy-remote.sh`).
+   Секреты репо: `SSH_PRIVATE_KEY`, `SSH_USER`, `SERVER_HOST`,
+   `DEPLOY_PATH`. `.env` на VPS не перезаписывается. **Запасной путь**
+   при исчерпании минут Actions: `./scripts/deploy-to-vps.sh`
+   ([manual-deploy.md](manual-deploy.md)) — checkup + amd64 image +
+   `docker load` + тот же `deploy-remote.sh`. Одноразовый перенос БД:
+   `scripts/sync-db-to-vps.sh`. Квота Free private: **2000 мин/мес** →
+   `./scripts/actions-minutes.py` ([actions-minutes.md](actions-minutes.md)).
 
 ---
 
