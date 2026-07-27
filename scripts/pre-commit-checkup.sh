@@ -59,6 +59,7 @@ else
 fi
 
 # ── 4. pytest + coverage ≥ 90% (exit 5 = нет тестов — допустимо на каркасе) ───
+# Порог — сторож на измеряемом коде; не писать тесты ради процента (см. БЗ §0.8).
 set +e
 (cd "$BACKEND" && poetry run pytest -q \
   --cov --cov-report=term-missing:skip-covered --cov-fail-under=90)

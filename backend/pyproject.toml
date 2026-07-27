@@ -143,6 +143,7 @@ omit = [
 precision = 1
 show_missing = true
 skip_covered = false
+# Gate for measured apps (omit above). Tests catch bugs — do not pad % to hit 90.
 fail_under = 90
 exclude_lines = [
     "pragma: no cover",
