@@ -9,6 +9,94 @@
   margin: 0 auto;
 }
 
+.page:has(.tocDesktop) .article,
+.page:has(.tocMobile) .article {
+  max-width: 1100px;
+}
+
+.layout {
+  display: block;
+}
+
+.tocDesktop {
+  display: none;
+}
+
+.tocMobile {
+  margin: 0 0 var(--space-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface);
+  padding: 0.5rem 0.85rem 0.75rem;
+}
+
+.tocHeading {
+  margin: 0 0 0.65rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tocSummary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  list-style: none;
+}
+
+.tocSummary::-webkit-details-marker {
+  display: none;
+}
+
+.tocList {
+  margin: 0.65rem 0 0;
+  padding: 0 0 0 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tocItemH3 {
+  margin-left: 0.75rem;
+  list-style: disc;
+}
+
+.tocItemH2 {
+  list-style: disc;
+}
+
+.tocLink {
+  color: var(--color-link);
+  text-decoration: none;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.tocLink:hover {
+  text-decoration: underline;
+}
+
+@media (min-width: 960px) {
+  .layout {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 46rem);
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .tocDesktop {
+    display: block;
+    position: sticky;
+    top: 5.5rem;
+    margin: 0;
+  }
+
+  .tocMobile {
+    display: none;
+  }
+}
+
 .breadcrumbs {
   display: flex;
   align-items: center;

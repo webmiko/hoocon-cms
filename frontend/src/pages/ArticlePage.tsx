@@ -7,6 +7,7 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
+import { extractArticleToc } from "../utils/articleToc";
 import { stripHtmlToText } from "../utils/stripHtml";
 import {
   buildArticleJsonLd,
@@ -16,6 +17,8 @@ import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
 import styles from "./ArticlePage.module.css";
 import "../styles/cms-body-charts.css";
+
+const TOC_MIN_SECTIONS = 3;
 
 /**
  * Article detail — readable column, scannable hierarchy, related links.
@@ -44,11 +47,13 @@ export function ArticlePage() {
     );
   }
 
+  const bodyWithToc = extractArticleToc(sanitizeHtml(article.body));
   const plain = stripHtmlToText(article.excerpt || article.body);
   const minutes = readingMinutes(article.body);
   const related = (listData?.results ?? [])
     .filter((item) => item.slug !== article.slug)
     .slice(0, 8);
+  const showToc = bodyWithToc.items.length >= TOC_MIN_SECTIONS;
 
   return (
     <div className={styles.page}>
@@ -114,11 +119,55 @@ export function ArticlePage() {
           </figure>
         ) : null}
 
-        {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 */}
-        <div
-          className={`${styles.body} cms-rich-body`}
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.body) }}
-        />
+        <div className={styles.layout}>
+          {showToc ? (
+            <>
+              <nav
+                className={styles.tocDesktop}
+                aria-label="Содержание статьи"
+              >
+                <p className={styles.tocHeading}>Содержание</p>
+                <ol className={styles.tocList}>
+                  {bodyWithToc.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className={
+                        item.level === 3 ? styles.tocItemH3 : styles.tocItemH2
+                      }
+                    >
+                      <a href={`#${item.id}`} className={styles.tocLink}>
+                        {item.text}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+              <details className={styles.tocMobile}>
+                <summary className={styles.tocSummary}>Содержание</summary>
+                <ol className={styles.tocList}>
+                  {bodyWithToc.items.map((item) => (
+                    <li
+                      key={`m-${item.id}`}
+                      className={
+                        item.level === 3 ? styles.tocItemH3 : styles.tocItemH2
+                      }
+                    >
+                      <a href={`#${item.id}`} className={styles.tocLink}>
+                        {item.text}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            </>
+          ) : null}
+
+          {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 */}
+          <div
+            className={`${styles.body} cms-rich-body`}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(bodyWithToc.html) }}
+          />
+        </div>
 
         {article.related_skus && article.related_skus.length > 0 ? (
           <section
