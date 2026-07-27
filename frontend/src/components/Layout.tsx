@@ -1,11 +1,12 @@
 import { useEffect, useId, useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { CompareProvider } from "../compare/CompareContext";
 import { CompareTray } from "./CompareTray";
 import { CookieConsent } from "./CookieConsent";
 import { Analytics } from "./Analytics";
 import { DesktopNav } from "./DesktopNav";
+import { RouteSlideOutlet } from "./RouteSlideOutlet";
 import { ScrollProgress } from "./ScrollProgress";
 import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
@@ -330,7 +331,7 @@ export function Layout() {
         }
       >
         <div className="container">
-          <Outlet />
+          <RouteSlideOutlet />
         </div>
       </main>
 
