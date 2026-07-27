@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { CSSProperties } from "react";
 
 import type { SKUList } from "../api/client";
@@ -10,6 +10,11 @@ import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
 import { cardHighlights, compactCardSpecName } from "../utils/cardHighlights";
 import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { catalogPathForSku } from "../utils/catalogPaths";
+import {
+  catalogFocusPath,
+  catalogSkuDomId,
+  saveCatalogFocus,
+} from "../utils/catalogFocus";
 import {
   protectedContentHandlers,
   protectedMediaImgProps,
@@ -34,6 +39,7 @@ type CatalogSkuCardProps = {
  * Photo save / text copy are deterred via contentProtection helpers.
  */
 export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
+  const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
   const imageSrc = sku.image?.image ?? null;
   const wash = useMatchedPhotoWash(imageSrc);
@@ -46,8 +52,17 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и ТТХ";
 
+  function rememberFocus() {
+    saveCatalogFocus({
+      path: catalogFocusPath(location.pathname, location.search),
+      slug: sku.slug,
+      y: window.scrollY,
+    });
+  }
+
   return (
     <article
+      id={catalogSkuDomId(sku.slug)}
       className={`${styles.card} u-protect-content`}
       data-purpose={purpose}
       style={cardStyle}
@@ -57,6 +72,8 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
         to={catalogPathForSku(sku)}
         className={styles.cardHit}
         aria-label={sku.name}
+        onPointerDown={rememberFocus}
+        onClick={rememberFocus}
       />
       {imageSrc ? (
         <div

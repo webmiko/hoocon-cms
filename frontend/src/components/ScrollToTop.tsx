@@ -56,6 +56,11 @@ export function ScrollToTop() {
     }
 
     if (navigationType === "POP") {
+      // Catalog restores to the opened card after list paint — avoid an early
+      // Y jump that lands too low while images are still loading.
+      if (pathname === "/catalog" || pathname.startsWith("/catalog/")) {
+        return;
+      }
       const saved = readScrollPosition(key);
       if (saved !== undefined && saved > 0) {
         return restoreScrollPosition(saved);

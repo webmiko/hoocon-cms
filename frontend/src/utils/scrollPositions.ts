@@ -31,45 +31,81 @@ export function readScrollPosition(key: string): number | undefined {
   return positions.get(key);
 }
 
-/**
- * Apply ``scrollTo`` and retry while the document is still growing
- * (async catalog / PDP content). Stops when height can host ``targetY``
- * or after a short deadline.
- *
- * Args:
- *   targetY: Desired scroll offset.
- *   maxMs: How long to keep retrying (default 2s).
- */
-export function restoreScrollPosition(targetY: number, maxMs = 2000): () => void {
-  const y = Math.max(0, Math.round(targetY));
+type RestoreOptions = {
+  maxMs?: number;
+  /** Stop only after scrollHeight stayed unchanged this many frames. */
+  stableFrames?: number;
+};
+
+function watchUntilStable(
+  apply: () => void,
+  options: RestoreOptions,
+): () => void {
+  const maxMs = options.maxMs ?? 4000;
+  const needStable = options.stableFrames ?? 10;
   let cancelled = false;
   const started = performance.now();
-
-  const apply = () => {
-    if (cancelled) return;
-    window.scrollTo({ top: y, left: 0, behavior: "auto" });
-  };
-
-  apply();
+  let lastHeight = -1;
+  let stable = 0;
 
   const tick = () => {
     if (cancelled) return;
     apply();
-    const maxY = Math.max(
-      0,
-      document.documentElement.scrollHeight - window.innerHeight,
-    );
+    const height = document.documentElement.scrollHeight;
+    if (height === lastHeight) {
+      stable += 1;
+    } else {
+      lastHeight = height;
+      stable = 0;
+    }
     const elapsed = performance.now() - started;
-    if (maxY >= y - 1 || elapsed >= maxMs) {
+    if (stable >= needStable || elapsed >= maxMs) {
       apply();
       return;
     }
     window.requestAnimationFrame(tick);
   };
 
+  apply();
   window.requestAnimationFrame(tick);
 
   return () => {
     cancelled = true;
   };
+}
+
+/**
+ * Apply ``scrollTo`` and keep correcting while layout/images change height.
+ *
+ * Args:
+ *   targetY: Desired scroll offset.
+ *   maxMs: How long to keep retrying (default 4s).
+ */
+export function restoreScrollPosition(targetY: number, maxMs = 4000): () => void {
+  const y = Math.max(0, Math.round(targetY));
+  return watchUntilStable(
+    () => {
+      window.scrollTo({ top: y, left: 0, behavior: "auto" });
+    },
+    { maxMs, stableFrames: 10 },
+  );
+}
+
+/**
+ * Keep an element centered in the viewport while images/layout settle.
+ *
+ * Args:
+ *   el: Catalog card (or any anchor) to bring into view.
+ *   maxMs: Retry budget.
+ */
+export function restoreScrollToElement(
+  el: HTMLElement,
+  maxMs = 4000,
+): () => void {
+  return watchUntilStable(
+    () => {
+      el.scrollIntoView({ block: "center", behavior: "auto" });
+    },
+    { maxMs, stableFrames: 12 },
+  );
 }

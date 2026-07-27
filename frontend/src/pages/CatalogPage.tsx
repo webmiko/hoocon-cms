@@ -26,8 +26,13 @@ import {
   saveCatalogAppend,
 } from "../utils/catalogAppendStorage";
 import {
+  catalogSkuDomId,
+  readCatalogFocus,
+} from "../utils/catalogFocus";
+import {
   readScrollPosition,
   restoreScrollPosition,
+  restoreScrollToElement,
 } from "../utils/scrollPositions";
 import styles from "./CatalogPage.module.css";
 
@@ -180,14 +185,48 @@ export function CatalogPage() {
     });
   }, [append, listKey]);
 
-  // After list paint on back: re-apply scroll (content was short during ScrollToTop).
+  // After list paint on back: land on the opened card (or saved Y).
   useEffect(() => {
     if (navigationType !== "POP") return;
     if (loading || displayedSkus.length === 0) return;
-    const y = readScrollPosition(location.key);
-    if (y === undefined || y <= 0) return;
-    return restoreScrollPosition(y, 2500);
-  }, [navigationType, loading, displayedSkus.length, location.key]);
+
+    const focus = readCatalogFocus(location.pathname, location.search);
+    if (focus?.slug) {
+      const el = document.getElementById(catalogSkuDomId(focus.slug));
+      if (el instanceof HTMLElement) {
+        return restoreScrollToElement(el, 4500);
+      }
+      // Card not in DOM yet — wait for «Показать ещё» restore, do not Y-jump.
+      const depth = readCatalogAppend(listKey);
+      if (depth && depth.lastPage > page) {
+        return;
+      }
+      if (append.key === listKey && append.lastPage > page) {
+        // Still merging extras — wait for next length change.
+        if (!displayedSkus.some((s) => s.slug === focus.slug)) {
+          return;
+        }
+      }
+    }
+
+    const y =
+      focus?.y ||
+      readScrollPosition(location.key) ||
+      0;
+    if (y <= 0) return;
+    return restoreScrollPosition(y, 4500);
+  }, [
+    navigationType,
+    loading,
+    displayedSkus,
+    listKey,
+    page,
+    append.key,
+    append.lastPage,
+    location.key,
+    location.pathname,
+    location.search,
+  ]);
 
   // On back/forward: reload pages 2..N that were open before leaving.
   useEffect(() => {
@@ -235,9 +274,21 @@ export function CatalogPage() {
         lastPage: lastLoaded,
         hasNext,
       });
-      const y = readScrollPosition(location.key);
-      if (y !== undefined && y > 0) {
-        restoreScrollPosition(y, 3000);
+      // Card may appear only after append — re-focus on next paint via the
+      // list effect (displayedSkus.length change). Also nudge immediately.
+      const focus = readCatalogFocus(location.pathname, location.search);
+      if (focus?.slug) {
+        window.requestAnimationFrame(() => {
+          const el = document.getElementById(catalogSkuDomId(focus.slug));
+          if (el instanceof HTMLElement) {
+            restoreScrollToElement(el, 4500);
+          }
+        });
+      } else {
+        const y = readScrollPosition(location.key);
+        if (y !== undefined && y > 0) {
+          restoreScrollPosition(y, 4500);
+        }
       }
     })();
 
@@ -258,6 +309,8 @@ export function CatalogPage() {
     facetKey,
     searchParams,
     location.key,
+    location.pathname,
+    location.search,
   ]);
 
   async function handleShowMore() {
