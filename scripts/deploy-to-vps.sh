@@ -78,7 +78,8 @@ IMAGE_NAME="${IMAGE_NAME:-$(git remote get-url origin \
   | sed -E 's#.*github.com[:/]##; s#\.git$##' \
   | tr '[:upper:]' '[:lower:]')}"
 GIT_SHA="$(git rev-parse HEAD)"
-DOCKER_IMAGE="${DOCKER_IMAGE:-${REGISTRY}/${IMAGE_NAME}:${GIT_SHA}}"
+# Always tag current HEAD unless explicitly overridden (avoids stale shell env).
+DOCKER_IMAGE="${DEPLOY_IMAGE:-${REGISTRY}/${IMAGE_NAME}:${GIT_SHA}}"
 
 SMOKE_HOST="${SMOKE_HOST:-}"
 if [[ -z "${SMOKE_HOST}" ]]; then
