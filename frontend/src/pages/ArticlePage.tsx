@@ -162,7 +162,7 @@ export function ArticlePage() {
             </>
           ) : null}
 
-          {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 */}
+          {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 (id kept for TOC) */}
           <div
             className={`${styles.body} cms-rich-body`}
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(bodyWithToc.html) }}

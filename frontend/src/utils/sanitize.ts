@@ -15,6 +15,7 @@ const ALLOWED_ATTR = [
   "alt",
   "title",
   "class",
+  "id", // TOC / FAQ in-page anchors (#section)
   "target",
   "rel",
   "loading",
