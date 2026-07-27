@@ -13,6 +13,26 @@ function isAlreadyOpaque(src: string): boolean {
 }
 
 /**
+ * Synchronous lookup of a session-cached display URL (no network).
+ *
+ * Args:
+ *   src: Media path previously resolved via ``resolveProtectedMediaSrc``.
+ *
+ * Returns:
+ *   Cached ``blob:`` / opaque URL, or ``null`` if not yet in the session cache.
+ */
+export function peekProtectedMediaSrc(src: string): string | null {
+  const trimmed = src.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (isAlreadyOpaque(trimmed)) {
+    return trimmed;
+  }
+  return blobBySrc.get(trimmed) ?? null;
+}
+
+/**
  * Resolve a display URL that does not expose the storage path in ``img.src``.
  *
  * Args:
@@ -51,7 +71,10 @@ export async function resolveProtectedMediaSrc(src: string): Promise<string> {
           throw new Error(`media fetch ${response.status}`);
         }
         const blob = await response.blob();
-        if (!blob.type.startsWith("image/") && blob.type !== "application/octet-stream") {
+        if (
+          !blob.type.startsWith("image/") &&
+          blob.type !== "application/octet-stream"
+        ) {
           // Some servers omit type; still try Object URL for known image paths.
           if (!trimmed.includes("/media/")) {
             throw new Error(`unexpected media type: ${blob.type || "empty"}`);

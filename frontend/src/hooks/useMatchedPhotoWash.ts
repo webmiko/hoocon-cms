@@ -9,6 +9,8 @@ export type MatchedPhotoWash = {
   accent: string;
 };
 
+const washBySrc = new Map<string, MatchedPhotoWash>();
+
 /**
  * Resolve a CSS background wash that matches the photo's edge backdrop.
  *
@@ -20,17 +22,21 @@ export type MatchedPhotoWash = {
  *
  * Returns:
  *   Sampled wash + accent, or undefined while loading / on failure.
+ *   Session-cached washes return synchronously on remount (no backdrop flash).
  */
 export function useMatchedPhotoWash(
   src: string | null | undefined,
 ): MatchedPhotoWash | undefined {
-  const [sampled, setSampled] = useState<{
+  const [asyncMatch, setAsyncMatch] = useState<{
     src: string;
     match: MatchedPhotoWash;
   } | null>(null);
 
   useEffect(() => {
     if (!src) {
+      return;
+    }
+    if (washBySrc.get(src)) {
       return;
     }
 
@@ -44,11 +50,12 @@ export function useMatchedPhotoWash(
       }
       const match = sampleEdgeMatchFromImage(img);
       if (match) {
-        setSampled({ src, match });
+        washBySrc.set(src, match);
+        setAsyncMatch({ src, match });
       }
     };
     img.onerror = () => {
-      // Keep prior sample only if it still matches; otherwise undefined via guard below.
+      // Leave undefined; caller keeps purpose-token wash.
     };
     img.src = src;
 
@@ -62,5 +69,12 @@ export function useMatchedPhotoWash(
   if (!src) {
     return undefined;
   }
-  return sampled?.src === src ? sampled.match : undefined;
+  const cached = washBySrc.get(src);
+  if (cached) {
+    return cached;
+  }
+  if (asyncMatch?.src === src) {
+    return asyncMatch.match;
+  }
+  return undefined;
 }

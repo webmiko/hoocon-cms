@@ -1,0 +1,16 @@
+/* Soft reveal — avoids a hard pop when blob URL replaces the placeholder. */
+.media {
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out, ease-out);
+}
+
+.mediaReady {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media {
+    opacity: 1;
+    transition: none;
+  }
+}
