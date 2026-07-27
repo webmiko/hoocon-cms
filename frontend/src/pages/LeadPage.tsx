@@ -1,3 +1,6 @@
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { LeadForm } from "../components/LeadForm";
 import { Seo } from "../components/Seo";
@@ -90,6 +93,14 @@ interface LeadPageProps {
  */
 export function LeadPage({ leadType }: LeadPageProps) {
   const copy = COPY[leadType];
+  const [searchParams] = useSearchParams();
+  const skuCodes = useMemo(() => {
+    const raw = searchParams.get("skus") || searchParams.get("sku") || "";
+    return raw
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }, [searchParams]);
 
   return (
     <div className={styles.page}>
@@ -126,7 +137,7 @@ export function LeadPage({ leadType }: LeadPageProps) {
       <p className={styles.afterNote}>{copy.after}</p>
 
       <div className={styles.formCard}>
-        <LeadForm leadType={leadType} />
+        <LeadForm leadType={leadType} skuCodes={skuCodes} />
       </div>
     </div>
   );

@@ -107,6 +107,10 @@ export interface CompareRow {
   name: string;
   values: string[];
   diff: boolean;
+  group?: string;
+  group_title?: string;
+  /** True for highlights/meta; false for full attribute-group rows. */
+  core?: boolean;
 }
 
 export interface CompareResponse {

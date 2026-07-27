@@ -22,6 +22,8 @@ interface LeadFormProps {
   leadType: LeadType;
   skuSlug?: string;
   skuName?: string;
+  /** Prefill message with several артикулов (compare → consultation). */
+  skuCodes?: string[];
   ballValveKit?: BallValveKitOptions | null;
 }
 
@@ -47,8 +49,35 @@ const INITIAL_STATE: FormState = {
   website: "",
 };
 
-export function LeadForm({ leadType, skuSlug, skuName, ballValveKit }: LeadFormProps) {
-  const [form, setForm] = useState<FormState>(INITIAL_STATE);
+function buildDefaultMessage(skuCodes?: string[], skuName?: string): string {
+  const codes = (skuCodes ?? []).map((c) => c.trim()).filter(Boolean);
+  if (codes.length > 1) {
+    return `Прошу подготовить КП на артикулы: ${codes.join(", ")}.`;
+  }
+  if (codes.length === 1) {
+    return `Прошу подготовить КП на ${codes[0]}.`;
+  }
+  if (skuName) {
+    return `Прошу подготовить КП на ${skuName}.`;
+  }
+  return "";
+}
+
+export function LeadForm({
+  leadType,
+  skuSlug,
+  skuName,
+  skuCodes,
+  ballValveKit,
+}: LeadFormProps) {
+  const defaultMessage = useMemo(
+    () => buildDefaultMessage(skuCodes, skuName),
+    [skuCodes, skuName],
+  );
+  const [form, setForm] = useState<FormState>(() => ({
+    ...INITIAL_STATE,
+    message: buildDefaultMessage(skuCodes, skuName),
+  }));
   const [pdnConsent, setPdnConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -60,11 +89,6 @@ export function LeadForm({ leadType, skuSlug, skuName, ballValveKit }: LeadFormP
       console.warn("CSRF token fetch failed:", err);
     });
   }, []);
-
-  const defaultMessage = useMemo(
-    () => (skuName ? `Прошу подготовить КП на ${skuName}.` : ""),
-    [skuName],
-  );
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
