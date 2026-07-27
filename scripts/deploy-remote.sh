@@ -1,14 +1,33 @@
 #!/usr/bin/env bash
-# Deploy from GitHub Actions runner → VPS over SSH.
-# Used by .github/workflows/ci.yml (push to develop/main only).
-# Local ad-hoc deploys are not supported — use CI/CD.
+# Deploy web image + frontend to VPS over SSH.
+#
+# Callers:
+#   - GitHub Actions (.github/workflows/ci.yml) — IMAGE_TRANSFER=pull (GHCR)
+#   - Local fallback (scripts/deploy-to-vps.sh) — IMAGE_TRANSFER=load
+#
+# Required env:
+#   DEPLOY_PATH, DOCKER_IMAGE
+#   SSH_HOST  — OR — SSH_USER + SERVER_HOST
+# Optional:
+#   IMAGE_TRANSFER=pull|load (default pull)
+#   GHCR_USER + GHCR_TOKEN — login before pull
+#   DEPLOY_APPLY_NGINX=1 (default)
+#   WWW_FRONTEND / WWW_STATIC / WWW_MEDIA
 set -euo pipefail
 
 DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH is required}"
-SSH_USER="${SSH_USER:?SSH_USER is required}"
-SERVER_HOST="${SERVER_HOST:?SERVER_HOST is required}"
 DOCKER_IMAGE="${DOCKER_IMAGE:?DOCKER_IMAGE is required}"
-SSH_TARGET="${SSH_USER}@${SERVER_HOST}"
+IMAGE_TRANSFER="${IMAGE_TRANSFER:-pull}"
+
+if [[ -n "${SSH_HOST:-}" ]]; then
+  SSH_TARGET="${SSH_HOST}"
+elif [[ -n "${SSH_USER:-}" && -n "${SERVER_HOST:-}" ]]; then
+  SSH_TARGET="${SSH_USER}@${SERVER_HOST}"
+else
+  echo "ERROR: set SSH_HOST or SSH_USER+SERVER_HOST" >&2
+  exit 1
+fi
+
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${HOME}/.ssh/known_hosts")
 RSYNC_SSH="ssh ${SSH_OPTS[*]}"
 
@@ -17,10 +36,13 @@ WWW_STATIC="${WWW_STATIC:-/var/www/hoocon/staticfiles}"
 WWW_MEDIA="${WWW_MEDIA:-/var/www/hoocon/media}"
 
 mkdir -p "${HOME}/.ssh"
-ssh-keyscan -H "${SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null || true
+if [[ -n "${SERVER_HOST:-}" ]]; then
+  ssh-keyscan -H "${SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null || true
+fi
 
 echo "Sync compose files to ${SSH_TARGET}:${DEPLOY_PATH}"
-ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p '${DEPLOY_PATH}' '${WWW_FRONTEND}' '${WWW_STATIC}' '${WWW_MEDIA}'"
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+  "mkdir -p '${DEPLOY_PATH}' '${WWW_FRONTEND}' '${WWW_STATIC}' '${WWW_MEDIA}'"
 
 rsync -az -e "${RSYNC_SSH}" \
   docker-compose.prod.yml \
@@ -34,7 +56,7 @@ if [[ -d frontend/dist ]]; then
   rsync -az -e "${RSYNC_SSH}" --delete frontend/dist/ \
     "${SSH_TARGET}:${WWW_FRONTEND}/"
 else
-  echo "ERROR: frontend/dist missing on runner" >&2
+  echo "ERROR: frontend/dist missing" >&2
   exit 1
 fi
 
@@ -52,20 +74,39 @@ if [[ -d deploy/nginx ]]; then
   fi
 fi
 
-echo "Pull image and restart stack (${DOCKER_IMAGE})"
+echo "Restart stack (${DOCKER_IMAGE}, transfer=${IMAGE_TRANSFER})"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s <<EOF
 set -euo pipefail
 cd "${DEPLOY_PATH}"
 test -f .env || { echo "ERROR: ${DEPLOY_PATH}/.env missing on server" >&2; exit 1; }
 
-if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USER:-}" ]]; then
-  echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+if [[ "${IMAGE_TRANSFER}" == "pull" ]]; then
+  if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USER:-}" ]]; then
+    echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+  fi
 fi
 
 export DOCKER_IMAGE="${DOCKER_IMAGE}"
+# Persist tag so compose restarts / reboot keep the same image.
+if grep -q '^DOCKER_IMAGE=' .env 2>/dev/null; then
+  sed -i "s|^DOCKER_IMAGE=.*|DOCKER_IMAGE=${DOCKER_IMAGE}|" .env
+else
+  printf '\nDOCKER_IMAGE=%s\n' "${DOCKER_IMAGE}" >> .env
+fi
+
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.hub.yml)
 
-"\${COMPOSE[@]}" pull web celery_worker
+if [[ "${IMAGE_TRANSFER}" == "pull" ]]; then
+  "\${COMPOSE[@]}" pull web celery_worker
+elif [[ "${IMAGE_TRANSFER}" == "load" ]]; then
+  docker image inspect "${DOCKER_IMAGE}" >/dev/null \
+    || { echo "ERROR: image ${DOCKER_IMAGE} not on host (docker load first)" >&2; exit 1; }
+  echo "Using locally loaded image (skip pull)"
+else
+  echo "ERROR: IMAGE_TRANSFER must be pull or load" >&2
+  exit 1
+fi
+
 "\${COMPOSE[@]}" up -d --no-build --remove-orphans db redis web celery_worker
 
 echo "Waiting for health..."
