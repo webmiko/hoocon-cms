@@ -170,20 +170,25 @@ export function SkuDetailPage() {
   const [tab, setTab] = useState<TabId>("description");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
-  /** Scroll tabs into view after user switches section (mobile long panels). */
+  const activeAccordionTriggerRef = useRef<HTMLButtonElement>(null);
+  /** Scroll active section into view after user switches (mobile accordion). */
   const scrollTabsAfterChange = useRef(false);
 
   useEffect(() => {
     if (!scrollTabsAfterChange.current) return;
     scrollTabsAfterChange.current = false;
-    tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const target =
+      activeAccordionTriggerRef.current ?? tabsRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [tab]);
 
   const selectTab = (next: TabId) => {
     scrollTabsAfterChange.current = true;
     if (next === tab) {
       scrollTabsAfterChange.current = false;
-      tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const target =
+        activeAccordionTriggerRef.current ?? tabsRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     setTab(next);
@@ -345,6 +350,139 @@ export function SkuDetailPage() {
   const activeTab = visibleTabs.some((t) => t.id === tab)
     ? tab
     : (visibleTabs[0]?.id ?? "description");
+
+  const renderTabBody = (id: TabId) => {
+    if (id === "description") {
+      return (
+        <section className={styles.section}>
+          {descriptionBody ? <StructuredText text={descriptionBody} /> : null}
+          {sku.category_description &&
+          sku.category_description !== descriptionBody &&
+          !descriptionsOverlap(sku.category_description, descriptionBody) &&
+          categoryCopyFitsSku(sku.category_description, sku.sku_code) ? (
+            <div className={styles.seriesBlock}>
+              <h2 className={styles.descDocTitle}>О линейке продукции</h2>
+              <StructuredText text={sku.category_description} />
+            </div>
+          ) : null}
+        </section>
+      );
+    }
+    if (id === "instructions" && sku.category_instructions) {
+      return (
+        <section className={styles.section}>
+          <InstructionText
+            text={sku.category_instructions}
+            styles={{
+              lead: styles.descLead,
+              quote: styles.descQuote,
+              docTitle: styles.descDocTitle,
+              section: styles.descSection,
+              subsection: styles.descSubsection,
+              list: styles.descList,
+            }}
+          />
+        </section>
+      );
+    }
+    if (id === "specs") {
+      return (
+        <section className={styles.section}>
+          {(displayAttributeGroups && displayAttributeGroups.length > 0
+            ? displayAttributeGroups
+            : null
+          )?.map((group) => (
+            <div key={group.key} className={styles.specGroup}>
+              <h3 className={styles.specGroupTitle}>{group.title}</h3>
+              <ul className={styles.specCards}>
+                {group.items
+                  .filter((attr, index, all) => {
+                    const key = `${attr.name}|${attr.value}`.toLowerCase();
+                    return (
+                      all.findIndex(
+                        (other) =>
+                          `${other.name}|${other.value}`.toLowerCase() === key,
+                      ) === index
+                    );
+                  })
+                  .map((attr) => (
+                    <li
+                      key={`${attr.slug}-${attr.value}`}
+                      className={styles.specCard}
+                    >
+                      <span className={styles.specName}>
+                        {softBreak(compactCardSpecName(attr.name))}
+                      </span>
+                      <SpecAttrValue
+                        slug={attr.slug}
+                        value={String(attr.value)}
+                        unit={attr.unit}
+                        valueClassName={styles.specValue}
+                        unitClassName={styles.specUnit}
+                      />
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+          {!displayAttributeGroups?.length &&
+          displayAttributes &&
+          displayAttributes.length > 0 ? (
+            <ul className={styles.specCards}>
+              {displayAttributes
+                .filter((attr, index, all) => {
+                  const key = `${attr.name}|${attr.value}`.toLowerCase();
+                  return (
+                    all.findIndex(
+                      (other) =>
+                        `${other.name}|${other.value}`.toLowerCase() === key,
+                    ) === index
+                  );
+                })
+                .map((attr) => (
+                  <li
+                    key={`${attr.slug}-${attr.value}`}
+                    className={styles.specCard}
+                  >
+                    <span className={styles.specName}>
+                      {softBreak(compactCardSpecName(attr.name))}
+                    </span>
+                    <SpecAttrValue
+                      slug={attr.slug}
+                      value={String(attr.value)}
+                      unit={attr.unit}
+                      valueClassName={styles.specValue}
+                      unitClassName={styles.specUnit}
+                    />
+                  </li>
+                ))}
+            </ul>
+          ) : null}
+          {sku.specs_text &&
+          !displayAttributeGroups?.length &&
+          !(displayAttributes && displayAttributes.length > 0) ? (
+            <div className={styles.specsProse}>
+              <StructuredText
+                text={overlayCopyForSibling(
+                  sku.specs_text,
+                  sku.sku_code,
+                  activeSibling,
+                )}
+              />
+            </div>
+          ) : null}
+        </section>
+      );
+    }
+    if (id === "analogs" && sku.analogs_text) {
+      return (
+        <section className={styles.section}>
+          <StructuredText text={sku.analogs_text} />
+        </section>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className={styles.detail} aria-busy={isSoftRefreshing || undefined}>
@@ -561,158 +699,82 @@ export function SkuDetailPage() {
         >
           {visibleTabs.length > 0 ? (
             <div className={styles.tabs} ref={tabsRef}>
-              <div className={styles.tabList} role="tablist" aria-label="Разделы">
-                {visibleTabs.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === item.id}
-                    className={
-                      activeTab === item.id ? styles.tabActive : styles.tab
-                    }
-                    onClick={() => selectTab(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+              {/* Desktop: horizontal tabs */}
+              <div className={styles.tabsDesktop}>
+                <div
+                  className={styles.tabList}
+                  role="tablist"
+                  aria-label="Разделы"
+                >
+                  {visibleTabs.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === item.id}
+                      className={
+                        activeTab === item.id ? styles.tabActive : styles.tab
+                      }
+                      onClick={() => selectTab(item.id)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.tabPanel} role="tabpanel">
+                  {renderTabBody(activeTab)}
+                </div>
               </div>
 
-              <div className={styles.tabPanel} role="tabpanel">
-                {activeTab === "description" ? (
-                  <section className={styles.section}>
-                    {descriptionBody ? (
-                      <StructuredText text={descriptionBody} />
-                    ) : null}
-                    {sku.category_description &&
-                    sku.category_description !== descriptionBody &&
-                    !descriptionsOverlap(
-                      sku.category_description,
-                      descriptionBody,
-                    ) &&
-                    categoryCopyFitsSku(
-                      sku.category_description,
-                      sku.sku_code,
-                    ) ? (
-                      <div className={styles.seriesBlock}>
-                        <h2 className={styles.descDocTitle}>О линейке продукции</h2>
-                        <StructuredText text={sku.category_description} />
-                      </div>
-                    ) : null}
-                  </section>
-                ) : null}
-
-                {activeTab === "instructions" && sku.category_instructions ? (
-                  <section className={styles.section}>
-                    <InstructionText
-                      text={sku.category_instructions}
-                      styles={{
-                        lead: styles.descLead,
-                        quote: styles.descQuote,
-                        docTitle: styles.descDocTitle,
-                        section: styles.descSection,
-                        subsection: styles.descSubsection,
-                        list: styles.descList,
-                      }}
-                    />
-                  </section>
-                ) : null}
-
-                {activeTab === "specs" ? (
-                  <section className={styles.section}>
-                    {(displayAttributeGroups && displayAttributeGroups.length > 0
-                      ? displayAttributeGroups
-                      : null
-                    )?.map((group) => (
-                      <div key={group.key} className={styles.specGroup}>
-                        <h3 className={styles.specGroupTitle}>{group.title}</h3>
-                        <ul className={styles.specCards}>
-                          {group.items
-                            .filter((attr, index, all) => {
-                              const key = `${attr.name}|${attr.value}`.toLowerCase();
-                              return (
-                                all.findIndex(
-                                  (other) =>
-                                    `${other.name}|${other.value}`.toLowerCase() ===
-                                    key,
-                                ) === index
-                              );
-                            })
-                            .map((attr) => (
-                              <li
-                                key={`${attr.slug}-${attr.value}`}
-                                className={styles.specCard}
-                              >
-                                <span className={styles.specName}>
-                                  {softBreak(compactCardSpecName(attr.name))}
-                                </span>
-                                <SpecAttrValue
-                                  slug={attr.slug}
-                                  value={String(attr.value)}
-                                  unit={attr.unit}
-                                  valueClassName={styles.specValue}
-                                  unitClassName={styles.specUnit}
-                                />
-                              </li>
-                            ))}
-                        </ul>
-                      </div>
-                    ))}
-                    {!displayAttributeGroups?.length &&
-                    displayAttributes &&
-                    displayAttributes.length > 0 ? (
-                      <ul className={styles.specCards}>
-                        {displayAttributes
-                          .filter((attr, index, all) => {
-                            const key = `${attr.name}|${attr.value}`.toLowerCase();
-                            return (
-                              all.findIndex(
-                                (other) =>
-                                  `${other.name}|${other.value}`.toLowerCase() ===
-                                  key,
-                              ) === index
-                            );
-                          })
-                          .map((attr) => (
-                            <li
-                              key={`${attr.slug}-${attr.value}`}
-                              className={styles.specCard}
-                            >
-                              <span className={styles.specName}>
-                                {softBreak(compactCardSpecName(attr.name))}
-                              </span>
-                              <SpecAttrValue
-                                slug={attr.slug}
-                                value={String(attr.value)}
-                                unit={attr.unit}
-                                valueClassName={styles.specValue}
-                                unitClassName={styles.specUnit}
-                              />
-                            </li>
-                          ))}
-                      </ul>
-                    ) : null}
-                    {sku.specs_text &&
-                    !displayAttributeGroups?.length &&
-                    !(displayAttributes && displayAttributes.length > 0) ? (
-                      <div className={styles.specsProse}>
-                        <StructuredText
-                          text={overlayCopyForSibling(
-                            sku.specs_text,
-                            sku.sku_code,
-                            activeSibling,
-                          )}
-                        />
-                      </div>
-                    ) : null}
-                  </section>
-                ) : null}
-
-                {activeTab === "analogs" && sku.analogs_text ? (
-                  <section className={styles.section}>
-                    <StructuredText text={sku.analogs_text} />
-                  </section>
-                ) : null}
+              {/* Mobile: exclusive accordion, sticky open header */}
+              <div className={styles.accordion} role="region" aria-label="Разделы">
+                {visibleTabs.map((item) => {
+                  const isOpen = activeTab === item.id;
+                  const panelId = `sku-acc-panel-${item.id}`;
+                  const triggerId = `sku-acc-trigger-${item.id}`;
+                  return (
+                    <div
+                      key={item.id}
+                      className={
+                        isOpen
+                          ? styles.accordionItemOpen
+                          : styles.accordionItem
+                      }
+                    >
+                      <h2 className={styles.accordionHeading}>
+                        <button
+                          id={triggerId}
+                          type="button"
+                          className={
+                            isOpen
+                              ? styles.accordionTriggerOpen
+                              : styles.accordionTrigger
+                          }
+                          aria-expanded={isOpen}
+                          aria-controls={panelId}
+                          ref={isOpen ? activeAccordionTriggerRef : undefined}
+                          onClick={() => selectTab(item.id)}
+                        >
+                          <span>{item.label}</span>
+                          <span
+                            className={styles.accordionChevron}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      </h2>
+                      {isOpen ? (
+                        <div
+                          id={panelId}
+                          role="region"
+                          aria-labelledby={triggerId}
+                          className={styles.accordionPanel}
+                        >
+                          {renderTabBody(item.id)}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : null}

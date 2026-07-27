@@ -359,10 +359,17 @@
 
 .tabs {
   margin-bottom: var(--space-xl);
-  /* Keep section title/tabs under sticky chrome after tab switch scroll. */
   scroll-margin-top: calc(
     var(--masthead-height) + var(--header-height) + var(--space-sm)
   );
+}
+
+.tabsDesktop {
+  display: block;
+}
+
+.accordion {
+  display: none;
 }
 
 .tabList {
@@ -377,18 +384,6 @@
   z-index: 100;
   background: var(--color-bg);
   padding-top: var(--space-sm);
-}
-
-@media (max-width: 768px) {
-  .tabs {
-    scroll-margin-top: calc(
-      var(--header-height) + env(safe-area-inset-top, 0px) + var(--space-sm)
-    );
-  }
-
-  .tabList {
-    top: var(--header-height);
-  }
 }
 
 .tab,
@@ -417,6 +412,99 @@
 
 .tabPanel {
   min-height: 8rem;
+}
+
+/* Mobile exclusive accordion (one panel open). */
+@media (max-width: 768px) {
+  .tabs {
+    scroll-margin-top: calc(
+      var(--header-height) + env(safe-area-inset-top, 0px) + var(--space-sm)
+    );
+  }
+
+  .tabsDesktop {
+    display: none;
+  }
+
+  .accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .accordionItem,
+  .accordionItemOpen {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .accordionHeading {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .accordionTrigger,
+  .accordionTriggerOpen {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    width: 100%;
+    margin: 0;
+    padding: var(--space-md) 0;
+    border: none;
+    background: var(--color-bg);
+    font: inherit;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-align: left;
+    cursor: pointer;
+    scroll-margin-top: calc(
+      var(--header-height) + env(safe-area-inset-top, 0px) + 2px
+    );
+  }
+
+  .accordionTrigger:hover,
+  .accordionTrigger:focus-visible {
+    color: var(--color-text);
+  }
+
+  .accordionTriggerOpen {
+    color: var(--color-link);
+    position: sticky;
+    top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+    z-index: 100;
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: 0 1px 0 var(--color-bg);
+  }
+
+  .accordionChevron {
+    flex: 0 0 auto;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+    opacity: 0.7;
+  }
+
+  .accordionTriggerOpen .accordionChevron {
+    transform: rotate(-135deg);
+    opacity: 1;
+  }
+
+  .accordionPanel {
+    padding: var(--space-lg) 0 var(--space-lg);
+    min-height: 0;
+  }
+
+  .accordionPanel .section {
+    margin-bottom: 0;
+  }
 }
 
 .seriesBlock {
