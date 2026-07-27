@@ -31,3 +31,4 @@
 - [Шаблоны карточек по сериям](series-card-templates.md)
 - [Решение по стеку: Hoocon CMS](stack-decision.md)
 - [Технический стиль копирайта (канон Belimo RU)](tech-copy-belimo-ru.md)
+- [План статей для подбора приводов](plan-articles-selection-guides.md)
