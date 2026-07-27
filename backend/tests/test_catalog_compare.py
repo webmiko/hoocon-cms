@@ -70,6 +70,18 @@ def test_normalize_compare_cell() -> None:
     assert normalize_compare_cell("  24  В= ") == normalize_compare_cell("24 в=")
 
 
+def test_format_compare_cells() -> None:
+    """Empty cells become dash; units append when missing from value."""
+    from catalog.compare import format_attribute_cell, format_highlight_cell
+
+    assert format_highlight_cell({"value": "", "unit": "Нм"}) == COMPARE_EMPTY_CELL
+    assert format_highlight_cell({"value": "5", "unit": "Нм"}) == "5 Нм"
+    assert format_highlight_cell({"value": "5 Нм", "unit": "Нм"}) == "5 Нм"
+    assert format_attribute_cell({"value": "", "unit": ""}) == COMPARE_EMPTY_CELL
+    assert format_attribute_cell({"value": "IP54", "unit": ""}) == "IP54"
+    assert format_attribute_cell({"value": "54", "unit": "дБ"}) == "54 дБ"
+
+
 def test_build_compare_rows_marks_diff() -> None:
     """Moment differs; voltage same; empty analog is dash."""
     payloads = [
@@ -147,3 +159,18 @@ def test_compare_endpoint_empty_skus(client) -> None:
     assert response.status_code == 200
     assert response.data["skus"] == []
     assert response.data["rows"] == []
+
+
+@pytest.mark.django_db
+def test_compare_endpoint_includes_attribute_rows(client) -> None:
+    """Full ТТХ rows carry group metadata alongside highlight rows."""
+    seeded = _seed_pair()
+    response = client.get(
+        reverse("catalog-compare-list"),
+        {"skus": f"{seeded['sku5'].slug},{seeded['sku10'].slug}"},
+    )
+    assert response.status_code == 200
+    rows = response.data["rows"]
+    assert any(row.get("core") is True for row in rows)
+    assert all("group" in row for row in rows)
+    assert all("values" in row and "diff" in row for row in rows)
