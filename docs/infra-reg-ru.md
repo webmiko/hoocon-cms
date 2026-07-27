@@ -74,11 +74,12 @@ Compose: db, redis, web, celery_worker
 - [ ] DNS A → новый VPS; TTL снижен заранее
 - [ ] TLS валиден; HSTS после стабилизации
 - [ ] MX/SPF/DKIM; тест письма Lead → `sales@hoocon.ru`
-- [ ] **SEO:** инвентарь URL 200/301
-      ([seo-url-migration.md](seo-url-migration.md) §5)
+- [x] **SEO:** инвентарь URL 200/301 **по IP**
+      ([seo-url-migration.md](seo-url-migration.md) §5;
+      `scripts/check-url-inventory.sh`) — полный после DNS
 - [ ] Метрика / Вебмастер на новом origin
 - [ ] Smoke: `/`, `/catalog`, SKU, форма RFQ, `/api/health/`
-- [ ] Бэкап до и после миграции
+- [x] Бэкап скрипт + cron на VPS (`scripts/backup-vps.sh`)
 
 ---
 
@@ -90,5 +91,79 @@ Compose: db, redis, web, celery_worker
 | Доставляемость почты | SPF/DKIM, не слать с «голого» IP без PTR |
 | Downtime cutover | параллельный прогон, низкий TTL, rollback DNS |
 | DDoS-Guard у Tilda сейчас | на VPS — fail2ban / лимиты nginx, при необходимости защита reg.ru |
+
+---
+
+## 6. Бэкапы (Postgres + media)
+
+Скрипт на хосте: [`scripts/backup-vps.sh`](../scripts/backup-vps.sh).
+
+| Параметр | Значение по умолчанию |
+|----------|------------------------|
+| Каталог | `/opt/hoocon/backups/<UTC-stamp>/` |
+| DB | `pg_dump -Fc` из контейнера `db` → `hoocon.dump` |
+| Media | `tar.gz` из `/var/www/hoocon/media` → `media.tar.gz` |
+| Retention | 7 дней (`RETENTION_DAYS`) |
+
+Прогон вручную:
+
+```bash
+ssh hoocon-prod 'sudo /opt/hoocon/scripts/backup-vps.sh'
+```
+
+После деплоя скопировать скрипт на VPS (если ещё нет в `/opt/hoocon/scripts/`):
+
+```bash
+scp scripts/backup-vps.sh hoocon-prod:/tmp/
+ssh hoocon-prod 'sudo cp /tmp/backup-vps.sh /opt/hoocon/scripts/ && sudo chmod +x /opt/hoocon/scripts/backup-vps.sh'
+```
+
+Crontab (раз в сутки, 03:15 UTC):
+
+```cron
+15 3 * * * /opt/hoocon/scripts/backup-vps.sh >> /var/log/hoocon-backup.log 2>&1
+```
+
+### Restore (кратко)
+
+```bash
+# DB
+cd /opt/hoocon
+BACKUP=/opt/hoocon/backups/<stamp>
+docker compose exec -T db pg_restore -U "$DB_USER" -d "$DB_NAME" \
+  --clean --if-exists --no-owner --no-acl /tmp/hoocon.dump
+# (сначала: docker cp $BACKUP/hoocon.dump $(docker compose ps -q db):/tmp/hoocon.dump)
+
+# Media
+sudo tar -C /var/www/hoocon -xzf "$BACKUP/media.tar.gz"
+```
+
+---
+
+## 7. Мониторинг (минимум до Sentry)
+
+Скрипт: [`scripts/monitor-health.sh`](../scripts/monitor-health.sh) —
+`curl` `/api/health/` + порог заполнения диска (`DISK_WARN_PCT=85`).
+
+```cron
+*/5 * * * * HEALTH_URL=http://127.0.0.1:8000/api/health/ \
+  /opt/hoocon/scripts/monitor-health.sh
+```
+
+Лог: `/var/log/hoocon-monitor.log`. Ненулевой exit → mail от cron (если
+настроен). Sentry — после стабилизации (Iter 6).
+
+---
+
+## 8. Отложено до домена / SMTP
+
+Пока нет cutover DNS `hoocon.ru` и почты reg.ru **не** делать в коде/проде:
+
+- TLS Let’s Encrypt, HSTS «в бою», HTTP→HTTPS redirect
+- SMTP smoke Lead/CRM, SPF/DKIM
+- Client auth / ЛК / чат поддержки
+- **AnalogMap / `/analog-belimo`** — только после валидированной карты
+  ([data-quality-etl.md](data-quality-etl.md)); сейчас лишь
+  `SKU.analog_belimo_code` + ETL heuristics
 
 Связано: [market-analysis.md](market-analysis.md), план проекта (scope / infra).

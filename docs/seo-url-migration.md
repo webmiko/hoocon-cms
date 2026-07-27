@@ -175,8 +175,9 @@ http / www    → 301 https://hoocon.ru
 ## 5. Cutover-чеклист SEO
 
 - [ ] Выгрузка актуальных sitemap.xml + sitemap-store.xml в день релиза
-- [ ] CSV редиректов залит; выборочный curl 20 URL
-- [ ] Новый `sitemap.xml` только с канонами (без `/tproduct/`)
+- [x] CSV редиректов залит; выборочный curl ~20 URL **по IP**
+  (`scripts/check-url-inventory.sh`, Host: `hoocon.ru`) — до DNS cutover
+- [ ] Новый `sitemap.xml` только с канонами (без `/tproduct/`) — после cutover
 - [ ] GSC / Яндекс.Вебмастер: смена sitemap, мониторинг 404
 - [ ] Метрика: цели на новых URL; сверка трафика 2–4 недели
 - [ ] Параллельный запуск: низкий TTL DNS; rollback = DNS обратно на Tilda
