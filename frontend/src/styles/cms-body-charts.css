@@ -641,7 +641,7 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
   }
 
   .cms-rich-body .series-table--spec td:nth-child(1)::before {
-    content: "Н·м";
+    content: "Момент";
   }
 
   .cms-rich-body .series-table--spec td:nth-child(2)::before {
@@ -657,11 +657,11 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
   }
 
   .cms-rich-body .series-table--mass td:nth-child(2)::before {
-    content: "Н·м";
+    content: "Момент";
   }
 
   .cms-rich-body .series-table--mass td:nth-child(3)::before {
-    content: "Вес";
+    content: "Масса";
   }
 
   .cms-rich-body .series-table--spec td:nth-child(3),
