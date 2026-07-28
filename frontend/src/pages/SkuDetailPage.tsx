@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 
 import {
@@ -30,6 +30,8 @@ import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import { photoScaleFromHighlights } from "../utils/productPhotoScale";
+import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import {
   catalogCategoryPath,
   catalogPathForSku,
@@ -263,6 +265,24 @@ export function SkuDetailPage() {
     }
     return [];
   }, [sku, theme]);
+
+  const photoScaleTorque = useMemo(
+    () => photoScaleFromHighlights(displayHighlights),
+    [displayHighlights],
+  );
+  const heroSrc = galleryImages[0]?.src;
+  const heroIsDiagram = Boolean(
+    galleryImages[0] &&
+      isTechnicalDiagram(galleryImages[0].src, galleryImages[0].alt),
+  );
+  const photoScale = useNormalizedPhotoScale(
+    heroIsDiagram ? null : heroSrc,
+    photoScaleTorque,
+  );
+  const productWashStyle = useMemo(
+    (): CSSProperties => ({ "--photo-scale": String(photoScale) }),
+    [photoScale],
+  );
 
   if (loading && !sku) {
     return <p className={styles.status}>Загрузка…</p>;
@@ -536,6 +556,12 @@ export function SkuDetailPage() {
           className={`${styles.heroMedia} u-protect-media`}
           data-purpose={mediaPurpose}
           src={galleryImages[0]?.src}
+          style={
+            galleryImages[0] &&
+            !isTechnicalDiagram(galleryImages[0].src, galleryImages[0].alt)
+              ? productWashStyle
+              : undefined
+          }
           backdrop={
             galleryImages[0] &&
             isTechnicalDiagram(galleryImages[0].src, galleryImages[0].alt)
@@ -656,6 +682,11 @@ export function SkuDetailPage() {
                 className={styles.galleryItem}
                 data-purpose={mediaPurpose}
                 src={item.src}
+                style={
+                  isTechnicalDiagram(item.src, item.alt)
+                    ? undefined
+                    : productWashStyle
+                }
                 backdrop={
                   isTechnicalDiagram(item.src, item.alt) ? "white" : "auto"
                 }

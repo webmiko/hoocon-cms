@@ -6,7 +6,6 @@ import { CompareToggle } from "./CompareToggle";
 import { ProtectedProductImage } from "./ProtectedProductImage";
 import { SignalSpecValue } from "./SignalSpecValue";
 import { SoftBreakText } from "./SoftBreakText";
-import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
 import { cardHighlights, compactCardSpecName } from "../utils/cardHighlights";
 import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { catalogPathForSku } from "../utils/catalogPaths";
@@ -20,7 +19,9 @@ import {
   protectedMediaImgProps,
 } from "../utils/contentProtection";
 import { formatEditionCountLabel } from "../utils/editionCountLabel";
+import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import { photoScaleFromHighlights } from "../utils/productPhotoScale";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
@@ -35,10 +36,9 @@ type CatalogSkuCardProps = {
 };
 
 /**
- * Catalog grid card with photo-edge wash behind the product cutout.
+ * Catalog grid card with theme photo wash behind the product cutout.
  *
- * Samples the studio backdrop into a L→R gradient for the media cell only;
- * the text block keeps the default card surface. Family Products
+ * Light gray / dark graphite via ``--photo-wash``. Family Products
  * (``edition_count > 1``) show a variants line and CTA «Выбрать вариант».
  * Photo save / text copy are deterred via contentProtection helpers.
  */
@@ -50,13 +50,8 @@ export function CatalogSkuCard({
   const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
   const imageSrc = sku.image?.image ?? null;
-  const wash = useMatchedPhotoWash(imageSrc);
-  const washStyle: CSSProperties | undefined = wash
-    ? { background: wash.css }
-    : undefined;
-  const cardStyle: CSSProperties | undefined = wash
-    ? ({ "--card-wash-gradient": wash.css } as CSSProperties)
-    : undefined;
+  const torqueScale = photoScaleFromHighlights(sku.highlights);
+  const photoScale = useNormalizedPhotoScale(imageSrc, torqueScale);
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
   const cardClass =
@@ -77,7 +72,6 @@ export function CatalogSkuCard({
       id={omitDomId ? undefined : catalogSkuDomId(sku.slug)}
       className={cardClass}
       data-purpose={purpose}
-      style={cardStyle}
       {...protectedContentHandlers}
     >
       <Link
@@ -91,7 +85,7 @@ export function CatalogSkuCard({
         <div
           className={`${styles.cardMedia} u-protect-media`}
           data-purpose={purpose}
-          style={washStyle}
+          style={{ "--photo-scale": String(photoScale) } as CSSProperties}
           onContextMenu={protectedMediaImgProps.onContextMenu}
         >
           <CompareToggle
