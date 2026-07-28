@@ -28,6 +28,8 @@ def convert_bytes_to_webp(
     *,
     quality: int = DEFAULT_WEBP_QUALITY,
     max_edge: int = MAX_EDGE_PX,
+    trim_alpha: bool = False,
+    flatten_white: bool = False,
 ) -> bytes:
     """Decode image bytes and re-encode as WebP.
 
@@ -35,6 +37,8 @@ def convert_bytes_to_webp(
         raw: Original JPEG/PNG/WebP bytes.
         quality: WebP quality 1–100 (default 90).
         max_edge: Max width/height; larger images are downscaled (LANCZOS).
+        trim_alpha: Crop transparent padding (diagrams with oversized canvas).
+        flatten_white: Composite onto white RGB (paper diagrams / montages).
 
     Returns:
         WebP bytes.
@@ -49,6 +53,12 @@ def convert_bytes_to_webp(
             converted = img.convert("RGBA")
         else:
             converted = img.convert("RGB")
+
+        if trim_alpha and converted.mode == "RGBA":
+            converted = trim_rgba_padding(converted)
+
+        if flatten_white:
+            converted = flatten_rgba_on_white(converted)
 
         w, h = converted.size
         longest = max(w, h)
@@ -65,6 +75,49 @@ def convert_bytes_to_webp(
             method=WEBP_METHOD,
         )
         return out.getvalue()
+
+
+def trim_rgba_padding(
+    image: Image.Image,
+    *,
+    alpha_threshold: int = 16,
+    pad_px: int = 8,
+) -> Image.Image:
+    """Crop near-transparent margins from an RGBA diagram.
+
+    Args:
+        image: Source RGBA (other modes returned unchanged).
+        alpha_threshold: Pixels at or below this alpha are treated as empty.
+        pad_px: Keep a small margin around remaining content.
+
+    Returns:
+        Cropped image, or the original when there is no usable content.
+    """
+    if image.mode != "RGBA":
+        return image
+    alpha = image.getchannel("A")
+    mask = alpha.point(lambda value: 255 if value > alpha_threshold else 0)
+    bbox = mask.getbbox()
+    if bbox is None:
+        return image
+    left, top, right, bottom = bbox
+    width, height = image.size
+    left = max(0, left - pad_px)
+    top = max(0, top - pad_px)
+    right = min(width, right + pad_px)
+    bottom = min(height, bottom + pad_px)
+    if left == 0 and top == 0 and right == width and bottom == height:
+        return image
+    return image.crop((left, top, right, bottom))
+
+
+def flatten_rgba_on_white(image: Image.Image) -> Image.Image:
+    """Composite transparent pixels onto an opaque white background."""
+    if image.mode != "RGBA":
+        return image.convert("RGB") if image.mode != "RGB" else image
+    background = Image.new("RGB", image.size, (255, 255, 255))
+    background.paste(image, mask=image.getchannel("A"))
+    return background
 
 
 def webp_upload_basename(filename: str) -> str:
