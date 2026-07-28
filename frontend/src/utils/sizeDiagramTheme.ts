@@ -39,15 +39,19 @@ export function isTechnicalDiagram(src: string, alt?: string): boolean {
   if (/-(?:dimensions|wiring|aux[_-]switch|settings)\./i.test(src)) {
     return true;
   }
+  if (/montazhnaya_sxema/i.test(src)) {
+    return true;
+  }
   const label = (alt || "").toLowerCase();
   return (
     label.includes("схема подключения") ||
+    label.includes("монтажн") ||
     label.includes("вспомогательн") ||
     label.includes("dip") ||
     label.includes("настройка") ||
     label.includes("габаритные размеры") ||
     label.includes("чертёж") ||
-    label.includes("чертеж")
+    (label.includes("термодатчик") && label.includes("схема"))
   );
 }
 

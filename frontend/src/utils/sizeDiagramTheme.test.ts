@@ -41,6 +41,12 @@ describe("sizeDiagramSrcForTheme", () => {
         "H8101 | Настройка DIP-переключателей",
       ),
     ).toBe(true);
+    expect(
+      isTechnicalDiagram(
+        "/media/x_montazhnaya_sxema_hv.webp",
+        "HVD24-20 | Монтажная схема",
+      ),
+    ).toBe(true);
     expect(isTechnicalDiagram("/media/x-0.webp", "product photo")).toBe(false);
   });
 
