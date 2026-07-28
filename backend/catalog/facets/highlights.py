@@ -133,12 +133,14 @@ def highlights_for_sku(
             # Allow room for Y/U inject before final trim.
             break
 
-    _ensure_modulating_signal_highlights(by_key)
+    # Control first: early limit break may collect Y/U EAV before «Управление»;
+    # modulating ensure would then pop Y/U (no proportional control yet).
     _ensure_control_highlight(
         by_key,
         sku_code=sku_code,
         category_slug=category_slug,
     )
+    _ensure_modulating_signal_highlights(by_key)
     _ensure_aux_switch_highlight(by_key, sku_code=sku_code)
 
     ordered: list[dict[str, str]] = []

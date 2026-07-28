@@ -400,6 +400,65 @@ def test_highlights_proportional_includes_y_u_signals() -> None:
 
 
 @pytest.mark.django_db
+def test_highlights_y_u_survive_early_limit_before_control() -> None:
+    """Catalog cards (limit=8) keep Y/U when EAV fills by_key before «Управление».
+
+    Attribute iteration often hits Y/U and other facets first; early break then
+    left control missing, and modulating ensure used to pop Y/U.
+    """
+    from catalog.facets import highlights_for_sku
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(
+        name="MU",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    product = Product.objects.create(name="DA", slug="da-mod-early", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA8MU",
+        slug="da8mu-mod-early-hl",
+        sku_code="DA8MU230-AS",
+        is_published=True,
+    )
+    rows_seed = (
+        ("Время поворота", "runtime", "< 55 с"),
+        ("Вспомогательный переключатель", "aux", "SPDT-2"),
+        ("Габаритные размеры", "dims", "100 × 180 × 68 мм"),
+        ("Крутящий момент", "moment", "8 Нм"),
+        ("Масса", "weight", "≈ 1,3 кг"),
+        ("Номинальное напряжение", "voltage", "AC 230 В"),
+        ("Обратная связь U", "feedback-signal", "0(2)...10 В="),
+        ("Площадь заслонки", "area", "до 0,8 м²"),
+        ("Степень защиты", "ip", "IP44"),
+        ("Упр. сигнал Y", "control-signal", "0(2)...10 В="),
+        ("Управление", "control", "Пропорциональное"),
+    )
+    for name, slug, value in rows_seed:
+        attr = Attribute.objects.create(name=name, slug=slug)
+        AttributeValue.objects.create(sku=sku, attribute=attr, value=value)
+
+    rows = highlights_for_sku(
+        list(sku.attribute_values.select_related("attribute")),
+        limit=8,
+        sku_code=sku.sku_code,
+        category_slug=cat.slug,
+    )
+    keys = [r["key"] for r in rows]
+    assert "control" in keys
+    assert "control_signal" in keys
+    assert "feedback_signal" in keys
+    assert keys.index("control") < keys.index("control_signal")
+    assert keys.index("control_signal") < keys.index("feedback_signal")
+
+
+@pytest.mark.django_db
 def test_facets_control_excludes_manual_override(client) -> None:
     """«Ручное управление» must not appear as an «Управление» facet chip."""
     from catalog.models import (
