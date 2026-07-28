@@ -292,7 +292,7 @@ export function ComparePage() {
           </div>
 
           <div
-            className={`${styles.scroll} u-protect-content`}
+            className={`${styles.scroll} ${styles.desktopOnly} u-protect-content`}
             {...protectedContentHandlers}
           >
             <table className={styles.table}>
@@ -303,50 +303,10 @@ export function ComparePage() {
                   </th>
                   {skus.map((sku) => (
                     <th key={sku.slug} scope="col" className={styles.skuCol}>
-                      <div className={styles.skuHead}>
-                        <button
-                          type="button"
-                          className={`${styles.colRemove} ${styles.noPrint}`}
-                          onClick={() => handleRemove(sku.slug)}
-                          aria-label={`Убрать ${sku.sku_code}`}
-                        >
-                          ×
-                        </button>
-                        {sku.image?.image ? (
-                          <ProtectedProductImage
-                            src={sku.image.image}
-                            alt=""
-                            frameClassName={styles.skuImage}
-                            className="u-protect-media"
-                            compact
-                            width={72}
-                            height={72}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <span
-                            className={styles.skuImagePlaceholder}
-                            aria-hidden="true"
-                          />
-                        )}
-                        <Link
-                          to={catalogPathForSku(sku)}
-                          className={styles.skuLink}
-                        >
-                          <span className={`${styles.skuCode} text-tech`}>
-                            {softBreak(sku.sku_code)}
-                          </span>
-                          <span className={styles.skuName}>
-                            {softBreak(sku.name)}
-                          </span>
-                        </Link>
-                        <Link
-                          to={`${catalogPathForSku(sku)}#rfq`}
-                          className={`${styles.skuCta} ${styles.noPrint}`}
-                        >
-                          Запросить цену
-                        </Link>
-                      </div>
+                      <CompareSkuHead
+                        sku={sku}
+                        onRemove={() => handleRemove(sku.slug)}
+                      />
                     </th>
                   ))}
                 </tr>
@@ -371,6 +331,83 @@ export function ComparePage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div
+            className={`${styles.mobileCompare} ${styles.mobileOnly} u-protect-content`}
+            {...protectedContentHandlers}
+          >
+            <ul className={styles.mobileProducts}>
+              {skus.map((sku) => (
+                <li key={sku.slug} className={styles.mobileProduct}>
+                  <CompareSkuHead
+                    sku={sku}
+                    onRemove={() => handleRemove(sku.slug)}
+                    compact
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {rows.length === 0 ? (
+              <p className={styles.noDiff} role="status">
+                Все выбранные характеристики совпадают. Снимите «Только
+                отличия», чтобы увидеть полный список.
+              </p>
+            ) : (
+              <div className={styles.mobileSpecs}>
+                {groupedRows.map((group) => (
+                  <section
+                    key={group.key || "core"}
+                    className={styles.mobileGroup}
+                    aria-label={
+                      allSpecs && group.title ? group.title : undefined
+                    }
+                  >
+                    {allSpecs && group.title ? (
+                      <h2 className={styles.mobileGroupTitle}>{group.title}</h2>
+                    ) : null}
+                    {group.rows.map((row) => (
+                      <article
+                        key={row.key}
+                        className={
+                          row.diff
+                            ? `${styles.mobileRow} ${styles.mobileDiff}`
+                            : styles.mobileRow
+                        }
+                      >
+                        <h3 className={styles.mobileAttr}>
+                          {compactCardSpecName(row.name)}
+                        </h3>
+                        <dl className={styles.mobileValues}>
+                          {row.values.map((value, index) => {
+                            const sku = skus[index];
+                            if (!sku) return null;
+                            return (
+                              <div
+                                key={`${row.key}-${sku.slug}`}
+                                className={styles.mobileValue}
+                              >
+                                <dt className={`${styles.skuCode} text-tech`}>
+                                  {sku.sku_code}
+                                </dt>
+                                <dd>
+                                  {isModulatingSignalKey(row.key) ? (
+                                    <SignalSpecValue value={value} />
+                                  ) : (
+                                    softBreak(value)
+                                  )}
+                                </dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </article>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
         </>
       ) : null}
@@ -437,6 +474,57 @@ export function ComparePage() {
           )}
         </div>
       </dialog>
+    </div>
+  );
+}
+
+function CompareSkuHead({
+  sku,
+  onRemove,
+  compact = false,
+}: {
+  sku: SKUList;
+  onRemove: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={compact ? `${styles.skuHead} ${styles.skuHeadCompact}` : styles.skuHead}
+    >
+      <button
+        type="button"
+        className={`${styles.colRemove} ${styles.noPrint}`}
+        onClick={onRemove}
+        aria-label={`Убрать ${sku.sku_code}`}
+      >
+        ×
+      </button>
+      {sku.image?.image ? (
+        <ProtectedProductImage
+          src={sku.image.image}
+          alt=""
+          frameClassName={styles.skuImage}
+          className="u-protect-media"
+          compact
+          width={compact ? 56 : 72}
+          height={compact ? 56 : 72}
+          loading="lazy"
+        />
+      ) : (
+        <span className={styles.skuImagePlaceholder} aria-hidden="true" />
+      )}
+      <Link to={catalogPathForSku(sku)} className={styles.skuLink}>
+        <span className={`${styles.skuCode} text-tech`}>
+          {softBreak(sku.sku_code)}
+        </span>
+        <span className={styles.skuName}>{softBreak(sku.name)}</span>
+      </Link>
+      <Link
+        to={`${catalogPathForSku(sku)}#rfq`}
+        className={`${styles.skuCta} ${styles.noPrint}`}
+      >
+        Запросить цену
+      </Link>
     </div>
   );
 }
