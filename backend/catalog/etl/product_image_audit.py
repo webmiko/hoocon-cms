@@ -238,11 +238,33 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
         heroes_by_sku.setdefault(int(image.sku_id), []).append(image)
 
     for sku_id, heroes in heroes_by_sku.items():
-        if len(heroes) < 2:
-            continue
-        summary["skus"] += 1
         ranked = sorted(heroes, key=_hero_rank, reverse=True)
         keep = ranked[0]
+        published = [h for h in heroes if h.is_published]
+
+        # No published hero left (or only one candidate): restore best so
+        # catalog cards / category tiles do not fall through to «фото 2».
+        if not published:
+            summary["skus"] += 1
+            summary["republished"] += 1
+            if not dry_run:
+                keep.is_published = True
+                keep.save(update_fields=["is_published", "updated_at"])
+                logger.info(
+                    "hero_restore sku=%s keep=%s",
+                    keep.sku.sku_code if keep.sku_id else sku_id,
+                    keep.pk,
+                )
+            if len(heroes) < 2:
+                continue
+            # Continue into prune so inferior published siblings stay down —
+            # after restore, recompute published set.
+            published = [keep]
+
+        if len(heroes) < 2:
+            continue
+
+        summary["skus"] += 1
         if not keep.is_published:
             summary["republished"] += 1
             if not dry_run:

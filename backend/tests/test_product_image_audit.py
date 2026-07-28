@@ -79,6 +79,49 @@ def test_prune_keeps_local_asset_hero_over_tilda() -> None:
 
 
 @pytest.mark.django_db
+def test_prune_restores_lone_unpublished_hero() -> None:
+    """SKU with only an unpublished sort=0 hero must get it back (category tiles)."""
+    cat = Category.objects.create(name="Ball", slug="sharovye-krany-restore")
+    product = Product.objects.create(name="BV240", slug="bv240-restore", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="8100-bv240a-restore",
+        name="BV240",
+        slug="bv240a-restore",
+        is_published=True,
+    )
+    hero = ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile(
+            "hero.png",
+            _png((811, 1080), color=(200, 205, 210)),
+            content_type="image/png",
+        ),
+        alt="BV240 | Шаровой кран — фото 1",
+        source_url="https://static.tildacdn.com/stor/hero.jpg",
+        sort_order=0,
+        is_published=False,
+    )
+    ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile(
+            "diagram.png",
+            _png((1000, 1250), color=(255, 255, 255)),
+            content_type="image/png",
+        ),
+        alt="BV240 | Шаровой кран — фото 2",
+        source_url="https://static.tildacdn.com/stor/diagram.jpg",
+        sort_order=1,
+        is_published=True,
+    )
+
+    summary = prune_inferior_hero_duplicates(dry_run=False)
+    assert summary["republished"] >= 1
+    hero.refresh_from_db()
+    assert hero.is_published is True
+
+
+@pytest.mark.django_db
 def test_prune_prefers_neutral_studio_over_chroma_promo() -> None:
     """Red promo local-asset must not displace a smaller grey studio hero."""
     cat = Category.objects.create(name="Air", slug="air-img-chroma")

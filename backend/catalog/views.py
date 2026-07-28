@@ -83,7 +83,9 @@ def preview_images_by_category(category_ids: list[int]) -> dict[int, ProductImag
         by_code: dict[str, ProductImage] = {}
         for img in preferred_imgs:
             code = cast(SKU, img.sku).sku_code
-            if code not in by_code:
+            prev = by_code.get(code)
+            # Prefer primary gallery slot (sort_order=0) over «фото 2» diagrams.
+            if prev is None or img.sort_order < prev.sort_order:
                 by_code[code] = img
         for cat_id, slug in slug_by_id.items():
             code = CATEGORY_PREVIEW_SKU_CODES.get(slug)
