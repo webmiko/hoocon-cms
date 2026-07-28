@@ -134,6 +134,8 @@
   display: block;
   pointer-events: none;
   background: transparent;
+  transform: scale(var(--photo-scale, 1));
+  transform-origin: center center;
 }
 
 .heroPlaceholder {
@@ -235,30 +237,10 @@
   background-size: 100% 100%;
 }
 
-/* Purpose washes behind transparent product WebP (PDP hero + thumbs). */
+/* Unified theme wash behind transparent product WebP (PDP hero + thumbs). */
 .heroMedia,
 .galleryItem {
-  background: var(--photo-wash-valve);
-}
-
-.heroMedia[data-purpose="air"],
-.galleryItem[data-purpose="air"] {
-  background: var(--photo-wash-air);
-}
-
-.heroMedia[data-purpose="smoke"],
-.galleryItem[data-purpose="smoke"] {
-  background: var(--photo-wash-smoke);
-}
-
-.heroMedia[data-purpose="fire"],
-.galleryItem[data-purpose="fire"] {
-  background: var(--photo-wash-fire);
-}
-
-.heroMedia[data-purpose="valve"],
-.galleryItem[data-purpose="valve"] {
-  background: var(--photo-wash-valve);
+  background: var(--photo-wash);
 }
 
 /* Wiring / dimension diagrams — paper white, not product wash. */
@@ -304,6 +286,8 @@
   display: block;
   pointer-events: none;
   background: transparent;
+  transform: scale(var(--photo-scale, 1));
+  transform-origin: center center;
 }
 
 /* Wiring / dimension crops: fill tile width (paper diagrams). */
@@ -313,6 +297,7 @@
   max-height: none;
   object-fit: contain;
   object-position: center center;
+  transform: none;
 }
 
 .header {

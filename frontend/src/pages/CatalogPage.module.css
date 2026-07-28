@@ -486,6 +486,7 @@
   display: grid;
   /* Photo share adapts with card/grid width — keeps media cell less “tall & skinny”. */
   --card-photo: minmax(7rem, 32%);
+  --card-wash-gradient: var(--photo-wash);
   grid-template-columns: var(--card-photo) minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
@@ -534,38 +535,13 @@
   border-color: transparent;
   background:
     linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-    var(
-      --card-wash-gradient,
-      linear-gradient(
-        to right,
-        color-mix(in srgb, var(--color-brand) 45%, transparent),
-        color-mix(in srgb, var(--color-brand) 20%, transparent)
-      )
-    )
-      border-box;
+    var(--card-wash-gradient, var(--photo-wash)) border-box;
   background-origin: border-box;
   background-clip: padding-box, border-box;
   box-shadow: var(--shadow);
   text-decoration: none;
   color: var(--color-text);
   transform: translateY(-2px);
-}
-
-/* Purpose fallbacks when photo sampling is unavailable. */
-.card[data-purpose="air"] {
-  --card-wash-gradient: var(--photo-wash-air);
-}
-
-.card[data-purpose="smoke"] {
-  --card-wash-gradient: var(--photo-wash-smoke);
-}
-
-.card[data-purpose="fire"] {
-  --card-wash-gradient: var(--photo-wash-fire);
-}
-
-.card[data-purpose="valve"] {
-  --card-wash-gradient: var(--photo-wash-valve);
 }
 
 .cardMedia,
@@ -583,31 +559,11 @@
   /* Cutout photos: side inset so product doesn't kiss the wash edge. */
   padding: 0 40px;
   box-sizing: border-box;
-  background: var(--photo-wash-valve);
+  background: var(--photo-wash);
   background-size: 100% 100%;
   border-right: none;
   overflow: hidden;
   line-height: 0;
-}
-
-.cardMedia[data-purpose="air"],
-.cardMediaPlaceholder[data-purpose="air"] {
-  background: var(--photo-wash-air);
-}
-
-.cardMedia[data-purpose="smoke"],
-.cardMediaPlaceholder[data-purpose="smoke"] {
-  background: var(--photo-wash-smoke);
-}
-
-.cardMedia[data-purpose="fire"],
-.cardMediaPlaceholder[data-purpose="fire"] {
-  background: var(--photo-wash-fire);
-}
-
-.cardMedia[data-purpose="valve"],
-.cardMediaPlaceholder[data-purpose="valve"] {
-  background: var(--photo-wash-valve);
 }
 
 .cardCompare {
@@ -645,6 +601,8 @@
   display: block;
   flex-shrink: 1;
   background: transparent;
+  transform: scale(var(--photo-scale, 1));
+  transform-origin: center center;
 }
 
 .cardBody {

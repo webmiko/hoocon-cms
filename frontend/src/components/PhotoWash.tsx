@@ -1,15 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { useMatchedPhotoWash } from "../hooks/useMatchedPhotoWash";
-
 type PhotoWashProps = {
-  /** Product photo URL to sample; omit for CSS purpose fallback only. */
+  /** Kept for call-site compatibility; theme wash is CSS-only. */
   src?: string | null;
   className?: string;
-  /** Category purpose wash until/unless sampling succeeds. */
+  /** Category purpose (legacy); all map to ``--photo-wash``. */
   "data-purpose"?: string;
   /**
-   * ``auto`` — sample cutout edge wash (product photos).
+   * ``auto`` — theme photo wash (light gray / dark graphite).
    * ``white`` — solid white (wiring / dimension diagrams from manuals).
    */
   backdrop?: "auto" | "white";
@@ -18,27 +16,20 @@ type PhotoWashProps = {
 };
 
 /**
- * Media cell that paints a wash matching the photo edge backdrop per SKU.
+ * Media cell with a unified theme wash behind product cutouts.
  *
- * Uses a multi-stop left→right gradient from sampled top-edge colors. Falls
- * back to ``data-purpose`` token washes when sampling is unavailable.
- * Diagram tiles use ``backdrop="white"`` so schematics stay on paper white.
+ * Light: light-gray gradient; dark: graphite. Diagram tiles keep
+ * ``backdrop="white"`` so schematics stay on paper.
  */
 export function PhotoWash({
-  src,
   className,
   style,
   children,
   backdrop = "auto",
   "data-purpose": purpose,
 }: PhotoWashProps) {
-  const wash = useMatchedPhotoWash(backdrop === "white" ? null : src);
   const mergedStyle: CSSProperties | undefined =
-    backdrop === "white"
-      ? { ...style, background: "#fff" }
-      : wash
-        ? { ...style, background: wash.css }
-        : style;
+    backdrop === "white" ? { ...style, background: "#fff" } : style;
 
   return (
     <div

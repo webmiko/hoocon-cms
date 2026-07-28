@@ -88,33 +88,19 @@
     linear-gradient(155deg, #0a0a0a 0%, #161616 42%, #121212 100%);
 
   /*
-   * Product photo washes (transparent WebP cutouts).
-   * Purpose: air / smoke / fire / valve — see mediaPurposeFromCategory().
+   * Product photo wash (transparent WebP cutouts) — one backdrop for all
+   * categories. Purpose aliases kept for existing data-purpose selectors.
    */
-  --photo-wash-valve: linear-gradient(
+  --photo-wash: linear-gradient(
     165deg,
-    #eceef3 0%,
-    #f8f9fb 45%,
-    #ffffff 100%
+    #d8dbe2 0%,
+    #e8eaef 48%,
+    #f2f3f6 100%
   );
-  --photo-wash-air: linear-gradient(
-    165deg,
-    #d8d9dc 0%,
-    #e8e9ec 48%,
-    #f4f4f5 100%
-  );
-  --photo-wash-smoke: linear-gradient(
-    165deg,
-    #dde3ea 0%,
-    #ebf0f4 45%,
-    #f8fafb 100%
-  );
-  --photo-wash-fire: linear-gradient(
-    165deg,
-    #f3e6e4 0%,
-    #faf0ee 45%,
-    #ffffff 100%
-  );
+  --photo-wash-valve: var(--photo-wash);
+  --photo-wash-air: var(--photo-wash);
+  --photo-wash-smoke: var(--photo-wash);
+  --photo-wash-fire: var(--photo-wash);
 
   /* Semantic */
   --color-danger: #b01010;
@@ -223,31 +209,17 @@ html[data-theme="dark"] {
     radial-gradient(ellipse 55% 45% at 92% 5%, rgba(80, 80, 100, 0.12), transparent 48%),
     linear-gradient(165deg, #16161a 0%, #121214 48%, #0e0e12 100%);
 
-  /* Product photo washes — dark counterparts (same purpose hues). */
-  --photo-wash-valve: linear-gradient(
+  /* Product photo wash — graphite gradient (all categories). */
+  --photo-wash: linear-gradient(
     165deg,
-    #1a1a20 0%,
-    #222228 45%,
-    #2a2a32 100%
+    #3a3a42 0%,
+    #2a2a32 48%,
+    #1c1c22 100%
   );
-  --photo-wash-air: linear-gradient(
-    165deg,
-    #1a1b1e 0%,
-    #222326 48%,
-    #2a2b2e 100%
-  );
-  --photo-wash-smoke: linear-gradient(
-    165deg,
-    #16181c 0%,
-    #1e2228 45%,
-    #282c34 100%
-  );
-  --photo-wash-fire: linear-gradient(
-    165deg,
-    #241818 0%,
-    #2a1c1c 45%,
-    #322222 100%
-  );
+  --photo-wash-valve: var(--photo-wash);
+  --photo-wash-air: var(--photo-wash);
+  --photo-wash-smoke: var(--photo-wash);
+  --photo-wash-fire: var(--photo-wash);
 
   --color-badge-default: #2a2a32;
   /* Keep dark fill + white label (light #a8a8b0 + white failed AA) */
