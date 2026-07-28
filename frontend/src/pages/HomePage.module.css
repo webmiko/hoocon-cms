@@ -362,6 +362,25 @@
   color: var(--color-text-muted);
 }
 
+.novinkiGrid {
+  margin-bottom: var(--space-lg);
+}
+
+.novinkiMore {
+  margin: 0;
+}
+
+.novinkiMore a {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  font-weight: 600;
+}
+
+.novinkiMore a:hover {
+  color: var(--color-link-hover);
+}
+
 /* Directions — full-bleed block system (Belimo-style product pillars). */
 .directions {
   width: 100vw;

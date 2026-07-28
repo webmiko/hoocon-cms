@@ -112,13 +112,16 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
         </div>
       )}
       <div className={styles.cardBody}>
-        <p
-          className={`${styles.cardStock} ${
-            sku.in_stock ? styles.cardStockIn : styles.cardStockOut
-          }`}
-        >
-          {stockAvailabilityLabel(sku.in_stock)}
-        </p>
+        <div className={styles.cardMetaRow}>
+          <p
+            className={`${styles.cardStock} ${
+              sku.in_stock ? styles.cardStockIn : styles.cardStockOut
+            }`}
+          >
+            {stockAvailabilityLabel(sku.in_stock)}
+          </p>
+          {sku.is_new ? <p className={styles.cardNew}>Новое</p> : null}
+        </div>
         <p className={`${styles.cardCode} text-tech`}>
           {softBreak(sku.sku_code)}
         </p>

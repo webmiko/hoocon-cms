@@ -100,6 +100,9 @@ export function CatalogPage() {
   const inStockOnly = ["1", "true", "yes", "on"].includes(
     (searchParams.get("in_stock") ?? "").toLowerCase(),
   );
+  const newOnly = ["1", "true", "yes", "on"].includes(
+    (searchParams.get("new") ?? "").toLowerCase(),
+  );
 
   const activeFacets: Partial<Record<FacetKey, string>> = {};
   for (const key of FACET_KEYS) {
@@ -123,12 +126,13 @@ export function CatalogPage() {
   if (q) params.q = q;
   if (page > 1) params.page = String(page);
   if (inStockOnly) params.in_stock = "1";
+  if (newOnly) params.new = "1";
   for (const [key, value] of Object.entries(activeFacets)) {
     if (value) params[key] = value;
   }
 
   const facetKey = FACET_KEYS.map((k) => activeFacets[k] ?? "").join("|");
-  const listKey = `${category}|${q}|${page}|${facetKey}|${inStockOnly ? "1" : "0"}`;
+  const listKey = `${category}|${q}|${page}|${facetKey}|${inStockOnly ? "1" : "0"}|${newOnly ? "1" : "0"}`;
   const { data: skusData, loading, error } = useAsync(
     () => api.skus(params),
     listKey,
@@ -141,7 +145,8 @@ export function CatalogPage() {
     Object.keys(activeFacets).length +
     (q ? 1 : 0) +
     (category ? 1 : 0) +
-    (inStockOnly ? 1 : 0);
+    (inStockOnly ? 1 : 0) +
+    (newOnly ? 1 : 0);
   const activeCategory = categories.find((c) => c.slug === category);
 
   // «Показать ещё»: append next DRF pages (PAGE_SIZE=20) without replacing.
@@ -246,6 +251,7 @@ export function CatalogPage() {
     const categoryParam = category;
     const qParam = q;
     const inStockParam = inStockOnly;
+    const newParam = newOnly;
     const basePage = page;
     const facetPairs = FACET_KEYS.map(
       (key) => [key, searchParams.get(key) ?? ""] as const,
@@ -260,6 +266,7 @@ export function CatalogPage() {
         if (categoryParam) request.category = categoryParam;
         if (qParam) request.q = qParam;
         if (inStockParam) request.in_stock = "1";
+        if (newParam) request.new = "1";
         for (const [key, value] of facetPairs) {
           request[key] = value;
         }
@@ -312,6 +319,7 @@ export function CatalogPage() {
     category,
     q,
     inStockOnly,
+    newOnly,
     facetKey,
     searchParams,
     location.key,
@@ -440,6 +448,14 @@ export function CatalogPage() {
           onClick={() => updateFilter("in_stock", inStockOnly ? "" : "1")}
         >
           <span className={styles.optionText}>Только в наличии</span>
+        </button>
+        <button
+          type="button"
+          className={newOnly ? styles.optionRowActive : styles.optionRow}
+          aria-pressed={newOnly}
+          onClick={() => updateFilter("new", newOnly ? "" : "1")}
+        >
+          <span className={styles.optionText}>Новинки</span>
         </button>
       </div>
 
@@ -614,6 +630,19 @@ export function CatalogPage() {
               >
                 <span className={styles.activeTagLabel}>Наличие</span>
                 <span className={styles.activeTagValue}>Есть в наличии</span>
+                <span className={styles.activeTagRemove} aria-hidden="true">
+                  ×
+                </span>
+              </button>
+            ) : null}
+            {newOnly ? (
+              <button
+                type="button"
+                className={styles.activeTag}
+                onClick={() => updateFilter("new", "")}
+              >
+                <span className={styles.activeTagLabel}>Подборка</span>
+                <span className={styles.activeTagValue}>Новинки</span>
                 <span className={styles.activeTagRemove} aria-hidden="true">
                   ×
                 </span>

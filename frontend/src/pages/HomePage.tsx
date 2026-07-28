@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DirectionsCategoryGrid } from "../components/DirectionsCategoryGrid";
+import { CatalogSkuCard } from "../components/CatalogSkuCard";
 import { HomeSkeleton } from "../components/HomeSkeleton";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import styles from "./HomePage.module.css";
+import catalogStyles from "./CatalogPage.module.css";
 
 /** Auto-advance interval for hero background slides. */
 const HERO_SLIDE_MS = 6500;
@@ -130,6 +132,11 @@ const HOME_PROJECTS = [
  */
 export function HomePage() {
   const { data: categoriesData, loading, error } = useAsync(() => api.categories());
+  const { data: novinkiData, loading: novinkiLoading } = useAsync(
+    () => api.skus({ new: "1", page_size: "8" }),
+    0,
+    "home:novinki",
+  );
   const partnersRef = useRef<HTMLElement>(null);
   const partnersParallaxRef = useRef<HTMLDivElement>(null);
   const [heroSlide, setHeroSlide] = useState(0);
@@ -366,6 +373,35 @@ export function HomePage() {
           )}
         </div>
       </section>
+
+      {(novinkiLoading || (novinkiData?.results?.length ?? 0) > 0) && (
+        <section
+          className={styles.section}
+          aria-labelledby="novinki-heading"
+        >
+          <div className={styles.sectionHead}>
+            <h2 id="novinki-heading">Новинки</h2>
+            <p className={styles.sectionLead}>
+              Линейки, недавно появившиеся в каталоге. Полный список — с
+              фильтром «Новинки».
+            </p>
+          </div>
+          {novinkiLoading ? (
+            <p className={styles.status}>Загрузка новинок…</p>
+          ) : (
+            <>
+              <div className={`${catalogStyles.grid} ${styles.novinkiGrid}`}>
+                {(novinkiData?.results ?? []).map((sku) => (
+                  <CatalogSkuCard key={sku.slug} sku={sku} />
+                ))}
+              </div>
+              <p className={styles.novinkiMore}>
+                <Link to="/catalog?new=1">Все новинки в каталоге</Link>
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       <section className={styles.section}>
         <div className={styles.sectionHead}>

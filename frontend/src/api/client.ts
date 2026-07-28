@@ -25,6 +25,9 @@ export type SKUList = components["schemas"]["SKUList"] & {
   highlights?: CatalogHighlight[];
   image?: { id: number; image: string; alt?: string } | null;
   in_stock?: boolean;
+  /** Within the 30-day «Новинки» window (first_published_at). */
+  is_new?: boolean;
+  first_published_at?: string | null;
   /** Published SKU count on the same Product (family cards). */
   edition_count?: number;
 };
