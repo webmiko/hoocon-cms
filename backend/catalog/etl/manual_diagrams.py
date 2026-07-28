@@ -20,6 +20,7 @@ from typing import Any, Final, Literal, cast
 import pypdfium2 as pdfium
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 from PIL import Image, ImageDraw, ImageFont
 
 from catalog.etl.manual_pdfs import (
@@ -463,6 +464,100 @@ def unpublish_legacy_static_dimension(*, dry_run: bool = False) -> int:
     if dry_run or count == 0:
         return count
     return qs.update(is_published=False)
+
+
+_COMBINED_DIAGRAM_ALT = re.compile(
+    r"(?i)размер\w*\s+и\s+(?:способ\s+)?подключ|схем\w*\s+размер\w*\s+и\s+подключ",
+)
+_WIRING_DIAGRAM_ALT = re.compile(r"(?i)схем\w*\s+подключ|подключен")
+_DIMENSIONS_DIAGRAM_ALT = re.compile(r"(?i)габарит|размер")
+_CATALOG_DIMENSIONS_ALT = re.compile(r"(?i)чертёж\s+из\s+каталог")
+
+
+def _is_wiring_diagram(alt: str) -> bool:
+    """True for a dedicated wiring tile (not a combined size+wiring shot)."""
+    text = alt or ""
+    if _COMBINED_DIAGRAM_ALT.search(text):
+        return False
+    return bool(_WIRING_DIAGRAM_ALT.search(text))
+
+
+def _is_dimensions_diagram(alt: str) -> bool:
+    """True for a dedicated dimensions tile (not combined size+wiring)."""
+    text = alt or ""
+    if _COMBINED_DIAGRAM_ALT.search(text):
+        return False
+    return bool(_DIMENSIONS_DIAGRAM_ALT.search(text))
+
+
+def _is_catalog_dimensions(alt: str, source_url: str) -> bool:
+    """True for HVA Illustrator/catalog dimension crop superseded by local razmer."""
+    if _CATALOG_DIMENSIONS_ALT.search(alt or ""):
+        return True
+    url = (source_url or "").lower()
+    return "manual-diagrams/hva" in url and "dimensions" in url
+
+
+def sku_has_split_diagrams(sku_id: int) -> bool:
+    """Published gallery has both a wiring tile and a dimensions tile."""
+    alts = ProductImage.objects.filter(sku_id=sku_id, is_published=True).values_list(
+        "alt",
+        flat=True,
+    )
+    has_wiring = False
+    has_dims = False
+    for alt in alts:
+        if _is_wiring_diagram(alt):
+            has_wiring = True
+        if _is_dimensions_diagram(alt):
+            has_dims = True
+        if has_wiring and has_dims:
+            return True
+    return False
+
+
+def unpublish_combined_when_split_diagrams(*, dry_run: bool = False) -> int:
+    """Hide combined size+wiring shots when separate wiring and dimensions exist."""
+    # Broad prefilter (icontains); exact match via ``_COMBINED_DIAGRAM_ALT``.
+    candidates = ProductImage.objects.filter(is_published=True).filter(
+        Q(alt__icontains="размеры и") | Q(alt__icontains="схема размеров") | Q(alt__icontains="размер и подключ"),
+    )
+    to_hide: list[int] = []
+    for image in candidates.iterator():
+        if not _COMBINED_DIAGRAM_ALT.search(image.alt or ""):
+            continue
+        if sku_has_split_diagrams(int(image.sku_id)):
+            to_hide.append(int(image.pk))
+    if dry_run or not to_hide:
+        return len(to_hide)
+    return ProductImage.objects.filter(pk__in=to_hide).update(is_published=False)
+
+
+def unpublish_redundant_hva_catalog_dimensions(*, dry_run: bool = False) -> int:
+    """Hide HVA catalog dimension crops when local razmer + wiring are published.
+
+    Local pack attaches sort=6 dimensions + wiring; ``apply_hva_manual_diagrams``
+    also added sort=8 «чертёж из каталога» — drop the catalog duplicate.
+    """
+    candidates = (
+        ProductImage.objects.filter(is_published=True, sku__sku_code__istartswith="HVA")
+        .select_related("sku")
+        .order_by("sku_id", "id")
+    )
+    to_hide: list[int] = []
+    for image in candidates.iterator():
+        if not _is_catalog_dimensions(image.alt, image.source_url or ""):
+            continue
+        siblings = ProductImage.objects.filter(sku_id=image.sku_id, is_published=True)
+        has_wiring = any(_is_wiring_diagram(s.alt) for s in siblings)
+        has_local_dims = any(
+            _is_dimensions_diagram(s.alt) and not _is_catalog_dimensions(s.alt, s.source_url or "") for s in siblings
+        )
+        if has_wiring and has_local_dims:
+            to_hide.append(int(image.pk))
+    if dry_run or not to_hide:
+        return len(to_hide)
+    return ProductImage.objects.filter(pk__in=to_hide).update(is_published=False)
 
 
 def _upsert_diagram(
@@ -1608,6 +1703,8 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         "created": 0,
         "updated": 0,
         "skipped": 0,
+        "unpublished_catalog_dims": 0,
+        "unpublished_combined": 0,
         "series": {},
         "dry_run": dry_run,
     }
@@ -1622,6 +1719,15 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         if parsed is None:
             summary["skipped"] += 1
             continue
+        # Prefer local HV-pack razmer + wiring over Illustrator catalog crop.
+        if sku_has_split_diagrams(int(sku.pk)):
+            siblings = ProductImage.objects.filter(sku_id=sku.pk, is_published=True)
+            if any(
+                _is_dimensions_diagram(s.alt) and not _is_catalog_dimensions(s.alt, s.source_url or "")
+                for s in siblings
+            ):
+                summary["skipped"] += 1
+                continue
         series_nm, fast = parsed
         cache_key = (series_nm, fast)
         if catalog is not None and cache_key not in crop_cache:
@@ -1681,4 +1787,11 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
                     name="Масса",
                     unit="кг",
                 )
+
+    summary["unpublished_catalog_dims"] = unpublish_redundant_hva_catalog_dimensions(
+        dry_run=dry_run,
+    )
+    summary["unpublished_combined"] = unpublish_combined_when_split_diagrams(
+        dry_run=dry_run,
+    )
     return summary
