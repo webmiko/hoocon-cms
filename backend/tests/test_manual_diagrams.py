@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from PIL import Image
 
 from catalog.etl.manual_diagrams import (
@@ -201,6 +202,32 @@ def test_parse_hva_series_and_source_url() -> None:
     assert parse_hva_series("da5fu24-ds") is None
     assert "hva5-dimensions" in source_url_for_hva(5, fast=False, kind="dimensions")
     assert "hva5q-dimensions" in source_url_for_hva(5, fast=True, kind="dimensions")
+
+
+@pytest.mark.django_db
+def test_hva_manual_diagrams_backfills_family_weight_without_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HVA-5Q shares envelope with HVA-5 but gets a different datasheet mass."""
+    from catalog.etl import manual_diagrams as md
+    from catalog.models import SKU, AttributeValue, Category, Product
+
+    monkeypatch.setattr(md, "find_hva_catalog_ai", lambda **_kw: None)
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnye-hva-wt-test")
+    product = Product.objects.create(name="HVA-5Q", slug="hva-5q-wt-test", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="HVA24-5Q",
+        slug="hva24-5q-wt-test",
+        sku_code="HVA24-5Q",
+        is_published=True,
+    )
+
+    md.apply_hva_manual_diagrams(dry_run=False)
+    by = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
+    assert by["dimensions"] == "71,1 × 144,1 × 62,1 мм"
+    assert by["weight"] == "< 0,8 кг"
 
 
 def test_crop_hvdf_product_photos_excludes_datasheet_chrome() -> None:

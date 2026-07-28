@@ -1454,10 +1454,15 @@ _HVA_CATALOG_PAGE: Final[dict[tuple[int, bool], int]] = {
     (20, True): 6,
     (40, True): 7,
 }
-# Envelope W × H × D from left-column «Размеры привода» drawings.
+# Envelope W × H × D from left-column «Размеры привода» drawings / datasheet.
 _HVA_ENVELOPE_MM: Final[dict[tuple[int, bool], str]] = {
     (5, False): "71,1 × 144,1 × 62,1 мм",
-    (5, True): "71,1 × 144,1 × 62,1 мм",  # same body family until proven otherwise
+    (5, True): "71,1 × 144,1 × 62,1 мм",  # same body as HVA-5; mass differs (see weight map)
+}
+# Datasheet Weight row per Nm/fast family (shared by all SKUs of that family).
+_HVA_WEIGHT: Final[dict[tuple[int, bool], str]] = {
+    (5, False): "≤ 0,5 кг",
+    (5, True): "< 0,8 кг",
 }
 _HVA_DIMS_TITLE = "Размеры привода(mm)"
 _HVA_CATALOG_SCALE: Final[float] = 2.5
@@ -1576,7 +1581,8 @@ def diagrams_from_hva_catalog(
 def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     """Attach HVA dimensions crops from the Illustrator catalog to galleries.
 
-    Also backfills ``dimensions`` ТТХ when the envelope is known from the drawing.
+    Also backfills ``dimensions`` / ``weight`` ТТХ from the known family maps
+    (same envelope for all SKUs of one Nm/fast family; mass may differ by family).
     """
     from catalog.etl.attr_write import set_sku_attribute
 
@@ -1590,7 +1596,6 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     catalog = find_hva_catalog_ai()
     if catalog is None:
         logger.info("hva_catalog_ai_missing")
-        return summary
 
     crop_cache: dict[tuple[int, bool], list[DiagramCrop] | None] = {}
     skus = list(SKU.objects.filter(sku_code__istartswith="HVA").order_by("sku_code"))
@@ -1601,7 +1606,7 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
             continue
         series_nm, fast = parsed
         cache_key = (series_nm, fast)
-        if cache_key not in crop_cache:
+        if catalog is not None and cache_key not in crop_cache:
             if cache_key not in _HVA_CATALOG_PAGE:
                 crop_cache[cache_key] = None
             else:
@@ -1620,33 +1625,42 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
                     )
                     crop_cache[cache_key] = None
 
-        crops = crop_cache[cache_key]
-        if not crops:
+        crops = crop_cache.get(cache_key) if catalog is not None else None
+        if crops:
+            series_key = f"hva-{series_nm}{'q' if fast else ''}"
+            series_stats = summary["series"].setdefault(
+                series_key,
+                {"created": 0, "updated": 0, "skus": 0},
+            )
+            series_stats["skus"] += 1
+            for crop in crops:
+                action = _upsert_diagram(sku, crop, dry_run=dry_run)
+                if action == "create":
+                    summary["created"] += 1
+                    series_stats["created"] += 1
+                elif action == "update":
+                    summary["updated"] += 1
+                    series_stats["updated"] += 1
+        else:
             summary["skipped"] += 1
-            continue
-
-        series_key = f"hva-{series_nm}{'q' if fast else ''}"
-        series_stats = summary["series"].setdefault(
-            series_key,
-            {"created": 0, "updated": 0, "skus": 0},
-        )
-        series_stats["skus"] += 1
-        for crop in crops:
-            action = _upsert_diagram(sku, crop, dry_run=dry_run)
-            if action == "create":
-                summary["created"] += 1
-                series_stats["created"] += 1
-            elif action == "update":
-                summary["updated"] += 1
-                series_stats["updated"] += 1
 
         envelope = _HVA_ENVELOPE_MM.get(cache_key)
-        if envelope and not dry_run:
-            set_sku_attribute(
-                sku,
-                slug="dimensions",
-                value=envelope,
-                name="Габаритные размеры",
-                unit="мм",
-            )
+        weight = _HVA_WEIGHT.get(cache_key)
+        if not dry_run:
+            if envelope:
+                set_sku_attribute(
+                    sku,
+                    slug="dimensions",
+                    value=envelope,
+                    name="Габаритные размеры",
+                    unit="мм",
+                )
+            if weight:
+                set_sku_attribute(
+                    sku,
+                    slug="weight",
+                    value=weight,
+                    name="Масса",
+                    unit="кг",
+                )
     return summary
