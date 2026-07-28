@@ -1072,12 +1072,13 @@
 }
 
 /*
- * Home «Новинки» carousel: photo-over-copy, fixed height.
- * Placed after catalog responsive rules so height stays locked.
+ * Home «Новинки» carousel: photo-over-copy, fixed card + photo heights
+ * so every slide shares the same media band (body text may clamp).
  */
 .card.cardVertical {
+  --card-vertical-photo: 14rem;
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: var(--card-vertical-photo) minmax(0, 1fr);
   align-items: stretch;
   width: 100%;
   height: 28.3125rem; /* 453px */
@@ -1087,9 +1088,10 @@
 
 .card.cardVertical .cardMedia,
 .card.cardVertical .cardMediaPlaceholder {
-  min-height: 0;
-  height: 100%;
-  max-height: none;
+  box-sizing: border-box;
+  min-height: var(--card-vertical-photo);
+  height: var(--card-vertical-photo);
+  max-height: var(--card-vertical-photo);
   width: 100%;
   align-self: stretch;
   overflow: hidden;
@@ -1099,7 +1101,8 @@
 }
 
 .card.cardVertical .cardMediaPlaceholder {
-  min-height: 10rem;
+  /* Same band as real photos — keep placeholder from collapsing. */
+  min-height: var(--card-vertical-photo);
 }
 
 .card.cardVertical .cardImage {
