@@ -3,7 +3,8 @@
 Source (Yandex Disk)::
 
     ~/Yandex.Disk.localized/фото для сайта/media-webp/
-        da3fu-d:ds.webp, da5fu24-a:as.webp, da10:15:20fu-d:ds.webp, …
+        da3fu-d:ds.webp, da5fu24-a:as.webp, da10:15:20fu-a:as.webp,
+        da10:15:20fu-d:ds.webp, …
         sa3fu-ds.webp, sa3fu-dst.webp, sa10:15mu-ds.webp, …
 
 Edition rules

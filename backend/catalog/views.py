@@ -41,6 +41,8 @@ from catalog.upload_serializers import ProductFileUploadSerializer
 # Representative SKU photos for homepage / category tiles (slug → sku_code).
 CATEGORY_PREVIEW_SKU_CODES: dict[str, str] = {
     "sharovye-krany": "8100-bv240a",  # DN 40 2-way — clearer than first DN 15
+    # Prefer media-webp DA5FU A over legacy Tilda DA10FU A (first-by-id).
+    "elektroprivody-s-pruzhinnym-vozvratom": "da5fu24-a",
 }
 
 

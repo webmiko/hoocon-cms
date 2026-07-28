@@ -395,6 +395,60 @@ def test_category_list_includes_preview_image(client) -> None:
 
 
 @pytest.mark.django_db
+def test_spring_return_category_prefers_da5fu_preview(client) -> None:
+    """Homepage spring-return tile uses DA5FU media hero, not legacy DA10FU Tilda."""
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    _buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 40, 40)).save(_buf, format="PNG")
+    png = _buf.getvalue()
+    cat = Category.objects.create(
+        name="С пружиной",
+        slug="elektroprivody-s-pruzhinnym-vozvratom",
+    )
+    p10 = Product.objects.create(name="DA10FU", slug="da10fu-preview", category=cat)
+    p5 = Product.objects.create(name="DA5FU", slug="da5fu-preview", category=cat)
+    sku10 = SKU.objects.create(
+        product=p10,
+        name="DA10FU24-A",
+        slug="da10fu24-a-preview",
+        sku_code="da10fu24-a",
+        is_published=True,
+    )
+    sku5 = SKU.objects.create(
+        product=p5,
+        name="DA5FU24-A",
+        slug="da5fu24-a-preview",
+        sku_code="da5fu24-a",
+        is_published=True,
+    )
+    ProductImage.objects.create(
+        sku=sku10,
+        image=SimpleUploadedFile("old.png", png, content_type="image/png"),
+        alt="legacy DA10FU",
+        is_published=True,
+        sort_order=0,
+    )
+    ProductImage.objects.create(
+        sku=sku5,
+        image=SimpleUploadedFile("new.png", png, content_type="image/png"),
+        alt="DA5FU media-webp",
+        is_published=True,
+        sort_order=0,
+    )
+    response = client.get(reverse("catalog-category-list"))
+    assert response.status_code == 200
+    row = next(r for r in response.data["results"] if r["slug"] == "elektroprivody-s-pruzhinnym-vozvratom")
+    assert row["image"] is not None
+    assert row["image"]["alt"] == "DA5FU media-webp"
+
+
+@pytest.mark.django_db
 def test_ball_valves_category_prefers_dn40_preview(client) -> None:
     """Homepage tile for шаровые краны uses DN 40 (BV240), not the first DN 15."""
     from io import BytesIO

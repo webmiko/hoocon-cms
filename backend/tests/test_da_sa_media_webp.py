@@ -101,6 +101,7 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
     pack.mkdir()
     (pack / "da5fu-d:ds.webp").write_bytes(_png(color=(50, 50, 50)))
     (pack / "da5fu24-a:as.webp").write_bytes(_png(color=(60, 60, 60)))
+    (pack / "da10:15:20fu-a:as.webp").write_bytes(_png(color=(65, 65, 65)))
     (pack / "da8:16:24mu24-d:ds.webp").write_bytes(_png(color=(70, 70, 70)))
     (pack / "da10:20mqu-d:ds.webp").write_bytes(_png(color=(80, 80, 80)))
     (pack / "da10:20mqu-a:as.webp").write_bytes(_png(color=(85, 85, 85)))
@@ -118,6 +119,21 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
         )
         for code in codes
     ]
+    p10 = Product.objects.create(name="DA10FU", slug="da10fu-webp", category=cat)
+    da10_a = SKU.objects.create(
+        product=p10,
+        sku_code="da10fu24-a",
+        name="da10fu24-a",
+        slug="da10fu24-a-webp",
+        is_published=True,
+    )
+    da15_as = SKU.objects.create(
+        product=p10,
+        sku_code="da15fu24-as",
+        name="da15fu24-as",
+        slug="da15fu24-as-webp",
+        is_published=True,
+    )
     p32 = Product.objects.create(name="DA32MU", slug="da32mu-webp", category=cat)
     da32 = SKU.objects.create(
         product=p32,
@@ -136,7 +152,7 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
     )
 
     summary = apply_da_sa_media_webp(dry_run=False, photo_root=pack)
-    assert summary["created"] == 7
+    assert summary["created"] == 9
 
     for sku in skus[:2] + skus[4:]:
         assert ProductImage.objects.filter(
@@ -148,6 +164,12 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
         assert ProductImage.objects.filter(
             sku=sku,
             source_url__contains="media-webp/da5fu24-a:as-product",
+            is_published=True,
+        ).exists()
+    for sku in (da10_a, da15_as):
+        assert ProductImage.objects.filter(
+            sku=sku,
+            source_url__contains="media-webp/da10:15:20fu-a:as-product",
             is_published=True,
         ).exists()
     assert ProductImage.objects.filter(
