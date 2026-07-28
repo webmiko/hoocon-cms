@@ -1074,37 +1074,32 @@
 }
 
 /*
- * Home «Новинки» carousel: photo-over-copy, fixed card + photo heights
- * so every slide shares the same media band (body text may clamp).
+ * Home «Новинки» carousel: photo = 1/3 card; body copy through editions only
+ * (stock → code → title → «N вариантов»), no ТТХ / footer chrome.
  */
 .card.cardVertical {
-  --card-vertical-photo: 14rem;
   grid-template-columns: 1fr;
-  grid-template-rows: var(--card-vertical-photo) minmax(0, 1fr);
+  grid-template-rows: 1fr 2fr;
   align-items: stretch;
   width: 100%;
-  height: 28.3125rem; /* 453px */
-  max-height: 28.3125rem;
+  max-width: 20rem; /* 320px — matches NovinkiCarousel MAX_SLIDE_PX */
+  height: 22.5rem; /* ~360px — photo ⅓, text through editions */
+  max-height: 22.5rem;
   overflow: hidden;
 }
 
 .card.cardVertical .cardMedia,
 .card.cardVertical .cardMediaPlaceholder {
   box-sizing: border-box;
-  min-height: var(--card-vertical-photo);
-  height: var(--card-vertical-photo);
-  max-height: var(--card-vertical-photo);
+  min-height: 0;
+  height: 100%;
+  max-height: none;
   width: 100%;
   align-self: stretch;
   overflow: hidden;
   border-right: none;
   border-bottom: none;
   padding: 0 40px;
-}
-
-.card.cardVertical .cardMediaPlaceholder {
-  /* Same band as real photos — keep placeholder from collapsing. */
-  min-height: var(--card-vertical-photo);
 }
 
 .card.cardVertical .cardImage {
@@ -1121,9 +1116,27 @@
 .card.cardVertical .cardBody {
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 12px;
+}
+
+.card.cardVertical .cardMetaRow,
+.card.cardVertical .cardCode,
+.card.cardVertical .cardEditions {
   flex-shrink: 0;
 }
 
-.card.cardVertical .cardSpecs {
-  overflow: hidden;
+.card.cardVertical .cardTitle {
+  flex-shrink: 0;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+/* Carousel teaser stops at editions count — hide specs / price row. */
+.card.cardVertical .cardSpecs,
+.card.cardVertical .cardFooter {
+  display: none;
 }

@@ -10,10 +10,11 @@ const TRANSITION_MS = 420;
 const GAP_PX = 16;
 /** Peek of neighboring cards on each side (px). */
 const PEEK_PX = 40;
-/** Min width for a vertical carousel card (~home novinki). */
-const MIN_SLIDE_PX = 300;
-/** Fixed card height (matches vertical CatalogSkuCard). */
-const SLIDE_HEIGHT_PX = 453;
+/** Min / max width for a vertical carousel card (~home novinki). */
+const MIN_SLIDE_PX = 260;
+const MAX_SLIDE_PX = 320;
+/** Fixed card height (matches vertical CatalogSkuCard teaser). */
+const SLIDE_HEIGHT_PX = 360;
 
 type NovinkiCarouselProps = {
   skus: SKUList[];
@@ -64,8 +65,9 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
       const w = el.clientWidth;
       setViewportW(w);
       const usable = Math.max(0, w - PEEK_PX * 2);
-      const byWidth = Math.floor((usable + GAP_PX) / (MIN_SLIDE_PX + GAP_PX));
-      const next = Math.max(1, Math.min(3, byWidth, Math.max(1, n)));
+      // Prefer packing max-width cards; fall back to one when the band is narrow.
+      const byMax = Math.floor((usable + GAP_PX) / (MAX_SLIDE_PX + GAP_PX));
+      const next = Math.max(1, Math.min(3, byMax || 1, Math.max(1, n)));
       setPerPage(next);
     };
 
@@ -77,8 +79,14 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
 
   const slideW =
     viewportW > 0
-      ? (viewportW - PEEK_PX * 2 - (perPage - 1) * GAP_PX) / perPage
-      : MIN_SLIDE_PX;
+      ? Math.min(
+          MAX_SLIDE_PX,
+          Math.max(
+            MIN_SLIDE_PX,
+            (viewportW - PEEK_PX * 2 - (perPage - 1) * GAP_PX) / perPage,
+          ),
+        )
+      : MAX_SLIDE_PX;
   const stride = slideW + GAP_PX;
 
   const go = useCallback(
