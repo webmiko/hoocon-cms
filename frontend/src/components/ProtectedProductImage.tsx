@@ -50,6 +50,7 @@ export function ProtectedProductImage({
   ...rest
 }: ProtectedProductImageProps) {
   const imgRef = useRef<HTMLImageElement>(null);
+  const frameRef = useRef<HTMLSpanElement>(null);
   const [trackedSrc, setTrackedSrc] = useState(src);
   const [allowFetch, setAllowFetch] = useState(() =>
     initialAllowFetch(src, loading),
@@ -71,7 +72,8 @@ export function ProtectedProductImage({
     if (allowFetch || loading !== "lazy") {
       return;
     }
-    const node = imgRef.current;
+    // Observe the frame (not the clipped 1×1 placeholder img) so IO can fire.
+    const node = frameRef.current ?? imgRef.current;
     if (!node || typeof IntersectionObserver === "undefined") {
       setAllowFetch(true);
       return;
@@ -106,7 +108,11 @@ export function ProtectedProductImage({
     .join(" ");
 
   return (
-    <span className={frameClass} data-ready={revealed ? "true" : "false"}>
+    <span
+      ref={frameRef}
+      className={frameClass}
+      data-ready={revealed ? "true" : "false"}
+    >
       {showShimmer ? (
         <span className={styles.shimmer} aria-hidden="true" />
       ) : null}

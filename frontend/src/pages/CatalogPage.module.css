@@ -575,12 +575,16 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 96px;
+  min-height: 7rem;
+  /* Stretch with the card body so the wash fills the whole photo column. */
+  height: 100%;
+  align-self: stretch;
   margin: 0;
   /* Cutout photos: side inset so product doesn't kiss the wash edge. */
   padding: 0 40px;
   box-sizing: border-box;
   background: var(--photo-wash-valve);
+  background-size: 100% 100%;
   border-right: none;
   overflow: hidden;
   line-height: 0;
@@ -617,16 +621,29 @@
   display: block;
 }
 
+/* ProtectedProductImage frame fills the photo column (wash stays behind). */
+.cardMedia > span {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
 .cardImage {
   position: relative;
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-height: 100%;
   margin: 0;
   padding: 0;
   object-fit: contain;
   object-position: center center;
   display: block;
-  flex-shrink: 0;
+  flex-shrink: 1;
   background: transparent;
 }
 
@@ -980,7 +997,7 @@
   .card:not(.cardVertical) .cardMediaPlaceholder {
     min-height: 0;
     height: auto;
-    max-height: none;
+    max-height: 16rem;
     width: 100%;
     border-right: none;
     border-bottom: none;
@@ -991,12 +1008,12 @@
     min-height: 7.5rem;
   }
 
-  /* Full card width; height follows intrinsic photo aspect ratio. */
+  /* Full card width; keep portrait cutouts inside a capped band. */
   .card:not(.cardVertical) .cardImage {
     position: relative;
     width: 100%;
     height: auto;
-    max-height: none;
+    max-height: 16rem;
     object-fit: contain;
     object-position: center center;
     display: block;
@@ -1100,13 +1117,20 @@
   border-right: none;
   border-bottom: none;
   padding: 0 40px;
+  background-size: 100% 100%;
+}
+
+.card.cardVertical .cardMedia > span {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .card.cardVertical .cardImage {
   position: relative;
-  width: auto;
+  width: 100%;
   max-width: 100%;
-  height: auto;
+  height: 100%;
   max-height: 100%;
   object-fit: contain;
   object-position: center center;
