@@ -1,7 +1,9 @@
-"""Seed HVD-Q, HVA-P (spring), and HV*QX (capacitor) from the 2025 catalog.
+"""Seed HVD-Q and HV*QX (capacitor) from the 2025 catalog.
 
 Creates Products/SKUs missing on the site, upserts ТТХ from datasheets /
 catalog pages, and optionally attaches local HV-seria photos.
+
+HVA-P (spring) is out of RF scope — Chinese-market only; do not seed.
 """
 
 from __future__ import annotations
@@ -33,7 +35,6 @@ from catalog.etl.webp import convert_bytes_to_webp
 from catalog.models import SKU, Category, Product, ProductImage
 
 CATEGORY_AIR = "elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
-CATEGORY_SPRING = "elektroprivody-s-pruzhinnym-vozvratom"
 CATEGORY_QX = "elektronnye-otkazoustoychivye-vozdushnye-privody"
 
 SORT_PRODUCT: Final[int] = 0
@@ -48,9 +49,6 @@ _EDITIONS: Final[tuple[tuple[str, bool], ...]] = (
 
 # HVD fast Q on/off — catalog pp. 47–54 (40Q already on site).
 HVD_Q_NMS: Final[tuple[int, ...]] = (5, 10, 20, 40)
-
-# HVA spring modulating — English manuals hva-{5,10,15}p.pdf (24 V editions).
-HVA_P_NMS: Final[tuple[int, ...]] = (5, 10, 15)
 
 # Capacitor fail-safe — catalog pp. 60–67 (HVD on/off + HVA modulating).
 QX_NMS: Final[tuple[int, ...]] = (5, 10, 20, 40)
@@ -110,39 +108,6 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
         "weight": "< 1,5 кг",
         "power": "15 Вт / 3 Вт (удержание)",
         "transformer-va": "50 ВА",
-    },
-}
-
-HVA_P_SPECS: Final[dict[int, dict[str, str]]] = {
-    5: {
-        "moment": "5 Нм",
-        "damper-area": "до 0,5 м²",
-        "running-time": "< 100 с (мотор) / < 25 с (пружина)",
-        "noise": "макс. 45 дБ(А) / 62 дБ(А) пружина",
-        "shaft-length": "≥ 90 мм",
-        "dimensions": "182 × 98 × 83,5 мм",
-        "weight": "< 1,8 кг",
-        "power": "5 Вт / 2 Вт (удержание)",
-    },
-    10: {
-        "moment": "10 Нм",
-        "damper-area": "до 1,0 м²",
-        "running-time": "< 110 с (мотор) / < 25 с (пружина)",
-        "noise": "макс. 45 дБ(А) / 62 дБ(А) пружина",
-        "shaft-length": "≥ 90 мм",
-        "dimensions": "249,6 × 101,2 × 87,3 мм",
-        "weight": "< 3,0 кг",
-        "power": "6 Вт / 2 Вт (удержание)",
-    },
-    15: {
-        "moment": "15 Нм",
-        "damper-area": "до 1,5 м²",
-        "running-time": "< 110 с (мотор) / < 25 с (пружина)",
-        "noise": "макс. 45 дБ(А) / 62 дБ(А) пружина",
-        "shaft-length": "≥ 90 мм",
-        "dimensions": "249,6 × 101,2 × 87,3 мм",
-        "weight": "< 3,0 кг",
-        "power": "6 Вт / 2 Вт (удержание)",
     },
 }
 
@@ -229,20 +194,12 @@ def _hvd_q_code(*, voltage: str, aux: bool, nm: int) -> str:
     return f"HVD{voltage}{'S' if aux else ''}-{nm}Q"
 
 
-def _hva_p_code(*, voltage: str, aux: bool, nm: int) -> str:
-    return f"HVA{voltage}{'S' if aux else ''}-{nm}P"
-
-
 def _qx_code(*, brand: str, voltage: str, aux: bool, nm: int) -> str:
     return f"{brand}{voltage}{'S' if aux else ''}-{nm}QX"
 
 
 def product_slug_hvd_q(nm: int) -> str:
     return f"privod-vozdushniy-hvd-{nm}q"
-
-
-def product_slug_hva_p(nm: int) -> str:
-    return f"privod-vozdushniy-pruzhina-hva-{nm}p"
 
 
 def product_slug_qx(*, brand: str, nm: int) -> str:
@@ -443,53 +400,6 @@ def ensure_hvd_q_catalog(*, dry_run: bool = False) -> dict[str, Any]:
     return {"products_created": products_created, "skus_created": skus_created, "dry_run": dry_run}
 
 
-def ensure_hva_p_catalog(*, dry_run: bool = False) -> dict[str, Any]:
-    """Create HVA-*P spring products (24 V editions from manuals)."""
-    category = Category.objects.filter(slug=CATEGORY_SPRING).first()
-    if category is None:
-        return {"products_created": 0, "skus_created": 0, "error": f"missing {CATEGORY_SPRING}"}
-    products_created = 0
-    skus_created = 0
-    for nm in HVA_P_NMS:
-        p_slug = product_slug_hva_p(nm)
-        title = f"HVA-{nm}P | {nm} Нм Привод воздушный с пружинным возвратом пропорциональное управление"
-        product = Product.objects.filter(slug=p_slug).first()
-        if product is None:
-            if dry_run:
-                products_created += 1
-            else:
-                product = Product.objects.create(
-                    category=category,
-                    name=title[:200],
-                    slug=p_slug,
-                    description=normalize_tech_copy(
-                        "Электроприводы HVA-P — пропорциональное управление с "
-                        "механическим пружинным возвратом при отключении питания.",
-                    ),
-                    instructions=_SERIES_INSTRUCTIONS,
-                )
-                products_created += 1
-        # Manuals cover AC/DC 24 V editions only.
-        for aux in (False, True):
-            code = _hva_p_code(voltage="24", aux=aux, nm=nm)
-            if SKU.objects.filter(sku_code__iexact=code).exists():
-                continue
-            if dry_run:
-                skus_created += 1
-                continue
-            if product is None:
-                continue
-            SKU.objects.create(
-                product=product,
-                name=title[:300],
-                slug=f"{p_slug}-{code.lower()}",
-                sku_code=code,
-                is_published=True,
-            )
-            skus_created += 1
-    return {"products_created": products_created, "skus_created": skus_created, "dry_run": dry_run}
-
-
 def ensure_hv_qx_catalog(*, dry_run: bool = False) -> dict[str, Any]:
     """Create HVD/HVA *QX capacitor products for 5/10/20/40 Nm."""
     category = Category.objects.filter(slug=CATEGORY_QX).first()
@@ -576,63 +486,6 @@ def _enrich_hvd_q_sku(sku: SKU, nm: int, voltage: str, aux: bool, *, dry_run: bo
     return attrs
 
 
-def _enrich_hva_p_sku(sku: SKU, nm: int, aux: bool, *, dry_run: bool) -> int:
-    row = HVA_P_SPECS[nm]
-    if dry_run:
-        return 0
-    attrs = 0
-    set_sku_attribute(sku, slug="control", value=CONTROL_MODULATING, name="Управление", unit="")
-    set_sku_attribute(
-        sku,
-        slug=CONTROL_SIGNAL_Y_SLUG,
-        value=CONTROL_SIGNAL_Y_CANON,
-        name=CONTROL_SIGNAL_Y_LABEL,
-        unit="",
-    )
-    set_sku_attribute(
-        sku,
-        slug=FEEDBACK_SIGNAL_U_SLUG,
-        value=FEEDBACK_SIGNAL_U_CANON,
-        name=FEEDBACK_SIGNAL_U_LABEL,
-        unit="",
-    )
-    attrs += 3
-    for name, slug, unit, value in _SHARED_BASE:
-        set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
-        attrs += 1
-    set_sku_attribute(
-        sku,
-        slug="storage-temp",
-        value="-40...+70 °C",
-        name="Температура хранения",
-        unit="°C",
-    )
-    attrs += 1
-    for name, slug, unit, key in (
-        ("Крутящий момент", "moment", "Нм", "moment"),
-        ("Площадь заслонки", "damper-area", "м²", "damper-area"),
-        ("Время поворота", "running-time", "с", "running-time"),
-        ("Уровень шума", "noise", "дБ", "noise"),
-        ("Длина вала заслонки", "shaft-length", "мм", "shaft-length"),
-        ("Габаритные размеры", "dimensions", "мм", "dimensions"),
-        ("Масса", "weight", "кг", "weight"),
-        ("Потребляемая мощность", "power-consumption", "Вт", "power"),
-    ):
-        set_sku_attribute(sku, slug=slug, value=row[key], name=name, unit=unit)
-        attrs += 1
-    attrs += _set_voltage_attrs(sku, "24")
-    if aux:
-        set_sku_attribute(
-            sku,
-            slug="aux-switch",
-            value="SPDT-2",
-            name="Вспомогательный переключатель",
-            unit="",
-        )
-        attrs += 1
-    return attrs
-
-
 def _enrich_qx_sku(
     sku: SKU,
     *,
@@ -706,16 +559,14 @@ def _enrich_qx_sku(
 
 
 _HVD_Q_RE = re.compile(r"(?i)^hvd(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)q$")
-_HVA_P_RE = re.compile(r"(?i)^hva(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)p$")
 _QX_RE = re.compile(r"(?i)^(?P<brand>hva|hvd)(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)qx$")
 
 
 def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False) -> dict[str, Any]:
-    """Ensure + enrich HVD-Q, HVA-P, and HV*QX families."""
+    """Ensure + enrich HVD-Q and HV*QX families (HVA-P is out of RF scope)."""
     summary: dict[str, Any] = {
         "dry_run": dry_run,
         "ensure_hvd_q": ensure_hvd_q_catalog(dry_run=dry_run),
-        "ensure_hva_p": ensure_hva_p_catalog(dry_run=dry_run),
         "ensure_qx": ensure_hv_qx_catalog(dry_run=dry_run),
         "skus": 0,
         "attributes": 0,
@@ -723,17 +574,16 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
         "media_updated": 0,
         "errors": [],
     }
-    for key in ("ensure_hvd_q", "ensure_hva_p", "ensure_qx"):
+    for key in ("ensure_hvd_q", "ensure_qx"):
         err = summary[key].get("error")
         if err:
             summary["errors"].append(err)
 
     for sku in SKU.objects.filter(
-        sku_code__iregex=r"(?i)^(hvd|hva)(24|230)s?-\d+(q|p|qx)$",
+        sku_code__iregex=r"(?i)^(hvd|hva)(24|230)s?-\d+(q|qx)$",
     ).order_by("sku_code"):
         code = sku.sku_code
         m_q = _HVD_Q_RE.match(code)
-        m_p = _HVA_P_RE.match(code)
         m_qx = _QX_RE.match(code)
         if m_q:
             nm = int(m_q.group("nm"))
@@ -751,17 +601,6 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
                 media = _attach_hvd_folder_media(sku, nm=nm, fast_q=True, dry_run=dry_run)
                 summary["media_created"] += media.get("created", 0)
                 summary["media_updated"] += media.get("updated", 0)
-        elif m_p:
-            nm = int(m_p.group("nm"))
-            if nm not in HVA_P_SPECS:
-                continue
-            summary["attributes"] += _enrich_hva_p_sku(
-                sku,
-                nm,
-                bool(m_p.group("aux")),
-                dry_run=dry_run,
-            )
-            summary["skus"] += 1
         elif m_qx:
             nm = int(m_qx.group("nm"))
             if nm not in QX_SPECS:
@@ -781,7 +620,6 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
                 summary["media_created"] += media.get("created", 0)
                 summary["media_updated"] += media.get("updated", 0)
 
-    # HVA-P datasheets (hva-5p / 10p / 15p) map via existing HVA attach.
     manuals = attach_hva_manuals(default_manuals_dir(), dry_run=dry_run)
     summary["manuals"] = {
         "created": manuals.get("created", 0),
@@ -792,7 +630,7 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
     if with_media:
         from catalog.etl.hva_local_media import apply_hva_local_media
 
-        # P / QX reuse std family body shots when no dedicated pack exists.
+        # QX reuse std family body shots when no dedicated pack exists.
         hva_media = apply_hva_local_media(dry_run=dry_run)
         summary["media_created"] += hva_media.get("created", 0)
         summary["media_updated"] += hva_media.get("updated", 0)

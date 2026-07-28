@@ -1,4 +1,4 @@
-"""Seed + enrich HVD-Q, HVA-P (spring), and HV*QX capacitor families.
+"""Seed + enrich HVD-Q and HV*QX capacitor families.
 
 Usage::
 
@@ -17,9 +17,9 @@ from catalog.etl.series_copy_hv_extra import apply_hv_extra_enrichment
 
 
 class Command(BaseCommand):
-    """Ensure catalog tiles for HVD-Q / HVA-P / capacitor QX and fill ТТХ."""
+    """Ensure catalog tiles for HVD-Q / capacitor QX and fill ТТХ."""
 
-    help = "Enrich HV extras: HVD-Q, HVA-P spring, HVA/HVD*QX capacitor."
+    help = "Enrich HV extras: HVD-Q and HVA/HVD*QX capacitor (not HVA-P)."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
@@ -40,7 +40,7 @@ class Command(BaseCommand):
         prefix = "[dry-run] " if dry_run else ""
         for err in stats.get("errors") or []:
             self.stdout.write(self.style.ERROR(f"{prefix}{err}"))
-        for key in ("ensure_hvd_q", "ensure_hva_p", "ensure_qx"):
+        for key in ("ensure_hvd_q", "ensure_qx"):
             block = stats[key]
             self.stdout.write(
                 f"{prefix}{key}: products+={block.get('products_created', 0)} skus+={block.get('skus_created', 0)}",
@@ -58,5 +58,4 @@ class Command(BaseCommand):
                 f"~{manuals.get('updated', 0)} skip={manuals.get('skipped', 0)}",
             )
             for warn in manuals.get("warnings") or []:
-                if "5p" in warn or "10p" in warn or "15p" in warn or "P" in warn:
-                    self.stdout.write(self.style.WARNING(f"{prefix}{warn}"))
+                self.stdout.write(self.style.WARNING(f"{prefix}{warn}"))

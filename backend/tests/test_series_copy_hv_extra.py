@@ -1,4 +1,4 @@
-"""Tests for HVD-Q / HVA-P / capacitor QX catalog seed."""
+"""Tests for HVD-Q / capacitor QX catalog seed (HVA-P is out of RF scope)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import pytest
 from catalog.etl.series_copy_hv_extra import (
     apply_hv_extra_enrichment,
     ensure_hv_qx_catalog,
-    ensure_hva_p_catalog,
     ensure_hvd_q_catalog,
 )
 from catalog.etl.sku_variant import parse_sku_variant
@@ -18,7 +17,7 @@ from catalog.models import SKU, AttributeValue, Category
     ("code", "control"),
     [
         ("HVD24-5Q", "on_off"),
-        ("HVA24-5P", "modulating"),
+        ("HVA24-5P", "modulating"),  # parse only; not seeded for RF
         ("HVD230S-10QX", "on_off"),
         ("HVA24-5QX", "modulating"),
     ],
@@ -44,20 +43,18 @@ def test_ensure_hvd_q_and_enrich() -> None:
         slug="elektronnye-otkazoustoychivye-vozdushnye-privody",
     )
     q = ensure_hvd_q_catalog(dry_run=False)
-    p = ensure_hva_p_catalog(dry_run=False)
     qx = ensure_hv_qx_catalog(dry_run=False)
     assert q["products_created"] == 4
     assert q["skus_created"] == 16
-    assert p["products_created"] == 3
-    assert p["skus_created"] == 6
     assert qx["products_created"] == 8
     assert qx["skus_created"] == 32
     assert SKU.objects.filter(sku_code="HVD24-5Q").exists()
-    assert SKU.objects.filter(sku_code="HVA24S-10P").exists()
+    assert not SKU.objects.filter(sku_code__iregex=r"(?i)^hva.*\d+p$").exists()
     assert SKU.objects.filter(sku_code="HVA230-40QX").exists()
 
     stats = apply_hv_extra_enrichment(dry_run=False)
     assert stats["skus"] >= 16
+    assert "ensure_hva_p" not in stats
     sku = SKU.objects.get(sku_code="HVD24-5Q")
     by = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
     assert by["running-time"] == "< 20 с"

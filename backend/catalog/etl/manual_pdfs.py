@@ -34,7 +34,8 @@ HVA modulating air (no spring; ASCII stems after rename)::
     hva-5.pdf / HVA-5 instruction.pdf → HVA24/230[S]-5
     hva-5q.pdf                        → HVA24/230[S]-5Q
     hva-10.pdf / hva-10q.pdf / …      → matching HVA* codes when present
-    hva-5p.pdf / hva-5uq.pdf          → spring / special (warn if no SKU)
+    hva-5uq.pdf                       → special (warn if no SKU)
+    # hva-*p.pdf — Chinese spring HVA-P; out of RF catalog (skip)
 """
 
 from __future__ import annotations
@@ -71,8 +72,9 @@ _SAMU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)mu(?:-ds[_-]?dst)?$")
 _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
 _HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
 _HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
-# hva-5 | hva-5q | hva-5p | hva-5uq | hva-10p | «HVA-5 instruction»
-_HVA_STEM = re.compile(r"(?i)^hva-(?P<token>\d+(?:uq|q|p)?)$")
+# hva-5 | hva-5q | hva-5uq | «HVA-5 instruction» (not hva-*p — RF-excluded)
+_HVA_STEM = re.compile(r"(?i)^hva-(?P<token>\d+(?:uq|q)?)$")
+_HVA_P_STEM = re.compile(r"(?i)^hva-(?P<token>\d+p)$")
 _HVA_INSTRUCTION_STEM = re.compile(r"(?i)^hva-5(?:\s+instruction)?$")
 _HVA_SKU_BODY = re.compile(
     r"(?i)^hva(?:24|230)s?-(?P<body>\d+(?:uq|q|p)?)$",
@@ -1061,8 +1063,13 @@ def attach_hvd_manuals(
 
 
 def parse_hva_manual_token(stem: str) -> str | None:
-    """Parse ``hva-5q`` / ``HVA-5 instruction`` → family token ``5`` / ``5q``."""
+    """Parse ``hva-5q`` / ``HVA-5 instruction`` → family token ``5`` / ``5q``.
+
+    Spring ``hva-*p`` manuals are RF-excluded (Chinese market) — return None.
+    """
     clean = normalize_manual_stem(stem)
+    if _HVA_P_STEM.fullmatch(clean):
+        return None
     if _HVA_INSTRUCTION_STEM.fullmatch(clean):
         return "5"
     match = _HVA_STEM.fullmatch(clean)
@@ -1118,7 +1125,11 @@ def discover_hva_manuals(
     for path in paths:
         token = parse_hva_manual_token(path.name)
         if token is None:
-            if path.name.casefold().startswith("hva"):
+            if _HVA_P_STEM.fullmatch(normalize_manual_stem(path.name)):
+                warnings.append(
+                    f"skip RF-excluded HVA-P manual: {path.name!r}",
+                )
+            elif path.name.casefold().startswith("hva"):
                 warnings.append(f"unrecognized HVA filename: {path.name!r}")
             continue
         if token in seen_tokens:

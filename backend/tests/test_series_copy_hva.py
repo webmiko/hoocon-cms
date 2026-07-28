@@ -27,7 +27,7 @@ from catalog.models import (
         ("hva-5", "5"),
         ("hva-5q.pdf", "5q"),
         ("hva-5uq", "5uq"),
-        ("hva-10p", "10p"),
+        ("hva-10p", None),  # RF-excluded Chinese spring
         ("HVA-5 instruction", "5"),
         ("da5fu-d:ds", None),
     ],

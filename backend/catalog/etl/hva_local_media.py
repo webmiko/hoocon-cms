@@ -11,8 +11,8 @@ Sources (Yandex Disk archive, resolved via common roots)::
 Falls back to the std Nm photo for Q families when a dedicated Q folder
 has no product shot (10Q/20Q/40Q share the same body photo as 10/20/40).
 
-Spring ``*P`` and capacitor ``*QX`` editions without a dedicated pack reuse
-the nearest std family body photo (15P → HVA-10 pack).
+Spring ``*P`` is out of RF scope. Capacitor ``*QX`` editions without a dedicated
+pack reuse the nearest std family body photo.
 """
 
 from __future__ import annotations
@@ -25,14 +25,19 @@ from typing import Any, Final
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from catalog.etl.manual_diagrams import SORT_WIRING, parse_hva_series
+from catalog.etl.manual_diagrams import (
+    SORT_WIRING,
+    parse_hva_series,
+    unpublish_combined_when_split_diagrams,
+    unpublish_redundant_hva_catalog_dimensions,
+)
 from catalog.etl.webp import convert_bytes_to_webp
 from catalog.models import SKU, ProductImage
 
 logger = logging.getLogger(__name__)
 
 _SOURCE_URL = "https://hoocon.ru/.local-assets/hva-catalog/hva{nm}{fast}-{kind}.webp"
-_P_OR_QX = re.compile(r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)(?P<kind>p|qx)$")
+_QX_RE = re.compile(r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)qx$")
 SORT_PRODUCT: Final[int] = 0
 # Keep below wiring(5) / AI-catalog dims(8) so gallery order is photo → schema → razmer → AI.
 SORT_LOCAL_DIMENSIONS: Final[int] = 6
@@ -133,19 +138,16 @@ def _photo_paths(
 
 
 def _media_target(sku_code: str) -> tuple[int, bool, str] | None:
-    """Map SKU → ``(photo_nm, fast, label)``; P/QX reuse std family shots."""
+    """Map SKU → ``(photo_nm, fast, label)``; QX reuse std family shots."""
     parsed = parse_hva_series(sku_code)
     if parsed is not None:
         nm, fast = parsed
         return nm, fast, f"HVA-{nm}{'Q' if fast else ''}"
-    match = _P_OR_QX.match((sku_code or "").strip().replace(" ", ""))
+    match = _QX_RE.match((sku_code or "").strip().replace(" ", ""))
     if match is None:
         return None
     nm = int(match.group("nm"))
-    kind = match.group("kind").upper()
-    # No dedicated 15 Nm photo pack — spring 15P shares the HVA-10 body.
-    photo_nm = 10 if nm == 15 else nm
-    return photo_nm, False, f"HVA-{nm}{kind}"
+    return nm, False, f"HVA-{nm}QX"
 
 
 def _source_url(nm: int, *, fast: bool, kind: str) -> str:
@@ -194,7 +196,7 @@ def apply_hva_local_media(
     dry_run: bool = False,
     photo_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Attach product / dimensions / wiring images to HVA std/Q/P/QX SKUs."""
+    """Attach product / dimensions / wiring images to HVA std/Q/QX SKUs."""
     root = photo_root or default_hva_photo_root()
     summary: dict[str, Any] = {
         "created": 0,
@@ -258,4 +260,11 @@ def apply_hva_local_media(
         if not attached_any:
             summary["skipped"] += 1
             summary["warnings"].append(f"no local media for {sku.sku_code}")
+
+    summary["unpublished_catalog_dims"] = unpublish_redundant_hva_catalog_dimensions(
+        dry_run=dry_run,
+    )
+    summary["unpublished_combined"] = unpublish_combined_when_split_diagrams(
+        dry_run=dry_run,
+    )
     return summary
