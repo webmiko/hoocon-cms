@@ -24,9 +24,10 @@ def _normalize_attr_name(name: str) -> str:
     return text
 
 
-def _attr_prefer_score(name: str) -> int:
+def _attr_prefer_score(name: str, *, slug: str = "") -> int:
     """Higher = keep this Attribute row when collapsing duplicates."""
     low = (name or "").casefold()
+    slug_low = (slug or "").casefold()
     score = 0
     if "крутящий момент" in low:
         score += 20
@@ -34,6 +35,11 @@ def _attr_prefer_score(name: str) -> int:
         score -= 10
     if "вид крана" in low:
         score += 5
+    # Prefer canonical Belimo Y/U slugs over legacy *-y / *-u aliases.
+    if slug_low in {"control-signal", "feedback-signal"}:
+        score += 15
+    if slug_low in {"control-signal-y", "feedback-signal-u"}:
+        score -= 5
     # Prefer shorter opaque-slug-free readable names slightly by length.
     score -= min(len(low), 40) // 20
     return score
@@ -58,6 +64,7 @@ def dedupe_attribute_values(
     for av in attribute_values:
         attr = cast(Attribute, av.attribute) if av.attribute_id else None
         name = attr.name if attr is not None else ""
+        slug = attr.slug if attr is not None else ""
         value = " ".join(str(av.value).split())
         key = (_normalize_attr_name(name), value.casefold())
         if key not in best:
@@ -67,6 +74,7 @@ def dedupe_attribute_values(
         current = best[key]
         cur_attr = cast(Attribute, current.attribute) if current.attribute_id else None
         cur_name = cur_attr.name if cur_attr is not None else ""
-        if _attr_prefer_score(name) > _attr_prefer_score(cur_name):
+        cur_slug = cur_attr.slug if cur_attr is not None else ""
+        if _attr_prefer_score(name, slug=slug) > _attr_prefer_score(cur_name, slug=cur_slug):
             best[key] = av
     return [best[key] for key in order]

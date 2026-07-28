@@ -12,6 +12,8 @@ from django.db.models import Prefetch
 from catalog.etl.attr_groups import (
     ATTR_GROUP_LABELS,
     ATTR_GROUP_ORDER,
+    CONTROL_SIGNAL_SLUGS,
+    FEEDBACK_SIGNAL_SLUGS,
     group_key_for_slug,
 )
 from catalog.facets import EXTRA_HIGHLIGHT_DEFS, FACET_DEFS
@@ -22,6 +24,9 @@ COMPARE_MAX_SKUS = 4
 COMPARE_EMPTY_CELL = "—"
 COMPARE_META_GROUP = "meta"
 COMPARE_META_GROUP_TITLE = "Основные"
+
+# Highlight keys already covered as core rows — skip EAV aliases in «Все характеристики».
+_SIGNAL_CORE_SKIP_SLUGS = CONTROL_SIGNAL_SLUGS | FEEDBACK_SIGNAL_SLUGS
 
 # Meta rows always first (not from EAV highlights).
 _META_ROW_DEFS: tuple[tuple[str, str], ...] = (
@@ -283,6 +288,61 @@ def _values_differ(values: list[str]) -> bool:
     return len(norms) > 1
 
 
+def _attr_lookup_keys(key: str) -> tuple[str, ...]:
+    """Facet key ↔ attribute slug variants for gap-fill."""
+    dashed = key.replace("_", "-")
+    underscored = key.replace("-", "_")
+    return tuple(dict.fromkeys((key, dashed, underscored)))
+
+
+def _fill_empty_compare_cells_from_attributes(
+    skus: list[SKU],
+    rows: list[dict[str, Any]],
+    *,
+    serializer_context: dict[str, Any] | None = None,
+) -> None:
+    """Replace ``—`` core cells when the SKU still has the EAV value.
+
+    List highlights are capped (Y/U signals eat slots), so mass/dimensions can
+    drop from cards while remaining on the PDP attribute list — compare must
+    not show a false gap.
+    """
+    context = serializer_context or {}
+    per_sku: list[dict[str, str]] = []
+    for sku in skus:
+        by_key: dict[str, str] = {}
+        for row in _sku_attribute_rows(sku, context):
+            slug = str(row.get("slug") or "").strip()
+            if not slug:
+                continue
+            cell = format_attribute_cell(row)
+            if cell == COMPARE_EMPTY_CELL:
+                continue
+            for alias in _attr_lookup_keys(slug):
+                by_key.setdefault(alias, cell)
+        per_sku.append(by_key)
+
+    for row in rows:
+        values = row.get("values")
+        if not isinstance(values, list):
+            continue
+        key = str(row.get("key") or "")
+        aliases = _attr_lookup_keys(key)
+        changed = False
+        for index, value in enumerate(values):
+            if value != COMPARE_EMPTY_CELL:
+                continue
+            if index >= len(per_sku):
+                continue
+            fill = next((per_sku[index][a] for a in aliases if a in per_sku[index]), None)
+            if fill is None:
+                continue
+            values[index] = fill
+            changed = True
+        if changed:
+            row["diff"] = _values_differ([str(v) for v in values])
+
+
 def build_compare_response(
     skus: list[SKU],
     *,
@@ -301,13 +361,26 @@ def build_compare_response(
     context = serializer_context or {}
     payloads = SKUListSerializer(skus, many=True, context=context).data
     sku_list = [dict(item) for item in payloads]
+    for item in sku_list:
+        code = str(item.get("sku_code") or "").strip()
+        if code:
+            item["sku_code"] = code.upper()
     core_rows = build_compare_rows(sku_list)
+    _fill_empty_compare_cells_from_attributes(
+        skus,
+        core_rows,
+        serializer_context=context,
+    )
     core_keys = {str(r["key"]) for r in core_rows}
-    # Also skip underscore variants of attr slugs already covered as facets.
+    # Also skip underscore/dash variants of facet keys already covered as core,
+    # plus legacy Y/U EAV aliases (control-signal-y / feedback-signal-u).
     expanded_skip = set(core_keys)
     for key in list(core_keys):
         expanded_skip.add(key.replace("_", "-"))
         expanded_skip.add(key.replace("-", "_"))
+    expanded_skip.update(_SIGNAL_CORE_SKIP_SLUGS)
+    for slug in _SIGNAL_CORE_SKIP_SLUGS:
+        expanded_skip.add(slug.replace("-", "_"))
     attr_rows = build_attribute_compare_rows(
         skus,
         serializer_context=context,

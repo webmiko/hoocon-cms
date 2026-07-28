@@ -125,8 +125,8 @@ def test_compare_endpoint_happy_path(client) -> None:
     assert by_key["moment"]["diff"] is True
     assert by_key["voltage"]["diff"] is False
     assert by_key["sku_code"]["values"] == [
-        seeded["sku10"].sku_code,
-        seeded["sku5"].sku_code,
+        seeded["sku10"].sku_code.upper(),
+        seeded["sku5"].sku_code.upper(),
     ]
 
 
@@ -162,15 +162,134 @@ def test_compare_endpoint_empty_skus(client) -> None:
 
 
 @pytest.mark.django_db
-def test_compare_endpoint_includes_attribute_rows(client) -> None:
-    """Full ТТХ rows carry group metadata alongside highlight rows."""
-    seeded = _seed_pair()
+def test_compare_fills_weight_when_highlight_truncated(client) -> None:
+    """Modulating editions can drop weight from list highlights; compare still shows EAV."""
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnie-weight-cmp")
+    product = Product.objects.create(name="DAMU", slug="damu-weight-cmp", category=cat)
+    sku_mod = SKU.objects.create(
+        product=product,
+        name="DA24",
+        slug="da24-weight-cmp",
+        sku_code="DA24MU230-AS",
+        is_published=True,
+    )
+    sku_onoff = SKU.objects.create(
+        product=product,
+        name="DA3FU",
+        slug="da3fu-weight-cmp",
+        sku_code="da3fu230-ds",
+        is_published=True,
+    )
+    attrs = {
+        "control": Attribute.objects.create(name="Управление", slug="control"),
+        "moment": Attribute.objects.create(name="Крутящий момент", slug="moment"),
+        "voltage": Attribute.objects.create(name="Напряжение", slug="voltage"),
+        "area": Attribute.objects.create(name="Площадь заслонки", slug="damper-area"),
+        "aux": Attribute.objects.create(name="Вспомогательный переключатель", slug="aux-switch"),
+        "runtime": Attribute.objects.create(name="Время поворота", slug="running-time"),
+        "signal": Attribute.objects.create(name="Упр. сигнал Y", slug="control-signal"),
+        "feedback": Attribute.objects.create(name="Обратная связь U", slug="feedback-signal"),
+        "weight": Attribute.objects.create(name="Масса", slug="weight"),
+    }
+    # Modulating SKU: enough primary rows that weight falls off list highlight limit.
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["control"], value="Пропорциональное")
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["moment"], value="24 Нм")
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["voltage"], value="AC 230 В")
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["area"], value="до 2,4 м²")
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["aux"], value="SPDT-2")
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["runtime"], value="< 160 с")
+    AttributeValue.objects.create(
+        sku=sku_mod,
+        attribute=attrs["signal"],
+        value="0(2)...10 В= / 0(4)...20 мА (спецзаказ)",
+    )
+    AttributeValue.objects.create(
+        sku=sku_mod,
+        attribute=attrs["feedback"],
+        value="0(2)...10 В= / 0(4)...20 мА (спецзаказ)",
+    )
+    AttributeValue.objects.create(sku=sku_mod, attribute=attrs["weight"], value="≈ 1,3 кг")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["control"], value="Открыто/закрыто")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["moment"], value="3 Нм")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["voltage"], value="AC 230 В")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["area"], value="до 0,3 м²")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["aux"], value="SPDT-1")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["runtime"], value="≤ 20 с")
+    AttributeValue.objects.create(sku=sku_onoff, attribute=attrs["weight"], value="< 1,3 кг")
+
     response = client.get(
         reverse("catalog-compare-list"),
-        {"skus": f"{seeded['sku5'].slug},{seeded['sku10'].slug}"},
+        {"skus": f"{sku_mod.slug},{sku_onoff.slug}"},
+    )
+    assert response.status_code == 200
+    assert [s["sku_code"] for s in response.data["skus"]] == [
+        "DA24MU230-AS",
+        "DA3FU230-DS",
+    ]
+    by_key = {row["key"]: row for row in response.data["rows"]}
+    assert "weight" in by_key
+    assert by_key["weight"]["values"] == ["≈ 1,3 кг", "< 1,3 кг"]
+
+
+@pytest.mark.django_db
+def test_compare_skips_legacy_signal_alias_rows(client) -> None:
+    """Legacy control-signal-y must not duplicate core Упр. сигнал Y with a dash gap."""
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnie-signal-cmp")
+    product = Product.objects.create(name="DAMU", slug="damu-signal-cmp", category=cat)
+    sku_a = SKU.objects.create(
+        product=product,
+        name="DA2",
+        slug="da2-signal-cmp",
+        sku_code="DA2MU230-AS",
+        is_published=True,
+    )
+    sku_b = SKU.objects.create(
+        product=product,
+        name="DA4",
+        slug="da4-signal-cmp",
+        sku_code="DA4MU230-AS",
+        is_published=True,
+    )
+    control = Attribute.objects.create(name="Управление", slug="control")
+    signal_canon = Attribute.objects.create(
+        name="Управляющий сигнал Y",
+        slug="control-signal",
+    )
+    signal_alias = Attribute.objects.create(
+        name="Управляющий сигнал Y",
+        slug="control-signal-y",
+    )
+    canon = "0(2)...10 В= / 0(4)...20 мА (спецзаказ)"
+    for sku in (sku_a, sku_b):
+        AttributeValue.objects.create(sku=sku, attribute=control, value="Пропорциональное")
+        AttributeValue.objects.create(sku=sku, attribute=signal_canon, value=canon)
+    # Alias only on first SKU — mimics uneven ETL; must not create a dashed diff row.
+    AttributeValue.objects.create(sku=sku_a, attribute=signal_alias, value=canon)
+
+    response = client.get(
+        reverse("catalog-compare-list"),
+        {"skus": f"{sku_a.slug},{sku_b.slug}"},
     )
     assert response.status_code == 200
     rows = response.data["rows"]
-    assert any(row.get("core") is True for row in rows)
-    assert all("group" in row for row in rows)
-    assert all("values" in row and "diff" in row for row in rows)
+    assert not any(row["key"] == "control-signal-y" for row in rows)
+    signal_rows = [row for row in rows if row["key"] == "control_signal"]
+    assert len(signal_rows) == 1
+    assert signal_rows[0]["values"] == [canon, canon]
+    assert signal_rows[0]["diff"] is False
