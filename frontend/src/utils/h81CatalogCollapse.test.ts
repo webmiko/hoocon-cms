@@ -48,6 +48,10 @@ describe("collapseH81CatalogSkus", () => {
       { slug: "hvd-a", product_slug: "privod-dimoudaleniya-hvd-3f" },
       { slug: "hvd-b", product_slug: "privod-dimoudaleniya-hvd-3f" },
       { slug: "hvd-air", product_slug: "privod-vozdushniy-hvd-40q" },
+      { slug: "hva-p", product_slug: "privod-vozdushniy-pruzhina-hva-5p" },
+      { slug: "hva-p-b", product_slug: "privod-vozdushniy-pruzhina-hva-5p" },
+      { slug: "qx-a", product_slug: "privod-vozdushniy-kondensator-hvd-5qx" },
+      { slug: "qx-b", product_slug: "privod-vozdushniy-kondensator-hvd-5qx" },
       { slug: "other", product_slug: "da5fu" },
     ];
     const out = collapseH81CatalogSkus(rows);
@@ -60,6 +64,8 @@ describe("collapseH81CatalogSkus", () => {
       "hva-a",
       "hvd-a",
       "hvd-air",
+      "hva-p",
+      "qx-a",
       "other",
     ]);
   });

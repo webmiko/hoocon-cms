@@ -126,11 +126,22 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
         control = "on_off"
         aux = True
-    # HVD24-5 / HVD24S-10 / HVD230S-40Q — air on/off (+ optional aux S).
+    # HVD/HVA …QX — capacitor fail-safe (before bare Q / std patterns).
+    elif re.fullmatch(r"hvd(?:24|230)s?-\d+qx", code):
+        control = "on_off"
+        aux = bool(re.match(r"hvd(?:24|230)s-", code))
+    elif re.fullmatch(r"hva(?:24|230)s?-\d+qx", code):
+        control = "modulating"
+        aux = bool(re.match(r"hva(?:24|230)s-", code))
+    # HVA24-5P — spring-return modulating (24 V manuals).
+    elif re.fullmatch(r"hva(?:24|230)s?-\d+p", code):
+        control = "modulating"
+        aux = bool(re.match(r"hva(?:24|230)s-", code))
+    # HVD24-5 / HVD24S-10 / HVD230S-40Q — air on/off (+ optional aux S). Not QX.
     elif re.fullmatch(r"hvd(?:24|230)s?-\d+q?", code):
         control = "on_off"
         aux = bool(re.match(r"hvd(?:24|230)s-", code))
-    # HVA24-5 / HVA24S-5Q — air damper without spring (modulating on Tilda).
+    # HVA24-5 / HVA24S-5Q — air damper without spring (modulating). Not QX/P.
     elif re.fullmatch(r"hva(?:24|230)s?-\d+q?", code):
         control = "modulating"
         aux = bool(re.match(r"hva(?:24|230)s-", code))

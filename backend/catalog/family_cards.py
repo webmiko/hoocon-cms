@@ -45,8 +45,13 @@ _SAFU_NM_SLUG = r"privod-protivopozharniy-\d+nm"
 _HVA_SLUG = (
     r"privod-vozdushniy-hva-\d+nm"
     r"|privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm"
+    r"|privod-vozdushniy-pruzhina-hva-\d+p"
+    r"|privod-vozdushniy-kondensator-hva-\d+qx"
 )
-_HVD_AIR_SLUG = r"privod-vozdushniy-hvd-(?:\d+nm|\d+q)"
+_HVD_AIR_SLUG = (
+    r"privod-vozdushniy-hvd-(?:\d+nm|\d+q)"
+    r"|privod-vozdushniy-kondensator-hvd-\d+qx"
+)
 _HVD_SMOKE_SLUG = r"privod-dimoudaleniya-hvd-\d+f"
 
 _FAMILY_PRODUCT_SLUG_RE = re.compile(

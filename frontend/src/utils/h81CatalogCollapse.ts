@@ -10,8 +10,9 @@ const DAFU_PRODUCT_SLUG_RE = /^privod-vozdushniy-pruzhina-dafu-\d+nm$/i;
 const SAMU_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-\d+nm$/i;
 const SAFU_PRODUCT_SLUG_RE = /^privod-protivopozharniy-\d+nm$/i;
 const HVA_PRODUCT_SLUG_RE =
-  /^privod-vozdushniy-hva-\d+nm$|^privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm$/i;
-const HVD_AIR_PRODUCT_SLUG_RE = /^privod-vozdushniy-hvd-(?:\d+nm|\d+q)$/i;
+  /^privod-vozdushniy-hva-\d+nm$|^privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm$|^privod-vozdushniy-pruzhina-hva-\d+p$|^privod-vozdushniy-kondensator-hva-\d+qx$/i;
+const HVD_AIR_PRODUCT_SLUG_RE =
+  /^privod-vozdushniy-hvd-(?:\d+nm|\d+q)$|^privod-vozdushniy-kondensator-hvd-\d+qx$/i;
 const HVD_SMOKE_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-hvd-\d+f$/i;
 
 export function isH81FamilyProductSlug(productSlug: string | undefined | null): boolean {
