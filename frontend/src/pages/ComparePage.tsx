@@ -200,7 +200,7 @@ export function ComparePage() {
       <Seo
         title="Сравнение моделей"
         description={
-          "Сравнение электроприводов и арматуры Hoocon по ТТХ: момент, " +
+          "Сравнение электроприводов и арматуры Hoocon по характеристикам: момент, " +
           "напряжение, управление и другие характеристики."
         }
         path="/compare"
@@ -224,7 +224,7 @@ export function ComparePage() {
       {slugs.length === 0 ? (
         <div className={styles.empty}>
           <p>Пока нечего сравнивать.</p>
-          <Link to="/catalog" className={styles.emptyCta} data-on-dark-cta>
+          <Link to="/catalog" className={styles.emptyCta} data-brand-cta>
             Перейти в каталог
           </Link>
         </div>

@@ -65,7 +65,7 @@ def sku_meta_title_partial(
     volt = _short_voltage_for_title(voltage)
     if volt:
         return f"{code} — {volt}"
-    return f"{code} — электропривод ОВК"
+    return f"{code} — электропривод вентиляции"
 
 
 def _short_voltage_for_title(voltage: str) -> str:
@@ -97,5 +97,8 @@ def sku_meta_description(
         cat = plain_text_for_meta(category_name, max_len=60)
         body = f"{code}: {cat}. Паспорт PDF, подбор аналогов Belimo, запрос КП у Hoocon."
     else:
-        body = f"{code}: электропривод ОВК Hoocon. Паспорт PDF, фильтры по ТТХ, запрос коммерческого предложения."
+        body = (
+            f"{code}: электропривод вентиляции Hoocon. Паспорт PDF, "
+            "фильтры по характеристикам, запрос коммерческого предложения."
+        )
     return format_meta_description(body)

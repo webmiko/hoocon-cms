@@ -69,7 +69,7 @@ export function PageView({ slug: slugProp }: PageViewProps) {
   const isLanding = page.slug === "zavod";
   const seoDescription =
     page.slug === "zavod"
-      ? "OEM электроприводов ОВК под вашим брендом напрямую с завода Ningbo Hoocon: CE, UL, EAC. Без посредников."
+      ? "OEM электроприводов вентиляции и кондиционирования под вашим брендом напрямую с завода Ningbo Hoocon: CE, UL, EAC. Без посредников."
       : desc;
 
   const crumbs = (

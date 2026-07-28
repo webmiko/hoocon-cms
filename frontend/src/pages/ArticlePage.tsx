@@ -214,7 +214,7 @@ export function ArticlePage() {
             Нужен подбор привода?
           </h2>
           <p className={styles.ctaText}>
-            Инженер поможет подобрать модель по ТТХ, крутящему моменту и сигналу
+            Инженер поможет подобрать модель по характеристикам, крутящему моменту и сигналу
             управления.
           </p>
           <Link to="/consultation" className={styles.ctaLink}>

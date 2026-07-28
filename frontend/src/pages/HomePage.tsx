@@ -233,10 +233,10 @@ export function HomePage() {
   return (
     <div className={styles.home}>
       <Seo
-        title="Электроприводы ОВК Hoocon — каталог, подбор, аналоги Belimo"
+        title="Электроприводы для вентиляции и кондиционирования Hoocon — каталог, подбор, аналоги Belimo"
         description={
-          "Производство электроприводов для вентиляции, кондиционирования и "
-          + "противопожарных систем. Каталог, фильтры по ТТХ, паспорта, аналоги "
+          "Электроприводы для вентиляции, кондиционирования и "
+          + "противопожарных систем. Каталог, фильтры по характеристикам, паспорта, аналоги "
           + "Belimo, запрос КП."
         }
         path="/"
@@ -278,10 +278,12 @@ export function HomePage() {
           <p id="hero-brand" className={styles.brand}>
             HOOCON
           </p>
-          <h1 className={styles.heroTitle}>Электроприводы для систем ОВК</h1>
+          <h1 className={styles.heroTitle}>
+            Электроприводы для вентиляции и кондиционирования
+          </h1>
           <p className={styles.heroLead}>
-            Подбор по ТТХ, паспорта, аналоги Belimo. Склад в Москве — отгрузка по
-            РФ. КП по запросу.
+            Подбор по техническим характеристикам, паспорта, аналоги Belimo.
+            Склад в Москве — отгрузка по РФ. КП по запросу.
           </p>
           <div className={styles.heroActions}>
             <Link to="/catalog" className={styles.ctaPrimary} data-brand-cta>
@@ -377,7 +379,7 @@ export function HomePage() {
           <li>
             <span className={styles.stepNum}>1</span>
             <div>
-              <h3>Подбор по ТТХ</h3>
+              <h3>Подбор по характеристикам</h3>
               <p>Фильтры по моменту, напряжению, типу пружины и артикулу.</p>
             </div>
           </li>
@@ -385,7 +387,7 @@ export function HomePage() {
             <span className={styles.stepNum}>2</span>
             <div>
               <h3>Паспорта и сертификаты</h3>
-              <p>PDF в карточке SKU — для согласования и проектной документации.</p>
+              <p>PDF в карточке модели — для согласования и проектной документации.</p>
             </div>
           </li>
           <li>
@@ -423,8 +425,9 @@ export function HomePage() {
           <div className={styles.partnersHead}>
             <h2 id="partners-heading">Наша профессиональная среда</h2>
             <p className={styles.partnersLead}>
-              Производители и дистрибьюторы, с которыми работаем по проектам ОВК.
-              Полный список точек продаж — на странице{" "}
+              Производители и дистрибьюторы, с которыми работаем по проектам
+              вентиляции и кондиционирования. Полный список точек продаж — на
+              странице{" "}
               <Link to="/gde-kupit">где купить</Link>.
             </p>
           </div>
@@ -506,8 +509,8 @@ export function HomePage() {
             <summary>Можно ли заменить SA10FU230-DS на DA10FU230-DS?</summary>
             <p>
               Нет. SA — для огнезадерживающих клапанов (пружина ≤ 25 с, работа при
-              нагреве). DA — для общеобменной вентиляции. Для ОЗК используйте
-              серию SA.
+              нагреве). DA — для общеобменной вентиляции. Для огнезадерживающих
+              клапанов используйте серию SA.
             </p>
           </details>
           <details className={styles.faqItem}>
@@ -521,7 +524,7 @@ export function HomePage() {
           <details className={styles.faqItem}>
             <summary>Как заказать и получить КП?</summary>
             <p>
-              Подберите SKU в каталоге или опишите задачу —{" "}
+              Подберите модель в каталоге или опишите задачу —{" "}
               <Link to="/consultation">заявка на консультацию</Link>. Ответ до 2
               рабочих часов. Партнёры:{" "}
               <Link to="/gde-kupit">где купить</Link>.

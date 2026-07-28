@@ -805,7 +805,7 @@ export function SkuDetailPage() {
               Отправьте заявку — подготовим КП на {displayName || sku.name}
               {" "}
               (арт. {displaySkuCode || sku.sku_code}). Ответим до 2 рабочих часов
-              с ценой и сроком или уточняющими вопросами по ТТХ.
+              с ценой и сроком или уточняющими вопросами по характеристикам.
             </p>
             <p className={styles.ctaSla}>
               Заявка уходит на sales@hoocon.ru. Публичного прайса нет — цена

@@ -34,7 +34,7 @@ export function skuSeoTitlePartial(
   if (volt) {
     return `${skuCode} — ${volt}`;
   }
-  return `${skuCode} — электропривод ОВК`;
+  return `${skuCode} — электропривод вентиляции`;
 }
 
 /** Collapse long voltage strings to ``24 В`` / ``230 В`` for SERP titles. */
@@ -62,8 +62,8 @@ export function skuSeoDescription(
     );
   }
   return truncateAtWord(
-    `${skuCode}: электропривод ОВК Hoocon. Паспорт PDF, фильтры по ТТХ, ` +
-      "запрос коммерческого предложения.",
+    `${skuCode}: электропривод вентиляции Hoocon. Паспорт PDF, фильтры по ` +
+      "характеристикам, запрос коммерческого предложения.",
     DESC_MAX,
   );
 }

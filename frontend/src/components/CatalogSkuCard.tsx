@@ -50,7 +50,7 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
     ? ({ "--card-wash-gradient": wash.css } as CSSProperties)
     : undefined;
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
-  const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и ТТХ";
+  const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
 
   function rememberFocus() {
     saveCatalogFocus({

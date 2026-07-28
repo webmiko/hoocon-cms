@@ -492,7 +492,11 @@ export function CatalogPage() {
   return (
     <div className={styles.page}>
       <Seo
-        title={activeCategory ? activeCategory.name : "Каталог электроприводов ОВК"}
+        title={
+          activeCategory
+            ? activeCategory.name
+            : "Каталог электроприводов вентиляции и кондиционирования"
+        }
         description={
           "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
           + "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."

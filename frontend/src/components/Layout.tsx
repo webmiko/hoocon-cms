@@ -341,7 +341,10 @@ export function Layout() {
             <p className={styles.footerLogo}>
               <BrandLogo onDark alt="Hoocon" />
             </p>
-            <p>Электроприводы для вентиляции, ПБ и дымоудаления.</p>
+            <p>
+              Электроприводы для вентиляции, противопожарной безопасности и
+              дымоудаления.
+            </p>
             <p>Склад в Москве · поставки по РФ</p>
           </div>
           <div>
@@ -404,7 +407,8 @@ export function Layout() {
         </div>
         <div className={`container ${styles.footerBottom}`}>
           <p>
-            © {new Date().getFullYear()} Hoocon · Управление системами ОВК
+            © {new Date().getFullYear()} Hoocon · Системы вентиляции и
+            кондиционирования
             <span className={styles.footerRelease}> · {releaseLabel()}</span>
           </p>
           <nav className={styles.footerLegal} aria-label="Правовая информация">

@@ -25,7 +25,7 @@ export default defineConfig({
         "og-image.svg",
       ],
       manifest: {
-        name: "Hoocon — электроприводы ОВК",
+        name: "Hoocon — электроприводы вентиляции и кондиционирования",
         short_name: "Hoocon",
         description:
           "B2B-каталог электроприводов Hoocon для ОВК: подбор, документы, запрос КП.",
