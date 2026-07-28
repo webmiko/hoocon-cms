@@ -280,7 +280,8 @@ export function SkuDetailPage() {
     photoScaleTorque,
   );
   const productWashStyle = useMemo(
-    (): CSSProperties => ({ "--photo-scale": String(photoScale) }),
+    (): CSSProperties =>
+      ({ "--photo-scale": String(photoScale) }) as CSSProperties,
     [photoScale],
   );
 
