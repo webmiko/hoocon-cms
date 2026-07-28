@@ -338,24 +338,31 @@ def _attach_hvd_folder_media(
     if not folder.is_dir():
         return counts
     label = f"HVD-{nm}{'Q' if fast_q else ''}"
-    product = None
-    for name in (f"hvd-{nm}q.webp", f"hvd-{nm}.webp", "hvd-40q.webp", f"hvd-{nm}-foto.webp"):
-        candidate = folder / name
-        if candidate.is_file():
-            product = candidate
-            break
-    dims = None
+    product_candidates: list[Path] = []
+    dim_candidates: list[Path] = []
+    for name in (
+        f"hvd-{nm}q.webp",
+        f"hvd-{nm}.webp",
+        "hvd-40q.webp",
+        f"hvd-{nm}-foto.webp",
+        f"hvd-{nm}.jpg",
+        f"hvd-{nm}.png",
+    ):
+        product_candidates.append(folder / name)
     for name in (
         f"hvd-{nm}-razmer.webp",
         f"hvd-{nm} razmer.webp",
         f"hvd-{nm}-razmeri.webp",
         "hvd40-razmer.webp",
-        f"hvd-{nm}q.webp",
+        f"hvd-{nm} razmer.png",
+        "hvd40-razmer.png",
     ):
-        candidate = folder / name
-        if candidate.is_file() and "razmer" in name:
-            dims = candidate
-            break
+        dim_candidates.append(folder / name)
+
+    from catalog.etl.hva_local_media import _best_raster
+
+    product = _best_raster(product_candidates, min_edge=600)
+    dims = _best_raster(dim_candidates, min_edge=400)
     wiring = None
     for name in ("hvd-cxema-on-off.webp", f"hvd-{nm}-cxema.webp", "hvd-5-cxema.webp"):
         for base in (folder, root / "hvd-5", root / "hvd-10"):

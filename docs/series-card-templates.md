@@ -266,6 +266,10 @@ poetry run python manage.py enrich_safu
 | HVA-P | `privod-vozdushniy-pruzhina-hva-{n}p` | `HVA24[S]-{n}P` | `enrich_hv_extra` |
 | HV*QX | `privod-vozdushniy-kondensator-{hva\|hvd}-{n}qx` | `HV{A\|D}{24\|230}[S]-{n}QX` | `enrich_hv_extra` |
 
+Медиа: студийные WebP из HV seria (длинная сторона ≤1600); если нет —
+кадр из каталога 2025 при `min_edge ≥ 800`. Дубли героя (Tilda + local)
+чистить: `manage.py audit_optimize_product_images`.
+
 ---
 
 ## 2c. HVD — воздух (on/off) и дым HVD-F

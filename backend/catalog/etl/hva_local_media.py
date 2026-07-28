@@ -57,6 +57,33 @@ def _family_dir_name(nm: int, *, fast: bool) -> str:
     return f"hva-{nm}"
 
 
+def _best_raster(paths: list[Path], *, min_edge: int = 600) -> Path | None:
+    """Pick the largest WebP/JPEG/PNG; skip tiny thumbs and HEIC."""
+    from PIL import Image
+
+    ranked: list[tuple[int, Path]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        suffix = path.suffix.casefold()
+        if suffix not in {".webp", ".jpg", ".jpeg", ".png"}:
+            continue
+        try:
+            with Image.open(path) as img:
+                w, h = img.size
+        except OSError:
+            continue
+        if min(w, h) < min_edge:
+            continue
+        # Prefer WebP at equal area so JPEG/PNG duplicates lose.
+        bonus = 10 if suffix == ".webp" else 0
+        ranked.append((w * h + bonus, path))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda row: row[0], reverse=True)
+    return ranked[0][1]
+
+
 def _photo_paths(
     root: Path,
     *,
@@ -66,30 +93,31 @@ def _photo_paths(
     """Resolve product / dimensions / wiring files for one family."""
     family_dir = root / _family_dir_name(nm, fast=fast)
     std_dir = root / f"hva-{nm}"
-    product: Path | None = None
-    dimensions: Path | None = None
+    product_candidates: list[Path] = []
+    dim_candidates: list[Path] = []
     wiring: Path | None = None
 
-    if family_dir.is_dir():
-        for name in (f"hva-{nm}q.webp", f"hva-{nm}.webp", "hva-5q.webp"):
-            candidate = family_dir / name
-            if candidate.is_file():
-                product = candidate
-                break
-        for name in (f"hva-{nm} razmer.webp", f"hva-{nm}q razmer.webp"):
-            candidate = family_dir / name
-            if candidate.is_file():
-                dimensions = candidate
-                break
+    for base in (family_dir, std_dir):
+        if not base.is_dir():
+            continue
+        for name in (
+            f"hva-{nm}q.webp",
+            f"hva-{nm}.webp",
+            "hva-5q.webp",
+            f"hva-{nm}.jpg",
+            f"hva-{nm}.png",
+        ):
+            product_candidates.append(base / name)
+        for name in (
+            f"hva-{nm} razmer.webp",
+            f"hva-{nm}q razmer.webp",
+            f"hva-{nm}-razmer.webp",
+            f"hva-{nm} razmer.png",
+        ):
+            dim_candidates.append(base / name)
 
-    if product is None and std_dir.is_dir():
-        candidate = std_dir / f"hva-{nm}.webp"
-        if candidate.is_file():
-            product = candidate
-    if dimensions is None and std_dir.is_dir():
-        candidate = std_dir / f"hva-{nm} razmer.webp"
-        if candidate.is_file():
-            dimensions = candidate
+    product = _best_raster(product_candidates, min_edge=600)
+    dimensions = _best_raster(dim_candidates, min_edge=400)
 
     # Shared modulating wiring schema from HVA-5 pack (same Y/U pinout family).
     for base in (root / "hva-5", family_dir, std_dir):
