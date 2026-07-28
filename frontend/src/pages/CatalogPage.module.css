@@ -551,55 +551,6 @@
   transform: translateY(-2px);
 }
 
-/*
- * Home «Новинки» carousel: always photo-over-copy, fixed height (~desktop
- * vertical card at ~322×453). Catalog grid keeps the default horizontal card.
- */
-.cardVertical {
-  grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: stretch;
-  width: 100%;
-  height: 28.3125rem; /* 453px */
-  max-height: 28.3125rem;
-}
-
-.cardVertical .cardMedia,
-.cardVertical .cardMediaPlaceholder {
-  min-height: 0;
-  height: 100%;
-  max-height: none;
-  width: 100%;
-  align-self: stretch;
-  border-right: none;
-  border-bottom: none;
-  padding: 0;
-}
-
-.cardVertical .cardMediaPlaceholder {
-  min-height: 10rem;
-}
-
-.cardVertical .cardImage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  object-position: center center;
-  display: block;
-}
-
-.cardVertical .cardBody {
-  min-height: 0;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.cardVertical .cardSpecs {
-  overflow: hidden;
-}
-
 /* Purpose fallbacks when photo sampling is unavailable. */
 .card[data-purpose="air"] {
   --card-wash-gradient: var(--photo-wash-air);
@@ -1013,8 +964,9 @@
     align-items: start;
   }
 
-  /* Photo top / copy bottom — height follows content (no equal halves / 70vh). */
-  .card {
+  /* Photo top / copy bottom — height follows content (no equal halves / 70vh).
+   * Skip .cardVertical (home Новинки carousel keeps a fixed 453px frame). */
+  .card:not(.cardVertical) {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
     align-items: stretch;
@@ -1022,8 +974,8 @@
     height: auto;
   }
 
-  .cardMedia,
-  .cardMediaPlaceholder {
+  .card:not(.cardVertical) .cardMedia,
+  .card:not(.cardVertical) .cardMediaPlaceholder {
     min-height: 0;
     height: auto;
     max-height: none;
@@ -1033,12 +985,12 @@
     padding: 0;
   }
 
-  .cardMediaPlaceholder {
+  .card:not(.cardVertical) .cardMediaPlaceholder {
     min-height: 7.5rem;
   }
 
   /* Full card width; height follows intrinsic photo aspect ratio. */
-  .cardImage {
+  .card:not(.cardVertical) .cardImage {
     position: relative;
     width: 100%;
     height: auto;
@@ -1048,7 +1000,7 @@
     display: block;
   }
 
-  .cardBody {
+  .card:not(.cardVertical) .cardBody {
     min-height: 0;
     overflow: visible;
   }
@@ -1117,4 +1069,56 @@
   .filterSummary::after {
     transition: none;
   }
+}
+
+/*
+ * Home «Новинки» carousel: photo-over-copy, fixed height.
+ * Placed after catalog responsive rules so height stays locked.
+ */
+.card.cardVertical {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  width: 100%;
+  height: 28.3125rem; /* 453px */
+  max-height: 28.3125rem;
+  overflow: hidden;
+}
+
+.card.cardVertical .cardMedia,
+.card.cardVertical .cardMediaPlaceholder {
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  width: 100%;
+  align-self: stretch;
+  overflow: hidden;
+  border-right: none;
+  border-bottom: none;
+  padding: 0;
+}
+
+.card.cardVertical .cardMediaPlaceholder {
+  min-height: 10rem;
+}
+
+.card.cardVertical .cardImage {
+  position: relative;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+}
+
+.card.cardVertical .cardBody {
+  min-height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.card.cardVertical .cardSpecs {
+  overflow: hidden;
 }
