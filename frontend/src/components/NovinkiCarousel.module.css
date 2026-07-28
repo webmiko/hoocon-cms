@@ -56,8 +56,16 @@
 
 .slide {
   min-width: 0;
+  display: flex;
+  align-items: stretch;
   transition: opacity 0.35s ease;
   opacity: 1;
+}
+
+.slide > * {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .slidePeek {

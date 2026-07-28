@@ -30,6 +30,8 @@ type CatalogSkuCardProps = {
   sku: SKUList;
   /** Skip ``id`` when the card is cloned (e.g. infinite carousel). */
   omitDomId?: boolean;
+  /** Home carousel: photo above copy, fixed card height. */
+  variant?: "default" | "vertical";
 };
 
 /**
@@ -40,7 +42,11 @@ type CatalogSkuCardProps = {
  * (``edition_count > 1``) show a variants line and CTA «Выбрать вариант».
  * Photo save / text copy are deterred via contentProtection helpers.
  */
-export function CatalogSkuCard({ sku, omitDomId = false }: CatalogSkuCardProps) {
+export function CatalogSkuCard({
+  sku,
+  omitDomId = false,
+  variant = "default",
+}: CatalogSkuCardProps) {
   const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
   const imageSrc = sku.image?.image ?? null;
@@ -53,6 +59,10 @@ export function CatalogSkuCard({ sku, omitDomId = false }: CatalogSkuCardProps) 
     : undefined;
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
+  const cardClass =
+    variant === "vertical"
+      ? `${styles.card} ${styles.cardVertical} u-protect-content`
+      : `${styles.card} u-protect-content`;
 
   function rememberFocus() {
     saveCatalogFocus({
@@ -65,7 +75,7 @@ export function CatalogSkuCard({ sku, omitDomId = false }: CatalogSkuCardProps) 
   return (
     <article
       id={omitDomId ? undefined : catalogSkuDomId(sku.slug)}
-      className={`${styles.card} u-protect-content`}
+      className={cardClass}
       data-purpose={purpose}
       style={cardStyle}
       {...protectedContentHandlers}

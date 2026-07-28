@@ -10,8 +10,10 @@ const TRANSITION_MS = 420;
 const GAP_PX = 16;
 /** Peek of neighboring cards on each side (px). */
 const PEEK_PX = 40;
-/** Min width for a catalog card slide (horizontal layout needs room). */
-const MIN_SLIDE_PX = 280;
+/** Min width for a vertical carousel card (~home novinki). */
+const MIN_SLIDE_PX = 300;
+/** Fixed card height (matches vertical CatalogSkuCard). */
+const SLIDE_HEIGHT_PX = 453;
 
 type NovinkiCarouselProps = {
   skus: SKUList[];
@@ -204,12 +206,16 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
                     ? `${styles.slide} ${styles.slidePeek}`
                     : styles.slide
                 }
-                style={{ width: slideW, flex: `0 0 ${slideW}px` }}
+                style={{
+                  width: slideW,
+                  flex: `0 0 ${slideW}px`,
+                  height: SLIDE_HEIGHT_PX,
+                }}
                 aria-hidden={!inWindow}
                 inert={!inWindow ? true : undefined}
                 data-peek={isPeek ? "true" : undefined}
               >
-                <CatalogSkuCard sku={sku} omitDomId />
+                <CatalogSkuCard sku={sku} omitDomId variant="vertical" />
               </li>
             );
           })}
