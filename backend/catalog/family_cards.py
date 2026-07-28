@@ -1,12 +1,12 @@
 """Collapse multi-edition Product cards to one SKU row in catalog lists.
 
 H81 kits (``h8101``…``h8122``), brass ``8100-bv*``, H8205 LAV, DAMU,
-DAMQU (``privod-vozdushniy-da8mqu-*``), DAFU (``…-pruzhina-dafu-*nm``),
-SAMU, SAFU (``privod-protivopozharniy-*nm``), HVA, HVD (air + smoke
-``…-hvd-*f``) keep many published SKUs under one Product. Paginated list APIs
-must return a single representative per family Product (within the current
-filter), otherwise the first page is filled by one series and siblings never
-appear.
+DAMQU (``privod-vozdushniy-da{n}mqu-*``),
+DAFU (``…-pruzhina-dafu-*nm``), SAMU, SAFU (``privod-protivopozharniy-*nm``),
+HVA, HVD (air + smoke ``…-hvd-*f``) keep many published SKUs under one Product.
+Paginated list APIs must return a single representative per family Product
+(within the current filter), otherwise the first page is filled by one series
+and siblings never appear.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ _H81_SLUG = "|".join(re.escape(s) for s in sorted(H81_FAMILY_PRODUCT_SLUGS))
 _BRASS_DN_SLUG = r"8100-bv\d+"
 _H8205_LAV_SLUG = r"h8205-lav\d+[st]*"
 _DAMU_SLUG = r"privod-vozdushniy-bez-pruzhini-damu-\d+nm"
-_DAMQU_SLUG = r"privod-vozdushniy-da8mqu-\d+nm"
+_DAMQU_SLUG = r"privod-vozdushniy-da\d+mqu-\d+nm"
 _DAFU_SLUG = r"privod-vozdushniy-pruzhina-dafu-\d+nm"
 # SAMU Nm only (``…-10nm``); HVD-F uses ``…-hvd-3f`` and must not share this.
 _SAMU_NM_SLUG = r"privod-dimoudaleniya-\d+nm"
@@ -45,7 +45,6 @@ _SAFU_NM_SLUG = r"privod-protivopozharniy-\d+nm"
 _HVA_SLUG = (
     r"privod-vozdushniy-hva-\d+nm"
     r"|privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm"
-    r"|privod-vozdushniy-pruzhina-hva-\d+p"
     r"|privod-vozdushniy-kondensator-hva-\d+qx"
 )
 _HVD_AIR_SLUG = (

@@ -4,13 +4,13 @@ const H81_PRODUCT_SLUG_RE = /^h81(?:01|02|03|04|05|06|07|08|21|22)$/i;
 const BRASS_DN_PRODUCT_SLUG_RE = /^8100-bv\d+$/i;
 const H8205_LAV_PRODUCT_SLUG_RE = /^h8205-lav\d+[st]*$/i;
 const DAMU_PRODUCT_SLUG_RE = /^privod-vozdushniy-bez-pruzhini-damu-\d+nm$/i;
-const DAMQU_PRODUCT_SLUG_RE = /^privod-vozdushniy-da8mqu-\d+nm$/i;
+const DAMQU_PRODUCT_SLUG_RE = /^privod-vozdushniy-da\d+mqu-\d+nm$/i;
 const DAFU_PRODUCT_SLUG_RE = /^privod-vozdushniy-pruzhina-dafu-\d+nm$/i;
 /** SAMU Nm only — not ``privod-dimoudaleniya-hvd-*f``. */
 const SAMU_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-\d+nm$/i;
 const SAFU_PRODUCT_SLUG_RE = /^privod-protivopozharniy-\d+nm$/i;
 const HVA_PRODUCT_SLUG_RE =
-  /^privod-vozdushniy-hva-\d+nm$|^privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm$|^privod-vozdushniy-pruzhina-hva-\d+p$|^privod-vozdushniy-kondensator-hva-\d+qx$/i;
+  /^privod-vozdushniy-hva-\d+nm$|^privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm$|^privod-vozdushniy-kondensator-hva-\d+qx$/i;
 const HVD_AIR_PRODUCT_SLUG_RE =
   /^privod-vozdushniy-hvd-(?:\d+nm|\d+q)$|^privod-vozdushniy-kondensator-hvd-\d+qx$/i;
 const HVD_SMOKE_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-hvd-\d+f$/i;

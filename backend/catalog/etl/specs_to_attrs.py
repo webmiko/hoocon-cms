@@ -14,6 +14,7 @@ from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.label_to_slug import CANONICAL_ATTRS, canonical_meta, label_to_slug
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs
+from catalog.etl.series_copy_damqu import is_damqu_product_slug
 from catalog.etl.sku_variant import filter_description_for_variant, parse_sku_variant
 from catalog.etl.tech_copy import normalize_manual_override_value, normalize_tech_copy
 from catalog.models import SKU, Product
@@ -24,6 +25,13 @@ DA8MQU_PRODUCT_SLUG = "privod-vozdushniy-da8mqu-8nm"
 CANONICAL_CARD_PRODUCT_SLUGS: frozenset[str] = frozenset(
     {DA8MQU_PRODUCT_SLUG, *ball_valve_product_slugs()},
 )
+
+
+def is_canonical_card_product_slug(slug: str | None) -> bool:
+    """True when catalog-cards enricher must not overwrite series ТТХ."""
+    text = (slug or "").strip()
+    return text in CANONICAL_CARD_PRODUCT_SLUGS or is_damqu_product_slug(text)
+
 
 _BULLET_LINE = re.compile(
     r"^\s*(?:[-–—•*]|\d+[.)]\s*)\s*(?P<body>.+)$",
@@ -301,7 +309,7 @@ def enrich_sku_cards(sku: SKU, *, dry_run: bool = False) -> EnrichResult:
     from catalog.sku_access import sku_product
 
     product = sku_product(sku)
-    if product is not None and product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
+    if product is not None and is_canonical_card_product_slug(product.slug):
         result.skipped = True
         result.reason = "canonical_series_copy"
         return result
@@ -426,7 +434,7 @@ def enrich_catalog_cards(
         if product_slug:
             products = products.filter(slug=product_slug)
         for product in products:
-            if product.slug in CANONICAL_CARD_PRODUCT_SLUGS:
+            if is_canonical_card_product_slug(product.slug):
                 continue
             maybe_clear_product_specs(product)
 

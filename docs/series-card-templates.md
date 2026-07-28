@@ -92,6 +92,14 @@ siblings на том же Product.
 
 Не путать с **DAMQU** / **HVA** (другие шаблоны slug; HVA — свой § ниже).
 
+**DAMQU** (ускоренные без пружины): Product.slug
+`privod-vozdushniy-da{n}mqu-{n}nm` (5/8/10/20 Нм), категория
+`elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata`, collapse BE+FE
+`da\d+mqu`. Ensure gaps: `ensure_ai_catalog_gaps`.
+
+**DAEU** (электронные отказоустойчивые) — снята с производства, в РФ-каталог
+не входит.
+
 ### ТТХ / highlights (минимум)
 
 moment, damper-area, voltage, control, aux_switch (для \*-S), running-time,
@@ -153,7 +161,7 @@ siblings; picker различает DST отдельным ключом упра
 | Product.name | `SA{n}MU \| Электропривод дымового клапана без возвратной пружины, {n} Нм` | — |
 | SKU.sku_code | `SA{n}MU{24\|230}-{DS\|DST}` | `SA10MU24-DST` |
 
-Моменты в каноне enricher: 10 / 15 / 30 Нм (`TORQUE_SPECS` в samu).
+Моменты в каноне enricher: 7 / 10 / 15 / 30 Нм (`TORQUE_SPECS` в samu).
 
 ### ТТХ
 
@@ -263,8 +271,9 @@ poetry run python manage.py enrich_safu
 | Серия | Product.slug | SKU | Команда |
 |-------|--------------|-----|---------|
 | HVD-Q | `privod-vozdushniy-hvd-{n}q` | `HVD{24\|230}[S]-{n}Q` | `enrich_hv_extra` |
-| HVA-P | `privod-vozdushniy-pruzhina-hva-{n}p` | `HVA24[S]-{n}P` | `enrich_hv_extra` |
 | HV*QX | `privod-vozdushniy-kondensator-{hva\|hvd}-{n}qx` | `HV{A\|D}{24\|230}[S]-{n}QX` | `enrich_hv_extra` |
+
+HVA-P (пружина, китайский рынок) в РФ-каталог не входит.
 
 Медиа: студийные WebP из HV seria (длинная сторона ≤1600); если нет —
 кадр из каталога 2025 при `min_edge ≥ 800`. Дубли героя (Tilda + local)

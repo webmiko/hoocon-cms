@@ -24,6 +24,8 @@ def test_is_collapsible_family_product_slug() -> None:
         "privod-vozdushniy-bez-pruzhini-damu-8nm",
     )
     assert is_collapsible_family_product_slug("privod-vozdushniy-da8mqu-8nm")
+    assert is_collapsible_family_product_slug("privod-vozdushniy-da5mqu-5nm")
+    assert not is_collapsible_family_product_slug("privod-vozdushniy-daeu-8nm")
     assert is_collapsible_family_product_slug(
         "privod-vozdushniy-pruzhina-dafu-10nm",
     )
@@ -35,9 +37,9 @@ def test_is_collapsible_family_product_slug() -> None:
     )
     assert is_collapsible_family_product_slug("privod-vozdushniy-hvd-5nm")
     assert is_collapsible_family_product_slug("privod-vozdushniy-hvd-40q")
-    assert is_collapsible_family_product_slug("privod-vozdushniy-pruzhina-hva-5p")
     assert is_collapsible_family_product_slug("privod-vozdushniy-kondensator-hvd-10qx")
     assert is_collapsible_family_product_slug("privod-vozdushniy-kondensator-hva-5qx")
+    assert not is_collapsible_family_product_slug("privod-vozdushniy-pruzhina-hva-5p")
     assert is_collapsible_family_product_slug("privod-dimoudaleniya-hvd-3f")
     assert not is_collapsible_family_product_slug("da5fu24")
     assert not is_collapsible_family_product_slug("sharovoy-kran-bv215")
