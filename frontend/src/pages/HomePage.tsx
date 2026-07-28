@@ -2,14 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DirectionsCategoryGrid } from "../components/DirectionsCategoryGrid";
-import { CatalogSkuCard } from "../components/CatalogSkuCard";
 import { HomeSkeleton } from "../components/HomeSkeleton";
+import { NovinkiCarousel } from "../components/NovinkiCarousel";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import styles from "./HomePage.module.css";
-import catalogStyles from "./CatalogPage.module.css";
 
 /** Auto-advance interval for hero background slides. */
 const HERO_SLIDE_MS = 6500;
@@ -390,11 +389,7 @@ export function HomePage() {
             <p className={styles.status}>Загрузка новинок…</p>
           ) : (
             <>
-              <div className={`${catalogStyles.grid} ${styles.novinkiGrid}`}>
-                {(novinkiData?.results ?? []).map((sku) => (
-                  <CatalogSkuCard key={sku.slug} sku={sku} />
-                ))}
-              </div>
+              <NovinkiCarousel skus={novinkiData?.results ?? []} />
               <p className={styles.novinkiMore}>
                 <Link to="/catalog?new=1">Все новинки в каталоге</Link>
               </p>

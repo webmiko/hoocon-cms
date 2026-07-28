@@ -362,10 +362,6 @@
   color: var(--color-text-muted);
 }
 
-.novinkiGrid {
-  margin-bottom: var(--space-lg);
-}
-
 .novinkiMore {
   margin: 0;
 }

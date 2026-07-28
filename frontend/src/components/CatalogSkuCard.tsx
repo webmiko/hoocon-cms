@@ -28,6 +28,8 @@ import styles from "../pages/CatalogPage.module.css";
 
 type CatalogSkuCardProps = {
   sku: SKUList;
+  /** Skip ``id`` when the card is cloned (e.g. infinite carousel). */
+  omitDomId?: boolean;
 };
 
 /**
@@ -38,7 +40,7 @@ type CatalogSkuCardProps = {
  * (``edition_count > 1``) show a variants line and CTA «Выбрать вариант».
  * Photo save / text copy are deterred via contentProtection helpers.
  */
-export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
+export function CatalogSkuCard({ sku, omitDomId = false }: CatalogSkuCardProps) {
   const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
   const imageSrc = sku.image?.image ?? null;
@@ -62,7 +64,7 @@ export function CatalogSkuCard({ sku }: CatalogSkuCardProps) {
 
   return (
     <article
-      id={catalogSkuDomId(sku.slug)}
+      id={omitDomId ? undefined : catalogSkuDomId(sku.slug)}
       className={`${styles.card} u-protect-content`}
       data-purpose={purpose}
       style={cardStyle}

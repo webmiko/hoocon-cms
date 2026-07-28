@@ -1,0 +1,80 @@
+.carousel {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--space-lg);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.navBtn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.navBtn:hover {
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+  color: var(--color-link-hover);
+}
+
+.navBtn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.viewport {
+  width: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+.track {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.slide {
+  min-width: 0;
+  transition: opacity 0.35s ease;
+  opacity: 1;
+}
+
+.slidePeek {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+.status {
+  margin: var(--space-md) 0 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .navBtn {
+    transition: none;
+  }
+}
