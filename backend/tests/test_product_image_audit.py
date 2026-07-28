@@ -23,6 +23,21 @@ def _png(size: tuple[int, int], color: tuple[int, int, int] = (20, 80, 140)) -> 
     return buf.getvalue()
 
 
+def _png_cutout(size: tuple[int, int], fill: tuple[int, int, int] = (30, 30, 30)) -> bytes:
+    """Opaque product blob on a transparent top edge (HVD-style cutout)."""
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    buf = BytesIO()
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    w, h = size
+    draw.rectangle((w // 4, h // 3, 3 * w // 4, 7 * h // 8), fill=(*fill, 255))
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 @pytest.mark.django_db
 def test_prune_keeps_local_asset_hero_over_tilda() -> None:
     cat = Category.objects.create(name="Air", slug="air-img-audit")
@@ -44,7 +59,11 @@ def test_prune_keeps_local_asset_hero_over_tilda() -> None:
     )
     strong = ProductImage.objects.create(
         sku=sku,
-        image=SimpleUploadedFile("local.png", _png((1200, 1500)), content_type="image/png"),
+        image=SimpleUploadedFile(
+            "local.png",
+            _png_cutout((1200, 1500)),
+            content_type="image/png",
+        ),
         alt="HVA-5 | фото привода",
         source_url="https://hoocon.ru/.local-assets/hva-catalog/hva5-product.webp",
         sort_order=0,
@@ -57,6 +76,52 @@ def test_prune_keeps_local_asset_hero_over_tilda() -> None:
     strong.refresh_from_db()
     assert weak.is_published is False
     assert strong.is_published is True
+
+
+@pytest.mark.django_db
+def test_prune_prefers_neutral_studio_over_chroma_promo() -> None:
+    """Red promo local-asset must not displace a smaller grey studio hero."""
+    cat = Category.objects.create(name="Air", slug="air-img-chroma")
+    product = Product.objects.create(name="HVA-5Q", slug="hva-5q-img-chroma", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="HVA230-5Q",
+        name="HVA230-5Q",
+        slug="hva230-5q-img-chroma",
+        is_published=True,
+    )
+    studio = ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile(
+            "studio.png",
+            _png((811, 1080), color=(203, 207, 210)),
+            content_type="image/png",
+        ),
+        alt="HVA-5Q | 5 Нм Привод",
+        source_url="https://static.tildacdn.com/stor999/studio.jpg",
+        sort_order=0,
+        is_published=False,
+    )
+    promo = ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile(
+            "promo.png",
+            _png((1200, 1500), color=(220, 88, 90)),
+            content_type="image/png",
+        ),
+        alt="HVA-5Q | фото привода",
+        source_url="https://hoocon.ru/.local-assets/hva-catalog/hva5q-product.webp",
+        sort_order=0,
+        is_published=True,
+    )
+
+    summary = prune_inferior_hero_duplicates(dry_run=False)
+    assert summary["republished"] == 1
+    assert summary["unpublished"] == 1
+    studio.refresh_from_db()
+    promo.refresh_from_db()
+    assert studio.is_published is True
+    assert promo.is_published is False
 
 
 @pytest.mark.django_db

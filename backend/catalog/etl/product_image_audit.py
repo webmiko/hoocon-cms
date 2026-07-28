@@ -1,9 +1,11 @@
 """Audit / optimize ProductImage rows: WebP-only, best hero, no weak duplicates.
 
 Policy for product (hero) shots:
+- Prefer cutout / low-chroma studio backdrops (catalog card wash) over
+  high-chroma promo fills (e.g. red HVA pack shots).
 - Prefer high-res studio / ``.local-assets`` WebP over legacy Tilda CDN crops.
 - Prefer catalog embeds when no studio shot reaches ``MIN_HERO_EDGE_PX``.
-- Keep at most one published hero per SKU (highest pixel area wins).
+- Keep at most one published hero per SKU (best rank wins).
 - Storage must be ``*.webp`` (re-encode JPEG/PNG leftovers).
 """
 
@@ -47,6 +49,63 @@ def _pixel_area(image: ProductImage) -> int:
     return max(0, w) * max(0, h)
 
 
+def _backdrop_quality(image: ProductImage) -> int:
+    """Score catalog-card backdrop suitability (0…100).
+
+    Cutouts (transparent top edge) and low-chroma studio greys score high.
+    High-chroma promo fills (red / maroon HVA pack shots) score low so they
+    do not displace a smaller neutral gallery hero for card wash.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return 50
+
+    try:
+        path = image.image.path
+    except (ValueError, NotImplementedError, AttributeError):
+        return 50
+    try:
+        with Image.open(path) as img:
+            rgba = img.convert("RGBA")
+            width, height = rgba.size
+            if width < 8 or height < 8:
+                return 50
+            # Sparse sample of the top band (same idea as FE wash sampler).
+            band_h = min(12, max(4, height // 80))
+            opaque: list[tuple[int, int, int]] = []
+            cells = 0
+            step_x = max(1, width // 24)
+            for y in range(2, 2 + band_h):
+                for x in range(0, width, step_x):
+                    cells += 1
+                    pixel = rgba.getpixel((x, y))
+                    if not isinstance(pixel, tuple) or len(pixel) < 4:
+                        continue
+                    if pixel[3] < 16:
+                        continue
+                    opaque.append((int(pixel[0]), int(pixel[1]), int(pixel[2])))
+    except OSError:
+        return 50
+
+    if cells <= 0:
+        return 50
+    # Sparse / transparent top → cutout (white stroke peeks still count low).
+    opaque_ratio = len(opaque) / cells
+    if opaque_ratio < 0.28:
+        return 100
+
+    chroma_sum = 0.0
+    for r, g, b in opaque:
+        chroma_sum += max(r, g, b) - min(r, g, b)
+    chroma = chroma_sum / len(opaque)
+    if chroma < 22:
+        return 90
+    if chroma < 45:
+        return 55
+    return 15
+
+
 def _is_hero_candidate(image: ProductImage) -> bool:
     """True for the primary product/hero slot (not dims, wiring, or фото 2+)."""
     alt = image.alt or ""
@@ -62,12 +121,18 @@ def _is_hero_candidate(image: ProductImage) -> bool:
     return True
 
 
-def _hero_rank(image: ProductImage) -> tuple[int, int, int, int]:
-    """Higher is better: local-asset, not Tilda, area, id stability."""
+def _hero_rank(image: ProductImage) -> tuple[int, int, int, int, int]:
+    """Higher is better: backdrop, local-asset, not Tilda, area, id."""
     url = image.source_url or ""
     local = 1 if _LOCAL_ASSET.search(url) else 0
     not_tilda = 0 if _TILDA_CDN.search(url) else 1
-    return (local, not_tilda, _pixel_area(image), image.pk or 0)
+    return (
+        _backdrop_quality(image),
+        local,
+        not_tilda,
+        _pixel_area(image),
+        image.pk or 0,
+    )
 
 
 def audit_product_images() -> dict[str, Any]:
@@ -153,18 +218,22 @@ def optimize_non_webp_images(*, dry_run: bool = False) -> dict[str, Any]:
 def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
     """Keep one best hero per SKU; unpublish weaker product-shot duplicates.
 
-    Ranking prefers ``.local-assets`` over Tilda CDN, then higher pixel area.
+    Ranking prefers neutral/cutout backdrops (card wash), then ``.local-assets``
+    over Tilda CDN, then higher pixel area. Unpublished former heroes are
+    re-evaluated so a chroma promo does not permanently displace a studio shot.
     """
     summary: dict[str, Any] = {
         "skus": 0,
         "unpublished": 0,
+        "republished": 0,
         "dry_run": dry_run,
         "samples": [],
     }
     heroes_by_sku: dict[int, list[ProductImage]] = {}
-    qs = ProductImage.objects.filter(is_published=True).select_related("sku")
+    # Include unpublished heroes so a previous prune can be corrected.
+    qs = ProductImage.objects.all().select_related("sku")
     for image in qs.iterator(chunk_size=500):
-        if not _is_hero_candidate(image):
+        if not image.sku_id or not _is_hero_candidate(image):
             continue
         heroes_by_sku.setdefault(int(image.sku_id), []).append(image)
 
@@ -174,7 +243,14 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
         summary["skus"] += 1
         ranked = sorted(heroes, key=_hero_rank, reverse=True)
         keep = ranked[0]
+        if not keep.is_published:
+            summary["republished"] += 1
+            if not dry_run:
+                keep.is_published = True
+                keep.save(update_fields=["is_published", "updated_at"])
         for image in ranked[1:]:
+            if not image.is_published:
+                continue
             summary["unpublished"] += 1
             if len(summary["samples"]) < 25:
                 summary["samples"].append(
