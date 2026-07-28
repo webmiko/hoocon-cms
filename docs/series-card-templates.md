@@ -233,16 +233,19 @@ poetry run python manage.py enrich_safu
 
 ### Замысел
 
-**Одна плитка на линейку** (HVA-5, HVA-5Q). Издания 24/230 × **A / AS** —
-siblings; picker напряжения и управления.
+**Одна плитка на линейку** (HVA-5…40, HVA-5Q…40Q). Издания 24/230 ×
+**A / AS** — siblings; picker напряжения и управления.
 
 ### Идентификаторы
 
 | Поле | Шаблон | Пример |
 |------|--------|--------|
 | Category.slug | `elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata` или `elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata` | — |
-| Product.slug | `privod-vozdushniy-hva-{n}nm` / `privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-{n}nm` | `…-hva-5nm` |
-| SKU.sku_code | `HVA{24\|230}[S]-{n}[Q]` | `HVA24S-5`, `HVA230-5Q` |
+| Product.slug | `privod-vozdushniy-hva-{n}nm` / `privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-{n}nm` | `…-hva-10nm` |
+| SKU.sku_code | `HVA{24\|230}[S]-{n}[Q]` | `HVA24S-10`, `HVA230-20Q` |
+
+Линейки в каталоге 2025 (модулирующие): **5 / 10 / 20 / 40** и ускоренные
+**5Q / 10Q / 20Q / 40Q**. Seed: `manage.py enrich_hva --with-media`.
 
 ### Каталог / PDP
 
@@ -254,6 +257,14 @@ siblings; picker напряжения и управления.
 
 `privod-vozdushniy-hva-5nm` / `HVA24-5`; ускоренный —
 `privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm`.
+
+### Связанные HV-линейки (каталог 2025)
+
+| Серия | Product.slug | SKU | Команда |
+|-------|--------------|-----|---------|
+| HVD-Q | `privod-vozdushniy-hvd-{n}q` | `HVD{24\|230}[S]-{n}Q` | `enrich_hv_extra` |
+| HVA-P | `privod-vozdushniy-pruzhina-hva-{n}p` | `HVA24[S]-{n}P` | `enrich_hv_extra` |
+| HV*QX | `privod-vozdushniy-kondensator-{hva\|hvd}-{n}qx` | `HV{A\|D}{24\|230}[S]-{n}QX` | `enrich_hv_extra` |
 
 ---
 
@@ -521,7 +532,7 @@ poetry run python manage.py enrich_ball_valves --series H8205
 | DA | `/catalog/…bez-pruzhinnogo…` — **7** плиток DA\*MU (по Нм); «8 вариантов» + CTA «Выбрать вариант»; PDP picker V/ctrl |
 | SA | дымоудаление — **3** плитки SA\*MU; N вариантов + CTA; PDP DS/DST |
 | SA\*FU | противопожарные — **5** плиток (3/5/10/15/20 Нм); N вариантов + CTA; PDP DS/DST |
-| HVA | без пружины — **1** плитка HVA-5; ускоренные — **1** HVA-5Q; PDP A/AS |
+| HVA | без пружины — плитки HVA-5/10/20/40; ускоренные — HVA-5Q…40Q; PDP A/AS |
 | HVD | без пружины — по **1** плитке HVD-5/10/20/40Q; PDP D/DS |
 | HVD-F | дымоудаление — **2** плитки (3F/5F); PDP DS/DST |
 | 8100 | `/catalog/sharovye-krany` — одна плитка на DN; N вариантов + CTA; PDP Kvs; RFQ kit |
