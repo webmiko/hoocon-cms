@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from typing import Final
 
 _TAG = re.compile(r"<[^>]+>")
 _BLOCK_BREAK = re.compile(
@@ -59,6 +60,49 @@ _INSTALL_HINT = re.compile(
     r"(?i)(?:Подготовка к установке|Монтаж привода|ключевые этапы|"
     r"Инструменты|Рекомендац)",
 )
+
+# Tilda page chrome that leaked into tab scrapes (footer / cookies / RFQ).
+_TILDA_CHROME_MARKERS: Final[tuple[str, ...]] = (
+    "BUY NOW",
+    "Load more",
+    "Смотрите также из этого раздела",
+    "Заказ приводов ОВК под своим брендом",
+    "Связаться с заводом-изготовителем",
+    "Контактная информация офиса",
+    "Factory in China",
+    "Разделы сайта",
+    "Политика данных",
+    "Реквизиты компании",
+    "Многоканальный телефон",
+    "Ваш запрос",
+    "Принять все",
+    "Куки, необходимые",
+    "Ваш Phone",
+    "Ваше Имя",
+)
+
+
+def strip_tilda_page_chrome(text: str) -> str:
+    """Truncate at the earliest Tilda footer / RFQ / cookies chrome marker.
+
+    Tab scrapes sometimes append the rest of the product page after real copy
+    (``BUY NOW``, site sections, cookie banner, «Ваш запрос», …).
+
+    Args:
+        text: Plain or lightly structured tab text.
+
+    Returns:
+        Text cut before chrome (stripped); empty input → empty string.
+    """
+    if not text:
+        return ""
+    lower = text.casefold()
+    cut = len(text)
+    for marker in _TILDA_CHROME_MARKERS:
+        idx = lower.find(marker.casefold())
+        if 0 <= idx < cut:
+            cut = idx
+    return text[:cut].rstrip()
 
 
 def html_to_text(raw: str) -> str:
@@ -380,6 +424,7 @@ def clean_polluted_description(raw: str) -> str:
         return ""
     # If HTML tags still present — convert first
     text = html_to_structured_text(raw) if "<" in raw else raw
+    text = strip_tilda_page_chrome(text)
     text = text.replace("\xa0", " ")
     kept: list[str] = []
     for line in text.splitlines():
@@ -437,7 +482,7 @@ _TAB_KEY = {
 
 def _plain_tab_text(chunk: str) -> str:
     """Structured plain text for one tab body, or empty if too short."""
-    text = html_to_structured_text(chunk)
+    text = strip_tilda_page_chrome(html_to_structured_text(chunk))
     text = dedupe_description_lines(text)
     if text and len(html_to_text(text)) >= 20:
         return text
@@ -827,6 +872,9 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
         Filtered plain text (one edition + shared footnotes).
     """
     if not text or not text.strip():
+        return ""
+    text = strip_tilda_page_chrome(text)
+    if not text.strip():
         return ""
     code = (sku_code or "").strip()
     if not code:

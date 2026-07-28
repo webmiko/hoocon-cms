@@ -14,6 +14,7 @@ from catalog.etl.html_text import (
     html_to_structured_text,
     html_to_text,
     is_noise_line,
+    strip_tilda_page_chrome,
 )
 
 
@@ -174,3 +175,37 @@ def test_filter_analogs_for_sku_keeps_matching_block() -> None:
     assert "LM24A" not in out
     assert filter_analogs_for_sku("", "x") == ""
     assert filter_analogs_for_sku(text, "") == text.strip()
+
+
+def test_strip_tilda_page_chrome_cuts_footer() -> None:
+    """Truncate analogs / tab copy before Tilda footer chrome."""
+    good = (
+        "Список приводов с близкими характеристиками SA20FU\n"
+        "– Belimo BF24-T\n"
+        "При выборе аналога учитывайте крутящий момент."
+    )
+    junk = (
+        "\n\nBUY NOW Load more\n"
+        "Разделы сайта\nКаталог продукции\n"
+        "Ваш запрос\nЗапросить КП\n"
+        "Принять все Настройка\n"
+        "Куки, необходимые для правильной работы сайта"
+    )
+    cleaned = strip_tilda_page_chrome(good + junk)
+    assert "Belimo BF24-T" in cleaned
+    assert "BUY NOW" not in cleaned
+    assert "Разделы сайта" not in cleaned
+    assert "Ваш запрос" not in cleaned
+    assert strip_tilda_page_chrome("") == ""
+
+
+def test_clean_and_filter_strip_tilda_chrome() -> None:
+    """Stored polluted analogs lose chrome via clean + filter paths."""
+    raw = "Аналоги привода SA20FU24-DS\n– Belimo BF24\n\nСмотрите также из этого раздела\nBUY NOW\nВаше Имя\nВаш Phone"
+    cleaned = clean_polluted_description(raw)
+    assert "Belimo BF24" in cleaned
+    assert "BUY NOW" not in cleaned
+    assert "Ваше Имя" not in cleaned
+    filtered = filter_analogs_for_sku(raw, "sa20fu24-ds")
+    assert "Belimo BF24" in filtered
+    assert "BUY NOW" not in filtered
