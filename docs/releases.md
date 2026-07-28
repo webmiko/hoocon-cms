@@ -63,6 +63,12 @@
 
 ## Changelog
 
+### v0.1.5 beta — 2026-07-28
+
+- Новинки на главной: компактные teaser-карточки в карусели; направления — 4 колонки.
+- Фото cutout: графитовый wash air и боковой inset; восстановление lone unpublished hero.
+- ETL: `attach_hv_media_webp` для оптимизированных HV-героев из media-webp.
+
 ### v0.1.4 beta — 2026-07-28
 
 - Новинки: `first_published_at` у SKU, бейдж «Новое», фильтр `?new=1`,
