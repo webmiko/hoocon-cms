@@ -97,6 +97,9 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
     ),
 )
 
+# Per-Nm family: dimensions shared by all SKUs of that family; weight may differ by Nm.
+_SAMU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
+
 TORQUE_SPECS: dict[int, dict[str, str]] = {
     10: {
         "moment": "10 Нм",
@@ -104,6 +107,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 45 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
+        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
         "power_24": "5 Вт (работа) / 1 Вт (удержание)",
         "power_230": "5 Вт (работа) / 1 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
@@ -114,6 +118,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 30 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
+        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
         "power_24": "7 Вт (работа) / 1,5 Вт (удержание)",
         "power_230": "7 Вт (работа) / 1,5 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
@@ -124,6 +129,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 115 с (95°)",
         "shaft-length": "≥ 90",
         "weight": "≈ 2,2 кг",
+        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
         "power_24": "10 Вт (работа) / 2 Вт (удержание)",
         "power_230": "10 Вт (работа) / 2 Вт (удержание)",
         "noise": "макс. 45 дБ(А)",
@@ -216,6 +222,7 @@ def instructions_for_samu_sku(sku_code: str) -> str | None:
         f"– Длина вала заслонки: {shaft_len}.",
         "– Диаметр вала: квадратный 12×12 мм.",
         (f"– Крутящий момент: {row['moment']}; площадь заслонки {format_damper_area(row['damper-area'])}."),
+        f"– Габаритные размеры: {row['dimensions']}.",
         "",
         "2. Монтаж привода",
         "",
@@ -347,6 +354,7 @@ def apply_samu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 ("Уровень шума", "noise", "дБ(A)", row["noise"]),
                 ("Длина вала заслонки", "shaft-length", "мм", row["shaft-length"]),
                 ("Масса", "weight", "кг", row["weight"]),
+                ("Габаритные размеры", "dimensions", "мм", row["dimensions"]),
             ):
                 if not dry_run:
                     _set_attr(sku, name, slug, unit, value)
