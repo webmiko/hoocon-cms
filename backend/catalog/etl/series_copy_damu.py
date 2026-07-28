@@ -12,6 +12,7 @@ from typing import Any, Final
 from django.db.models import QuerySet
 
 from catalog.etl.attr_groups import (
+    ATTR_GROUP_ELECTRICAL,
     ATTR_GROUP_FUNCTIONAL,
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
@@ -22,8 +23,10 @@ from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
     CONTROL_SIGNAL_Y_CANON,
     CONTROL_SIGNAL_Y_LABEL,
+    CONTROL_SIGNAL_Y_SLUG,
     FEEDBACK_SIGNAL_U_CANON,
     FEEDBACK_SIGNAL_U_LABEL,
+    FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
     normalize_control_attribute_value,
@@ -100,6 +103,20 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "мм",
         "≥ 50",
         ATTR_GROUP_SIZE,
+    ),
+    (
+        "Длина кабеля",
+        "cable-length",
+        "мм",
+        "1000 мм",
+        ATTR_GROUP_SIZE,
+    ),
+    (
+        "Сечение провода",
+        "wire-cross-section",
+        "мм²",
+        "0,5 мм²",
+        ATTR_GROUP_ELECTRICAL,
     ),
 )
 
@@ -599,14 +616,14 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     _set_attr(
                         sku,
                         CONTROL_SIGNAL_Y_LABEL,
-                        "control-signal-y",
+                        CONTROL_SIGNAL_Y_SLUG,
                         "",
                         CONTROL_SIGNAL_Y_CANON,
                     )
                     _set_attr(
                         sku,
                         FEEDBACK_SIGNAL_U_LABEL,
-                        "feedback-signal-u",
+                        FEEDBACK_SIGNAL_U_SLUG,
                         "",
                         FEEDBACK_SIGNAL_U_CANON,
                     )
