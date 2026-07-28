@@ -402,6 +402,27 @@ export function CatalogPage() {
 
   const filterSections = (
     <>
+      <div className={styles.filterSection}>
+        <button
+          type="button"
+          className={
+            inStockOnly ? styles.optionRowActive : styles.optionRow
+          }
+          aria-pressed={inStockOnly}
+          onClick={() => updateFilter("in_stock", inStockOnly ? "" : "1")}
+        >
+          <span className={styles.optionText}>Только в наличии</span>
+        </button>
+        <button
+          type="button"
+          className={newOnly ? styles.optionRowActive : styles.optionRow}
+          aria-pressed={newOnly}
+          onClick={() => updateFilter("new", newOnly ? "" : "1")}
+        >
+          <span className={styles.optionText}>Новинки</span>
+        </button>
+      </div>
+
       <details className={styles.filterSection} open>
         <summary className={styles.filterSummary}>
           <span className={styles.filterSummaryLabel}>Категория</span>
@@ -437,27 +458,6 @@ export function CatalogPage() {
           ))}
         </nav>
       </details>
-
-      <div className={styles.filterSection}>
-        <button
-          type="button"
-          className={
-            inStockOnly ? styles.optionRowActive : styles.optionRow
-          }
-          aria-pressed={inStockOnly}
-          onClick={() => updateFilter("in_stock", inStockOnly ? "" : "1")}
-        >
-          <span className={styles.optionText}>Только в наличии</span>
-        </button>
-        <button
-          type="button"
-          className={newOnly ? styles.optionRowActive : styles.optionRow}
-          aria-pressed={newOnly}
-          onClick={() => updateFilter("new", newOnly ? "" : "1")}
-        >
-          <span className={styles.optionText}>Новинки</span>
-        </button>
-      </div>
 
       {facets.map((facet) => {
         const selected = activeFacets[facet.key as FacetKey];
