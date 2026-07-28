@@ -109,9 +109,9 @@
 - Репозиторий на GitHub — **private**.
 - Разработка и запуск — локально (Docker Compose).
 - Публичный деплой — отдельный этап после готовности MVP.
-- **Prod-хост:** VPS reg.ru; домен и почта там же
-  ([infra-reg-ru.md](infra-reg-ru.md)). SMTP заявок — ящики reg.ru,
-  не внешний ESP по умолчанию.
+- **Prod-хост:** VPS + DNS на reg.ru; почта — Яндекс 360 (~1 год)
+  ([infra-reg-ru.md](infra-reg-ru.md)). SMTP заявок — `smtp.yandex.ru`,
+  не ESP вроде SendGrid по умолчанию.
 
 ---
 

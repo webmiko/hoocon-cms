@@ -12,7 +12,7 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 | Backend | Django + DRF, PostgreSQL, Celery / Redis |
 | Admin | Django Admin (Unfold) |
 | Frontend | React + TypeScript + Vite |
-| Prod | VPS / DNS / mail **reg.ru**, Docker Compose, GitHub Actions |
+| Prod | VPS / DNS **reg.ru** + почта **Яндекс 360**, Docker Compose, GitHub Actions |
 
 Python 3.12–3.13.
 

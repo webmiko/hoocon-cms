@@ -10,8 +10,8 @@ Belimo / Dastech / дилеры (Panoramavent и др.).
 `lms-backend` (VPS + nginx + Celery + SMTP); безопасность форм — чеклист
 стандартов разработки.
 
-Инфра prod (зафиксировано): **VPS + домен + почта на reg.ru** —
-см. [infra-reg-ru.md](infra-reg-ru.md).
+Инфра prod (зафиксировано): **VPS + домен на reg.ru**, почта —
+**Яндекс 360** (~1 год) — см. [infra-reg-ru.md](infra-reg-ru.md).
 
 ---
 
@@ -170,7 +170,7 @@ SKU-страницы `privod-…`, `/gde-kupit`, юр. страницы). Кат
    цен) — дилер копирует; OEM должен быть удобнее.
 2. **Инженерный FAQ и статьи** с перелинковкой на SKU (уже зачаток).
 3. **RFQ с контекстом SKU** (модель, кол-во, объект) + Celery-письмо
-   на `sales@hoocon.ru` через почту reg.ru.
+   на `sales@hoocon.ru` через SMTP Яндекс 360.
 4. **SLA в UI**: «Ответим в рабочее время за N часов».
 5. **Склад Москва** как жёсткий оффер в hero и карточке (наличие —
    позже; в v1 хотя бы текст/флаг).
@@ -223,7 +223,7 @@ INP &lt; 200 ms, CLS &lt; 0.08, WCAG 2.2 AA.
 5. **Миграция URL:** сохранить `/catalog`, `/privod-…`; 301 с
    `/tproduct/…` и опечаток-алиасов —
    [seo-url-migration.md](seo-url-migration.md).
-6. **Prod только reg.ru:** один VPS, DNS, почта — см. infra-док.
+6. **Prod:** VPS + DNS на reg.ru; почта Яндекс 360 — см. infra-док.
 
 ---
 

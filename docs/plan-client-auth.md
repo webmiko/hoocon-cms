@@ -28,7 +28,7 @@ challenge + min-fill) и `config/admin_otp.py` (6-значный Email OTP).
 
 | # | Условие | Зачем |
 |---|---------|--------|
-| 1 | SMTP prod/staging (reg.ru) работает | Доставка OTP / писем |
+| 1 | SMTP prod/staging (Яндекс 360) работает | Доставка OTP / писем |
 | 2 | Celery + Redis | Отправка писем; OAuth `state` / ticket в Redis |
 | 3 | HTTPS | Secure cookies; Redirect URI Яндекс ID |
 

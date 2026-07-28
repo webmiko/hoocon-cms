@@ -400,7 +400,7 @@ elif _cache_url:
         },
     }
 
-# ── Email (SMTP reg.ru on prod; see docs/infra-reg-ru.md) ───────────
+# ── Email (SMTP Яндекс 360 on prod; see docs/infra-reg-ru.md) ────────
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")

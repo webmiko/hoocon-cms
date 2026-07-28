@@ -16,7 +16,7 @@
 - [Качество данных при переносе (Tilda → CMS)](data-quality-etl.md)
 - [Аудит дизайна Hoocon SPA (2026-07-19)](design-audit-2026-07.md)
 - [Дизайн-система Hoocon SPA](design-system.md)
-- [Инфраструктура prod: VPS / домен / почта reg.ru](infra-reg-ru.md)
+- [Инфраструктура prod: VPS / домен (reg.ru) + почта (Яндекс 360)](infra-reg-ru.md)
 - [Анализ рынка и сайта: Hoocon CMS (глубокая проработка)](market-analysis.md)
 - [План: регистрация клиентов (email + пароль / OTP / Яндекс ID)](plan-client-auth.md)
 - [План: личный кабинет клиента (обращения и КП)](plan-client-cabinet.md)
