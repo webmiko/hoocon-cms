@@ -38,6 +38,7 @@ from catalog.facets import (
 )
 from catalog.media_urls import RelativeImageField
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
+from catalog.newness import sku_is_new
 from catalog.sku_access import (
     sku_attribute_values,
     sku_category_instructions,
@@ -313,6 +314,7 @@ class SKUListSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     price_on_request = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
+    is_new = serializers.SerializerMethodField()
     category_slug = serializers.CharField(
         source="product.category.slug",
         read_only=True,
@@ -335,6 +337,8 @@ class SKUListSerializer(serializers.ModelSerializer):
             "price",
             "price_on_request",
             "in_stock",
+            "is_new",
+            "first_published_at",
             "edition_count",
             "image",
             "highlights",
@@ -357,6 +361,10 @@ class SKUListSerializer(serializers.ModelSerializer):
     def get_in_stock(self, obj: SKU) -> bool:
         """True when warehouse quantity is positive (no raw qty in public API)."""
         return obj.in_stock
+
+    def get_is_new(self, obj: SKU) -> bool:
+        """True when first_published_at is within the Новинки window (30 days)."""
+        return sku_is_new(obj)
 
     def get_edition_count(self, obj: SKU) -> int:
         """Published SKU count on the same Product (family card signal)."""

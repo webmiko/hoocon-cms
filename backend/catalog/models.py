@@ -236,6 +236,17 @@ class SKU(models.Model):
         default=None,
         help_text="Время последней загрузки остатков из выгрузки 1С.",
     )
+    first_published_at: models.DateTimeField | None = models.DateTimeField(
+        "впервые на сайте",
+        null=True,
+        blank=True,
+        default=None,
+        db_index=True,
+        help_text=(
+            "Когда SKU впервые стал виден в публичном каталоге. "
+            "Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL."
+        ),
+    )
     description: models.TextField = models.TextField(
         "описание",
         blank=True,
@@ -279,6 +290,13 @@ class SKU(models.Model):
     def __str__(self) -> str:
         """Return the SKU name for Admin and logs."""
         return self.name
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Stamp ``first_published_at`` on first public publish."""
+        from catalog.newness import ensure_first_published_at
+
+        ensure_first_published_at(self)
+        super().save(*args, **kwargs)  # type: ignore[arg-type]
 
     @property
     def in_stock(self) -> bool:

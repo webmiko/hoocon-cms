@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from catalog.facets import FACET_BY_KEY, FACET_KEYS, filter_skus_by_facet
 from catalog.models import SKU, Attribute
+from catalog.newness import new_since
 
 # Reserved query keys — not treated as Attribute.slug / facet filters.
 _RESERVED_QUERY_KEYS: frozenset[str] = frozenset(
@@ -28,6 +29,7 @@ _RESERVED_QUERY_KEYS: frozenset[str] = frozenset(
         "format",
         "search",
         "in_stock",
+        "new",
     },
 )
 
@@ -40,6 +42,7 @@ class SKUFilterSet(django_filters.FilterSet):
     category = django_filters.CharFilter(method="filter_category")
     q = django_filters.CharFilter(method="filter_q")
     in_stock = django_filters.CharFilter(method="filter_in_stock")
+    new = django_filters.CharFilter(method="filter_new")
 
     class Meta:
         model = SKU
@@ -69,6 +72,17 @@ class SKUFilterSet(django_filters.FilterSet):
         if not value or value.strip().casefold() not in _IN_STOCK_TRUE:
             return queryset
         return queryset.filter(stock_qty__gt=0)
+
+    def filter_new(
+        self,
+        queryset: QuerySet[SKU],
+        _name: str,
+        value: str,
+    ) -> QuerySet[SKU]:
+        """When truthy, keep SKUs with ``first_published_at`` in the Новинки window."""
+        if not value or value.strip().casefold() not in _IN_STOCK_TRUE:
+            return queryset
+        return queryset.filter(first_published_at__gte=new_since())
 
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
         """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
@@ -120,6 +134,15 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
                 "required": False,
                 "in": "query",
                 "description": "Только товары в наличии (stock_qty > 0). Значения: 1 / true / yes.",
+                "schema": {"type": "string", "enum": ["1", "true", "yes"]},
+            },
+            {
+                "name": "new",
+                "required": False,
+                "in": "query",
+                "description": (
+                    "Только новинки (first_published_at за последние 30 суток). Значения: 1 / true / yes."
+                ),
                 "schema": {"type": "string", "enum": ["1", "true", "yes"]},
             },
         ]

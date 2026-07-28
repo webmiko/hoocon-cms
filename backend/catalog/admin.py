@@ -145,6 +145,7 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
         "stock_qty",
         "in_stock_label",
         "is_published",
+        "first_published_at",
         "price",
         "stock_updated_at",
         "updated_at",
@@ -167,6 +168,7 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "name",
                     "slug",
                     "is_published",
+                    "first_published_at",
                     "analog_belimo_code",
                 ),
                 "description": (
