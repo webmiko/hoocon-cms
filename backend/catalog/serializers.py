@@ -53,14 +53,54 @@ def _prices_visible() -> bool:
     return bool(SiteSettings.load().show_prices_on_site)
 
 
-def _sku_gallery_images(obj: SKU) -> list[ProductImage]:
-    """Published gallery photos scoped to the SKU control / torque edition."""
+def _sku_own_images(obj: SKU) -> list[ProductImage]:
+    """Published images attached directly to this SKU (prefetch-aware)."""
     images = getattr(obj, "_prefetched_images", None)
     if images is None:
         images = list(
             obj.images.filter(is_published=True).order_by("sort_order", "id"),
         )
-    return filter_images_for_variant(list(images), parse_sku_variant(obj.sku_code))
+    return list(images)
+
+
+def _family_gallery_images(obj: SKU) -> list[ProductImage]:
+    """Published images from all published SKUs on the same Product.
+
+    Cached on ``product._family_gallery_images`` so list/detail serializers
+    do not re-query for every empty edition of the same family.
+    """
+    if not obj.product_id:
+        return []
+    product = getattr(obj, "product", None)
+    if product is not None:
+        cached = getattr(product, "_family_gallery_images", None)
+        if cached is not None:
+            return list(cached)
+
+    images = list(
+        ProductImage.objects.filter(
+            is_published=True,
+            sku__is_published=True,
+            sku__product_id=obj.product_id,
+        ).order_by("sort_order", "id"),
+    )
+    if product is not None:
+        setattr(product, "_family_gallery_images", images)
+    return images
+
+
+def _sku_gallery_images(obj: SKU) -> list[ProductImage]:
+    """Published gallery for this edition; fall back to family photos if empty.
+
+    Editions often share one body photo (24/230, S/non-S). When a SKU has no
+    own rows, reuse the Product family's gallery filtered for this control /
+    torque so cards and PDP are not blank.
+    """
+    variant = parse_sku_variant(obj.sku_code)
+    own = filter_images_for_variant(_sku_own_images(obj), variant)
+    if own:
+        return own
+    return filter_images_for_variant(_family_gallery_images(obj), variant)
 
 
 def _sku_kvs_value(obj: SKU) -> str:

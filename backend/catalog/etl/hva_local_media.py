@@ -10,11 +10,15 @@ Sources (Yandex Disk archive, resolved via common roots)::
 
 Falls back to the std Nm photo for Q families when a dedicated Q folder
 has no product shot (10Q/20Q/40Q share the same body photo as 10/20/40).
+
+Spring ``*P`` and capacitor ``*QX`` editions without a dedicated pack reuse
+the nearest std family body photo (15P → HVA-10 pack).
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, Final
 
@@ -28,6 +32,7 @@ from catalog.models import SKU, ProductImage
 logger = logging.getLogger(__name__)
 
 _SOURCE_URL = "https://hoocon.ru/.local-assets/hva-catalog/hva{nm}{fast}-{kind}.webp"
+_P_OR_QX = re.compile(r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)(?P<kind>p|qx)$")
 SORT_PRODUCT: Final[int] = 0
 # Keep below wiring(5) / AI-catalog dims(8) so gallery order is photo → schema → razmer → AI.
 SORT_LOCAL_DIMENSIONS: Final[int] = 6
@@ -99,6 +104,22 @@ def _photo_paths(
     return {"product": product, "dimensions": dimensions, "wiring": wiring}
 
 
+def _media_target(sku_code: str) -> tuple[int, bool, str] | None:
+    """Map SKU → ``(photo_nm, fast, label)``; P/QX reuse std family shots."""
+    parsed = parse_hva_series(sku_code)
+    if parsed is not None:
+        nm, fast = parsed
+        return nm, fast, f"HVA-{nm}{'Q' if fast else ''}"
+    match = _P_OR_QX.match((sku_code or "").strip().replace(" ", ""))
+    if match is None:
+        return None
+    nm = int(match.group("nm"))
+    kind = match.group("kind").upper()
+    # No dedicated 15 Nm photo pack — spring 15P shares the HVA-10 body.
+    photo_nm = 10 if nm == 15 else nm
+    return photo_nm, False, f"HVA-{nm}{kind}"
+
+
 def _source_url(nm: int, *, fast: bool, kind: str) -> str:
     return _SOURCE_URL.format(nm=nm, fast="q" if fast else "", kind=kind)
 
@@ -145,7 +166,7 @@ def apply_hva_local_media(
     dry_run: bool = False,
     photo_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Attach product / dimensions / wiring images to all HVA std/Q SKUs."""
+    """Attach product / dimensions / wiring images to HVA std/Q/P/QX SKUs."""
     root = photo_root or default_hva_photo_root()
     summary: dict[str, Any] = {
         "created": 0,
@@ -163,15 +184,14 @@ def apply_hva_local_media(
     bytes_cache: dict[Path, bytes] = {}
     skus = list(SKU.objects.filter(sku_code__istartswith="HVA").order_by("sku_code"))
     for sku in skus:
-        parsed = parse_hva_series(sku.sku_code)
-        if parsed is None:
+        target = _media_target(sku.sku_code)
+        if target is None:
             summary["skipped"] += 1
             continue
-        nm, fast = parsed
-        if (nm, fast) not in path_cache:
-            path_cache[(nm, fast)] = _photo_paths(root, nm=nm, fast=fast)
-        paths = path_cache[(nm, fast)]
-        label = f"HVA-{nm}{'Q' if fast else ''}"
+        photo_nm, fast, label = target
+        if (photo_nm, fast) not in path_cache:
+            path_cache[(photo_nm, fast)] = _photo_paths(root, nm=photo_nm, fast=fast)
+        paths = path_cache[(photo_nm, fast)]
         jobs: list[tuple[str, str, int, Path | None]] = [
             ("product", f"{label} | фото привода", SORT_PRODUCT, paths["product"]),
             (
@@ -199,7 +219,7 @@ def apply_hva_local_media(
                 raw=bytes_cache[path],
                 alt=alt,
                 sort_order=sort_order,
-                source_url=_source_url(nm, fast=fast, kind=kind),
+                source_url=_source_url(photo_nm, fast=fast, kind=kind),
                 dry_run=dry_run,
             )
             attached_any = True

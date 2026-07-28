@@ -782,4 +782,11 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
         "skipped": manuals.get("skipped", 0),
         "warnings": manuals.get("warnings") or [],
     }
+    if with_media:
+        from catalog.etl.hva_local_media import apply_hva_local_media
+
+        # P / QX reuse std family body shots when no dedicated pack exists.
+        hva_media = apply_hva_local_media(dry_run=dry_run)
+        summary["media_created"] += hva_media.get("created", 0)
+        summary["media_updated"] += hva_media.get("updated", 0)
     return summary
