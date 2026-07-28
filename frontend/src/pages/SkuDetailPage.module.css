@@ -70,7 +70,7 @@
 
 .heroMedia {
   margin: 0;
-  padding: 0;
+  padding: 0 40px;
   box-sizing: border-box;
   min-height: 220px;
   height: 100%;
@@ -85,11 +85,16 @@
   justify-content: center;
 }
 
+/* Diagrams stay edge-to-edge on paper white (no cutout inset). */
+.heroMedia[data-backdrop="white"] {
+  padding-inline: 0;
+}
+
 .heroZoomTrigger {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
+  width: auto;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -98,8 +103,13 @@
   cursor: zoom-in;
   line-height: 0;
   position: absolute;
-  inset: 0;
+  /* Match .heroMedia side inset (absolute ignores parent padding). */
+  inset: 0 40px;
   overflow: hidden;
+}
+
+.heroMedia[data-backdrop="white"] .heroZoomTrigger {
+  inset: 0;
 }
 
 .heroImage {

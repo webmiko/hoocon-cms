@@ -99,9 +99,9 @@
   );
   --photo-wash-air: linear-gradient(
     165deg,
-    #dfeaf5 0%,
-    #eef4fa 48%,
-    #ffffff 100%
+    #d8d9dc 0%,
+    #e8e9ec 48%,
+    #f4f4f5 100%
   );
   --photo-wash-smoke: linear-gradient(
     165deg,
@@ -232,9 +232,9 @@ html[data-theme="dark"] {
   );
   --photo-wash-air: linear-gradient(
     165deg,
-    #141c28 0%,
-    #1a2430 48%,
-    #222c38 100%
+    #1a1b1e 0%,
+    #222326 48%,
+    #2a2b2e 100%
   );
   --photo-wash-smoke: linear-gradient(
     165deg,

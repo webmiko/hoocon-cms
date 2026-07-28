@@ -577,7 +577,9 @@
   width: 100%;
   min-height: 96px;
   margin: 0;
-  padding: 0;
+  /* Cutout photos: side inset so product doesn't kiss the wash edge. */
+  padding: 0 40px;
+  box-sizing: border-box;
   background: var(--photo-wash-valve);
   border-right: none;
   overflow: hidden;
@@ -982,7 +984,7 @@
     width: 100%;
     border-right: none;
     border-bottom: none;
-    padding: 0;
+    padding: 0 40px;
   }
 
   .card:not(.cardVertical) .cardMediaPlaceholder {
@@ -1097,7 +1099,7 @@
   overflow: hidden;
   border-right: none;
   border-bottom: none;
-  padding: 0;
+  padding: 0 40px;
 }
 
 .card.cardVertical .cardMediaPlaceholder {
