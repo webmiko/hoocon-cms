@@ -402,14 +402,14 @@
   gap: var(--space-lg);
 }
 
-/* Wide home band (~1114px+): three product pillars per row. */
+/* Wide home band (~1114px+): four product pillars per row. */
 @container directions-inner (min-width: 1114px) {
   .directionGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .directionBlock {
-    min-height: 300px;
+    min-height: 280px;
   }
 }
 
