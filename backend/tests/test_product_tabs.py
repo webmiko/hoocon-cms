@@ -57,6 +57,60 @@ def test_filter_analogs_keeps_matching_edition() -> None:
     assert "230" in out
 
 
+def test_filter_analogs_bare_hoocon_headers_split_ds_dst() -> None:
+    """Separate ``Hoocon …-DS`` / ``…-DST`` headings must not cross-leak."""
+    text = """
+Список аналогов SA30MU:
+
+Hoocon SA30MU24-DS (24В)
+
+– Belimo BEE24
+
+Hoocon SA30MU24-DST (24 В с термодатчиком)
+
+– Belimo BEE24ST
+""".strip()
+    out_ds = filter_analogs_for_sku(text, "SA30MU24-DS")
+    assert "BEE24" in out_ds
+    assert "BEE24ST" not in out_ds
+    out_dst = filter_analogs_for_sku(text, "SA30MU24-DST")
+    assert "BEE24ST" in out_dst
+    assert "– Belimo BEE24\n" not in out_dst
+    assert "– Belimo BEE24\r" not in out_dst
+    assert not out_dst.rstrip().endswith("BEE24")
+
+
+def test_filter_analogs_bare_hoocon_headers_split_by_control() -> None:
+    """«Hoocon DA15FU24-D/DS» headings must not leak into A/AS editions."""
+    text = """
+Список аналогов для привода заслонки Hoocon серии DA15FU:
+
+Hoocon DA15FU24-D/DS (24 В, 15Нм):
+
+– Belimo BF24 — без пружины
+
+Hoocon DA15FU24-A/AS (24 В, 15Нм с пружиной)
+
+– Belimo BX24 — с пружиной
+
+Hoocon DA15FU230-D/DS (230 В, 15Нм)
+
+– Belimo BX230
+""".strip()
+    out_a = filter_analogs_for_sku(text, "DA15FU24-A")
+    assert "BX24" in out_a
+    assert "BF24" not in out_a
+    assert "BX230" not in out_a
+    assert "DA15FU24-A" in out_a
+    assert "D/DS" not in out_a
+
+    out_ds = filter_analogs_for_sku(text, "DA15FU24-DS")
+    assert "BF24" in out_ds
+    assert "BX24" not in out_ds
+    assert "BX230" not in out_ds
+    assert "DA15FU24-DS" in out_ds
+
+
 def test_filter_analogs_hoocon_dlya_headers() -> None:
     """DAMU-style «Для Hoocon DA2MU230-…» blocks filter by edition + rewrite heading."""
     text = """

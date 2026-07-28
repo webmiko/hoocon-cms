@@ -7,7 +7,9 @@ from django.urls import reverse
 
 from catalog.etl.belimo_analogs import (
     analogs_plain_text_for_sku,
+    belimo_code_is_modulating,
     belimo_code_is_thermal,
+    belimo_code_matches_control,
     belimo_codes_for_sku,
     extract_belimo_codes_from_text,
     infer_belimo_codes,
@@ -246,6 +248,132 @@ def test_belimo_codes_for_sku_prefers_card_text() -> None:
     assert belimo_codes_for_sku(sku) == ["LF24-S", "LF24-RS"]
 
 
+def test_belimo_code_control_sr_token() -> None:
+    """Open/close vs ``-SR``; spring ``LF24-RS`` stays ambiguous (kept)."""
+    assert belimo_code_is_modulating("LM24A-SR") is True
+    assert belimo_code_is_modulating("LM24A-SR-S") is True
+    assert belimo_code_is_modulating("NM24A-SR-20") is True
+    assert belimo_code_is_modulating("LM24A-S") is False
+    assert belimo_code_is_modulating("CM230-L/R") is False
+    assert belimo_code_matches_control("CM230-L/R", "on_off") is True
+    assert belimo_code_matches_control("CM230-L/R", "modulating") is False
+    assert belimo_code_matches_control("LM230A-S", "modulating") is False
+    assert belimo_code_matches_control("LM230A-SR-S", "modulating") is True
+    assert belimo_code_matches_control("LM230A-SR-S", "on_off") is False
+    assert belimo_code_matches_control("LF24-RS", "modulating") is True
+    assert belimo_code_matches_control("LF24-RS", "on_off") is True
+    assert belimo_code_matches_control("LF24-S", "modulating") is True
+
+
+@pytest.mark.django_db
+def test_shared_ds_as_block_splits_belimo_by_control() -> None:
+    """Combined ``…-DS/…-AS`` card text must not pin one Belimo on both sides."""
+    cat = Category.objects.create(
+        name="Air no spring",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    product = Product.objects.create(name="DA2MU", slug="da2mu-shared-analog", category=cat)
+    text = """
+Список аналогов для привода серии DA..MU 2 Нм
+
+Для Hoocon DA2MU230-DS/DA2MU230-AS (230В):
+
+– Belimo CM230-L/R
+
+Основные характеристики аналогов
+Управление: 2-/3-позиционное
+""".strip()
+    moment = Attribute.objects.create(name="Крутящий момент", slug="moment")
+    voltage = Attribute.objects.create(name="Напряжение", slug="voltage")
+    control = Attribute.objects.create(name="Управление", slug="control")
+    aux = Attribute.objects.create(name="Вспомогательный переключатель", slug="aux-switch")
+
+    ds = SKU.objects.create(
+        product=product,
+        name="DA2MU230-DS",
+        slug="da2mu230-ds-shared",
+        sku_code="DA2MU230-DS",
+        is_published=True,
+        analog_belimo_code="CM230-L/R",
+        analogs_text=text,
+    )
+    AttributeValue.objects.create(sku=ds, attribute=moment, value="2 Нм")
+    AttributeValue.objects.create(sku=ds, attribute=voltage, value="AC 230 В")
+    AttributeValue.objects.create(sku=ds, attribute=control, value="Открыто/закрыто")
+    AttributeValue.objects.create(sku=ds, attribute=aux, value="SPDT-1")
+
+    as_sku = SKU.objects.create(
+        product=product,
+        name="DA2MU230-AS",
+        slug="da2mu230-as-shared",
+        sku_code="DA2MU230-AS",
+        is_published=True,
+        analog_belimo_code="CM230-L/R",
+        analogs_text=text,
+    )
+    AttributeValue.objects.create(sku=as_sku, attribute=moment, value="2 Нм")
+    AttributeValue.objects.create(sku=as_sku, attribute=voltage, value="AC 230 В")
+    AttributeValue.objects.create(sku=as_sku, attribute=control, value="Пропорциональное")
+    AttributeValue.objects.create(sku=as_sku, attribute=aux, value="SPDT-1")
+
+    assert belimo_codes_for_sku(ds) == ["CM230-L/R"]
+    assert belimo_codes_for_sku(as_sku) == ["LM230A-SR-S"]
+    assert primary_belimo_code_for_sku(as_sku) == "LM230A-SR-S"
+
+    as_text = analogs_plain_text_for_sku(as_sku)
+    assert "CM230-L/R" not in as_text
+    assert "DA2MU230-AS" in as_text
+    ds_text = analogs_plain_text_for_sku(ds)
+    assert "CM230-L/R" in ds_text
+
+
+@pytest.mark.django_db
+def test_damu_2nm_split_analogs_by_control() -> None:
+    """Split DA2MU card: on/off keeps CM*, modulating keeps LM*-SR only."""
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "catalog" / "etl" / "data" / "damu_2nm_analogs.txt").read_text(
+        encoding="utf-8"
+    )
+    cat = Category.objects.create(
+        name="Air no spring",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    product = Product.objects.create(
+        name="DA2MU",
+        slug="da2mu-2nm-split",
+        category=cat,
+        analogs_text=text,
+    )
+    ds = SKU.objects.create(
+        product=product,
+        name="DA2MU230-DS",
+        slug="da2mu230-ds-split",
+        sku_code="DA2MU230-DS",
+        is_published=True,
+        analogs_text=text,
+    )
+    as_sku = SKU.objects.create(
+        product=product,
+        name="DA2MU230-AS",
+        slug="da2mu230-as-split",
+        sku_code="DA2MU230-AS",
+        is_published=True,
+        analogs_text=text,
+    )
+    ds_text = analogs_plain_text_for_sku(ds)
+    as_text = analogs_plain_text_for_sku(as_sku)
+    assert "CM230-L/R" in ds_text
+    assert "LM230A-SR" not in ds_text
+    assert "Dastech" in ds_text
+    assert "CM230-L/R" not in as_text
+    assert extract_belimo_codes_from_text(as_text) == ["LM230A-SR-S"]
+    assert "Dastech" not in as_text
+    assert belimo_codes_for_sku(ds) == ["CM230-L/R"]
+    assert belimo_codes_for_sku(as_sku) == ["LM230A-SR-S"]
+    assert primary_belimo_code_for_sku(as_sku) == "LM230A-SR-S"
+
+
 @pytest.mark.django_db
 def test_belimo_codes_for_sku_infers_when_text_empty() -> None:
     """Missing analogs_text → infer from EAV + category."""
@@ -350,13 +478,19 @@ def test_sku_code_is_thermal_suffix_only() -> None:
 
 
 def test_belimo_code_is_thermal_suffix_only() -> None:
-    """Belimo thermal codes end with FST / -T; mid-string -T is not thermal."""
+    """Thermal Belimo: ``-T`` / ``FST`` / smoke ``…ST`` family codes."""
     assert belimo_code_is_thermal("BF24-T") is True
     assert belimo_code_is_thermal("bf24-t") is True
     assert belimo_code_is_thermal("BF24-FST") is True
+    assert belimo_code_is_thermal("FST-230-3N") is True
+    assert belimo_code_is_thermal("FST-24-3N") is True
+    assert belimo_code_is_thermal("BEE24ST") is True
+    assert belimo_code_is_thermal("BEE230ST") is True
     assert belimo_code_is_thermal("X-T-Y") is False
     assert belimo_code_is_thermal("BF24-S") is False
+    assert belimo_code_is_thermal("BEE24") is False
     assert belimo_code_is_thermal("XFSTY") is False
+    assert belimo_code_is_thermal("FSR-230-3N") is False
     assert belimo_code_is_thermal("") is False
     assert belimo_code_is_thermal(None) is False
 

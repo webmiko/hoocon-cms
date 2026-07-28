@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from django.core.management.base import BaseCommand
 
-from catalog.etl.belimo_analogs import primary_belimo_code_for_sku
+from catalog.etl.belimo_analogs import (
+    _sku_uses_ds_as_control_editions,
+    belimo_code_is_thermal,
+    belimo_code_matches_control,
+    primary_belimo_code_for_sku,
+)
+from catalog.etl.sku_variant import parse_sku_variant, sku_code_is_thermal
 from catalog.models import SKU
 
 
@@ -51,8 +57,23 @@ class Command(BaseCommand):
                 if current.casefold() == primary.casefold():
                     skipped += 1
                     continue
-                skipped += 1
-                continue
+                # Auto-refresh clear mismatches without --force:
+                # shared DS/AS on/off Belimo on modulating SKU, or DST without FST/-T.
+                control = parse_sku_variant(sku.sku_code).control
+                control_mismatch = _sku_uses_ds_as_control_editions(
+                    sku.sku_code,
+                ) and not belimo_code_matches_control(current, control)
+                thermal_mismatch = (
+                    sku_code_is_thermal(sku.sku_code)
+                    and belimo_code_is_thermal(primary)
+                    and current.casefold() != primary.casefold()
+                ) or (
+                    # Plain DS/… kept a thermal Belimo from a shared voltage list.
+                    (not sku_code_is_thermal(sku.sku_code)) and belimo_code_is_thermal(current)
+                )
+                if not control_mismatch and not thermal_mismatch:
+                    skipped += 1
+                    continue
             if current.casefold() == primary.casefold():
                 skipped += 1
                 continue

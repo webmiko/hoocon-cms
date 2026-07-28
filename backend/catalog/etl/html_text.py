@@ -601,7 +601,7 @@ _ANALOGS_FULL_CODE_RE = re.compile(
     r"(?i)\b([a-z]{2,}\d+[a-z]*\d*-[a-z]{1,3})\b",
 )
 _ANALOGS_EDITION_HEADER_RE = re.compile(
-    r"(?i)^(?P<prefix>для\s+(?:hoocon\s+)?|аналоги\s+для\s+)"
+    r"(?i)^(?P<prefix>для\s+(?:hoocon\s+)?|аналоги\s+для\s+|hoocon\s+)"
     r"(?P<body>.+?)"
     r"(?P<tail>\s*\([^)]*\))?\s*:?\s*$",
 )
@@ -611,7 +611,7 @@ _ANALOGS_VOLTAGE_HEADER_RE = re.compile(
     r"(?:\((?P<body>[^)]*)\))?\s*:?\s*$",
 )
 _ANALOGS_SHORT_SLASH_RE = re.compile(
-    r"(?i)(?P<stem>[a-z]{2,}\d+[a-z]*\d*)-(?P<a>[ads]{1,3})\s*/\s*(?P<b>[ads]{1,3})\b",
+    r"(?i)(?P<stem>[a-z]{2,}\d+[a-z]*\d*)-(?P<a>[adst]{1,3})\s*/\s*(?P<b>[adst]{1,3})\b",
 )
 _ANALOGS_MULTI_VOLT_OVERVIEW_RE = re.compile(
     r"(?i)^аналоги\s+.+\s+и\s+[a-z]{2,}\d",
@@ -624,11 +624,18 @@ def _compact_sku_token(code: str) -> str:
 
 
 def _control_suffix_family(suffix: str) -> str:
-    """Map edition suffix to control family for slash-header matching."""
+    """Map edition suffix to control family for slash-header matching.
+
+    ``DST`` (thermal) is distinct from ``DS`` so separate ``…-DS`` / ``…-DST``
+    headings do not leak into each other. Combined ``DS/DST`` slash headers
+    still match via explicit suffix membership below.
+    """
     suf = (suffix or "").casefold()
     if suf in {"a", "as"}:
         return "modulating"
-    if suf in {"d", "ds", "dst"}:
+    if suf == "dst":
+        return "on_off_thermal"
+    if suf in {"d", "ds"}:
         return "on_off"
     if suf == "m":
         return "modbus"
@@ -714,37 +721,40 @@ def _sku_matches_listed_or_slash(sku_code: str, header: str) -> bool | None:
     sku_fam = _control_suffix_family(sku_suf)
     sku_stem = sku_compact[: -len(sku_suf)] if sku_suf else sku_compact
 
-    if listed:
-        for raw in listed:
-            item = _compact_sku_token(raw)
-            if item == sku_compact:
-                return True
-            item_suf = _sku_control_suffix(item)
-            item_stem = item[: -len(item_suf)] if item_suf else item
-            # Same stem + same control family (D↔DS, A↔AS, DS↔DST).
-            if item_stem == sku_stem and item_suf and sku_suf and _control_suffix_family(item_suf) == sku_fam:
-                return True
-            # Paren ``SA10MU24-DS/DST`` lists DS; DST is same stem family.
-            if (
-                item_stem == sku_stem
-                and item_suf in {"ds", "dst"}
-                and sku_suf
-                in {
-                    "ds",
-                    "dst",
-                }
-            ):
-                return True
-        return False
-
     if short is not None:
         stem = short.group("stem").casefold()
         sufs = {short.group("a").casefold(), short.group("b").casefold()}
-        if sku_stem != _compact_sku_token(stem):
+        if sku_stem == _compact_sku_token(stem):
+            if sku_suf in sufs:
+                return True
+            # Combined DS/DST slash (thermal pair) — both sides share the block.
+            if sku_suf in {"ds", "dst"} and {"ds", "dst"} <= sufs:
+                return True
+            if any(_control_suffix_family(s) == sku_fam for s in sufs):
+                return True
+            # Wrong control side of this slash group.
+            if listed:
+                return False
             return False
-        if sku_suf in sufs:
+
+    if listed:
+        listed_sufs: set[str] = set()
+        for raw in listed:
+            item = _compact_sku_token(raw)
+            item_suf = _sku_control_suffix(item)
+            item_stem = item[: -len(item_suf)] if item_suf else item
+            if item_stem == sku_stem and item_suf:
+                listed_sufs.add(item_suf)
+            if item == sku_compact:
+                return True
+            # Same stem + same control family (D↔DS, A↔AS). Not DS↔DST.
+            if item_stem == sku_stem and item_suf and sku_suf and _control_suffix_family(item_suf) == sku_fam:
+                return True
+        # Combined ``SA10MU24-DS/DST`` when FULL_CODE only captured ``…-DS``.
+        if sku_suf in {"ds", "dst"} and {"ds", "dst"} <= listed_sufs:
             return True
-        return any(_control_suffix_family(s) == sku_fam for s in sufs)
+        return False
+
     return None
 
 
@@ -832,6 +842,8 @@ def filter_analogs_for_sku(text: str, sku_code: str) -> str:
         r"(?i)^(основные характеристики|общие характеристики|аналоги привода|"
         r"аналоги для|аналоги\s+\d|аналоги\s+[a-z]|важные параметры)\b"
         r"|^для\s+(?:hoocon\s+)?[a-z]{2,}\d"
+        # Bare Tilda headings: «Hoocon DA15FU24-D/DS (24 В):»
+        r"|^hoocon\s+[a-z]{2,}\d"
         r"|^[A-Z]{2,}\d+[A-Z]*\d*(?:-|\s|$)",
     )
     shared_re = re.compile(

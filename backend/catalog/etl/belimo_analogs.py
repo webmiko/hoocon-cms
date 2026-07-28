@@ -35,8 +35,10 @@ _HAS_230 = re.compile(r"(?:^|[^0-9])230(?:[^0-9]|$)")
 _HAS_24 = re.compile(r"(?:^|[^0-9])24(?:[^0-9]|$)")
 _MOMENT_NUM = re.compile(r"(\d+[.,]?\d*)")
 _AREA_NUM = re.compile(r"(\d+[.,]?\d*)")
-# Belimo thermal article: ends with FST or -T (not mid-string "-T").
-_THERMAL_BELIMO_SUFFIX = re.compile(r"fst$|-t$")
+# Belimo thermal: ``BF24-T``, ``BF24-FST``, ``FST-230-3N``, smoke ``BEE24ST``.
+_THERMAL_BELIMO_TOKEN = re.compile(
+    r"(?:^|-)fst(?:-|$)|fst$|st$|-t$",
+)
 
 # Category slug fragments → purpose for inference.
 _PURPOSE_BY_CATEGORY: tuple[tuple[str, Purpose], ...] = (
@@ -299,11 +301,122 @@ def analogs_plain_text_for_sku(sku: SKU) -> str:
     raw = sku_section_text(sku, "analogs_text")
     if not raw.strip():
         return ""
-    return filter_analogs_for_sku(raw, sku.sku_code)
+    filtered = _analogs_text_scoped(raw, sku)
+    return _drop_belimo_lines_for_thermal(filtered, sku_code_is_thermal(sku.sku_code))
+
+
+def _analogs_text_scoped(raw: str, sku: SKU) -> str:
+    """Filter analogs by edition / control / aux (shared resolution + PDP base)."""
+    filtered = filter_analogs_for_sku(raw, sku.sku_code)
+    variant = parse_sku_variant(sku.sku_code)
+    if _sku_uses_ds_as_control_editions(sku.sku_code):
+        filtered = _drop_belimo_lines_for_control(filtered, variant.control)
+    aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
+    return _drop_belimo_lines_for_aux(filtered, aux)
+
+
+def _drop_belimo_lines_for_thermal(text: str, thermal_sku: bool) -> str:
+    """Keep Belimo bullets that match thermal vs non-thermal SKU edition."""
+    if not text.strip():
+        return text
+    out: list[str] = []
+    for line in text.splitlines():
+        codes = extract_belimo_codes_from_text(line)
+        if codes:
+            if thermal_sku and not any(belimo_code_is_thermal(c) for c in codes):
+                continue
+            if not thermal_sku and all(belimo_code_is_thermal(c) for c in codes):
+                continue
+        out.append(line)
+    return "\n".join(out).strip()
+
+
+def _drop_belimo_lines_for_control(text: str, control: str | None) -> str:
+    """Remove Belimo bullet lines that contradict SKU control (shared DS/AS lists)."""
+    if not control or not text.strip():
+        return text
+    out: list[str] = []
+    for line in text.splitlines():
+        codes = extract_belimo_codes_from_text(line)
+        if codes and not any(belimo_code_matches_control(c, control) for c in codes):
+            continue
+        out.append(line)
+    return "\n".join(out).strip()
+
+
+def _drop_belimo_lines_for_aux(text: str, aux_switch: bool | None) -> str:
+    """Drop the mismatched side of Belimo BASE / BASE-S bullet pairs."""
+    if aux_switch is None or not text.strip():
+        return text
+    codes = extract_belimo_codes_from_text(text)
+    keep = set(_filter_codes_by_aux(codes, aux_switch))
+    if not codes or keep == set(codes):
+        return text
+    out: list[str] = []
+    for line in text.splitlines():
+        line_codes = extract_belimo_codes_from_text(line)
+        if line_codes and not any(code in keep for code in line_codes):
+            continue
+        out.append(line)
+    return "\n".join(out).strip()
+
+
+def belimo_code_is_modulating(code: str | None) -> bool:
+    """True when a Belimo article is a modulating (``-SR``) edition.
+
+    Belimo marks proportional control with ``-SR`` (e.g. ``LM24A-SR``,
+    ``LM24A-SR-S``, ``NM24A-SR-20``). Open/close articles (``LM24A-S``,
+    ``CM230-L/R``) do not include that token.
+    """
+    return bool(re.search(r"-SR(?:-|$)", normalize_belimo_code(code or "")))
+
+
+def belimo_code_is_open_close(code: str | None) -> bool:
+    """True for clear open/close Belimo articles (not proportional ``-SR``).
+
+    Matches ``CM230-L/R`` and ``LM24A-S`` / ``LM24A-S2``. Does **not** match
+    spring-return ``LF24-RS`` / ``LF24-S`` (``-RS`` / bare ``-S`` on LF/NF),
+    which appear on both control sides in Tilda cards.
+    """
+    normalized = normalize_belimo_code(code or "")
+    if not normalized or belimo_code_is_modulating(normalized):
+        return False
+    if re.search(r"-L(?:/R)?$|-R$", normalized):
+        return True
+    # Classic non-spring LM/NM/SM/GM with aux ``-S`` and no ``-SR``.
+    return bool(re.search(r"^(?:LM|NM|SM|GM)\d+A-S\d?$", normalized))
+
+
+def belimo_code_matches_control(code: str | None, control: str | None) -> bool:
+    """Whether a Belimo article fits Hoocon control (``on_off`` / ``modulating``).
+
+    Shared Tilda blocks often list one Belimo line under ``…-DS/…-AS``. We only
+    reject unambiguous mismatches: modulating SKU + open/close article, or
+    on/off SKU + ``-SR`` article. Ambiguous spring codes (``LF24-RS``) are kept.
+    """
+    if not control or not (code or "").strip():
+        return True
+    if control == "modulating":
+        return not belimo_code_is_open_close(code)
+    if control in {"on_off", "3_point"}:
+        return not belimo_code_is_modulating(code)
+    return True
+
+
+def _sku_uses_ds_as_control_editions(sku_code: str) -> bool:
+    """True for articles with Tilda ``-A/-AS`` / ``-D/-DS`` control suffixes."""
+    from catalog.etl.html_text import _compact_sku_token, _sku_control_suffix
+
+    suf = _sku_control_suffix(_compact_sku_token(sku_code))
+    return suf in {"a", "as", "d", "ds", "dst"}
 
 
 def belimo_codes_for_sku(sku: SKU) -> list[str]:
     """Resolve Belimo codes for a SKU: card text first, else ТТХ inference.
+
+    Card text wins only when codes match the SKU control mode. Combined
+    ``-DS/-AS`` analog blocks often list an on/off Belimo (e.g. ``CM230-L/R``);
+    modulating editions then fall through to inference (``…-SR``).
 
     Args:
         sku: Catalog SKU (product + category + EAV used when inferring).
@@ -313,16 +426,39 @@ def belimo_codes_for_sku(sku: SKU) -> list[str]:
     """
     variant = parse_sku_variant(sku.sku_code)
     voltage = variant.voltage
-    text = analogs_plain_text_for_sku(sku)
+    control = variant.control
+    apply_control = _sku_uses_ds_as_control_editions(sku.sku_code)
+    from catalog.sku_access import sku_section_text
+
+    raw = sku_section_text(sku, "analogs_text")
+    text = _analogs_text_scoped(raw, sku) if raw.strip() else ""
     from_text = extract_belimo_codes_from_text(text, voltage=voltage)
     if from_text:
         aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
-        return _filter_codes_by_aux(from_text, aux)
+        filtered = _filter_codes_by_aux(from_text, aux)
+        if apply_control:
+            filtered = _filter_codes_by_control(filtered, control)
+        if sku_code_is_thermal(sku.sku_code):
+            thermal_only = [c for c in filtered if belimo_code_is_thermal(c)]
+            if thermal_only:
+                filtered = thermal_only
+            # else keep card codes for facet; primary_belimo_code_for_sku
+            # still refuses a non-thermal primary.
+        else:
+            filtered = [c for c in filtered if not belimo_code_is_thermal(c)]
+        if filtered:
+            return filtered
 
     stored = (sku.analog_belimo_code or "").strip()
     if stored:
-        # Explicit field wins over inference (may be set by admin / fill command).
-        return [normalize_belimo_code(stored)]
+        code = normalize_belimo_code(stored)
+        thermal_sku = sku_code_is_thermal(sku.sku_code)
+        thermal_code = belimo_code_is_thermal(code)
+        # Stale fill: thermal Belimo on plain DS (or reverse) must not block inference.
+        if thermal_sku != thermal_code:
+            pass
+        elif not apply_control or belimo_code_matches_control(code, control):
+            return [code]
 
     return _infer_for_sku(sku, voltage=voltage)
 
@@ -363,17 +499,24 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
     return [code for code in codes if code not in drop]
 
 
+def _filter_codes_by_control(codes: list[str], control: str | None) -> list[str]:
+    """Keep Belimo articles that match Hoocon ``on_off`` / ``modulating``."""
+    if not control or not codes:
+        return codes
+    return [code for code in codes if belimo_code_matches_control(code, control)]
+
+
 def belimo_code_is_thermal(code: str | None) -> bool:
-    """True when a Belimo article is a thermal edition (``FST`` / ``-T`` suffix).
+    """True when a Belimo article is a thermal edition (``FST`` / ``ST`` / ``-T``).
 
     Args:
-        code: Belimo article (e.g. ``BF24-T``, ``BF24-FST``).
+        code: Belimo article (e.g. ``BF24-T``, ``FST-230-3N``, ``BEE24ST``).
 
     Returns:
-        True only when the code ends with ``FST`` or ``-T``. Mid-string
-        ``-T`` (e.g. ``X-T-Y``) is not thermal.
+        True for ``FST…`` / ``…ST`` / ``…-T`` / ``…-FST`` thermal markers.
+        Mid-string ``-T-`` (e.g. ``X-T-Y``) is not thermal.
     """
-    return bool(_THERMAL_BELIMO_SUFFIX.search((code or "").casefold()))
+    return bool(_THERMAL_BELIMO_TOKEN.search(normalize_belimo_code(code or "").casefold()))
 
 
 def primary_belimo_code_for_sku(sku: SKU) -> str | None:

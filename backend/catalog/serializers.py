@@ -12,7 +12,7 @@ from typing import Any
 from rest_framework import serializers
 
 from catalog.etl.attr_groups import attach_groups, group_attribute_rows
-from catalog.etl.html_text import dedupe_description_lines, filter_analogs_for_sku
+from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.sku_variant import (
     filter_attributes_for_variant,
     filter_description_for_variant,
@@ -111,18 +111,10 @@ def _sku_specs_text(obj: SKU) -> str:
 
 
 def _sku_analogs_text(obj: SKU) -> str:
-    """Аналоги text for this edition only."""
-    # None → product inherit; "" on SKU stays empty (no product re-fetch).
-    if obj.analogs_text is not None:
-        if not obj.analogs_text.strip():
-            return ""
-        text = dedupe_description_lines(obj.analogs_text)
-    else:
-        text = sku_product_field(obj, "analogs_text")
-        if not text.strip():
-            return ""
-        text = dedupe_description_lines(text)
-    return filter_analogs_for_sku(text, obj.sku_code)
+    """Аналоги text for this edition only (control-aware Belimo lines)."""
+    from catalog.etl.belimo_analogs import analogs_plain_text_for_sku
+
+    return analogs_plain_text_for_sku(obj)
 
 
 def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any]]:
