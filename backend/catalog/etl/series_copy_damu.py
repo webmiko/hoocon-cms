@@ -360,8 +360,8 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
                 "",
                 "5. Пропорциональное управление",
                 "",
-                f"– {CONTROL_SIGNAL_Y_LABEL}: 0(2)…10 В= / 0(4)…20 мА.",
-                "– Обратная связь U: 0(2)…10 В= / 0(4)…20 мА (по схеме в инструкции).",
+                f"– {CONTROL_SIGNAL_Y_LABEL}: {CONTROL_SIGNAL_Y_CANON}.",
+                f"– {FEEDBACK_SIGNAL_U_LABEL}: {FEEDBACK_SIGNAL_U_CANON}.",
             ],
         )
         next_ch = 6

@@ -1,7 +1,7 @@
 """Canonical copy + ТТХ for Hoocon SA..MU (smoke damper, no spring return).
 
 Source: English manuals ``sa{n}mu-ds_dst.pdf`` (Nm 10/15/30) + Belimo RU glossary.
-SA7 has a PDF but no catalog SKUs yet.
+SA7 shares the SA..MU manuals family; catalog SKUs include 7/10/15/30 Нм.
 """
 
 from __future__ import annotations
@@ -101,6 +101,17 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 _SAMU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
 
 TORQUE_SPECS: dict[int, dict[str, str]] = {
+    7: {
+        "moment": "7 Нм",
+        "damper-area": "до 0,7 м²",
+        "running-time": "< 45 с (95°)",
+        "shaft-length": "≥ 50",
+        "weight": "≈ 1,7 кг",
+        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
+        "power_24": "5 Вт (работа) / 1 Вт (удержание)",
+        "power_230": "5 Вт (работа) / 1 Вт (удержание)",
+        "noise": "макс. 50 дБ(А)",
+    },
     10: {
         "moment": "10 Нм",
         "damper-area": "до 1,0 м²",

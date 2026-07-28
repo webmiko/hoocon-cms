@@ -76,6 +76,13 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
         if code.endswith("-a") or code.endswith("-d"):
             return 0
         return None
+    # DA..EU electronic fail-safe: album «DS включает 2 вспомогательных».
+    if re.match(r"da\d+eu", code):
+        if code.endswith("-ds"):
+            return 2
+        if code.endswith("-d"):
+            return 0
+        return None
     if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):
         return 2
     # SA..FU fire/smoke manuals: «S type include 2 auxiliary switch» (DS/DST).
@@ -94,6 +101,9 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
     # HVA24S-5 / HVD230S-10 — «S» edition = 2 auxiliary switches.
     if re.search(r"(?:hva|hvd)\d*s-?\d", code):
         return 2
+    # Bare HVA24-5 / HVD230-40 (no S) — no aux group.
+    if re.fullmatch(r"(?:hva|hvd)(?:24|230)-\d+(?:q|qx|qa|p)?", code):
+        return 0
     if re.search(r"-a(?:$|[^a-z])", code) or code.endswith("-a"):
         return 0
     if re.search(r"-d(?:$|[^a-z])", code) or code.endswith("-d"):
