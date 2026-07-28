@@ -272,8 +272,13 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
     code = (sku_code or "").casefold()
     # HVD-…F: spring-return smoke/fire compact (same Belimo BFL/BLF class as SA..FU).
     # Must win over category ``…dymoudalen…`` which also hosts SA..MU (no spring).
-    if code.startswith("hvd"):
+    if re.search(r"(?i)^hvd\d.*-\d+f(?:$|[^a-z0-9])", code):
         return "fire_spring"
+    # HVD-Q / HVD-QX — fast non-spring air (not fire).
+    if re.search(r"(?i)^hvd\d.*-\d+qx?(?:$|[^a-z0-9])", code):
+        return "fast"
+    if re.search(r"(?i)^hvd\d", code):
+        return "air_no_spring"
     for fragment, purpose in _PURPOSE_BY_CATEGORY:
         if fragment in slug:
             return purpose

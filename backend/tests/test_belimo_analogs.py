@@ -211,6 +211,11 @@ def test_detect_purpose_hvd_is_fire_spring() -> None:
     assert detect_purpose(category_slug=slug, sku_code="HVD24S-3F") == "fire_spring"
     assert detect_purpose(category_slug=slug, sku_code="HVD230ST-5F") == "fire_spring"
     assert detect_purpose(category_slug=slug, sku_code="SA10MU24-DS") == "smoke"
+    # Bare / Q HVD are air (non-spring), not fire BFL/BLF.
+    assert detect_purpose(category_slug=slug, sku_code="HVD24-40") == "air_no_spring"
+    assert detect_purpose(category_slug=slug, sku_code="HVD24S-20") == "air_no_spring"
+    assert detect_purpose(category_slug=slug, sku_code="HVD24-10Q") == "fast"
+    assert detect_purpose(category_slug=slug, sku_code="HVD230S-40QX") == "fast"
 
 
 def test_infer_fast_actuator() -> None:
