@@ -31,12 +31,16 @@
 }
 
 .checkbox:checked + .checkboxUi {
-  background: var(--color-link);
-  border-color: var(--color-link);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.2'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.2'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
   background-size: 14px 14px;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+:global(html[data-theme="dark"]) .checkbox:checked + .checkboxUi {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23121214' stroke-width='2.2'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
 }
 
 .checkbox:focus-visible + .checkboxUi {
@@ -51,8 +55,8 @@
   margin-top: 4px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--color-text);
-  color: #fff;
+  background: var(--color-inverse);
+  color: var(--color-on-inverse);
   font-size: 10px;
   font-weight: 600;
   white-space: nowrap;

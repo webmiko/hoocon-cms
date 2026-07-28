@@ -60,7 +60,8 @@
    */
   --control-blur: 32px;
   --control-saturate: 1.35;
-  --color-brand-control: color-mix(in srgb, var(--color-brand) 86%, transparent);
+  /* 88% keeps white labels ≥4.5:1 on light surfaces (86% was ~4.43). */
+  --color-brand-control: color-mix(in srgb, var(--color-brand) 88%, transparent);
   --color-brand-control-hover: color-mix(
     in srgb,
     var(--color-brand-hover) 92%,

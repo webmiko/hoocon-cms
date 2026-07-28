@@ -97,6 +97,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase;
 }
 
 .remove {
@@ -146,8 +147,8 @@
   min-height: 40px;
   padding: 8px 18px;
   border-radius: var(--radius-sm, 6px);
-  background: var(--color-link);
-  color: #fff;
+  background: var(--color-brand-control);
+  color: var(--color-on-brand);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
@@ -155,9 +156,9 @@
 }
 
 .compare:hover {
-  filter: brightness(0.95);
+  background: var(--color-brand-control-hover);
   text-decoration: none;
-  color: #fff;
+  color: var(--color-on-brand);
 }
 
 .comparePulse {

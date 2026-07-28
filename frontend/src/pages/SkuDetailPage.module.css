@@ -843,7 +843,7 @@
   background: var(--color-primary-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: white;
+  color: var(--color-on-primary);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 500;
@@ -851,7 +851,7 @@
 
 .link:hover {
   background: var(--color-primary-hover);
-  color: white;
+  color: var(--color-on-primary);
   text-decoration: none;
 }
 

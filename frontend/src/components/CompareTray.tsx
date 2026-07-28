@@ -100,6 +100,7 @@ export function CompareTray() {
           <Link
             to={compareTo}
             className={`${styles.compare} ${pulse ? styles.comparePulse : ""}`.trim()}
+            data-brand-cta
           >
             Перейти к сравнению
           </Link>

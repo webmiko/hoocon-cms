@@ -47,8 +47,8 @@
   align-items: center;
   padding: 8px 18px;
   border-radius: var(--radius-sm, 6px);
-  background: var(--color-link);
-  color: #fff;
+  background: var(--color-brand-control);
+  color: var(--color-on-brand);
   font-weight: 700;
   text-decoration: none;
 }
@@ -381,6 +381,7 @@
 .skuCode {
   font-size: 12px;
   font-weight: 700;
+  text-transform: uppercase;
 }
 
 .skuName {
