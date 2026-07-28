@@ -1439,7 +1439,7 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
 # ── HVA: dimensions from Russian Illustrator catalog (PDF-compatible .ai) ──
 
 _HVA_CODE = re.compile(
-    r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)(?P<fast>q)?(?:x)?$",
+    r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)(?P<fast>q)?$",
 )
 _HVA_CATALOG_NAME = "浒江2022俄文画册3.ai"
 _HVA_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/hva{nm}{fast}-{kind}.webp"
@@ -1457,12 +1457,24 @@ _HVA_CATALOG_PAGE: Final[dict[tuple[int, bool], int]] = {
 # Envelope W × H × D from left-column «Размеры привода» drawings / datasheet.
 _HVA_ENVELOPE_MM: Final[dict[tuple[int, bool], str]] = {
     (5, False): "71,1 × 144,1 × 62,1 мм",
-    (5, True): "71,1 × 144,1 × 62,1 мм",  # same body as HVA-5; mass differs (see weight map)
+    (5, True): "71,1 × 141,1 × 62,1 мм",
+    (10, False): "167,8 × 88,2 × 68 мм",
+    (10, True): "167,8 × 86,2 × 68 мм",
+    (20, False): "191,8 × 103,4 × 68 мм",
+    (20, True): "191,8 × 103,4 × 68 мм",
+    (40, False): "180,8 × 99 × 68 мм",
+    (40, True): "198,6 × 104 × 68 мм",
 }
 # Datasheet Weight row per Nm/fast family (shared by all SKUs of that family).
 _HVA_WEIGHT: Final[dict[tuple[int, bool], str]] = {
-    (5, False): "≤ 0,5 кг",
+    (5, False): "< 0,8 кг",
     (5, True): "< 0,8 кг",
+    (10, False): "< 1,1 кг",
+    (10, True): "< 1,1 кг",
+    (20, False): "< 1,4 кг",
+    (20, True): "< 1,4 кг",
+    (40, False): "< 1,5 кг",
+    (40, True): "< 1,5 кг",
 }
 _HVA_DIMS_TITLE = "Размеры привода(mm)"
 _HVA_CATALOG_SCALE: Final[float] = 2.5
@@ -1482,7 +1494,13 @@ def find_hva_catalog_ai(*, manuals_dir: Path | None = None) -> Path | None:
     path = manuals_dir / _HVA_CATALOG_NAME
     if path.is_file():
         return path
-    # Fallback: any .ai in manuals dir.
+    # Yandex Disk originals (not always symlinked into manuals dir).
+    for candidate in (
+        Path.home() / "Yandex.Disk.localized/浒江2022俄文画册3文件夹(_F)" / _HVA_CATALOG_NAME,
+        Path.home() / "Yandex.Disk.localized/浒江2022俄文画册2文件夹(_F)/浒江2022俄文画册2.ai",
+    ):
+        if candidate.is_file():
+            return candidate
     if manuals_dir.is_dir():
         for candidate in sorted(manuals_dir.glob("*.ai")):
             return candidate

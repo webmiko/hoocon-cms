@@ -198,7 +198,7 @@ def test_patch_damu_wiring_labels_ru_replaces_english_titles() -> None:
 def test_parse_hva_series_and_source_url() -> None:
     assert parse_hva_series("HVA24-5") == (5, False)
     assert parse_hva_series("HVA230S-5Q") == (5, True)
-    assert parse_hva_series("HVA24-5QX") == (5, True)
+    assert parse_hva_series("HVA24-5QX") is None
     assert parse_hva_series("da5fu24-ds") is None
     assert "hva5-dimensions" in source_url_for_hva(5, fast=False, kind="dimensions")
     assert "hva5q-dimensions" in source_url_for_hva(5, fast=True, kind="dimensions")
@@ -208,7 +208,7 @@ def test_parse_hva_series_and_source_url() -> None:
 def test_hva_manual_diagrams_backfills_family_weight_without_catalog(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """HVA-5Q shares envelope with HVA-5 but gets a different datasheet mass."""
+    """HVA-5Q gets datasheet envelope/mass even when the .ai catalog is missing."""
     from catalog.etl import manual_diagrams as md
     from catalog.models import SKU, AttributeValue, Category, Product
 
@@ -226,7 +226,7 @@ def test_hva_manual_diagrams_backfills_family_weight_without_catalog(
 
     md.apply_hva_manual_diagrams(dry_run=False)
     by = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
-    assert by["dimensions"] == "71,1 × 144,1 × 62,1 мм"
+    assert by["dimensions"] == "71,1 × 141,1 × 62,1 мм"
     assert by["weight"] == "< 0,8 кг"
 
 

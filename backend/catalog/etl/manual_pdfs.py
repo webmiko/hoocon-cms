@@ -28,6 +28,13 @@ HVD fire/smoke F-series (spring return; not air HVD-5)::
 
     hvd-3f-s_st.pdf                → HVD24/230 S/ST-3F
     hvd-5f-s_st.pdf                → HVD24/230 S/ST-5F
+
+HVA modulating air (no spring; ASCII stems after rename)::
+
+    hva-5.pdf / HVA-5 instruction.pdf → HVA24/230[S]-5
+    hva-5q.pdf                        → HVA24/230[S]-5Q
+    hva-10.pdf / hva-10q.pdf / …      → matching HVA* codes when present
+    hva-5p.pdf / hva-5uq.pdf          → spring / special (warn if no SKU)
 """
 
 from __future__ import annotations
@@ -64,6 +71,12 @@ _SAMU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)mu(?:-ds[_-]?dst)?$")
 _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
 _HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
 _HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
+# hva-5 | hva-5q | hva-5p | hva-5uq | hva-10p | «HVA-5 instruction»
+_HVA_STEM = re.compile(r"(?i)^hva-(?P<token>\d+(?:uq|q|p)?)$")
+_HVA_INSTRUCTION_STEM = re.compile(r"(?i)^hva-5(?:\s+instruction)?$")
+_HVA_SKU_BODY = re.compile(
+    r"(?i)^hva(?:24|230)s?-(?P<body>\d+(?:uq|q|p)?)$",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1012,6 +1025,154 @@ def attach_hvd_manuals(
         for match in matches:
             payload = match.path.read_bytes()
             title = f"Инструкция HVD-{match.torque_nm}F (S/ST)"
+            basename = _storage_basename(match.path)
+            for code in match.sku_codes:
+                sku = code_to_sku.get(code.casefold())
+                if sku is None:
+                    warnings.append(f"SKU missing in DB: {code}")
+                    continue
+                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                if dry_run:
+                    summary["by_sku"].setdefault(code, []).append(title)
+                    summary["created" if existing is None else "updated"] += 1
+                    continue
+                if existing is None:
+                    pf = ProductFile(
+                        sku=sku,
+                        title=title,
+                        file_type=ProductFile.FileType.DATASHEET,
+                        is_published=True,
+                        sort_order=0,
+                    )
+                    pf.file.save(basename, ContentFile(payload), save=True)
+                    summary["created"] += 1
+                else:
+                    current_size = existing.file.size if existing.file else 0
+                    if current_size != len(payload):
+                        existing.file.save(basename, ContentFile(payload), save=True)
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+                summary["by_sku"].setdefault(code, []).append(title)
+        if dry_run:
+            transaction.set_rollback(True)
+    summary["warnings"] = warnings
+    return summary
+
+
+def parse_hva_manual_token(stem: str) -> str | None:
+    """Parse ``hva-5q`` / ``HVA-5 instruction`` → family token ``5`` / ``5q``."""
+    clean = normalize_manual_stem(stem)
+    if _HVA_INSTRUCTION_STEM.fullmatch(clean):
+        return "5"
+    match = _HVA_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    return match.group("token").casefold()
+
+
+def sku_codes_for_hva_manual(token: str, sku_codes: list[str]) -> list[str]:
+    """Map PDF token onto catalog ``HVA(24|230)[S]-{token}`` codes only."""
+    want = token.casefold()
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _HVA_SKU_BODY.fullmatch(compact)
+        if match is None:
+            continue
+        if match.group("body").casefold() == want:
+            out.append(code)
+    return out
+
+
+def discover_hva_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan for ``hva-*.pdf`` / legacy HVA-5 instruction and map to HVA SKUs."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__istartswith="HVA").values_list("sku_code", flat=True),
+        )
+    matches: list[ManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+
+    paths = sorted(
+        {
+            *manuals_dir.glob("hva-*.pdf"),
+            *manuals_dir.glob("HVA-*.pdf"),
+            *manuals_dir.glob("HVA-5 instruction.pdf"),
+        },
+        key=lambda p: (
+            # Prefer ascii ``hva-5.pdf`` over legacy ``HVA-5 instruction.pdf``.
+            0 if _HVA_STEM.fullmatch(normalize_manual_stem(p.name)) else 1,
+            p.name.casefold(),
+        ),
+    )
+    # Prefer ``hva-5.pdf`` over legacy ``HVA-5 instruction.pdf`` for token 5.
+    seen_tokens: set[str] = set()
+    for path in paths:
+        token = parse_hva_manual_token(path.name)
+        if token is None:
+            if path.name.casefold().startswith("hva"):
+                warnings.append(f"unrecognized HVA filename: {path.name!r}")
+            continue
+        if token in seen_tokens:
+            warnings.append(f"duplicate HVA manual for {token!r}, skip {path.name!r}")
+            continue
+        codes = sku_codes_for_hva_manual(token, sku_codes)
+        if not codes:
+            warnings.append(
+                f"no catalog SKU for {path.name!r} (expected HVA*S?-{token.upper()})",
+            )
+            continue
+        seen_tokens.add(token)
+        nm_match = re.match(r"^(\d+)", token)
+        torque_nm = int(nm_match.group(1)) if nm_match else 0
+        matches.append(
+            ManualMatch(
+                path=path,
+                torque_nm=torque_nm,
+                kind=token,
+                sku_codes=tuple(codes),
+            ),
+        )
+    return matches, warnings
+
+
+def attach_hva_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for matching HVA SKUs."""
+    matches, warnings = discover_hva_manuals(manuals_dir)
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": warnings,
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+    code_to_sku = {
+        s.sku_code.casefold(): s
+        for s in SKU.objects.filter(
+            sku_code__in=[c for m in matches for c in m.sku_codes],
+        )
+    }
+    with transaction.atomic():
+        for match in matches:
+            payload = match.path.read_bytes()
+            label = match.kind.upper()
+            title = f"Инструкция HVA-{label}"
             basename = _storage_basename(match.path)
             for code in match.sku_codes:
                 sku = code_to_sku.get(code.casefold())

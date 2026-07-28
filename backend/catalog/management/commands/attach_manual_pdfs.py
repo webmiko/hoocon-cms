@@ -19,6 +19,7 @@ from catalog.etl.manual_pdfs import (
     attach_dafu_manuals,
     attach_damqu_manuals,
     attach_damu_manuals,
+    attach_hva_manuals,
     attach_hvd_manuals,
     attach_safu_manuals,
     attach_samu_manuals,
@@ -52,7 +53,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--series",
-            choices=("all", "dafu", "safu", "damu", "damqu", "samu", "hvd", "h81"),
+            choices=("all", "dafu", "safu", "damu", "damqu", "samu", "hvd", "hva", "h81"),
             default="all",
             help="Which series manuals to attach (default: all).",
         )
@@ -88,6 +89,8 @@ class Command(BaseCommand):
             summaries.append(("SAMU", attach_samu_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "hvd"}:
             summaries.append(("HVD", attach_hvd_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "hva"}:
+            summaries.append(("HVA", attach_hva_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "h81"}:
             h81 = apply_h81_instruction_pdfs(dry_run=dry_run)
             self.stdout.write(
