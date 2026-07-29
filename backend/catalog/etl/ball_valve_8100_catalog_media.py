@@ -1,12 +1,12 @@
-"""Attach series-8100 brass PDF + dimension/wiring crops to ``8100-bv*`` SKUs.
+"""Attach series-8100 brass PDF to ``8100-bv*`` SKUs (documents only).
 
 Source::
 
     ``_инструкции-pdf/шаровые краны серии 8100.pdf`` (6 pages, ~3 MiB)
 
-- ProductFile datasheet on every published brass body SKU.
-- ProductImage tiles: габариты (стр.4) + схема подключения привода (стр.5).
-- Optional ТТХ fill for empty size attrs from the page-4 table (no silent overwrite).
+Габариты / схемы подключения смотрят в самом PDF — в галерею карточки
+кропы не кладём (выглядят кустарно на thumbnail). Optional ТТХ fill for
+empty size attrs from the page-4 table (no silent overwrite).
 """
 
 from __future__ import annotations
@@ -19,21 +19,10 @@ from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
-from PIL import Image
 
 from catalog.etl.attr_write import set_sku_attribute
-from catalog.etl.h81_catalog_media import crop_h81_dimensions
-from catalog.etl.manual_diagrams import (
-    SORT_DIMENSIONS,
-    SORT_WIRING,
-    DiagramCrop,
-    _pil_to_png_bytes,
-    _upsert_diagram,
-    render_pdf_page,
-)
 from catalog.etl.manual_pdfs import default_manuals_dir
-from catalog.etl.webp import convert_bytes_to_webp
-from catalog.models import SKU, AttributeValue, ProductFile
+from catalog.models import SKU, AttributeValue, ProductFile, ProductImage
 from catalog.validators import MAX_PRODUCT_FILE_SIZE_BYTES
 
 logger = logging.getLogger(__name__)
@@ -41,17 +30,9 @@ logger = logging.getLogger(__name__)
 PDF_FILENAME: Final[str] = "шаровые краны серии 8100.pdf"
 PDF_TITLE: Final[str] = "Паспорт серии 8100 (шаровые краны)"
 PDF_SORT: Final[int] = 40
-_SOURCE_URL = "https://hoocon.ru/.local-assets/8100-series/{stem}-{kind}.webp"
-_RENDER_SCALE = 2.5
+# Legacy diagram tiles from an earlier pass — unpublished on apply.
+_LEGACY_DIAGRAM_SOURCE_PREFIX: Final[str] = "https://hoocon.ru/.local-assets/8100-series/"
 _SKU_BODY_RE = re.compile(r"(?i)^(?:8100-)?bv(?P<num>\d{3,4})(?P<ed>[a-e])?$")
-
-# Page index 3 = «Габаритные размеры» table + threaded drawing.
-_DIMS_PAGE = 3
-_DIMS_BAND = (0.50, 0.72, 0.03, 0.97)  # top, bottom, left, right
-
-# Page index 4 = «Схема подключения» (right column).
-_WIRING_PAGE = 4
-_WIRING_BAND = (0.10, 0.98, 0.48, 0.98)
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,11 +79,6 @@ def brass_body_code_from_sku(sku_code: str) -> str | None:
     if match is None:
         return None
     return f"BV{match.group('num')}"
-
-
-def source_url_for_8100(stem: str, kind: str) -> str:
-    """Stable ProductImage.source_url for upsert."""
-    return _SOURCE_URL.format(stem=stem.casefold(), kind=kind)
 
 
 def _normalize_mm(value: str) -> str:
@@ -157,33 +133,15 @@ def attach_8100_series_pdf(
         return "update"
 
 
-def _crop_band(page: Image.Image, band: tuple[float, float, float, float]) -> Image.Image:
-    top, bottom, left, right = band
-    return crop_h81_dimensions(page, top=top, bottom=bottom, left=left, right=right)
-
-
-def build_8100_diagram_crops(pdf_path: Path) -> list[DiagramCrop]:
-    """Rasterize page 4–5 bands into dimensions + wiring crops."""
-    dims_page = render_pdf_page(pdf_path, _DIMS_PAGE, scale=_RENDER_SCALE)
-    wiring_page = render_pdf_page(pdf_path, _WIRING_PAGE, scale=_RENDER_SCALE)
-    dims_img = _crop_band(dims_page, _DIMS_BAND)
-    wiring_img = _crop_band(wiring_page, _WIRING_BAND)
-    return [
-        DiagramCrop(
-            kind="dimensions",
-            png_bytes=_pil_to_png_bytes(dims_img),
-            alt="Серия 8100 | Габаритные размеры (мм), чертёж из паспорта серии",
-            sort_order=SORT_DIMENSIONS,
-            source_url=source_url_for_8100("brass", "dimensions"),
-        ),
-        DiagramCrop(
-            kind="wiring",
-            png_bytes=_pil_to_png_bytes(wiring_img),
-            alt="Серия 8100 | Схема подключения электропривода (паспорт серии)",
-            sort_order=SORT_WIRING,
-            source_url=source_url_for_8100("brass", "wiring"),
-        ),
-    ]
+def unpublish_legacy_8100_diagram_tiles(*, dry_run: bool = False) -> int:
+    """Hide page-crop tiles previously added to brass galleries."""
+    qs = ProductImage.objects.filter(
+        source_url__startswith=_LEGACY_DIAGRAM_SOURCE_PREFIX,
+        is_published=True,
+    )
+    if dry_run:
+        return qs.count()
+    return qs.update(is_published=False)
 
 
 def _attr_value(sku: SKU, slug: str) -> str | None:
@@ -250,15 +208,14 @@ def apply_8100_catalog_media(
     pdf_path: Path | None = None,
     force_attrs: bool = False,
 ) -> dict[str, Any]:
-    """Attach series PDF + diagrams to published ``8100-bv*`` SKUs."""
+    """Attach series PDF to published ``8100-bv*`` SKUs; drop legacy gallery crops."""
     summary: dict[str, Any] = {
-        "created": 0,
-        "updated": 0,
         "pdf_created": 0,
         "pdf_updated": 0,
         "pdf_skipped": 0,
         "attrs_filled": 0,
         "attrs_mismatched": 0,
+        "unpublished_diagrams": 0,
         "skipped": 0,
         "dry_run": dry_run,
         "pdf": "",
@@ -280,10 +237,7 @@ def apply_8100_catalog_media(
         summary["skipped"] = 1
         return summary
 
-    crops = build_8100_diagram_crops(catalog)
-    webp_cache: dict[str, bytes] = {
-        crop.source_url: convert_bytes_to_webp(crop.png_bytes, quality=92, max_edge=1600) for crop in crops
-    }
+    summary["unpublished_diagrams"] = unpublish_legacy_8100_diagram_tiles(dry_run=dry_run)
 
     for sku in skus:
         pdf_action = attach_8100_series_pdf(sku, pdf_path=catalog, dry_run=dry_run)
@@ -294,18 +248,6 @@ def apply_8100_catalog_media(
         else:
             summary["pdf_skipped"] += 1
 
-        for crop in crops:
-            action = _upsert_diagram(
-                sku,
-                crop,
-                dry_run=dry_run,
-                webp_bytes=webp_cache[crop.source_url],
-            )
-            if action == "create":
-                summary["created"] += 1
-            elif action == "update":
-                summary["updated"] += 1
-
         attr_stats = sync_brass_dims_from_pdf(
             sku,
             dry_run=dry_run,
@@ -314,10 +256,9 @@ def apply_8100_catalog_media(
         summary["attrs_filled"] += attr_stats["filled"]
         summary["attrs_mismatched"] += attr_stats["mismatched"]
         logger.info(
-            "8100_catalog_media %s pdf=%s diagrams=%s attrs_filled=%s",
+            "8100_catalog_media %s pdf=%s attrs_filled=%s",
             sku.sku_code,
             pdf_action,
-            len(crops),
             attr_stats["filled"],
         )
 

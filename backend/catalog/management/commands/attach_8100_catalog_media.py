@@ -1,4 +1,4 @@
-"""Attach series-8100 brass PDF + diagram crops to ``8100-bv*`` SKUs.
+"""Attach series-8100 brass PDF datasheet to ``8100-bv*`` SKUs.
 
 Usage::
 
@@ -6,6 +6,9 @@ Usage::
     poetry run python manage.py attach_8100_catalog_media --dry-run
     poetry run python manage.py attach_8100_catalog_media --pdf /path/to.pdf
     poetry run python manage.py attach_8100_catalog_media --force-attrs
+
+Diagram page-crops are not attached to the gallery (look in the PDF).
+Re-running unpublishes any legacy ``8100-series/*`` tiles.
 """
 
 from __future__ import annotations
@@ -20,9 +23,9 @@ from catalog.etl.ball_valve_8100_catalog_media import apply_8100_catalog_media
 
 
 class Command(BaseCommand):
-    """Attach 8100 series passport PDF and dimension/wiring tiles."""
+    """Attach 8100 series passport PDF to brass body SKUs."""
 
-    help = "Attach series-8100 PDF + габариты/подключение crops to brass SKUs."
+    help = "Attach series-8100 PDF datasheet to brass SKUs (no gallery crops)."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
@@ -51,10 +54,10 @@ class Command(BaseCommand):
         )
         prefix = "[dry-run] " if dry_run else ""
         self.stdout.write(
-            f"{prefix}diagrams create={summary['created']} update={summary['updated']} "
-            f"pdf create={summary['pdf_created']} update={summary['pdf_updated']} "
+            f"{prefix}pdf create={summary['pdf_created']} update={summary['pdf_updated']} "
             f"attrs_filled={summary['attrs_filled']} "
             f"attrs_mismatch={summary['attrs_mismatched']} "
+            f"unpublished_diagrams={summary['unpublished_diagrams']} "
             f"pdf={summary['pdf']}",
         )
         self.stdout.write(json.dumps(summary, ensure_ascii=False, indent=2))

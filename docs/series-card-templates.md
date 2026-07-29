@@ -374,14 +374,14 @@ poetry run python manage.py enrich_ball_valves
 poetry run python manage.py enrich_ball_valves --series BV220
 # герои DN из media-webp (2-WAY/3-WAY BRASS DNxx.webp):
 poetry run python manage.py attach_ball_valve_media_webp
-# паспорт серии + габариты/подключение из PDF:
+# паспорт серии PDF в Документы (без кропов в галерею):
 poetry run python manage.py attach_8100_catalog_media
 ```
 
 Код: `series_copy_ball_valves.py` (`product_slug_for_series`,
 `brass_sku_slug`, `merge_brass_bv_onto_dn_products`);
-фото — `ball_valve_media_webp.py`; документ/схемы —
-`ball_valve_8100_catalog_media.py`.
+фото — `ball_valve_media_webp.py`; паспорт —
+`ball_valve_8100_catalog_media.py` (только ProductFile).
 
 ### Референс
 

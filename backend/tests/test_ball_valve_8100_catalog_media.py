@@ -1,9 +1,8 @@
-"""Tests for series-8100 brass PDF + diagram attach."""
+"""Tests for series-8100 brass PDF attach (documents only)."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,10 +14,9 @@ from catalog.etl.ball_valve_8100_catalog_media import (
     attach_8100_series_pdf,
     brass_body_code_from_sku,
     find_8100_series_pdf,
-    source_url_for_8100,
     sync_brass_dims_from_pdf,
+    unpublish_legacy_8100_diagram_tiles,
 )
-from catalog.etl.manual_diagrams import SORT_DIMENSIONS, SORT_WIRING, DiagramCrop
 from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
 
 
@@ -28,25 +26,6 @@ def _png(size: tuple[int, int] = (400, 300), color: tuple[int, int, int] = (240,
     buf = BytesIO()
     Image.new("RGB", size, color=color).save(buf, format="PNG")
     return buf.getvalue()
-
-
-def _fake_crops() -> list[DiagramCrop]:
-    return [
-        DiagramCrop(
-            kind="dimensions",
-            png_bytes=_png(color=(200, 200, 210)),
-            alt="dims",
-            sort_order=SORT_DIMENSIONS,
-            source_url=source_url_for_8100("brass", "dimensions"),
-        ),
-        DiagramCrop(
-            kind="wiring",
-            png_bytes=_png(color=(210, 200, 200)),
-            alt="wiring",
-            sort_order=SORT_WIRING,
-            source_url=source_url_for_8100("brass", "wiring"),
-        ),
-    ]
 
 
 @pytest.mark.parametrize(
@@ -59,13 +38,6 @@ def _fake_crops() -> list[DiagramCrop]:
 )
 def test_brass_body_code_from_sku(code: str, body: str | None) -> None:
     assert brass_body_code_from_sku(code) == body
-
-
-def test_source_url_for_8100_stable() -> None:
-    assert source_url_for_8100("brass", "dimensions").endswith("brass-dimensions.webp")
-    assert source_url_for_8100("brass", "wiring").startswith(
-        "https://hoocon.ru/.local-assets/8100-series/",
-    )
 
 
 def test_brass_dims_table_covers_all_dn_cards() -> None:
@@ -90,8 +62,8 @@ def test_brass_dims_table_covers_all_dn_cards() -> None:
 
 
 @pytest.mark.django_db
-def test_attach_pdf_and_diagrams(tmp_path: Path) -> None:
-    """PDF datasheet + diagram tiles land on brass SKUs; hero stays published."""
+def test_attach_pdf_only_no_gallery_crops(tmp_path: Path) -> None:
+    """PDF datasheet lands on brass SKUs; no 8100-series gallery tiles."""
     pdf = tmp_path / "шаровые краны серии 8100.pdf"
     pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -117,32 +89,39 @@ def test_attach_pdf_and_diagrams(tmp_path: Path) -> None:
         is_published=True,
     )
 
-    with patch(
-        "catalog.etl.ball_valve_8100_catalog_media.build_8100_diagram_crops",
-        return_value=_fake_crops(),
-    ):
-        summary = apply_8100_catalog_media(dry_run=False, pdf_path=pdf)
+    summary = apply_8100_catalog_media(dry_run=False, pdf_path=pdf)
 
     assert summary["pdf_created"] == 1
-    assert summary["created"] == 2
     assert ProductFile.objects.filter(sku=sku, title__contains="8100").exists()
-    dims = ProductImage.objects.filter(
-        sku=sku,
-        source_url__contains="8100-series/brass-dimensions",
-        is_published=True,
-    ).first()
-    assert dims is not None
-    assert dims.sort_order == SORT_DIMENSIONS
-    wiring = ProductImage.objects.filter(
-        sku=sku,
-        source_url__contains="8100-series/brass-wiring",
-        is_published=True,
-    ).first()
-    assert wiring is not None
-    assert wiring.sort_order == SORT_WIRING
+    assert ProductImage.objects.filter(source_url__contains="8100-series").count() == 0
     hero.refresh_from_db()
     assert hero.is_published is True
     assert hero.sort_order == 0
+
+
+@pytest.mark.django_db
+def test_unpublish_legacy_diagram_tiles() -> None:
+    """Re-apply hides previously attached page-crop tiles."""
+    cat = Category.objects.create(name="Ball", slug="sharovye-8100-legacy")
+    product = Product.objects.create(name="BV220", slug="8100-bv220-legacy", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="8100-bv220a",
+        name="BV220A",
+        slug="8100-bv220-legacy-a",
+        is_published=True,
+    )
+    tile = ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile("dims.webp", _png(), content_type="image/webp"),
+        alt="legacy dims",
+        source_url="https://hoocon.ru/.local-assets/8100-series/brass-dimensions.webp",
+        sort_order=8,
+        is_published=True,
+    )
+    assert unpublish_legacy_8100_diagram_tiles(dry_run=False) == 1
+    tile.refresh_from_db()
+    assert tile.is_published is False
 
 
 @pytest.mark.django_db
@@ -194,14 +173,9 @@ def test_dry_run_writes_nothing(tmp_path: Path) -> None:
         slug="8100-bv225-8100-bv225a",
         is_published=True,
     )
-    with patch(
-        "catalog.etl.ball_valve_8100_catalog_media.build_8100_diagram_crops",
-        return_value=_fake_crops(),
-    ):
-        summary = apply_8100_catalog_media(dry_run=True, pdf_path=pdf)
+    summary = apply_8100_catalog_media(dry_run=True, pdf_path=pdf)
     assert summary["pdf_created"] == 1
     assert ProductFile.objects.count() == 0
-    assert ProductImage.objects.filter(source_url__contains="8100-series").count() == 0
 
 
 def test_find_8100_series_pdf_override(tmp_path: Path) -> None:
@@ -215,6 +189,8 @@ def test_find_8100_series_pdf_override(tmp_path: Path) -> None:
 @pytest.mark.django_db
 def test_attach_pdf_skip_when_too_large(tmp_path: Path) -> None:
     """Oversize PDF is skipped (mirrors catalog attach guard)."""
+    from unittest.mock import patch
+
     pdf = tmp_path / "big.pdf"
     pdf.write_bytes(b"%PDF" + b"0" * 100)
     cat = Category.objects.create(name="Ball", slug="sharovye-8100-big")
