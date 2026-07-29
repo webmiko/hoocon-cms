@@ -632,6 +632,375 @@
       text-align: center;
     }
 
+
+    .lang {
+      position: fixed;
+      top: 0.85rem;
+      right: 0.85rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .lang a {
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      color: var(--muted);
+    }
+
+    .lang a.on {
+      background: var(--brand);
+      color: #fff;
+    }
+
+
+
+    /* —— Format switcher —— */
+    .fmt {
+      position: fixed;
+      top: 0.85rem;
+      left: 0.85rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .fmt button {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      color: var(--muted);
+      background: transparent;
+    }
+    .fmt button.on {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    /* —— Shared slide deck chrome —— */
+    @media screen {
+      body.slides-phone,
+      body.slides-a4 {
+        background: #cfcfd2;
+        padding: 1.25rem 0 2.5rem;
+      }
+      body.slides-phone .lang,
+      body.slides-a4 .lang,
+      body.slides-phone .fmt,
+      body.slides-a4 .fmt { position: fixed; }
+
+      body.slides-phone .slide,
+      body.slides-a4 .slide {
+        margin: 0 auto 1.25rem;
+        background:
+          radial-gradient(900px 420px at 8% -10%, rgba(220, 19, 19, 0.1), transparent 55%),
+          linear-gradient(165deg, #f7f7f8 0%, #efefef 50%, #f4f1f1 100%);
+        border-radius: 18px;
+        box-shadow: 0 10px 36px rgba(20, 20, 30, 0.18);
+        overflow: hidden;
+        display: grid;
+        align-content: stretch;
+        box-sizing: border-box;
+      }
+      body.slides-phone .slide > .wrap,
+      body.slides-a4 .slide > .wrap {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 0.65rem;
+      }
+      body.slides-phone .hero,
+      body.slides-a4 .hero {
+        min-height: 0;
+        align-content: center;
+        padding: 0;
+      }
+      body.slides-phone .hero::before,
+      body.slides-a4 .hero::before { display: none; }
+      body.slides-phone section,
+      body.slides-a4 section,
+      body.slides-phone .verdict,
+      body.slides-a4 .verdict { padding: 0; }
+      body.slides-phone .foot,
+      body.slides-a4 .foot {
+        padding: 0.5rem 0 0;
+        margin: 0;
+        text-align: center;
+      }
+      body.slides-phone .verdict > .wrap,
+      body.slides-a4 .verdict > .wrap {
+        align-content: center;
+        gap: 0.65rem;
+      }
+
+      /* Phone portrait ~9:19.5 (iPhone-class) */
+      body.slides-phone .slide {
+        width: min(calc(100% - 1.25rem), 390px);
+        aspect-ratio: 9 / 19.5;
+        padding: 18px 16px 20px;
+        border-radius: 28px;
+      }
+      body.slides-phone .brand-mark {
+        font-size: clamp(1.85rem, 11vw, 2.55rem);
+        margin-bottom: 0.55rem;
+      }
+      body.slides-phone .brand-mark span { font-size: 0.28em; letter-spacing: 0.06em; }
+      body.slides-phone .hero h1 { font-size: 1.15rem; max-width: none; margin-bottom: 0.45rem; }
+      body.slides-phone .hero p { font-size: 0.88rem; max-width: none; }
+      body.slides-phone .hero-meta { margin-top: 0.9rem; gap: 0.45rem 0.75rem; }
+      body.slides-phone .pill { font-size: 0.75rem; }
+      body.slides-phone .section-head { margin-bottom: 0.55rem; gap: 0.2rem; }
+      body.slides-phone .section-head h2 { font-size: 1.12rem; }
+      body.slides-phone .section-head p { font-size: 0.8rem; max-width: none; }
+      body.slides-phone .panel { padding: 0.7rem 0.75rem; border-radius: 14px; }
+      body.slides-phone .pain,
+      body.slides-phone .money,
+      body.slides-phone .side { grid-template-columns: 1fr; gap: 0.55rem; }
+      body.slides-phone .side .now { border-left: none; border-top: 1px solid var(--line); }
+      body.slides-phone .big-stat .num { font-size: clamp(2.4rem, 14vw, 3.4rem); }
+      body.slides-phone .funnel { gap: 0.45rem; }
+      body.slides-phone .funnel-row {
+        grid-template-columns: 3.2rem 1fr auto;
+        gap: 0.4rem;
+        font-size: 0.72rem;
+      }
+      body.slides-phone .funnel-bar { height: 16px; }
+      body.slides-phone .compare-legend { font-size: 0.72rem; margin-bottom: 0.4rem; }
+      body.slides-phone .matrix { gap: 0.35rem; }
+      body.slides-phone .matrix-row {
+        grid-template-columns: 1fr;
+        gap: 0.15rem;
+      }
+      body.slides-phone .matrix-label { font-size: 0.78rem; }
+      body.slides-phone .bar-meta { font-size: 0.62rem; }
+      body.slides-phone .bar-track { height: 8px; }
+      body.slides-phone .caps { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+      body.slides-phone .cap { padding: 0.55rem 0.55rem; gap: 0.25rem; border-radius: 12px; }
+      body.slides-phone .cap .icon { width: 28px; height: 28px; border-radius: 8px; }
+      body.slides-phone .cap h3 { font-size: 0.82rem; }
+      body.slides-phone .cap p { font-size: 0.68rem; line-height: 1.3; }
+      body.slides-phone .vs { font-size: 0.62rem; }
+      body.slides-phone .chart-cols { min-height: 110px; gap: 0.75rem; }
+      body.slides-phone .col-bar { max-width: 72px; font-size: 0.95rem; }
+      body.slides-phone .col figcaption { font-size: 0.72rem; }
+      body.slides-phone .roi-list { gap: 0.4rem; }
+      body.slides-phone .roi-list .n { font-size: 1.05rem; min-width: 2.4rem; }
+      body.slides-phone .roi-list strong { font-size: 0.8rem; }
+      body.slides-phone .roi-list span { font-size: 0.7rem; }
+      body.slides-phone .side > div { padding: 0.65rem 0.7rem; }
+      body.slides-phone .side h3 { font-size: 0.78rem; margin-bottom: 0.4rem; }
+      body.slides-phone .side li { font-size: 0.74rem; }
+      body.slides-phone .side ul { gap: 0.28rem; }
+      body.slides-phone .verdict-box { padding: 0.85rem 0.9rem; gap: 0.55rem; border-radius: 16px; }
+      body.slides-phone .verdict-box h2 { font-size: 1.05rem; max-width: none; }
+      body.slides-phone .verdict-grid { grid-template-columns: 1fr; gap: 0.15rem; }
+      body.slides-phone .verdict-grid strong { font-size: 1rem; }
+      body.slides-phone .verdict-grid span { font-size: 0.75rem; }
+      body.slides-phone .foot { font-size: 0.62rem; line-height: 1.35; }
+
+      /* A4 landscape */
+      body.slides-a4 .slide {
+        width: min(calc(100% - 1.5rem), 297mm);
+        aspect-ratio: 297 / 210;
+        padding: 10mm 12mm;
+        border-radius: 6px;
+      }
+      body.slides-a4 .brand-mark {
+        font-size: clamp(2.2rem, 6vw, 4rem);
+        margin-bottom: 0.85rem;
+      }
+      body.slides-a4 .section-head { margin-bottom: 0.9rem; gap: 0.25rem; }
+      body.slides-a4 .section-head h2 { font-size: clamp(1.2rem, 2.2vw, 1.55rem); }
+      body.slides-a4 .matrix { gap: 0.45rem; }
+      body.slides-a4 .matrix-row { gap: 0.55rem; }
+      body.slides-a4 .bar-track { height: 10px; }
+      body.slides-a4 .caps { gap: 0.55rem; }
+      body.slides-a4 .cap { padding: 0.7rem 0.8rem; gap: 0.35rem; }
+      body.slides-a4 .cap p { font-size: 0.78rem; }
+      body.slides-a4 .big-stat .num { font-size: clamp(2.8rem, 7vw, 4.4rem); }
+      body.slides-a4 .chart-cols { min-height: 150px; }
+      body.slides-a4 .roi-list { gap: 0.5rem; }
+      body.slides-a4 .verdict-box { padding: 1.1rem 1.35rem; gap: 0.85rem; }
+      body.slides-a4 .verdict-box h2 { font-size: clamp(1.25rem, 2.4vw, 1.65rem); }
+      body.slides-a4 .foot { font-size: 0.72rem; }
+    }
+
+    @page phone {
+      size: 90mm 195mm;
+      margin: 4mm;
+    }
+    @page a4land {
+      size: A4 landscape;
+      margin: 8mm;
+    }
+
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: var(--ink);
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .lang, .fmt { display: none !important; }
+
+      body.slides-phone .slide { page: phone; }
+      body.slides-a4 .slide { page: a4land; }
+
+      .slide {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        display: grid;
+        align-content: center;
+      }
+      .slide:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .slide > .wrap {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 0.55rem;
+      }
+      .hero {
+        min-height: 0 !important;
+        padding: 0 !important;
+        align-content: center;
+      }
+      .hero::before { display: none !important; }
+      section, .verdict { padding: 0 !important; }
+      .foot { padding: 0.4rem 0 0 !important; margin: 0; text-align: center; }
+      .panel {
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+      .funnel-bar > span,
+      .bar-track > span,
+      .col-bar { transition: none !important; }
+      a { color: inherit !important; text-decoration: none !important; }
+      * { animation: none !important; }
+
+      /* Phone print densify */
+      body.slides-phone .slide {
+        width: 82mm;
+        height: 187mm;
+        max-height: 187mm;
+      }
+      body.slides-phone .brand-mark { font-size: 22pt; margin-bottom: 0.35rem; }
+      body.slides-phone .hero h1 { font-size: 11pt; max-width: none; }
+      body.slides-phone .hero p { font-size: 8pt; max-width: none; }
+      body.slides-phone .pill { font-size: 7pt; }
+      body.slides-phone .section-head { margin-bottom: 0.35rem; }
+      body.slides-phone .section-head h2 { font-size: 11pt; }
+      body.slides-phone .section-head p { font-size: 7.5pt; max-width: none; }
+      body.slides-phone .panel { padding: 0.45rem 0.5rem; }
+      body.slides-phone .pain,
+      body.slides-phone .money,
+      body.slides-phone .side { grid-template-columns: 1fr !important; gap: 0.4rem; }
+      body.slides-phone .side .now { border-left: none !important; border-top: 1px solid var(--line); }
+      body.slides-phone .big-stat .num { font-size: 28pt; }
+      body.slides-phone .funnel-row {
+        grid-template-columns: 2.6rem 1fr auto;
+        font-size: 7pt;
+      }
+      body.slides-phone .funnel-bar { height: 12px; }
+      body.slides-phone .matrix-row { grid-template-columns: 1fr !important; gap: 0.1rem; }
+      body.slides-phone .matrix { gap: 0.25rem; }
+      body.slides-phone .matrix-label { font-size: 7.5pt; }
+      body.slides-phone .bar-meta { font-size: 6pt; }
+      body.slides-phone .bar-track { height: 6px; }
+      body.slides-phone .caps { grid-template-columns: 1fr 1fr !important; gap: 0.3rem; }
+      body.slides-phone .cap { padding: 0.35rem 0.4rem; gap: 0.15rem; }
+      body.slides-phone .cap .icon { width: 20px; height: 20px; }
+      body.slides-phone .cap h3 { font-size: 8pt; }
+      body.slides-phone .cap p { font-size: 6.5pt; }
+      body.slides-phone .vs { font-size: 5.5pt; }
+      body.slides-phone .chart-cols { min-height: 70px; }
+      body.slides-phone .col-bar { max-width: 48px; font-size: 9pt; }
+      body.slides-phone .roi-list .n { font-size: 10pt; min-width: 1.8rem; }
+      body.slides-phone .roi-list strong { font-size: 7.5pt; }
+      body.slides-phone .roi-list span { font-size: 6.5pt; }
+      body.slides-phone .side > div { padding: 0.4rem 0.45rem; }
+      body.slides-phone .side h3 { font-size: 7.5pt; }
+      body.slides-phone .side li { font-size: 6.5pt; }
+      body.slides-phone .verdict-box { padding: 0.55rem 0.6rem; }
+      body.slides-phone .verdict-box h2 { font-size: 10pt; max-width: none; }
+      body.slides-phone .verdict-grid { grid-template-columns: 1fr !important; }
+      body.slides-phone .verdict-grid strong { font-size: 9pt; }
+      body.slides-phone .verdict-grid span { font-size: 7pt; }
+      body.slides-phone .foot { font-size: 6pt; }
+
+      /* A4 landscape print */
+      body.slides-a4 .slide {
+        width: 281mm;
+        height: 194mm;
+        max-height: 194mm;
+      }
+      body.slides-a4 .brand-mark { font-size: 42pt; margin-bottom: 0.6rem; }
+      body.slides-a4 .hero h1 { font-size: 18pt; max-width: none; }
+      body.slides-a4 .hero p { font-size: 11pt; }
+      body.slides-a4 .section-head h2 { font-size: 16pt; }
+      body.slides-a4 .section-head p { font-size: 10pt; max-width: none; }
+      body.slides-a4 .panel { padding: 0.75rem 0.9rem; }
+      body.slides-a4 .big-stat .num { font-size: 48pt; }
+      body.slides-a4 .funnel-row { font-size: 9pt; }
+      body.slides-a4 .funnel-bar { height: 18px; }
+      body.slides-a4 .matrix { gap: 0.35rem; }
+      body.slides-a4 .matrix-label { font-size: 9pt; }
+      body.slides-a4 .bar-meta { font-size: 7pt; }
+      body.slides-a4 .bar-track { height: 9px; }
+      body.slides-a4 .caps { gap: 0.45rem; }
+      body.slides-a4 .cap { padding: 0.55rem 0.65rem; }
+      body.slides-a4 .cap h3 { font-size: 10pt; }
+      body.slides-a4 .cap p { font-size: 8pt; }
+      body.slides-a4 .vs { font-size: 7pt; }
+      body.slides-a4 .chart-cols { min-height: 120px; }
+      body.slides-a4 .col-bar { max-width: 90px; font-size: 12pt; }
+      body.slides-a4 .roi-list .n { font-size: 14pt; }
+      body.slides-a4 .roi-list strong { font-size: 9pt; }
+      body.slides-a4 .roi-list span { font-size: 8pt; }
+      body.slides-a4 .side h3 { font-size: 10pt; }
+      body.slides-a4 .side li { font-size: 9pt; }
+      body.slides-a4 .verdict-box h2 { font-size: 16pt; max-width: none; }
+      body.slides-a4 .verdict-grid strong { font-size: 13pt; }
+      body.slides-a4 .verdict-grid span { font-size: 9pt; }
+      body.slides-a4 .foot { font-size: 8pt; }
+    }
+
+
     @keyframes rise {
       from { opacity: 0; transform: translateY(18px); }
       to { opacity: 1; transform: translateY(0); }
@@ -649,11 +1018,15 @@
   </style>
 </head>
 <body>
-  <nav class="lang" aria-label="Язык" style="position:fixed;top:0.85rem;right:0.85rem;z-index:10;display:flex;gap:0.35rem;background:rgba(255,255,255,0.92);border:1px solid rgba(28,28,28,0.1);border-radius:999px;padding:0.25rem;box-shadow:0 16px 48px rgba(20,20,30,0.07);backdrop-filter:blur(10px)">
-    <a href="project-defense.html" style="text-decoration:none;font-size:0.78rem;font-weight:700;padding:0.35rem 0.7rem;border-radius:999px;background:#dc1313;color:#fff">RU</a>
-    <a href="project-defense-zh.html" style="text-decoration:none;font-size:0.78rem;font-weight:700;padding:0.35rem 0.7rem;border-radius:999px;color:#5a5a5a">中文</a>
+  <nav class="fmt" aria-label="Формат слайдов">
+    <button type="button" data-fmt="phone" class="on">Phone</button>
+    <button type="button" data-fmt="a4">A4</button>
   </nav>
-  <header class="hero">
+  <nav class="lang" aria-label="Язык">
+    <a class="on" href="project-defense.html">RU</a>
+    <a href="project-defense-zh.html">中文</a>
+  </nav>
+  <header class="hero slide">
     <div class="wrap">
       <p class="brand-mark">HOOCON<span>CMS · ЗАЩИТА ПРОЕКТА</span></p>
       <h1>Новый сайт сильнее Tilda по подбору, заявкам и деньгам</h1>
@@ -665,7 +1038,7 @@
     </div>
   </header>
 
-  <section>
+  <section class="slide">
     <div class="wrap">
       <div class="section-head">
         <h2>Боль текущего сайта</h2>
@@ -705,7 +1078,7 @@
     </div>
   </section>
 
-  <section>
+  <section class="slide">
     <div class="wrap">
       <div class="section-head">
         <h2>Сравнение по осям</h2>
@@ -784,7 +1157,7 @@
     </div>
   </section>
 
-  <section>
+  <section class="slide">
     <div class="wrap">
       <div class="section-head">
         <h2>Возможности CMS</h2>
@@ -843,7 +1216,7 @@
     </div>
   </section>
 
-  <section>
+  <section class="slide">
     <div class="wrap">
       <div class="section-head">
         <h2>Финансовая выгода</h2>
@@ -901,7 +1274,7 @@
     </div>
   </section>
 
-  <section>
+  <section class="slide">
     <div class="wrap">
       <div class="section-head">
         <h2>Было / стало</h2>
@@ -934,7 +1307,7 @@
     </div>
   </section>
 
-  <section class="verdict">
+  <section class="slide verdict">
     <div class="wrap">
       <div class="verdict-box">
         <h2>Вывод: CMS — инструмент продаж, а не «новый дизайн»</h2>
@@ -953,12 +1326,9 @@
           </div>
         </div>
       </div>
+      <p class="foot">Источники: аудит hoocon.ru, market-analysis · конверсия Tilda ~0,09% · целевой рост CVR — ориентир плана, не гарантия.</p>
     </div>
   </section>
-
-  <p class="foot wrap">
-    Источники: аудит hoocon.ru, market-analysis · конверсия Tilda ~0,09% · целевой рост CVR — ориентир плана, не гарантия.
-  </p>
 
   <script>
     (function () {
@@ -973,8 +1343,34 @@
         });
       }
 
-      if (reduce) {
+      function setFormat(fmt) {
+        document.body.classList.remove("slides-phone", "slides-a4");
+        document.body.classList.add(fmt === "a4" ? "slides-a4" : "slides-phone");
+        document.querySelectorAll(".fmt button").forEach(function (btn) {
+          btn.classList.toggle("on", btn.getAttribute("data-fmt") === fmt);
+        });
+        try { localStorage.setItem("defense-slide-fmt", fmt); } catch (e) {}
         fillBars(document);
+      }
+
+      var params = new URLSearchParams(location.search);
+      var saved = "";
+      try { saved = localStorage.getItem("defense-slide-fmt") || ""; } catch (e) {}
+      var initial = params.get("format") || saved || "phone";
+      if (initial !== "a4" && initial !== "phone") initial = "phone";
+      setFormat(initial);
+
+      document.querySelectorAll(".fmt button").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          setFormat(btn.getAttribute("data-fmt"));
+        });
+      });
+
+      window.addEventListener("beforeprint", function () {
+        fillBars(document);
+      });
+
+      if (reduce) {
         return;
       }
 
