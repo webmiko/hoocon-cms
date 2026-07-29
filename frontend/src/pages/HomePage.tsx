@@ -378,8 +378,10 @@ export function HomePage() {
                 loading="lazy"
                 decoding="async"
               />
-              <h3 className={styles.caseTitle}>{project.name}</h3>
-              <p className={styles.caseLead}>{project.lead}</p>
+              <div className={styles.caseCaption}>
+                <h3 className={styles.caseTitle}>{project.name}</h3>
+                <p className={styles.caseLead}>{project.lead}</p>
+              </div>
             </li>
           ))}
         </ul>

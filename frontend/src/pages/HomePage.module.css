@@ -335,29 +335,61 @@
 }
 
 .caseItem {
+  position: relative;
   margin: 0;
   min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  aspect-ratio: 3 / 2;
 }
 
 .caseImg {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 2;
+  height: 100%;
   object-fit: cover;
-  margin-bottom: var(--space-md);
+}
+
+.caseCaption {
+  position: absolute;
+  inset-inline: var(--space-md);
+  bottom: var(--space-md);
+  z-index: 1;
+  padding: var(--space-md) var(--space-md) calc(var(--space-md) - 2px);
+  border-radius: var(--radius-md);
+  /* ≥82% surface so title/lead stay WCAG AA on light & dark photos. */
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+  box-shadow: var(--shadow-soft);
 }
 
 .caseTitle {
   margin: 0 0 var(--space-xs);
   font-size: 1.05rem;
+  color: var(--color-text);
 }
 
 .caseLead {
   margin: 0;
   color: var(--color-text-soft);
-  line-height: 1.55;
-  max-width: 42ch;
+  line-height: 1.45;
+  font-size: var(--font-size-sm);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .caseCaption {
+    background: var(--glass-bg-strong);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .caseCaption {
+    background: var(--glass-bg-strong);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .section {
