@@ -24,9 +24,14 @@
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.navBtn:hover {
+.navBtn:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
   color: var(--color-link-hover);
+}
+
+.navBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .navBtn:focus-visible {
@@ -34,44 +39,51 @@
   outline-offset: 2px;
 }
 
-.viewport {
-  width: 100%;
-  overflow: hidden;
-  touch-action: pan-y;
-  cursor: grab;
-}
-
-.viewport:active {
-  cursor: grabbing;
-}
-
+/* Same snap pattern as DirectionsCategoryGrid @ ≤649px. */
 .track {
   list-style: none;
-  margin: 0;
-  padding: 0.25rem 0;
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: var(--space-xs) 11%;
   display: flex;
-  width: max-content;
-  will-change: transform;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 11%;
+  gap: var(--space-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
 }
 
 .slide {
+  flex: 0 0 78%;
+  width: 78%;
+  max-width: 78%;
   min-width: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  transition: opacity 0.35s ease;
+  scroll-snap-align: center;
   opacity: 1;
+  transition: opacity 0.28s var(--ease-out, ease);
 }
 
 .slide > * {
   flex: 1 1 auto;
   width: 100%;
+  max-width: 20rem;
   min-width: 0;
 }
 
 .slidePeek {
-  opacity: 0.38;
-  pointer-events: none;
+  opacity: 0.42;
+}
+
+.slideActive {
+  opacity: 1;
 }
 
 .status {
@@ -79,6 +91,29 @@
   text-align: center;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+@media (min-width: 650px) {
+  .track {
+    margin: 0;
+    padding-inline: var(--space-sm);
+    scroll-padding-inline: var(--space-sm);
+    gap: var(--space-lg);
+  }
+
+  .slide {
+    flex: 0 0 min(20rem, 42%);
+    width: min(20rem, 42%);
+    max-width: min(20rem, 42%);
+  }
+}
+
+@media (min-width: 960px) {
+  .slide {
+    flex: 0 0 min(20rem, 30%);
+    width: min(20rem, 30%);
+    max-width: min(20rem, 30%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

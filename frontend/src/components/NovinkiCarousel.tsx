@@ -1,18 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { SKUList } from "../api/client";
 import { CatalogSkuCard } from "./CatalogSkuCard";
 import styles from "./NovinkiCarousel.module.css";
 
-const LOOP_COPIES = 3;
-const AUTOPLAY_MS = 5600;
-const TRANSITION_MS = 420;
-const GAP_PX = 16;
-/** Peek of neighboring cards on each side (px). */
-const PEEK_PX = 40;
-/** Min / max width for a vertical carousel card (~home novinki). */
-const MIN_SLIDE_PX = 260;
-const MAX_SLIDE_PX = 320;
 /** Fixed card height (matches vertical CatalogSkuCard teaser). */
 const SLIDE_HEIGHT_PX = 360;
 
@@ -21,155 +12,75 @@ type NovinkiCarouselProps = {
 };
 
 /**
- * Home «Новинки» carousel: CatalogSkuCard slides, peeks, autoplay, reduced-motion.
- * Pattern aligned with RelatedArticlesCarousel.
+ * Home «Новинки»: native CSS scroll-snap (same pattern as DirectionsCategoryGrid
+ * on mobile) — one active card, translucent peeks, browser-driven slide.
  */
 export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
   const n = skus.length;
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const jumpTimer = useRef<number | null>(null);
-  const dragX = useRef<number | null>(null);
-
-  const [perPage, setPerPage] = useState(1);
-  const [viewportW, setViewportW] = useState(0);
-  const [index, setIndex] = useState(n);
-  const [animate, setAnimate] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  const trackItems =
-    n > 0 ? Array.from({ length: LOOP_COPIES }, () => skus).flat() : [];
-  const middleStart = n;
-  const resetKey = `${middleStart}-${n}-${perPage}`;
-  const [syncedResetKey, setSyncedResetKey] = useState(resetKey);
-
-  if (syncedResetKey !== resetKey) {
-    setSyncedResetKey(resetKey);
-    setAnimate(false);
-    setIndex(middleStart);
-  }
+  const trackRef = useRef<HTMLUListElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduceMotion(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
+    const root = trackRef.current;
+    if (!root || n === 0) return;
 
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const w = el.clientWidth;
-      setViewportW(w);
-      const usable = Math.max(0, w - PEEK_PX * 2);
-      // Prefer packing max-width cards; fall back to one when the band is narrow.
-      const byMax = Math.floor((usable + GAP_PX) / (MAX_SLIDE_PX + GAP_PX));
-      const next = Math.max(1, Math.min(3, byMax || 1, Math.max(1, n)));
-      setPerPage(next);
+    const updateActive = () => {
+      const slides = Array.from(root.children) as HTMLElement[];
+      if (slides.length === 0) return;
+      const mid = root.scrollLeft + root.clientWidth / 2;
+      let best = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      slides.forEach((el, i) => {
+        const center = el.offsetLeft + el.offsetWidth / 2;
+        const dist = Math.abs(center - mid);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      });
+      setActiveIndex(best);
     };
 
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
+    let raf = 0;
+    const scheduleUpdate = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateActive();
+      });
+    };
+
+    updateActive();
+    root.addEventListener("scroll", scheduleUpdate, { passive: true });
+    const ro = new ResizeObserver(scheduleUpdate);
+    ro.observe(root);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      root.removeEventListener("scroll", scheduleUpdate);
+      ro.disconnect();
+    };
   }, [n]);
 
-  const slideW =
-    viewportW > 0
-      ? Math.min(
-          MAX_SLIDE_PX,
-          Math.max(
-            MIN_SLIDE_PX,
-            (viewportW - PEEK_PX * 2 - (perPage - 1) * GAP_PX) / perPage,
-          ),
-        )
-      : MAX_SLIDE_PX;
-  const stride = slideW + GAP_PX;
-
-  const go = useCallback(
-    (delta: number) => {
-      if (n === 0) return;
-      setAnimate(true);
-      setIndex((prev) => prev + delta);
-    },
-    [n],
-  );
-
-  useEffect(() => {
-    if (n === 0 || !animate) return;
-    if (index >= middleStart && index < middleStart + n) return;
-
-    if (jumpTimer.current !== null) {
-      window.clearTimeout(jumpTimer.current);
-    }
-    jumpTimer.current = window.setTimeout(() => {
-      setAnimate(false);
-      setIndex(((index % n) + n) % n + middleStart);
-    }, TRANSITION_MS);
-
-    return () => {
-      if (jumpTimer.current !== null) {
-        window.clearTimeout(jumpTimer.current);
-      }
-    };
-  }, [animate, index, middleStart, n]);
-
-  useEffect(() => {
-    if (reduceMotion || paused || n < 2) return;
-    const id = window.setInterval(() => go(1), AUTOPLAY_MS);
-    return () => window.clearInterval(id);
-  }, [go, n, paused, reduceMotion]);
-
-  function onPointerDown(event: React.PointerEvent) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    dragX.current = event.clientX;
-    setPaused(true);
-  }
-
-  function onPointerUp(event: React.PointerEvent) {
-    if (dragX.current === null) return;
-    const dx = event.clientX - dragX.current;
-    dragX.current = null;
-    if (Math.abs(dx) > 40) {
-      go(dx < 0 ? 1 : -1);
-    }
-    setPaused(false);
-  }
-
-  function onPointerCancel() {
-    dragX.current = null;
-    setPaused(false);
+  function go(delta: number) {
+    const root = trackRef.current;
+    if (!root || n === 0) return;
+    const next = Math.max(0, Math.min(n - 1, activeIndex + delta));
+    const slide = root.children[next] as HTMLElement | undefined;
+    if (!slide) return;
+    const left = slide.offsetLeft - (root.clientWidth - slide.offsetWidth) / 2;
+    root.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
   }
 
   if (n === 0) return null;
 
-  const logical = ((index % n) + n) % n;
-  const opaqueStart = index;
-  const opaqueEnd = index + perPage;
-
   return (
-    <div
-      className={styles.carousel}
-      role="region"
-      aria-roledescription="карусель"
-      aria-labelledby="novinki-heading"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
-          setPaused(false);
-        }
-      }}
-    >
+    <div className={styles.carousel}>
       <div className={styles.toolbar}>
         <button
           type="button"
           className={styles.navBtn}
           aria-label="Предыдущие новинки"
+          disabled={activeIndex <= 0}
           onClick={() => go(-1)}
         >
           ←
@@ -178,60 +89,40 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
           type="button"
           className={styles.navBtn}
           aria-label="Следующие новинки"
+          disabled={activeIndex >= n - 1}
           onClick={() => go(1)}
         >
           →
         </button>
       </div>
 
-      <div
-        ref={viewportRef}
-        className={styles.viewport}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
+      <ul
+        ref={trackRef}
+        className={styles.track}
+        role="region"
+        aria-roledescription="карусель"
+        aria-labelledby="novinki-heading"
       >
-        <ul
-          className={styles.track}
-          style={{
-            gap: GAP_PX,
-            transform: `translateX(${PEEK_PX - index * stride}px)`,
-            transition:
-              animate && !reduceMotion
-                ? `transform ${TRANSITION_MS}ms var(--ease-out, ease)`
-                : "none",
-          }}
-        >
-          {trackItems.map((sku, i) => {
-            const inWindow = i >= opaqueStart && i < opaqueEnd;
-            const isPeek = i === opaqueStart - 1 || i === opaqueEnd;
-            const dimmed = !inWindow;
-            return (
-              <li
-                key={`${sku.slug}-${i}`}
-                className={
-                  dimmed
-                    ? `${styles.slide} ${styles.slidePeek}`
-                    : styles.slide
-                }
-                style={{
-                  width: slideW,
-                  flex: `0 0 ${slideW}px`,
-                  height: SLIDE_HEIGHT_PX,
-                }}
-                aria-hidden={!inWindow}
-                inert={!inWindow ? true : undefined}
-                data-peek={isPeek ? "true" : undefined}
-              >
-                <CatalogSkuCard sku={sku} omitDomId variant="vertical" />
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+        {skus.map((sku, index) => {
+          const active = index === activeIndex;
+          return (
+            <li
+              key={sku.slug}
+              className={
+                active
+                  ? `${styles.slide} ${styles.slideActive}`
+                  : `${styles.slide} ${styles.slidePeek}`
+              }
+              style={{ height: SLIDE_HEIGHT_PX }}
+            >
+              <CatalogSkuCard sku={sku} variant="vertical" />
+            </li>
+          );
+        })}
+      </ul>
 
       <p className={styles.status} aria-live="polite">
-        {logical + 1} из {n}
+        {activeIndex + 1} из {n}
       </p>
     </div>
   );
