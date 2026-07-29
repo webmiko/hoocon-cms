@@ -1397,6 +1397,90 @@ def crop_hvdf_product_photos(page: Image.Image) -> tuple[Image.Image, Image.Imag
     return body, with_sensor
 
 
+_HVDF_PHOTO_CANVAS: Final[tuple[int, int]] = (1661, 2076)
+_HVDF_PHOTO_MARGIN: Final[float] = 0.07
+_HVDF_PHOTO_REF_NM: Final[int] = 5
+_HVDF_PHOTO_MIN_SCALE: Final[float] = 0.75
+
+
+def _rgba_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+    """Tight bbox of non-transparent, non-near-white content."""
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    step = max(1, max(width, height) // 400)
+    pixels = cast(Any, rgba.load())
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    for y in range(0, height, step):
+        for x in range(0, width, step):
+            r, g, b, a = pixels[x, y]
+            if a < 24:
+                continue
+            if r < 18 and g < 18 and b < 18:
+                continue
+            if r > 248 and g > 248 and b > 248:
+                continue
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+    if max_x < 0:
+        return 0, 0, width, height
+    pad = step + 2
+    return (
+        max(0, min_x - pad),
+        max(0, min_y - pad),
+        min(width, max_x + pad + 1),
+        min(height, max_y + pad + 1),
+    )
+
+
+def center_hvdf_photos_on_canvas(
+    body: Image.Image,
+    thermal: Image.Image,
+    *,
+    series_nm: int,
+    canvas_size: tuple[int, int] = _HVDF_PHOTO_CANVAS,
+    margin: float = _HVDF_PHOTO_MARGIN,
+    ref_nm: int = _HVDF_PHOTO_REF_NM,
+    min_scale: float = _HVDF_PHOTO_MIN_SCALE,
+) -> tuple[Image.Image, Image.Image]:
+    """Trim S/ST cutouts and center on a shared portrait canvas.
+
+    The PDF crop pads empty sensor space on the S (no SAF72) frame so S/ST share
+    size — after white-punch that pad becomes transparent and looks like a
+    right-hand gap. Trimming + centering fixes catalog alignment while keeping
+    one pixel scale for both editions. Size ∝ Nm (REF=5 → full frame).
+    """
+    canvas_w, canvas_h = canvas_size
+    inner_w = int(canvas_w * (1 - 2 * margin))
+    inner_h = int(canvas_h * (1 - 2 * margin))
+    factor = min_scale + (1.0 - min_scale) * (min(series_nm, ref_nm) / ref_nm)
+
+    crops: list[Image.Image] = []
+    for src in (body, thermal):
+        rgba = src.convert("RGBA")
+        x0, y0, x1, y1 = _rgba_content_bbox(rgba)
+        crops.append(rgba.crop((x0, y0, x1, y1)))
+
+    max_long = max(max(crop.size) for crop in crops)
+    unit = min(inner_w / max_long, inner_h / max_long)
+    target_long = max_long * unit * factor
+
+    placed: list[Image.Image] = []
+    for crop in crops:
+        cw, ch = crop.size
+        scale = target_long / max(cw, ch)
+        nw, nh = max(1, int(cw * scale)), max(1, int(ch * scale))
+        if nw > inner_w or nh > inner_h:
+            s2 = min(inner_w / nw, inner_h / nh)
+            nw, nh = max(1, int(nw * s2)), max(1, int(nh * s2))
+        resized = crop.resize((nw, nh), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+        canvas.paste(resized, ((canvas_w - nw) // 2, (canvas_h - nh) // 2), resized)
+        placed.append(canvas)
+    return placed[0], placed[1]
+
+
 def diagrams_from_hvdf_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCrop]:
     """Build photo + wiring + dimensions crops from an HVD-…F English manual."""
     page = render_pdf_page(pdf_path, 1)
@@ -1405,6 +1489,11 @@ def diagrams_from_hvdf_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCro
     # PhotoWash purpose gradient (smoke) shows through instead of sampled grey.
     body_img = punch_near_white_background(body_img)
     thermal_img = punch_near_white_background(thermal_img)
+    body_img, thermal_img = center_hvdf_photos_on_canvas(
+        body_img,
+        thermal_img,
+        series_nm=series_nm,
+    )
     wiring_img, dims_img = crop_safu_diagrams(page)
     series = f"HVD-{series_nm}F"
     s_code = f"HVD24S-{series_nm}F"

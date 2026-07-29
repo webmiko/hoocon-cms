@@ -242,6 +242,40 @@ def test_crop_hvdf_product_photos_excludes_datasheet_chrome() -> None:
     assert thermal.size[1] < height * 0.20
 
 
+def test_center_hvdf_photos_on_canvas_centers_asymmetric_s_pad() -> None:
+    """S edition empty sensor column must not leave a right-hand catalog gap."""
+    from catalog.etl.manual_diagrams import (
+        _HVDF_PHOTO_CANVAS,
+        center_hvdf_photos_on_canvas,
+    )
+
+    # Mimic punched S (body left) vs ST (body + sensor).
+    body = Image.new("RGBA", (200, 120), (0, 0, 0, 0))
+    for y in range(10, 110):
+        for x in range(10, 100):
+            body.putpixel((x, y), (40, 40, 40, 255))
+    thermal = Image.new("RGBA", (200, 120), (0, 0, 0, 0))
+    for y in range(10, 110):
+        for x in range(10, 190):
+            thermal.putpixel((x, y), (40, 40, 40, 255))
+
+    out_body, out_thermal = center_hvdf_photos_on_canvas(body, thermal, series_nm=5)
+    assert out_body.size == _HVDF_PHOTO_CANVAS
+    assert out_thermal.size == _HVDF_PHOTO_CANVAS
+
+    def margins(im: Image.Image) -> tuple[int, int]:
+        a = im.split()[-1]
+        bbox = a.getbbox()
+        assert bbox is not None
+        w, _h = im.size
+        return bbox[0], w - bbox[2]
+
+    left_b, right_b = margins(out_body)
+    left_t, right_t = margins(out_thermal)
+    assert abs(left_b - right_b) <= 2
+    assert abs(left_t - right_t) <= 2
+
+
 def test_punch_near_white_background_keeps_interior() -> None:
     """Edge white becomes alpha; dark product body stays opaque."""
     from catalog.etl.manual_diagrams import punch_near_white_background
