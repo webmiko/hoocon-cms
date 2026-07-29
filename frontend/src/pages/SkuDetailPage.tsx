@@ -30,7 +30,7 @@ import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
 import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
-import { photoScaleFromHighlights } from "../utils/productPhotoScale";
+import { photoScalePlanFromHighlights } from "../utils/productPhotoScale";
 import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import {
   catalogCategoryPath,
@@ -266,9 +266,9 @@ export function SkuDetailPage() {
     return [];
   }, [sku, theme]);
 
-  const photoScaleTorque = useMemo(
-    () => photoScaleFromHighlights(displayHighlights),
-    [displayHighlights],
+  const photoPlan = useMemo(
+    () => photoScalePlanFromHighlights(displayHighlights, displaySkuCode),
+    [displayHighlights, displaySkuCode],
   );
   const heroSrc = galleryImages[0]?.src;
   const heroIsDiagram = Boolean(
@@ -277,7 +277,8 @@ export function SkuDetailPage() {
   );
   const photoScale = useNormalizedPhotoScale(
     heroIsDiagram ? null : heroSrc,
-    photoScaleTorque,
+    photoPlan.target,
+    photoPlan.maxCssScale,
   );
   const productWashStyle = useMemo(
     (): CSSProperties =>

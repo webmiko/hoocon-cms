@@ -546,6 +546,7 @@
 
 .cardMedia,
 .cardMediaPlaceholder {
+  --media-pad-inline: 40px;
   position: relative;
   display: flex;
   align-items: center;
@@ -556,14 +557,25 @@
   height: 100%;
   align-self: stretch;
   margin: 0;
-  /* Cutout photos: side inset so product doesn't kiss the wash edge. */
-  padding: 0 40px;
+  /* Side air on the media block; product WebPs stay full-bleed (no baked margins). */
+  padding: 0 var(--media-pad-inline);
   box-sizing: border-box;
   background: var(--photo-wash);
   background-size: 100% 100%;
   border-right: none;
   overflow: hidden;
   line-height: 0;
+}
+
+/* Baked canvas packs (valve / HV air+Q) already include margins — no CSS inset. */
+.cardMedia[data-purpose="valve"],
+.cardMediaPlaceholder[data-purpose="valve"],
+.cardMedia[data-purpose="air"],
+.cardMediaPlaceholder[data-purpose="air"],
+.cardMedia[data-purpose="smoke"],
+.cardMediaPlaceholder[data-purpose="smoke"] {
+  --media-pad-inline: 0px;
+  padding: 0;
 }
 
 .cardCompare {
@@ -582,6 +594,7 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  min-width: 0;
   align-self: stretch;
   display: flex;
   align-items: center;
@@ -603,6 +616,16 @@
   background: transparent;
   transform: scale(var(--photo-scale, 1));
   transform-origin: center center;
+}
+
+.cardMedia[data-purpose="valve"] .cardImage,
+.cardMedia[data-purpose="air"] .cardImage,
+.cardMedia[data-purpose="smoke"] .cardImage {
+  width: auto;
+  height: auto;
+  max-width: min(100%, calc(100% * var(--photo-scale, 1)));
+  max-height: min(100%, calc(100% * var(--photo-scale, 1)));
+  transform: none;
 }
 
 .cardBody {
@@ -959,7 +982,7 @@
     width: 100%;
     border-right: none;
     border-bottom: none;
-    padding: 0 40px;
+    padding: 0 var(--media-pad-inline, 40px);
   }
 
   .card:not(.cardVertical) .cardMediaPlaceholder {
@@ -1074,7 +1097,7 @@
   overflow: hidden;
   border-right: none;
   border-bottom: none;
-  padding: 0 40px;
+  padding: 0 var(--media-pad-inline, 40px);
   background-size: 100% 100%;
 }
 

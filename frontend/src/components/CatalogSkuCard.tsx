@@ -21,7 +21,7 @@ import {
 import { formatEditionCountLabel } from "../utils/editionCountLabel";
 import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
-import { photoScaleFromHighlights } from "../utils/productPhotoScale";
+import { photoScalePlanFromHighlights } from "../utils/productPhotoScale";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
@@ -50,8 +50,12 @@ export function CatalogSkuCard({
   const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
   const imageSrc = sku.image?.image ?? null;
-  const torqueScale = photoScaleFromHighlights(sku.highlights);
-  const photoScale = useNormalizedPhotoScale(imageSrc, torqueScale);
+  const photoPlan = photoScalePlanFromHighlights(sku.highlights, sku.sku_code);
+  const photoScale = useNormalizedPhotoScale(
+    imageSrc,
+    photoPlan.target,
+    photoPlan.maxCssScale,
+  );
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
   const cardClass =
