@@ -26,9 +26,23 @@ def test_instructions_for_damu_sku_modulating_with_aux() -> None:
     assert "AC/DC 24 В" not in text
     assert "Пропорциональное управление" in text
     assert "Вспомогательные переключатели" in text
+    assert "клеммы 21,22" in text
+    assert "Переключатель b" in text
+    assert "DIP-переключатели" in text
     assert "Двухпозиционное управление" not in text
     assert "0(4)...20 мА (спецзаказ)" in text
     assert "по схеме в инструкции" not in text
+    assert "по заводской таблице в инструкции" not in text
+
+
+def test_instructions_for_damu_sku_on_off_aux_omits_dip() -> None:
+    """-DS gets aux angle table without modulating DIP section."""
+    text = instructions_for_damu_sku("DA2MU24-DS")
+    assert text is not None
+    assert "Вспомогательные переключатели" in text
+    assert "клеммы 21,22" in text
+    assert "Переключатель b" not in text
+    assert "DIP-переключатели" not in text
 
 
 def test_instructions_for_damu_sku_rejects_other_series() -> None:
