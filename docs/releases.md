@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.10 beta — 2026-07-29
+
+- Home: Novinki CSS scroll-snap carousel; frosted captions on object cases.
+- Related articles: Safari/PWA slide transitions; local `sync-db-from-vps`.
+
 ### v0.1.9 beta — 2026-07-29
 
 - SEO: SSR `og:image` для PDP через family gallery fallback (как на карточке/PDP).
