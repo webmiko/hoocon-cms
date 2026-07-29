@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.11 beta — 2026-07-30
+
+- Catalog heroes: shared portrait canvas sizing for brass DN and HV Nm; HVD-…F
+  photos centered after SAF72 pad trim; FE skips double scale on baked packs.
+
 ### v0.1.10 beta — 2026-07-29
 
 - Home: Novinki CSS scroll-snap carousel; frosted captions on object cases.
