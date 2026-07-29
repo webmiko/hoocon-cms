@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOOCON 新官网项目说明 · 致总经理</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand: #dc1313;
+      --brand-deep: #b01010;
+      --brand-soft: rgba(220, 19, 19, 0.1);
+      --ink: #1c1c1c;
+      --muted: #5a5a5a;
+      --line: rgba(28, 28, 28, 0.1);
+      --old: #8a8a8a;
+      --ok: #1a7a45;
+      --surface: rgba(255, 255, 255, 0.9);
+      --radius: 18px;
+      --shadow: 0 16px 48px rgba(20, 20, 30, 0.07);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --max: 1040px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Noto Sans SC", "IBM Plex Sans", sans-serif;
+      background:
+        radial-gradient(1100px 560px at 8% -8%, rgba(220, 19, 19, 0.11), transparent 55%),
+        radial-gradient(800px 420px at 100% 0%, rgba(90, 90, 90, 0.07), transparent 50%),
+        linear-gradient(165deg, #f7f7f8 0%, #efefef 50%, #f4f1f1 100%);
+      line-height: 1.55;
+    }
+
+    a { color: var(--brand-deep); }
+    .wrap { width: min(100% - 2rem, var(--max)); margin-inline: auto; }
+
+    .hero {
+      min-height: min(88vh, 760px);
+      display: grid;
+      align-content: end;
+      padding: 2.5rem 0 3.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -15% -30% 40%;
+      height: 65%;
+      background:
+        linear-gradient(135deg, transparent 30%, rgba(220, 19, 19, 0.07) 50%, transparent 70%),
+        repeating-linear-gradient(
+          -18deg, transparent, transparent 18px,
+          rgba(28, 28, 28, 0.03) 18px, rgba(28, 28, 28, 0.03) 19px
+        );
+      pointer-events: none;
+      mask-image: linear-gradient(to top, black 15%, transparent);
+    }
+
+    .brand {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.4rem, 8vw, 4.8rem);
+      letter-spacing: -0.04em;
+      line-height: 0.92;
+      color: var(--brand);
+      margin: 0 0 1.1rem;
+      animation: rise 0.8s var(--ease) both;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 0.55rem;
+      font-size: 0.28em;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--ink);
+      font-family: "Noto Sans SC", sans-serif;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.35rem, 3vw, 1.85rem);
+      font-weight: 700;
+      margin: 0 0 0.7rem;
+      max-width: 18em;
+      text-wrap: balance;
+      letter-spacing: -0.01em;
+      animation: rise 0.8s var(--ease) 0.08s both;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 34em;
+      animation: rise 0.8s var(--ease) 0.14s both;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem 1.2rem;
+      margin-top: 1.75rem;
+      animation: rise 0.8s var(--ease) 0.2s both;
+    }
+
+    .tag {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .tag i {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--brand);
+      display: inline-block;
+    }
+
+    .tag.old i { background: var(--old); }
+
+    section { padding: 3.25rem 0; }
+
+    .head {
+      margin-bottom: 1.5rem;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .head h2 {
+      margin: 0;
+      font-size: clamp(1.3rem, 2.6vw, 1.65rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 40em;
+    }
+
+    .panel {
+      background: var(--surface);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.35rem 1.45rem;
+    }
+
+    .pain {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 1.1rem;
+    }
+
+    @media (max-width: 800px) {
+      .pain { grid-template-columns: 1fr; }
+    }
+
+    .num {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: clamp(3.2rem, 9vw, 5rem);
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      color: var(--old);
+      margin: 0 0 0.4rem;
+    }
+
+    .num em {
+      font-style: normal;
+      color: var(--brand);
+    }
+
+    .num-label {
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.9rem;
+    }
+
+    .pain .note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .jobs {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .jobs li {
+      display: grid;
+      grid-template-columns: 2rem 1fr;
+      gap: 0.65rem;
+      align-items: start;
+    }
+
+    .jobs b {
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 8px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      display: grid;
+      place-items: center;
+      font-size: 0.85rem;
+      font-family: Montserrat, sans-serif;
+    }
+
+    .jobs strong {
+      display: block;
+      font-size: 0.98rem;
+      margin-bottom: 0.1rem;
+    }
+
+    .jobs span {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .benefits {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.9rem;
+    }
+
+    @media (max-width: 700px) {
+      .benefits { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      padding: 1.2rem 1.25rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 0.45rem;
+      transition: transform 0.28s var(--ease);
+    }
+
+    .card:hover { transform: translateY(-2px); }
+
+    .card .kicker {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: 1.35rem;
+      color: var(--brand);
+      letter-spacing: -0.03em;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .chart-wrap {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 1.1rem;
+    }
+
+    @media (max-width: 800px) {
+      .chart-wrap { grid-template-columns: 1fr; }
+    }
+
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.4rem;
+      align-items: end;
+      min-height: 210px;
+      padding-top: 0.4rem;
+    }
+
+    .col {
+      display: grid;
+      gap: 0.55rem;
+      justify-items: center;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 100px;
+      border-radius: 10px 10px 4px 4px;
+      color: #fff;
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 0.6rem;
+      height: 0;
+      transition: height 1.1s var(--ease);
+    }
+
+    .bar.old { background: linear-gradient(180deg, #b0b0b0, #777); }
+    .bar.new { background: linear-gradient(180deg, #f25555, var(--brand-deep)); }
+
+    .col figcaption {
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    @media (max-width: 720px) {
+      .side { grid-template-columns: 1fr; }
+    }
+
+    .side > div { padding: 1.3rem 1.35rem; }
+    .side .was { background: #f3f3f3; }
+    .side .now {
+      background: linear-gradient(160deg, #fff 0%, #fff5f5 100%);
+      border-left: 1px solid var(--line);
+    }
+
+    @media (max-width: 720px) {
+      .side .now { border-left: none; border-top: 1px solid var(--line); }
+    }
+
+    .side h3 {
+      margin: 0 0 0.9rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .side .was h3 { color: var(--old); }
+    .side .now h3 { color: var(--brand); }
+
+    .side ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .side li {
+      font-size: 0.94rem;
+      padding-left: 1.3rem;
+      position: relative;
+    }
+
+    .side .was li::before {
+      content: "–";
+      position: absolute;
+      left: 0;
+      color: var(--old);
+      font-weight: 700;
+    }
+
+    .side .now li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.4rem;
+      width: 0.65rem;
+      height: 0.65rem;
+      background: var(--brand);
+      clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 18%, 80% 0, 36% 62%);
+    }
+
+    .verdict {
+      padding: 3rem 0 4.25rem;
+    }
+
+    .verdict-box {
+      border-radius: calc(var(--radius) + 4px);
+      padding: clamp(1.4rem, 4vw, 2.3rem);
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(28, 28, 28, 0.96), rgba(40, 20, 20, 0.94)),
+        radial-gradient(560px 260px at 90% 10%, rgba(220, 19, 19, 0.35), transparent);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 1.2rem;
+    }
+
+    .verdict-box h2 {
+      margin: 0;
+      font-size: clamp(1.3rem, 2.8vw, 1.75rem);
+      max-width: 16em;
+      text-wrap: balance;
+    }
+
+    .verdict-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+    }
+
+    @media (max-width: 720px) {
+      .verdict-grid { grid-template-columns: 1fr; }
+    }
+
+    .verdict-grid div {
+      padding: 0.85rem 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .verdict-grid strong {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .verdict-grid span {
+      font-size: 0.9rem;
+      opacity: 0.75;
+    }
+
+    .foot {
+      padding: 0 0 2.4rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .lang {
+      position: fixed;
+      top: 0.85rem;
+      right: 0.85rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .lang a {
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      color: var(--muted);
+    }
+
+    .lang a.on {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+      .bar { height: var(--h, auto); }
+    }
+  </style>
+</head>
+<body>
+  <nav class="lang" aria-label="语言">
+    <a href="project-defense.html">RU</a>
+    <a class="on" href="project-defense-zh.html">中文</a>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <p class="brand">HOOCON<span>新官网项目说明 · 致总经理</span></p>
+      <h1>官网从“展示页”变成“销售工具”</h1>
+      <p>用白话说明：项目解决什么问题、对公司业务有什么用。对比对象：当前 Tilda 网站 <a href="https://hoocon.ru" target="_blank" rel="noopener">hoocon.ru</a>。</p>
+      <div class="tags">
+        <span class="tag old"><i></i>现在：Tilda 建站</span>
+        <span class="tag"><i></i>目标：自有 B2B 官网系统</span>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <div class="head">
+        <h2>客户真正来网站做什么</h2>
+        <p>不是来“加购物车下单”，而是来选型和要报价。</p>
+      </div>
+      <div class="pain">
+        <div class="panel">
+          <div class="num">0.09<em>%</em></div>
+          <div class="num-label">当前网站：访问 → 询价 的转化率（约一年）</div>
+          <p class="note">意思很简单：1000 个人来访，大约只有 1 个人提交询价。广告费花了，线索却很少。</p>
+        </div>
+        <div class="panel">
+          <ul class="jobs">
+            <li>
+              <b>1</b>
+              <div>
+                <strong>找到合适型号</strong>
+                <span>按扭矩、电压等条件快速筛选</span>
+              </div>
+            </li>
+            <li>
+              <b>2</b>
+              <div>
+                <strong>下载资料 / 证书</strong>
+                <span>工程师、消防审核需要文件才放心</span>
+              </div>
+            </li>
+            <li>
+              <b>3</b>
+              <div>
+                <strong>提交询价要报价</strong>
+                <span>带上型号，方便销售马上跟进</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="head">
+        <h2>项目给业务带来的好处</h2>
+        <p>不讲技术细节，只讲对公司有用的结果。</p>
+      </div>
+      <div class="benefits">
+        <article class="card">
+          <div class="kicker">×3–5</div>
+          <h3>同样流量，多拿询价</h3>
+          <p>不靠多花钱打广告，而是让来访的人更容易找到产品并提交询价。转化提到 0.3%–0.5%，询价量就可能是现在的 3–5 倍。</p>
+        </article>
+        <article class="card">
+          <div class="kicker">更快</div>
+          <h3>缩短“找到产品 → 拿到报价”</h3>
+          <p>客户自己能筛选、对比、下载文件，少打电话问“帮我选型号”。销售更快接到带明确型号的询价。</p>
+        </article>
+        <article class="card">
+          <div class="kicker">少流失</div>
+          <h3>少把客户丢给经销商网站</h3>
+          <p>很多经销商站筛选、对比做得更方便。客户在官网选不出来，就会去别处。新站把选型能力留在自己官网。</p>
+        </article>
+        <article class="card">
+          <div class="kicker">可管</div>
+          <h3>询价进系统，不丢单</h3>
+          <p>询价进后台，有状态、有跟进，不是散落在邮箱里。管理层能看清：有多少询价、谁在跟、卡在哪。</p>
+        </article>
+        <article class="card">
+          <div class="kicker">资产</div>
+          <h3>网站变成公司自己的资产</h3>
+          <p>产品数据、页面、搜索、以后加功能，都自己掌控，不受 Tilda 能力上限和平台规则束缚。</p>
+        </article>
+        <article class="card">
+          <div class="kicker">长久</div>
+          <h3>搜索流量更能留住</h3>
+          <p>产品页更容易被搜索引擎收录和长期积累。今天的内容，明天还能继续带来访客。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="head">
+        <h2>钱从哪里来</h2>
+        <p>同样的访问量，差别在“有多少人变成询价”。</p>
+      </div>
+      <div class="chart-wrap">
+        <div class="panel">
+          <div class="cols" id="leads-chart">
+            <figure class="col">
+              <div class="bar old" data-h="28" style="--h:28%">1×</div>
+              <figcaption>现在 Tilda<br />询价基数</figcaption>
+            </figure>
+            <figure class="col">
+              <div class="bar new" data-h="100" style="--h:100%">×3–5</div>
+              <figcaption>新系统目标<br />询价提升</figcaption>
+            </figure>
+          </div>
+          <p style="margin:1rem 0 0;text-align:center;font-size:0.88rem;color:var(--muted);">
+            目标方向：0.09% → 0.3%–0.5%（不增加广告预算）
+          </p>
+        </div>
+        <div class="panel">
+          <ul class="jobs">
+            <li>
+              <b>¥</b>
+              <div>
+                <strong>提高广告和自然流量的回报</strong>
+                <span>同样花钱请来的访客，更多变成线索</span>
+              </div>
+            </li>
+            <li>
+              <b>时</b>
+              <div>
+                <strong>销售少做“帮选型”的重复劳动</strong>
+                <span>时间用在报价和成交上</span>
+              </div>
+            </li>
+            <li>
+              <b>控</b>
+              <div>
+                <strong>线索留在自己公司</strong>
+                <span>减少因官网不好用而流失到别人的站</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="head">
+        <h2>现在 vs 新项目</h2>
+        <p>一眼看懂：关掉哪些问题，换来哪些能力。</p>
+      </div>
+      <div class="side">
+        <div class="was">
+          <h3>现在 · Tilda 网站</h3>
+          <ul>
+            <li>有购物车图标，但没有真正下单</li>
+            <li>筛选弱，工程师不好找型号</li>
+            <li>不能方便对比几款产品</li>
+            <li>询价后难系统跟进</li>
+            <li>功能受建站平台限制</li>
+            <li>访问多，真正询价很少</li>
+          </ul>
+        </div>
+        <div class="now">
+          <h3>新项目 · 自有官网系统</h3>
+          <ul>
+            <li>只做询价，符合 B2B 买法</li>
+            <li>按参数快速筛选型号</li>
+            <li>产品对比，选型更清楚</li>
+            <li>询价进后台，可管可跟</li>
+            <li>数据、功能自己掌控</li>
+            <li>目标：同样流量，更多线索</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="verdict">
+    <div class="wrap">
+      <div class="verdict-box">
+        <h2>一句话：不是换皮，是把官网变成赚钱工具</h2>
+        <div class="verdict-grid">
+          <div>
+            <strong>帮客户</strong>
+            <span>更快找到合适型号</span>
+          </div>
+          <div>
+            <strong>帮公司</strong>
+            <span>更多询价留在自己手里</span>
+          </div>
+          <div>
+            <strong>帮管理</strong>
+            <span>线索看得见、跟得上</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot wrap">
+    说明：0.09% 为当前 Tilda 站点历史转化参考；×3–5 为业务目标区间，非承诺数字。
+  </p>
+
+  <script>
+    (function () {
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function fill(root) {
+        root.querySelectorAll("[data-h]").forEach(function (el) {
+          el.style.height = el.getAttribute("data-h") + "%";
+        });
+      }
+      if (reduce) {
+        fill(document);
+        return;
+      }
+      var el = document.getElementById("leads-chart");
+      if (!el) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          fill(e.target);
+          io.unobserve(e.target);
+        });
+      }, { threshold: 0.25 });
+      io.observe(el);
+    })();
+  </script>
+</body>
+</html>
