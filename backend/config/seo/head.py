@@ -237,7 +237,11 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
     if cat is not None:
         crumbs.append((catalog_category_path(cat.slug), cat.name))
     crumbs.append((canonical, display_name))
-    primary_image = sku.images.filter(is_published=True).order_by("sort_order", "id").first()
+    # Same gallery as PDP/API: own photos, else family fallback filtered by variant.
+    from catalog.serializers import _sku_gallery_images
+
+    gallery = _sku_gallery_images(sku)
+    primary_image = gallery[0] if gallery else None
     return SeoHeadContext(
         canonical_path=canonical,
         page_title=_format_page_title(title_partial),

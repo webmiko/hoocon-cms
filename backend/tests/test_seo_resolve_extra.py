@@ -89,6 +89,59 @@ def test_absolute_media_url_and_og_fallback() -> None:
 
 
 @pytest.mark.django_db
+def test_resolve_seo_sku_og_image_uses_family_gallery_fallback() -> None:
+    """Bare edition without own photo still gets sibling gallery as og:image."""
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from catalog.models import SKU, Category, Product, ProductImage
+    from catalog.urls_paths import catalog_path_for_sku
+    from config.seo.head import resolve_seo_context
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(40, 120, 200)).save(buf, format="PNG")
+    png = buf.getvalue()
+
+    cat = Category.objects.create(name="Air OG", slug="air-og-family")
+    product = Product.objects.create(
+        name="HVA-5 OG",
+        slug="privod-hva-5-og",
+        category=cat,
+    )
+    donor = SKU.objects.create(
+        product=product,
+        sku_code="HVA24-5",
+        name="HVA24-5",
+        slug="hva24-5-og",
+        is_published=True,
+    )
+    bare = SKU.objects.create(
+        product=product,
+        sku_code="HVA230S-5",
+        name="HVA230S-5",
+        slug="hva230s-5-og",
+        is_published=True,
+    )
+    ProductImage.objects.create(
+        sku=donor,
+        image=SimpleUploadedFile("hva-og.png", png, content_type="image/png"),
+        alt="HVA OG",
+        source_url="https://example.test/hva-og.webp",
+        sort_order=0,
+        is_published=True,
+    )
+
+    path = catalog_path_for_sku(bare)
+    ctx = resolve_seo_context(path)
+    assert ctx.og_type == "product"
+    assert ctx.og_image_url is not None
+    assert "/media/" in ctx.og_image_url
+    assert ctx.og_image_url.startswith("http")
+
+
+@pytest.mark.django_db
 def test_resolve_seo_deep_catalog_path_is_fallback() -> None:
     """Three-segment catalog path is not treated as a category page."""
     ctx = resolve_seo_context("/catalog/a/b/c")
