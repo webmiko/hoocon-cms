@@ -5,7 +5,7 @@ import { softBreak } from "../utils/softBreak";
 import { catalogCategoryPath } from "../utils/catalogPaths";
 import styles from "../pages/HomePage.module.css";
 
-const CAROUSEL_MQ = "(max-width: 649px)";
+const CAROUSEL_MQ = "(max-width: 920px)";
 
 export type DirectionCategory = {
   slug: string;
@@ -25,7 +25,7 @@ type DirectionsCategoryGridProps = {
 };
 
 /**
- * Category pillars: CSS grid on wide screens; snap carousel ≤649px
+ * Category pillars: CSS grid on wide screens; snap carousel ≤920px
  * with one active card and translucent side peeks.
  */
 export function DirectionsCategoryGrid({
@@ -36,6 +36,7 @@ export function DirectionsCategoryGrid({
   const trackRef = useRef<HTMLDivElement>(null);
   const [carousel, setCarousel] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [trackWidth, setTrackWidth] = useState(0);
 
   useEffect(() => {
     const mq = window.matchMedia(CAROUSEL_MQ);
@@ -54,6 +55,7 @@ export function DirectionsCategoryGrid({
     const updateActive = () => {
       const slides = Array.from(root.children) as HTMLElement[];
       if (slides.length === 0) return;
+      setTrackWidth(root.clientWidth);
       const mid = root.scrollLeft + root.clientWidth / 2;
       let best = 0;
       let bestDist = Number.POSITIVE_INFINITY;
@@ -88,6 +90,12 @@ export function DirectionsCategoryGrid({
     };
   }, [carousel, categories.length]);
 
+  const focusCount = carousel && trackWidth >= 840 ? 2 : 1;
+  const activeWindowStart =
+    focusCount === 1
+      ? activeIndex
+      : Math.min(activeIndex, Math.max(0, categories.length - focusCount));
+
   return (
     <div
       ref={trackRef}
@@ -98,7 +106,9 @@ export function DirectionsCategoryGrid({
     >
       {categories.map((cat, index) => {
         const lead = categoryLead(cat.description ?? "");
-        const active = !carousel || index === activeIndex;
+        const active =
+          !carousel ||
+          (index >= activeWindowStart && index < activeWindowStart + focusCount);
         return (
           <Link
             key={cat.slug}

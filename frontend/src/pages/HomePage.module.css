@@ -325,73 +325,6 @@
   line-height: 1.4;
 }
 
-.casesGrid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-xl);
-}
-
-.caseItem {
-  position: relative;
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  aspect-ratio: 3 / 2;
-}
-
-.caseImg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.caseCaption {
-  position: absolute;
-  inset-inline: var(--space-md);
-  bottom: var(--space-md);
-  z-index: 1;
-  padding: var(--space-md) var(--space-md) calc(var(--space-md) - 2px);
-  border-radius: var(--radius-md);
-  /* ≥82% surface so title/lead stay WCAG AA on light & dark photos. */
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
-  -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
-  box-shadow: var(--shadow-soft);
-}
-
-.caseTitle {
-  margin: 0 0 var(--space-xs);
-  font-size: 1.05rem;
-  color: var(--color-text);
-}
-
-.caseLead {
-  margin: 0;
-  color: var(--color-text-soft);
-  line-height: 1.45;
-  font-size: var(--font-size-sm);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .caseCaption {
-    background: var(--glass-bg-strong);
-  }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .caseCaption {
-    background: var(--glass-bg-strong);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
-
 .section {
   max-width: var(--max-width);
   margin: 0 auto var(--space-3xl);
@@ -900,10 +833,6 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .casesGrid {
-    grid-template-columns: 1fr;
-  }
-
   .steps {
     grid-template-columns: 1fr;
     gap: var(--space-md);
@@ -963,7 +892,7 @@
 }
 
 /* Snap carousel: one active card + translucent side peeks. */
-@media (max-width: 649px) {
+@media (max-width: 920px) {
   .directionGrid {
     display: flex;
     overflow-x: auto;
@@ -1004,6 +933,19 @@
 
   .directionMedia {
     min-height: 140px;
+  }
+}
+
+@media (min-width: 760px) and (max-width: 920px) {
+  .directionGrid {
+    scroll-padding-inline: 8%;
+    padding-inline: 8%;
+  }
+
+  .directionBlock {
+    flex: 0 0 44%;
+    width: 44%;
+    max-width: 44%;
   }
 }
 

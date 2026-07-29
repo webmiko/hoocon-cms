@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DirectionsCategoryGrid } from "../components/DirectionsCategoryGrid";
+import { HomeCasesCarousel } from "../components/HomeCasesCarousel";
 import { HomeSkeleton } from "../components/HomeSkeleton";
 import { NovinkiCarousel } from "../components/NovinkiCarousel";
 import { Seo } from "../components/Seo";
@@ -366,25 +367,7 @@ export function HomePage() {
             здания. Детали поставки — в ответе на запрос КП.
           </p>
         </div>
-        <ul className={styles.casesGrid}>
-          {HOME_PROJECTS.map((project) => (
-            <li key={project.name} className={styles.caseItem}>
-              <img
-                className={styles.caseImg}
-                src={project.image}
-                alt=""
-                width={project.width}
-                height={project.height}
-                loading="lazy"
-                decoding="async"
-              />
-              <div className={styles.caseCaption}>
-                <h3 className={styles.caseTitle}>{project.name}</h3>
-                <p className={styles.caseLead}>{project.lead}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <HomeCasesCarousel projects={HOME_PROJECTS} />
       </section>
 
       <section
