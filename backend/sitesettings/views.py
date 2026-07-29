@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ class PublicSettingsView(APIView):
     permission_classes: list[type] = []
 
     def get(self, request: Request) -> Response:
-        """Return Yandex Metrika / GA4 IDs from SiteSettings.
+        """Return Yandex Metrika / GA4 IDs from SiteSettings with env defaults.
 
         Args:
             request: unused DRF request.
@@ -25,9 +26,11 @@ class PublicSettingsView(APIView):
             JSON with yandex_metrika_id and ga4_measurement_id (may be empty).
         """
         site = SiteSettings.load()
+        ym = (site.yandex_metrika_id or "").strip() or settings.YANDEX_METRIKA_ID
+        ga = (site.ga4_measurement_id or "").strip() or settings.GA4_MEASUREMENT_ID
         return Response(
             {
-                "yandex_metrika_id": site.yandex_metrika_id.strip(),
-                "ga4_measurement_id": site.ga4_measurement_id.strip(),
+                "yandex_metrika_id": ym.strip(),
+                "ga4_measurement_id": ga.strip(),
             }
         )

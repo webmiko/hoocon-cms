@@ -328,8 +328,10 @@ _SPA_DEFAULT = str(BASE_DIR.parent / "frontend" / "dist" / "index.html")
 SPA_INDEX_HTML = os.getenv("SPA_INDEX_HTML", _SPA_DEFAULT)
 
 # Analytics (fallback if SiteSettings IDs empty; SPA prefers /api/settings/public/).
-YANDEX_METRIKA_ID = os.getenv("YANDEX_METRIKA_ID", "").strip()
-GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "").strip()
+# Analytics counters (public IDs — not secrets). Admin SiteSettings overrides env.
+# Defaults = production counters so CSP / SPA work without empty Admin.
+YANDEX_METRIKA_ID = os.getenv("YANDEX_METRIKA_ID", "73321399").strip()
+GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "G-DLRV7BZ5JP").strip()
 
 # Social bots (secrets — never expose via API; chat IDs live in SiteSettings Admin).
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()

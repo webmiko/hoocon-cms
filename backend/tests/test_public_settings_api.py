@@ -7,13 +7,12 @@ from django.test import Client
 
 
 @pytest.mark.django_db
-def test_site_settings_analytics_defaults_empty() -> None:
-    """Analytics counter IDs default to empty (opt-in via Admin)."""
+def test_site_settings_analytics_field_defaults_blank() -> None:
+    """Model field defaults stay blank; IDs filled by migration / Admin / env."""
     from sitesettings.models import SiteSettings
 
-    s = SiteSettings.load()
-    assert s.yandex_metrika_id == ""
-    assert s.ga4_measurement_id == ""
+    assert SiteSettings._meta.get_field("yandex_metrika_id").default == ""
+    assert SiteSettings._meta.get_field("ga4_measurement_id").default == ""
 
 
 @pytest.mark.django_db
@@ -55,3 +54,20 @@ def test_public_settings_api_returns_analytics_ids_only() -> None:
     assert "secret-max-token" not in body
     assert "telegram_bot_token" not in body
     assert "vk_access_token" not in body
+
+
+@pytest.mark.django_db
+def test_public_settings_api_falls_back_to_django_settings(settings) -> None:
+    """Empty Admin uses Django settings defaults (production counters)."""
+    from sitesettings.models import SiteSettings
+
+    settings.YANDEX_METRIKA_ID = "73321399"
+    settings.GA4_MEASUREMENT_ID = "G-DLRV7BZ5JP"
+    s = SiteSettings.load()
+    s.yandex_metrika_id = ""
+    s.ga4_measurement_id = ""
+    s.save()
+
+    data = Client().get("/api/settings/public/").json()
+    assert data["yandex_metrika_id"] == "73321399"
+    assert data["ga4_measurement_id"] == "G-DLRV7BZ5JP"

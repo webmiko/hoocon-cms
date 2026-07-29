@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { BallValveKitFields } from "./BallValveKitFields";
 import type { BallValveKitOptions } from "../utils/ballValveKit";
+import { trackLeadSubmit } from "../utils/analyticsTrack";
 import styles from "./LeadForm.module.css";
 
 /**
@@ -132,6 +133,7 @@ export function LeadForm({
 
     try {
       await api.createLead(payload);
+      trackLeadSubmit(leadType);
       setSuccess(true);
       setForm(INITIAL_STATE);
       setPdnConsent(false);
