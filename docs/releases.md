@@ -63,6 +63,10 @@
 
 ## Changelog
 
+### v0.1.9 beta — 2026-07-29
+
+- SEO: SSR `og:image` для PDP через family gallery fallback (как на карточке/PDP).
+
 ### v0.1.8 beta — 2026-07-29
 
 - Аналитика: цели `lead_submit` / SPA hits; Metrika `73321399`, GA4 `G-DLRV7BZ5JP`;
