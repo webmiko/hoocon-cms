@@ -107,18 +107,27 @@ const HOME_PARTNERS: ReadonlyArray<{
 const HOME_PROJECTS = [
   {
     name: "Пекинское метро",
+    lead:
+      "Приводы на системах вентиляции метрополитена — круглосуточная нагрузка "
+      + "и жёсткие требования к надёжности.",
     image: "/home/projects/beijing-metro.webp",
     width: 960,
     height: 640,
   },
   {
     name: "АЭС Даявань, Шэньчжэнь",
+    lead:
+      "Объекты атомной энергетики: сертифицированные приводы для вентиляционных "
+      + "и противопожарных контуров.",
     image: "/home/projects/dayawan-npp.webp",
     width: 960,
     height: 640,
   },
   {
     name: "БЦ SOHO",
+    lead:
+      "Коммерческие здания: приводы воздушных клапанов и климат-систем в плотной "
+      + "городской застройке.",
     image: "/home/projects/soho-bc.webp",
     width: 960,
     height: 640,
@@ -349,6 +358,33 @@ export function HomePage() {
         </div>
       </section>
 
+      <section className={styles.section} aria-labelledby="cases-heading">
+        <div className={styles.sectionHead}>
+          <h2 id="cases-heading">На объектах</h2>
+          <p className={styles.sectionLead}>
+            Среда, где работают приводы Hoocon: метро, энергетика, коммерческие
+            здания. Детали поставки — в ответе на запрос КП.
+          </p>
+        </div>
+        <ul className={styles.casesGrid}>
+          {HOME_PROJECTS.map((project) => (
+            <li key={project.name} className={styles.caseItem}>
+              <img
+                className={styles.caseImg}
+                src={project.image}
+                alt=""
+                width={project.width}
+                height={project.height}
+                loading="lazy"
+                decoding="async"
+              />
+              <h3 className={styles.caseTitle}>{project.name}</h3>
+              <p className={styles.caseLead}>{project.lead}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section
         className={styles.directions}
         aria-labelledby="directions-heading"
@@ -454,7 +490,7 @@ export function HomePage() {
         </div>
         <div className={styles.partnersInner}>
           <div className={styles.partnersHead}>
-            <h2 id="partners-heading">Наша профессиональная среда</h2>
+            <h2 id="partners-heading">Партнёры по проектам ОВК</h2>
             <p className={styles.partnersLead}>
               Производители и дистрибьюторы, с которыми работаем по проектам
               вентиляции и кондиционирования. Полный список точек продаж — на
