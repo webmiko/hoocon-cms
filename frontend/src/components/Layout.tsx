@@ -308,14 +308,6 @@ export function Layout() {
             >
               Сравнение
             </Link>
-            <Link
-              to="/consultation"
-              className={styles.navMobileCta}
-              data-brand-cta
-              onClick={closeMenu}
-            >
-              Запросить КП
-            </Link>
           </nav>
 
           <ThemeToggle showLabel />

@@ -8,13 +8,19 @@
 :root {
   color-scheme: light;
 
-  /* Brand — hexes synced with styles/brandColors.ts (PWA theme_color / meta). */
-  --color-brand: #dc1313;
-  --color-brand-hover: #b01010;
-  --color-brand-deep: #b01010;
-  --color-brand-deeper: #8f0d0d;
+  /* Brand — logo red from public/logo.svg (#da0e2b); keep brandColors.ts in sync. */
+  --color-brand: #da0e2b;
+  --color-brand-hover: #b80c24;
+  --color-brand-deep: #b80c24;
+  --color-brand-deeper: #8f0a1c;
   --color-brand-soft: color-mix(in srgb, var(--color-brand) 9%, transparent);
   --color-on-brand: #ffffff;
+  /* Solid chrome CTA fill (header / sticky) — same as logo in both themes. */
+  --color-brand-fill: var(--color-brand);
+  --color-brand-fill-hover: var(--color-brand-hover);
+  --color-on-brand-fill: var(--color-on-brand);
+  /* Label on brand-control / data-brand-cta (may differ from ink on-brand in dark). */
+  --color-on-brand-control: var(--color-on-brand-fill);
   /* Brand as ink on surfaces (dark theme remaps brand for WCAG AA). */
   --color-brand-ink: var(--color-brand);
 
@@ -60,11 +66,15 @@
    */
   --control-blur: 32px;
   --control-saturate: 1.35;
-  /* 88% keeps white labels ≥4.5:1 on light surfaces (86% was ~4.43). */
-  --color-brand-control: color-mix(in srgb, var(--color-brand) 88%, transparent);
+  /*
+   * ≥94% so on-brand-fill stays ≥4.5:1 even when backdrop-filter blends a
+   * bright page through the fill. Mix from brand-fill (logo), not brand-ink.
+   * 88% was AA on flat white but washed out under blur.
+   */
+  --color-brand-control: color-mix(in srgb, var(--color-brand-fill) 94%, transparent);
   --color-brand-control-hover: color-mix(
     in srgb,
-    var(--color-brand-hover) 92%,
+    var(--color-brand-fill-hover) 96%,
     transparent
   );
   --color-inverse-control: color-mix(in srgb, var(--color-inverse) 88%, transparent);
@@ -169,8 +179,8 @@ html[data-theme="dark"] {
   color-scheme: dark;
 
   /*
-   * Brand red lifted for contrast on dark surfaces (#dc1313 ~3:1 as ink).
-   * Fills use the same palette; on-brand is dark text (white fails AA on #ff7070).
+   * Brand ink lifted for links on dark surfaces (#da0e2b alone ~3.6:1).
+   * Chrome CTA fills stay logo red + white (--color-brand-fill).
    */
   --color-brand: #ff7070;
   --color-brand-hover: #ff9a9a;
@@ -179,6 +189,15 @@ html[data-theme="dark"] {
   --color-brand-ink: var(--color-brand);
   --color-brand-soft: color-mix(in srgb, var(--color-brand) 22%, transparent);
   --color-on-brand: #121214;
+  --color-brand-fill: #da0e2b;
+  --color-brand-fill-hover: #b80c24;
+  --color-on-brand-fill: #ffffff;
+  /* Brand CTAs: solid logo fill + white (not translucent coral + dark ink). */
+  --color-brand-control: var(--color-brand-fill);
+  --color-brand-control-hover: var(--color-brand-fill-hover);
+  --color-on-brand-control: var(--color-on-brand-fill);
+  --color-primary-control: var(--color-brand-control);
+  --color-primary-control-hover: var(--color-brand-control-hover);
   --color-link: var(--color-brand);
   --color-link-hover: var(--color-brand-hover);
 

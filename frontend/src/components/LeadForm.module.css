@@ -77,7 +77,7 @@
   padding: var(--space-md) var(--space-xl);
   min-height: 48px;
   background: var(--color-brand-control);
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-base);

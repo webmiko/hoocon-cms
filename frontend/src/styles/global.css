@@ -91,7 +91,7 @@ a[data-brand-cta]:visited,
 a[data-brand-cta]:hover,
 a[data-brand-cta]:active,
 a[data-brand-cta]:visited:hover {
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   text-decoration: none;
 }
 
@@ -179,17 +179,22 @@ a[data-brand-cta]:hover {
   }
 
   a[data-brand-cta] {
-    background-color: var(--color-brand);
+    background-color: var(--color-brand-fill);
   }
 
   a[data-brand-cta]:hover {
-    background-color: var(--color-brand-hover);
+    background-color: var(--color-brand-fill-hover);
   }
 }
 
 button:active,
 a:active {
   transform: scale(0.98);
+}
+
+/* Chrome brand CTAs keep a sharp layer — global a:active scale blurs glyphs. */
+a[data-brand-cta]:active {
+  transform: none;
 }
 
 h1,

@@ -458,7 +458,7 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   font-weight: 600;
   font-size: var(--font-size-sm);
   border: none;
@@ -467,7 +467,7 @@
 }
 
 .emptyCta:hover {
-  background: var(--color-brand-hover);
+  background: var(--color-brand-control-hover);
   transform: translateY(-1px);
 }
 

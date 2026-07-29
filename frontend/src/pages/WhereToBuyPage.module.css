@@ -137,7 +137,7 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   font-weight: 600;
   font-size: var(--font-size-sm);
   text-decoration: none;
@@ -146,7 +146,7 @@
 
 .cardCta:hover {
   background: var(--color-brand-control-hover);
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   text-decoration: none;
 }
 
@@ -225,7 +225,7 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   font-weight: 700;
   font-size: var(--font-size-sm);
   text-decoration: none;
@@ -235,7 +235,7 @@
 
 .oemCta:hover {
   background: var(--color-brand-control-hover);
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   text-decoration: none;
 }
 

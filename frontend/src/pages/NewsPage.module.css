@@ -426,15 +426,15 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 600;
 }
 
 .link:hover {
-  background: var(--color-brand-hover);
-  color: var(--color-on-brand);
+  background: var(--color-brand-control-hover);
+  color: var(--color-on-brand-control);
   text-decoration: none;
 }
 

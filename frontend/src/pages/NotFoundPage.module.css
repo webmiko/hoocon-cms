@@ -103,7 +103,7 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand, #fff);
+  color: var(--color-on-brand-control, #fff);
   border-radius: var(--radius);
   text-decoration: none;
   font-weight: 600;
@@ -111,6 +111,6 @@
 
 .homeLink:hover {
   background: var(--color-brand-control-hover);
-  color: var(--color-on-brand, #fff);
+  color: var(--color-on-brand-control, #fff);
   text-decoration: none;
 }
