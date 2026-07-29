@@ -38,6 +38,8 @@
   overflow: hidden;
   touch-action: pan-y;
   cursor: grab;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .viewport:active {
@@ -51,6 +53,7 @@
   display: flex;
   width: max-content;
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 .slide {

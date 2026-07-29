@@ -27,6 +27,9 @@ interface RelatedArticlesCarouselProps {
 /**
  * Full-width related carousel: opaque center cards, translucent edge peeks.
  * Visible card count follows viewport width. Infinite loop + reduced-motion.
+ *
+ * Transition stays on between slides; only the infinite-loop reindex jumps with
+ * ``transition: none`` (Safari/PWA skips animation if both flip in one frame).
  */
 export function RelatedArticlesCarousel({
   articles,
@@ -42,7 +45,8 @@ export function RelatedArticlesCarousel({
   const [perPage, setPerPage] = useState(1);
   const [viewportW, setViewportW] = useState(0);
   const [index, setIndex] = useState(n);
-  const [animate, setAnimate] = useState(false);
+  /** True only while reindexing the loop window (no CSS transition). */
+  const [suppressTransition, setSuppressTransition] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -55,7 +59,7 @@ export function RelatedArticlesCarousel({
   // Realign loop window when item count / page size changes.
   if (syncedResetKey !== resetKey) {
     setSyncedResetKey(resetKey);
-    setAnimate(false);
+    setSuppressTransition(true);
     setIndex(middleStart);
   }
 
@@ -96,30 +100,46 @@ export function RelatedArticlesCarousel({
   const go = useCallback(
     (delta: number) => {
       if (n === 0) return;
-      setAnimate(true);
+      setSuppressTransition(false);
       setIndex((prev) => prev + delta);
     },
     [n],
   );
 
+  // After a seamless loop jump, re-enable transition on the next frames.
   useEffect(() => {
-    if (n === 0 || !animate) return;
+    if (!suppressTransition) return;
+    let raf2 = 0;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        setSuppressTransition(false);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [suppressTransition, index]);
+
+  useEffect(() => {
+    if (n === 0) return;
     if (index >= middleStart && index < middleStart + n) return;
 
     if (jumpTimer.current !== null) {
       window.clearTimeout(jumpTimer.current);
     }
+    const delay = reduceMotion ? 0 : TRANSITION_MS;
     jumpTimer.current = window.setTimeout(() => {
-      setAnimate(false);
+      setSuppressTransition(true);
       setIndex(((index % n) + n) % n + middleStart);
-    }, TRANSITION_MS);
+    }, delay);
 
     return () => {
       if (jumpTimer.current !== null) {
         window.clearTimeout(jumpTimer.current);
       }
     };
-  }, [animate, index, middleStart, n]);
+  }, [index, middleStart, n, reduceMotion]);
 
   useEffect(() => {
     if (reduceMotion || paused || n < 2) return;
@@ -127,24 +147,31 @@ export function RelatedArticlesCarousel({
     return () => window.clearInterval(id);
   }, [go, n, paused, reduceMotion]);
 
-  function onPointerDown(event: React.PointerEvent) {
+  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
     dragX.current = event.clientX;
     setPaused(true);
   }
 
-  function onPointerUp(event: React.PointerEvent) {
+  function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (dragX.current === null) return;
     const dx = event.clientX - dragX.current;
     dragX.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     if (Math.abs(dx) > 40) {
       go(dx < 0 ? 1 : -1);
     }
     setPaused(false);
   }
 
-  function onPointerCancel() {
+  function onPointerCancel(event: React.PointerEvent<HTMLDivElement>) {
     dragX.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     setPaused(false);
   }
 
@@ -154,6 +181,11 @@ export function RelatedArticlesCarousel({
   // Opaque window: [index, index + perPage). Edge peeks: neighbors outside.
   const opaqueStart = index;
   const opaqueEnd = index + perPage;
+  const offsetPx = PEEK_PX - index * stride;
+  const trackTransition =
+    suppressTransition || reduceMotion
+      ? "none"
+      : `transform ${TRANSITION_MS}ms var(--ease-out, ease)`;
 
   return (
     <div
@@ -200,11 +232,8 @@ export function RelatedArticlesCarousel({
           className={styles.track}
           style={{
             gap: GAP_PX,
-            transform: `translateX(${PEEK_PX - index * stride}px)`,
-            transition:
-              animate && !reduceMotion
-                ? `transform ${TRANSITION_MS}ms var(--ease-out, ease)`
-                : "none",
+            transform: `translate3d(${offsetPx}px, 0, 0)`,
+            transition: trackTransition,
           }}
         >
           {trackItems.map((article, i) => {
