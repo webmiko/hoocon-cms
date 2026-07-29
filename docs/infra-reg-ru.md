@@ -318,6 +318,19 @@ docker compose exec -T db pg_restore -U "$DB_USER" -d "$DB_NAME" \
 sudo tar -C /var/www/hoocon -xzf "$BACKUP/media.tar.gz"
 ```
 
+### Локальная отладка = копия прода
+
+Подтянуть **актуальный** dump с VPS в локальную Postgres (Homebrew / Compose):
+
+```bash
+./scripts/sync-db-from-vps.sh                 # свежий pg_dump с прода
+./scripts/sync-db-from-vps.sh --from-backup   # последний cron-бэкап
+./scripts/sync-db-from-vps.sh --with-media    # dump + rsync media (иначе 404 фото)
+```
+
+Обратное направление (локаль → VPS): `./scripts/sync-db-to-vps.sh`.
+Только media: `rsync -az hoocon-prod:/var/www/hoocon/media/ backend/media/`.
+
 ---
 
 ## 10. Мониторинг (минимум до Sentry)
