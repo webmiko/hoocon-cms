@@ -81,8 +81,10 @@ def test_sku_filter_by_canonical_moment_alias(client) -> None:
 def test_analog_facet_from_belimo_code(client) -> None:
     """«Аналоги» facet lists SKU.analog_belimo_code and filters by it."""
     seeded = _seed_with_attrs()
+    # Aux Belimo article must sit on a -DS edition (non-aux would strip -S).
+    seeded["sku5"].sku_code = "da5fu24-ds"
     seeded["sku5"].analog_belimo_code = "LM24A-S"
-    seeded["sku5"].save(update_fields=["analog_belimo_code"])
+    seeded["sku5"].save(update_fields=["sku_code", "analog_belimo_code"])
     seeded["sku10"].analog_belimo_code = "NM230A"
     seeded["sku10"].save(update_fields=["analog_belimo_code"])
 
@@ -186,6 +188,52 @@ def test_sku_detail_dedupes_parallel_attributes(client) -> None:
     assert names.count("Напряжение (В)") == 1
     assert "Мощность" not in names
     assert "Крутящий момент" in names
+
+
+@pytest.mark.django_db
+def test_sku_detail_dedupes_legacy_control_signal_y_alias(client) -> None:
+    """Canon «Упр. сигнал Y» wins over legacy «Управляющий сигнал Y»."""
+    from catalog.etl.tech_copy import (
+        CONTROL_SIGNAL_Y_CANON,
+        CONTROL_SIGNAL_Y_LABEL,
+        CONTROL_SIGNAL_Y_SLUG,
+    )
+    from catalog.models import Attribute, AttributeValue
+
+    seed = _seed_with_attrs()
+    sku = seed["sku5"]
+    canon, _ = Attribute.objects.get_or_create(
+        slug=CONTROL_SIGNAL_Y_SLUG,
+        defaults={"name": CONTROL_SIGNAL_Y_LABEL},
+    )
+    if canon.name != CONTROL_SIGNAL_Y_LABEL:
+        canon.name = CONTROL_SIGNAL_Y_LABEL
+        canon.save(update_fields=["name"])
+    legacy, _ = Attribute.objects.get_or_create(
+        slug="control-signal-y",
+        defaults={"name": "Управляющий сигнал Y"},
+    )
+    AttributeValue.objects.update_or_create(
+        sku=sku,
+        attribute=canon,
+        defaults={"value": CONTROL_SIGNAL_Y_CANON},
+    )
+    AttributeValue.objects.update_or_create(
+        sku=sku,
+        attribute=legacy,
+        defaults={"value": CONTROL_SIGNAL_Y_CANON},
+    )
+
+    response = client.get(reverse("catalog-sku-detail", kwargs={"slug": sku.slug}))
+    assert response.status_code == 200
+    y_rows = [
+        a
+        for a in response.data["attributes"]
+        if a["value"] == CONTROL_SIGNAL_Y_CANON and "сигнал" in a["name"].casefold() and "y" in a["name"].casefold()
+    ]
+    assert len(y_rows) == 1
+    assert y_rows[0]["name"] == CONTROL_SIGNAL_Y_LABEL
+    assert y_rows[0]["slug"] == CONTROL_SIGNAL_Y_SLUG
 
 
 @pytest.mark.django_db

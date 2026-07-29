@@ -305,6 +305,10 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         (CONTROL_SIGNAL_Y_SLUG, CONTROL_SIGNAL_Y_LABEL, CONTROL_SIGNAL_Y_CANON),
         (FEEDBACK_SIGNAL_U_SLUG, FEEDBACK_SIGNAL_U_LABEL, FEEDBACK_SIGNAL_U_CANON),
     )
+    legacy_slugs = {
+        CONTROL_SIGNAL_Y_SLUG: "control-signal-y",
+        FEEDBACK_SIGNAL_U_SLUG: "feedback-signal-u",
+    }
     for slug, name, value in specs:
         clipped = clip_attribute_value(value)
         attr, _created = Attribute.objects.get_or_create(
@@ -321,9 +325,17 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         )
         if created:
             changed += 1
-            continue
-        if (av.value or "").strip() != clipped:
+        elif (av.value or "").strip() != clipped:
             av.value = clipped
             av.save(update_fields=["value"])
             changed += 1
+        # Drop legacy Tilda alias row so ТТХ cards do not show Y/U twice.
+        legacy = legacy_slugs.get(slug)
+        if legacy:
+            deleted, _ = AttributeValue.objects.filter(
+                sku=sku,
+                attribute__slug=legacy,
+            ).delete()
+            if deleted:
+                changed += deleted
     return changed

@@ -11,6 +11,14 @@ from typing import cast
 
 from catalog.models import Attribute, AttributeValue
 
+# Canonical Belimo Y/U signal slugs + legacy Tilda aliases → one dedupe bucket.
+_SIGNAL_SLUG_BUCKET: dict[str, str] = {
+    "control-signal": "control-signal",
+    "control-signal-y": "control-signal",
+    "feedback-signal": "feedback-signal",
+    "feedback-signal-u": "feedback-signal",
+}
+
 
 def _normalize_attr_name(name: str) -> str:
     """Collapse Attribute.name variants for duplicate detection."""
@@ -21,7 +29,20 @@ def _normalize_attr_name(name: str) -> str:
         return "крутящий момент"
     if text in {"вид", "вид крана"}:
         return "вид"
+    # Legacy Tilda «Управляющий сигнал Y» vs canon «Упр. сигнал Y».
+    if text in {"управляющий сигнал y", "упр. сигнал y", "упр сигнал y"}:
+        return "упр. сигнал y"
+    if text in {"управляющий сигнал u", "упр. сигнал u", "упр сигнал u"}:
+        return "упр. сигнал u"
     return text
+
+
+def _dedupe_key(name: str, slug: str, value: str) -> tuple[str, str]:
+    """Build collapse key: prefer Y/U slug bucket, else normalized name."""
+    bucket = _SIGNAL_SLUG_BUCKET.get((slug or "").casefold())
+    if bucket is not None:
+        return (f"slug:{bucket}", value.casefold())
+    return (_normalize_attr_name(name), value.casefold())
 
 
 def _attr_prefer_score(name: str, *, slug: str = "") -> int:
@@ -51,7 +72,9 @@ def dedupe_attribute_values(
     """Drop duplicate ТТХ rows (same name/value from parallel Tilda attrs).
 
     Keeps the preferred Attribute when names collide (e.g. «Крутящий момент»
-    over mislabeled «Мощность» with the same Нм value).
+    over mislabeled «Мощность» with the same Нм value). Also collapses
+    legacy ``control-signal-y`` / ``feedback-signal-u`` onto canonical Y/U
+    slugs when values match.
 
     Args:
         attribute_values: Prefetched rows with ``attribute`` selected.
@@ -66,7 +89,7 @@ def dedupe_attribute_values(
         name = attr.name if attr is not None else ""
         slug = attr.slug if attr is not None else ""
         value = " ".join(str(av.value).split())
-        key = (_normalize_attr_name(name), value.casefold())
+        key = _dedupe_key(name, slug, value)
         if key not in best:
             best[key] = av
             order.append(key)
