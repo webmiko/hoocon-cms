@@ -372,10 +372,13 @@ dn, ways, **kvs**, material, thread, габариты, **compatible-actuators**,
 poetry run python manage.py enrich_ball_valves
 # точечно:
 poetry run python manage.py enrich_ball_valves --series BV220
+# герои DN из media-webp (2-WAY/3-WAY BRASS DNxx.webp):
+poetry run python manage.py attach_ball_valve_media_webp
 ```
 
 Код: `series_copy_ball_valves.py` (`product_slug_for_series`,
-`brass_sku_slug`, `merge_brass_bv_onto_dn_products`).
+`brass_sku_slug`, `merge_brass_bv_onto_dn_products`);
+фото — `ball_valve_media_webp.py`.
 
 ### Референс
 
