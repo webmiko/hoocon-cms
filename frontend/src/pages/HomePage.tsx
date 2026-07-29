@@ -146,7 +146,7 @@ export function HomePage() {
     0,
     "home:novinki",
   );
-  const partnersRef = useRef<HTMLElement>(null);
+  const partnersTrackRef = useRef<HTMLElement>(null);
   const partnersParallaxRef = useRef<HTMLDivElement>(null);
   const [heroSlide, setHeroSlide] = useState(0);
   /** Only decode slides once shown — keeps inactive hero WebPs off first paint. */
@@ -178,47 +178,57 @@ export function HomePage() {
       return;
     }
 
-    /** Drift vs scroll; keep under bleed (~55% section height). */
-    const PARALLAX_FACTOR = 0.18;
-    /** Catch-up per frame; lower = smoother / more lag. */
-    const PARALLAX_EASE = 0.05;
+    /**
+     * Drift over fixed bg. Rest pose: when the section mid hits the viewport
+     * mid, translateY is 0 so copy sits in the block centre.
+     */
+    const PARALLAX_FACTOR = 0.22;
+    const PARALLAX_EASE = 0.12;
+    /** Half-height of the “centred” dead zone (px) → force rest pose. */
+    const CENTER_SLACK = 28;
 
     let current = 0;
     let frame = 0;
     let running = false;
-    /** Cached geometry — avoid getBoundingClientRect on every scroll frame. */
-    let sectionTop = 0;
-    let sectionHeight = 1;
-
-    const measure = () => {
-      const section = partnersRef.current;
-      if (!section) {
-        return;
-      }
-      const rect = section.getBoundingClientRect();
-      sectionTop = rect.top + window.scrollY;
-      sectionHeight = rect.height || 1;
-    };
 
     const tick = () => {
-      const layer = partnersParallaxRef.current;
-      if (!layer) {
+      const track = partnersTrackRef.current;
+      const block = partnersParallaxRef.current;
+      if (!track || !block) {
         running = false;
         return;
       }
+      const rect = track.getBoundingClientRect();
       const viewH = window.innerHeight || 1;
-      const mid = sectionTop - window.scrollY + sectionHeight / 2;
-      const raw = (mid - viewH / 2) * PARALLAX_FACTOR;
-      const maxShift = sectionHeight * 0.35;
-      const target = Math.max(-maxShift, Math.min(maxShift, raw));
-      current += (target - current) * PARALLAX_EASE;
-      layer.style.transform = `translate3d(0, ${current.toFixed(2)}px, 0)`;
+      const sectionMid = rect.top + rect.height / 2;
+      const viewMid = viewH / 2;
+      const delta = sectionMid - viewMid;
+      const maxShift = Math.min(96, Math.max(48, rect.height * 0.14));
+
+      let target: number;
+      if (Math.abs(delta) <= CENTER_SLACK) {
+        /* Section centred on screen → content centred in the block. */
+        target = 0;
+      } else {
+        /* Outside the slack: continue from 0 so rest pose stays the origin. */
+        const signed = delta < 0 ? delta + CENTER_SLACK : delta - CENTER_SLACK;
+        target = Math.max(-maxShift, Math.min(maxShift, signed * PARALLAX_FACTOR));
+      }
+
+      const ease = target === 0 ? 0.28 : PARALLAX_EASE;
+      current += (target - current) * ease;
+      if (target === 0 && Math.abs(current) < 0.35) {
+        current = 0;
+      }
+      block.style.transform =
+        current === 0 ? "none" : `translate3d(0, ${current.toFixed(2)}px, 0)`;
 
       if (Math.abs(target - current) > 0.12) {
         frame = requestAnimationFrame(tick);
       } else {
         current = target;
-        layer.style.transform = `translate3d(0, ${current.toFixed(2)}px, 0)`;
+        block.style.transform =
+          current === 0 ? "none" : `translate3d(0, ${current.toFixed(2)}px, 0)`;
         running = false;
       }
     };
@@ -230,19 +240,13 @@ export function HomePage() {
       }
     };
 
-    const onResize = () => {
-      measure();
-      onScroll();
-    };
-
-    measure();
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", onScroll);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", onScroll);
     };
   }, []);
 
@@ -455,66 +459,57 @@ export function HomePage() {
       </section>
 
       <section
-        ref={partnersRef}
+        ref={partnersTrackRef}
         className={styles.partners}
         aria-labelledby="partners-heading"
       >
         <div className={styles.partnersBackdrop} aria-hidden="true">
-          <div ref={partnersParallaxRef} className={styles.partnersParallax}>
-            <img
-              className={styles.partnersParallaxImg}
-              src="/home/partners-bg.webp"
-              alt=""
-              width={1920}
-              height={1280}
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
           <div className={styles.partnersShade} />
         </div>
-        <div className={styles.partnersInner}>
-          <div className={styles.partnersHead}>
-            <h2 id="partners-heading">Партнёры по проектам ОВК</h2>
-            <p className={styles.partnersLead}>
-              Производители и дистрибьюторы, с которыми работаем по проектам
-              вентиляции и кондиционирования. Полный список точек продаж — на
-              странице{" "}
-              <Link to="/gde-kupit">где купить</Link>.
-            </p>
+        <div ref={partnersParallaxRef} className={styles.partnersMotion}>
+          <div className={styles.partnersInner}>
+            <div className={styles.partnersHead}>
+              <h2 id="partners-heading">Партнёры по проектам ОВК</h2>
+              <p className={styles.partnersLead}>
+                Производители и дистрибьюторы, с которыми работаем по проектам
+                вентиляции и кондиционирования. Полный список точек продаж — на
+                странице{" "}
+                <Link to="/gde-kupit">где купить</Link>.
+              </p>
+            </div>
+            <ul className={styles.partnerLogos}>
+              {HOME_PARTNERS.map((partner) => {
+                const logo = (
+                  <img
+                    className={styles.partnerLogoImg}
+                    src={partner.logo}
+                    alt={partner.name}
+                    width={partner.width}
+                    height={partner.height}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                );
+                return (
+                  <li key={partner.name} className={styles.partnerLogoItem}>
+                    {partner.href ? (
+                      <a
+                        href={partner.href}
+                        className={styles.partnerLogoLink}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        aria-label={partner.name}
+                      >
+                        {logo}
+                      </a>
+                    ) : (
+                      logo
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-          <ul className={styles.partnerLogos}>
-            {HOME_PARTNERS.map((partner) => {
-              const logo = (
-                <img
-                  className={styles.partnerLogoImg}
-                  src={partner.logo}
-                  alt={partner.name}
-                  width={partner.width}
-                  height={partner.height}
-                  loading="lazy"
-                  decoding="async"
-                />
-              );
-              return (
-                <li key={partner.name} className={styles.partnerLogoItem}>
-                  {partner.href ? (
-                    <a
-                      href={partner.href}
-                      className={styles.partnerLogoLink}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      aria-label={partner.name}
-                    >
-                      {logo}
-                    </a>
-                  ) : (
-                    logo
-                  )}
-                </li>
-              );
-            })}
-          </ul>
         </div>
       </section>
 

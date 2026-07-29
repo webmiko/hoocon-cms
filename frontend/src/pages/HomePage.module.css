@@ -245,17 +245,17 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   border: 1px solid transparent;
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-brand) 28%, transparent);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-brand-fill) 28%, transparent);
 }
 
 .ctaPrimary:hover {
   background: var(--color-brand-control-hover);
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   text-decoration: none;
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-brand) 32%, transparent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--color-brand-fill) 32%, transparent);
 }
 
 .ctaSecondary {
@@ -580,42 +580,31 @@
   padding-block: clamp(72px, 10vw, 120px);
   padding-inline: clamp(40px, 6vw, 72px);
   min-height: clamp(360px, 48vw, 480px);
-  overflow: hidden;
-  isolation: isolate;
+  /* No overflow/isolation — they break background-attachment: fixed. */
   color: #fff;
   background: #0a0a0a;
-  animation: rise 0.7s var(--ease-out) 0.14s both;
 }
 
 .partnersBackdrop {
   position: absolute;
   inset: 0;
   z-index: 0;
-  overflow: hidden;
   pointer-events: none;
-}
-
-.partnersParallax {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -40%;
-  height: 180%;
-  will-change: transform;
-}
-
-.partnersParallaxImg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+  /*
+   * Viewport-fixed photo: section scrolls, bg stays put → only content drifts.
+   * Image path matches former <img src="/home/partners-bg.webp">.
+   */
+  background-color: #0a0a0a;
+  background-image: url("/home/partners-bg.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .partnersShade {
   position: absolute;
   inset: 0;
-  z-index: 1;
   pointer-events: none;
   background:
     radial-gradient(
@@ -626,14 +615,23 @@
     rgba(8, 8, 8, 0.8);
 }
 
-.partnersInner {
+.partnersMotion {
   position: relative;
   z-index: 2;
   grid-area: 1 / 1;
   width: 100%;
+  align-self: center;
+  justify-self: center;
+  will-change: transform;
+}
+
+.partnersInner {
+  width: 100%;
   max-width: var(--max-width);
   margin: 0 auto;
   text-align: center;
+  /* Opacity-only — transform here would fight JS parallax on the parent. */
+  animation: partnersIn 0.7s var(--ease-out) 0.14s both;
 }
 
 .partnersHead {
@@ -764,15 +762,15 @@
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control);
   font-weight: 700;
   text-decoration: none;
   transition: background-color var(--transition), transform var(--transition-fast);
 }
 
 .deliveryCta:hover {
-  background: var(--color-brand-hover);
-  color: var(--color-on-brand);
+  background: var(--color-brand-control-hover);
+  color: var(--color-on-brand-control);
   text-decoration: none;
   transform: translateY(-1px);
 }
@@ -819,6 +817,16 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes partnersIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
 
@@ -957,12 +965,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .heroBrand,
-  .partners,
+  .partnersInner,
   .trust,
   .section,
   .directions,
   .directionBlock {
     animation: none;
+  }
+
+  .partnersBackdrop {
+    background-attachment: scroll;
+  }
+
+  .partnersMotion {
+    transform: none !important;
+    will-change: auto;
   }
 
   .directionBlock {
@@ -971,17 +988,6 @@
 
   .heroSlide {
     transition: none;
-  }
-
-  .partnersParallax {
-    top: -30%;
-    height: 160%;
-    transform: none !important;
-    will-change: auto;
-  }
-
-  .partnersParallaxImg {
-    will-change: auto;
   }
 
   .directionBlock:hover .directionImage {
