@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
 import { buildBreadcrumbJsonLd, buildFaqJsonLd } from "../utils/jsonLd";
+import { metaDescription } from "../utils/seoMeta";
 import styles from "./PageView.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -52,7 +53,7 @@ export function PageView({ slug: slugProp }: PageViewProps) {
     );
   }
 
-  const desc = page.body.replace(/<[^>]+>/g, "").slice(0, 160);
+  const desc = metaDescription(page.body.replace(/<[^>]+>/g, ""));
   const jsonLd =
     page.slug === "faq"
       ? [buildFaqJsonLd(), buildBreadcrumbJsonLd([

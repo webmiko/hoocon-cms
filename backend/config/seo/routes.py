@@ -20,6 +20,8 @@ DEFAULT_DESCRIPTION = (
     "Каталог, фильтры по характеристикам, паспорта, аналоги Belimo, запрос КП."
 )
 OG_IMAGE_PATH = "/og-image.svg"
+# Яндекс.Вебмастер — meta-тег подтверждения домена (публичный, не секрет).
+YANDEX_VERIFICATION_CONTENT = "4b0c304eeaf471e0"
 SLUG_RE = r"^[a-z0-9][a-z0-9-]{0,298}[a-z0-9]$|^[a-z0-9]$"
 
 # FAQ snippets for FAQPage JSON-LD (home + /faq). Keep in sync with HomePage.

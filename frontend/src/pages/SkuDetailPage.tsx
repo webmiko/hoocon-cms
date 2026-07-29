@@ -532,6 +532,7 @@ export function SkuDetailPage() {
           ]),
         ]}
         ogType="product"
+        image={galleryImages[0]?.src}
       />
       <Breadcrumbs
         items={[
@@ -663,7 +664,7 @@ export function SkuDetailPage() {
               }}
             />
             <a href="#rfq" className={styles.heroCta}>
-              Запросить цену
+              Запросить КП
             </a>
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
   buildArticleJsonLd,
   buildBreadcrumbJsonLd,
 } from "../utils/jsonLd";
+import { metaDescription } from "../utils/seoMeta";
 import styles from "./NewsPage.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -42,6 +43,7 @@ export function NewsPage() {
   }
 
   const plain = stripHtmlToText(news.body);
+  const description = metaDescription(plain);
   const minutes = readingMinutes(news.body);
   const related = (listData?.results ?? [])
     .filter((item) => item.slug !== news.slug)
@@ -52,14 +54,15 @@ export function NewsPage() {
       <article className={styles.article}>
         <Seo
           title={news.title}
-          description={plain.slice(0, 160)}
+          description={description}
           path={`/novosti/${news.slug}`}
           ogType="article"
+          image={news.cover}
           jsonLd={[
             buildArticleJsonLd({
               title: news.title,
               slug: news.slug,
-              description: plain.slice(0, 160),
+              description,
               published_at: news.published_at,
               pathPrefix: "/novosti",
             }),
@@ -104,7 +107,11 @@ export function NewsPage() {
 
         {news.cover ? (
           <figure className={styles.coverFigure}>
-            <img className={styles.cover} src={news.cover} alt="" />
+            <img
+              className={styles.cover}
+              src={news.cover}
+              alt={news.title}
+            />
           </figure>
         ) : null}
 

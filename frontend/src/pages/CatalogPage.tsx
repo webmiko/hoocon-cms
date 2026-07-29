@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate, useNavigationType, useParams, useSearch
 import { useEffect, useMemo, useState } from "react";
 
 import { Seo } from "../components/Seo";
+import { categorySeoDescription } from "../utils/seoMeta";
 import { CatalogSkeleton } from "../components/CatalogSkeleton";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
@@ -514,8 +515,12 @@ export function CatalogPage() {
             : "Каталог электроприводов вентиляции и кондиционирования"
         }
         description={
-          "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
-          + "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
+          activeCategory
+            ? categorySeoDescription(
+                activeCategory.name,
+                activeCategory.description,
+              )
+            : categorySeoDescription()
         }
         path={category ? catalogCategoryPath(category) : "/catalog"}
         jsonLd={[

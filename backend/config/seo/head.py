@@ -21,6 +21,7 @@ from config.seo.routes import (
     NOINDEX_PREFIXES,
     OG_IMAGE_PATH,
     PUBLIC_STATIC_ROUTES,
+    YANDEX_VERIFICATION_CONTENT,
 )
 from config.seo.sanitize import normalize_spa_path, plain_text_for_meta, validate_slug
 
@@ -41,6 +42,26 @@ class SeoHeadContext:
     in_stock: bool = True
     category_name: str | None = None
     breadcrumb: tuple[tuple[str, str], ...] = ()
+    # Absolute og:image when the page has a primary photo; else site default.
+    og_image_url: str | None = None
+
+
+def _absolute_media_url(file_field: object | None) -> str | None:
+    """Build absolute SITE_URL + media path from an ImageFieldFile-like object."""
+    if file_field is None:
+        return None
+    try:
+        url = str(getattr(file_field, "url", "") or "").strip()
+    except ValueError:
+        return None
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("//"):
+        return f"https:{url}"
+    path = url if url.startswith("/") else f"/{url}"
+    return f"{settings.SITE_URL.rstrip('/')}{path}"
 
 
 def _format_page_title(partial: str | None) -> str:
@@ -77,6 +98,7 @@ def _resolve_article(path: str) -> SeoHeadContext | None:
             ("/statyi", "Статьи"),
             (f"/statyi/{slug}", article.title),
         ),
+        og_image_url=_absolute_media_url(article.cover),
     )
 
 
@@ -104,6 +126,7 @@ def _resolve_news(path: str) -> SeoHeadContext | None:
             ("/novosti", "Новости"),
             (f"/novosti/{slug}", news.title),
         ),
+        og_image_url=_absolute_media_url(news.cover),
     )
 
 
@@ -214,6 +237,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
     if cat is not None:
         crumbs.append((catalog_category_path(cat.slug), cat.name))
     crumbs.append((canonical, display_name))
+    primary_image = sku.images.filter(is_published=True).order_by("sort_order", "id").first()
     return SeoHeadContext(
         canonical_path=canonical,
         page_title=_format_page_title(title_partial),
@@ -229,6 +253,9 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         in_stock=sku.in_stock,
         category_name=cat_name,
         breadcrumb=tuple(crumbs),
+        og_image_url=_absolute_media_url(
+            primary_image.image if primary_image is not None else None,
+        ),
     )
 
 
@@ -332,7 +359,9 @@ def _replace_tag(html: str, pattern: str, replacement: str) -> str:
     return new_html if count else html
 
 
-def _og_image_url() -> str:
+def _og_image_url(context: SeoHeadContext) -> str:
+    if context.og_image_url:
+        return context.og_image_url
     return f"{settings.SITE_URL.rstrip('/')}{OG_IMAGE_PATH}"
 
 
@@ -351,12 +380,18 @@ def apply_seo_head(html: str, context: SeoHeadContext, *, canonical_url: str) ->
     description = escape(context.description)
     canonical = escape(canonical_url)
     robots = "noindex, nofollow" if context.noindex else "index, follow"
-    og_image = escape(_og_image_url())
+    og_image = escape(_og_image_url(context))
     og_type = escape(context.og_type)
 
     html = _replace_tag(html, r"<title>.*?</title>", f"<title>{title}</title>")
     html = _ensure_meta(html, "name", "description", description)
     html = _ensure_meta(html, "name", "robots", robots)
+    html = _ensure_meta(
+        html,
+        "name",
+        "yandex-verification",
+        escape(YANDEX_VERIFICATION_CONTENT),
+    )
     html = _ensure_link_canonical(html, canonical)
     html = _ensure_meta(html, "property", "og:title", title)
     html = _ensure_meta(html, "property", "og:description", description)

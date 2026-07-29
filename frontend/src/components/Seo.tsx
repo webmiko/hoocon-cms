@@ -1,10 +1,14 @@
 import { Helmet } from "react-helmet-async";
 
 import { canonicalizePath } from "../utils/canonicalizePath";
-import { brandedTitle } from "../utils/seoMeta";
+import {
+  absoluteOgImageUrl,
+  brandedTitle,
+  SITE_URL,
+} from "../utils/seoMeta";
 
 const SITE_NAME = "Hoocon";
-const SITE_URL = "https://hoocon.ru";
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.svg`;
 
 interface SeoProps {
   title: string;
@@ -19,6 +23,11 @@ interface SeoProps {
   noindex?: boolean;
   /** Optional image URL to ``<link rel="preload" as="image">`` (LCP). */
   preloadImage?: string;
+  /**
+   * Absolute or site-relative image for og:image / twitter:image.
+   * Falls back to site-wide ``/og-image.svg``.
+   */
+  image?: string | null;
 }
 
 function cspNonce(): string | undefined {
@@ -44,13 +53,14 @@ export function Seo({
   ogType = "website",
   noindex = false,
   preloadImage,
+  image,
 }: SeoProps) {
   const fullTitle = brandedTitle(title);
   const canonicalPath = path ? canonicalizePath(path) : "/";
   const canonical =
     canonicalPath === "/" ? SITE_URL : `${SITE_URL}${canonicalPath}`;
   const robots = noindex ? "noindex, nofollow" : "index, follow";
-  const ogImage = `${SITE_URL}/og-image.svg`;
+  const ogImage = absoluteOgImageUrl(image) ?? DEFAULT_OG_IMAGE;
   const nonce = cspNonce();
   const blocks = jsonLd
     ? Array.isArray(jsonLd)

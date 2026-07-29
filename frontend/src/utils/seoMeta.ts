@@ -1,9 +1,14 @@
 /** SERP-oriented title/description helpers (docs/seo-meta-yandex-google.md). */
 
+export const SITE_URL = "https://hoocon.ru";
 const SITE_NAME = "Hoocon";
 const TITLE_MAX = 60;
 const TITLE_PARTIAL_MAX = TITLE_MAX - ` — ${SITE_NAME}`.length;
 const DESC_MAX = 160;
+
+const CATALOG_FALLBACK_DESCRIPTION =
+  "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
+  + "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo.";
 
 function truncateAtWord(text: string, maxLen: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -14,6 +19,57 @@ function truncateAtWord(text: string, maxLen: number): string {
   const at = cut.lastIndexOf(" ");
   const base = at > 20 ? cut.slice(0, at) : cut;
   return `${base}…`;
+}
+
+/** Meta description capped at a word boundary (≤160). */
+export function metaDescription(text: string, maxLen: number = DESC_MAX): string {
+  return truncateAtWord(text, maxLen);
+}
+
+/**
+ * Absolute URL for og:image (relative media → production origin).
+ *
+ * Args:
+ *   src: Absolute or site-relative image URL.
+ *
+ * Returns:
+ *   Absolute https URL, or undefined when src is empty.
+ */
+export function absoluteOgImageUrl(
+  src: string | null | undefined,
+): string | undefined {
+  const raw = (src ?? "").trim();
+  if (!raw) {
+    return undefined;
+  }
+  if (raw.startsWith("https://") || raw.startsWith("http://")) {
+    return raw;
+  }
+  if (raw.startsWith("//")) {
+    return `https:${raw}`;
+  }
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${SITE_URL}${path}`;
+}
+
+/**
+ * Unique category listing description (align with backend ``_resolve_catalog_category``).
+ *
+ * Args:
+ *   categoryName: Category display name.
+ *   categoryDescription: Optional long description from API.
+ */
+export function categorySeoDescription(
+  categoryName?: string | null,
+  categoryDescription?: string | null,
+): string {
+  const fromBody = (categoryDescription ?? "").replace(/\s+/g, " ").trim();
+  const fromName = (categoryName ?? "").replace(/\s+/g, " ").trim();
+  const source = fromBody || fromName;
+  if (!source) {
+    return CATALOG_FALLBACK_DESCRIPTION;
+  }
+  return truncateAtWord(source, DESC_MAX);
 }
 
 export function brandedTitle(partial: string): string {

@@ -58,6 +58,36 @@ def test_resolve_seo_catalog_category() -> None:
     assert ("/catalog", "Каталог") in ctx.breadcrumb
 
 
+def test_absolute_media_url_and_og_fallback() -> None:
+    """Relative media paths become absolute; empty falls back in apply path."""
+    from django.conf import settings
+
+    from config.seo.head import SeoHeadContext, _absolute_media_url, _og_image_url
+
+    class _FakeFile:
+        url = "/media/x.webp"
+
+    abs_url = _absolute_media_url(_FakeFile())
+    assert abs_url == f"{settings.SITE_URL.rstrip('/')}/media/x.webp"
+    assert _absolute_media_url(None) is None
+
+    default_ctx = SeoHeadContext(
+        canonical_path="/",
+        page_title="t",
+        description="d",
+        noindex=False,
+    )
+    assert _og_image_url(default_ctx).endswith("/og-image.svg")
+    custom = SeoHeadContext(
+        canonical_path="/x",
+        page_title="t",
+        description="d",
+        noindex=False,
+        og_image_url="https://hoocon.ru/media/y.webp",
+    )
+    assert _og_image_url(custom) == "https://hoocon.ru/media/y.webp"
+
+
 @pytest.mark.django_db
 def test_resolve_seo_deep_catalog_path_is_fallback() -> None:
     """Three-segment catalog path is not treated as a category page."""

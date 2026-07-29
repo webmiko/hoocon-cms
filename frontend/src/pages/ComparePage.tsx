@@ -523,7 +523,7 @@ function CompareSkuHead({
         to={`${catalogPathForSku(sku)}#rfq`}
         className={`${styles.skuCta} ${styles.noPrint}`}
       >
-        Запросить цену
+        Запросить КП
       </Link>
     </div>
   );

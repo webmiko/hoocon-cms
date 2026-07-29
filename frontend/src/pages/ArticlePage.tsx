@@ -15,6 +15,7 @@ import {
 } from "../utils/jsonLd";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
+import { metaDescription } from "../utils/seoMeta";
 import styles from "./ArticlePage.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -49,6 +50,7 @@ export function ArticlePage() {
 
   const bodyWithToc = extractArticleToc(sanitizeHtml(article.body));
   const plain = stripHtmlToText(article.excerpt || article.body);
+  const description = metaDescription(plain);
   const minutes = readingMinutes(article.body);
   const related = (listData?.results ?? [])
     .filter((item) => item.slug !== article.slug)
@@ -60,14 +62,15 @@ export function ArticlePage() {
       <article className={styles.article}>
         <Seo
           title={article.title}
-          description={plain.slice(0, 160)}
+          description={description}
           path={`/statyi/${article.slug}`}
           ogType="article"
+          image={article.cover}
           jsonLd={[
             buildArticleJsonLd({
               title: article.title,
               slug: article.slug,
-              description: plain.slice(0, 160),
+              description,
               published_at: article.published_at,
               pathPrefix: "/statyi",
             }),
@@ -115,7 +118,11 @@ export function ArticlePage() {
 
         {article.cover ? (
           <figure className={styles.coverFigure}>
-            <img className={styles.cover} src={article.cover} alt="" />
+            <img
+              className={styles.cover}
+              src={article.cover}
+              alt={article.title}
+            />
           </figure>
         ) : null}
 
