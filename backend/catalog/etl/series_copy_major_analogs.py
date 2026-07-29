@@ -315,7 +315,7 @@ def build_qx_analogs(brand: str, nm: int) -> str:
         ),
         "",
         (
-            "Прямых клонов мало: ориентир — линейки Belimo SuperCap / Fail-Safe "
+            "Прямых аналогов мало: ориентир — линейки Belimo SuperCap / Fail-Safe "
             "и Siemens / Honeywell с электронным возвратом. Перед заменой "
             "сверяйте время резерва и схему подключения."
         ),
