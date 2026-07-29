@@ -440,7 +440,7 @@ def belimo_codes_for_sku(sku: SKU) -> list[str]:
     from_text = extract_belimo_codes_from_text(text, voltage=voltage)
     if from_text:
         aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
-        filtered = _filter_codes_by_aux(from_text, aux)
+        filtered = _strip_lone_aux_suffix(_filter_codes_by_aux(from_text, aux), aux)
         if apply_control:
             filtered = _filter_codes_by_control(filtered, control)
         if sku_code_is_thermal(sku.sku_code):
@@ -463,7 +463,10 @@ def belimo_codes_for_sku(sku: SKU) -> list[str]:
         if thermal_sku != thermal_code:
             pass
         elif not apply_control or belimo_code_matches_control(code, control):
-            return [code]
+            aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
+            filtered = _strip_lone_aux_suffix(_filter_codes_by_aux([code], aux), aux)
+            if filtered:
+                return filtered
 
     return _infer_for_sku(sku, voltage=voltage)
 
@@ -485,6 +488,8 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
     """Drop the mismatched side of BASE / BASE-S pairs only.
 
     Unrelated articles (``LF24-S`` + ``LF24-RS``) are kept together.
+    Lone ``…-S`` without a bare pair is left as-is here; non-aux editions
+    are normalized later by :func:`_strip_lone_aux_suffix`.
     """
     if aux_switch is None or len(codes) <= 1:
         return codes
@@ -502,6 +507,32 @@ def _filter_codes_by_aux(codes: list[str], aux_switch: bool | None) -> list[str]
     if not drop:
         return codes
     return [code for code in codes if code not in drop]
+
+
+def _strip_lone_aux_suffix(codes: list[str], aux_switch: bool | None) -> list[str]:
+    """For non-aux SKUs, strip trailing ``-S`` when the card listed only the aux article.
+
+    Shared D/DS analog blocks often list a single ``LM24A-S``; without a bare
+    ``LM24A`` pair, :func:`_filter_codes_by_aux` cannot drop the mismatch.
+    """
+    if aux_switch is not False or not codes:
+        return codes
+    out: list[str] = []
+    for code in codes:
+        if re.search(r"-S\d?$", code, re.I):
+            base = re.sub(r"-S\d?$", "", code, flags=re.I)
+            out.append(base if base else code)
+        else:
+            out.append(code)
+    # Dedupe while preserving order.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for code in out:
+        if code in seen:
+            continue
+        seen.add(code)
+        unique.append(code)
+    return unique
 
 
 def _filter_codes_by_control(codes: list[str], control: str | None) -> list[str]:

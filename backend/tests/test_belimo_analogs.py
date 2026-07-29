@@ -135,6 +135,41 @@ def test_belimo_codes_filters_aux_suffix_from_shared_block() -> None:
     assert belimo_codes_for_sku(with_s) == ["NM24A-SR-20-S"]
 
 
+@pytest.mark.django_db
+def test_belimo_codes_strips_lone_s_for_non_aux_damu_d() -> None:
+    """Shared D/DS card with only LM24A-S → D gets LM24A, DS keeps -S."""
+    cat = Category.objects.create(name="Air", slug="air-damu-aux-analog")
+    product = Product.objects.create(
+        name="DA4MU",
+        slug="da4mu-aux-analog",
+        category=cat,
+        analogs_text="""
+Аналоги для DA4MU24-D/DS (24 В, 4Нм):
+– Belimo LM24A-S (без возвратной пружины)
+""",
+    )
+    bare = SKU.objects.create(
+        product=product,
+        name="DA4MU24-D",
+        slug="da4mu24-d-aux",
+        sku_code="DA4MU24-D",
+        is_published=True,
+        analog_belimo_code="LM24A-S",
+    )
+    with_s = SKU.objects.create(
+        product=product,
+        name="DA4MU24-DS",
+        slug="da4mu24-ds-aux",
+        sku_code="DA4MU24-DS",
+        is_published=True,
+        analog_belimo_code="LM24A-S",
+    )
+    assert belimo_codes_for_sku(bare) == ["LM24A"]
+    assert belimo_codes_for_sku(with_s) == ["LM24A-S"]
+    assert primary_belimo_code_for_sku(bare) == "LM24A"
+    assert primary_belimo_code_for_sku(with_s) == "LM24A-S"
+
+
 def test_infer_air_no_spring_by_moment_voltage_aux_control() -> None:
     """HVD-class: LM/NM/GM by moment + voltage + aux + control."""
     assert infer_belimo_codes(
