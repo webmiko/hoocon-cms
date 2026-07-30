@@ -1402,6 +1402,10 @@ _HVDF_PHOTO_MARGIN: Final[float] = 0.07
 _HVDF_PHOTO_REF_NM: Final[int] = 5
 _HVDF_PHOTO_MIN_SCALE: Final[float] = 0.75
 
+# Shared portrait canvas for punched studio heroes (HVDF / H81 / H8205).
+CATALOG_HERO_CANVAS: Final[tuple[int, int]] = _HVDF_PHOTO_CANVAS
+CATALOG_HERO_MARGIN: Final[float] = _HVDF_PHOTO_MARGIN
+
 
 def _rgba_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     """Tight bbox of non-transparent, non-near-white content."""
@@ -1434,6 +1438,37 @@ def _rgba_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     )
 
 
+def center_cutout_on_canvas(
+    image: Image.Image,
+    *,
+    canvas_size: tuple[int, int] = CATALOG_HERO_CANVAS,
+    margin: float = CATALOG_HERO_MARGIN,
+    factor: float = 1.0,
+) -> Image.Image:
+    """Trim a punched cutout and center it on the shared portrait canvas.
+
+    ``factor`` scales the long side relative to a full inner-box fit (1.0 = max).
+    Used for kit heroes (H81 / H8205) that share one studio shot per family —
+    no DN/Nm curve, just consistent framing with brass/HV packs.
+    """
+    canvas_w, canvas_h = canvas_size
+    inner_w = int(canvas_w * (1 - 2 * margin))
+    inner_h = int(canvas_h * (1 - 2 * margin))
+    rgba = image.convert("RGBA")
+    x0, y0, x1, y1 = _rgba_content_bbox(rgba)
+    crop = rgba.crop((x0, y0, x1, y1))
+    cw, ch = crop.size
+    fit = min(inner_w / cw, inner_h / ch) * max(0.01, min(factor, 1.0))
+    nw, nh = max(1, int(cw * fit)), max(1, int(ch * fit))
+    if nw > inner_w or nh > inner_h:
+        s2 = min(inner_w / nw, inner_h / nh)
+        nw, nh = max(1, int(nw * s2)), max(1, int(nh * s2))
+    resized = crop.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    canvas.paste(resized, ((canvas_w - nw) // 2, (canvas_h - nh) // 2), resized)
+    return canvas
+
+
 def center_hvdf_photos_on_canvas(
     body: Image.Image,
     thermal: Image.Image,
@@ -1451,21 +1486,19 @@ def center_hvdf_photos_on_canvas(
     right-hand gap. Trimming + centering fixes catalog alignment while keeping
     one pixel scale for both editions. Size ∝ Nm (REF=5 → full frame).
     """
+    factor = min_scale + (1.0 - min_scale) * (min(series_nm, ref_nm) / ref_nm)
+    # Shared long-side target so S and ST stay optically matched.
     canvas_w, canvas_h = canvas_size
     inner_w = int(canvas_w * (1 - 2 * margin))
     inner_h = int(canvas_h * (1 - 2 * margin))
-    factor = min_scale + (1.0 - min_scale) * (min(series_nm, ref_nm) / ref_nm)
-
     crops: list[Image.Image] = []
     for src in (body, thermal):
         rgba = src.convert("RGBA")
         x0, y0, x1, y1 = _rgba_content_bbox(rgba)
         crops.append(rgba.crop((x0, y0, x1, y1)))
-
     max_long = max(max(crop.size) for crop in crops)
     unit = min(inner_w / max_long, inner_h / max_long)
     target_long = max_long * unit * factor
-
     placed: list[Image.Image] = []
     for crop in crops:
         cw, ch = crop.size

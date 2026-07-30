@@ -242,6 +242,24 @@ def test_crop_hvdf_product_photos_excludes_datasheet_chrome() -> None:
     assert thermal.size[1] < height * 0.20
 
 
+def test_center_cutout_on_canvas_centers_and_fills() -> None:
+    """Kit heroes land centered on the shared portrait canvas."""
+    from catalog.etl.manual_diagrams import CATALOG_HERO_CANVAS, center_cutout_on_canvas
+
+    src = Image.new("RGBA", (200, 300), (0, 0, 0, 0))
+    for y in range(20, 280):
+        for x in range(40, 160):
+            src.putpixel((x, y), (50, 50, 50, 255))
+    out = center_cutout_on_canvas(src)
+    assert out.size == CATALOG_HERO_CANVAS
+    a = out.split()[-1]
+    bbox = a.getbbox()
+    assert bbox is not None
+    w, _h = out.size
+    left, right = bbox[0], w - bbox[2]
+    assert abs(left - right) <= 2
+
+
 def test_center_hvdf_photos_on_canvas_centers_asymmetric_s_pad() -> None:
     """S edition empty sensor column must not leave a right-hand catalog gap."""
     from catalog.etl.manual_diagrams import (

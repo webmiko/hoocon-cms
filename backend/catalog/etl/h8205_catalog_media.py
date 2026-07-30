@@ -24,6 +24,7 @@ from catalog.etl.manual_diagrams import (
     DiagramCrop,
     _pil_to_png_bytes,
     _upsert_diagram,
+    center_cutout_on_canvas,
     punch_near_white_background,
     render_pdf_page,
 )
@@ -71,7 +72,7 @@ def crops_for_h8205(
         from PIL import Image
 
         img = Image.open(io.BytesIO(raw)).convert("RGB")
-        img = punch_near_white_background(img)
+        img = center_cutout_on_canvas(punch_near_white_background(img))
         out.append(
             DiagramCrop(
                 kind="photo",

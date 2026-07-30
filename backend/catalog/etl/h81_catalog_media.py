@@ -34,6 +34,7 @@ from catalog.etl.manual_diagrams import (
     DiagramKind,
     _pil_to_png_bytes,
     _upsert_diagram,
+    center_cutout_on_canvas,
     punch_near_white_background,
     render_pdf_page,
 )
@@ -342,7 +343,7 @@ def crop_h81_dimensions(
 
 
 def _photo_image_from_file(path: Path) -> Image.Image | None:
-    """Load a studio JPEG and punch near-white backdrop."""
+    """Load a studio JPEG, punch near-white backdrop, center on shared canvas."""
     if not path.is_file():
         logger.warning("h81_catalog_photo_missing path=%s", path)
         return None
@@ -351,7 +352,8 @@ def _photo_image_from_file(path: Path) -> Image.Image | None:
     except OSError as exc:
         logger.warning("h81_catalog_photo_open_failed path=%s err=%s", path, type(exc).__name__)
         return None
-    return punch_near_white_background(image)
+    punched = punch_near_white_background(image)
+    return center_cutout_on_canvas(punched)
 
 
 def crops_for_h81_family(
