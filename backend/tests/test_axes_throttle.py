@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import Client
+from django.test import Client, override_settings
 
 
 @pytest.fixture
@@ -50,6 +50,7 @@ def test_axes_failure_limit_set() -> None:
 
 
 @pytest.mark.django_db
+@override_settings(ADMIN_EMAIL_OTP_ENABLED=False)
 def test_axes_lockout_after_failure_limit(axes_client) -> None:
     """After AXES_FAILURE_LIMIT failed logins, the IP is locked out (403)."""
     limit = settings.AXES_FAILURE_LIMIT
@@ -81,6 +82,7 @@ def test_axes_lockout_after_failure_limit(axes_client) -> None:
 
 
 @pytest.mark.django_db
+@override_settings(ADMIN_EMAIL_OTP_ENABLED=False)
 def test_axes_does_not_block_correct_login_first_try(axes_client) -> None:
     """A correct login on the first attempt is not blocked."""
     User.objects.create_user(
