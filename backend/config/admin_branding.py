@@ -7,7 +7,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 admin.site.site_header = _("Hoocon — администрирование")
-admin.site.site_title = _("Админка Hoocon")
+admin.site.site_title = _("HOOCON CMS")
 admin.site.index_title = _("Панель управления")
 
 # Сторонние apps/модели без полной RU-локали — подписи для индекса Admin.

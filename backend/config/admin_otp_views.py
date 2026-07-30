@@ -98,6 +98,13 @@ class AdminPasswordlessOtpLoginView(LoginView):
         kwargs["request"] = self.request
         return kwargs
 
+    def get_success_url(self) -> str:
+        """Stay inside Admin after OTP (never Django's /accounts/profile/)."""
+        url = super().get_success_url()
+        if isinstance(url, str) and url.startswith("/admin"):
+            return url
+        return reverse("admin:index")
+
     def form_valid(self, form: Any) -> HttpResponse:
         login = str(form.cleaned_data.get("username") or "").strip()
         try:

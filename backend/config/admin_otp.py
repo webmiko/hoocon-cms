@@ -67,7 +67,7 @@ def admin_email_otp_enabled() -> bool:
 
 def otp_ttl_seconds() -> int:
     """Challenge lifetime in seconds."""
-    return int(getattr(settings, "ADMIN_EMAIL_OTP_TTL_SECONDS", 60))
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_TTL_SECONDS", 300))
 
 
 def otp_max_attempts() -> int:
@@ -365,9 +365,9 @@ def normalize_otp_input(raw: str) -> str:
 
 
 def peek_admin_otp_next_url(request: HttpRequest, *, fallback: str) -> str:
-    """Safe relative next path from session."""
+    """Safe Admin-relative next path from session (never public SPA URLs)."""
     raw = request.session.get(SESSION_NEXT)
-    if isinstance(raw, str) and raw.startswith("/") and not raw.startswith("//"):
+    if isinstance(raw, str) and raw.startswith("/admin") and not raw.startswith("//"):
         return raw
     return fallback
 

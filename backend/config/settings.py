@@ -231,6 +231,11 @@ TIME_ZONE = "Europe/Moscow"
 USE_I18N = True
 USE_TZ = True
 
+# After staff auth (incl. Admin Email OTP) land in Admin, not Django's
+# default /accounts/profile/ (SPA shell → empty page on :8000).
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/admin/login/"
+
 STATIC_URL = "/static/"
 STATIC_ROOT = str(BASE_DIR / "staticfiles")
 STATICFILES_DIRS = [BASE_DIR / "static"]
@@ -260,7 +265,7 @@ _UNFOLD_PRIMARY = {
 }
 
 UNFOLD = {
-    "SITE_TITLE": _("Админка Hoocon"),
+    "SITE_TITLE": _("HOOCON CMS"),
     "SITE_HEADER": _("Hoocon"),
     "SITE_SUBHEADER": _("Панель управления"),
     "SITE_URL": "/",
@@ -409,13 +414,17 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_SSL = _env_bool("EMAIL_USE_SSL", default=True)
 EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=False)
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
+)
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
 
 # Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
 # Prod: ADMIN_EMAIL_OTP_ENABLED=true + ALLOWED_EMAILS (SMTP required).
 ADMIN_EMAIL_OTP_ENABLED = _env_bool("ADMIN_EMAIL_OTP_ENABLED", default=False)
-ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "60"))
+ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "300"))
 ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"))
 ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "60"),

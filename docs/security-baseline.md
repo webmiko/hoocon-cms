@@ -86,7 +86,7 @@ Admin, файлы, SPA, VPS.
 - Admin: только staff; опц. IP allowlist nginx на `/admin/` (prod).
   **Email OTP:** при `ADMIN_EMAIL_OTP_ENABLED=true` вход без пароля —
   логин/email → 6-значный код на почту (`config/admin_otp.py`). SMTP
-  обязателен. TTL кода короткий (дефолт 60 с); allowlist
+  обязателен. TTL кода 5 мин (дефолт 300 с); allowlist
   `ADMIN_EMAIL_OTP_ALLOWED_EMAILS`; progressive delay на неверный код;
   rate limit запросов кода по IP (+ django-axes). При `false` —
   классический пароль (локалка/CI/авария).

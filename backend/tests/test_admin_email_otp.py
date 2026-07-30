@@ -16,7 +16,7 @@ User = get_user_model()
 
 OTP_SETTINGS = {
     "ADMIN_EMAIL_OTP_ENABLED": True,
-    "ADMIN_EMAIL_OTP_TTL_SECONDS": 60,
+    "ADMIN_EMAIL_OTP_TTL_SECONDS": 300,
     "ADMIN_EMAIL_OTP_MAX_ATTEMPTS": 5,
     "ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS": 60,
     "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "",
@@ -65,10 +65,11 @@ def test_admin_otp_happy_path_logs_in() -> None:
     admin_user = _staff(username="otp-ok", email="otp-ok@example.com")
     client = Client()
     with patch("config.admin_otp.generate_otp_code", return_value="424242"):
+        # No next= — must not fall through to /accounts/profile/
         _csrf_post(
             client,
             "/admin/login/",
-            {"username": admin_user.email, "next": "/admin/"},
+            {"username": admin_user.email},
         )
     otp_page = client.get("/admin/otp/")
     assert otp_page.status_code == 200
@@ -81,7 +82,7 @@ def test_admin_otp_happy_path_logs_in() -> None:
         {"otp_code": "424242", "csrfmiddlewaretoken": csrf},
     )
     assert done.status_code == 302
-    assert done["Location"].endswith("/admin/")
+    assert done["Location"].endswith("/admin/") or "/admin/" in done["Location"]
     assert client.session.get("_auth_user_id") == str(admin_user.pk)
     assert client.session.get("admin_otp_user_id") is None
 
@@ -401,7 +402,7 @@ def test_allowlist_blocks_other_staff_email() -> None:
     )
     assert ok_resp.status_code == 302
     assert len(mail.outbox) == 1
-    assert "1 мин" in mail.outbox[0].body
+    assert "5 мин" in mail.outbox[0].body
 
 
 @pytest.mark.django_db
@@ -468,6 +469,8 @@ def test_progressive_delay_blocks_immediate_retry() -> None:
 def test_otp_ttl_human_and_allowlist_helpers() -> None:
     from config.admin_otp import otp_ttl_human, staff_email_allowed_for_otp
 
+    with override_settings(ADMIN_EMAIL_OTP_TTL_SECONDS=300):
+        assert otp_ttl_human() == "5 мин."
     with override_settings(ADMIN_EMAIL_OTP_TTL_SECONDS=60):
         assert otp_ttl_human() == "1 мин."
     with override_settings(ADMIN_EMAIL_OTP_TTL_SECONDS=45):

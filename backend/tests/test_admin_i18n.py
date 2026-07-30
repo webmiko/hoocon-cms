@@ -55,7 +55,7 @@ def test_admin_index_has_no_english_app_headings() -> None:
     assert "Редиректы" in html
     assert "Настройки сайта" in html
     assert "Защита входа" in html
-    assert "Админка Hoocon" in html or "Панель управления" in html
+    assert "HOOCON CMS" in html or "Панель управления" in html
 
     # App captions / module headings (avoid false positives like <!-- Content -->).
     for english in (
