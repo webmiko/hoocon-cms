@@ -25,6 +25,7 @@ from config.admin_otp import (
     AdminOtpVerifyError,
     admin_email_otp_enabled,
     clear_admin_otp_challenge,
+    consume_otp_request_quota,
     find_staff_user_for_otp,
     get_pending_admin_otp_user,
     mask_email,
@@ -99,6 +100,13 @@ class AdminPasswordlessOtpLoginView(LoginView):
 
     def form_valid(self, form: Any) -> HttpResponse:
         login = str(form.cleaned_data.get("username") or "").strip()
+        try:
+            consume_otp_request_quota(self.request)
+        except AdminOtpDeliveryError as exc:
+            _record_axes_failure(self.request, login)
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+
         user = find_staff_user_for_otp(login)
         if user is None or not (getattr(user, "email", "") or "").strip():
             _record_axes_failure(self.request, login)
@@ -169,6 +177,7 @@ def admin_otp_verify_view(request: HttpRequest) -> HttpResponse:
 def admin_otp_resend_view(request: HttpRequest) -> HttpResponse:
     """Resend a fresh OTP code."""
     try:
+        consume_otp_request_quota(request)
         resend_admin_otp(request)
         messages.success(request, "Новый код отправлен на email.")
     except AdminOtpDeliveryError as exc:

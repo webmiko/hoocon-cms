@@ -413,12 +413,18 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
 
 # Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
-# Prod: set ADMIN_EMAIL_OTP_ENABLED=true (SMTP required).
+# Prod: ADMIN_EMAIL_OTP_ENABLED=true + ALLOWED_EMAILS (SMTP required).
 ADMIN_EMAIL_OTP_ENABLED = _env_bool("ADMIN_EMAIL_OTP_ENABLED", default=False)
-ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "600"))
+ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "60"))
 ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"))
 ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "60"),
+)
+# Comma-separated; empty = any active staff (local/CI). Prod: mikolamus@ya.ru
+ADMIN_EMAIL_OTP_ALLOWED_EMAILS = os.getenv("ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "")
+ADMIN_EMAIL_OTP_REQUEST_LIMIT = int(os.getenv("ADMIN_EMAIL_OTP_REQUEST_LIMIT", "5"))
+ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS = int(
+    os.getenv("ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS", "600"),
 )
 
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─

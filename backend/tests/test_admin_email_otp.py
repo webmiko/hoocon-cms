@@ -16,9 +16,12 @@ User = get_user_model()
 
 OTP_SETTINGS = {
     "ADMIN_EMAIL_OTP_ENABLED": True,
-    "ADMIN_EMAIL_OTP_TTL_SECONDS": 600,
+    "ADMIN_EMAIL_OTP_TTL_SECONDS": 60,
     "ADMIN_EMAIL_OTP_MAX_ATTEMPTS": 5,
     "ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS": 60,
+    "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "",
+    "ADMIN_EMAIL_OTP_REQUEST_LIMIT": 50,
+    "ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS": 600,
     "EMAIL_BACKEND": "django.core.mail.backends.locmem.EmailBackend",
     "AXES_ENABLED": False,
 }
@@ -34,7 +37,7 @@ def _staff(*, username: str, email: str) -> object:
     return User.objects.create_superuser(
         username=username,
         email=email,
-        password="UnusedPass123!",
+        password="password12",
     )
 
 
@@ -136,7 +139,7 @@ def test_admin_password_login_when_otp_disabled() -> None:
         "/admin/login/",
         {
             "username": admin_user.username,
-            "password": "UnusedPass123!",
+            "password": "password12",
             "next": "/admin/",
         },
     )
@@ -163,7 +166,7 @@ def test_unknown_login_does_not_send_mail() -> None:
 @pytest.mark.django_db
 @override_settings(**OTP_SETTINGS)
 def test_staff_without_email_does_not_send_mail() -> None:
-    User.objects.create_superuser(username="no-mail", email="", password="UnusedPass123!")
+    User.objects.create_superuser(username="no-mail", email="", password="password12")
     client = Client()
     response = _csrf_post(
         client,
@@ -257,18 +260,19 @@ def test_otp_short_code_and_exhausted_attempts() -> None:
             {"username": admin_user.username, "next": "/admin/"},
         )
     csrf = client.cookies["csrftoken"].value
-    short = client.post(
-        "/admin/otp/",
-        {"otp_code": "12", "csrfmiddlewaretoken": csrf},
-    )
-    assert short.status_code == 200
-    assert client.session.get("admin_otp_user_id") == admin_user.pk
-
-    for _ in range(4):
-        bad = client.post(
+    with patch("config.admin_otp._delay_after_attempts", return_value=0):
+        short = client.post(
             "/admin/otp/",
-            {"otp_code": "000000", "csrfmiddlewaretoken": csrf},
+            {"otp_code": "12", "csrfmiddlewaretoken": csrf},
         )
+        assert short.status_code == 200
+        assert client.session.get("admin_otp_user_id") == admin_user.pk
+
+        for _ in range(4):
+            bad = client.post(
+                "/admin/otp/",
+                {"otp_code": "000000", "csrfmiddlewaretoken": csrf},
+            )
     assert bad.status_code == 302
     assert bad["Location"].endswith("/admin/login/")
     assert client.session.get("admin_otp_user_id") is None
@@ -322,7 +326,7 @@ def test_find_staff_and_pending_edge_cases() -> None:
     inactive = User.objects.create_user(
         username="otp-inactive",
         email="otp-inactive@example.com",
-        password="UnusedPass123!",
+        password="password12",
         is_staff=True,
         is_active=False,
     )
@@ -369,6 +373,110 @@ def test_find_staff_and_pending_edge_cases() -> None:
     req.session.create()
     with pytest.raises(AdminOtpVerifyError, match="истёк|истекла"):
         verify_admin_otp(req, "123456")
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **OTP_SETTINGS,
+        "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "allowed@example.com",
+    },
+)
+def test_allowlist_blocks_other_staff_email() -> None:
+    _staff(username="blocked", email="blocked@example.com")
+    allowed = _staff(username="ok-user", email="allowed@example.com")
+    client = Client()
+    blocked_resp = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": "blocked", "next": "/admin/"},
+    )
+    assert blocked_resp.status_code == 200
+    assert len(mail.outbox) == 0
+
+    ok_resp = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": allowed.username, "next": "/admin/"},
+    )
+    assert ok_resp.status_code == 302
+    assert len(mail.outbox) == 1
+    assert "1 мин" in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **OTP_SETTINGS,
+        "ADMIN_EMAIL_OTP_REQUEST_LIMIT": 2,
+        "ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS": 600,
+    },
+)
+def test_otp_request_rate_limit_by_ip() -> None:
+    admin_user = _staff(username="otp-rate", email="otp-rate@example.com")
+    client = Client(REMOTE_ADDR="203.0.113.50")
+    with patch("config.admin_otp.generate_otp_code", return_value="121212"):
+        r1 = _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+        assert r1.status_code == 302
+        client.get("/admin/otp/cancel/")
+        r2 = _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+        assert r2.status_code == 302
+        client.get("/admin/otp/cancel/")
+        r3 = _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    assert r3.status_code == 200
+    assert len(mail.outbox) == 2
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_progressive_delay_blocks_immediate_retry() -> None:
+    admin_user = _staff(username="otp-delay", email="otp-delay@example.com")
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="131313"):
+        _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    csrf = client.cookies["csrftoken"].value
+    first = client.post(
+        "/admin/otp/",
+        {"otp_code": "000000", "csrfmiddlewaretoken": csrf},
+    )
+    assert first.status_code == 200
+    assert "Неверный код" in first.content.decode()
+    second = client.post(
+        "/admin/otp/",
+        {"otp_code": "000000", "csrfmiddlewaretoken": csrf},
+    )
+    assert second.status_code == 200
+    assert "Подождите" in second.content.decode()
+
+
+def test_otp_ttl_human_and_allowlist_helpers() -> None:
+    from config.admin_otp import otp_ttl_human, staff_email_allowed_for_otp
+
+    with override_settings(ADMIN_EMAIL_OTP_TTL_SECONDS=60):
+        assert otp_ttl_human() == "1 мин."
+    with override_settings(ADMIN_EMAIL_OTP_TTL_SECONDS=45):
+        assert otp_ttl_human() == "45 сек."
+    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS=""):
+        assert staff_email_allowed_for_otp("any@x.ru") is True
+    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="A@X.ru, b@y.ru"):
+        assert staff_email_allowed_for_otp("a@x.ru") is True
+        assert staff_email_allowed_for_otp("other@x.ru") is False
 
 
 @pytest.fixture(autouse=True)

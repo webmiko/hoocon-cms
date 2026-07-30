@@ -3,6 +3,9 @@
 Ported from lms-backend ``config/admin_otp.py``: 6-digit code, hash+pepper,
 cache challenge, TTL / attempts / resend cooldown. Hoocon uses passwordless
 request-code (username/email → code) instead of password+OTP 2FA.
+
+Hardening: short TTL, email allowlist, progressive verify delay, IP request
+rate limit (axes remains for long IP lockout).
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import math
 import re
 import secrets
 import time
@@ -31,6 +35,8 @@ SESSION_SENT_AT = "admin_otp_sent_at"
 
 _OTP_DIGITS = 6
 _MASK_LOCAL_KEEP = 1
+# Seconds to wait after 1st, 2nd, … wrong attempt before the next try is allowed.
+_PROGRESSIVE_DELAYS_SEC: tuple[int, ...] = (0, 2, 5, 10, 20)
 
 
 class AdminOtpError(Exception):
@@ -51,6 +57,7 @@ class AdminOtpChallenge:
 
     code_hash: str
     attempts: int
+    locked_until: float = 0.0
 
 
 def admin_email_otp_enabled() -> bool:
@@ -60,7 +67,7 @@ def admin_email_otp_enabled() -> bool:
 
 def otp_ttl_seconds() -> int:
     """Challenge lifetime in seconds."""
-    return int(getattr(settings, "ADMIN_EMAIL_OTP_TTL_SECONDS", 600))
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_TTL_SECONDS", 60))
 
 
 def otp_max_attempts() -> int:
@@ -71,6 +78,39 @@ def otp_max_attempts() -> int:
 def otp_resend_cooldown_seconds() -> int:
     """Minimum seconds between resend requests."""
     return int(getattr(settings, "ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60))
+
+
+def otp_request_limit() -> int:
+    """Max OTP send/resend requests per IP per window."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_REQUEST_LIMIT", 5))
+
+
+def otp_request_window_seconds() -> int:
+    """Sliding window for IP OTP request rate limit."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS", 600))
+
+
+def otp_allowed_emails() -> frozenset[str]:
+    """Lowercased allowlist; empty means any active staff email is OK."""
+    raw = str(getattr(settings, "ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "") or "")
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
+def staff_email_allowed_for_otp(email: str) -> bool:
+    """True if email may receive Admin OTP (allowlist empty → allow all)."""
+    allowed = otp_allowed_emails()
+    if not allowed:
+        return True
+    return (email or "").strip().lower() in allowed
+
+
+def otp_ttl_human() -> str:
+    """Human TTL for email footer (e.g. «1 мин.» / «45 сек.»)."""
+    ttl = max(1, otp_ttl_seconds())
+    if ttl < 60:
+        return f"{ttl} сек."
+    minutes = max(1, math.ceil(ttl / 60))
+    return f"{minutes} мин."
 
 
 def mask_email(email: str) -> str:
@@ -97,6 +137,31 @@ def hash_otp_code(code: str) -> str:
     digest.update(b"|admin-email-otp|")
     digest.update(code.strip().encode("utf-8"))
     return digest.hexdigest()
+
+
+def _client_ip(request: HttpRequest) -> str:
+    return (request.META.get("REMOTE_ADDR") or "0.0.0.0").strip() or "0.0.0.0"
+
+
+def consume_otp_request_quota(request: HttpRequest) -> None:
+    """Count OTP send/resend for this IP; raise if over limit."""
+    limit = otp_request_limit()
+    window = otp_request_window_seconds()
+    key = f"admin_email_otp:req_v1:{_client_ip(request)}"
+    try:
+        count = int(cache.incr(key))
+    except ValueError:
+        # Key missing — seed window.
+        cache.add(key, 1, timeout=window)
+        count = 1
+        # Race: another worker may have created it.
+        if cache.get(key) != 1:
+            try:
+                count = int(cache.incr(key))
+            except ValueError:
+                count = 1
+    if count > limit:
+        raise AdminOtpDeliveryError("Слишком много запросов. Попробуйте позже.")
 
 
 def _cache_key(user_id: int, session_key: str) -> str:
@@ -159,15 +224,18 @@ def find_staff_user_for_otp(login: str) -> AbstractBaseUser | None:
     user_model = get_user_model()
     qs = user_model.objects.filter(is_active=True, is_staff=True)
     user = qs.filter(username__iexact=raw).first()
-    if user is not None:
-        return user
-    if "@" in raw:
-        return qs.filter(email__iexact=raw).first()
-    return None
+    if user is None and "@" in raw:
+        user = qs.filter(email__iexact=raw).first()
+    if user is None:
+        return None
+    email = (getattr(user, "email", "") or "").strip()
+    if not staff_email_allowed_for_otp(email):
+        return None
+    return user
 
 
 def _store_challenge(user_id: int, session_key: str, code: str) -> None:
-    payload = {"code_hash": hash_otp_code(code), "attempts": 0}
+    payload = {"code_hash": hash_otp_code(code), "attempts": 0, "locked_until": 0.0}
     cache.set(_cache_key(user_id, session_key), payload, timeout=otp_ttl_seconds())
 
 
@@ -177,13 +245,26 @@ def _load_challenge(user_id: int, session_key: str) -> AdminOtpChallenge | None:
         return None
     code_hash = raw.get("code_hash")
     attempts = raw.get("attempts", 0)
+    locked_until = raw.get("locked_until", 0.0)
     if not isinstance(code_hash, str):
         return None
     try:
         attempts_int = int(attempts)
+        locked_f = float(locked_until or 0.0)
     except (TypeError, ValueError):
         return None
-    return AdminOtpChallenge(code_hash=code_hash, attempts=attempts_int)
+    return AdminOtpChallenge(
+        code_hash=code_hash,
+        attempts=attempts_int,
+        locked_until=locked_f,
+    )
+
+
+def _delay_after_attempts(attempts: int) -> int:
+    if attempts <= 0:
+        return 0
+    idx = min(attempts, len(_PROGRESSIVE_DELAYS_SEC) - 1)
+    return _PROGRESSIVE_DELAYS_SEC[idx]
 
 
 def send_admin_otp_email(*, to_email: str, code: str) -> None:
@@ -192,10 +273,7 @@ def send_admin_otp_email(*, to_email: str, code: str) -> None:
     site_name = "Hoocon"
     subject = f"Код входа в админку — {site_name}"
     intro = "Ваш одноразовый код для входа в панель управления:"
-    footer = (
-        f"Код действует {max(1, otp_ttl_seconds() // 60)} мин. "
-        "Если вы не пытались войти — проигнорируйте письмо."
-    )
+    footer = f"Код действует {otp_ttl_human()} Если вы не пытались войти — проигнорируйте письмо."
     plain_body = f"{intro}\n\n{code}\n\n{footer}\n{site_url}\n"
     html_body = render_to_string(
         "email/admin_otp.html",
@@ -229,6 +307,8 @@ def start_admin_otp_challenge(
     email = (getattr(user, "email", "") or "").strip()
     if not email:
         raise AdminOtpDeliveryError("У пользователя нет email для OTP.")
+    if not staff_email_allowed_for_otp(email):
+        raise AdminOtpDeliveryError("Не удалось отправить код на email.")
 
     session_key = _ensure_session_key(request)
     code = generate_otp_code()
@@ -263,6 +343,8 @@ def resend_admin_otp(request: HttpRequest) -> None:
     email = (getattr(user, "email", "") or "").strip()
     if not email:
         raise AdminOtpDeliveryError("У пользователя нет email для OTP.")
+    if not staff_email_allowed_for_otp(email):
+        raise AdminOtpDeliveryError("Не удалось отправить код на email.")
 
     session_key = _ensure_session_key(request)
     code = generate_otp_code()
@@ -310,6 +392,11 @@ def verify_admin_otp(
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Код истёк. Войдите снова.")
 
+    now = time.time()
+    if challenge.locked_until > now:
+        wait = max(1, int(math.ceil(challenge.locked_until - now)))
+        raise AdminOtpVerifyError(f"Подождите {wait} сек. перед следующей попыткой.")
+
     if challenge.attempts >= otp_max_attempts():
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.")
@@ -338,13 +425,20 @@ def _bump_attempts(
     session_key: str,
     challenge: AdminOtpChallenge,
 ) -> AdminOtpChallenge:
+    new_attempts = challenge.attempts + 1
+    delay = _delay_after_attempts(new_attempts)
     updated = AdminOtpChallenge(
         code_hash=challenge.code_hash,
-        attempts=challenge.attempts + 1,
+        attempts=new_attempts,
+        locked_until=time.time() + delay if delay else 0.0,
     )
     cache.set(
         _cache_key(user_id, session_key),
-        {"code_hash": updated.code_hash, "attempts": updated.attempts},
+        {
+            "code_hash": updated.code_hash,
+            "attempts": updated.attempts,
+            "locked_until": updated.locked_until,
+        },
         timeout=otp_ttl_seconds(),
     )
     return updated
