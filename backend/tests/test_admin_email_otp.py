@@ -305,13 +305,13 @@ def test_find_staff_and_pending_edge_cases() -> None:
     from django.test import RequestFactory
 
     from config.admin_otp import (
+        AdminOtpVerifyError,
         _cache_key,
         _load_challenge,
         find_staff_user_for_otp,
         get_pending_admin_otp_user,
         pending_admin_otp_user_id,
         verify_admin_otp,
-        AdminOtpVerifyError,
     )
 
     assert find_staff_user_for_otp("") is None
