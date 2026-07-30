@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.13 beta — 2026-07-30
+
+- Admin: passwordless Email OTP login when `ADMIN_EMAIL_OTP_ENABLED=true`
+  (username/email → 6-digit code); classic password when flag is off.
+
 ### v0.1.12 beta — 2026-07-30
 
 - H8205: DN-ascending catalog order; Instructions tab from wiring catalog text.
