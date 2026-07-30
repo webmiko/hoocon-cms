@@ -1,13 +1,23 @@
 """Canonical article slug renames (Tilda ID prefixes → readable ЧПУ).
 
 Spec: docs/seo-url-migration.md — keep old path as 301, new slug as canonical.
+Also relocates ``article_covers/<old-slug>/…`` files to ``article_covers/<new>/…``
+so media folder names match the public URL.
 """
 
 from __future__ import annotations
 
+import logging
+from pathlib import PurePosixPath
+
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+
 from content.models import Article
 from redirects.models import Redirect
 from redirects.pathutils import normalize_path
+
+logger = logging.getLogger(__name__)
 
 # old slug (Tilda / scrape) → canonical public slug
 ARTICLE_SLUG_RENAMES: dict[str, str] = {
@@ -21,11 +31,81 @@ ARTICLE_SLUG_RENAMES: dict[str, str] = {
 }
 
 
+def relocate_article_cover_to_slug(article: Article) -> str | None:
+    """Move cover file into ``article_covers/<article.slug>/`` when folder drifts.
+
+    Args:
+        article: Article with optional ``cover`` FileField.
+
+    Returns:
+        New relative media path, or ``None`` when no move was needed / possible.
+    """
+    if not article.cover or not article.slug:
+        return None
+    old_name = (article.cover.name or "").replace("\\", "/")
+    parts = PurePosixPath(old_name).parts
+    if len(parts) < 3 or parts[0] != "article_covers":
+        return None
+    folder = parts[1]
+    if folder == article.slug:
+        return None
+    basename = parts[-1]
+    new_name = f"article_covers/{article.slug}/{basename}"
+    if not default_storage.exists(old_name):
+        logger.warning(
+            "article_cover_missing slug=%s path=%s",
+            article.slug,
+            old_name,
+        )
+        return None
+    if default_storage.exists(new_name):
+        # Destination already has the file — just repoint the field.
+        article.cover.name = new_name
+        article.save(update_fields=["cover", "updated_at"])
+        try:
+            default_storage.delete(old_name)
+        except OSError:
+            logger.warning("article_cover_old_delete_failed path=%s", old_name)
+        return new_name
+
+    with default_storage.open(old_name, "rb") as src:
+        default_storage.save(new_name, ContentFile(src.read()))
+    article.cover.name = new_name
+    article.save(update_fields=["cover", "updated_at"])
+    try:
+        default_storage.delete(old_name)
+    except OSError:
+        logger.warning("article_cover_old_delete_failed path=%s", old_name)
+    logger.info(
+        "article_cover_relocated slug=%s from=%s to=%s",
+        article.slug,
+        old_name,
+        new_name,
+    )
+    return new_name
+
+
+def relocate_all_article_covers() -> list[tuple[str, str]]:
+    """Relocate every article cover whose folder ≠ current slug.
+
+    Returns:
+        List of ``(old_path, new_path)`` moves.
+    """
+    moved: list[tuple[str, str]] = []
+    for article in Article.objects.exclude(cover="").iterator():
+        old = article.cover.name
+        new = relocate_article_cover_to_slug(article)
+        if new:
+            moved.append((old, new))
+    return moved
+
+
 def apply_article_slug_renames() -> list[tuple[str, str]]:
     """Rename articles and upsert 301 ``/statyi/{old}`` → ``/statyi/{new}``.
 
     If both old and new Article rows exist, keep the new row and delete the old
     one (body/cover already on the survivor). If only old exists, rename in place.
+    After slug fixes, relocate cover files into ``article_covers/<slug>/``.
 
     Returns:
         List of ``(old_slug, new_slug)`` pairs that were ensured (rename and/or
@@ -51,4 +131,6 @@ def apply_article_slug_renames() -> list[tuple[str, str]]:
             },
         )
         applied.append((old_slug, new_slug))
+
+    relocate_all_article_covers()
     return applied
