@@ -95,10 +95,11 @@
   padding-inline: 0;
 }
 
-/* Valves / HV (air + accelerated→smoke): no CSS inset — margins are in the WebP. */
+/* Baked canvas packs: no CSS inset — margins are in the WebP. */
 .heroMedia[data-purpose="valve"],
 .heroMedia[data-purpose="air"],
-.heroMedia[data-purpose="smoke"] {
+.heroMedia[data-purpose="smoke"],
+.heroMedia[data-purpose="fire"] {
   --media-pad-inline: 0px;
   padding: 0;
 }
@@ -135,7 +136,8 @@
 .heroMedia[data-backdrop="white"] .heroZoomTrigger,
 .heroMedia[data-purpose="valve"] .heroZoomTrigger,
 .heroMedia[data-purpose="air"] .heroZoomTrigger,
-.heroMedia[data-purpose="smoke"] .heroZoomTrigger {
+.heroMedia[data-purpose="smoke"] .heroZoomTrigger,
+.heroMedia[data-purpose="fire"] .heroZoomTrigger {
   inset: 0;
 }
 
@@ -160,7 +162,8 @@
  */
 .heroMedia[data-purpose="valve"] .heroImage,
 .heroMedia[data-purpose="air"] .heroImage,
-.heroMedia[data-purpose="smoke"] .heroImage {
+.heroMedia[data-purpose="smoke"] .heroImage,
+.heroMedia[data-purpose="fire"] .heroImage {
   width: auto;
   height: auto;
   max-width: min(100%, calc(100% * var(--photo-scale, 1)));
@@ -322,7 +325,8 @@
 
 .galleryItem[data-purpose="valve"] .galleryImage,
 .galleryItem[data-purpose="air"] .galleryImage,
-.galleryItem[data-purpose="smoke"] .galleryImage {
+.galleryItem[data-purpose="smoke"] .galleryImage,
+.galleryItem[data-purpose="fire"] .galleryImage {
   width: auto;
   height: auto;
   max-width: min(100%, calc(100% * var(--photo-scale, 1)));

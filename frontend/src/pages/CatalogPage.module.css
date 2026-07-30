@@ -567,13 +567,15 @@
   line-height: 0;
 }
 
-/* Baked canvas packs (valve / HV air+Q) already include margins — no CSS inset. */
+/* Baked canvas packs already include margins — no CSS inset. */
 .cardMedia[data-purpose="valve"],
 .cardMediaPlaceholder[data-purpose="valve"],
 .cardMedia[data-purpose="air"],
 .cardMediaPlaceholder[data-purpose="air"],
 .cardMedia[data-purpose="smoke"],
-.cardMediaPlaceholder[data-purpose="smoke"] {
+.cardMediaPlaceholder[data-purpose="smoke"],
+.cardMedia[data-purpose="fire"],
+.cardMediaPlaceholder[data-purpose="fire"] {
   --media-pad-inline: 0px;
   padding: 0;
 }
@@ -620,7 +622,8 @@
 
 .cardMedia[data-purpose="valve"] .cardImage,
 .cardMedia[data-purpose="air"] .cardImage,
-.cardMedia[data-purpose="smoke"] .cardImage {
+.cardMedia[data-purpose="smoke"] .cardImage,
+.cardMedia[data-purpose="fire"] .cardImage {
   width: auto;
   height: auto;
   max-width: min(100%, calc(100% * var(--photo-scale, 1)));

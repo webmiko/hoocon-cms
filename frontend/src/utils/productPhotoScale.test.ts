@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   contentFillFromImageData,
+  isDaSaCanvasMediaSku,
   isHvCanvasMediaSku,
+  isKitCanvasMediaSku,
   normalizePhotoScale,
   parseDn,
   parseMomentNm,
@@ -111,8 +113,36 @@ describe("isHvCanvasMediaSku", () => {
   });
 });
 
+describe("isDaSaCanvasMediaSku", () => {
+  it("matches DA/SA MU/FU editions", () => {
+    expect(isDaSaCanvasMediaSku("DA8MU24-DS")).toBe(true);
+    expect(isDaSaCanvasMediaSku("da5fu24-a")).toBe(true);
+    expect(isDaSaCanvasMediaSku("SA10MU230-DST")).toBe(true);
+    expect(isDaSaCanvasMediaSku("SA5FU-DS")).toBe(true);
+  });
+
+  it("skips HV and brass", () => {
+    expect(isDaSaCanvasMediaSku("HVA24-10Q")).toBe(false);
+    expect(isDaSaCanvasMediaSku("8100-BV215A")).toBe(false);
+  });
+});
+
+describe("isKitCanvasMediaSku", () => {
+  it("matches H81 and H8205 kits", () => {
+    expect(isKitCanvasMediaSku("H8101-BV215A-24AS")).toBe(true);
+    expect(isKitCanvasMediaSku("H8122-BV2150-230DS")).toBe(true);
+    expect(isKitCanvasMediaSku("H8205-LAV232-24A")).toBe(true);
+  });
+
+  it("skips plain brass bodies", () => {
+    expect(isKitCanvasMediaSku("8100-BV215A")).toBe(false);
+    expect(isKitCanvasMediaSku("DA8MU24-D")).toBe(false);
+  });
+});
+
 describe("photoScalePlanFromHighlights", () => {
-  it("allows actuator boost above 1", () => {
+  it("allows non-baked actuator boost above 1", () => {
+    // Unknown sku + moment still uses FE scale (pre-canvas packs).
     const plan = photoScalePlanFromHighlights([{ key: "moment", value: "10 Нм" }]);
     expect(plan.maxCssScale).toBe(PHOTO_SCALE_CSS_MAX);
   });
@@ -132,13 +162,13 @@ describe("photoScalePlanFromHighlights", () => {
     expect(plan.maxCssScale).toBe(1);
   });
 
-  it("keeps DA/SA moment scale when sku is not HV canvas", () => {
+  it("caps baked DA/SA heroes at CSS scale 1", () => {
     const plan = photoScalePlanFromHighlights(
-      [{ key: "moment", value: "10 Нм" }],
-      "DA10MU24-DS",
+      [{ key: "moment", value: "8 Нм" }],
+      "DA8MU24-DS",
     );
-    expect(plan.target).toBeCloseTo(productPhotoScale(10), 5);
-    expect(plan.maxCssScale).toBe(PHOTO_SCALE_CSS_MAX);
+    expect(plan.target).toBe(1);
+    expect(plan.maxCssScale).toBe(1);
   });
 });
 

@@ -155,9 +155,7 @@ export type PhotoScalePlan = {
 };
 
 /**
- * HVA/HVD air SKUs whose heroes are sized on the shared media-webp canvas.
- *
- * Smoke ``…F`` editions are excluded (no Nm canvas pack yet).
+ * HVA/HVD SKUs whose heroes are sized on the shared media-webp / HVDF canvas.
  */
 export function isHvCanvasMediaSku(skuCode: string | null | undefined): boolean {
   // Air HVA/HVD (+Q/QX/P) and smoke HVD-…F — relative size baked into heroes.
@@ -165,15 +163,34 @@ export function isHvCanvasMediaSku(skuCode: string | null | undefined): boolean 
 }
 
 /**
+ * DA/SA (MU/FU/MQU/EU) SKUs with Nm hierarchy baked into media-webp cutouts.
+ */
+export function isDaSaCanvasMediaSku(skuCode: string | null | undefined): boolean {
+  return /^(?:da|sa)\d+(?:fu|mu|mqu|eu)(?:24|230)?-(?:as|dst|ds|a|d)$/i.test(
+    (skuCode || "").trim(),
+  );
+}
+
+/**
+ * H81 kits / H8205 LAV — studio heroes centered on the shared catalog canvas.
+ */
+export function isKitCanvasMediaSku(skuCode: string | null | undefined): boolean {
+  const code = (skuCode || "").trim();
+  if (/^h81(?:01|02|03|04|05|06|07|08|21|22)-bv/i.test(code)) {
+    return true;
+  }
+  return /^h8205-lav/i.test(code);
+}
+
+/**
  * Resolve torque or DN scale plan from SKU highlights (before crop compensation).
  *
- * Baked packs (brass DN, HVA/HVD Nm) keep ``target`` / ``maxCssScale`` at 1 so
- * CSS does not apply a second relative shrink. Other actuators (DA/SA, HVDF)
- * still map moment → 75…100% with fill boost up to ``PHOTO_SCALE_CSS_MAX``.
+ * Baked packs (brass DN, HVA/HVD, DA/SA Nm) keep ``target`` / ``maxCssScale`` at 1
+ * so CSS does not apply a second relative shrink.
  *
  * Args:
  *   highlights: List/detail highlights.
- *   skuCode: Optional SKU code to detect baked HV air heroes.
+ *   skuCode: Optional SKU code to detect baked actuator heroes.
  *
  * Returns:
  *   Target / maxCss plan.
@@ -182,8 +199,11 @@ export function photoScalePlanFromHighlights(
   highlights: ReadonlyArray<{ key: string; value: string }> | null | undefined,
   skuCode?: string | null,
 ): PhotoScalePlan {
-  // HVA/HVD air: Nm hierarchy is baked into media-webp (do not FE-scale again).
-  if (isHvCanvasMediaSku(skuCode)) {
+  if (
+    isHvCanvasMediaSku(skuCode) ||
+    isDaSaCanvasMediaSku(skuCode) ||
+    isKitCanvasMediaSku(skuCode)
+  ) {
     return { target: 1, maxCssScale: 1 };
   }
   const nm = parseMomentNm(momentHighlightValue(highlights));
