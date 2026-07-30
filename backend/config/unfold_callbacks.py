@@ -68,9 +68,20 @@ def perm_view_sitesettings(request: HttpRequest) -> bool:
 
 
 def unfold_extras_css(request: HttpRequest) -> str:
-    """URL of thin CSS for lead sticker / status / stats on Unfold shell."""
+    """URL of thin CSS for Unfold shell (cache-busted)."""
     del request
-    return static("admin/css/hoocon-unfold-extras.css")
+    url = static("admin/css/hoocon-unfold-extras.css")
+    from django.conf import settings
+
+    version = getattr(settings, "BUILD_SHA", "").strip()
+    if not version and settings.DEBUG:
+        path = settings.BASE_DIR / "static/admin/css/hoocon-unfold-extras.css"
+        if path.is_file():
+            version = str(int(path.stat().st_mtime))
+    if version:
+        sep = "&" if "?" in url else "?"
+        return f"{url}{sep}v={version}"
+    return url
 
 
 def _can_view_leads(request: HttpRequest) -> bool:

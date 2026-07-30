@@ -879,3 +879,17 @@ kbd.hoocon-sidebar-shortcut > span {
     padding-right: 0.5rem;
   }
 }
+
+/* All applications flyout: wider than Unfold w-80 so RU labels fit; wrap, don’t truncate. */
+.hoocon-all-apps-panel {
+  box-sizing: border-box;
+  width: min(28rem, calc(100vw - 4.5rem));
+  max-width: 28rem;
+}
+
+.hoocon-all-apps-panel h2,
+.hoocon-all-apps-panel a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
