@@ -267,6 +267,7 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": "Загрузить остатки",
             "form": form,
             "template_url": template_url,
+            "changelist_url": changelist_url,
             "media": self.media,
         }
         return render(request, "admin/catalog/stock_upload.html", context)

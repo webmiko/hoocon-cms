@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n unfold %}
 
 {% block content %}
 <nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
@@ -10,34 +10,42 @@
   <span>Загрузить остатки</span>
 </nav>
 
-<h1>{{ title }}</h1>
-<p>
-  Выгрузка из 1С (1–2 раза в неделю). Обновляются только артикулы из каталога;
-  неизвестные строки игнорируются; SKU без строки в файле не меняются.
-</p>
-<p>
-  <a href="{{ template_url }}">Скачать шаблон Excel</a>
-  (заголовки: Артикул | Свободно; также подходят Остатки / Остаток).
-</p>
-<form method="post" enctype="multipart/form-data" novalidate>
+<div class="mb-8 max-w-2xl">
+  <h1 class="font-semibold text-font-important-light text-xl dark:text-font-important-dark">
+    {{ title }}
+  </h1>
+  <p class="mt-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    Выгрузка из 1С (1–2 раза в неделю). Обновляются только артикулы из каталога;
+    неизвестные строки игнорируются; SKU без строки в файле не меняются.
+  </p>
+  <p class="mt-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    <a
+      href="{{ template_url }}"
+      class="font-medium text-primary-600 underline-offset-2 hover:underline dark:text-primary-500"
+    >Скачать шаблон Excel</a>
+    (заголовки: Артикул | Свободно; также подходят Остатки / Остаток).
+  </p>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate class="max-w-2xl">
   {% csrf_token %}
-  <fieldset class="module aligned">
-    {% for field in form %}
-      <div class="form-row">
-        {{ field.errors }}
-        {{ field.label_tag }}
-        {{ field }}
-        {% if field.help_text %}
-          <div class="help">{{ field.help_text }}</div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </fieldset>
-  <div class="submit-row">
-    <input type="submit" value="Загрузить" class="default">
-    <a href="{% url 'admin:catalog_sku_changelist' %}" class="button cancel-link">
+
+  {% if form.errors %}
+    <div class="flex flex-col gap-4 mb-6 *:mb-0">
+      {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+      {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+    </div>
+  {% endif %}
+
+  {% include "unfold/helpers/field.html" with field=form.file %}
+
+  <div class="flex flex-wrap gap-3 mt-6">
+    {% component "unfold/components/button.html" with submit=1 variant="primary" icon="upload" %}
+      Загрузить остатки
+    {% endcomponent %}
+    {% component "unfold/components/button.html" with href=changelist_url variant="secondary" %}
       {% trans "Отмена" %}
-    </a>
+    {% endcomponent %}
   </div>
 </form>
 {% endblock %}

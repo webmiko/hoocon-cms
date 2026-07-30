@@ -98,6 +98,23 @@ def test_stock_upload_admin_requires_staff(client) -> None:
 
 
 @pytest.mark.django_db
+def test_stock_upload_admin_page_has_unfold_actions(client) -> None:
+    admin = User.objects.create_superuser(
+        username="stock-ui",
+        email="stock-ui@example.com",
+        password="x",
+    )
+    client.force_login(admin)
+    response = client.get(reverse("admin:catalog_sku_import_stock"))
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'type="submit"' in html
+    assert "Загрузить остатки" in html
+    assert "Выберите файл" in html or "file_upload" in html
+    assert 'enctype="multipart/form-data"' in html
+
+
+@pytest.mark.django_db
 def test_stock_upload_admin_applies_xlsx(client) -> None:
     from catalog.models import SKU, Category, Product
 

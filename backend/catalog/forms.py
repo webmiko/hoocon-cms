@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from django import forms
+from unfold.widgets import UnfoldAdminFileFieldWidget
 
 from catalog.validators import validate_stock_xlsx_upload
+
+
+class StockFileWidget(UnfoldAdminFileFieldWidget):
+    """Unfold file picker with RU placeholder for stock XLSX."""
+
+    template_name = "admin/catalog/widgets/stock_file_input.html"
 
 
 class StockUploadForm(forms.Form):
@@ -14,6 +21,7 @@ class StockUploadForm(forms.Form):
         label="Файл остатков (.xlsx)",
         help_text="Колонки: «Артикул» и «Свободно» (или «Остатки» / «Остаток»).",
         allow_empty_file=False,
+        widget=StockFileWidget,
     )
 
     def clean_file(self) -> object:

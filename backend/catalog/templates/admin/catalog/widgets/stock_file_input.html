@@ -1,0 +1,27 @@
+{% load i18n static %}
+
+<div class="flex flex-row">
+  <div class="{{ widget.file_wrapper_class }}">
+    <label for="{{ widget.attrs.id }}" class="flex grow relative">
+      <input
+        type="text"
+        aria-label="Выберите файл .xlsx"
+        value="{% if widget.value %}{{ widget.value.url }}{% else %}Выберите файл .xlsx{% endif %}"
+        disabled
+        class="grow font-medium min-w-0 px-3 py-2 text-ellipsis"
+      >
+      <span class="absolute opacity-0 inset-0 z-10 cursor-pointer *:cursor-pointer *:h-[36px] *:w-full">
+        <input type="{{ widget.type }}" name="{{ widget.name }}" {% include "django/forms/widgets/attrs.html" %}>
+      </span>
+    </label>
+    <div class="flex flex-none items-center leading-none relative self-stretch">
+      <label
+        for="{{ widget.attrs.id }}"
+        class="cursor-pointer text-base-400 px-3 hover:text-base-700 dark:text-base-500 dark:hover:text-base-200"
+        title="Выбрать файл"
+      >
+        <span class="material-symbols-outlined">file_upload</span>
+      </label>
+    </div>
+  </div>
+</div>
