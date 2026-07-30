@@ -412,6 +412,15 @@ EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=False)
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
 
+# Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
+# Prod: set ADMIN_EMAIL_OTP_ENABLED=true (SMTP required).
+ADMIN_EMAIL_OTP_ENABLED = _env_bool("ADMIN_EMAIL_OTP_ENABLED", default=False)
+ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "600"))
+ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"))
+ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(
+    os.getenv("ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "60"),
+)
+
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─
 LOGGING = {
     "version": 1,

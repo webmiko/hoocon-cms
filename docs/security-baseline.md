@@ -84,6 +84,9 @@ Admin, файлы, SPA, VPS.
 - Сериализаторы: explicit fields; mass assignment закрыт.
 - Ошибки API: без stack trace клиенту; логировать `type(e).__name__`.
 - Admin: только staff; опц. IP allowlist nginx на `/admin/` (prod).
+  **Email OTP:** при `ADMIN_EMAIL_OTP_ENABLED=true` вход без пароля —
+  логин/email → 6-значный код на почту (`config/admin_otp.py`). SMTP
+  обязателен. При `false` — классический пароль (локалка/CI/авария).
 
 ### 3.3 Файлы и ETL
 

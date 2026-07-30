@@ -1,0 +1,43 @@
+{% extends "unfold/layouts/unauthenticated.html" %}
+
+{% load i18n static unfold %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  {{ form.media }}
+{% endblock %}
+
+{% block title %}
+  {{ title }} | {{ site_title }}
+{% endblock %}
+
+{% block content %}
+  {% include "unfold/helpers/unauthenticated_title.html" with title=site_title|default:_("Django site admin") subtitle=_("Welcome back to") %}
+
+  {% include "unfold/helpers/messages.html" %}
+
+  {% if form.errors or form.non_field_errors %}
+    <div class="flex flex-col gap-4 mb-8 *:mb-0">
+      {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+      {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+    </div>
+  {% endif %}
+
+  <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    Введите логин или email — одноразовый код придёт на почту аккаунта.
+  </p>
+
+  <form action="{{ app_path }}" method="post" id="login-form">
+    {% csrf_token %}
+    {% include "unfold/helpers/field.html" with field=form.username %}
+
+    <div class="flex flex-col gap-3 mt-6">
+      {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
+        Получить код
+        <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">
+          arrow_forward
+        </span>
+      {% endcomponent %}
+    </div>
+  </form>
+{% endblock %}

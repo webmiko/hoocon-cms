@@ -1,0 +1,64 @@
+{% extends "unfold/layouts/unauthenticated.html" %}
+
+{% load i18n static unfold %}
+
+{% block title %}
+  {{ title }} | {{ site_title }}
+{% endblock %}
+
+{% block content %}
+  {% include "unfold/helpers/unauthenticated_title.html" with title=site_title|default:_("Django site admin") subtitle=_("Welcome back to") %}
+
+  {% include "unfold/helpers/messages.html" %}
+
+  {% if error %}
+    <div class="flex flex-col gap-4 mb-8 *:mb-0">
+      {% include "unfold/helpers/messages/error.html" with error=error %}
+    </div>
+  {% endif %}
+
+  <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark" id="otp-hint-id">
+    Мы отправили одноразовый код на {{ masked_email }}.
+    Введите его, чтобы войти в админку.
+  </p>
+
+  <form method="post" action="{% url 'admin:otp' %}" novalidate>
+    {% csrf_token %}
+    <div class="form-field flex flex-col group mb-4">
+      <div class="flex gap-2 flex-col">
+        <label for="id_otp_code" class="block font-semibold mb-2 text-font-important-light text-sm dark:text-font-important-dark">
+          Код из письма
+        </label>
+        <input
+          type="text"
+          name="otp_code"
+          id="id_otp_code"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="12"
+          pattern="[0-9 ]*"
+          required
+          autofocus
+          aria-describedby="otp-hint-id"
+          class="border border-base-200 bg-white font-medium px-3 py-2 rounded-default shadow-xs text-font-default-light text-sm focus:outline-2 focus:-outline-offset-2 focus:outline-primary-600 dark:bg-base-900 dark:border-base-700 dark:text-font-default-dark w-full tracking-[0.35em] text-center text-xl font-semibold"
+        />
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3 mt-6">
+      {% component "unfold/components/button.html" with submit=1 variant="primary" class="w-full" %}
+        Подтвердить
+      {% endcomponent %}
+      {% component "unfold/components/button.html" with submit=1 form="otp-resend-form" variant="secondary" class="w-full" %}
+        Отправить снова
+      {% endcomponent %}
+      {% component "unfold/components/button.html" with href=otp_cancel_url variant="secondary" class="w-full" %}
+        Отмена
+      {% endcomponent %}
+    </div>
+  </form>
+
+  <form id="otp-resend-form" method="post" action="{{ otp_resend_url }}" hidden>
+    {% csrf_token %}
+  </form>
+{% endblock %}
