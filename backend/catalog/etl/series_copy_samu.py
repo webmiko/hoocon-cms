@@ -98,7 +98,10 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 )
 
 # Per-Nm family: dimensions shared by all SKUs of that family; weight may differ by Nm.
-_SAMU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
+# Envelope from English manual «Actuator Dimensions(mm)» drawings (longest × width × depth).
+_SAMU_DIMS_7_10 = "160 × 102 × 62 мм"
+_SAMU_DIMS_15 = "156 × 98 × 59 мм"
+_SAMU_DIMS_30 = "249 × 100 × 60,6 мм"
 
 TORQUE_SPECS: dict[int, dict[str, str]] = {
     7: {
@@ -107,7 +110,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 45 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
-        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAMU_DIMS_7_10,
         "power_24": "5 Вт (работа) / 1 Вт (удержание)",
         "power_230": "5 Вт (работа) / 1 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
@@ -118,7 +121,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 45 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
-        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAMU_DIMS_7_10,
         "power_24": "5 Вт (работа) / 1 Вт (удержание)",
         "power_230": "5 Вт (работа) / 1 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
@@ -129,7 +132,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 30 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
-        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAMU_DIMS_15,
         "power_24": "7 Вт (работа) / 1,5 Вт (удержание)",
         "power_230": "7 Вт (работа) / 1,5 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
@@ -140,7 +143,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "running-time": "< 115 с (95°)",
         "shaft-length": "≥ 90",
         "weight": "≈ 2,2 кг",
-        "dimensions": _SAMU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAMU_DIMS_30,
         "power_24": "10 Вт (работа) / 2 Вт (удержание)",
         "power_230": "10 Вт (работа) / 2 Вт (удержание)",
         "noise": "макс. 45 дБ(А)",

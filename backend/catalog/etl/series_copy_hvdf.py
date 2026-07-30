@@ -113,7 +113,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 
 _TorqueSpec = dict[str, str]
 _HVDF_3_DIMENSIONS = "132 × 88 × 59 мм"
-_HVDF_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
+_HVDF_5_DIMENSIONS = "158 × 102 × 59 мм"
 
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
@@ -134,7 +134,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "weight": "< 1,5 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
         "shaft-length": "< 90 мм",
-        "dimensions": _HVDF_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _HVDF_5_DIMENSIONS,
     },
 }
 

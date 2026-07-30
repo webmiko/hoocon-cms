@@ -109,8 +109,9 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 )
 
 _TorqueSpec = dict[str, str]
-_SAFU_SMALL_DIMENSIONS = "132 × 87 × 59 мм"
-_SAFU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
+_SAFU_SMALL_DIMENSIONS = "132 × 87 × 59 мм"  # SA3 body (manual drawing)
+_SAFU_MID_DIMENSIONS = "157 × 100 × 59 мм"  # SA5 body
+_SAFU_LARGE_DIMENSIONS = "249,6 × 101,2 × 60,6 мм"  # SA10…20 body
 
 # Per-Nm rows from manuals; SA20 borrows SA15 timing/power until PDF exists.
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
@@ -132,7 +133,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "weight": "< 1,5 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
         "shaft-length": "< 90 мм",
-        "dimensions": _SAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAFU_MID_DIMENSIONS,
     },
     10: {
         "moment": "10 Нм",
@@ -142,7 +143,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "weight": "< 2,5 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
         "shaft-length": "< 90 мм",
-        "dimensions": _SAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAFU_LARGE_DIMENSIONS,
     },
     15: {
         "moment": "15 Нм",
@@ -152,7 +153,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "weight": "< 2,8 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
         "shaft-length": "< 90 мм",
-        "dimensions": _SAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAFU_LARGE_DIMENSIONS,
     },
     20: {
         "moment": "20 Нм",
@@ -162,7 +163,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "weight": "< 2,8 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
         "shaft-length": "< 90 мм",
-        "dimensions": _SAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _SAFU_LARGE_DIMENSIONS,
     },
 }
 

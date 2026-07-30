@@ -46,7 +46,7 @@ def test_samu_enrichment_sets_temp_sensor_saf72_on_dst() -> None:
     by_dst = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=dst).select_related("attribute")}
     assert by_ds["temp-sensor"] == TEMP_SENSOR_NONE
     assert by_dst["temp-sensor"] == TEMP_SENSOR_SAF72
-    assert by_ds["dimensions"] == by_dst["dimensions"] == "см. «Габаритные размеры»"
+    assert by_ds["dimensions"] == by_dst["dimensions"] == "160 × 102 × 62 мм"
     assert by_ds["weight"] == by_dst["weight"] == "≈ 1,7 кг"
     assert "SAF72" in (dst.description or "")
     assert "без датчика" in (ds.description or "").casefold()

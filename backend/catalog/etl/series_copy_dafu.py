@@ -137,7 +137,8 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 _TorqueSpec = dict[str, str]
 # Overall housing from DA5FU dimension photo (Ш × В × Г); DA3 shares the small body.
 _DAFU_SMALL_DIMENSIONS = "98 × 156 × 84 мм"
-_DAFU_DIMENSIONS_SEE_DRAWING = "см. «Габаритные размеры»"
+# DA10…20 share the large spring-return body (page-3 «Габаритные размеры»).
+_DAFU_LARGE_DIMENSIONS = "100 × 249 × 87,3 мм"
 
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
@@ -165,7 +166,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "running-time": "≤ 25 с",
         "weight": "< 2,6 кг",
         "transformer-va": "10 В·А",
-        "dimensions": _DAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
     15: {
         "moment": "15 Нм",
@@ -174,7 +175,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "running-time": "≤ 25 с",
         "weight": "< 2,6 кг",
         "transformer-va": "15 В·А",
-        "dimensions": _DAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
     20: {
         "moment": "20 Нм",
@@ -183,7 +184,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "running-time": "≤ 25 с",
         "weight": "< 2,8 кг",
         "transformer-va": "20 В·А",
-        "dimensions": _DAFU_DIMENSIONS_SEE_DRAWING,
+        "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
 }
 
