@@ -140,6 +140,9 @@
   padding: var(--space-sm) 0;
   border: none;
   background: transparent;
+  /* Kill global `button` frosted underlay — matches plain `.navLink` text. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   color: var(--color-text);
   font: inherit;
   font-weight: 500;
@@ -151,6 +154,10 @@
 .navMoreButton:hover,
 .navMoreButtonOpen {
   color: var(--color-link-hover);
+}
+
+.navMoreButton:active {
+  transform: none;
 }
 
 .navMoreCaret {
