@@ -63,6 +63,13 @@
 
 ## Changelog
 
+### v0.1.12 beta — 2026-07-30
+
+- H8205: DN-ascending catalog order; Instructions tab from wiring catalog text.
+- Catalog heroes: H81/H8205 + DA/SA on shared canvas; real overall dimensions for
+  DAFU/SAFU/SAMU/HVDF; article/news cover folders match canonical slugs
+  (`aquatherm-2025` + 301s).
+
 ### v0.1.11 beta — 2026-07-30
 
 - Catalog heroes: shared portrait canvas sizing for brass DN and HV Nm; HVD-…F
