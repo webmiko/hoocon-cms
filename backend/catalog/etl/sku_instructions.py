@@ -1,7 +1,7 @@
-"""SKU-scoped install guides for public PDP (all actuator series).
+"""SKU-scoped install guides for public PDP (actuators + H8205 LAV kits).
 
-Prefer a series builder (torque / voltage / aux / thermal). Fall back to
-filtering stored Product/Category ``instructions`` by SKU variant.
+Prefer a series builder (torque / voltage / aux / thermal / wiring). Fall back
+to filtering stored Product/Category ``instructions`` by SKU variant.
 """
 
 from __future__ import annotations
@@ -69,6 +69,7 @@ def instructions_for_sku(sku_code: str, *, stored_text: str = "") -> str:
 
 def _builders() -> tuple[_Builder, ...]:
     """Lazy imports avoid circular loads among series_copy modules."""
+    from catalog.etl.h8205_lav import instructions_for_h8205_sku
     from catalog.etl.series_copy_dafu import instructions_for_dafu_sku
     from catalog.etl.series_copy_damu import instructions_for_damu_sku
     from catalog.etl.series_copy_hvdf import instructions_for_hvdf_sku
@@ -81,4 +82,5 @@ def _builders() -> tuple[_Builder, ...]:
         instructions_for_safu_sku,
         instructions_for_samu_sku,
         instructions_for_hvdf_sku,
+        instructions_for_h8205_sku,
     )

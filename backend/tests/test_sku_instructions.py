@@ -13,6 +13,7 @@ def test_instructions_for_sku_covers_main_actuator_series() -> None:
         "SA5FU24-DST": ("SA5FU", "AC/DC 24 В", "100…240"),
         "SA10MU230-DS": ("SA10MU", "100…240", "AC/DC 24 В"),
         "HVD24ST-3F": ("HVD-3F", "AC/DC 24 В", "100…240"),
+        "H8205-LAV232-24A": ("H8205", "AC/DC 24 В", "100…240"),
     }
     for code, (series, keep, drop) in cases.items():
         text = instructions_for_sku(code)

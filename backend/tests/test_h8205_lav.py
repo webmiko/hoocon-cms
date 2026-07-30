@@ -8,6 +8,7 @@ from catalog.ball_valve_kit import build_ball_valve_kit_options
 from catalog.etl.h8205_lav import (
     all_h8205_series,
     h8205_edition_sku_codes,
+    instructions_for_h8205_sku,
     is_h8205_sku_code,
 )
 from catalog.etl.series_copy_ball_valves import apply_h8205_lav_enrichment
@@ -45,6 +46,37 @@ def test_is_h8205_sku_code() -> None:
     assert is_h8205_sku_code("H8205-LAV280ST-230M")
     assert not is_h8205_sku_code("H8101-BV215A-24AS")
     assert not is_h8205_sku_code("8100-bv232a")
+
+
+def test_instructions_for_h8205_scopes_control_and_opts() -> None:
+    """Wiring tab text follows catalog p.29 and edition A/D/M + S/T."""
+    analog = instructions_for_h8205_sku("H8205-LAV232-24A")
+    assert analog is not None
+    assert "LAV232" in analog
+    assert "AC/DC 24 В" in analog
+    assert "100…240" not in analog
+    assert "Аналоговое управление — LAA" in analog
+    assert "Клемма 7 (Y)" in analog
+    assert "Вспомогательный переключатель" not in analog
+    assert "Аварийный сигнал" not in analog
+
+    on_off = instructions_for_h8205_sku("H8205-LAV280-230D")
+    assert on_off is not None
+    assert "Дискретное управление" in on_off
+    assert "LAD" in on_off
+    assert "AC 100…240 В" in on_off
+    assert "AC/DC 24 В" not in on_off
+
+    modbus_st = instructions_for_h8205_sku("H8205-LAV3100ST-24M")
+    assert modbus_st is not None
+    assert "Modbus RS-485 — LAM" in modbus_st
+    assert "Клемма 81 (A)" in modbus_st
+    assert "Вспомогательный переключатель" in modbus_st
+    assert "Аварийный сигнал" in modbus_st
+    assert "41 и 42" in modbus_st
+
+    assert instructions_for_h8205_sku("H8101-BV215A-24AS") is None
+    assert instructions_for_h8205_sku("") is None
 
 
 def test_parse_sku_variant_h8205() -> None:

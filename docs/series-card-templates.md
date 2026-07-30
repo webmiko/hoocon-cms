@@ -382,6 +382,8 @@ poetry run python manage.py attach_8100_catalog_media
 `brass_sku_slug`, `merge_brass_bv_onto_dn_products`);
 фото — `ball_valve_media_webp.py`; паспорт —
 `ball_valve_8100_catalog_media.py` (только ProductFile).
+Относительный размер героев (общий canvas DN/Нм) —
+[docs/catalog-hero-canvas.md](catalog-hero-canvas.md).
 
 ### Референс
 
@@ -489,6 +491,9 @@ aux/fault из опций S/T/ST. **Kvs не ось siblings** для LAV (в о
   артикуле).
 - Picker: ways, DN (фиксированы на карточке), body, V, control (**M**
   включён).
+- Вкладка «Инструкция»: `instructions_for_h8205_sku` (каталог p.29 —
+  безопасность + клеммы LAD/LAA/LAM по A/D/M, опции S/T) — без отдельного
+  seed в Category/Product.
 - `ball_valve_kit`: нет.
 
 ### Сборка вручную
