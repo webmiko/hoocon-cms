@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -23,6 +24,7 @@ from content.etl.tilda_articles import (
     scrape_all_articles,
 )
 from content.models import News
+from content.news_slug_renames import apply_news_slug_renames, canonical_news_slug
 from redirects.models import Redirect
 
 logger = logging.getLogger(__name__)
@@ -83,6 +85,7 @@ class Command(BaseCommand):
 
         created = updated = 0
         for item in scraped:
+            item = replace(item, slug=canonical_news_slug(item.slug))
             self.stdout.write(f"  {item.slug}: {item.title[:70]}")
             if dry_run:
                 continue
@@ -94,6 +97,8 @@ class Command(BaseCommand):
             self._ensure_redirects(item)
 
         if not dry_run:
+            for old_slug, new_slug in apply_news_slug_renames():
+                self.stdout.write(f"news slug: {old_slug} → {new_slug} (+301)")
             Redirect.objects.update_or_create(
                 from_path="/news",
                 defaults={

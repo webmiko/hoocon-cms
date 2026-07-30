@@ -578,10 +578,13 @@ class Command(BaseCommand):
         """Write canonical copy into the database."""
         from content.article_slug_renames import apply_article_slug_renames
         from content.news_cover_from_sku import attach_sku_cover_to_news
+        from content.news_slug_renames import apply_news_slug_renames
 
         now = timezone.now()
         for old_slug, new_slug in apply_article_slug_renames():
             self.stdout.write(f"article slug: {old_slug} → {new_slug} (+301)")
+        for old_slug, new_slug in apply_news_slug_renames():
+            self.stdout.write(f"news slug: {old_slug} → {new_slug} (+301)")
 
         pages_done = 0
         for slug, (title, body) in PAGES.items():
