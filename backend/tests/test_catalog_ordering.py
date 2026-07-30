@@ -148,3 +148,58 @@ def test_catalog_order_sku_code_nm_for_ball_valves() -> None:
         .values_list("sku_code", flat=True),
     )
     assert codes == ["8100-bv32a", "8100-bv215a"]
+
+
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="REGEXP_REPLACE ordering requires Postgres",
+)
+def test_catalog_order_h8205_by_dn_not_voltage_trail() -> None:
+    """H8205 LAV cards sort by body DN (32 before 100), not by -24/-230 trail."""
+    cat = Category.objects.create(slug="komplekty", name="Комплекты")
+    _sku("H8205-LAV2100-24A", category=cat, moment=None)
+    _sku("H8205-LAV232-24A", category=cat, moment=None)
+    _sku("H8205-LAV332-24A", category=cat, moment=None)
+    _sku("H8205-LAV3100-230A", category=cat, moment=None)
+
+    codes = list(
+        annotate_moment_nm(
+            SKU.objects.filter(is_published=True).annotate(
+                category_spec_order=spec_order_case(
+                    slug_field="product__category__slug",
+                ),
+            ),
+        )
+        .order_by(*catalog_list_order_by())
+        .values_list("sku_code", flat=True),
+    )
+    assert codes == [
+        "H8205-LAV232-24A",
+        "H8205-LAV332-24A",
+        "H8205-LAV2100-24A",
+        "H8205-LAV3100-230A",
+    ]
+
+
+@pytest.mark.skipif(
+    connection.vendor != "postgresql",
+    reason="REGEXP_REPLACE ordering requires Postgres",
+)
+def test_catalog_order_h8205_two_way_before_three_at_same_dn() -> None:
+    """At equal DN, 2-way H8205 precedes 3-way even if voltages differ."""
+    cat = Category.objects.create(slug="komplekty", name="Комплекты")
+    _sku("H8205-LAV3300-24A", category=cat, moment=None)
+    _sku("H8205-LAV2300-230A", category=cat, moment=None)
+
+    codes = list(
+        annotate_moment_nm(
+            SKU.objects.filter(is_published=True).annotate(
+                category_spec_order=spec_order_case(
+                    slug_field="product__category__slug",
+                ),
+            ),
+        )
+        .order_by(*catalog_list_order_by())
+        .values_list("sku_code", flat=True),
+    )
+    assert codes == ["H8205-LAV2300-230A", "H8205-LAV3300-24A"]
