@@ -160,10 +160,215 @@ def test_unknown_login_does_not_send_mail() -> None:
     assert client.session.get("_auth_user_id") is None
 
 
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_staff_without_email_does_not_send_mail() -> None:
+    User.objects.create_superuser(username="no-mail", email="", password="UnusedPass123!")
+    client = Client()
+    response = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": "no-mail", "next": "/admin/"},
+    )
+    assert response.status_code == 200
+    assert len(mail.outbox) == 0
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_delivery_failure_shows_error() -> None:
+    admin_user = _staff(username="otp-fail", email="otp-fail@example.com")
+    client = Client()
+    with patch(
+        "config.admin_otp.send_admin_otp_email",
+        side_effect=RuntimeError("smtp down"),
+    ):
+        response = _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    assert response.status_code == 200
+    assert client.session.get("admin_otp_user_id") is None
+    assert len(mail.outbox) == 0
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_page_without_challenge_redirects_to_login() -> None:
+    client = Client()
+    response = client.get("/admin/otp/")
+    assert response.status_code == 302
+    assert response["Location"].endswith("/admin/login/")
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_cancel_clears_challenge() -> None:
+    admin_user = _staff(username="otp-cancel", email="otp-cancel@example.com")
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="333333"):
+        _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    assert client.session.get("admin_otp_user_id") == admin_user.pk
+    cancelled = client.get("/admin/otp/cancel/")
+    assert cancelled.status_code == 302
+    assert cancelled["Location"].endswith("/admin/login/")
+    assert client.session.get("admin_otp_user_id") is None
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_resend_after_cooldown_sends_new_mail() -> None:
+    admin_user = _staff(username="otp-resend2", email="otp-resend2@example.com")
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="444444"):
+        _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    assert len(mail.outbox) == 1
+    session = client.session
+    session["admin_otp_sent_at"] = 0.0
+    session.save()
+    csrf = client.cookies["csrftoken"].value
+    with patch("config.admin_otp.generate_otp_code", return_value="555555"):
+        again = client.post(
+            "/admin/otp/resend/",
+            {"csrfmiddlewaretoken": csrf},
+        )
+    assert again.status_code == 302
+    assert len(mail.outbox) == 2
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_short_code_and_exhausted_attempts() -> None:
+    admin_user = _staff(username="otp-attempts", email="otp-attempts@example.com")
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="666666"):
+        _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    csrf = client.cookies["csrftoken"].value
+    short = client.post(
+        "/admin/otp/",
+        {"otp_code": "12", "csrfmiddlewaretoken": csrf},
+    )
+    assert short.status_code == 200
+    assert client.session.get("admin_otp_user_id") == admin_user.pk
+
+    for _ in range(4):
+        bad = client.post(
+            "/admin/otp/",
+            {"otp_code": "000000", "csrfmiddlewaretoken": csrf},
+        )
+    assert bad.status_code == 302
+    assert bad["Location"].endswith("/admin/login/")
+    assert client.session.get("admin_otp_user_id") is None
+    assert client.session.get("_auth_user_id") is None
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_login_redirects_to_otp_when_challenge_pending() -> None:
+    admin_user = _staff(username="otp-pend", email="otp-pend@example.com")
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="777777"):
+        _csrf_post(
+            client,
+            "/admin/login/",
+            {"username": admin_user.username, "next": "/admin/"},
+        )
+    again = client.get("/admin/login/")
+    assert again.status_code == 302
+    assert again["Location"].endswith("/admin/otp/")
+
+
 def test_normalize_and_mask_helpers() -> None:
     assert normalize_otp_input("12 34-56") == "123456"
     assert mask_email("ab@hoocon.ru") == "a***@hoocon.ru"
+    assert mask_email("no-at") == "***"
+    assert mask_email("@domain.ru") == "***@domain.ru"
     assert len(hash_otp_code("123456")) == 64
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_find_staff_and_pending_edge_cases() -> None:
+    from django.test import RequestFactory
+
+    from config.admin_otp import (
+        _cache_key,
+        _load_challenge,
+        find_staff_user_for_otp,
+        get_pending_admin_otp_user,
+        pending_admin_otp_user_id,
+        verify_admin_otp,
+        AdminOtpVerifyError,
+    )
+
+    assert find_staff_user_for_otp("") is None
+    assert find_staff_user_for_otp("not-an-email") is None
+    admin_user = _staff(username="otp-edge", email="otp-edge@example.com")
+    assert find_staff_user_for_otp("otp-edge").pk == admin_user.pk
+
+    inactive = User.objects.create_user(
+        username="otp-inactive",
+        email="otp-inactive@example.com",
+        password="UnusedPass123!",
+        is_staff=True,
+        is_active=False,
+    )
+
+    client = Client()
+    factory = RequestFactory()
+    session = client.session
+    session["admin_otp_user_id"] = "not-int"
+    session.save()
+    req = factory.get("/admin/otp/")
+    req.session = client.session
+    assert pending_admin_otp_user_id(req) is None
+
+    session = client.session
+    session["admin_otp_user_id"] = 999999
+    session.save()
+    req = factory.get("/admin/otp/")
+    req.session = client.session
+    assert get_pending_admin_otp_user(req) is None
+
+    session = client.session
+    session["admin_otp_user_id"] = inactive.pk
+    session.save()
+    req = factory.get("/admin/otp/")
+    req.session = client.session
+    assert get_pending_admin_otp_user(req) is None
+
+    cache.set(_cache_key(admin_user.pk, "sess"), "not-a-dict", timeout=60)
+    assert _load_challenge(admin_user.pk, "sess") is None
+    cache.set(_cache_key(admin_user.pk, "sess"), {"code_hash": 1}, timeout=60)
+    assert _load_challenge(admin_user.pk, "sess") is None
+    cache.set(
+        _cache_key(admin_user.pk, "sess"),
+        {"code_hash": "abc", "attempts": "x"},
+        timeout=60,
+    )
+    assert _load_challenge(admin_user.pk, "sess") is None
+
+    session = client.session
+    session["admin_otp_user_id"] = admin_user.pk
+    session.save()
+    req = factory.get("/admin/otp/")
+    req.session = client.session
+    req.session.create()
+    with pytest.raises(AdminOtpVerifyError, match="истёк|истекла"):
+        verify_admin_otp(req, "123456")
 
 
 @pytest.fixture(autouse=True)
