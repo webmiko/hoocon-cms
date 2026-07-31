@@ -1,0 +1,1 @@
+../../assets/photo-crop-tool.js
