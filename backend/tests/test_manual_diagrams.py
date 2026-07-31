@@ -84,8 +84,11 @@ def test_crop_modulating_uses_right_column() -> None:
     page = Image.new("RGB", (1600, 1200), color=(240, 240, 240))
     wiring, dims = crop_modulating_diagrams(page)
     assert wiring.size[0] < page.size[0] * 0.6
-    assert dims.size[0] == wiring.size[0]
     assert wiring.size[1] > 0
+    assert dims.size[1] > 0
+    # Between title bars: wiring must not reach the dimensions band (~0.31+).
+    assert wiring.size[1] < page.size[1] * 0.22
+    assert dims.size[1] < page.size[1] * 0.30
 
 
 def test_parse_safu_series_and_fallback() -> None:

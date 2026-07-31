@@ -1,7 +1,9 @@
 """Crop wiring + overall-dimensions diagrams from instruction PDFs / catalog.
 
-D/DS manuals (4 pages): diagrams on page 3 (stacked).
-A/AS manuals (2 pages, landscape): diagrams in the right column of page 2.
+D/DS manuals:
+  - legacy (4 pages, portrait): diagrams stacked on page 3;
+  - new RU A4×2 landscape: same right-column sheet-2 layout as A/AS.
+A/AS manuals (2 pages, landscape): wiring + dimensions in the right column of page 2.
 SA..FU manuals (2 pages, landscape): wiring + dimensions in the right column of page 2.
 HVA: dimensions from the Russian Illustrator catalog (``.ai``, PDF-compatible).
 
@@ -183,8 +185,25 @@ def punch_near_white_background(
     return rgba
 
 
+def _trim_near_white(image: Image.Image, *, luma_max: int = 245, pad: int = 10) -> Image.Image:
+    """Tighten crop to inked content; keep a small pad around diagrams."""
+    mask = image.convert("L").point(lambda pixel: 255 if pixel < luma_max else 0)
+    bbox = mask.getbbox()
+    if bbox is None:
+        return image
+    x0, y0, x1, y1 = bbox
+    return image.crop(
+        (
+            max(0, x0 - pad),
+            max(0, y0 - pad),
+            min(image.width, x1 + pad),
+            min(image.height, y1 + pad),
+        ),
+    )
+
+
 def crop_on_off_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
-    """Crop wiring and dimensions from a D/DS page-3 raster.
+    """Crop wiring and dimensions from a legacy D/DS page-3 raster.
 
     Skips HOOCON chrome and the black section titles («Схема подключения»,
     «Габаритные размеры…») so only the drawings remain.
@@ -194,19 +213,22 @@ def crop_on_off_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
     wiring = page.crop((30, int(0.15 * height), width - 30, int(0.34 * height)))
     # Below black «Габаритные размеры…» bar (~0.34–0.38).
     dimensions = page.crop((30, int(0.38 * height), width - 30, int(0.64 * height)))
-    return wiring, dimensions
+    return _trim_near_white(wiring), _trim_near_white(dimensions)
 
 
 def crop_modulating_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
-    """Crop wiring + dimensions from the right column of an A/AS page-2 raster.
+    """Crop wiring + dimensions from the right column of a landscape sheet-2 raster.
 
-    Same vertical cuts as D/DS: drop logo and black section titles.
+    Black section titles sit near y≈0.10, 0.31, 0.58. Crop diagram bodies between
+    them and inset past the ТТХ table so grey table edges do not bleed in.
+    Also used for new 2-page D/DS landscape manuals (same sheet layout as A/AS).
     """
     width, height = page.size
-    left = int(width * 0.48)
-    wiring = page.crop((left, int(0.15 * height), width - 20, int(0.34 * height)))
-    dimensions = page.crop((left, int(0.38 * height), width - 20, int(0.62 * height)))
-    return wiring, dimensions
+    left = int(width * 0.505)
+    right = width - 25
+    wiring = page.crop((left, int(0.122 * height), right, int(0.300 * height)))
+    dimensions = page.crop((left, int(0.338 * height), right, int(0.575 * height)))
+    return _trim_near_white(wiring), _trim_near_white(dimensions)
 
 
 def crop_safu_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
@@ -232,6 +254,15 @@ def render_pdf_page(pdf_path: Path, page_index: int, *, scale: float = _RENDER_S
         document.close()
 
 
+def _pdf_page_count(pdf_path: Path) -> int:
+    """Return the number of pages in ``pdf_path``."""
+    document = pdfium.PdfDocument(str(pdf_path))
+    try:
+        return len(document)
+    finally:
+        document.close()
+
+
 def diagrams_from_pdf(
     pdf_path: Path,
     *,
@@ -248,11 +279,13 @@ def diagrams_from_pdf(
     Returns:
         Two ``DiagramCrop`` rows (wiring, dimensions).
     """
-    if edition == "on_off":
+    page_count = _pdf_page_count(pdf_path)
+    if edition == "on_off" and page_count >= 3:
         page = render_pdf_page(pdf_path, 2)
         wiring_img, dims_img = crop_on_off_diagrams(page)
     else:
-        page = render_pdf_page(pdf_path, 1)
+        # A/AS and new 2-page D/DS landscape RU manuals: right column of sheet 2.
+        page = render_pdf_page(pdf_path, 1 if page_count > 1 else 0)
         wiring_img, dims_img = crop_modulating_diagrams(page)
 
     series = f"DA{series_nm}FU"
