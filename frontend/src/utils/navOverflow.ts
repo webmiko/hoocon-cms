@@ -8,10 +8,10 @@ export type NavItem = {
 
 export const DESKTOP_NAV_ITEMS: readonly NavItem[] = [
   { to: "/catalog", label: "Каталог" },
+  { to: "/zavod", label: "Завод · OEM" },
   { to: "/statyi", label: "Статьи" },
   { to: "/novosti", label: "Новости" },
   { to: "/company", label: "О компании" },
-  { to: "/zavod", label: "Завод · OEM" },
   { to: "/gde-kupit", label: "Где купить" },
   { to: "/kontakty", label: "Контакты" },
 ];

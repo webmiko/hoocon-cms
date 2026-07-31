@@ -268,6 +268,13 @@ export function Layout() {
             <Link to="/catalog" className={styles.navMobileLink} onClick={closeMenu}>
               Каталог
             </Link>
+            <Link
+              to="/zavod"
+              className={styles.navMobileLink}
+              onClick={closeMenu}
+            >
+              Завод · OEM напрямую
+            </Link>
             <Link to="/statyi" className={styles.navMobileLink} onClick={closeMenu}>
               Статьи
             </Link>
@@ -280,13 +287,6 @@ export function Layout() {
               onClick={closeMenu}
             >
               О компании
-            </Link>
-            <Link
-              to="/zavod"
-              className={styles.navMobileLink}
-              onClick={closeMenu}
-            >
-              Завод · OEM напрямую
             </Link>
             <Link
               to="/gde-kupit"
