@@ -71,7 +71,8 @@ node_modules/
 docs/demo/export/
 
 # RU manual HTML demos / build scripts (local only; not site)
-docs/demo/manuals-ru/
+# Tracked on branch local/manuals-ru-demo only (not for prod/develop).
+# docs/demo/manuals-ru/
 
 # Coverage / tooling artifacts
 backend/coverage.json
