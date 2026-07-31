@@ -41,6 +41,27 @@ def test_display_version_drops_patch_after_ga() -> None:
     assert display_version("0.1.0", channel="beta") == "0.1.0"
 
 
+def test_package_version_rejects_invalid() -> None:
+    """Malformed version raises ValueError."""
+    with pytest.raises(ValueError, match="Invalid RELEASE_VERSION"):
+        package_version("not-a-version")
+
+
+def test_display_version_edge_cases() -> None:
+    """Invalid raw passthrough; two-part with channel; GA label without channel."""
+    assert display_version("weird", channel="beta") == "weird"
+    assert display_version("1.2", channel="beta") == "1.2"
+    import config.release as release_mod
+
+    previous = release_mod.RELEASE_CHANNEL
+    try:
+        release_mod.RELEASE_CHANNEL = ""
+        assert release_label() == f"v{display_version()}"
+        assert release_label(with_v=False) == display_version()
+    finally:
+        release_mod.RELEASE_CHANNEL = previous
+
+
 def test_pyproject_and_package_json_match_release_module() -> None:
     """pyproject.toml and frontend/package.json stay in sync with release.py."""
     pyproject = (_REPO_ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
