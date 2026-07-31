@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from django.core.files.base import ContentFile
 
 from catalog.etl.manual_pdfs import (
     normalize_manual_stem,
@@ -177,6 +178,88 @@ def test_iter_manual_pdfs_prefers_ru_subdir(tmp_path: Path) -> None:
     assert found is not None
     assert found.parent.name == "RU"
     assert find_manual_file(tmp_path, "sa3fu-ds_dst.pdf") is not None
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("sa10mu-ds_dst.pdf", (10, True)),
+        ("SA10MU-DS — руководство (RU).pdf", (10, False)),
+        ("SA3FU-DS_DST — руководство (RU).pdf", (3, True)),
+        ("sa5fu-ds_dst", (5, True)),
+        ("sa7mu-ds", (7, False)),
+        ("da5fu-d:ds", None),
+    ],
+)
+def test_parse_sa_manual_stems_ru_and_en(
+    raw: str,
+    expected: tuple[int, bool] | None,
+) -> None:
+    from catalog.etl.manual_pdfs import parse_safu_manual_stem, parse_samu_manual_stem
+
+    if "fu" in raw.casefold():
+        assert parse_safu_manual_stem(raw) == expected
+        assert parse_samu_manual_stem(raw) is None
+    elif "mu" in raw.casefold():
+        assert parse_samu_manual_stem(raw) == expected
+        assert parse_safu_manual_stem(raw) is None
+    else:
+        assert parse_safu_manual_stem(raw) is None
+        assert parse_samu_manual_stem(raw) is None
+
+
+def test_discover_samu_prefers_ru_ds_only_over_en(tmp_path: Path) -> None:
+    from catalog.etl.manual_pdfs import discover_samu_manuals
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "EN").mkdir()
+    (tmp_path / "RU" / "SA10MU-DS — руководство (RU).pdf").write_bytes(b"%PDF-ru")
+    (tmp_path / "EN" / "sa10mu-ds_dst.pdf").write_bytes(b"%PDF-en")
+    codes = [
+        "SA10MU24-DS",
+        "SA10MU24-DST",
+        "SA10MU230-DS",
+        "SA10MU230-DST",
+    ]
+    matches, warnings = discover_samu_manuals(tmp_path, sku_codes=codes)
+    assert warnings == []
+    assert len(matches) == 1
+    assert matches[0].path.parent.name == "RU"
+    assert matches[0].kind == "samu_ds"
+    assert set(matches[0].sku_codes) == {"SA10MU24-DS", "SA10MU230-DS"}
+
+
+@pytest.mark.django_db
+def test_attach_samu_renames_legacy_ds_dst_title(tmp_path: Path) -> None:
+    """Legacy ``(DS/DST)`` titles become ``(DS)`` on re-attach."""
+    from catalog.etl.manual_pdfs import _samu_manual_title, attach_samu_manuals
+    from catalog.models import SKU, Category, Product, ProductFile
+
+    cat = Category.objects.create(name="Дым", slug="dym-samu-title")
+    product = Product.objects.create(name="SA10MU", slug="samu-title-prod", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="SA10MU24-DS",
+        name="SA10MU24-DS",
+        slug="sa10mu24-ds-title",
+        is_published=True,
+    )
+    legacy = ProductFile.objects.create(
+        sku=sku,
+        title="Инструкция SA10MU (DS/DST)",
+        file_type=ProductFile.FileType.DATASHEET,
+        is_published=True,
+        sort_order=0,
+    )
+    legacy.file.save("sa10mu-ds_dst.pdf", ContentFile(b"%PDF-old"), save=True)
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "RU" / "SA10MU-DS — руководство (RU).pdf").write_bytes(b"%PDF-ru-new")
+    summary = attach_samu_manuals(tmp_path, dry_run=False)
+    assert summary["updated"] >= 1
+    legacy.refresh_from_db()
+    assert legacy.title == _samu_manual_title(10)
+    assert ProductFile.objects.filter(sku=sku, title__contains="DST").count() == 0
 
 
 def test_discover_dafu_in_ru_subdir(tmp_path: Path) -> None:

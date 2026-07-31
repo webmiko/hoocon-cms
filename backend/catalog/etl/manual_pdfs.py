@@ -12,7 +12,8 @@ Filename conventions (DAFU)::
 
 SAFU (fire/smoke)::
 
-    sa3fu-ds_dst.pdf    → SA3FU …-DS / …-DST (24 В and 230 В)
+    sa3fu-ds_dst.pdf                         → SA3FU …-DS / …-DST
+    SA3FU-DS_DST — руководство (RU).pdf      → same (RU preferred over EN)
 
 DAMU / DAMQU (no spring, English manuals)::
 
@@ -24,7 +25,8 @@ DAMU / DAMQU (no spring, English manuals)::
 
 SAMU (smoke, no spring)::
 
-    sa10mu-ds_dst.pdf              → SA10MU …-DS / …-DST (24 В and 230 В)
+    sa10mu-ds_dst.pdf                        → SA10MU …-DS / …-DST (EN)
+    SA10MU-DS — руководство (RU).pdf         → SA10MU …-DS only (RU preferred)
 
 HVD fire/smoke F-series (spring return; not air HVD-5)::
 
@@ -59,7 +61,8 @@ logger = logging.getLogger(__name__)
 _ON_OFF_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fu-d[:_\-]ds?$")
 _MOD_24_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fu24-a[:_\-]as?$")
 _DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
-_SAFU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?:-ds[_-]?dst)?$")
+# sa5fu-ds_dst | SA5FU-DS_DST | sa5fu-ds (RU DS-only)
+_SAFU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?:-ds(?P<dst>[_-]?dst)?)?$")
 _SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
 # da2mu-a_as | da4_6mu-d_ds | da8_16_24_32mu24-a_as | da8_16_24mqu230-d_ds
 _DAMU_STEM = re.compile(
@@ -70,8 +73,13 @@ _DAMQU_STEM = re.compile(
 )
 _DAMU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)mu(?!q)")
 _DAMQU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)mqu")
-_SAMU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)mu(?:-ds[_-]?dst)?$")
+# sa10mu-ds_dst | SA10MU-DS — руководство (RU) → sa10mu-ds after normalize
+_SAMU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)mu(?:-ds(?P<dst>[_-]?dst)?)?$")
 _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
+# Disk export: «SA10MU-DS — руководство (RU).pdf»
+_RU_MANUAL_SUFFIX = re.compile(
+    r"(?i)\s*[—–\-]\s*руководство(?:\s*\(\s*ru\s*\))?\s*$",
+)
 _HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
 _HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
 # hva-5 | hva-5q | hva-5uq | «HVA-5 instruction» (not hva-*p — RF-excluded)
@@ -175,11 +183,12 @@ def find_manual_file(manuals_dir: Path, filename: str) -> Path | None:
 
 
 def normalize_manual_stem(filename: str) -> str:
-    """Strip extension and Disk artefacts from a PDF basename."""
+    """Strip extension, RU guide suffix, and Disk artefacts from a PDF basename."""
     stem = Path(filename).name
     if stem.casefold().endswith(".pdf"):
         stem = stem[:-4]
-    return stem.replace("\xa0", "").strip()
+    stem = stem.replace("\xa0", "").strip()
+    return _RU_MANUAL_SUFFIX.sub("", stem).strip()
 
 
 def parse_manual_stem(stem: str) -> tuple[int, str] | None:
@@ -417,24 +426,32 @@ def ensure_dafu_spring_category(*, dry_run: bool = False) -> dict[str, int]:
     return {"moved": moved, "already": already, "category": target.slug}
 
 
-def parse_safu_manual_stem(stem: str) -> int | None:
-    """Parse ``sa5fu-ds_dst`` → ``5``, or None if not a SAFU manual."""
+def parse_safu_manual_stem(stem: str) -> tuple[int, bool] | None:
+    """Parse ``sa5fu-ds_dst`` → ``(5, True)``, ``SA5FU-DS`` → ``(5, False)``."""
     clean = normalize_manual_stem(stem)
     match = _SAFU_STEM.fullmatch(clean)
     if match is None:
         return None
-    return int(match.group("nm"))
+    return int(match.group("nm")), bool(match.group("dst"))
 
 
-def sku_codes_for_safu_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
-    """Filter catalog SKU codes that a SAFU DS/DST manual covers."""
+def sku_codes_for_safu_manual(
+    torque_nm: int,
+    sku_codes: list[str],
+    *,
+    covers_dst: bool = True,
+) -> list[str]:
+    """Filter catalog SKU codes that a SAFU DS[/DST] manual covers."""
     out: list[str] = []
     for code in sku_codes:
         compact = code.strip().casefold().replace(" ", "")
         match = _SAFU_CODE.match(compact)
         if match is None or int(match.group("nm")) != torque_nm:
             continue
-        if compact.endswith("-ds") or compact.endswith("-dst"):
+        if compact.endswith("-dst"):
+            if covers_dst:
+                out.append(code)
+        elif compact.endswith("-ds"):
             out.append(code)
     return out
 
@@ -444,7 +461,11 @@ def discover_safu_manuals(
     *,
     sku_codes: list[str] | None = None,
 ) -> tuple[list[ManualMatch], list[str]]:
-    """Scan ``manuals_dir`` for SAFU PDFs and map them to SKU codes."""
+    """Scan ``manuals_dir`` for SAFU PDFs and map them to SKU codes.
+
+    When both RU and EN PDFs exist for the same Nm, the first hit wins
+    (``iter_manual_pdfs`` yields RU before EN).
+    """
     if sku_codes is None:
         sku_codes = list(
             SKU.objects.filter(sku_code__iregex=r"(?i)^sa[0-9]+fu").values_list(
@@ -452,31 +473,36 @@ def discover_safu_manuals(
                 flat=True,
             ),
         )
-    matches: list[ManualMatch] = []
+    by_nm: dict[int, ManualMatch] = {}
     warnings: list[str] = []
     if not manuals_dir.is_dir():
         warnings.append(f"manuals dir missing: {manuals_dir}")
-        return matches, warnings
+        return [], warnings
 
     for path in iter_manual_pdfs(manuals_dir):
-        torque_nm = parse_safu_manual_stem(path.name)
-        if torque_nm is None:
+        parsed = parse_safu_manual_stem(path.name)
+        if parsed is None:
             if re.search(r"(?i)sa\d+fu", path.name):
                 warnings.append(f"unrecognized SAFU filename: {path.name!r}")
             continue
-        codes = sku_codes_for_safu_manual(torque_nm, sku_codes)
+        torque_nm, covers_dst = parsed
+        if torque_nm in by_nm:
+            continue
+        codes = sku_codes_for_safu_manual(
+            torque_nm,
+            sku_codes,
+            covers_dst=covers_dst,
+        )
         if not codes:
             warnings.append(f"no SKU for {path.name!r} (nm={torque_nm} safu)")
             continue
-        matches.append(
-            ManualMatch(
-                path=path,
-                torque_nm=torque_nm,
-                kind="safu_ds_dst",
-                sku_codes=tuple(codes),
-            ),
+        by_nm[torque_nm] = ManualMatch(
+            path=path,
+            torque_nm=torque_nm,
+            kind="safu_ds_dst" if covers_dst else "safu_ds",
+            sku_codes=tuple(codes),
         )
-    return matches, warnings
+    return list(by_nm.values()), warnings
 
 
 def attach_safu_manuals(
@@ -883,24 +909,32 @@ def attach_damqu_manuals(
     return _attach_matches(matches, warnings, dry_run=dry_run)
 
 
-def parse_samu_manual_stem(stem: str) -> int | None:
-    """Parse ``sa10mu-ds_dst`` → ``10``."""
+def parse_samu_manual_stem(stem: str) -> tuple[int, bool] | None:
+    """Parse ``sa10mu-ds_dst`` → ``(10, True)``, ``SA10MU-DS`` → ``(10, False)``."""
     clean = normalize_manual_stem(stem)
     match = _SAMU_STEM.fullmatch(clean)
     if match is None:
         return None
-    return int(match.group("nm"))
+    return int(match.group("nm")), bool(match.group("dst"))
 
 
-def sku_codes_for_samu_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
-    """Filter SA..MU DS/DST SKU codes for one manual."""
+def sku_codes_for_samu_manual(
+    torque_nm: int,
+    sku_codes: list[str],
+    *,
+    covers_dst: bool = True,
+) -> list[str]:
+    """Filter SA..MU DS[/DST] SKU codes for one manual."""
     out: list[str] = []
     for code in sku_codes:
         compact = code.strip().casefold().replace(" ", "")
         match = _SAMU_CODE.match(compact)
         if match is None or int(match.group("nm")) != torque_nm:
             continue
-        if compact.endswith("-ds") or compact.endswith("-dst"):
+        if compact.endswith("-dst"):
+            if covers_dst:
+                out.append(code)
+        elif compact.endswith("-ds"):
             out.append(code)
     return out
 
@@ -910,7 +944,7 @@ def discover_samu_manuals(
     *,
     sku_codes: list[str] | None = None,
 ) -> tuple[list[ManualMatch], list[str]]:
-    """Scan ``manuals_dir`` for SAMU English PDFs."""
+    """Scan ``manuals_dir`` for SAMU PDFs (RU preferred over EN)."""
     if sku_codes is None:
         sku_codes = list(
             SKU.objects.filter(sku_code__iregex=r"(?i)^sa[0-9]+mu").values_list(
@@ -918,28 +952,70 @@ def discover_samu_manuals(
                 flat=True,
             ),
         )
-    matches: list[ManualMatch] = []
+    by_nm: dict[int, ManualMatch] = {}
     warnings: list[str] = []
     if not manuals_dir.is_dir():
         warnings.append(f"manuals dir missing: {manuals_dir}")
-        return matches, warnings
+        return [], warnings
     for path in iter_manual_pdfs(manuals_dir):
-        torque_nm = parse_samu_manual_stem(path.name)
-        if torque_nm is None:
+        parsed = parse_samu_manual_stem(path.name)
+        if parsed is None:
+            if re.search(r"(?i)sa\d+mu", path.name):
+                warnings.append(f"unrecognized SAMU filename: {path.name!r}")
             continue
-        codes = sku_codes_for_samu_manual(torque_nm, sku_codes)
+        torque_nm, covers_dst = parsed
+        if torque_nm in by_nm:
+            continue
+        codes = sku_codes_for_samu_manual(
+            torque_nm,
+            sku_codes,
+            covers_dst=covers_dst,
+        )
         if not codes:
             warnings.append(f"no SKU for {path.name!r} (nm={torque_nm} samu)")
             continue
-        matches.append(
-            ManualMatch(
-                path=path,
-                torque_nm=torque_nm,
-                kind="samu_ds_dst",
-                sku_codes=tuple(codes),
-            ),
+        by_nm[torque_nm] = ManualMatch(
+            path=path,
+            torque_nm=torque_nm,
+            kind="samu_ds_dst" if covers_dst else "samu_ds",
+            sku_codes=tuple(codes),
         )
-    return matches, warnings
+    return list(by_nm.values()), warnings
+
+
+def _samu_manual_title(torque_nm: int) -> str:
+    """Public ProductFile title for SA..MU (DS only; DST cards unpublished)."""
+    return f"Инструкция SA{torque_nm}MU (DS)"
+
+
+def _samu_manual_legacy_title(torque_nm: int) -> str:
+    """Pre-RU title that still mentioned DST — renamed on attach."""
+    return f"Инструкция SA{torque_nm}MU (DS/DST)"
+
+
+def _find_samu_instruction_file(sku: SKU, torque_nm: int) -> ProductFile | None:
+    """Prefer current title; fall back to legacy ``(DS/DST)`` row."""
+    title = _samu_manual_title(torque_nm)
+    existing = ProductFile.objects.filter(sku=sku, title=title).first()
+    if existing is not None:
+        return existing
+    return ProductFile.objects.filter(
+        sku=sku,
+        title=_samu_manual_legacy_title(torque_nm),
+    ).first()
+
+
+def rename_legacy_samu_manual_titles(*, dry_run: bool = False) -> int:
+    """Rename leftover ``Инструкция SA{n}MU (DS/DST)`` → ``… (DS)``."""
+    legacy = list(
+        ProductFile.objects.filter(title__regex=r"^Инструкция SA\d+MU \(DS/DST\)$"),
+    )
+    if dry_run or not legacy:
+        return len(legacy)
+    for pf in legacy:
+        pf.title = pf.title.replace(" (DS/DST)", " (DS)", 1)
+        pf.save(update_fields=["title"])
+    return len(legacy)
 
 
 def attach_samu_manuals(
@@ -954,11 +1030,13 @@ def attach_samu_manuals(
         "created": 0,
         "updated": 0,
         "skipped": 0,
+        "renamed_titles": 0,
         "warnings": warnings,
         "dry_run": dry_run,
         "by_sku": {},
     }
     if not matches:
+        summary["renamed_titles"] = rename_legacy_samu_manual_titles(dry_run=dry_run)
         return summary
     code_to_sku = {
         s.sku_code.casefold(): s
@@ -969,14 +1047,14 @@ def attach_samu_manuals(
     with transaction.atomic():
         for match in matches:
             payload = match.path.read_bytes()
-            title = f"Инструкция SA{match.torque_nm}MU (DS/DST)"
+            title = _samu_manual_title(match.torque_nm)
             basename = _storage_basename(match.path)
             for code in match.sku_codes:
                 sku = code_to_sku.get(code.casefold())
                 if sku is None:
                     warnings.append(f"SKU missing in DB: {code}")
                     continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                existing = _find_samu_instruction_file(sku, match.torque_nm)
                 if dry_run:
                     summary["by_sku"].setdefault(code, []).append(title)
                     summary["created" if existing is None else "updated"] += 1
@@ -992,15 +1070,20 @@ def attach_samu_manuals(
                     pf.file.save(basename, ContentFile(payload), save=True)
                     summary["created"] += 1
                 else:
+                    changed = False
+                    if existing.title != title:
+                        existing.title = title
+                        existing.save(update_fields=["title"])
+                        changed = True
                     current_size = existing.file.size if existing.file else 0
                     if current_size != len(payload):
                         existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
+                        changed = True
+                    summary["updated" if changed else "skipped"] += 1
                 summary["by_sku"].setdefault(code, []).append(title)
         if dry_run:
             transaction.set_rollback(True)
+    summary["renamed_titles"] = rename_legacy_samu_manual_titles(dry_run=dry_run)
     summary["warnings"] = warnings
     return summary
 
