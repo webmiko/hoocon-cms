@@ -58,14 +58,18 @@ AUX_TABLE = [
 
 @dataclass(frozen=True)
 class EnPdfSpec:
-    """One EN PDF → one RU HTML (single voltage)."""
+    """One EN PDF → one RU HTML.
+
+    ``voltage_id``: ``v24`` / ``v230`` (one voltage) or ``dual`` (24+230 in one PDF).
+    ``family``: ``mu`` / ``mqu`` (DA) or ``safu`` / ``samu`` (SA).
+    """
 
     stem: str
     pdf_name: str
     title: str
-    voltage_id: str  # v24 | v230
-    modulating: bool  # A/AS
-    family: str  # mu | mqu
+    voltage_id: str  # v24 | v230 | dual
+    modulating: bool  # A/AS (DA); unused for SA ON/OFF
+    family: str  # mu | mqu | safu | samu
     skus: tuple[str, ...]
     torque: str
     areas: tuple[str, ...]
@@ -75,6 +79,14 @@ class EnPdfSpec:
     mass: str
     shaft: str
     storage_temp: str = "–30…+80 °C"
+    ambient_temp: str = "–20…+50 °C"
+    ip_rating: str = "IP44"
+    shaft_length: str = "≥ 50 мм"
+    manual_override: str = "расцепление редуктора кнопкой, с самовозвратом"
+    direction: str = "переключателем / клеммами питания"
+    # Aux switch b trip angles (SA PDFs: 80° or 85°).
+    aux_b_lo: str = "–5…80°"
+    aux_b_hi: str = "80…90°"
 
 
 EN_PDF_SPECS: tuple[EnPdfSpec, ...] = (
@@ -210,15 +222,299 @@ EN_PDF_SPECS: tuple[EnPdfSpec, ...] = (
         mass="1,3 кг",
         shaft="круглый 10…20 мм, квадратный 10×10…16×16 мм",
     ),
+    # SA FU — fire/smoke spring-return (combined 24+230, DS/DST).
+    EnPdfSpec(
+        stem="sa3fu-ds-dst",
+        pdf_name="sa3fu-ds_dst.pdf",
+        title="SA3FU …-DS/DST — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="safu",
+        skus=("SA3FU24-DS/DST", "SA3FU230-DS/DST"),
+        torque="3 Нм",
+        areas=("< 0,3 м²", "< 0,3 м²"),
+        running=("< 75 с / < 25 с", "< 75 с / < 25 с"),
+        power="5 Вт под нагрузкой\n2 Вт удержание",
+        sound=(
+            "макс. 45 дБ(А) при работе двигателя, "
+            "макс. 50 дБ(А) при возврате пружины"
+        ),
+        mass="< 1,3 кг",
+        shaft="квадратный 12×12 мм (втулки 8×8, 10×10 мм)",
+        storage_temp="–40…+70 °C",
+        ambient_temp="–20…+50 °C",
+        ip_rating="IP54",
+        shaft_length="≥ 50 мм",
+        manual_override="расцепление редуктора кнопкой, с самовозвратом",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…80°",
+        aux_b_hi="80…90°",
+    ),
+    EnPdfSpec(
+        stem="sa5fu-ds-dst",
+        pdf_name="sa5fu-ds_dst.pdf",
+        title="SA5FU …-DS/DST — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="safu",
+        skus=("SA5FU24-DS/DST", "SA5FU230-DS/DST"),
+        torque="5 Нм",
+        areas=("< 0,5 м²", "< 0,5 м²"),
+        running=("< 70 с / < 20 с", "< 70 с / < 20 с"),
+        power="5 Вт под нагрузкой\n3 Вт удержание",
+        sound=(
+            "макс. 45 дБ(А) при работе двигателя, "
+            "макс. 62 дБ(А) при возврате пружины"
+        ),
+        mass="< 1,5 кг",
+        shaft="квадратный 12×12 мм (втулки 8×8, 10×10 мм)",
+        storage_temp="–40…+70 °C",
+        ambient_temp="–20…+50 °C",
+        ip_rating="IP54",
+        shaft_length="< 90 мм",
+        manual_override="расцепление редуктора кнопкой, с самовозвратом",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…80°",
+        aux_b_hi="80…90°",
+    ),
+    EnPdfSpec(
+        stem="sa10fu-ds-dst",
+        pdf_name="sa10fu-ds_dst.pdf",
+        title="SA10FU …-DS/DST — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="safu",
+        skus=("SA10FU24-DS/DST", "SA10FU230-DS/DST"),
+        torque="10 Нм",
+        areas=("< 1,0 м²", "< 1,0 м²"),
+        running=("< 100 с / < 25 с", "< 100 с / < 25 с"),
+        power="5 Вт под нагрузкой\n3 Вт удержание",
+        sound=(
+            "макс. 45 дБ(А) при работе двигателя, "
+            "макс. 62 дБ(А) при возврате пружины"
+        ),
+        mass="< 2,5 кг",
+        shaft="квадратный 12×12 мм (втулки 8×8, 10×10 мм)",
+        storage_temp="–40…+70 °C",
+        ambient_temp="–20…+50 °C",
+        ip_rating="IP54",
+        shaft_length="< 90 мм",
+        manual_override="расцепление редуктора кнопкой, с самовозвратом",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…85°",
+        aux_b_hi="85…90°",
+    ),
+    EnPdfSpec(
+        stem="sa15fu-ds-dst",
+        pdf_name="sa15fu-ds_dst.pdf",
+        title="SA15FU …-DS/DST — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="safu",
+        skus=("SA15FU24-DS/DST", "SA15FU230-DS/DST"),
+        torque="15 Нм",
+        areas=("< 1,5 м²", "< 1,5 м²"),
+        running=("< 150 с / < 25 с", "< 150 с / < 25 с"),
+        power="10 Вт под нагрузкой\n3,5 Вт удержание",
+        sound=(
+            "макс. 45 дБ(А) при работе двигателя, "
+            "макс. 62 дБ(А) при возврате пружины"
+        ),
+        mass="< 2,8 кг",
+        shaft="квадратный 12×12 мм (втулки 8×8, 10×10 мм)",
+        storage_temp="–40…+70 °C",
+        ambient_temp="–20…+50 °C",
+        ip_rating="IP54",
+        shaft_length="< 90 мм",
+        manual_override="расцепление редуктора кнопкой, с самовозвратом",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…85°",
+        aux_b_hi="85…90°",
+    ),
+    # SA MU — smoke damper, no spring (combined 24+230, только DS — без DST).
+    EnPdfSpec(
+        stem="sa7mu-ds-dst",
+        pdf_name="sa7mu-ds_dst.pdf",
+        title="SA7MU …-DS — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="samu",
+        skus=("SA7MU24-DS", "SA7MU230-DS"),
+        torque="7 Нм",
+        areas=("< 0,7 м²", "< 0,7 м²"),
+        running=("< 30 с (95°)", "< 30 с (95°)"),
+        power="5 Вт под нагрузкой\n1 Вт удержание",
+        sound="макс. 50 дБ(А)",
+        mass="1,7 кг",
+        shaft="квадратный 12×12 мм",
+        storage_temp="–30…+80 °C",
+        ambient_temp="–30…+50 °C",
+        ip_rating="IP54",
+        shaft_length="≥ 50 мм",
+        manual_override="металлическая рукоятка",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…80°",
+        aux_b_hi="80…90°",
+    ),
+    EnPdfSpec(
+        stem="sa10mu-ds-dst",
+        pdf_name="sa10mu-ds_dst.pdf",
+        title="SA10MU …-DS — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="samu",
+        skus=("SA10MU24-DS", "SA10MU230-DS"),
+        torque="10 Нм",
+        areas=("< 1,0 м²", "< 1,0 м²"),
+        running=("< 45 с (95°)", "< 45 с (95°)"),
+        power="5 Вт под нагрузкой\n1 Вт удержание",
+        sound="макс. 50 дБ(А)",
+        mass="1,7 кг",
+        shaft="квадратный 12×12 мм",
+        storage_temp="–30…+80 °C",
+        ambient_temp="–30…+50 °C",
+        ip_rating="IP54",
+        shaft_length="≥ 50 мм",
+        manual_override="металлическая рукоятка",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…80°",
+        aux_b_hi="80…90°",
+    ),
+    EnPdfSpec(
+        stem="sa15mu-ds-dst",
+        pdf_name="sa15mu-ds_dst.pdf",
+        title="SA15MU …-DS — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="samu",
+        skus=("SA15MU24-DS", "SA15MU230-DS"),
+        torque="15 Нм",
+        areas=("< 1,5 м²", "< 1,5 м²"),
+        running=("< 30 с (95°)", "< 30 с (95°)"),
+        power="5 Вт под нагрузкой\n1 Вт удержание",
+        sound="макс. 50 дБ(А)",
+        mass="1,7 кг",
+        shaft="квадратный 12×12 мм",
+        storage_temp="–30…+80 °C",
+        ambient_temp="–30…+50 °C",
+        ip_rating="IP54",
+        shaft_length="≥ 90 мм",
+        manual_override="металлическая рукоятка",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…80°",
+        aux_b_hi="80…90°",
+    ),
+    EnPdfSpec(
+        stem="sa30mu-ds-dst",
+        pdf_name="sa30mu-ds_dst.pdf",
+        title="SA30MU …-DS — руководство (RU)",
+        voltage_id="dual",
+        modulating=False,
+        family="samu",
+        skus=("SA30MU24-DS", "SA30MU230-DS"),
+        torque="30 Нм",
+        areas=("< 3,0 м²", "< 3,0 м²"),
+        running=("< 115 с (95°)", "< 115 с (95°)"),
+        power="10 Вт под нагрузкой\n2 Вт удержание",
+        sound="макс. 45 дБ(А)",
+        mass="2,2 кг",
+        shaft="квадратный 12×12 мм",
+        storage_temp="–30…+80 °C",
+        ambient_temp="–30…+50 °C",
+        ip_rating="IP54",
+        shaft_length="≥ 90 мм",
+        manual_override="металлическая рукоятка",
+        direction="для монтажа с противоположной стороны",
+        aux_b_lo="–5…85°",
+        aux_b_hi="85…90°",
+    ),
 )
 
 
+def _sa_aux_table(spec: EnPdfSpec) -> list[list[str]]:
+    """Factory aux angles — cable terminals S1–S6 (EN SA PDFs)."""
+    return [
+        ["Переключатель a", "Клеммы S1, S2", "Клеммы S1, S3"],
+        ["–5…5°", "Замкнуто", "Разомкнуто"],
+        ["5…90°", "Разомкнуто", "Замкнуто"],
+        ["Переключатель b", "Клеммы S4, S5", "Клеммы S4, S6"],
+        [spec.aux_b_lo, "Замкнуто", "Разомкнуто"],
+        [spec.aux_b_hi, "Разомкнуто", "Замкнуто"],
+    ]
+
+
 def _build_doc(spec: EnPdfSpec):
-    vt = mh.VOLTAGE_TEMPLATES[spec.voltage_id]
     n = len(spec.skus)
     assert len(spec.areas) == n and len(spec.running) == n
+    is_sa = spec.family in {"safu", "samu"}
 
-    if spec.modulating:
+    if is_sa:
+        if spec.family == "safu":
+            edition = (
+                "Исполнения «DS» / «DST» включают 2 группы вспомогательных "
+                "переключателей."
+            )
+            dst_note = "Исполнение «DST» — с термодатчиком SAF72."
+        else:
+            # SAMU EN PDFs: только DS (без DST / SAF72).
+            edition = (
+                "Исполнение «DS» включает 2 группы вспомогательных переключателей."
+            )
+            dst_note = ""
+        direction = spec.direction
+        angle = "Макс. 95°"
+        if spec.family == "safu":
+            # Глоссарий Belimo RU / series-card: противопожарный клапан (не «пружинный»).
+            heading = (
+                "Привод противопожарного клапана — 2-позиционное управление"
+            )
+            intro = (
+                "Для противопожарных и дымовых клапанов в системах HVAC "
+                "(отопления, вентиляции и кондиционирования воздуха)"
+            )
+            control = "Управление: вкл./выкл. (ON/OFF)"
+            doc_title = (
+                "Руководство по эксплуатации — привод противопожарного клапана"
+            )
+            running_label = "Время поворота / возврат пружины"
+        else:
+            heading = "2- / 3-позиционное управление"
+            intro = (
+                "Для управления дымовыми клапанами в системах дымоудаления "
+                "и противодымной вентиляции"
+            )
+            control = "Управление: 2- / 3-позиционное"
+            doc_title = (
+                "Руководство по эксплуатации — привод дымового клапана"
+            )
+            running_label = "Время поворота"
+        lead_voltage = (
+            "Номинальное напряжение: AC/DC 24 В; AC 100…240 В"
+        )
+        summary_lines = [
+            heading,
+            intro,
+            f"Крутящий момент: {spec.torque}",
+            f"{running_label}: {spec.running[0]}",
+            lead_voltage,
+            control,
+            edition,
+        ]
+        if dst_note:
+            summary_lines.append(dst_note)
+        summary = "\n".join(summary_lines)
+        elec = [
+            [
+                "Номинальное напряжение",
+                "AC/DC 24 В, 50/60 Гц",
+                "AC 100…240 В, 50/60 Гц",
+            ],
+            ["Потребляемая мощность", spec.power, spec.power],
+            ["Сечение подключаемых проводов", "0,5 мм²", "0,5 мм²"],
+        ]
+        aux_table = _sa_aux_table(spec)
+    elif spec.modulating:
+        vt = mh.VOLTAGE_TEMPLATES[spec.voltage_id]
         control = (
             "Упр. сигнал Y: 0(2)…10 В= / 0(4)…20 мА (спецзаказ)\n"
             "Обратная связь U: 0(2)…10 В= / 0(4)…20 мА (спецзаказ)"
@@ -231,55 +527,95 @@ def _build_doc(spec: EnPdfSpec):
         heading = (
             "Пропорциональное управление"
             if spec.family == "mu"
-            else "Быстроходный привод — пропорциональное управление"
+            else "Привод ускоренного срабатывания — пропорциональное управление"
         )
+        summary = "\n".join(
+            [
+                heading,
+                "Для управления воздушными заслонками в системах HVAC "
+                "(отопления, вентиляции и кондиционирования воздуха)",
+                f"Крутящий момент: {spec.torque}",
+                f"Время поворота: {', '.join(spec.running)}",
+                vt.lead_voltage,
+                control,
+                edition,
+            ]
+        )
+        elec = [
+            ["Номинальное напряжение", vt.nominal_voltage],
+            ["Потребляемая мощность", spec.power],
+            ["Сечение подключаемых проводов", "0,5 мм²"],
+        ]
+        aux_table = list(AUX_TABLE)
+        if spec.family == "mqu":
+            doc_title = (
+                "Руководство по эксплуатации — привод ускоренного срабатывания"
+            )
+        else:
+            doc_title = "Руководство по эксплуатации — пропорциональный привод"
     else:
-        control = "Управление: 2-позиционное и 3-позиционное"
+        vt = mh.VOLTAGE_TEMPLATES[spec.voltage_id]
+        control = "Управление: 2- / 3-позиционное"
         edition = (
             "Исполнение «DS» включает 2 группы вспомогательных переключателей."
         )
         direction = "переключателем / клеммами питания"
         angle = "Макс. 95°"
         heading = (
-            "2-позиционное и 3-позиционное управление"
+            "2- / 3-позиционное управление"
             if spec.family == "mu"
-            else "Быстроходный привод — 2-/3-позиционное управление"
+            else "Привод ускоренного срабатывания — 2- / 3-позиционное управление"
         )
-
-    summary = "\n".join(
-        [
-            heading,
-            "Для управления воздушными заслонками в системах HVAC "
-            "(отопления, вентиляции и кондиционирования воздуха)",
-            f"Крутящий момент: {spec.torque}",
-            f"Время поворота: {', '.join(spec.running)}",
-            vt.lead_voltage,
-            control,
-            edition,
+        summary = "\n".join(
+            [
+                heading,
+                "Для управления воздушными заслонками в системах HVAC "
+                "(отопления, вентиляции и кондиционирования воздуха)",
+                f"Крутящий момент: {spec.torque}",
+                f"Время поворота: {', '.join(spec.running)}",
+                vt.lead_voltage,
+                control,
+                edition,
+            ]
+        )
+        elec = [
+            ["Номинальное напряжение", vt.nominal_voltage],
+            ["Потребляемая мощность", spec.power],
+            ["Сечение подключаемых проводов", "0,5 мм²"],
         ]
-    )
+        aux_table = list(AUX_TABLE)
+        if spec.family == "mqu":
+            doc_title = (
+                "Руководство по эксплуатации — привод ускоренного срабатывания"
+            )
+        else:
+            doc_title = "Руководство по эксплуатации — привод вкл./выкл."
 
-    elec = [
-        ["Номинальное напряжение", vt.nominal_voltage],
-        ["Потребляемая мощность", spec.power],
-        ["Сечение подключаемых проводов", "0,5 мм²"],
-    ]
+    time_row = (
+        "Время поворота / возврат пружины"
+        if spec.family == "safu"
+        else "Время поворота"
+    )
     func = [
         ["Функциональные параметры", *([""] * n)],
         ["Площадь обслуживаемой заслонки", *spec.areas],
-        ["Время поворота", *spec.running],
+        [time_row, *spec.running],
         ["Направление вращения", *([direction] * n)],
-        [
-            "Ручное управление",
-            *(["расцепление редуктора кнопкой, с самовозвратом"] * n),
-        ],
+        ["Ручное управление", *([spec.manual_override] * n)],
         ["Угол поворота", *([angle] * n)],
         ["Уровень звуковой мощности", *([spec.sound] * n)],
         ["Индикация положения", *(["Механический указатель"] * n)],
         ["Условия эксплуатации", *([""] * n)],
-        ["Класс защиты", *([vt.protection_class] * n)],
-        ["Степень защиты корпуса", *(["IP44"] * n)],
-        ["Температура окружающей среды", *(["–20…+50 °C"] * n)],
+        [
+            "Класс защиты",
+            *(
+                [mh._protection_class_for_sku(s) for s in spec.skus]
+                if is_sa
+                else [mh.VOLTAGE_TEMPLATES[spec.voltage_id].protection_class] * n
+            ),
+        ],
+        ["Степень защиты корпуса", *([spec.ip_rating] * n)],
+        ["Температура окружающей среды", *([spec.ambient_temp] * n)],
         ["Температура хранения", *([spec.storage_temp] * n)],
         [
             "Испытание на влажность",
@@ -290,17 +626,10 @@ def _build_doc(spec: EnPdfSpec):
             "Габаритные размеры (Д × Ш × В)",
             *(["См. «Габаритные размеры»"] * n),
         ],
-        ["Длина вала заслонки", *(["≥ 50 мм"] * n)],
+        ["Длина вала заслонки", *([spec.shaft_length] * n)],
         ["Диаметр вала заслонки", *([spec.shaft] * n)],
         ["Масса", *([spec.mass] * n)],
     ]
-
-    if spec.family == "mqu":
-        doc_title = "Руководство по эксплуатации — быстроходный привод"
-    elif spec.modulating:
-        doc_title = "Руководство по эксплуатации — пропорциональный привод"
-    else:
-        doc_title = "Руководство по эксплуатации — привод вкл./выкл."
 
     return mh.ManualDoc(
         stem=spec.stem,
@@ -312,22 +641,33 @@ def _build_doc(spec: EnPdfSpec):
         summary=summary,
         electrical_table=elec,
         function_table=func,
-        aux_table=list(AUX_TABLE),
+        aux_table=aux_table,
         product_photo="product.png",
         lead_photo="lead.png",
     )
 
 
-def convert_en_pdf(spec: EnPdfSpec, out_dir: Path) -> Path:
-    """Materialize assets from EN PDF and write ``{stem}.html``."""
-    assets = out_dir / "assets" / spec.stem
+def convert_en_pdf(spec: EnPdfSpec, out_dir: Path, *, force: bool = False) -> Path:
+    """Materialize assets from EN PDF and write ``{DA,SA,HV}/{stem}.html``."""
+    finished_dir = mh.finished_manuals_dir(out_dir, stem=spec.stem)
+    finished_dir.mkdir(parents=True, exist_ok=True)
+    mh._ensure_family_logo(finished_dir)
+    html_path = finished_dir / f"{spec.stem}.html"
+    if mh.manual_stem_is_locked(spec.stem) and not force:
+        if html_path.is_file():
+            return html_path
+        raise FileNotFoundError(
+            f"Locked manual {spec.stem!r} has no HTML yet; use --force to build."
+        )
+
+    assets = finished_dir / "assets" / spec.stem
     if assets.exists():
         for old in assets.iterdir():
             if old.is_file():
                 old.unlink()
     assets.mkdir(parents=True, exist_ok=True)
 
-    profile = mh.ensure_diagram_assets(spec.stem, out_dir)
+    profile = mh.ensure_diagram_assets(spec.stem, finished_dir, force=force)
     doc = _build_doc(spec)
     if (assets / "product.png").is_file():
         doc.product_photo = "product.png"
@@ -335,19 +675,27 @@ def convert_en_pdf(spec: EnPdfSpec, out_dir: Path) -> Path:
             "lead.png" if (assets / "lead.png").is_file() else "product.png"
         )
     body = mh.render_grid(doc, diagram_profile=profile)
-    note = (
-        f'<p class="template-voltage-note"><strong>'
-        f"{html.escape(mh.VOLTAGE_TEMPLATES[spec.voltage_id].label_ru)}</strong>"
-        f" — перевод с EN PDF <code>{html.escape(spec.pdf_name)}</code>. "
-        f"Шаблон {html.escape(spec.voltage_id.upper())}; "
-        f"канон: <code>TEMPLATES.md</code>.</p>"
-    )
+    if spec.voltage_id == "dual":
+        note = (
+            '<p class="template-voltage-note"><strong>'
+            "AC/DC 24 В + AC 100…240 В</strong>"
+            f" — перевод с EN PDF <code>{html.escape(spec.pdf_name)}</code> "
+            "(оба напряжения в одном руководстве). "
+            "Канон: <code>TEMPLATES.md</code>.</p>"
+        )
+    else:
+        note = (
+            f'<p class="template-voltage-note"><strong>'
+            f"{html.escape(mh.VOLTAGE_TEMPLATES[spec.voltage_id].label_ru)}</strong>"
+            f" — перевод с EN PDF <code>{html.escape(spec.pdf_name)}</code>. "
+            f"Шаблон {html.escape(spec.voltage_id.upper())}; "
+            f"канон: <code>TEMPLATES.md</code>.</p>"
+        )
     body = body.replace(
         '<section class="sheet sheet-page1">',
         f'{note}<section class="sheet sheet-page1">',
         1,
     )
-    html_path = out_dir / f"{spec.stem}.html"
     html_path.write_text(
         mh.HTML_SHELL.format(title=html.escape(spec.title), body=body),
         encoding="utf-8",
@@ -357,25 +705,50 @@ def convert_en_pdf(spec: EnPdfSpec, out_dir: Path) -> Path:
 
 def rewrite_index(out_dir: Path, en_rows: list[tuple[str, str]]) -> None:
     """Refresh index.html including EN→RU stems and voltage templates."""
+    title_by_stem = {stem: title for stem, title in mh.STEM_MAP.values()}
+    for stem, title in en_rows:
+        title_by_stem[stem] = title
     rows: list[str] = [
         "<li><strong>Шаблоны напряжения (для EN→RU)</strong><br>"
         '<a href="template-v24.html">V24 — AC/DC 24 В</a> · '
         '<a href="template-v230.html">V230 — AC 100…240 В</a> · '
         "<code>TEMPLATES.md</code></li>",
-        "<li><strong>EN→RU (раздельные PDF 24 / 230 В)</strong><ul>",
+        "<li><strong>Семейства готовых руководств</strong><br>"
+        '<code>DA/</code> (готово) · <code>SA/</code> (готово) · '
+        '<code>HV/</code> (очередь EN)</li>',
     ]
-    for stem, title in en_rows:
-        rows.append(
-            f"<li><strong>{html.escape(title)}</strong><br>"
-            f'<a href="{stem}.html">HTML (сетка 12 / A4)</a></li>',
+    by_family: dict[str, list[tuple[str, str]]] = {
+        "DA": [],
+        "SA": [],
+        "HV": [],
+    }
+    listed: set[str] = set()
+    for fam_dir, stem, _path in mh.iter_finished_manual_html(out_dir):
+        listed.add(stem)
+        by_family.setdefault(fam_dir, []).append(
+            (stem, title_by_stem.get(stem, stem)),
         )
-    rows.append("</ul></li>")
-    for stem, title in sorted(mh.STEM_MAP.values(), key=lambda x: x[0]):
-        if (out_dir / f"{stem}.html").is_file():
+    for stem, title in en_rows:
+        if stem in listed:
+            continue
+        fam = mh.finished_manuals_subdir(stem)
+        by_family.setdefault(fam, []).append((stem, title))
+        listed.add(stem)
+    for fam in ("DA", "SA", "HV"):
+        items = by_family.get(fam) or []
+        if not items and fam != "DA":
+            rows.append(
+                f"<li><strong>{fam}/</strong> — папка готова, HTML пока нет "
+                f"(EN PDF в <code>_инструкции-pdf/EN/</code>)</li>",
+            )
+            continue
+        rows.append(f"<li><strong>{fam}/</strong><ul>")
+        for stem, title in sorted(items, key=lambda x: x[0]):
             rows.append(
                 f"<li><strong>{html.escape(title)}</strong><br>"
-                f'<a href="{stem}.html">HTML (сетка 12 / A4)</a></li>',
+                f'<a href="{fam}/{stem}.html">HTML (сетка 12 / A4)</a></li>',
             )
+        rows.append("</ul></li>")
     (out_dir / "index.html").write_text(
         "<!DOCTYPE html><html lang='ru'><head><meta charset='utf-8'>"
         "<title>Инструкции SKU (RU)</title>"
@@ -383,6 +756,8 @@ def rewrite_index(out_dir: Path, en_rows: list[tuple[str, str]]) -> None:
         "padding:0 1rem}li{margin:.65rem 0}</style></head><body>"
         "<h1>Руководства по эксплуатации (RU)</h1>"
         "<p>Адаптивная вёрстка на 12 колонках, 2 листа A4 альбом. "
+        "Готовые руководства — в <code>DA/</code>, <code>SA/</code>, "
+        "<code>HV/</code>. "
         "Новые переводы с EN — шаблоны "
         "<a href='template-v24.html'>V24</a> / "
         "<a href='template-v230.html'>V230</a>.</p>"
@@ -399,6 +774,11 @@ def main() -> None:
         nargs="*",
         help="Optional stem filter (default: all EN_PDF_SPECS).",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Rebuild even LOCKED_MANUAL_STEMS (finished manuals).",
+    )
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -406,17 +786,20 @@ def main() -> None:
         print("OK", path.name)
 
     only = set(args.only) if args.only else None
-    en_rows: list[tuple[str, str]] = []
+    en_rows: list[tuple[str, str]] = [(s.stem, s.title) for s in EN_PDF_SPECS]
     for spec in EN_PDF_SPECS:
         if only is not None and spec.stem not in only:
             continue
+        locked = mh.manual_stem_is_locked(spec.stem) and not args.force
         try:
-            out = convert_en_pdf(spec, args.out_dir)
+            out = convert_en_pdf(spec, args.out_dir, force=args.force)
         except FileNotFoundError as exc:
             print("SKIP", spec.stem, exc)
             continue
-        print("OK", out.name, "←", spec.pdf_name)
-        en_rows.append((spec.stem, spec.title))
+        if locked:
+            print("LOCKED", out.name, "(не пересобран)")
+        else:
+            print("OK", out.name, "←", spec.pdf_name)
 
     rewrite_index(args.out_dir, en_rows)
     print("OK index.html")

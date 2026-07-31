@@ -227,6 +227,45 @@
     object-fit: contain;
     object-position: top center;
   }
+  .sheet-page1 .aux-diagram-media-compact {
+    max-height: 36mm;
+  }
+  .sheet-page1 .aux-diagram-compact {
+    max-height: 36mm;
+  }
+  .sheet-page1 .aux-diagram-caption {
+    margin: 0;
+    padding: 0;
+    font-size: 5.5pt;
+    line-height: 1.25;
+    color: #333;
+  }
+  /* Captioned aux: note + caption share one grid row (same baseline). */
+  .sheet-page1 .sheet1-aux-row-captioned {
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-main {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: stretch;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-diagram {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: stretch;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-note {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-diagram-caption {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }
   .sheet-page1 .sheet1-dip-diagram {
     min-height: 0;
     max-height: 48mm;
@@ -382,7 +421,23 @@
   }
   .sheet2-body .diagrams-block .diagrams {
     flex: 1 1 auto;
-    align-content: start;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5mm;
+    overflow: hidden;
+  }
+  .sheet2-body .diagrams-block .diagrams > .diagram {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  .sheet2-body .diagrams-block .diagrams > .diagram-dip {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }
   .sheet-page2 .lead-heading {
     font-size: clamp(10pt, 1.8vw, 13pt);
@@ -429,6 +484,9 @@
     width: 100%;
     max-height: 34mm;
   }
+  .sheet-page2 .wiring-board > img {
+    max-height: 40mm;
+  }
   .wiring-board {
     position: relative;
     width: 100%;
@@ -451,11 +509,11 @@
     display: block;
     width: 100%;
     height: auto;
-    max-height: 38mm;
+    max-height: 40mm;
     object-fit: contain;
   }
   .wiring-board-ru-headers > img {
-    max-height: 34mm;
+    max-height: 40mm;
   }
   .wiring-board .wl {
     position: absolute;
@@ -479,6 +537,16 @@
   .sheet-page2 .diagrams .diagram:nth-child(3) img {
     max-height: 42mm;
   }
+  .sheet-page2 .diagrams .diagram-dip > img {
+    max-height: none;
+  }
+  /* Free vertical room for the wide DIP table on A/AS sheet 2. */
+  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board > img {
+    max-height: 28mm !important;
+  }
+  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) img {
+    max-height: 38mm !important;
+  }
   .diagrams .banner {
     display: block;
     width: 100%;
@@ -489,21 +557,41 @@
     /* diagrams-block = sheet cols 7–12 → local 6; image on sheet 10–12 = local 4–6. */
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--gap);
-    align-items: center;
+    align-items: start;
     width: 100%;
+    min-height: 0;
   }
   .diagram-rotation .rotation-panel .rotation-copy {
     grid-column: 1 / span 3;
     width: 100%;
     box-sizing: border-box;
-    padding: 0.5mm 0;
+    padding: 0;
     min-width: 0;
   }
-  .diagram-rotation .rotation-panel > img {
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media {
     grid-column: 4 / span 3;
     width: 100%;
     min-width: 0;
     justify-self: stretch;
+  }
+  .diagram-rotation .rotation-media {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6mm;
+    min-height: 0;
+  }
+  .diagram-rotation .rotation-media > img {
+    width: 100%;
+    max-height: 34mm !important;
+    object-fit: contain;
+    object-position: top center;
+  }
+  .diagram-rotation .rotation-media > .rotation-label {
+    margin: 0 !important;
+    text-align: center;
+    font-size: 6pt;
   }
   .diagram-rotation > .rotation-copy {
     width: 100%;
@@ -511,14 +599,14 @@
     padding: 0.5mm 0;
   }
   .rotation-copy {
-    font-size: 6.5pt;
-    line-height: 1.3;
+    font-size: 6pt;
+    line-height: 1.25;
   }
   .rotation-copy p {
-    margin: 0 0 1.2mm;
+    margin: 0 0 0.8mm;
   }
   .rotation-table {
-    margin: 0 0 1.2mm !important;
+    margin: 0 0 0.8mm !important;
     font-size: 5.2pt !important;
     table-layout: fixed;
     width: 100%;
@@ -537,7 +625,25 @@
     font-weight: 650;
   }
   .diagram-rotation img {
-    max-height: 42mm !important;
+    max-height: 36mm !important;
+  }
+  .diagram-rotation.diagram-dip > img {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Definite height so object-fit can scale the whole table (not clip). */
+    height: 0;
+    max-height: none !important;
+    object-fit: contain;
+    object-position: top center;
+    display: block;
+  }
+  .diagram-rotation.diagram-thermal .rotation-panel > img {
+    max-height: 52mm !important;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
   }
   .sheet-page2 .note {
     margin: 1mm 0 0;
@@ -659,6 +765,10 @@
     height: auto;
     object-fit: contain;
   }
+  /* SA FU/MU: slightly smaller hero so left body + SAF72 fit without clip. */
+  .sheet-page1 .product-col .product-photo[src*="/sa"] {
+    max-height: 58mm;
+  }
   .doc-title-box {
     grid-column: 2 / span 5;
     grid-row: 2;
@@ -712,7 +822,7 @@
     font-size: clamp(14pt, 16cqw, 48pt);
     font-weight: 700;
     color: var(--red);
-    line-height: 1;
+    line-height: 1.1;
     white-space: nowrap;
     text-align: center;
     overflow: hidden;
@@ -851,7 +961,8 @@
     .diagrams { grid-template-columns: 1fr; }
     .diagram-rotation .rotation-panel { grid-template-columns: 1fr; }
     .diagram-rotation .rotation-panel .rotation-copy,
-    .diagram-rotation .rotation-panel > img { grid-column: 1 / -1; }
+    .diagram-rotation .rotation-panel > img,
+    .diagram-rotation .rotation-panel > .rotation-media { grid-column: 1 / -1; }
   }
 
   @page { size: A4 landscape; margin: 0; }
@@ -882,6 +993,9 @@
     }
     .summary-media { grid-column: 1 / span 2; }
     .summary-copy { grid-column: 3 / span 4; }
+    /* Photo crop (clip-path) must remain for print PDF — only hide the UI. */
+    .photo-crop-panel,
+    #toggle-photo-crop { display: none !important; }
   }
 </style>
 </head>
@@ -1059,5 +1173,6 @@
       }
     })();
   </script>
+  <script src="assets/photo-crop-tool.js"></script>
 </body>
 </html>

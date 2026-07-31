@@ -7,7 +7,11 @@
 Термины RU: [docs/tech-copy-belimo-ru.md](../../tech-copy-belimo-ru.md).
 **Канон данных:** `_инструкции-pdf/` (ТТХ, схемы, aux). PPTX — только
 внутренний каркас извлечения, в `manuals-ru/` не публикуется.
-Ассеты: `assets/<stem>/`.
+Готовые руководства по семействам:
+[`DA/`](DA/) (готово), [`SA/`](SA/), [`HV/`](HV/)
+(`{DA,SA,HV}/<stem>.html`, `{DA,SA,HV}/assets/<stem>/`).
+Curated для генератора / шаблонов: [`assets/`](assets/).
+Шаблоны V24/V230 — в корне `manuals-ru/`.
 
 Эталонные HTML-каркасы (пусто / плейсхолдеры):
 
@@ -101,19 +105,32 @@ JS-fit: `fitDocTitle()` (заголовок документа) и `fitTorque()`
 
 | Stem | Источник схем | `rotation_kind` | Картинка вращения |
 |------|---------------|-----------------|-------------------|
-| `da2mu-d-ds` | curated wiring + catalog dims | `terminals` | да |
-| `da2mu-a-as` | catalog | `signal` | да |
-| `da3fu-d-ds` | catalog | `screw` | нет |
-| `da4-6mu-d-ds` | PDF `da4_6mu-d_ds.pdf` | `terminals_jumper` | да |
-| `da4-6mu-a-as` | PDF `da4_6mu-a_as.pdf` | `terminals_jumper` | да |
-| `da5fu-d-ds` | PDF `da5fu-d_ds.pdf` | `angle_limit` | да |
-| `da10-15-20fu24-230-d-ds` | PDF `da10fu-d:ds.pdf` | `angle_limit` | да |
-| `da10-15-20fu24-a-as` | PDF `da10fu24-a:as.pdf` | `slider` | да |
-| `da8-16-24-32mu24-a-as` | EN `da8_16_24_32mu24-a_as.pdf` | `signal` | да |
-| `da8-16-24-32mu24-d-ds` | EN `…mu24-d_ds.pdf` | `terminals_jumper` | да |
-| `da8-16-24-32mu230-*` | EN `…mu230-*.pdf` | как 24 В | да |
-| `da8-16-24mqu24-a-as` | EN `…mqu24-a_as.pdf` | `signal` | да |
-| `da8-16-24mqu230-*` | EN `…mqu230-*.pdf` | A=`signal` / D=`terminals_jumper` | да |
+| `da2mu-d-ds` | **LOCKED готовый** — не пересобирать | `terminals` | да |
+| `da2mu-a-as` | **LOCKED готовый** — не пересобирать | `signal` | да |
+| `da3fu-d-ds` | **LOCKED готовый** — не пересобирать | `screw` | нет |
+| `da4-6mu-d-ds` | **LOCKED готовый** — не пересобирать | `terminals_jumper` | да |
+| `da4-6mu-a-as` | **LOCKED готовый** — не пересобирать | `terminals_jumper` | да |
+| `da5fu-d-ds` | **LOCKED готовый** — не пересобирать | `angle_limit` | да |
+| `da10-15-20fu24-230-d-ds` | **LOCKED готовый** — не пересобирать | `angle_limit` | да |
+| `da10-15-20fu24-a-as` | **LOCKED готовый** — не пересобирать | `slider` | да |
+| `da8-16-24-32mu24-a-as` | **LOCKED готовый** — не пересобирать | `dip` | DIP table |
+| `da8-16-24-32mu24-d-ds` | **LOCKED готовый** — не пересобирать | `commutating` | S1 |
+| `da8-16-24-32mu230-a-as` | **LOCKED готовый** — не пересобирать | `dip` | DIP table |
+| `da8-16-24-32mu230-d-ds` | **LOCKED готовый** — не пересобирать | `commutating` | S1 |
+| `da8-16-24mqu24-a-as` | **LOCKED готовый** — не пересобирать | `dip` | DIP table |
+| `da8-16-24mqu230-a-as` | **LOCKED готовый** — не пересобирать | `dip` | DIP table |
+| `da8-16-24mqu230-d-ds` | **LOCKED готовый** — не пересобирать | `commutating` | S1 |
+
+**Locked manuals** (`LOCKED_MANUAL_STEMS`): HTML + `{DA,SA,HV}/assets/<stem>/`
+не трогать генераторами. Сейчас: **15** DA в `DA/` + **`sa3fu-ds-dst`**,
+**`sa5fu-ds-dst`**, **`sa7mu-ds-dst`**, **`sa10fu-ds-dst`**, **`sa10mu-ds-dst`**,
+**`sa15fu-ds-dst`**, **`sa15mu-ds-dst`** в `SA/`.
+Обход только с `--force`.
+
+**Locked DIP:** `assets/dip-diagram-control-signal-ru.png` (Creator Studio,
+белый фон). Генератор только копирует в `DA/assets/<stem>/dip-diagram.png`;
+SHA256 зафиксирован в `DIP_DIAGRAM_LOCKED_SHA256` — смена файла без обновления
+digest → ошибка. Не кропать из EN PDF.
 
 `angle_limit` (DA5FU, DA10/15/20 FU D/DS): баннер и текст про **механический упор угла**,
 не «переключение направления»; схема — винт ограничения из PDF.
@@ -170,7 +187,10 @@ PDF-кропы (`_pdf_clip_png`):
 
 ## Очередь EN (ориентир на V24 / V230)
 
-Раздельные PDF в `_инструкции-pdf/EN/` — один PDF → один HTML:
+Раздельные PDF в `_инструкции-pdf/EN/` — один PDF → один HTML
+в папке семейства (`DA/` / `SA/` / `HV/`).
+
+### DA/ — готово (locked)
 
 | Stem | PDF | Шаблон |
 |------|-----|--------|
@@ -185,11 +205,58 @@ PDF-кропы (`_pdf_clip_png`):
 Нет в EN: `da8_16_24mqu24-d_ds.pdf`.  
 `da5mqu-*.pdf` — комбинированные 24+230 (не V24/V230) — отдельно.
 
+### SA/ — готово (EN→RU, dual 24+230)
+
+| Stem | PDF EN | Статус |
+|------|--------|--------|
+| `sa3fu-ds-dst` | `sa3fu-ds_dst.pdf` | **LOCKED** |
+| `sa5fu-ds-dst` | `sa5fu-ds_dst.pdf` | **LOCKED** |
+| `sa10fu-ds-dst` | `sa10fu-ds_dst.pdf` | **LOCKED** |
+| `sa15fu-ds-dst` | `sa15fu-ds_dst.pdf` | **LOCKED** |
+| `sa7mu-ds-dst` | `sa7mu-ds_dst.pdf` | **LOCKED** (только DS) |
+| `sa10mu-ds-dst` | `sa10mu-ds_dst.pdf` | **LOCKED** (только DS) |
+| `sa15mu-ds-dst` | `sa15mu-ds_dst.pdf` | **LOCKED** (только DS) |
+| `sa30mu-ds-dst` | `sa30mu-ds_dst.pdf` | **LOCKED** (только DS) |
+
+Комбинированный 24+230 в одном PDF (не V24/V230).
+SAFU — DS/DST + блок SAF72; **SAMU — только DS** (без DST).
+
+### HV/ — очередь (папка готова)
+
+| Ориентир stem | PDF EN |
+|---------------|--------|
+| `hva-2` | `hva-2.pdf` |
+| `hva-5` | `hva-5.pdf` / `HVA-5 instruction.pdf` |
+| `hva-5q` | `hva-5q.pdf` |
+| `hva-5uq` | `hva-5uq.pdf` |
+| `hva-8q` | `hva-8q.pdf` |
+| `hva-10` | `hva-10.pdf` |
+| `hva-10q` | `hva-10q.pdf` |
+| `hva-20` | `hva-20.pdf` |
+| `hva-20q` | `hva-20q.pdf` |
+| `hva-40` | `hva-40.pdf` |
+| `hva-40q` | `hva-40q.pdf` |
+| `hvd-3f-s-st` | `hvd-3f-s_st.pdf` |
+| `hvd-5f-s-st` | `hvd-5f-s_st.pdf` |
+
 Пересборка EN→RU:
 
 ```bash
 python3 docs/demo/manuals-ru/scripts/en_pdf_to_manuals.py
 ```
+
+## Кроп фото (печать PDF)
+
+В тулбаре мануала — **«Кроп фото»** ([`assets/photo-crop-tool.js`](assets/photo-crop-tool.js)):
+
+1. Цель: `product` (лист 1) или `lead` (лист 2).
+2. Слайдеры границ (верх / право / низ / лево, %).
+3. `clip-path` применяется **и на экране, и в «Печать / PDF»** (панель скрывается, кроп остаётся).
+4. Чтобы запечь в файл: **Скачать PNG** → заменить `assets/<stem>/product.png` или `lead.png` → **Сброс**.
+
+Открывать через `http.server` (не `file://`), иначе скачивание PNG может упереться в CORS.
+
+---
 
 ## Пересборка
 
@@ -197,5 +264,6 @@ python3 docs/demo/manuals-ru/scripts/en_pdf_to_manuals.py
 python3 docs/demo/manuals-ru/scripts/pptx-manual-to-html.py
 ```
 
-Пишет HTML серий + `template-v24.html` / `template-v230.html`.
+Пишет готовые HTML в `{DA,SA,HV}/` по семейству stem, шаблоны
+`template-v24.html` / `template-v230.html` в корень.
 Превью: эта папка (локально часто `python3 -m http.server 8765`).

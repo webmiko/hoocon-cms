@@ -32,6 +32,66 @@ EMU_PER_MM = 914400 / 25.4
 
 # This file lives at ``docs/demo/manuals-ru/scripts/…``.
 _MANUALS_RU_DIR = Path(__file__).resolve().parents[1]
+# Published finished manuals by product family (EN→RU queue).
+MANUAL_FAMILY_DIRS: dict[str, str] = {
+    "da": "DA",
+    "sa": "SA",
+    "hv": "HV",
+}
+FINISHED_MANUALS_SUBDIR = "DA"  # default / legacy alias for DA family
+
+
+def manual_family_for_stem(stem: str) -> str:
+    """Map HTML stem to family folder key: da | sa | hv."""
+    s = stem.casefold()
+    if s.startswith("sa"):
+        return "sa"
+    if s.startswith("hv"):
+        return "hv"
+    return "da"
+
+
+def finished_manuals_subdir(stem: str | None = None, *, family: str | None = None) -> str:
+    """Directory name under manuals-ru for finished HTML (``DA`` / ``SA`` / ``HV``)."""
+    key = family or (manual_family_for_stem(stem) if stem else "da")
+    return MANUAL_FAMILY_DIRS.get(key, FINISHED_MANUALS_SUBDIR)
+
+
+def finished_manuals_dir(
+    out_dir: Path | None = None,
+    *,
+    stem: str | None = None,
+    family: str | None = None,
+) -> Path:
+    """Published finished manuals live under ``manuals-ru/{DA,SA,HV}/``."""
+    base = out_dir if out_dir is not None else _MANUALS_RU_DIR
+    return base / finished_manuals_subdir(stem, family=family)
+
+
+def _ensure_family_logo(finished_dir: Path) -> None:
+    """Symlink Hoocon logo into ``{DA,SA,HV}/assets/`` for relative HTML paths."""
+    assets = finished_dir / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    link = assets / "hoocon-logo.svg"
+    target = Path("../../assets/hoocon-logo.svg")
+    if link.is_symlink() or link.is_file():
+        return
+    link.symlink_to(target)
+
+
+def iter_finished_manual_html(
+    out_dir: Path | None = None,
+) -> list[tuple[str, str, Path]]:
+    """Yield ``(family_subdir, stem, html_path)`` for all finished manuals."""
+    base = out_dir if out_dir is not None else _MANUALS_RU_DIR
+    rows: list[tuple[str, str, Path]] = []
+    for fam_dir in MANUAL_FAMILY_DIRS.values():
+        folder = base / fam_dir
+        if not folder.is_dir():
+            continue
+        for html_path in sorted(folder.glob("*.html")):
+            rows.append((fam_dir, html_path.stem, html_path))
+    return rows
 
 
 def _repo_root() -> Path:
@@ -87,6 +147,18 @@ PHRASES: list[tuple[str, str]] = [
     (
         "SPRING-RETURN DAMPER ACTUATOR Instruction Manual",
         "Привод с пружинным возвратом\nРуководство по эксплуатации",
+    ),
+    (
+        "FIRE AND SMOKE DAMPER ACTUATOR\nInstruction Manual",
+        "Привод противопожарного клапана\nРуководство по эксплуатации",
+    ),
+    (
+        "FIRE AND SMOKE DAMPER ACTUATOR Instruction Manual",
+        "Привод противопожарного клапана\nРуководство по эксплуатации",
+    ),
+    (
+        "FIRE AND SMOKE DAMPER ACTUATOR",
+        "Привод противопожарного клапана",
     ),
     (
         "GENERAL DAMPER ACTUATOR\nInstruction Manual",
@@ -526,6 +598,8 @@ def translate(text: str) -> str:
         (r"(?i)\bTorque:\s*", "Крутящий момент: "),
         (r"(?i)GENERAL\s+DAMPER\s+ACTUATOR", "Привод воздушной заслонки"),
         (r"(?i)Instruction\s+Manual", "Руководство по эксплуатации"),
+        (r"(?i)FIRE\s+AND\s+SMOKE\s+DAMPER\s+ACTUATOR",
+         "Привод противопожарного клапана"),
         (r"(?i)SPRING-RETURN\s+DAMPER\s+ACTUATOR",
          "Привод с пружинным возвратом"),
     ]
@@ -692,6 +766,18 @@ ROTATION_COPY_TERMINALS_JUMPER = (
     "<p>Направление вращения можно изменить с помощью перемычки на двигателе.</p>"
     '<p class="rotation-label">Поворотный переключатель</p>'
 )
+# EN MU/MQU D/DS: terminals + DIP S1 («Commutating switch»).
+ROTATION_COPY_COMMUTATING = (
+    "<p>Заводская настройка: напряжение подаётся на клеммы 1 и 3, "
+    "привод вращается по часовой стрелке.</p>"
+    '<table class="data-table rotation-table"><tbody>'
+    "<tr><td>Электропитание</td><td>Клеммы 1, 2</td><td>Клеммы 1, 3</td></tr>"
+    "<tr><td>Направление вращения</td>"
+    "<td>против часовой стрелки</td><td>по часовой стрелке</td></tr>"
+    "</tbody></table>"
+    "<p>Направление вращения можно изменить DIP-переключателем S1.</p>"
+)
+ROTATION_LABEL_COMMUTATING = "Коммутирующий переключатель"
 ROTATION_COPY_SCREW = (
     "<p>Направление вращения можно изменить винтом на верхней крышке.</p>"
 )
@@ -706,6 +792,17 @@ ROTATION_COPY_SLIDER = (
     "<p>Направление вращения меняется ползунком переключателя "
     "на верхней крышке привода.</p>"
 )
+# SA FU/MU: reverse by mounting the actuator on the opposite side.
+ROTATION_COPY_FLIP_SIDE = (
+    "<p>Направление вращения задаётся ориентацией привода при монтаже "
+    "(установка с противоположной стороны).</p>"
+)
+
+# RU caption under EN D/DS aux crop (Chinese callouts on the board drawing).
+AUX_CAPTION_EN_MU_ONOFF = (
+    "Винт M3 с крестообразным шлицем, полукруглая головка (a, b). "
+    "Разъём двигателя."
+)
 
 
 @dataclass(frozen=True)
@@ -715,7 +812,7 @@ class DiagramProfile:
     wiring_media: str | None  # basename under product_images, or None → curated shared
     dimensions_media: str  # basename under product_images
     wiring_overlays: bool  # RU overlays on curated ON/OFF wiring crop
-    rotation_kind: str  # terminals | signal | terminals_jumper | screw | jumper | angle_limit | slider
+    rotation_kind: str  # terminals | signal | terminals_jumper | screw | jumper | angle_limit | slider | dip | commutating
     rotation_image: bool  # show rotary-switch drawing
     # Optional local instruction PDF (under ``_инструкции-pdf/``) — overrides media crops.
     instruction_pdf: str | None = None
@@ -723,6 +820,8 @@ class DiagramProfile:
     sheet1_aux_diagram: bool = False
     # Sheet 1: DIP / control-signal mode crop (A/AS modulating), below aux row.
     sheet1_dip_diagram: bool = False
+    # Optional RU caption under aux diagram (e.g. translate CN callouts on EN crop).
+    sheet1_aux_caption: str | None = None
     # Sheet 2 wiring: RU «Привод» / «Вспомогательный переключатель» above cropped PNG.
     wiring_ru_headers: bool = False
 
@@ -802,73 +901,153 @@ DIAGRAM_PROFILES: dict[str, DiagramProfile] = {
         wiring_media="da8mu24-a-wiring.webp",
         dimensions_media="da8mu24-a-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="signal",
+        rotation_kind="dip",
         rotation_image=True,
         instruction_pdf="da8_16_24_32mu24-a_as.pdf",
         sheet1_aux_diagram=True,
-        sheet1_dip_diagram=True,
         wiring_ru_headers=True,
     ),
     "da8-16-24-32mu24-d-ds": DiagramProfile(
         wiring_media="da8mu24-d-wiring.webp",
         dimensions_media="da8mu24-d-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="terminals_jumper",
+        rotation_kind="commutating",
         rotation_image=True,
         instruction_pdf="da8_16_24_32mu24-d_ds.pdf",
         sheet1_aux_diagram=True,
+        sheet1_aux_caption=AUX_CAPTION_EN_MU_ONOFF,
         wiring_ru_headers=True,
     ),
     "da8-16-24-32mu230-a-as": DiagramProfile(
         wiring_media="da8mu230-a-wiring.webp",
         dimensions_media="da8mu230-a-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="signal",
+        rotation_kind="dip",
         rotation_image=True,
         instruction_pdf="da8_16_24_32mu230-a_as.pdf",
         sheet1_aux_diagram=True,
-        sheet1_dip_diagram=True,
         wiring_ru_headers=True,
     ),
     "da8-16-24-32mu230-d-ds": DiagramProfile(
         wiring_media="da8mu230-d-wiring.webp",
         dimensions_media="da8mu230-d-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="terminals_jumper",
+        rotation_kind="commutating",
         rotation_image=True,
         instruction_pdf="da8_16_24_32mu230-d_ds.pdf",
         sheet1_aux_diagram=True,
+        sheet1_aux_caption=AUX_CAPTION_EN_MU_ONOFF,
         wiring_ru_headers=True,
     ),
     "da8-16-24mqu24-a-as": DiagramProfile(
         wiring_media="da8mqu24-a-wiring.webp",
         dimensions_media="da8mqu24-a-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="signal",
+        rotation_kind="dip",
         rotation_image=True,
         instruction_pdf="da8_16_24mqu24-a_as.pdf",
         sheet1_aux_diagram=True,
-        sheet1_dip_diagram=True,
         wiring_ru_headers=True,
     ),
     "da8-16-24mqu230-a-as": DiagramProfile(
         wiring_media="da8mqu230-a-wiring.webp",
         dimensions_media="da8mqu230-a-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="signal",
+        rotation_kind="dip",
         rotation_image=True,
         instruction_pdf="da8_16_24mqu230-a_as.pdf",
         sheet1_aux_diagram=True,
-        sheet1_dip_diagram=True,
         wiring_ru_headers=True,
     ),
     "da8-16-24mqu230-d-ds": DiagramProfile(
         wiring_media="da8mqu230-d-wiring.webp",
         dimensions_media="da8mqu230-d-dimensions.webp",
         wiring_overlays=False,
-        rotation_kind="terminals_jumper",
+        rotation_kind="commutating",
         rotation_image=True,
         instruction_pdf="da8_16_24mqu230-d_ds.pdf",
+        sheet1_aux_diagram=True,
+        sheet1_aux_caption=AUX_CAPTION_EN_MU_ONOFF,
+        wiring_ru_headers=True,
+    ),
+    # SA EN (combined 24+230, DS/DST) under ``_инструкции-pdf/EN/``.
+    "sa3fu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa3fu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="thermal_saf72",
+        rotation_image=True,
+        instruction_pdf="sa3fu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa5fu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa5fu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="thermal_saf72",
+        rotation_image=True,
+        instruction_pdf="sa5fu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa10fu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa10fu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="thermal_saf72",
+        rotation_image=True,
+        instruction_pdf="sa10fu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa15fu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa15fu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="thermal_saf72",
+        rotation_image=True,
+        instruction_pdf="sa15fu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa7mu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa7mu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="flip_side",
+        rotation_image=False,
+        instruction_pdf="sa7mu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa10mu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa10mu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="flip_side",
+        rotation_image=False,
+        instruction_pdf="sa10mu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa15mu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa15mu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="flip_side",
+        rotation_image=False,
+        instruction_pdf="sa15mu-ds_dst.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "sa30mu-ds-dst": DiagramProfile(
+        wiring_media=None,
+        dimensions_media="sa30mu-placeholder.webp",
+        wiring_overlays=False,
+        rotation_kind="flip_side",
+        rotation_image=False,
+        instruction_pdf="sa30mu-ds_dst.pdf",
         sheet1_aux_diagram=True,
         wiring_ru_headers=True,
     ),
@@ -955,16 +1134,51 @@ def _crop_dark_bottom_banner(img: "Image.Image") -> "Image.Image":
         return float(arr[y].mean())
 
     y = height - 1
-    while y > max(0, height - 8) and row_mean(y) > 200:
+    # Skip trailing white / light pad under the bar (trim_pad can be > 8 px).
+    while y > max(0, height - 80) and row_mean(y) > 180:
         y -= 1
     end = y
-    while y > max(0, height - 160) and row_mean(y) < 90:
+    if end <= 0 or row_mean(end) >= 90:
+        return img
+    while y > max(0, height - 220) and row_mean(y) < 90:
         y -= 1
-    if end - y < 8:
+    # Thin hairline rules are often 2–6 px; keep a floor so we still strip them.
+    if end - y < 2:
         return img
     # Small pad above the bar; do not eat into the drawing.
     cut = max(0, y - 2)
     return img.crop((0, 0, img.width, cut + 1))
+
+
+def _crop_dark_top_banner(img: "Image.Image") -> "Image.Image":
+    """Drop solid dark bar at the top (EN section title banner remnant)."""
+    import numpy as np
+
+    arr = np.asarray(img.convert("RGB"))
+    height = arr.shape[0]
+
+    def row_mean(y: int) -> float:
+        return float(arr[y].mean())
+
+    def row_dark_frac(y: int) -> float:
+        return float((arr[y].mean(axis=1) < 90).mean())
+
+    # Find the solid dark banner (skip leading white / anti-aliased edge).
+    start: int | None = None
+    for y in range(min(height - 1, 100)):
+        if row_mean(y) < 100 and row_dark_frac(y) > 0.55:
+            start = y
+            break
+    if start is None:
+        return img
+    y = start
+    while y < min(height - 1, 220) and row_mean(y) < 100 and row_dark_frac(y) > 0.55:
+        y += 1
+    if y - start < 2:
+        return img
+    # Small pad below the bar; do not eat into top dimension ticks.
+    cut = min(height - 1, y + 2)
+    return img.crop((0, cut, img.width, height))
 
 
 def _trim_white(img: "Image.Image", *, pad: int = 4) -> "Image.Image":
@@ -1045,6 +1259,11 @@ def _pdf_clip_png(
     dest: Path,
     scale: float = 4.0,
     crop_bottom_banner: bool = False,
+    crop_top_banner: bool = False,
+    trim_pad: int = 4,
+    wipe_top_pt: float = 0.0,
+    wipe_words: frozenset[str] | None = None,
+    wipe_words_y: tuple[float, float] | None = None,
 ) -> None:
     import fitz
     from PIL import Image
@@ -1052,15 +1271,38 @@ def _pdf_clip_png(
     doc = fitz.open(pdf_path)
     try:
         page = doc[page_index]
+        if wipe_words:
+            y_lo, y_hi = wipe_words_y if wipe_words_y is not None else (0.0, 1e9)
+            x_lo, _, x_hi, _ = clip
+            for w in page.get_text("words"):
+                text, x0, y0, x1, y1 = w[4], w[0], w[1], w[2], w[3]
+                if text not in wipe_words:
+                    continue
+                if y0 < y_lo or y0 > y_hi or x1 < x_lo or x0 > x_hi:
+                    continue
+                page.add_redact_annot(
+                    fitz.Rect(x0 - 1, y0 - 1, x1 + 1, y1 + 1),
+                    fill=(1, 1, 1),
+                )
+            page.apply_redactions(images=0)
         pix = page.get_pixmap(
             matrix=fitz.Matrix(scale, scale),
             clip=fitz.Rect(*clip),
             alpha=False,
         )
         img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        if wipe_top_pt > 0:
+            # Erase a solid top band (PDF points × scale → px).
+            wipe_px = min(img.height, max(0, int(wipe_top_pt * scale)))
+            if wipe_px:
+                img.paste((255, 255, 255), (0, 0, img.width, wipe_px))
+        if crop_top_banner:
+            img = _crop_dark_top_banner(img)
         if crop_bottom_banner:
             img = _crop_dark_bottom_banner(img)
-        img = _trim_white(img)
+        img = _trim_white(img, pad=trim_pad)
+        if crop_top_banner:
+            img = _crop_dark_top_banner(img)
         if crop_bottom_banner:
             # Trim may re-include a thin rule; strip again after white trim.
             img = _crop_dark_bottom_banner(img)
@@ -1068,6 +1310,97 @@ def _pdf_clip_png(
         img.save(dest, optimize=True)
     finally:
         doc.close()
+
+
+# Locked curated RU DIP table (Apple Creator Studio → white bg).
+# Do not replace with PDF crops / screenshots without updating this digest.
+DIP_DIAGRAM_LOCKED_NAME = "dip-diagram-control-signal-ru.png"
+DIP_DIAGRAM_LOCKED_SHA256 = (
+    "7a3180cd4ebf7a7b2f2f739e5a3e59f088b89b6b081cceedcc136d8712516f9e"
+)
+
+# Finished manuals — generators must not rewrite HTML/assets (unless --force).
+LOCKED_MANUAL_STEMS: frozenset[str] = frozenset(
+    {
+        "da2mu-a-as",
+        "da2mu-d-ds",
+        "da3fu-d-ds",
+        "da4-6mu-a-as",
+        "da4-6mu-d-ds",
+        "da5fu-d-ds",
+        "da8-16-24-32mu24-a-as",
+        "da8-16-24-32mu24-d-ds",
+        "da8-16-24-32mu230-a-as",
+        "da8-16-24-32mu230-d-ds",
+        "da8-16-24mqu24-a-as",
+        "da8-16-24mqu230-a-as",
+        "da8-16-24mqu230-d-ds",
+        "da10-15-20fu24-230-d-ds",
+        "da10-15-20fu24-a-as",
+        # SA — все FU/MU зафиксированы.
+        "sa3fu-ds-dst",
+        "sa5fu-ds-dst",
+        "sa7mu-ds-dst",
+        "sa10fu-ds-dst",
+        "sa10mu-ds-dst",
+        "sa15fu-ds-dst",
+        "sa15mu-ds-dst",
+        "sa30mu-ds-dst",
+    }
+)
+
+
+def manual_stem_is_locked(stem: str) -> bool:
+    return stem in LOCKED_MANUAL_STEMS
+
+
+def _curated_assets_dir() -> Path:
+    return _repo_root() / "docs" / "demo" / "manuals-ru" / "assets"
+
+
+def _copy_locked_curated(
+    *,
+    stem_dir: Path,
+    curated_name: str,
+    dest_name: str,
+    expected_sha256: str,
+) -> None:
+    """Copy a locked curated PNG into ``stem_dir``; refuse unexpected edits."""
+    import hashlib
+
+    curated = _curated_assets_dir() / curated_name
+    if not curated.is_file():
+        raise FileNotFoundError(f"Missing locked curated asset: {curated}")
+    data = curated.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != expected_sha256:
+        raise RuntimeError(
+            f"Locked curated asset changed: {curated.name}\n"
+            f"  expected sha256={expected_sha256}\n"
+            f"  actual   sha256={digest}\n"
+            "Update DIP_DIAGRAM_LOCKED_SHA256 only after intentional replace."
+        )
+    stem_dir.mkdir(parents=True, exist_ok=True)
+    (stem_dir / dest_name).write_bytes(data)
+
+
+def _copy_curated_dip_diagram(stem_dir: Path) -> None:
+    """RU DIP table — locked curated (not EN PDF crop)."""
+    _copy_locked_curated(
+        stem_dir=stem_dir,
+        curated_name=DIP_DIAGRAM_LOCKED_NAME,
+        dest_name="dip-diagram.png",
+        expected_sha256=DIP_DIAGRAM_LOCKED_SHA256,
+    )
+
+
+def _copy_curated_aux_diagram(stem_dir: Path) -> None:
+    """RU aux / board layout (landscape, hub left) for EN MU/MQU manuals."""
+    curated = _curated_assets_dir() / "aux-diagram-mu-board-ru.png"
+    if not curated.is_file():
+        raise FileNotFoundError(f"Missing curated aux diagram: {curated}")
+    stem_dir.mkdir(parents=True, exist_ok=True)
+    (stem_dir / "aux-diagram.png").write_bytes(curated.read_bytes())
 
 
 def _materialize_da4_6mu_a_as_from_pdf(pdf_path: Path, stem_dir: Path) -> None:
@@ -1086,14 +1419,8 @@ def _materialize_da4_6mu_a_as_from_pdf(pdf_path: Path, stem_dir: Path) -> None:
         dest=stem_dir / "aux-diagram.png",
         scale=5.0,
     )
-    # DIP / control-signal mode diagrams (A/AS only; below aux table on PDF).
-    _pdf_clip_png(
-        pdf_path,
-        page_index=0,
-        clip=(40, 185, 360, 290),
-        dest=stem_dir / "dip-diagram.png",
-        scale=4.0,
-    )
+    # DIP / control-signal mode — curated RU diagram (not EN PDF crop).
+    _copy_curated_dip_diagram(stem_dir)
     # Lead: reuse product faceplate.
     product = stem_dir / "product.png"
     if product.is_file():
@@ -1325,70 +1652,181 @@ def _materialize_landscape_en_mu_from_pdf(
 
     Layout matches DA4/6 RU PDFs (sheet1 aux+product; sheet2 wiring/dims/rotation).
     """
+    # Hero: full body + hub; right edge before black SKU/torque plate.
     _pdf_clip_png(
         pdf_path,
         page_index=0,
-        clip=(500, 140, 700, 330),
+        clip=(482, 118, 662, 302),
         dest=stem_dir / "product.png",
         scale=5.0,
+        trim_pad=20,
     )
-    product = stem_dir / "product.png"
-    if product.is_file():
-        (stem_dir / "lead.png").write_bytes(product.read_bytes())
 
+    # Sheet-2 lead: page-1 product (no SKU plate / no section banner).
     _pdf_clip_png(
         pdf_path,
-        page_index=0,
-        clip=(218, 68, 472, 168),
-        dest=stem_dir / "aux-diagram.png",
+        page_index=1,
+        clip=(42, 50, 150, 148),
+        dest=stem_dir / "lead.png",
         scale=5.0,
     )
+    if not (stem_dir / "lead.png").is_file():
+        product = stem_dir / "product.png"
+        if product.is_file():
+            (stem_dir / "lead.png").write_bytes(product.read_bytes())
+
     if modulating:
+        # A/AS: curated RU board (DIP + terminals 1–5 / 21–26).
+        _copy_curated_aux_diagram(stem_dir)
+        # Sheet 2 «Dial switch set» — curated RU DIP table.
+        _copy_curated_dip_diagram(stem_dir)
+    else:
+        # D/DS: ON/OFF board from PDF (terminals 1–3 / 21–26, no DIP bank).
         _pdf_clip_png(
             pdf_path,
-            page_index=1,
-            clip=(468, 420, 825, 575),
-            dest=stem_dir / "dip-diagram.png",
-            scale=4.0,
+            page_index=0,
+            clip=(226, 56, 372, 180),
+            dest=stem_dir / "aux-diagram.png",
+            scale=5.0,
+            trim_pad=12,
         )
-        # Sheet-2 rotation figure: same DIP block (direction = switch 4).
+        # Sheet 2: board + S1 (EN «Commutating switch» → RU label under img).
         _pdf_clip_png(
             pdf_path,
             page_index=1,
-            clip=(700, 420, 825, 575),
+            clip=(618, 432, 825, 545),
             dest=stem_dir / "rotation.png",
             scale=5.0,
-        )
-    else:
-        _pdf_clip_png(
-            pdf_path,
-            page_index=1,
-            clip=(468, 420, 825, 575),
-            dest=stem_dir / "rotation.png",
-            scale=4.0,
+            trim_pad=16,
         )
 
+    # Wiring: below EN «Actuator» / «Auxiliary switch» (RU headers in HTML).
+    # Start above diagram ink; redact EN titles so terminal/switch tops stay.
     _pdf_clip_png(
         pdf_path,
         page_index=1,
-        clip=(468, 98, 825, 198),
+        clip=(468, 88, 825, 198),
         dest=stem_dir / "wiring.png",
         crop_bottom_banner=True,
+        trim_pad=12,
+        wipe_words=frozenset({"Actuator", "Auxiliary", "switch"}),
+        wipe_words_y=(80.0, 105.0),
     )
+    # Dimensions: below EN «Actuator Dimensions(mm)» (RU banner in HTML).
     _pdf_clip_png(
         pdf_path,
         page_index=1,
-        clip=(468, 220, 825, 410),
+        clip=(468, 232, 825, 410),
         dest=stem_dir / "dimensions.png",
         crop_bottom_banner=True,
     )
 
 
-def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
+def _materialize_sa_en_from_pdf(
+    pdf_path: Path,
+    stem_dir: Path,
+    *,
+    spring_return: bool,
+) -> None:
+    """Crop product + diagrams from landscape A4×2 EN SA FU/MU manuals.
+
+    Combined 24 В + 230 В; sheet 2 has wiring + dims; SAFU also SAF72 block.
+    """
+    # Hero: leave left margin so body is not flush-clipped; FU keeps SAF72 accessory.
+    if spring_return:
+        product_clip = (450, 105, 690, 315)
+        product_pad = 20
+    else:
+        # SAMU: extra left white so chassis edge is not flush in the hero slot.
+        product_clip = (430, 95, 685, 320)
+        product_pad = 48
+    _pdf_clip_png(
+        pdf_path,
+        page_index=0,
+        clip=product_clip,
+        dest=stem_dir / "product.png",
+        scale=5.0,
+        trim_pad=product_pad,
+    )
+
+    # Lead: stop above page-1 «Technical specification» bar (~y 162).
+    _pdf_clip_png(
+        pdf_path,
+        page_index=1,
+        clip=(42, 48, 158, 158),
+        dest=stem_dir / "lead.png",
+        scale=5.0,
+        trim_pad=12,
+        crop_bottom_banner=True,
+    )
+    if not (stem_dir / "lead.png").is_file():
+        product = stem_dir / "product.png"
+        if product.is_file():
+            (stem_dir / "lead.png").write_bytes(product.read_bytes())
+
+    # Sheet 1 aux schematic only (no factory-table bleed on the left).
+    _pdf_clip_png(
+        pdf_path,
+        page_index=0,
+        clip=(245, 58, 385, 178),
+        dest=stem_dir / "aux-diagram.png",
+        scale=5.0,
+        trim_pad=10,
+    )
+
+    # Stop above «Actuator Dimensions(mm)» bar (SAF10/15 ~y 201–202; others ~y 208).
+    wiring_y1 = 195.0 if spring_return else 198.0
+    _pdf_clip_png(
+        pdf_path,
+        page_index=1,
+        clip=(468, 88, 825, wiring_y1),
+        dest=stem_dir / "wiring.png",
+        crop_bottom_banner=True,
+        trim_pad=12,
+        wipe_words=frozenset({"Actuator", "Auxiliary", "switch"}),
+        wipe_words_y=(70.0, 100.0),
+    )
+
+    # Dims under «Actuator Dimensions(mm)».
+    # Clip includes the EN title bar (stripped); stop above footer (~y 387).
+    # Do not wipe_words here — white text holes break solid-banner detection.
+    dims_y0 = 190.0
+    dims_y1 = 382.0
+    _pdf_clip_png(
+        pdf_path,
+        page_index=1,
+        clip=(468, dims_y0, 825, dims_y1),
+        dest=stem_dir / "dimensions.png",
+        crop_top_banner=True,
+        crop_bottom_banner=True,
+        trim_pad=10,
+    )
+
+    if spring_return:
+        # Drawings only — EN prose lives as RU copy in HTML.
+        _pdf_clip_png(
+            pdf_path,
+            page_index=1,
+            clip=(468, 445, 825, 590),
+            dest=stem_dir / "thermal.png",
+            scale=4.0,
+            trim_pad=6,
+        )
+
+
+def ensure_diagram_assets(
+    stem: str,
+    out_dir: Path,
+    *,
+    force: bool = False,
+) -> DiagramProfile:
     """Copy/convert catalog diagrams into ``assets/<stem>/`` for this manual."""
     profile = DIAGRAM_PROFILES.get(stem)
     if profile is None:
         raise KeyError(f"No DiagramProfile for stem {stem!r}")
+    if manual_stem_is_locked(stem) and not force:
+        # Keep published HTML/assets as-is.
+        return profile
     assets_root = out_dir / "assets"
     stem_dir = assets_root / stem
     stem_dir.mkdir(parents=True, exist_ok=True)
@@ -1429,6 +1867,22 @@ def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
                 pdf_path, stem_dir, modulating=False
             )
             return profile
+        if stem in {
+            "sa3fu-ds-dst",
+            "sa5fu-ds-dst",
+            "sa10fu-ds-dst",
+            "sa15fu-ds-dst",
+        }:
+            _materialize_sa_en_from_pdf(pdf_path, stem_dir, spring_return=True)
+            return profile
+        if stem in {
+            "sa7mu-ds-dst",
+            "sa10mu-ds-dst",
+            "sa15mu-ds-dst",
+            "sa30mu-ds-dst",
+        }:
+            _materialize_sa_en_from_pdf(pdf_path, stem_dir, spring_return=False)
+            return profile
 
     # Dimensions — always from catalog; strip baked-in title bar if present.
     _webp_to_png(
@@ -1439,7 +1893,7 @@ def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
 
     # Wiring — curated shared crop for DA2MU ON/OFF; else catalog.
     if profile.wiring_media is None:
-        curated = assets_root / "wiring-schematic-onoff.png"
+        curated = _curated_assets_dir() / "wiring-schematic-onoff.png"
         if not curated.is_file():
             raise FileNotFoundError(f"Missing curated wiring: {curated}")
         (stem_dir / "wiring.png").write_bytes(curated.read_bytes())
@@ -1448,7 +1902,7 @@ def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
 
     # Rotary-switch drawing (shared curated asset when needed).
     if profile.rotation_image:
-        curated_rot = assets_root / "rotation-switch-schematic-onoff.png"
+        curated_rot = _curated_assets_dir() / "rotation-switch-schematic-onoff.png"
         if not curated_rot.is_file():
             raise FileNotFoundError(f"Missing curated rotation: {curated_rot}")
         (stem_dir / "rotation.png").write_bytes(curated_rot.read_bytes())
@@ -1493,6 +1947,7 @@ def _wiring_figure_html(
 
 
 def _rotation_figure_html(stem: str, profile: DiagramProfile) -> str:
+    label_under_img = ""
     if profile.rotation_kind == "terminals":
         copy = ROTATION_COPY_TERMINALS
         banner = "Переключение направления вращения"
@@ -1502,6 +1957,10 @@ def _rotation_figure_html(stem: str, profile: DiagramProfile) -> str:
     elif profile.rotation_kind == "terminals_jumper":
         copy = ROTATION_COPY_TERMINALS_JUMPER
         banner = "Переключение направления вращения"
+    elif profile.rotation_kind == "commutating":
+        copy = ROTATION_COPY_COMMUTATING
+        banner = "Переключение направления вращения"
+        label_under_img = ROTATION_LABEL_COMMUTATING
     elif profile.rotation_kind == "jumper":
         copy = ROTATION_COPY_JUMPER
         banner = "Переключение направления вращения"
@@ -1511,23 +1970,63 @@ def _rotation_figure_html(stem: str, profile: DiagramProfile) -> str:
     elif profile.rotation_kind == "slider":
         copy = ROTATION_COPY_SLIDER
         banner = "Изменение положения ручки переключателя"
+    elif profile.rotation_kind == "dip":
+        # EN MU/MQU A/AS: Dial switch set lives on sheet 2 (not sheet 1).
+        banner = "Настройки DIP-переключателя"
+        return (
+            '<figure class="diagram diagram-wide diagram-rotation diagram-dip">'
+            f'<h2 class="banner">{banner}</h2>'
+            f'<img src="assets/{stem}/dip-diagram.png" alt="{banner}">'
+            "</figure>"
+        )
+    elif profile.rotation_kind == "thermal_saf72":
+        banner = "Термодатчик SAF72"
+        copy = (
+            "<p>Состоит из датчика окружающей среды (TS1) и канального "
+            "датчика (TS2).</p>"
+            "<p>TS1 размыкается при температуре окружающей среды выше "
+            "72&nbsp;°C.</p>"
+            "<p>TS2 размыкается при температуре в канале выше 72&nbsp;°C.</p>"
+            "<p>Поставляется с исполнением «DST».</p>"
+        )
+        return (
+            '<figure class="diagram diagram-wide diagram-rotation diagram-thermal">'
+            f'<h2 class="banner">{banner}</h2>'
+            '<div class="rotation-panel">'
+            f'<div class="rotation-copy">{copy}</div>'
+            f'<img src="assets/{stem}/thermal.png" alt="{banner}">'
+            "</div></figure>"
+        )
+    elif profile.rotation_kind == "flip_side":
+        copy = ROTATION_COPY_FLIP_SIDE
+        banner = "Переключение направления вращения"
+        return (
+            '<figure class="diagram diagram-wide diagram-rotation">'
+            f'<h2 class="banner">{banner}</h2>'
+            f'<div class="rotation-copy">{copy}</div></figure>'
+        )
     else:
         copy = ROTATION_COPY_SCREW
         banner = "Переключение направления вращения"
-    img = (
-        f'<img src="assets/{stem}/rotation.png" alt="">'
-        if profile.rotation_image
-        else ""
-    )
-    panel = (
-        f'<div class="rotation-panel"><div class="rotation-copy">{copy}</div>{img}</div>'
-        if profile.rotation_image
-        else f'<div class="rotation-copy">{copy}</div>'
-    )
+    if not profile.rotation_image:
+        return (
+            '<figure class="diagram diagram-wide diagram-rotation">'
+            f'<h2 class="banner">{banner}</h2>'
+            f'<div class="rotation-copy">{copy}</div></figure>'
+        )
+    img = f'<img src="assets/{stem}/rotation.png" alt="">'
+    if label_under_img:
+        media = (
+            f'<div class="rotation-media">{img}'
+            f'<p class="rotation-label">{html.escape(label_under_img)}</p></div>'
+        )
+    else:
+        media = img
     return (
         '<figure class="diagram diagram-wide diagram-rotation">'
         f'<h2 class="banner">{banner}</h2>'
-        f"{panel}</figure>"
+        f'<div class="rotation-panel"><div class="rotation-copy">{copy}</div>'
+        f"{media}</div></figure>"
     )
 
 
@@ -2391,7 +2890,16 @@ def _normalize_da10_15_20fu24_a_as(doc: ManualDoc) -> None:
 
 
 def _tech_sku_label(sku: str) -> str:
-    """PDF-style label: ``DA4MU24-A`` → ``DA4MU24-A/AS``, ``…-D`` → ``…-D/DS``."""
+    """PDF-style label: ``DA4MU24-A`` → ``DA4MU24-A/AS``, ``…-D`` → ``…-D/DS``.
+
+    SAFU keeps ``…-DS/DST``; SAMU stays ``…-DS`` (no DST in EN PDFs).
+    """
+    if "/DST" in sku.upper() or re.search(r"-DST$", sku, re.I):
+        return sku
+    if re.search(r"^SA\d*FU.*-DS$", sku, re.I):
+        return re.sub(r"-DS$", "-DS/DST", sku, flags=re.I)
+    if re.search(r"^SA\d*MU.*-DS$", sku, re.I):
+        return sku
     if re.search(r"-AS$", sku, re.I):
         return re.sub(r"-AS$", "-A/AS", sku, flags=re.I)
     if re.search(r"-A$", sku, re.I):
@@ -2667,6 +3175,20 @@ def _tech_tables_with_skus(
     return elec, func
 
 
+def _torque_html(torque: str | None) -> str:
+    """Render torque headline; 4+ values wrap mid-list into two lines."""
+    text = (torque or "").strip()
+    if not text:
+        return ""
+    parts = [p.strip() for p in text.split(" / ") if p.strip()]
+    if len(parts) >= 4:
+        mid = len(parts) // 2
+        line1 = html.escape(" / ".join(parts[:mid]))
+        line2 = html.escape(" / ".join(parts[mid:]))
+        return f"{line1}<br>{line2}"
+    return html.escape(text)
+
+
 def _sku_block(skus: list[str]) -> str:
     if not skus:
         return ""
@@ -2757,6 +3279,19 @@ def _summary_parts(summary: str) -> tuple[str, str, str]:
             items_flat.append(m.group(1).strip())
             items_flat.append(m.group(2).strip())
             continue
+        # SA: «Исполнения DS/DST …; DST — SAF72» → two bullets.
+        m = re.match(
+            r"(?is)^(Исполнения?\s+«DS»\s*/\s*«DST»[^;]*);?\s*"
+            r"(«DST»\s*[—–-].*|Исполнение\s+«DST»\s*[—–-].*)$",
+            it,
+        )
+        if m:
+            items_flat.append(m.group(1).strip().rstrip(";").strip())
+            dst = m.group(2).strip()
+            if dst.startswith("«DST»"):
+                dst = f"Исполнение {dst}"
+            items_flat.append(dst)
+            continue
         items_flat.append(it)
     items_html = "".join(f"<li>{html.escape(it)}</li>" for it in items_flat)
     list_html = f'<ul class="lead-list">{items_html}</ul>' if items_html else ""
@@ -2818,7 +3353,29 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
             <div class="sheet1-dip-diagram">
               <img src="assets/{stem}/dip-diagram.png" alt="Режим управляющего сигнала">
             </div>"""
-        sheet1_main = f"""
+        aux_caption = diagram_profile.sheet1_aux_caption
+        if aux_caption:
+            sheet1_main = f"""
+          <div class="stack sheet1-left sheet1-with-aux-diagram">
+            <div class="sheet1-aux-row sheet1-aux-row-captioned">
+              <div class="stack sheet1-aux sheet1-aux-main">
+                <h2 class="banner">Вспомогательный переключатель</h2>
+                {aux_table_html}
+              </div>
+              <div class="sheet1-aux-diagram">
+                <div class="media aux-diagram-media aux-diagram-media-compact">
+                  <img class="aux-diagram aux-diagram-compact" src="assets/{stem}/aux-diagram.png" alt="">
+                </div>
+              </div>
+              <p class="aux-note">*Установите угол переключателя в соответствии с требованием заказчика</p>
+              <p class="aux-diagram-caption">{html.escape(aux_caption)}</p>
+            </div>{dip_html}
+            <h2 class="banner banner-follow">Внимание</h2>
+            <div class="prose">{warnings}</div>
+          </div>
+"""
+        else:
+            sheet1_main = f"""
           <div class="stack sheet1-left sheet1-with-aux-diagram">
             <div class="sheet1-aux-row">
               <div class="stack sheet1-aux">
@@ -2875,7 +3432,7 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
       <div class="sheet1-cols-right product-col">
         <div class="media">{photo}</div>
         <div class="media-meta">
-          <h1 class="torque">{html.escape(doc.torque or "")}</h1>
+          <h1 class="torque">{_torque_html(doc.torque)}</h1>
           {_sku_block(doc.skus)}
         </div>
         <div class="doc-title-box">
@@ -3157,6 +3714,45 @@ HTML_SHELL = """\
     object-fit: contain;
     object-position: top center;
   }}
+  .sheet-page1 .aux-diagram-media-compact {{
+    max-height: 36mm;
+  }}
+  .sheet-page1 .aux-diagram-compact {{
+    max-height: 36mm;
+  }}
+  .sheet-page1 .aux-diagram-caption {{
+    margin: 0;
+    padding: 0;
+    font-size: 5.5pt;
+    line-height: 1.25;
+    color: #333;
+  }}
+  /* Captioned aux: note + caption share one grid row (same baseline). */
+  .sheet-page1 .sheet1-aux-row-captioned {{
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: end;
+  }}
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-main {{
+    grid-column: 1;
+    grid-row: 1;
+    align-self: stretch;
+  }}
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-diagram {{
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: stretch;
+  }}
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-note {{
+    grid-column: 1;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }}
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-diagram-caption {{
+    grid-column: 2;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }}
   .sheet-page1 .sheet1-dip-diagram {{
     min-height: 0;
     max-height: 48mm;
@@ -3312,7 +3908,23 @@ HTML_SHELL = """\
   }}
   .sheet2-body .diagrams-block .diagrams {{
     flex: 1 1 auto;
-    align-content: start;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5mm;
+    overflow: hidden;
+  }}
+  .sheet2-body .diagrams-block .diagrams > .diagram {{
+    flex: 0 0 auto;
+    min-height: 0;
+  }}
+  .sheet2-body .diagrams-block .diagrams > .diagram-dip {{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }}
   .sheet-page2 .lead-heading {{
     font-size: clamp(10pt, 1.8vw, 13pt);
@@ -3359,6 +3971,9 @@ HTML_SHELL = """\
     width: 100%;
     max-height: 34mm;
   }}
+  .sheet-page2 .wiring-board > img {{
+    max-height: 40mm;
+  }}
   .wiring-board {{
     position: relative;
     width: 100%;
@@ -3381,11 +3996,11 @@ HTML_SHELL = """\
     display: block;
     width: 100%;
     height: auto;
-    max-height: 38mm;
+    max-height: 40mm;
     object-fit: contain;
   }}
   .wiring-board-ru-headers > img {{
-    max-height: 34mm;
+    max-height: 40mm;
   }}
   .wiring-board .wl {{
     position: absolute;
@@ -3409,6 +4024,16 @@ HTML_SHELL = """\
   .sheet-page2 .diagrams .diagram:nth-child(3) img {{
     max-height: 42mm;
   }}
+  .sheet-page2 .diagrams .diagram-dip > img {{
+    max-height: none;
+  }}
+  /* Free vertical room for the wide DIP table on A/AS sheet 2. */
+  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board > img {{
+    max-height: 28mm !important;
+  }}
+  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) img {{
+    max-height: 38mm !important;
+  }}
   .diagrams .banner {{
     display: block;
     width: 100%;
@@ -3419,21 +4044,41 @@ HTML_SHELL = """\
     /* diagrams-block = sheet cols 7–12 → local 6; image on sheet 10–12 = local 4–6. */
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--gap);
-    align-items: center;
+    align-items: start;
     width: 100%;
+    min-height: 0;
   }}
   .diagram-rotation .rotation-panel .rotation-copy {{
     grid-column: 1 / span 3;
     width: 100%;
     box-sizing: border-box;
-    padding: 0.5mm 0;
+    padding: 0;
     min-width: 0;
   }}
-  .diagram-rotation .rotation-panel > img {{
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media {{
     grid-column: 4 / span 3;
     width: 100%;
     min-width: 0;
     justify-self: stretch;
+  }}
+  .diagram-rotation .rotation-media {{
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6mm;
+    min-height: 0;
+  }}
+  .diagram-rotation .rotation-media > img {{
+    width: 100%;
+    max-height: 34mm !important;
+    object-fit: contain;
+    object-position: top center;
+  }}
+  .diagram-rotation .rotation-media > .rotation-label {{
+    margin: 0 !important;
+    text-align: center;
+    font-size: 6pt;
   }}
   .diagram-rotation > .rotation-copy {{
     width: 100%;
@@ -3441,14 +4086,14 @@ HTML_SHELL = """\
     padding: 0.5mm 0;
   }}
   .rotation-copy {{
-    font-size: 6.5pt;
-    line-height: 1.3;
+    font-size: 6pt;
+    line-height: 1.25;
   }}
   .rotation-copy p {{
-    margin: 0 0 1.2mm;
+    margin: 0 0 0.8mm;
   }}
   .rotation-table {{
-    margin: 0 0 1.2mm !important;
+    margin: 0 0 0.8mm !important;
     font-size: 5.2pt !important;
     table-layout: fixed;
     width: 100%;
@@ -3467,7 +4112,25 @@ HTML_SHELL = """\
     font-weight: 650;
   }}
   .diagram-rotation img {{
-    max-height: 42mm !important;
+    max-height: 36mm !important;
+  }}
+  .diagram-rotation.diagram-dip > img {{
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Definite height so object-fit can scale the whole table (not clip). */
+    height: 0;
+    max-height: none !important;
+    object-fit: contain;
+    object-position: top center;
+    display: block;
+  }}
+  .diagram-rotation.diagram-thermal .rotation-panel > img {{
+    max-height: 52mm !important;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
   }}
   .sheet-page2 .note {{
     margin: 1mm 0 0;
@@ -3589,6 +4252,10 @@ HTML_SHELL = """\
     height: auto;
     object-fit: contain;
   }}
+  /* SA FU/MU: slightly smaller hero so left body + SAF72 fit without clip. */
+  .sheet-page1 .product-col .product-photo[src*="/sa"] {{
+    max-height: 58mm;
+  }}
   .doc-title-box {{
     grid-column: 2 / span 5;
     grid-row: 2;
@@ -3642,7 +4309,7 @@ HTML_SHELL = """\
     font-size: clamp(14pt, 16cqw, 48pt);
     font-weight: 700;
     color: var(--red);
-    line-height: 1;
+    line-height: 1.1;
     white-space: nowrap;
     text-align: center;
     overflow: hidden;
@@ -3781,7 +4448,8 @@ HTML_SHELL = """\
     .diagrams {{ grid-template-columns: 1fr; }}
     .diagram-rotation .rotation-panel {{ grid-template-columns: 1fr; }}
     .diagram-rotation .rotation-panel .rotation-copy,
-    .diagram-rotation .rotation-panel > img {{ grid-column: 1 / -1; }}
+    .diagram-rotation .rotation-panel > img,
+    .diagram-rotation .rotation-panel > .rotation-media {{ grid-column: 1 / -1; }}
   }}
 
   @page {{ size: A4 landscape; margin: 0; }}
@@ -3812,6 +4480,9 @@ HTML_SHELL = """\
     }}
     .summary-media {{ grid-column: 1 / span 2; }}
     .summary-copy {{ grid-column: 3 / span 4; }}
+    /* Photo crop (clip-path) must remain for print PDF — only hide the UI. */
+    .photo-crop-panel,
+    #toggle-photo-crop {{ display: none !important; }}
   }}
 </style>
 </head>
@@ -3907,6 +4578,7 @@ HTML_SHELL = """\
       }}
     }})();
   </script>
+  <script src="assets/photo-crop-tool.js"></script>
 </body>
 </html>
 """
@@ -3970,12 +4642,22 @@ def translate_pptx_inplace(prs: Presentation) -> None:
                             _set_runs_text(cell, translate(raw))
 
 
-def convert_one(src: Path, out_dir: Path) -> Path:
+def convert_one(src: Path, out_dir: Path, *, force: bool = False) -> Path:
     meta = STEM_MAP.get(src.name)
     if not meta:
         raise SystemExit(f"Unknown PPTX mapping: {src.name}")
     stem, title = meta
-    assets = out_dir / "assets" / stem
+    finished_dir = finished_manuals_dir(out_dir, stem=stem)
+    finished_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_family_logo(finished_dir)
+    if manual_stem_is_locked(stem) and not force:
+        html_path = finished_dir / f"{stem}.html"
+        if html_path.is_file():
+            return html_path
+        raise SystemExit(
+            f"Locked manual {stem!r} has no HTML yet; pass force=True to build."
+        )
+    assets = finished_dir / "assets" / stem
     if assets.exists():
         for old in assets.iterdir():
             if old.is_file():
@@ -3986,7 +4668,7 @@ def convert_one(src: Path, out_dir: Path) -> Path:
     translate_pptx_inplace(prs)
     # PDF instructions are canon; do not publish a translated PPTX beside HTML.
     doc = extract_manual(prs, assets, stem, title)
-    diagram_profile = ensure_diagram_assets(stem, out_dir)
+    diagram_profile = ensure_diagram_assets(stem, finished_dir, force=force)
     # Prefer photos cropped from the instruction PDF when present.
     if (assets / "product.png").is_file():
         doc.product_photo = "product.png"
@@ -3994,7 +4676,7 @@ def convert_one(src: Path, out_dir: Path) -> Path:
             "lead.png" if (assets / "lead.png").is_file() else "product.png"
         )
     body = render_grid(doc, diagram_profile=diagram_profile)
-    html_path = out_dir / f"{stem}.html"
+    html_path = finished_dir / f"{stem}.html"
     html_path.write_text(
         HTML_SHELL.format(title=html.escape(title), body=body),
         encoding="utf-8",
@@ -4025,7 +4707,11 @@ def main() -> None:
         '<a href="template-v24.html">V24 — AC/DC 24 В</a> · '
         '<a href="template-v230.html">V230 — AC 100…240 В</a> · '
         "<code>TEMPLATES.md</code></li>",
+        "<li><strong>Семейства</strong><br>"
+        '<code>DA/</code> · <code>SA/</code> · <code>HV/</code></li>',
     ]
+    title_by_stem = {stem: title for stem, title in STEM_MAP.values()}
+    listed: set[str] = set()
     for name, (stem, title) in STEM_MAP.items():
         src = args.src_dir / name
         if not src.exists():
@@ -4033,9 +4719,20 @@ def main() -> None:
             continue
         out = convert_one(src, args.out_dir)
         print("OK", out.name)
+        sub = finished_manuals_subdir(stem)
+        listed.add(stem)
         index_rows.append(
             f"<li><strong>{html.escape(title)}</strong><br>"
-            f'<a href="{stem}.html">HTML (сетка 12 / A4)</a></li>',
+            f'<a href="{sub}/{stem}.html">HTML (сетка 12 / A4)</a></li>',
+        )
+
+    for fam_dir, stem, _html_path in iter_finished_manual_html(args.out_dir):
+        if stem in listed:
+            continue
+        label = title_by_stem.get(stem, stem)
+        index_rows.append(
+            f"<li><strong>{html.escape(label)}</strong><br>"
+            f'<a href="{fam_dir}/{stem}.html">HTML (сетка 12 / A4)</a></li>',
         )
 
     (args.out_dir / "index.html").write_text(
@@ -4045,6 +4742,8 @@ def main() -> None:
         "padding:0 1rem}li{margin:.65rem 0}</style></head><body>"
         "<h1>Руководства по эксплуатации (RU)</h1>"
         "<p>Адаптивная вёрстка на 12 колонках, 2 листа A4 альбом. "
+        "Готовые руководства — в <code>DA/</code>, <code>SA/</code>, "
+        "<code>HV/</code>. "
         "Текст и схемы — по <code>_инструкции-pdf/</code>; термины — "
         "<code>docs/tech-copy-belimo-ru.md</code>. "
         "Новые переводы с раздельными PDF 24/230 В — шаблоны "
