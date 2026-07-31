@@ -67,6 +67,12 @@ frontend/dist/
 frontend/dev-dist/
 node_modules/
 
+# Demo slide raster exports (PNG/PDF)
+docs/demo/export/
+
+# RU manual HTML demos / build scripts (local only; not site)
+docs/demo/manuals-ru/
+
 # Coverage / tooling artifacts
 backend/coverage.json
 coverage.json
