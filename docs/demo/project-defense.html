@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOOCON CMS — защита проекта</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand: #dc1313;
+      --brand-deep: #b01010;
+      --brand-soft: rgba(220, 19, 19, 0.1);
+      --ink: #1c1c1c;
+      --muted: #5a5a5a;
+      --line: rgba(28, 28, 28, 0.1);
+      --old: #8a8a8a;
+      --old-bg: #ececec;
+      --new: #dc1313;
+      --new-bg: #fff5f5;
+      --ok: #1a7a45;
+      --surface: rgba(255, 255, 255, 0.88);
+      --radius: 18px;
+      --shadow: 0 16px 48px rgba(20, 20, 30, 0.07);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --max: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "IBM Plex Sans", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(220, 19, 19, 0.12), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(90, 90, 90, 0.08), transparent 50%),
+        linear-gradient(165deg, #f7f7f8 0%, #efefef 45%, #f4f1f1 100%);
+      line-height: 1.45;
+    }
+
+    img { max-width: 100%; display: block; }
+    a { color: var(--brand-deep); }
+
+    .wrap {
+      width: min(100% - 2rem, var(--max));
+      margin-inline: auto;
+    }
+
+    /* —— Hero —— */
+    .hero {
+      min-height: min(92vh, 820px);
+      display: grid;
+      align-content: end;
+      padding: 2.5rem 0 3.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -20% -35% 35%;
+      height: 70%;
+      background:
+        linear-gradient(135deg, transparent 30%, rgba(220, 19, 19, 0.08) 50%, transparent 70%),
+        repeating-linear-gradient(
+          -18deg,
+          transparent,
+          transparent 18px,
+          rgba(28, 28, 28, 0.035) 18px,
+          rgba(28, 28, 28, 0.035) 19px
+        );
+      pointer-events: none;
+      mask-image: linear-gradient(to top, black 20%, transparent);
+    }
+
+    .brand-mark {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.6rem, 9vw, 5.2rem);
+      letter-spacing: -0.04em;
+      line-height: 0.92;
+      color: var(--brand);
+      margin: 0 0 1.25rem;
+      text-wrap: balance;
+      animation: rise 0.8s var(--ease) both;
+    }
+
+    .brand-mark span {
+      display: block;
+      color: var(--ink);
+      font-size: 0.38em;
+      letter-spacing: 0.18em;
+      font-weight: 700;
+      margin-top: 0.55rem;
+    }
+
+    .hero h1 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.35rem, 3.2vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.75rem;
+      max-width: 18ch;
+      text-wrap: balance;
+      animation: rise 0.8s var(--ease) 0.08s both;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 36ch;
+      animation: rise 0.8s var(--ease) 0.14s both;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin-top: 2rem;
+      animation: rise 0.8s var(--ease) 0.2s both;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .pill i {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--brand);
+      display: inline-block;
+    }
+
+    .pill.old i { background: var(--old); }
+
+    /* —— Sections —— */
+    section {
+      padding: 3.5rem 0;
+    }
+
+    .section-head {
+      display: grid;
+      gap: 0.4rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .section-head h2 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.35rem, 2.8vw, 1.75rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0;
+      text-wrap: balance;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 52ch;
+    }
+
+    /* —— Pain metric —— */
+    .pain {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 1.25rem;
+      align-items: stretch;
+    }
+
+    @media (max-width: 800px) {
+      .pain { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.4rem 1.5rem;
+    }
+
+    .big-stat {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .big-stat .num {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: clamp(3.5rem, 10vw, 5.5rem);
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      color: var(--old);
+    }
+
+    .big-stat .num em {
+      font-style: normal;
+      color: var(--brand);
+    }
+
+    .big-stat .label {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .funnel {
+      display: grid;
+      gap: 0.85rem;
+      align-content: center;
+    }
+
+    .funnel-row {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr auto;
+      gap: 0.75rem;
+      align-items: center;
+      font-size: 0.88rem;
+    }
+
+    .funnel-bar {
+      height: 28px;
+      border-radius: 6px;
+      background: var(--old-bg);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .funnel-bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #9a9a9a, #6e6e6e);
+      width: 0;
+      transition: width 1.1s var(--ease);
+    }
+
+    .funnel-bar.new > span {
+      background: linear-gradient(90deg, #f04a4a, var(--brand));
+    }
+
+    .funnel-row strong {
+      font-variant-numeric: tabular-nums;
+      min-width: 3.5rem;
+      text-align: right;
+    }
+
+    /* —— Compare matrix —— */
+    .compare-legend {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .compare-legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 0.4rem;
+      vertical-align: -1px;
+    }
+
+    .compare-legend .l-old::before { background: var(--old); }
+    .compare-legend .l-new::before { background: var(--brand); }
+
+    .matrix {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .matrix-row {
+      display: grid;
+      grid-template-columns: minmax(7rem, 11rem) 1fr;
+      gap: 0.85rem;
+      align-items: center;
+    }
+
+    @media (max-width: 640px) {
+      .matrix-row { grid-template-columns: 1fr; gap: 0.35rem; }
+    }
+
+    .matrix-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .bars {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .bar-track {
+      height: 14px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    .bar-track > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: 4px;
+      transition: width 1s var(--ease);
+    }
+
+    .bar-track.old > span { background: #9a9a9a; }
+    .bar-track.new > span { background: var(--brand); }
+
+    .bar-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    /* —— Capabilities grid —— */
+    .caps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+    }
+
+    @media (max-width: 900px) {
+      .caps { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .caps { grid-template-columns: 1fr; }
+    }
+
+    .cap {
+      padding: 1.15rem 1.2rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 0.55rem;
+      transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease);
+    }
+
+    .cap:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 44px rgba(20, 20, 30, 0.1);
+    }
+
+    .cap .icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      display: grid;
+      place-items: center;
+    }
+
+    .cap h3 {
+      margin: 0;
+      font-family: Montserrat, sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .cap p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .vs {
+      display: flex;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .vs .bad {
+      color: var(--old);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+      opacity: 0.85;
+    }
+
+    .vs .good { color: var(--ok); }
+
+    /* —— Money —— */
+    .money {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.1rem;
+    }
+
+    @media (max-width: 800px) {
+      .money { grid-template-columns: 1fr; }
+    }
+
+    .chart-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-items: end;
+      min-height: 220px;
+      padding: 0.5rem 0.25rem 0;
+    }
+
+    .col {
+      display: grid;
+      gap: 0.6rem;
+      justify-items: center;
+    }
+
+    .col-bar {
+      width: 100%;
+      max-width: 110px;
+      border-radius: 10px 10px 4px 4px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 0.65rem;
+      color: #fff;
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: 1.15rem;
+      height: 0;
+      transition: height 1.1s var(--ease);
+    }
+
+    .col-bar.old {
+      background: linear-gradient(180deg, #b0b0b0, #777);
+    }
+
+    .col-bar.new {
+      background: linear-gradient(180deg, #f25555, var(--brand-deep));
+    }
+
+    .col figcaption {
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .roi-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .roi-list li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+      align-items: start;
+    }
+
+    .roi-list .n {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: 1.35rem;
+      color: var(--brand);
+      line-height: 1;
+      min-width: 3.2rem;
+    }
+
+    .roi-list strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .roi-list span {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    /* —— Side-by-side table —— */
+    .side {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    @media (max-width: 720px) {
+      .side { grid-template-columns: 1fr; }
+    }
+
+    .side > div {
+      padding: 1.35rem 1.4rem;
+    }
+
+    .side .was {
+      background: #f3f3f3;
+    }
+
+    .side .now {
+      background: linear-gradient(160deg, #fff 0%, #fff5f5 100%);
+      border-left: 1px solid var(--line);
+    }
+
+    @media (max-width: 720px) {
+      .side .now { border-left: none; border-top: 1px solid var(--line); }
+    }
+
+    .side h3 {
+      margin: 0 0 1rem;
+      font-family: Montserrat, sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .side .was h3 { color: var(--old); }
+    .side .now h3 { color: var(--brand); }
+
+    .side ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .side li {
+      font-size: 0.92rem;
+      padding-left: 1.35rem;
+      position: relative;
+    }
+
+    .side .was li::before {
+      content: "–";
+      position: absolute;
+      left: 0;
+      color: var(--old);
+      font-weight: 700;
+    }
+
+    .side .now li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.35rem;
+      width: 0.65rem;
+      height: 0.65rem;
+      background: var(--brand);
+      border-radius: 2px;
+      clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 18%, 80% 0, 36% 62%);
+    }
+
+    /* —— Verdict —— */
+    .verdict {
+      padding: 3rem 0 4.5rem;
+    }
+
+    .verdict-box {
+      border-radius: calc(var(--radius) + 4px);
+      padding: clamp(1.5rem, 4vw, 2.4rem);
+      background:
+        linear-gradient(135deg, rgba(28, 28, 28, 0.96), rgba(40, 20, 20, 0.94)),
+        radial-gradient(600px 280px at 90% 10%, rgba(220, 19, 19, 0.35), transparent);
+      color: #fff;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 1.25rem;
+    }
+
+    .verdict-box h2 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.4rem, 3vw, 1.9rem);
+      margin: 0;
+      letter-spacing: -0.02em;
+      max-width: 22ch;
+      text-wrap: balance;
+    }
+
+    .verdict-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 720px) {
+      .verdict-grid { grid-template-columns: 1fr; }
+    }
+
+    .verdict-grid div {
+      padding: 0.9rem 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .verdict-grid strong {
+      display: block;
+      font-family: Montserrat, sans-serif;
+      font-size: 1.35rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .verdict-grid span {
+      font-size: 0.88rem;
+      opacity: 0.75;
+    }
+
+    .foot {
+      padding: 0 0 2.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+
+    .lang {
+      position: fixed;
+      top: 0.85rem;
+      right: 0.85rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .lang a {
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      color: var(--muted);
+    }
+
+    .lang a.on {
+      background: var(--brand);
+      color: #fff;
+    }
+
+
+
+    /* —— Format switcher —— */
+    .fmt {
+      position: fixed;
+      top: 0.85rem;
+      left: 0.85rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .fmt button {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+      color: var(--muted);
+      background: transparent;
+    }
+    .fmt button.on {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    /* —— Shared slide deck chrome —— */
+    @media screen {
+      body.slides-phone,
+      body.slides-a4 {
+        background: #cfcfd2;
+        padding: 1.25rem 0 2.5rem;
+      }
+      body.slides-phone .lang,
+      body.slides-a4 .lang,
+      body.slides-phone .fmt,
+      body.slides-a4 .fmt { position: fixed; }
+
+      body.slides-phone .slide,
+      body.slides-a4 .slide {
+        margin: 0 auto 1.25rem;
+        background:
+          radial-gradient(900px 420px at 8% -10%, rgba(220, 19, 19, 0.1), transparent 55%),
+          linear-gradient(165deg, #f7f7f8 0%, #efefef 50%, #f4f1f1 100%);
+        border-radius: 18px;
+        box-shadow: 0 10px 36px rgba(20, 20, 30, 0.18);
+        overflow: hidden;
+        display: grid;
+        align-content: stretch;
+        box-sizing: border-box;
+      }
+      body.slides-phone .slide > .wrap,
+      body.slides-a4 .slide > .wrap {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 0.65rem;
+      }
+      body.slides-phone .hero,
+      body.slides-a4 .hero {
+        min-height: 0;
+        align-content: center;
+        padding: 0;
+      }
+      body.slides-phone .hero::before,
+      body.slides-a4 .hero::before { display: none; }
+      body.slides-phone section,
+      body.slides-a4 section,
+      body.slides-phone .verdict,
+      body.slides-a4 .verdict { padding: 0; }
+      body.slides-phone .foot,
+      body.slides-a4 .foot {
+        padding: 0.5rem 0 0;
+        margin: 0;
+        text-align: center;
+      }
+      body.slides-phone .verdict > .wrap,
+      body.slides-a4 .verdict > .wrap {
+        align-content: center;
+        gap: 0.65rem;
+      }
+
+      /* Phone portrait ~9:19.5 (iPhone-class) */
+      body.slides-phone .slide {
+        width: min(calc(100% - 1.25rem), 390px);
+        aspect-ratio: 9 / 19.5;
+        padding: 18px 16px 20px;
+        border-radius: 28px;
+      }
+      body.slides-phone .brand-mark {
+        font-size: clamp(1.85rem, 11vw, 2.55rem);
+        margin-bottom: 0.55rem;
+      }
+      body.slides-phone .brand-mark span { font-size: 0.28em; letter-spacing: 0.06em; }
+      body.slides-phone .hero h1 { font-size: 1.15rem; max-width: none; margin-bottom: 0.45rem; }
+      body.slides-phone .hero p { font-size: 0.88rem; max-width: none; }
+      body.slides-phone .hero-meta { margin-top: 0.9rem; gap: 0.45rem 0.75rem; }
+      body.slides-phone .pill { font-size: 0.75rem; }
+      body.slides-phone .section-head { margin-bottom: 0.55rem; gap: 0.2rem; }
+      body.slides-phone .section-head h2 { font-size: 1.12rem; }
+      body.slides-phone .section-head p { font-size: 0.8rem; max-width: none; }
+      body.slides-phone .panel { padding: 0.7rem 0.75rem; border-radius: 14px; }
+      body.slides-phone .pain,
+      body.slides-phone .money,
+      body.slides-phone .side { grid-template-columns: 1fr; gap: 0.55rem; }
+      body.slides-phone .side .now { border-left: none; border-top: 1px solid var(--line); }
+      body.slides-phone .big-stat .num { font-size: clamp(2.4rem, 14vw, 3.4rem); }
+      body.slides-phone .funnel { gap: 0.45rem; }
+      body.slides-phone .funnel-row {
+        grid-template-columns: 3.2rem 1fr auto;
+        gap: 0.4rem;
+        font-size: 0.72rem;
+      }
+      body.slides-phone .funnel-bar { height: 16px; }
+      body.slides-phone .compare-legend { font-size: 0.72rem; margin-bottom: 0.4rem; }
+      body.slides-phone .matrix { gap: 0.35rem; }
+      body.slides-phone .matrix-row {
+        grid-template-columns: 1fr;
+        gap: 0.15rem;
+      }
+      body.slides-phone .matrix-label { font-size: 0.78rem; }
+      body.slides-phone .bar-meta { font-size: 0.62rem; }
+      body.slides-phone .bar-track { height: 8px; }
+      body.slides-phone .caps { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+      body.slides-phone .cap { padding: 0.55rem 0.55rem; gap: 0.25rem; border-radius: 12px; }
+      body.slides-phone .cap .icon { width: 28px; height: 28px; border-radius: 8px; }
+      body.slides-phone .cap h3 { font-size: 0.82rem; }
+      body.slides-phone .cap p { font-size: 0.68rem; line-height: 1.3; }
+      body.slides-phone .vs { font-size: 0.62rem; }
+      body.slides-phone .chart-cols { min-height: 110px; gap: 0.75rem; }
+      body.slides-phone .col-bar { max-width: 72px; font-size: 0.95rem; }
+      body.slides-phone .col figcaption { font-size: 0.72rem; }
+      body.slides-phone .roi-list { gap: 0.4rem; }
+      body.slides-phone .roi-list .n { font-size: 1.05rem; min-width: 2.4rem; }
+      body.slides-phone .roi-list strong { font-size: 0.8rem; }
+      body.slides-phone .roi-list span { font-size: 0.7rem; }
+      body.slides-phone .side > div { padding: 0.65rem 0.7rem; }
+      body.slides-phone .side h3 { font-size: 0.78rem; margin-bottom: 0.4rem; }
+      body.slides-phone .side li { font-size: 0.74rem; }
+      body.slides-phone .side ul { gap: 0.28rem; }
+      body.slides-phone .verdict-box { padding: 0.85rem 0.9rem; gap: 0.55rem; border-radius: 16px; }
+      body.slides-phone .verdict-box h2 { font-size: 1.05rem; max-width: none; }
+      body.slides-phone .verdict-grid { grid-template-columns: 1fr; gap: 0.15rem; }
+      body.slides-phone .verdict-grid strong { font-size: 1rem; }
+      body.slides-phone .verdict-grid span { font-size: 0.75rem; }
+      body.slides-phone .foot { font-size: 0.62rem; line-height: 1.35; }
+
+      /* A4 landscape */
+      body.slides-a4 .slide {
+        width: min(calc(100% - 1.5rem), 297mm);
+        aspect-ratio: 297 / 210;
+        padding: 10mm 12mm;
+        border-radius: 6px;
+      }
+      body.slides-a4 .brand-mark {
+        font-size: clamp(2.2rem, 6vw, 4rem);
+        margin-bottom: 0.85rem;
+      }
+      body.slides-a4 .section-head { margin-bottom: 0.9rem; gap: 0.25rem; }
+      body.slides-a4 .section-head h2 { font-size: clamp(1.2rem, 2.2vw, 1.55rem); }
+      body.slides-a4 .matrix { gap: 0.45rem; }
+      body.slides-a4 .matrix-row { gap: 0.55rem; }
+      body.slides-a4 .bar-track { height: 10px; }
+      body.slides-a4 .caps { gap: 0.55rem; }
+      body.slides-a4 .cap { padding: 0.7rem 0.8rem; gap: 0.35rem; }
+      body.slides-a4 .cap p { font-size: 0.78rem; }
+      body.slides-a4 .big-stat .num { font-size: clamp(2.8rem, 7vw, 4.4rem); }
+      body.slides-a4 .chart-cols { min-height: 150px; }
+      body.slides-a4 .roi-list { gap: 0.5rem; }
+      body.slides-a4 .verdict-box { padding: 1.1rem 1.35rem; gap: 0.85rem; }
+      body.slides-a4 .verdict-box h2 { font-size: clamp(1.25rem, 2.4vw, 1.65rem); }
+      body.slides-a4 .foot { font-size: 0.72rem; }
+    }
+
+    @page phone {
+      size: 90mm 195mm;
+      margin: 4mm;
+    }
+    @page a4land {
+      size: A4 landscape;
+      margin: 8mm;
+    }
+
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: var(--ink);
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .lang, .fmt { display: none !important; }
+
+      body.slides-phone .slide { page: phone; }
+      body.slides-a4 .slide { page: a4land; }
+
+      .slide {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        display: grid;
+        align-content: center;
+      }
+      .slide:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .slide > .wrap {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 0.55rem;
+      }
+      .hero {
+        min-height: 0 !important;
+        padding: 0 !important;
+        align-content: center;
+      }
+      .hero::before { display: none !important; }
+      section, .verdict { padding: 0 !important; }
+      .foot { padding: 0.4rem 0 0 !important; margin: 0; text-align: center; }
+      .panel {
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+      .funnel-bar > span,
+      .bar-track > span,
+      .col-bar { transition: none !important; }
+      a { color: inherit !important; text-decoration: none !important; }
+      * { animation: none !important; }
+
+      /* Phone print densify */
+      body.slides-phone .slide {
+        width: 82mm;
+        height: 187mm;
+        max-height: 187mm;
+      }
+      body.slides-phone .brand-mark { font-size: 22pt; margin-bottom: 0.35rem; }
+      body.slides-phone .hero h1 { font-size: 11pt; max-width: none; }
+      body.slides-phone .hero p { font-size: 8pt; max-width: none; }
+      body.slides-phone .pill { font-size: 7pt; }
+      body.slides-phone .section-head { margin-bottom: 0.35rem; }
+      body.slides-phone .section-head h2 { font-size: 11pt; }
+      body.slides-phone .section-head p { font-size: 7.5pt; max-width: none; }
+      body.slides-phone .panel { padding: 0.45rem 0.5rem; }
+      body.slides-phone .pain,
+      body.slides-phone .money,
+      body.slides-phone .side { grid-template-columns: 1fr !important; gap: 0.4rem; }
+      body.slides-phone .side .now { border-left: none !important; border-top: 1px solid var(--line); }
+      body.slides-phone .big-stat .num { font-size: 28pt; }
+      body.slides-phone .funnel-row {
+        grid-template-columns: 2.6rem 1fr auto;
+        font-size: 7pt;
+      }
+      body.slides-phone .funnel-bar { height: 12px; }
+      body.slides-phone .matrix-row { grid-template-columns: 1fr !important; gap: 0.1rem; }
+      body.slides-phone .matrix { gap: 0.25rem; }
+      body.slides-phone .matrix-label { font-size: 7.5pt; }
+      body.slides-phone .bar-meta { font-size: 6pt; }
+      body.slides-phone .bar-track { height: 6px; }
+      body.slides-phone .caps { grid-template-columns: 1fr 1fr !important; gap: 0.3rem; }
+      body.slides-phone .cap { padding: 0.35rem 0.4rem; gap: 0.15rem; }
+      body.slides-phone .cap .icon { width: 20px; height: 20px; }
+      body.slides-phone .cap h3 { font-size: 8pt; }
+      body.slides-phone .cap p { font-size: 6.5pt; }
+      body.slides-phone .vs { font-size: 5.5pt; }
+      body.slides-phone .chart-cols { min-height: 70px; }
+      body.slides-phone .col-bar { max-width: 48px; font-size: 9pt; }
+      body.slides-phone .roi-list .n { font-size: 10pt; min-width: 1.8rem; }
+      body.slides-phone .roi-list strong { font-size: 7.5pt; }
+      body.slides-phone .roi-list span { font-size: 6.5pt; }
+      body.slides-phone .side > div { padding: 0.4rem 0.45rem; }
+      body.slides-phone .side h3 { font-size: 7.5pt; }
+      body.slides-phone .side li { font-size: 6.5pt; }
+      body.slides-phone .verdict-box { padding: 0.55rem 0.6rem; }
+      body.slides-phone .verdict-box h2 { font-size: 10pt; max-width: none; }
+      body.slides-phone .verdict-grid { grid-template-columns: 1fr !important; }
+      body.slides-phone .verdict-grid strong { font-size: 9pt; }
+      body.slides-phone .verdict-grid span { font-size: 7pt; }
+      body.slides-phone .foot { font-size: 6pt; }
+
+      /* A4 landscape print */
+      body.slides-a4 .slide {
+        width: 281mm;
+        height: 194mm;
+        max-height: 194mm;
+      }
+      body.slides-a4 .brand-mark { font-size: 42pt; margin-bottom: 0.6rem; }
+      body.slides-a4 .hero h1 { font-size: 18pt; max-width: none; }
+      body.slides-a4 .hero p { font-size: 11pt; }
+      body.slides-a4 .section-head h2 { font-size: 16pt; }
+      body.slides-a4 .section-head p { font-size: 10pt; max-width: none; }
+      body.slides-a4 .panel { padding: 0.75rem 0.9rem; }
+      body.slides-a4 .big-stat .num { font-size: 48pt; }
+      body.slides-a4 .funnel-row { font-size: 9pt; }
+      body.slides-a4 .funnel-bar { height: 18px; }
+      body.slides-a4 .matrix { gap: 0.35rem; }
+      body.slides-a4 .matrix-label { font-size: 9pt; }
+      body.slides-a4 .bar-meta { font-size: 7pt; }
+      body.slides-a4 .bar-track { height: 9px; }
+      body.slides-a4 .caps { gap: 0.45rem; }
+      body.slides-a4 .cap { padding: 0.55rem 0.65rem; }
+      body.slides-a4 .cap h3 { font-size: 10pt; }
+      body.slides-a4 .cap p { font-size: 8pt; }
+      body.slides-a4 .vs { font-size: 7pt; }
+      body.slides-a4 .chart-cols { min-height: 120px; }
+      body.slides-a4 .col-bar { max-width: 90px; font-size: 12pt; }
+      body.slides-a4 .roi-list .n { font-size: 14pt; }
+      body.slides-a4 .roi-list strong { font-size: 9pt; }
+      body.slides-a4 .roi-list span { font-size: 8pt; }
+      body.slides-a4 .side h3 { font-size: 10pt; }
+      body.slides-a4 .side li { font-size: 9pt; }
+      body.slides-a4 .verdict-box h2 { font-size: 16pt; max-width: none; }
+      body.slides-a4 .verdict-grid strong { font-size: 13pt; }
+      body.slides-a4 .verdict-grid span { font-size: 9pt; }
+      body.slides-a4 .foot { font-size: 8pt; }
+    }
+
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+      .funnel-bar > span,
+      .bar-track > span,
+      .col-bar { width: var(--w, auto); height: var(--h, auto); }
+    }
+  </style>
+</head>
+<body>
+  <nav class="fmt" aria-label="Формат слайдов">
+    <button type="button" data-fmt="phone" class="on">Phone</button>
+    <button type="button" data-fmt="a4">A4</button>
+  </nav>
+  <nav class="lang" aria-label="Язык">
+    <a class="on" href="index.html">RU</a>
+    <a href="project-defense-zh.html">中文</a>
+  </nav>
+  <header class="hero slide">
+    <div class="wrap">
+      <p class="brand-mark">HOOCON<span>CMS · ЗАЩИТА ПРОЕКТА</span></p>
+      <h1>Новый сайт сильнее Tilda по подбору, заявкам и деньгам</h1>
+      <p>Сравнение с текущим <a href="https://hoocon.ru" target="_blank" rel="noopener">hoocon.ru</a>: только ключевые факты и цифры.</p>
+      <div class="hero-meta">
+        <span class="pill old"><i></i>Сейчас: Tilda Store</span>
+        <span class="pill"><i></i>Цель: собственный B2B CMS</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Боль текущего сайта</h2>
+        <p>Клиент B2B ищет модель и КП — не «корзину». Платформа Tilda это тормозит.</p>
+      </div>
+      <div class="pain">
+        <div class="panel big-stat">
+          <div class="num">0,09<em>%</em></div>
+          <div class="label">конверсия сессия → заявка на Tilda за год</div>
+          <p style="margin:1rem 0 0;color:var(--muted);font-size:0.9rem;">
+            Даже рост до 0,3–0,5% даёт ×3–5 заявок с того же трафика.
+          </p>
+        </div>
+        <div class="panel funnel" id="funnel">
+          <div class="funnel-row">
+            <span>Трафик</span>
+            <div class="funnel-bar" style="--w:100%"><span data-w="100"></span></div>
+            <strong>100%</strong>
+          </div>
+          <div class="funnel-row">
+            <span>Каталог</span>
+            <div class="funnel-bar" style="--w:42%"><span data-w="42"></span></div>
+            <strong>~42%</strong>
+          </div>
+          <div class="funnel-row">
+            <span>Tilda</span>
+            <div class="funnel-bar" style="--w:9%"><span data-w="9"></span></div>
+            <strong>0,09%</strong>
+          </div>
+          <div class="funnel-row">
+            <span>CMS</span>
+            <div class="funnel-bar new" style="--w:45%"><span data-w="45"></span></div>
+            <strong>цель ×3–5</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Сравнение по осям</h2>
+        <p>Оценка зрелости 0–10: что мешает инженеру и снабженцу на старом сайте.</p>
+      </div>
+      <div class="compare-legend">
+        <span class="l-old">Tilda (сейчас)</span>
+        <span class="l-new">Hoocon CMS</span>
+      </div>
+      <div class="panel matrix" id="matrix">
+        <div class="matrix-row">
+          <div class="matrix-label">Фильтры ТТХ</div>
+          <div class="bars">
+            <div class="bar-meta"><span>слабо</span><span>3 / 9</span></div>
+            <div class="bar-track old"><span data-w="30"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">Поиск SKU</div>
+          <div class="bars">
+            <div class="bar-meta"><span>ограничен</span><span>4 / 9</span></div>
+            <div class="bar-track old"><span data-w="40"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">SEO каталога</div>
+          <div class="bars">
+            <div class="bar-meta"><span>JS-Store риск</span><span>4 / 9</span></div>
+            <div class="bar-track old"><span data-w="40"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">RFQ / CRM</div>
+          <div class="bars">
+            <div class="bar-meta"><span>форма без CRM</span><span>5 / 9</span></div>
+            <div class="bar-track old"><span data-w="50"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">Сравнение SKU</div>
+          <div class="bars">
+            <div class="bar-meta"><span>нет</span><span>1 / 9</span></div>
+            <div class="bar-track old"><span data-w="10"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">PDF / сертификаты</div>
+          <div class="bars">
+            <div class="bar-meta"><span>не first-class</span><span>4 / 9</span></div>
+            <div class="bar-track old"><span data-w="40"></span></div>
+            <div class="bar-track new"><span data-w="90"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">Скорость / UX</div>
+          <div class="bars">
+            <div class="bar-meta"><span>тяжёлый JS</span><span>4 / 8</span></div>
+            <div class="bar-track old"><span data-w="40"></span></div>
+            <div class="bar-track new"><span data-w="80"></span></div>
+          </div>
+        </div>
+        <div class="matrix-row">
+          <div class="matrix-label">Контроль данных</div>
+          <div class="bars">
+            <div class="bar-meta"><span>аренда платформы</span><span>3 / 10</span></div>
+            <div class="bar-track old"><span data-w="30"></span></div>
+            <div class="bar-track new"><span data-w="100"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Возможности CMS</h2>
+        <p>То, чего нельзя нормально сделать на Tilda Store для B2B ОВК.</p>
+      </div>
+      <div class="caps">
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h14"/></svg>
+          </div>
+          <h3>Фасет-фильтры</h3>
+          <div class="vs"><span class="bad">Tilda</span><span class="good">момент · 24/230 · пружина</span></div>
+          <p>Инженер отсекает каталог за секунды, URL сохраняет выбор.</p>
+        </article>
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>
+          </div>
+          <h3>Сравнение SKU</h3>
+          <div class="vs"><span class="bad">нет</span><span class="good">таблица ТТХ</span></div>
+          <p>Рядом модели — как у дилеров с аналогами Belimo.</p>
+        </article>
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16v4H4zm0 6h10v10H4zm12 0h4v10h-4z"/></svg>
+          </div>
+          <h3>RFQ + CRM</h3>
+          <div class="vs"><span class="bad">письмо в никуда</span><span class="good">статусы · менеджер</span></div>
+          <p>Заявка с контекстом SKU, антиспам, очередь в админке.</p>
+        </article>
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          </div>
+          <h3>Поиск по каталогу</h3>
+          <div class="vs"><span class="bad">поверхностный</span><span class="good">артикул · серия · ТТХ</span></div>
+          <p>Postgres FTS — находит модель, а не только заголовок карточки.</p>
+        </article>
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/></svg>
+          </div>
+          <h3>Документы first-class</h3>
+          <div class="vs"><span class="bad">ссылки в тексте</span><span class="good">паспорт · сертификат</span></div>
+          <p>Скачивание с карточки — критерий доверия ПТО и ПБ.</p>
+        </article>
+        <article class="cap">
+          <div class="icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7z"/></svg>
+          </div>
+          <h3>Свой стек и SEO</h3>
+          <div class="vs"><span class="bad">аренда Tilda</span><span class="good">VPS · 301 · JSON-LD</span></div>
+          <p>Контроль URL, индексации и безопасности без лимитов конструктора.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Финансовая выгода</h2>
+        <p>Один и тот же трафик. Разница — в заявках и скорости сделки.</p>
+      </div>
+      <div class="money">
+        <div class="panel">
+          <div class="chart-cols" id="leads-chart" aria-label="Относительное число заявок">
+            <figure class="col">
+              <div class="col-bar old" data-h="28" style="--h:28%">1×</div>
+              <figcaption>Tilda<br />база заявок</figcaption>
+            </figure>
+            <figure class="col">
+              <div class="col-bar new" data-h="100" style="--h:100%">×3–5</div>
+              <figcaption>CMS<br />цель по CVR</figcaption>
+            </figure>
+          </div>
+          <p style="margin:1rem 0 0;font-size:0.88rem;color:var(--muted);text-align:center;">
+            При CVR 0,09% → 0,3–0,5% без роста рекламного бюджета
+          </p>
+        </div>
+        <div class="panel">
+          <ul class="roi-list">
+            <li>
+              <span class="n">×3+</span>
+              <div>
+                <strong>Больше лидов с того же трафика</strong>
+                <span>Фильтры + сравнение + понятный RFQ снимают трение подбора</span>
+              </div>
+            </li>
+            <li>
+              <span class="n">↓</span>
+              <div>
+                <strong>Короче цикл «нашёл → КП»</strong>
+                <span>Модель и PDF за минуты вместо звонка «помогите подобрать»</span>
+              </div>
+            </li>
+            <li>
+              <span class="n">₽</span>
+              <div>
+                <strong>Меньше утечки к дилерам</strong>
+                <span>OEM удобнее витрины конкурента с таблицами аналогов</span>
+              </div>
+            </li>
+            <li>
+              <span class="n">∞</span>
+              <div>
+                <strong>Актив без аренды платформы</strong>
+                <span>Данные, SEO и доработки — свои, без потолка Tilda Store</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Было / стало</h2>
+        <p>Коротко: что убираем и что даём клиенту.</p>
+      </div>
+      <div class="side">
+        <div class="was">
+          <h3>hoocon.ru · Tilda</h3>
+          <ul>
+            <li>Корзина / wishlist без цен и оплаты</li>
+            <li>Слабые фильтры под инженера</li>
+            <li>Каталог Store тянется JS — риск SEO</li>
+            <li>Нет сравнения моделей</li>
+            <li>Заявка без CRM-контура</li>
+            <li>Зависимость от конструктора</li>
+          </ul>
+        </div>
+        <div class="now">
+          <h3>Hoocon CMS</h3>
+          <ul>
+            <li>Только RFQ — язык B2B, не e-com</li>
+            <li>Фасеты: момент, напряжение, пружина</li>
+            <li>Индексируемые SKU + 301 с Tilda</li>
+            <li>Сравнение по ТТХ</li>
+            <li>Лиды в админке + письма менеджеру</li>
+            <li>Свой VPS, ETL, развитие продукта</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide verdict">
+    <div class="wrap">
+      <div class="verdict-box">
+        <h2>Вывод: CMS — инструмент продаж, а не «новый дизайн»</h2>
+        <div class="verdict-grid">
+          <div>
+            <strong>Подбор</strong>
+            <span>быстрее дилера и Tilda</span>
+          </div>
+          <div>
+            <strong>Заявки</strong>
+            <span>цель ×3–5 к 0,09%</span>
+          </div>
+          <div>
+            <strong>Актив</strong>
+            <span>свой каталог и SEO</span>
+          </div>
+        </div>
+      </div>
+      <p class="foot">Источники: аудит hoocon.ru, market-analysis · конверсия Tilda ~0,09% · целевой рост CVR — ориентир плана, не гарантия.</p>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function fillBars(root) {
+        root.querySelectorAll("[data-w]").forEach(function (el) {
+          el.style.width = el.getAttribute("data-w") + "%";
+        });
+        root.querySelectorAll("[data-h]").forEach(function (el) {
+          el.style.height = el.getAttribute("data-h") + "%";
+        });
+      }
+
+      function setFormat(fmt) {
+        document.body.classList.remove("slides-phone", "slides-a4");
+        document.body.classList.add(fmt === "a4" ? "slides-a4" : "slides-phone");
+        document.querySelectorAll(".fmt button").forEach(function (btn) {
+          btn.classList.toggle("on", btn.getAttribute("data-fmt") === fmt);
+        });
+        try { localStorage.setItem("defense-slide-fmt", fmt); } catch (e) {}
+        fillBars(document);
+      }
+
+      var params = new URLSearchParams(location.search);
+      var saved = "";
+      try { saved = localStorage.getItem("defense-slide-fmt") || ""; } catch (e) {}
+      var initial = params.get("format") || saved || "phone";
+      if (initial !== "a4" && initial !== "phone") initial = "phone";
+      setFormat(initial);
+
+      document.querySelectorAll(".fmt button").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          setFormat(btn.getAttribute("data-fmt"));
+        });
+      });
+
+      window.addEventListener("beforeprint", function () {
+        fillBars(document);
+      });
+
+      if (reduce) {
+        return;
+      }
+
+      const io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            fillBars(entry.target);
+            io.unobserve(entry.target);
+          });
+        },
+        { threshold: 0.25 }
+      );
+
+      ["funnel", "matrix", "leads-chart"].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) io.observe(el);
+      });
+    })();
+  </script>
+</body>
+</html>
