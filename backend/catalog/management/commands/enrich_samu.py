@@ -18,7 +18,7 @@ from catalog.etl.series_copy_samu import apply_samu_enrichment
 class Command(BaseCommand):
     """Apply smoke-damper ТТХ for all SAMU products and SKUs."""
 
-    help = "Enrich SAMU: shared manual attrs + torque/voltage/thermal editions."
+    help = "Enrich SAMU: shared manual attrs + torque/voltage; unpublish -DST."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
@@ -36,6 +36,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"{prefix}SAMU enriched: products={stats['products']}, "
-                f"skus={stats['skus']}, attributes={stats['attributes']}",
+                f"skus={stats['skus']}, attributes={stats['attributes']}, "
+                f"unpublished_dst={stats['unpublished_dst']}",
             ),
         )

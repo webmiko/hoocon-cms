@@ -319,8 +319,30 @@ def _clear_sku_attributes(sku: SKU) -> None:
     AttributeValue.objects.filter(sku=sku).delete()
 
 
+def unpublish_samu_dst_skus(*, dry_run: bool = False) -> int:
+    """Hide SA..MU ``-DST`` editions from the public catalog.
+
+    Russian manuals cover DS only; thermal DST cards stay in Admin/DB but
+    ``is_published=False`` so they leave list/PDP/siblings/sitemap.
+
+    Args:
+        dry_run: When True, count only.
+
+    Returns:
+        Number of SKUs that were (or would be) unpublished.
+    """
+    qs = SKU.objects.filter(
+        sku_code__iregex=r"(?i)^sa\d+mu\d+-dst$",
+        is_published=True,
+    )
+    count = qs.count()
+    if not dry_run and count:
+        qs.update(is_published=False)
+    return count
+
+
 def apply_samu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
-    """Rewrite SA..MU products/SKUs from English smoke-damper manuals."""
+    """Rewrite SA..MU products/SKUs from smoke-damper manuals; hide DST cards."""
     products = list(samu_product_queryset().select_related("category"))
     skus_done = 0
     attrs = 0
@@ -443,9 +465,11 @@ def apply_samu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             attrs += 3
             skus_done += 1
 
+    unpublished_dst = unpublish_samu_dst_skus(dry_run=dry_run)
     return {
         "products": len(products),
         "skus": skus_done,
         "attributes": attrs,
+        "unpublished_dst": unpublished_dst,
         "dry_run": dry_run,
     }

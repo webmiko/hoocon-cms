@@ -38,9 +38,12 @@ def test_samu_enrichment_sets_temp_sensor_saf72_on_dst() -> None:
 
     stats = apply_samu_enrichment(dry_run=False)
     assert stats["skus"] >= 2
+    assert stats["unpublished_dst"] >= 1
 
     ds.refresh_from_db()
     dst.refresh_from_db()
+    assert ds.is_published is True
+    assert dst.is_published is False
 
     by_ds = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=ds).select_related("attribute")}
     by_dst = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=dst).select_related("attribute")}

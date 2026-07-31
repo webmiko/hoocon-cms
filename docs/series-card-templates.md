@@ -32,7 +32,7 @@ siblings на том же Product.
 | Серия | Product = | Collapse в каталоге | Категория | Оси picker | RFQ «добавить привод» |
 |-------|-----------|---------------------|-----------|------------|------------------------|
 | **DA\*** (DAMU) | 1 Nm-линейка | **да** | без пружины | V / управление (A/AS/D/DS) | нет |
-| **SA\*** (SAMU) | 1 Nm-линейка | **да** | дымоудаление | V / управление (DS/DST) | нет |
+| **SA\*** (SAMU) | 1 Nm-линейка | **да** | дымоудаление | V / управление (DS; DST скрыт) | нет |
 | **SA\*FU** (SAFU) | 1 Nm-линейка | **да** | противопожарные | V / управление (DS/DST) | нет |
 | **HVA** | 1 Nm-линейка | **да** | без пружины / ускоренные | V / управление (A/AS) | нет |
 | **HVD** (воздух) | 1 Nm/Q-линейка | **да** | без пружины | V / управление (D/DS) | нет |
@@ -149,8 +149,9 @@ Product `privod-vozdushniy-bez-pruzhini-damu-8nm`, артикул `DA8MU24-D`
 
 ### Замысел
 
-**Одна плитка на Nm**. Издания 24/230 × **DS / DST** (терморазмыкатель) —
-siblings; picker различает DST отдельным ключом управления.
+**Одна плитка на Nm**. Публичные издания 24/230 × **DS**. Издания **DST**
+сняты с публикации (`enrich_samu` → `unpublish_samu_dst_skus`); RU-мануалы
+покрывают DS. В Admin DST остаются для истории/ТТХ.
 
 ### Идентификаторы
 
@@ -159,7 +160,7 @@ siblings; picker различает DST отдельным ключом упра
 | Category.slug | `elektroprivody-dlya-klapanov-dymoudaleniya` | — |
 | Product.slug | `privod-dimoudaleniya-{n}nm` | `privod-dimoudaleniya-10nm` |
 | Product.name | `SA{n}MU \| Электропривод дымового клапана без возвратной пружины, {n} Нм` | — |
-| SKU.sku_code | `SA{n}MU{24\|230}-{DS\|DST}` | `SA10MU24-DST` |
+| SKU.sku_code | `SA{n}MU{24\|230}-{DS\|DST}` | `SA10MU24-DS` (DST — unpublished) |
 
 Моменты в каноне enricher: 7 / 10 / 15 / 30 Нм (`TORQUE_SPECS` в samu).
 
@@ -172,8 +173,8 @@ moment, area, voltage, control (on/off), aux (2×SPDT), **temp_sensor=SAF72**
 
 - Collapse: **да** (`privod-dimoudaleniya-\d+nm`).
 - List title: Product.name; фасеты приводов.
-- Picker: напряжение, управление **DS / DST** (`siblings.sibling_edition_row`
-  через `sku_code_is_thermal`).
+- Picker: напряжение, управление **DS** (DST siblings скрыты через
+  `is_published=False`).
 - Soft-nav + overlay; RFQ kit нет.
 
 ### Сборка вручную
@@ -188,11 +189,12 @@ poetry run python manage.py enrich_samu
 poetry run python manage.py attach_manual_pdfs --series samu
 ```
 
+`enrich_samu` идемпотентно снимает с публикации все `SA*MU*-DST`.
 Код: `backend/catalog/etl/series_copy_samu.py`.
 
 ### Референс
 
-Product `privod-dimoudaleniya-10nm`; `SA10MU24-DS` / `SA10MU24-DST`.
+Product `privod-dimoudaleniya-10nm`; публично `SA10MU24-DS` / `SA10MU230-DS`.
 
 ### Если меняем карточку SA
 
@@ -554,7 +556,7 @@ poetry run python manage.py enrich_ball_valves --series H8205
 | Серия | URL / проверка |
 |-------|----------------|
 | DA | `/catalog/…bez-pruzhinnogo…` — **7** плиток DA\*MU (по Нм); «8 вариантов» + CTA «Выбрать вариант»; PDP picker V/ctrl |
-| SA | дымоудаление — **3** плитки SA\*MU; N вариантов + CTA; PDP DS/DST |
+| SA | дымоудаление — **4** плитки SA\*MU (7/10/15/30); PDP DS (DST скрыт) |
 | SA\*FU | противопожарные — **5** плиток (3/5/10/15/20 Нм); N вариантов + CTA; PDP DS/DST |
 | HVA | без пружины — плитки HVA-5/10/20/40; ускоренные — HVA-5Q…40Q; PDP A/AS |
 | HVD | без пружины — по **1** плитке HVD-5/10/20/40Q; PDP D/DS |
