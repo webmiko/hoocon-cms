@@ -1,7 +1,9 @@
 """Attach local instruction PDFs to matching catalog SKUs.
 
 Source of truth for manuals: repo symlink ``_инструкции-pdf``
-(Yandex Disk «Интскрукции по эксплуатации/PDF»).
+(Yandex Disk «Интскрукции по эксплуатации/PDF»), with language
+subfolders ``RU/`` (translated) and ``EN/`` (still English). Discovery
+scans both (RU first) plus any leftover flat files in the root.
 
 Filename conventions (DAFU)::
 
@@ -106,6 +108,72 @@ def default_manuals_dir(repo_root: Path | None = None) -> Path:
     return (repo_root / "_инструкции-pdf").resolve()
 
 
+# Prefer translated PDFs when the same basename exists in both folders.
+_MANUAL_LANG_SUBDIRS: tuple[str, ...] = ("RU", "EN")
+
+
+def _manual_search_dirs(manuals_dir: Path) -> list[Path]:
+    """Language subfolders (RU → EN) then the manuals root itself."""
+    dirs: list[Path] = []
+    for name in _MANUAL_LANG_SUBDIRS:
+        sub = manuals_dir / name
+        if sub.is_dir():
+            dirs.append(sub)
+    dirs.append(manuals_dir)
+    return dirs
+
+
+def iter_manual_pdfs(manuals_dir: Path, pattern: str = "*.pdf") -> list[Path]:
+    """List manuals under ``RU/``, ``EN/``, and the root (deduped, RU first).
+
+    Args:
+        manuals_dir: ``_инструкции-pdf`` (or a test tmp dir).
+        pattern: Glob relative to each search dir (e.g. ``*.pdf``, ``hvd-*.pdf``).
+
+    Returns:
+        Unique file paths by basename (casefold); RU wins over EN/root.
+    """
+    if not manuals_dir.is_dir():
+        return []
+    seen_paths: set[Path] = set()
+    seen_names: set[str] = set()
+    out: list[Path] = []
+    for directory in _manual_search_dirs(manuals_dir):
+        for path in sorted(directory.glob(pattern)):
+            if not path.is_file():
+                continue
+            key = path.resolve()
+            if key in seen_paths:
+                continue
+            name_key = path.name.casefold()
+            if name_key in seen_names:
+                continue
+            seen_paths.add(key)
+            seen_names.add(name_key)
+            out.append(path)
+    return out
+
+
+def find_manual_file(manuals_dir: Path, filename: str) -> Path | None:
+    """Resolve a basename under ``RU/``, ``EN/``, or the manuals root.
+
+    Args:
+        manuals_dir: ``_инструкции-pdf`` root.
+        filename: Exact basename (e.g. ``шаровые краны серии 8100.pdf``).
+
+    Returns:
+        First existing file (RU preferred), or None.
+    """
+    if not filename or not manuals_dir.is_dir():
+        return None
+    name = Path(filename).name
+    for directory in _manual_search_dirs(manuals_dir):
+        candidate = directory / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def normalize_manual_stem(filename: str) -> str:
     """Strip extension and Disk artefacts from a PDF basename."""
     stem = Path(filename).name
@@ -186,7 +254,7 @@ def discover_dafu_manuals(
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
 
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         parsed = parse_manual_stem(path.name)
         if parsed is None:
             if re.search(r"(?i)da\d+fu", path.name):
@@ -390,7 +458,7 @@ def discover_safu_manuals(
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
 
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         torque_nm = parse_safu_manual_stem(path.name)
         if torque_nm is None:
             if re.search(r"(?i)sa\d+fu", path.name):
@@ -622,7 +690,7 @@ def discover_damu_manuals(
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
 
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         parsed = parse_damu_manual_stem(path.name)
         if parsed is None:
             continue
@@ -663,7 +731,7 @@ def discover_damqu_manuals(
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
 
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         parsed = parse_damqu_manual_stem(path.name)
         if parsed is None:
             continue
@@ -798,8 +866,8 @@ def attach_damqu_manuals(
     missing_24_d = [
         c for c in sku_codes_for_damqu_manual((8, 16, 24), "d_ds", 24, sku_codes) if c.casefold() not in covered
     ]
-    fallback = manuals_dir / "da8_16_24mqu230-d_ds.pdf"
-    if missing_24_d and fallback.is_file():
+    fallback = find_manual_file(manuals_dir, "da8_16_24mqu230-d_ds.pdf")
+    if missing_24_d and fallback is not None and fallback.is_file():
         matches.append(
             ManualMatch(
                 path=fallback,
@@ -855,7 +923,7 @@ def discover_samu_manuals(
     if not manuals_dir.is_dir():
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         torque_nm = parse_samu_manual_stem(path.name)
         if torque_nm is None:
             continue
@@ -977,7 +1045,7 @@ def discover_hvd_manuals(
     if not manuals_dir.is_dir():
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
-    for path in sorted(manuals_dir.glob("hvd-*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
         torque_nm = parse_hvd_f_manual_stem(path.name)
         if torque_nm is None:
             warnings.append(f"unrecognized HVD filename: {path.name!r}")
@@ -1110,9 +1178,9 @@ def discover_hva_manuals(
 
     paths = sorted(
         {
-            *manuals_dir.glob("hva-*.pdf"),
-            *manuals_dir.glob("HVA-*.pdf"),
-            *manuals_dir.glob("HVA-5 instruction.pdf"),
+            *iter_manual_pdfs(manuals_dir, "hva-*.pdf"),
+            *iter_manual_pdfs(manuals_dir, "HVA-*.pdf"),
+            *iter_manual_pdfs(manuals_dir, "HVA-5 instruction.pdf"),
         },
         key=lambda p: (
             # Prefer ascii ``hva-5.pdf`` over legacy ``HVA-5 instruction.pdf``.

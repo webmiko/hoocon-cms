@@ -2,7 +2,7 @@
 
 Source::
 
-    ``_инструкции-pdf/шаровые краны серии 8100.pdf`` (6 pages, ~3 MiB)
+    ``_инструкции-pdf/RU/шаровые краны серии 8100.pdf`` (6 pages, ~3 MiB)
 
 Габариты / схемы подключения смотрят в самом PDF — в галерею карточки
 кропы не кладём (выглядят кустарно на thumbnail). Optional ТТХ fill for
@@ -21,7 +21,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 
 from catalog.etl.attr_write import set_sku_attribute
-from catalog.etl.manual_pdfs import default_manuals_dir
+from catalog.etl.manual_pdfs import default_manuals_dir, find_manual_file
 from catalog.models import SKU, AttributeValue, ProductFile, ProductImage
 from catalog.validators import MAX_PRODUCT_FILE_SIZE_BYTES
 
@@ -69,8 +69,7 @@ def find_8100_series_pdf(*, pdf_path: Path | None = None) -> Path | None:
     """Resolve the series-8100 brass PDF under ``_инструкции-pdf``."""
     if pdf_path is not None:
         return pdf_path if pdf_path.is_file() else None
-    candidate = default_manuals_dir() / PDF_FILENAME
-    return candidate if candidate.is_file() else None
+    return find_manual_file(default_manuals_dir(), PDF_FILENAME)
 
 
 def brass_body_code_from_sku(sku_code: str) -> str | None:

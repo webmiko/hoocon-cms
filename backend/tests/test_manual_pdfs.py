@@ -158,3 +158,36 @@ def test_discover_ignores_damu(tmp_path: Path) -> None:
     assert len(matches) == 1
     assert matches[0].sku_codes == ("DA5FU24-D", "DA5FU24-DS")
     assert warnings == []
+
+
+def test_iter_manual_pdfs_prefers_ru_subdir(tmp_path: Path) -> None:
+    from catalog.etl.manual_pdfs import find_manual_file, iter_manual_pdfs
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "EN").mkdir()
+    (tmp_path / "RU" / "da5fu-d:ds.pdf").write_bytes(b"%PDF-ru")
+    (tmp_path / "EN" / "sa3fu-ds_dst.pdf").write_bytes(b"%PDF-en")
+    (tmp_path / "EN" / "da5fu-d:ds.pdf").write_bytes(b"%PDF-en-dup")
+    paths = iter_manual_pdfs(tmp_path)
+    names = [p.name for p in paths]
+    assert names.count("da5fu-d:ds.pdf") == 1
+    assert paths[0].parent.name == "RU"
+    assert "sa3fu-ds_dst.pdf" in names
+    found = find_manual_file(tmp_path, "da5fu-d:ds.pdf")
+    assert found is not None
+    assert found.parent.name == "RU"
+    assert find_manual_file(tmp_path, "sa3fu-ds_dst.pdf") is not None
+
+
+def test_discover_dafu_in_ru_subdir(tmp_path: Path) -> None:
+    from catalog.etl.manual_pdfs import discover_dafu_manuals
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "RU" / "da5fu-d:ds.pdf").write_bytes(b"%PDF-1.4")
+    matches, warnings = discover_dafu_manuals(
+        tmp_path,
+        sku_codes=["DA5FU24-D", "DA5FU24-DS"],
+    )
+    assert len(matches) == 1
+    assert matches[0].path.parent.name == "RU"
+    assert warnings == []

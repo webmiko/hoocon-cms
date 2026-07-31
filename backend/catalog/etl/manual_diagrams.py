@@ -27,6 +27,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 from catalog.etl.manual_pdfs import (
     default_manuals_dir,
+    find_manual_file,
+    iter_manual_pdfs,
     normalize_manual_stem,
     parse_manual_stem,
     parse_safu_manual_stem,
@@ -1148,7 +1150,7 @@ def find_damu_manual_pdf(
 
     if not manuals_dir.is_dir():
         return None
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         parsed = parse_damu_manual_stem(path.name)
         if parsed is None:
             continue
@@ -1317,7 +1319,7 @@ def find_samu_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
             return Path(pf.file.path)
     if not manuals_dir.is_dir():
         return None
-    for path in sorted(manuals_dir.glob("*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir):
         nm = parse_samu_manual_stem(path.name)
         if nm == pdf_nm:
             return path
@@ -1611,7 +1613,7 @@ def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
             return Path(pf.file.path)
     if not manuals_dir.is_dir():
         return None
-    for path in sorted(manuals_dir.glob("hvd-*.pdf")):
+    for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
         nm = parse_hvd_f_manual_stem(path.name)
         if nm == series_nm:
             return path
@@ -1741,8 +1743,8 @@ def parse_hva_series(sku_code: str) -> tuple[int, bool] | None:
 def find_hva_catalog_ai(*, manuals_dir: Path | None = None) -> Path | None:
     """Locate the HOOCON Russian Illustrator catalog with HVA drawings."""
     manuals_dir = manuals_dir or default_manuals_dir()
-    path = manuals_dir / _HVA_CATALOG_NAME
-    if path.is_file():
+    path = find_manual_file(manuals_dir, _HVA_CATALOG_NAME)
+    if path is not None:
         return path
     # Yandex Disk originals (not always symlinked into manuals dir).
     for candidate in (
@@ -1752,8 +1754,11 @@ def find_hva_catalog_ai(*, manuals_dir: Path | None = None) -> Path | None:
         if candidate.is_file():
             return candidate
     if manuals_dir.is_dir():
-        for candidate in sorted(manuals_dir.glob("*.ai")):
-            return candidate
+        for directory in (manuals_dir / "RU", manuals_dir / "EN", manuals_dir):
+            if not directory.is_dir():
+                continue
+            for candidate in sorted(directory.glob("*.ai")):
+                return candidate
     return None
 
 

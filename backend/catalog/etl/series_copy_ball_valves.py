@@ -80,6 +80,7 @@ from catalog.etl.h8205_lav import (
     h8205_edition_sku_codes,
     is_h8205_sku_code,
 )
+from catalog.etl.manual_pdfs import default_manuals_dir, find_manual_file
 from catalog.etl.sku_variant import parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_MODBUS,
@@ -129,7 +130,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 CATALOG_IMAGES_DIR = (
     _REPO_ROOT / ".." / "hoocon" / "data" / "catalog" / "каталог 2026 шаровые - hoocon images"
 ).resolve()
-CATALOG_PDF_PATH = (_REPO_ROOT / "_инструкции-pdf" / "каталог_2026_шаровые_hoocon_ver_1.05.pdf").resolve()
+_CATALOG_PDF_NAME = "каталог_2026_шаровые_hoocon_ver_1.05.pdf"
+CATALOG_PDF_PATH = (
+    find_manual_file(default_manuals_dir(_REPO_ROOT), _CATALOG_PDF_NAME)
+    or (_REPO_ROOT / "_инструкции-pdf" / "RU" / _CATALOG_PDF_NAME).resolve()
+)
 
 
 def format_compatible_actuators(series: tuple[str, ...]) -> str:
