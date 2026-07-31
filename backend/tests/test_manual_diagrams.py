@@ -140,6 +140,28 @@ def test_crop_safu_uses_right_column() -> None:
     assert dims.size[1] > wiring.size[1]
 
 
+def test_crop_safu_skips_black_section_titles() -> None:
+    """Wiring/dimensions exclude black title bars (no sliced banner at bottom)."""
+    width, height = 2000, 1600
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    for y0, y1 in ((160, 200), (560, 600), (1100, 1140)):
+        for y in range(y0, y1):
+            for x in range(int(width * 0.50), width):
+                page.putpixel((x, y), (0, 0, 0))
+    page.putpixel((int(width * 0.7), 220), (12, 34, 56))
+    page.putpixel((int(width * 0.7), 620), (78, 90, 12))
+
+    wiring, dims = crop_safu_diagrams(page)
+    assert wiring.size[0] < width * 0.55
+    assert dims.size[0] == wiring.size[0]
+    wire_colors = set(wiring.get_flattened_data())
+    dim_colors = set(dims.get_flattened_data())
+    assert (12, 34, 56) in wire_colors
+    assert (78, 90, 12) in dim_colors
+    assert (0, 0, 0) not in wire_colors
+    assert (0, 0, 0) not in dim_colors
+
+
 def test_crop_damu_skips_black_section_titles() -> None:
     """Wiring/dimensions crops exclude black title bars and stay between them."""
     from catalog.etl.manual_diagrams import crop_damu_diagrams

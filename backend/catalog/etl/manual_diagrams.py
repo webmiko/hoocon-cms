@@ -234,16 +234,38 @@ def crop_modulating_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Imag
 
 
 def crop_safu_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
-    """Crop wiring + dimensions from the right column of an SA..FU page-2 raster.
+    """Crop wiring + dimensions from the right column of an SA..FU/MU page-2.
 
-    Layout (landscape): left = ТТХ table; right = Wiring → Dimensions → Thermal.
-    Black section titles sit near y≈0.10, 0.34, 0.65 — crop content between them.
+    Layout (landscape): left = ТТХ table; right = Wiring → Dimensions → next.
+    Black section titles are detected and excluded so crops do not keep a
+    sliced banner at the bottom (EN) or the following section title (RU).
+    Left cut at 50% clears the ТТХ table edge that leaks at 48%.
     """
     width, height = page.size
-    left = int(width * 0.48)
-    wiring = page.crop((left, int(0.12 * height), width - 10, int(0.335 * height)))
-    dimensions = page.crop((left, int(0.37 * height), width - 10, int(0.645 * height)))
-    return wiring, dimensions
+    left = int(width * 0.50)
+    right = width - 10
+
+    def _fallback() -> tuple[Image.Image, Image.Image]:
+        wiring = page.crop((left, int(0.12 * height), right, int(0.318 * height)))
+        dimensions = page.crop((left, int(0.37 * height), right, int(0.618 * height)))
+        return wiring, dimensions
+
+    # Title bars are ~40px; ignore thinner ink runs in the drawing.
+    bands = _right_column_black_bands(page, left=left, min_band_px=36)
+    if len(bands) >= 2:
+        wiring_top = bands[0][1] + 6
+        wiring_bot = max(wiring_top + 40, bands[1][0] - 4)
+        dims_top = bands[1][1] + 6
+        if len(bands) >= 3:
+            dims_bot = max(dims_top + 40, bands[2][0] - 4)
+        else:
+            dims_bot = int(0.62 * height)
+        if wiring_bot > wiring_top + 20 and dims_bot > dims_top + 20:
+            wiring = page.crop((left, wiring_top, right, wiring_bot))
+            dimensions = page.crop((left, dims_top, right, dims_bot))
+            return wiring, dimensions
+
+    return _fallback()
 
 
 def render_pdf_page(pdf_path: Path, page_index: int, *, scale: float = _RENDER_SCALE) -> Image.Image:
@@ -385,8 +407,15 @@ def find_safu_manual_pdf(
     series_nm: int,
     manuals_dir: Path | None = None,
 ) -> Path | None:
-    """Locate an SA..FU manual PDF for the series (with fallback Nm)."""
+    """Locate an SA..FU manual PDF (RU pack preferred over attached EN files)."""
     pdf_nm = safu_pdf_source_series_nm(series_nm)
+    root = manuals_dir or default_manuals_dir()
+    if root.is_dir():
+        for path in iter_manual_pdfs(root):
+            parsed = parse_safu_manual_stem(path.name)
+            if parsed is not None and parsed[0] == pdf_nm:
+                return path.resolve()
+
     file_qs = ProductFile.objects.filter(
         is_published=True,
         sku__sku_code__iregex=rf"(?i)^sa{pdf_nm}fu",
@@ -396,16 +425,6 @@ def find_safu_manual_pdf(
         path = Path(product_file.file.path)
         if path.is_file():
             return path
-
-    root = manuals_dir or default_manuals_dir()
-    if not root.is_dir():
-        return None
-    for path in sorted(root.iterdir()):
-        if path.suffix.casefold() != ".pdf":
-            continue
-        nm = parse_safu_manual_stem(normalize_manual_stem(path.name))
-        if nm == pdf_nm:
-            return path.resolve()
     return None
 
 
@@ -1304,11 +1323,17 @@ def relabel_samu_diagram_crops(
 
 
 def find_samu_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> Path | None:
-    """Locate a SAMU English manual PDF for the series (with fallback Nm)."""
+    """Locate a SAMU manual PDF (RU pack preferred over attached EN files)."""
     from catalog.etl.manual_pdfs import parse_samu_manual_stem
 
     pdf_nm = samu_pdf_source_series_nm(series_nm)
     manuals_dir = manuals_dir or default_manuals_dir()
+    if manuals_dir.is_dir():
+        for path in iter_manual_pdfs(manuals_dir):
+            parsed = parse_samu_manual_stem(path.name)
+            if parsed is not None and parsed[0] == pdf_nm:
+                return path.resolve()
+
     file_qs = ProductFile.objects.filter(
         is_published=True,
         sku__sku_code__iregex=rf"(?i)^sa{pdf_nm}mu",
@@ -1317,12 +1342,6 @@ def find_samu_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
     for pf in file_qs.select_related("sku")[:3]:
         if pf.file and Path(pf.file.path).is_file():
             return Path(pf.file.path)
-    if not manuals_dir.is_dir():
-        return None
-    for path in iter_manual_pdfs(manuals_dir):
-        nm = parse_samu_manual_stem(path.name)
-        if nm == pdf_nm:
-            return path
     return None
 
 
