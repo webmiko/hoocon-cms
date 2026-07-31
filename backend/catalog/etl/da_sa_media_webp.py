@@ -14,6 +14,8 @@ Edition rules
 - Dedicated ``…-dst`` body shots are **not** preferred: DST cards use the
   ``-ds`` photo plus SAF72 tiles from ``media_webp_extras`` (full DST set).
 - If only a ``-dst`` pack exists (no ``-ds``), it is still used as fallback.
+- DA10/15/20 FU ``-A`` / ``-AS`` use the shared ``…-d:ds`` body photo (same
+  chassis as on/off); ``da10:15:20fu-a:as.webp`` is not attached as hero.
 """
 
 from __future__ import annotations
@@ -61,6 +63,9 @@ _PHOTO_NM_FALLBACK: dict[tuple[str, str], dict[int, int]] = {
     ("da", "mu"): {32: 24},
     ("da", "mqu"): {8: 10},
 }
+
+# DA10/15/20 FU modulating editions share the on/off body photo.
+_DAFU_MOD_USES_ON_OFF_BODY_NM: frozenset[int] = frozenset({10, 15, 20})
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,10 +147,26 @@ def _edition_score(shot: _PackShot, edition: str) -> int:
     return 0
 
 
+def _photo_edition_for_sku(parts: _SkuParts) -> str:
+    """Pack edition key to match for this SKU's body hero.
+
+    DA10/15/20 FU ``-A``/``-AS`` reuse the on/off ``-D``/``-DS`` chassis photo.
+    """
+    if (
+        parts.family == "da"
+        and parts.series == "fu"
+        and parts.nm in _DAFU_MOD_USES_ON_OFF_BODY_NM
+        and parts.edition in {"a", "as"}
+    ):
+        return "ds"
+    return parts.edition
+
+
 def _pick_shot(parts: _SkuParts, shots: list[_PackShot]) -> _PackShot | None:
     """Best pack file for this SKU (voltage + edition, DST prefers DS body)."""
     fallback = _PHOTO_NM_FALLBACK.get((parts.family, parts.series), {})
     nm = fallback.get(parts.nm, parts.nm)
+    photo_edition = _photo_edition_for_sku(parts)
     best: _PackShot | None = None
     best_key: tuple[int, int] = (0, 0)
     for shot in shots:
@@ -159,7 +180,7 @@ def _pick_shot(parts: _SkuParts, shots: list[_PackShot]) -> _PackShot | None:
             continue
         if shot.voltage is not None and parts.voltage is None:
             continue
-        ed_score = _edition_score(shot, parts.edition)
+        ed_score = _edition_score(shot, photo_edition)
         if ed_score == 0:
             continue
         # Prefer exact edition, then voltage-specific pack over generic.

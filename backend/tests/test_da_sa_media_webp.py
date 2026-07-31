@@ -102,6 +102,7 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
     (pack / "da5fu-d:ds.webp").write_bytes(_png(color=(50, 50, 50)))
     (pack / "da5fu24-a:as.webp").write_bytes(_png(color=(60, 60, 60)))
     (pack / "da10:15:20fu-a:as.webp").write_bytes(_png(color=(65, 65, 65)))
+    (pack / "da10:15:20fu-d:ds.webp").write_bytes(_png(color=(55, 55, 120)))
     (pack / "da8:16:24mu24-d:ds.webp").write_bytes(_png(color=(70, 70, 70)))
     (pack / "da10:20mqu-d:ds.webp").write_bytes(_png(color=(80, 80, 80)))
     (pack / "da10:20mqu-a:as.webp").write_bytes(_png(color=(85, 85, 85)))
@@ -169,7 +170,7 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
     for sku in (da10_a, da15_as):
         assert ProductImage.objects.filter(
             sku=sku,
-            source_url__contains="media-webp/da10:15:20fu-a:as-product",
+            source_url__contains="media-webp/da10:15:20fu-d:ds-product",
             is_published=True,
         ).exists()
     assert ProductImage.objects.filter(
@@ -182,3 +183,53 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
         source_url__contains="media-webp/da10:20mqu-d:ds-product",
         is_published=True,
     ).exists()
+
+
+@pytest.mark.django_db
+def test_da20fu24_a_as_uses_d_ds_body_photo(tmp_path: Path) -> None:
+    """DA20FU24-A/AS must attach the shared ``…-d:ds`` hero, not ``…-a:as``."""
+    pack = tmp_path / "media-webp"
+    pack.mkdir()
+    (pack / "da10:15:20fu-a:as.webp").write_bytes(_png(color=(200, 40, 40)))
+    (pack / "da10:15:20fu-d:ds.webp").write_bytes(_png(color=(40, 40, 200)))
+
+    cat = Category.objects.create(name="Spring", slug="spring-da20-photo")
+    product = Product.objects.create(name="DA20FU", slug="da20fu-photo", category=cat)
+    a = SKU.objects.create(
+        product=product,
+        sku_code="da20fu24-a",
+        name="da20fu24-a",
+        slug="da20fu24-a-photo",
+        is_published=True,
+    )
+    as_sku = SKU.objects.create(
+        product=product,
+        sku_code="da20fu24-as",
+        name="da20fu24-as",
+        slug="da20fu24-as-photo",
+        is_published=True,
+    )
+    ds = SKU.objects.create(
+        product=product,
+        sku_code="da20fu24-ds",
+        name="da20fu24-ds",
+        slug="da20fu24-ds-photo",
+        is_published=True,
+    )
+
+    summary = apply_da_sa_media_webp(dry_run=False, photo_root=pack)
+    assert summary["created"] == 3
+    for sku in (a, as_sku, ds):
+        assert ProductImage.objects.filter(
+            sku=sku,
+            source_url__contains="media-webp/da10:15:20fu-d:ds-product",
+            is_published=True,
+        ).exists()
+    assert (
+        ProductImage.objects.filter(
+            sku__in=[a, as_sku],
+            source_url__contains="media-webp/da10:15:20fu-a:as-product",
+            is_published=True,
+        ).count()
+        == 0
+    )
