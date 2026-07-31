@@ -109,6 +109,11 @@ JS-fit: `fitDocTitle()` (заголовок документа) и `fitTorque()`
 | `da5fu-d-ds` | PDF `da5fu-d_ds.pdf` | `angle_limit` | да |
 | `da10-15-20fu24-230-d-ds` | PDF `da10fu-d:ds.pdf` | `angle_limit` | да |
 | `da10-15-20fu24-a-as` | PDF `da10fu24-a:as.pdf` | `slider` | да |
+| `da8-16-24-32mu24-a-as` | EN `da8_16_24_32mu24-a_as.pdf` | `signal` | да |
+| `da8-16-24-32mu24-d-ds` | EN `…mu24-d_ds.pdf` | `terminals_jumper` | да |
+| `da8-16-24-32mu230-*` | EN `…mu230-*.pdf` | как 24 В | да |
+| `da8-16-24mqu24-a-as` | EN `…mqu24-a_as.pdf` | `signal` | да |
+| `da8-16-24mqu230-*` | EN `…mqu230-*.pdf` | A=`signal` / D=`terminals_jumper` | да |
 
 `angle_limit` (DA5FU, DA10/15/20 FU D/DS): баннер и текст про **механический упор угла**,
 не «переключение направления»; схема — винт ограничения из PDF.
@@ -165,12 +170,26 @@ PDF-кропы (`_pdf_clip_png`):
 
 ## Очередь EN (ориентир на V24 / V230)
 
-Раздельные PDF в `_инструкции-pdf/` — переводить парой:
+Раздельные PDF в `_инструкции-pdf/EN/` — один PDF → один HTML:
 
-- `da8_16_24_32mu24-a_as` / `…mu230-a_as` (+ D/DS)
-- `da8_16_24mqu24-a_as` / `…mqu230-*`
+| Stem | PDF | Шаблон |
+|------|-----|--------|
+| `da8-16-24-32mu24-a-as` | `da8_16_24_32mu24-a_as.pdf` | V24 |
+| `da8-16-24-32mu24-d-ds` | `da8_16_24_32mu24-d_ds.pdf` | V24 |
+| `da8-16-24-32mu230-a-as` | `da8_16_24_32mu230-a_as.pdf` | V230 |
+| `da8-16-24-32mu230-d-ds` | `da8_16_24_32mu230-d_ds.pdf` | V230 |
+| `da8-16-24mqu24-a-as` | `da8_16_24mqu24-a_as.pdf` | V24 |
+| `da8-16-24mqu230-a-as` | `da8_16_24mqu230-a_as.pdf` | V230 |
+| `da8-16-24mqu230-d-ds` | `da8_16_24mqu230-d_ds.pdf` | V230 |
 
-Один PDF на напряжение → один HTML по шаблону V24 или V230.
+Нет в EN: `da8_16_24mqu24-d_ds.pdf`.  
+`da5mqu-*.pdf` — комбинированные 24+230 (не V24/V230) — отдельно.
+
+Пересборка EN→RU:
+
+```bash
+python3 docs/demo/manuals-ru/scripts/en_pdf_to_manuals.py
+```
 
 ## Пересборка
 

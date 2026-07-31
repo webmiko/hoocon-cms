@@ -797,7 +797,94 @@ DIAGRAM_PROFILES: dict[str, DiagramProfile] = {
         instruction_pdf="da10fu24-a:as.pdf",
         sheet1_aux_diagram=True,
     ),
+    # EN→RU V24/V230 (separate voltage PDFs under ``_инструкции-pdf/EN/``).
+    "da8-16-24-32mu24-a-as": DiagramProfile(
+        wiring_media="da8mu24-a-wiring.webp",
+        dimensions_media="da8mu24-a-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="signal",
+        rotation_image=True,
+        instruction_pdf="da8_16_24_32mu24-a_as.pdf",
+        sheet1_aux_diagram=True,
+        sheet1_dip_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24-32mu24-d-ds": DiagramProfile(
+        wiring_media="da8mu24-d-wiring.webp",
+        dimensions_media="da8mu24-d-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="terminals_jumper",
+        rotation_image=True,
+        instruction_pdf="da8_16_24_32mu24-d_ds.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24-32mu230-a-as": DiagramProfile(
+        wiring_media="da8mu230-a-wiring.webp",
+        dimensions_media="da8mu230-a-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="signal",
+        rotation_image=True,
+        instruction_pdf="da8_16_24_32mu230-a_as.pdf",
+        sheet1_aux_diagram=True,
+        sheet1_dip_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24-32mu230-d-ds": DiagramProfile(
+        wiring_media="da8mu230-d-wiring.webp",
+        dimensions_media="da8mu230-d-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="terminals_jumper",
+        rotation_image=True,
+        instruction_pdf="da8_16_24_32mu230-d_ds.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24mqu24-a-as": DiagramProfile(
+        wiring_media="da8mqu24-a-wiring.webp",
+        dimensions_media="da8mqu24-a-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="signal",
+        rotation_image=True,
+        instruction_pdf="da8_16_24mqu24-a_as.pdf",
+        sheet1_aux_diagram=True,
+        sheet1_dip_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24mqu230-a-as": DiagramProfile(
+        wiring_media="da8mqu230-a-wiring.webp",
+        dimensions_media="da8mqu230-a-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="signal",
+        rotation_image=True,
+        instruction_pdf="da8_16_24mqu230-a_as.pdf",
+        sheet1_aux_diagram=True,
+        sheet1_dip_diagram=True,
+        wiring_ru_headers=True,
+    ),
+    "da8-16-24mqu230-d-ds": DiagramProfile(
+        wiring_media="da8mqu230-d-wiring.webp",
+        dimensions_media="da8mqu230-d-dimensions.webp",
+        wiring_overlays=False,
+        rotation_kind="terminals_jumper",
+        rotation_image=True,
+        instruction_pdf="da8_16_24mqu230-d_ds.pdf",
+        sheet1_aux_diagram=True,
+        wiring_ru_headers=True,
+    ),
 }
+
+
+def resolve_instruction_pdf(filename: str) -> Path:
+    """Resolve an instruction PDF under ``_инструкции-pdf/{RU,EN}/`` or root."""
+    root = _repo_root() / "_инструкции-pdf"
+    name = Path(filename).name
+    for sub in ("RU", "EN", ""):
+        base = root / sub if sub else root
+        candidate = base / name
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"Instruction PDF missing: {root}/{{RU,EN}}/{name}")
 
 
 def _find_media_file(basename: str) -> Path:
@@ -1228,6 +1315,75 @@ def _materialize_da10_15_20fu24_a_as_from_pdf(pdf_path: Path, stem_dir: Path) ->
     )
 
 
+def _materialize_landscape_en_mu_from_pdf(
+    pdf_path: Path,
+    stem_dir: Path,
+    *,
+    modulating: bool,
+) -> None:
+    """Crop product + diagrams from landscape A4×2 EN MU/MQU manuals.
+
+    Layout matches DA4/6 RU PDFs (sheet1 aux+product; sheet2 wiring/dims/rotation).
+    """
+    _pdf_clip_png(
+        pdf_path,
+        page_index=0,
+        clip=(500, 140, 700, 330),
+        dest=stem_dir / "product.png",
+        scale=5.0,
+    )
+    product = stem_dir / "product.png"
+    if product.is_file():
+        (stem_dir / "lead.png").write_bytes(product.read_bytes())
+
+    _pdf_clip_png(
+        pdf_path,
+        page_index=0,
+        clip=(218, 68, 472, 168),
+        dest=stem_dir / "aux-diagram.png",
+        scale=5.0,
+    )
+    if modulating:
+        _pdf_clip_png(
+            pdf_path,
+            page_index=1,
+            clip=(468, 420, 825, 575),
+            dest=stem_dir / "dip-diagram.png",
+            scale=4.0,
+        )
+        # Sheet-2 rotation figure: same DIP block (direction = switch 4).
+        _pdf_clip_png(
+            pdf_path,
+            page_index=1,
+            clip=(700, 420, 825, 575),
+            dest=stem_dir / "rotation.png",
+            scale=5.0,
+        )
+    else:
+        _pdf_clip_png(
+            pdf_path,
+            page_index=1,
+            clip=(468, 420, 825, 575),
+            dest=stem_dir / "rotation.png",
+            scale=4.0,
+        )
+
+    _pdf_clip_png(
+        pdf_path,
+        page_index=1,
+        clip=(468, 98, 825, 198),
+        dest=stem_dir / "wiring.png",
+        crop_bottom_banner=True,
+    )
+    _pdf_clip_png(
+        pdf_path,
+        page_index=1,
+        clip=(468, 220, 825, 410),
+        dest=stem_dir / "dimensions.png",
+        crop_bottom_banner=True,
+    )
+
+
 def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
     """Copy/convert catalog diagrams into ``assets/<stem>/`` for this manual."""
     profile = DIAGRAM_PROFILES.get(stem)
@@ -1238,9 +1394,7 @@ def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
     stem_dir.mkdir(parents=True, exist_ok=True)
 
     if profile.instruction_pdf:
-        pdf_path = _repo_root() / "_инструкции-pdf" / profile.instruction_pdf
-        if not pdf_path.is_file():
-            raise FileNotFoundError(f"Instruction PDF missing: {pdf_path}")
+        pdf_path = resolve_instruction_pdf(profile.instruction_pdf)
         if stem == "da4-6mu-d-ds":
             _materialize_da4_6mu_d_ds_from_pdf(pdf_path, stem_dir)
             return profile
@@ -1255,6 +1409,25 @@ def ensure_diagram_assets(stem: str, out_dir: Path) -> DiagramProfile:
             return profile
         if stem == "da10-15-20fu24-230-d-ds":
             _materialize_da10_15_20fu24_230_d_ds_from_pdf(pdf_path, stem_dir)
+            return profile
+        if stem in {
+            "da8-16-24-32mu24-a-as",
+            "da8-16-24-32mu230-a-as",
+            "da8-16-24mqu24-a-as",
+            "da8-16-24mqu230-a-as",
+        }:
+            _materialize_landscape_en_mu_from_pdf(
+                pdf_path, stem_dir, modulating=True
+            )
+            return profile
+        if stem in {
+            "da8-16-24-32mu24-d-ds",
+            "da8-16-24-32mu230-d-ds",
+            "da8-16-24mqu230-d-ds",
+        }:
+            _materialize_landscape_en_mu_from_pdf(
+                pdf_path, stem_dir, modulating=False
+            )
             return profile
 
     # Dimensions — always from catalog; strip baked-in title bar if present.
