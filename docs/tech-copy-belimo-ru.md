@@ -112,12 +112,15 @@ Belimo (B2B HVAC).
 | Auxiliary switch | Вспомогательный переключатель |
 | Actuator Dimensions(mm) | Габаритные размеры привода (мм) |
 | Switch The Direction Of Rotation | Переключение направления вращения |
-| Factory setting: Terminal 1,2 has power supply, the actuator rotates anticlockwise. | Заводская настройка: напряжение подается на клеммы 1 и 2, привод вращается против часовой стрелки. |
+| Factory setting: Terminal 1,2 has power supply, the actuator rotates anticlockwise. | Заводская настройка: напряжение подаётся на клеммы 1 и 2, привод вращается против часовой стрелки. |
 | Power supply: Terminal1,2 anticlockwise / Terminal1,3 clockwise | Питание: клеммы 1, 2 — вращение против часовой стрелки; клеммы 1, 3 — вращение по часовой стрелке |
 | Rotary switch | Поворотный переключатель |
 | anticlockwise | против часовой стрелки |
 | clockwise | по часовой стрелке |
 | The direction of rotation can be changed by the motor pin. | Направление вращения можно изменить с помощью перемычки на двигателе. |
+| Set switch direction | Установка направления вращения переключателем |
+| Turn to 0 with the signal increase, actuator rotates anticlockwise. | Положение 0: при увеличении управляющего сигнала — против часовой стрелки |
+| Turn to 1 with the signal increases, actuator rotates clockwise. | Положение 1: при увеличении управляющего сигнала — по часовой стрелке |
 
 ---
 
