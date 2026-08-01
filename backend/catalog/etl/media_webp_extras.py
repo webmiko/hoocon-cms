@@ -29,6 +29,7 @@ from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 
 from catalog.etl.hv_media_webp import default_media_webp_root
 from catalog.etl.sku_variant import sku_code_is_thermal
@@ -149,17 +150,37 @@ def _upsert_tile(
 
 
 def _demote_tilda_montage(sku: SKU, *, dry_run: bool) -> int:
-    """Unpublish Tilda «Монтажная схема» tiles once a local montage exists."""
+    """Unpublish Tilda montage tiles once a local montage exists.
+
+    Tilda alts vary: ``Монтажная схема …`` or ``схема монтажная …``.
+    """
     qs = ProductImage.objects.filter(
         sku=sku,
         is_published=True,
-        alt__icontains="Монтажная схема",
         source_url__icontains="tildacdn",
+    ).filter(
+        Q(alt__icontains="монтажная схема") | Q(alt__icontains="схема монтажная"),
     )
     count = qs.count()
     if count and not dry_run:
         qs.update(is_published=False)
     return count
+
+
+def demote_tilda_montages_where_local_exists(*, dry_run: bool = False) -> int:
+    """Demote Tilda montage rows on SKUs that already have media-webp montage."""
+    sku_ids = (
+        ProductImage.objects.filter(
+            is_published=True,
+            source_url__icontains="montazhnaya_sxema",
+        )
+        .values_list("sku_id", flat=True)
+        .distinct()
+    )
+    total = 0
+    for sku in SKU.objects.filter(pk__in=sku_ids).order_by("sku_code"):
+        total += _demote_tilda_montage(sku, dry_run=dry_run)
+    return total
 
 
 def sku_code_is_hv_qa(sku_code: str | None) -> bool:

@@ -202,3 +202,53 @@ def test_media_webp_extras_trims_and_flattens_montage(tmp_path: Path) -> None:
     assert stored.mode in {"RGB", "RGBA"}
     assert max(stored.size) <= 1600
     assert stored.size[0] * stored.size[1] < 400_000
+
+
+@pytest.mark.django_db
+def test_demote_tilda_montage_reversed_alt_word_order() -> None:
+    """Tilda alts like «схема монтажная …» are demoted when local montage exists."""
+    from catalog.etl.media_webp_extras import demote_tilda_montages_where_local_exists
+
+    cat = Category.objects.create(name="MQU demote", slug="mqu-demote-montage")
+    product = Product.objects.create(name="DA8MQU", slug="da8mqu-demote", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA8MQU24-A",
+        name="DA8MQU24-A",
+        slug="da8mqu24-a-demote",
+        is_published=True,
+    )
+    local = ProductImage(
+        sku=sku,
+        alt="DA8MQU24-A | Монтажная схема",
+        source_url="https://hoocon.ru/.local-assets/media-webp/montazhnaya_sxema_da8:16:24mu.webp",
+        sort_order=4,
+        is_published=True,
+    )
+    local.image.save(
+        "local.webp",
+        SimpleUploadedFile("local.webp", _png((10, 10, 10)), content_type="image/webp"),
+        save=False,
+    )
+    local.full_clean()
+    local.save()
+    tilda = ProductImage(
+        sku=sku,
+        alt="схема монтажная для привода вентиляции Hoocon da8mqu",
+        source_url="https://static.tildacdn.com/stor3864/76088397.jpg",
+        sort_order=3,
+        is_published=True,
+    )
+    tilda.image.save(
+        "tilda.webp",
+        SimpleUploadedFile("tilda.webp", _png((200, 100, 50)), content_type="image/webp"),
+        save=False,
+    )
+    tilda.full_clean()
+    tilda.save()
+
+    assert demote_tilda_montages_where_local_exists() == 1
+    tilda.refresh_from_db()
+    local.refresh_from_db()
+    assert tilda.is_published is False
+    assert local.is_published is True
