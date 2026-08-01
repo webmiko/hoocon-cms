@@ -131,6 +131,8 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert ".hoocon-admin-header" in css
     assert ".hoocon-all-apps-panel" in css
     assert "min(28rem" in css
+    assert ".hoocon-integrations" in css
+    assert ".hoocon-integrations__actions" in css
 
 
 @pytest.mark.django_db

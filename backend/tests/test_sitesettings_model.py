@@ -64,11 +64,9 @@ def test_show_prices_can_be_toggled_true() -> None:
 
 
 @pytest.mark.django_db
-def test_str_shows_show_prices_state() -> None:
-    """__str__ mentions the show_prices_on_site state for Admin readability."""
+def test_str_is_integrations_label() -> None:
+    """__str__ is a short Russian Admin label for the singleton."""
     from sitesettings.models import SiteSettings
 
     settings = SiteSettings.load()
-    text = str(settings)
-    assert "цены" in text
-    assert "нет" in text or "да" in text
+    assert str(settings) == "Интеграции сайта"

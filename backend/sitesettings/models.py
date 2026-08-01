@@ -130,8 +130,8 @@ class SiteSettings(models.Model):
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "настройки сайта"
-        verbose_name_plural = "настройки сайта"
+        verbose_name = "интеграция"
+        verbose_name_plural = "интеграции"
 
     @classmethod
     def load(cls) -> SiteSettings:
@@ -156,5 +156,4 @@ class SiteSettings(models.Model):
 
     def __str__(self) -> str:
         """Return Russian label for Admin/logs."""
-        state = "да" if self.show_prices_on_site else "нет"
-        return f"Настройки сайта (цены: {state})"
+        return "Интеграции сайта"

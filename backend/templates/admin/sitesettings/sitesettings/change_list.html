@@ -1,0 +1,49 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content_title %}Интеграции{% endblock %}
+
+{% block result_list %}
+{% with dash=integration_dashboard %}
+<section class="hoocon-integrations" aria-label="Статус интеграций">
+  <header class="hoocon-integrations__head">
+    <div>
+      <h1 class="hoocon-integrations__title">Интеграции</h1>
+      <p class="hoocon-integrations__sub">
+        Подключено: {{ dash.connected_count }} из {{ dash.total_count }}
+        {% if dash.updated_at %}
+          · обновлено {{ dash.updated_at|date:"j E Y, H:i" }}
+        {% endif %}
+      </p>
+    </div>
+    <nav class="hoocon-integrations__actions" aria-label="Действия">
+      {% if dash.change_url %}
+        <a class="hoocon-admin-open" href="{{ dash.change_url }}">Настроить</a>
+      {% endif %}
+      {% if dash.social_log_url %}
+        <a class="hoocon-integrations__link" href="{{ dash.social_log_url }}">Журнал анонсов</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <section class="hoocon-lead-stats__cards hoocon-integrations__cards" aria-label="Каналы">
+    {% for card in dash.cards %}
+    <article class="hoocon-lead-stats__card hoocon-integrations__card hoocon-integrations__card--{{ card.status }}">
+      <div class="hoocon-integrations__card-top">
+        <p class="hoocon-lead-stats__label">{{ card.name }}</p>
+        <span class="hoocon-integrations__badge hoocon-integrations__badge--{{ card.status }}">
+          {{ card.status_label }}
+        </span>
+      </div>
+      <p class="hoocon-integrations__detail">{{ card.detail }}</p>
+      {% if card.hint %}
+        <p class="hoocon-integrations__hint">{{ card.hint }}</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+</section>
+{% endwith %}
+{% endblock %}
+
+{% block pagination %}{% endblock %}

@@ -7,12 +7,13 @@ from typing import Any
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin
 from sitesettings.credentials import token_source_label
+from sitesettings.integration_dashboard import build_integration_dashboard
 from sitesettings.models import SiteSettings
 
 
@@ -71,6 +72,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Singleton Admin: edit only; no add/delete when row exists."""
 
     form = SiteSettingsAdminForm
+    change_list_template = "admin/sitesettings/sitesettings/change_list.html"
     list_display = (
         "__str__",
         "show_prices_on_site",
@@ -188,6 +190,17 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             getattr(settings, "MAX_BOT_TOKEN", ""),
         )
         return format_html("<strong>{}</strong>", label)
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Show integration status dashboard instead of a one-row table."""
+        SiteSettings.load()
+        context = dict(extra_context or {})
+        context["integration_dashboard"] = build_integration_dashboard()
+        return super().changelist_view(request, extra_context=context)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Allow add only if singleton row is missing."""

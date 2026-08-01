@@ -893,3 +893,164 @@ kbd.hoocon-sidebar-shortcut > span {
   word-break: break-word;
   white-space: normal;
 }
+
+/* SiteSettings changelist: integration status dashboard. */
+.hoocon-integrations {
+  width: 100%;
+  max-width: 64rem;
+  padding: 0.75rem 0 1.25rem;
+}
+
+.hoocon-integrations__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem 1.5rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 0.25rem;
+}
+
+.hoocon-integrations__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hoocon-integrations__sub {
+  margin: 0;
+  color: var(--hoocon-quiet);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  max-width: 28rem;
+}
+
+.hoocon-integrations__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 0.85rem;
+  margin: 0.25rem 0 0;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 52rem) {
+  .hoocon-integrations__actions {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 1rem 0 0.25rem;
+    border-top: 1px solid var(--hoocon-glass-border);
+    gap: 0.9rem;
+  }
+}
+
+.hoocon-integrations__actions .hoocon-admin-open,
+.hoocon-integrations__actions .hoocon-admin-lead-open,
+.hoocon-integrations__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--hoocon-radius-pill);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.hoocon-integrations__link {
+  border: 1px solid var(--hoocon-glass-border);
+  background: var(--hoocon-surface-muted);
+  color: var(--hoocon-quiet);
+}
+
+.hoocon-integrations__link:hover {
+  color: var(--hoocon-primary);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
+}
+
+.hoocon-integrations__cards {
+  margin-bottom: 0;
+  /* Unfold @container: <720 → 1; ≥720 → 2; ≥1024 → 3. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+}
+
+@container (min-width: 720px) {
+  .hoocon-integrations__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 1024px) {
+  .hoocon-integrations__cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.hoocon-integrations__card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.hoocon-integrations__card-top .hoocon-lead-stats__label {
+  margin: 0;
+}
+
+.hoocon-integrations__badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--hoocon-radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.hoocon-integrations__badge--on {
+  color: #0f6b3a;
+  background: color-mix(in srgb, #16a34a 16%, var(--hoocon-surface));
+}
+
+.hoocon-integrations__badge--partial {
+  color: #9a6700;
+  background: color-mix(in srgb, #ca8a04 16%, var(--hoocon-surface));
+}
+
+.hoocon-integrations__badge--off {
+  color: var(--hoocon-quiet);
+  background: var(--hoocon-surface-muted);
+}
+
+.hoocon-integrations__card--on {
+  border-color: color-mix(in srgb, #16a34a 28%, transparent);
+}
+
+.hoocon-integrations__card--partial {
+  border-color: color-mix(in srgb, #ca8a04 30%, transparent);
+}
+
+.hoocon-integrations__detail {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-integrations__hint {
+  margin: 0;
+  color: var(--hoocon-quiet);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
