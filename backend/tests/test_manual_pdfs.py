@@ -274,3 +274,49 @@ def test_discover_dafu_in_ru_subdir(tmp_path: Path) -> None:
     assert len(matches) == 1
     assert matches[0].path.parent.name == "RU"
     assert warnings == []
+
+
+@pytest.mark.django_db
+def test_clone_damqu_manuals_from_da8_to_16_24() -> None:
+    """DA16/DA24 get the same datasheet titles/bytes as DA8 editions."""
+    from catalog.etl.manual_pdfs import clone_damqu_manuals_from_donor
+    from catalog.models import SKU, Category, Product, ProductFile
+
+    cat = Category.objects.create(name="MQU manuals", slug="mqu-manuals-clone")
+    skus: dict[str, SKU] = {}
+    for nm in (8, 16, 24):
+        product = Product.objects.create(
+            name=f"DA{nm}MQU",
+            slug=f"privod-vozdushniy-da{nm}mqu-{nm}nm",
+            category=cat,
+        )
+        for ed in ("24-A", "24-D"):
+            code = f"DA{nm}MQU{ed}"
+            skus[code] = SKU.objects.create(
+                product=product,
+                sku_code=code,
+                name=code,
+                slug=f"{code.lower()}-man",
+                is_published=True,
+            )
+    title_a = "Инструкция DA8/16/24MQU24 (A/AS)"
+    title_d = "Инструкция DA8/16/24MQU (D/DS)"
+    for code, title, body in (
+        ("DA8MQU24-A", title_a, b"%PDF-a"),
+        ("DA8MQU24-D", title_d, b"%PDF-d"),
+    ):
+        pf = ProductFile(
+            sku=skus[code],
+            title=title,
+            file_type=ProductFile.FileType.DATASHEET,
+            is_published=True,
+            sort_order=0,
+        )
+        pf.file.save(f"{code.lower()}.pdf", ContentFile(body), save=True)
+
+    stats = clone_damqu_manuals_from_donor()
+    assert stats["targets"] == 4
+    assert stats["created"] == 4
+    for nm in (16, 24):
+        assert ProductFile.objects.filter(sku=skus[f"DA{nm}MQU24-A"], title=title_a).exists()
+        assert ProductFile.objects.filter(sku=skus[f"DA{nm}MQU24-D"], title=title_d).exists()

@@ -7,6 +7,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 
 from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
+from catalog.etl.manual_pdfs import clone_damqu_manuals_from_donor
 from catalog.etl.series_copy_damqu import (
     apply_damqu_enrichment,
     retire_damqu_noncanonical_nm,
@@ -51,5 +52,13 @@ class Command(BaseCommand):
                 f"{prefix}DAMQU media from DA8 → 16/24: "
                 f"targets={media['targets']}, created={media['created']}, "
                 f"updated={media['updated']}, skipped={media['skipped']}",
+            ),
+        )
+        manuals = clone_damqu_manuals_from_donor(dry_run=dry_run)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix}DAMQU manuals from DA8 → 16/24: "
+                f"targets={manuals['targets']}, created={manuals['created']}, "
+                f"updated={manuals['updated']}, skipped={manuals['skipped']}",
             ),
         )

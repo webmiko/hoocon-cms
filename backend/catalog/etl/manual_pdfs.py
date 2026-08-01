@@ -909,6 +909,122 @@ def attach_damqu_manuals(
     return _attach_matches(matches, warnings, dry_run=dry_run)
 
 
+_DAMQU_EDITION_TAIL = re.compile(
+    r"(?i)^da(?P<nm>\d+)mqu(?P<tail>(?:24|230)-(?:as|ds|a|d))$",
+)
+
+
+def _damqu_edition_tail(sku_code: str) -> tuple[int, str] | None:
+    """Return (nm, ``24-A``-style tail) for DA..MQU, else None."""
+    match = _DAMQU_EDITION_TAIL.fullmatch((sku_code or "").strip().replace(" ", ""))
+    if match is None:
+        return None
+    return int(match.group("nm")), match.group("tail").upper()
+
+
+def _clone_one_manual(
+    *,
+    donor_file: ProductFile,
+    target: SKU,
+    dry_run: bool,
+) -> str:
+    """Upsert one datasheet onto ``target`` from ``donor_file`` bytes."""
+    title = (donor_file.title or "").strip()
+    if not title:
+        return "skipped"
+    existing = ProductFile.objects.filter(sku=target, title=title).first()
+    if dry_run:
+        return "update" if existing is not None else "create"
+
+    payload = b""
+    if donor_file.file:
+        donor_file.file.open("rb")
+        try:
+            payload = donor_file.file.read()
+        finally:
+            donor_file.file.close()
+    if not payload:
+        return "skipped"
+    basename = Path(getattr(donor_file.file, "name", "") or "manual.pdf").name
+    with transaction.atomic():
+        if existing is None:
+            pf = ProductFile(
+                sku=target,
+                title=title[:300],
+                file_type=donor_file.file_type or ProductFile.FileType.DATASHEET,
+                is_published=donor_file.is_published,
+                sort_order=donor_file.sort_order,
+            )
+            pf.file.save(basename, ContentFile(payload), save=True)
+            return "create"
+        current_size = existing.file.size if existing.file else 0
+        if current_size != len(payload):
+            existing.file.save(basename, ContentFile(payload), save=True)
+            existing.file_type = donor_file.file_type or existing.file_type
+            existing.is_published = donor_file.is_published
+            existing.sort_order = donor_file.sort_order
+            existing.save(
+                update_fields=["file_type", "is_published", "sort_order", "updated_at"],
+            )
+            return "update"
+        return "skipped"
+
+
+def clone_damqu_manuals_from_donor(
+    *,
+    donor_nm: int = 8,
+    target_nms: tuple[int, ...] = (16, 24),
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Copy ProductFile manuals from DA{donor}MQU onto DA16/DA24 same editions.
+
+    EN family PDFs (``da8_16_24mqu*``) already cover 8/16/24; when the manuals
+    dir is missing on the host, clone from DA8 rows that were attached earlier.
+
+    Returns:
+        Counters: created, updated, skipped, targets, dry_run.
+    """
+    summary: dict[str, Any] = {
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "targets": 0,
+        "dry_run": dry_run,
+        "donor_nm": donor_nm,
+        "target_nms": list(target_nms),
+    }
+    donors = {
+        sku.sku_code.upper(): sku
+        for sku in SKU.objects.filter(sku_code__iregex=rf"(?i)^da{donor_nm}mqu").prefetch_related(
+            "files",
+        )
+    }
+    targets = SKU.objects.filter(
+        sku_code__iregex=rf"(?i)^da({'|'.join(str(n) for n in target_nms)})mqu",
+        is_published=True,
+    ).order_by("sku_code")
+    for target in targets:
+        parsed = _damqu_edition_tail(target.sku_code or "")
+        if parsed is None:
+            summary["skipped"] += 1
+            continue
+        _, tail = parsed
+        donor = donors.get(f"DA{donor_nm}MQU{tail}")
+        if donor is None:
+            summary["skipped"] += 1
+            continue
+        summary["targets"] += 1
+        for pf in donor.files.all():
+            action = _clone_one_manual(donor_file=pf, target=target, dry_run=dry_run)
+            if action == "create":
+                summary["created"] += 1
+            elif action == "update":
+                summary["updated"] += 1
+            else:
+                summary["skipped"] += 1
+    return summary
+
+
 def parse_samu_manual_stem(stem: str) -> tuple[int, bool] | None:
     """Parse ``sa10mu-ds_dst`` → ``(10, True)``, ``SA10MU-DS`` → ``(10, False)``."""
     clean = normalize_manual_stem(stem)
