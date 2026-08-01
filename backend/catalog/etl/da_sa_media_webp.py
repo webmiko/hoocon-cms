@@ -58,10 +58,11 @@ _SKU_RE = re.compile(
     r"-(?P<ed>as|dst|ds|a|d)$",
 )
 
-# Pack masks without this Nm → reuse neighbour (DA32 ≈ DA24; DA8MQU ≈ DA10MQU).
+# Pack masks without this Nm → reuse neighbour (DA32 ≈ DA24;
+# MQU pack file is still named da10:20mqu → map 8/16/24 onto those masks).
 _PHOTO_NM_FALLBACK: dict[tuple[str, str], dict[int, int]] = {
     ("da", "mu"): {32: 24},
-    ("da", "mqu"): {8: 10},
+    ("da", "mqu"): {8: 10, 16: 10, 24: 20},
 }
 
 # DA10/15/20 FU modulating editions share the on/off body photo.

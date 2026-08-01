@@ -8,7 +8,8 @@ Local-only sources (not committed)::
 
 Gaps vs published catalog (site edition convention)::
 
-- DA5/10/20MQU — 24/230 × A/AS/D/DS
+- DA5/8/16/24MQU — 24/230 × A/AS/D/DS (EN manuals ``da5mqu`` /
+  ``da8_16_24mqu``). DA10/20 снимаются ``retire_damqu_noncanonical_nm``.
 - SA7MU — 24/230 × DS/DST
 - HVD*-40 bare (not Q/QX) — 24/230 × plain/S
 
@@ -27,7 +28,7 @@ CATEGORY_MQU: Final[str] = "elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata"
 CATEGORY_SAMU: Final[str] = "elektroprivody-dlya-klapanov-dymoudaleniya"
 CATEGORY_HVD: Final[str] = "elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
 
-_MQU_NMS: Final[tuple[int, ...]] = (5, 10, 20)
+_MQU_NMS: Final[tuple[int, ...]] = (5, 8, 16, 24)
 _MQU_EDITIONS: Final[tuple[str, ...]] = ("A", "AS", "D", "DS")
 _SAMU_EDITIONS: Final[tuple[str, ...]] = ("DS", "DST")
 _VOLTS: Final[tuple[str, ...]] = ("24", "230")
@@ -50,7 +51,7 @@ _MQU_DESC = normalize_tech_copy(
 – Время поворота: ускоренное относительно серии DA..MU.
 – Управление: пропорциональное (-A/-AS) или 2-/3-позиционное (-D/-DS).
 – Вспомогательные переключатели 2 SPDT: суффиксы -AS / -DS.
-– Степень защиты корпуса: IP54.
+– Степень защиты корпуса: IP44.
 """.strip(),
 )
 
@@ -148,7 +149,7 @@ def _ensure_sku(
 
 
 def ensure_damqu_gaps(*, dry_run: bool = False) -> dict[str, Any]:
-    """Create DA5/10/20MQU products and eight editions each."""
+    """Create DA5/8/16/24MQU products and eight editions each."""
     category = Category.objects.filter(slug=CATEGORY_MQU).first()
     if category is None:
         return {

@@ -109,7 +109,7 @@ def test_apply_damqu_enrichment_24v_and_230v_editions() -> None:
 
 @pytest.mark.django_db
 def test_apply_damqu_enrichment_multi_nm() -> None:
-    """DA5 and DA20 get distinct moment / area / VA from TORQUE_SPECS."""
+    """DA5 and DA24 get distinct moment / area / running-time from manuals."""
     cat = Category.objects.create(
         name="MQU",
         slug="elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata",
@@ -119,10 +119,10 @@ def test_apply_damqu_enrichment_multi_nm() -> None:
         name="old",
         slug="privod-vozdushniy-da5mqu-5nm",
     )
-    p20 = Product.objects.create(
+    p24 = Product.objects.create(
         category=cat,
         name="old",
-        slug="privod-vozdushniy-da20mqu-20nm",
+        slug="privod-vozdushniy-da24mqu-24nm",
     )
     sku5 = SKU.objects.create(
         product=p5,
@@ -131,11 +131,11 @@ def test_apply_damqu_enrichment_multi_nm() -> None:
         sku_code="DA5MQU24-D",
         is_published=True,
     )
-    sku20 = SKU.objects.create(
-        product=p20,
+    sku24 = SKU.objects.create(
+        product=p24,
         name="old",
-        slug="da20mqu24-d-test",
-        sku_code="DA20MQU24-D",
+        slug="da24mqu24-d-test",
+        sku_code="DA24MQU24-D",
         is_published=True,
     )
 
@@ -144,13 +144,140 @@ def test_apply_damqu_enrichment_multi_nm() -> None:
     assert stats["skus"] == 2
 
     by5 = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku5).select_related("attribute")}
-    by20 = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku20).select_related("attribute")}
+    by24 = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku24).select_related("attribute")}
     assert by5["moment"] == "5 Нм"
     assert by5["damper-area"] == "до 0,5"
     assert by5["transformer-va"] == "18"
-    assert by20["moment"] == "20 Нм"
-    assert by20["damper-area"] == "до 2,0"
-    assert by20["transformer-va"] == "25"
+    assert by5["ip-rating"] == "IP44"
+    assert by5["power-consumption"].startswith("12 Вт")
+    assert "6…16" in by5["shaft-diameter"] or "6...16" in by5["shaft-diameter"]
+    assert by5["rotation-direction"] == "выбирается с помощью переключателя"
+    assert by24["moment"] == "24 Нм"
+    assert by24["damper-area"] == "до 2,4"
+    assert by24["running-time"] == "< 45 с (95°)"
+    assert by24["transformer-va"] == "25"
+    assert by24["ip-rating"] == "IP44"
+    assert by24["noise"] == "55"
+
+
+@pytest.mark.django_db
+def test_retire_damqu_noncanonical_nm_redirects() -> None:
+    """DA10/DA20 unpublished; 301 to DA8/DA24 same edition."""
+    from catalog.etl.series_copy_damqu import retire_damqu_noncanonical_nm
+    from redirects.models import Redirect
+
+    cat = Category.objects.create(
+        name="MQU",
+        slug="elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata",
+    )
+    p8 = Product.objects.create(
+        category=cat,
+        name="DA8",
+        slug="privod-vozdushniy-da8mqu-8nm",
+    )
+    p10 = Product.objects.create(
+        category=cat,
+        name="DA10",
+        slug="privod-vozdushniy-da10mqu-10nm",
+    )
+    p20 = Product.objects.create(
+        category=cat,
+        name="DA20",
+        slug="privod-vozdushniy-da20mqu-20nm",
+    )
+    p24 = Product.objects.create(
+        category=cat,
+        name="DA24",
+        slug="privod-vozdushniy-da24mqu-24nm",
+    )
+    target8 = SKU.objects.create(
+        product=p8,
+        name="t8",
+        slug="da8mqu24-a-tgt",
+        sku_code="DA8MQU24-A",
+        is_published=True,
+    )
+    legacy10 = SKU.objects.create(
+        product=p10,
+        name="l10",
+        slug="da10mqu24-a-legacy",
+        sku_code="DA10MQU24-A",
+        is_published=True,
+    )
+    target24 = SKU.objects.create(
+        product=p24,
+        name="t24",
+        slug="da24mqu24-a-tgt",
+        sku_code="DA24MQU24-A",
+        is_published=True,
+    )
+    legacy20 = SKU.objects.create(
+        product=p20,
+        name="l20",
+        slug="da20mqu24-a-legacy",
+        sku_code="DA20MQU24-A",
+        is_published=True,
+    )
+
+    stats = retire_damqu_noncanonical_nm()
+    assert stats["skus_unpublished"] == 2
+    assert stats["redirects"] == 2
+
+    legacy10.refresh_from_db()
+    legacy20.refresh_from_db()
+    assert legacy10.is_published is False
+    assert legacy20.is_published is False
+    assert target8.is_published is True
+    assert target24.is_published is True
+
+    r10 = Redirect.objects.get(from_path__contains="da10mqu24-a-legacy")
+    assert "da8mqu24-a-tgt" in r10.to_path
+    assert r10.status_code == 301
+    r20 = Redirect.objects.get(from_path__contains="da20mqu24-a-legacy")
+    assert "da24mqu24-a-tgt" in r20.to_path
+
+
+@pytest.mark.django_db
+def test_apply_damqu_enrichment_manual_aligned_da8_and_da16() -> None:
+    """DA8/DA16MQU ТТХ match EN ``da8_16_24mqu`` manuals."""
+    cat = Category.objects.create(name="MQU8", slug="zaslonki-damqu-manual")
+    p8 = Product.objects.create(category=cat, name="old", slug=PRODUCT_SLUG)
+    p16 = Product.objects.create(
+        category=cat,
+        name="old",
+        slug="privod-vozdushniy-da16mqu-16nm",
+    )
+    sku8 = SKU.objects.create(
+        product=p8,
+        name="old",
+        slug="da8mqu24-a-manual",
+        sku_code="DA8MQU24-A",
+        is_published=True,
+    )
+    sku16 = SKU.objects.create(
+        product=p16,
+        name="old",
+        slug="da16mqu24-a-manual",
+        sku_code="DA16MQU24-A",
+        is_published=True,
+    )
+    apply_damqu_enrichment()
+    by8 = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku8).select_related("attribute")}
+    by16 = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku16).select_related("attribute")}
+    assert by8["ip-rating"] == "IP44"
+    assert by8["noise"] == "55"
+    assert by8["power-consumption"] == "12 Вт (работа) / 1 Вт (удержание)"
+    assert "95°" in by8["running-time"]
+    assert "95°" in by8["rotation-angle"]
+    assert by8["weight"] == "1,2…1,3"
+    assert "DIP" in by8["rotation-direction"]
+    assert by16["moment"] == "16 Нм"
+    assert by16["damper-area"] == "до 1,6"
+    assert by16["running-time"] == "< 16 с (95°)"
+    assert by16["noise"] == "55"
+    p8.refresh_from_db()
+    assert "IP44" in p8.description
+    assert "IP54" not in p8.description
 
 
 @pytest.mark.django_db

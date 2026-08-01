@@ -1,7 +1,13 @@
 """Canonical copy + ТТХ for Hoocon DA..MQU (fast damper, no spring return).
 
-Sources: DA8MQU datasheet (legacy 8 Нм) + 2022 Russian AI album
-(``浒江2022俄文画册2.ai``) for DA5 / DA10 / DA20MQU.
+ТТХ канон по EN manuals (``_инструкции-pdf/EN/``)::
+
+- ``da5mqu-*.pdf`` → DA5MQU
+- ``da8_16_24mqu*.pdf`` → DA8MQU / DA16MQU / DA24MQU
+
+Публичный ряд: **5 / 8 / 16 / 24 Нм**. DA10MQU / DA20MQU снимаются
+с каталога (``retire_damqu_noncanonical_nm``).
+RU wording: ``docs/tech-copy-belimo-ru.md``.
 Characteristics are stored as EAV rows with group keys for PDP cards.
 """
 
@@ -59,8 +65,9 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 – Без возвратной пружины: положение заслонки фиксируется
   при отключении питания.
 – Время поворота: ускоренное (см. ТТХ выбранного артикула).
-– Крутящий момент: 5…20 Нм (DA5MQU, DA8MQU, DA10MQU, DA20MQU).
-– Степень защиты корпуса: IP54.
+– Крутящий момент: 5 / 8 / 16 / 24 Нм
+  (DA5MQU, DA8MQU, DA16MQU, DA24MQU).
+– Степень защиты корпуса: IP44.
 – Температура окружающей среды: –20…+50 °C.
 
 Область применения:
@@ -78,19 +85,21 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 # name, slug, unit, value, group_key — shared across Nm (edition overrides below).
 AttrRow = tuple[str, str, str, str, str]
 
+# EN manuals: DA5 — switch; DA8/16/24 — DIP.
+_ROTATION_SWITCH: Final[str] = "выбирается с помощью переключателя"
+_ROTATION_DIP: Final[str] = "переключается DIP-переключателями"
+_POS_INDICATION: Final[str] = "механический указатель"
+_ANGLE_95: Final[str] = "макс. 95°, регулируется механическими упорами"
+_POWER_12_1: Final[str] = "12 Вт (работа) / 1 Вт (удержание)"
+_SHAFT_8_24: Final[str] = "○ 10…20 / □ 10×10…16×16"
+_WEIGHT_8_24: Final[str] = "1,2…1,3"
+
 _SHARED_BASE: tuple[AttrRow, ...] = (
     (
         "Сечение клемм",
         "terminal-size",
         "мм²",
         "макс. 2,0",
-        ATTR_GROUP_FUNCTIONAL,
-    ),
-    (
-        "Направление вращения",
-        "rotation-direction",
-        "",
-        "задаётся вручную",
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
@@ -104,49 +113,49 @@ _SHARED_BASE: tuple[AttrRow, ...] = (
         "Угол поворота",
         "rotation-angle",
         "°",
-        "макс. 90°",
+        _ANGLE_95,
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
         "Индикация положения",
         "position-indication",
         "",
-        "механическая",
+        _POS_INDICATION,
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
         "Степень защиты корпуса",
         "ip-rating",
         "",
-        "IP54",
+        "IP44",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Температура окружающей среды",
         "ambient-temp",
         "°C",
-        "–20…+50 (IEC 721-3-3)",
+        "–20…+50",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Температура хранения",
         "storage-temp",
         "°C",
-        "–30…+80 (IEC 721-3-2)",
+        "–30…+80",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Относительная влажность",
         "humidity",
         "",
-        "95 %, без конденсата (EN 60730-1)",
+        "95 % относительной влажности, без конденсации / согласно EN 60730-1",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Длина вала заслонки",
         "shaft-length",
         "мм",
-        "≥ 50",
+        "> 50",
         ATTR_GROUP_SIZE,
     ),
     (
@@ -159,58 +168,70 @@ _SHARED_BASE: tuple[AttrRow, ...] = (
 )
 
 _DIMS_5: Final[str] = "165,5 × 84,8 × 65"
-_DIMS_8_20: Final[str] = "180 × 100 × 68"
+_DIMS_8_24: Final[str] = "180 × 100 × 68"
 
 TORQUE_SPECS: dict[int, dict[str, str]] = {
+    # da5mqu-a_as / da5mqu-d_ds
     5: {
         "moment": "5 Нм",
         "damper-area": "до 0,5",
-        "running-time": "< 10 с (90°)",
+        "running-time": "< 10 с (95°)",
         "noise": "55",
         "dimensions": _DIMS_5,
-        "weight": "0,8",
-        "shaft-diameter": "○ 10…16 / □ 8×8…14×14",
-        "power_24": "8 Вт (работа) / 1 Вт (удержание)",
-        "power_230": "8 Вт (работа) / 1 Вт (удержание)",
+        "weight": "< 0,7",
+        "shaft-diameter": "○ 6…16 / □ 8×8…12×12",
+        "rotation-direction": _ROTATION_SWITCH,
+        "power_24": _POWER_12_1,
+        "power_230": _POWER_12_1,
         "transformer-va": "18",
     },
+    # da8_16_24mqu* — row 8 Нм
     8: {
         "moment": "8 Нм",
         "damper-area": "до 0,8",
-        "running-time": "< 8 с (90°)",
-        "noise": "65",
-        "dimensions": _DIMS_8_20,
-        "weight": "1,2",
-        "shaft-diameter": "○ 10…20 / □ 10×10…16×16",
-        "power_24": "12 Вт (работа) / 0,8 Вт (удержание)",
-        "power_230": "12 Вт (работа) / 1 Вт (удержание)",
+        "running-time": "< 8 с (95°)",
+        "noise": "55",
+        "dimensions": _DIMS_8_24,
+        "weight": _WEIGHT_8_24,
+        "shaft-diameter": _SHAFT_8_24,
+        "rotation-direction": _ROTATION_DIP,
+        "power_24": _POWER_12_1,
+        "power_230": _POWER_12_1,
         "transformer-va": "18",
     },
-    10: {
-        "moment": "10 Нм",
-        "damper-area": "до 1,0",
-        "running-time": "< 10 с (90°)",
-        "noise": "65",
-        "dimensions": _DIMS_8_20,
-        "weight": "1,2",
-        "shaft-diameter": "○ 10…20 / □ 10×10…14×14",
-        "power_24": "12 Вт (работа) / 0,8 Вт (удержание)",
-        "power_230": "12 Вт (работа) / 1 Вт (удержание)",
+    # da8_16_24mqu* — row 16 Нм
+    16: {
+        "moment": "16 Нм",
+        "damper-area": "до 1,6",
+        "running-time": "< 16 с (95°)",
+        "noise": "55",
+        "dimensions": _DIMS_8_24,
+        "weight": _WEIGHT_8_24,
+        "shaft-diameter": _SHAFT_8_24,
+        "rotation-direction": _ROTATION_DIP,
+        "power_24": _POWER_12_1,
+        "power_230": _POWER_12_1,
         "transformer-va": "25",
     },
-    20: {
-        "moment": "20 Нм",
-        "damper-area": "до 2,0",
-        "running-time": "< 20 с (90°)",
-        "noise": "65",
-        "dimensions": _DIMS_8_20,
-        "weight": "1,2",
-        "shaft-diameter": "○ 10…20 / □ 10×10…14×14",
-        "power_24": "12 Вт (работа) / 0,8 Вт (удержание)",
-        "power_230": "12 Вт (работа) / 1 Вт (удержание)",
+    # da8_16_24mqu* — row 24 Нм
+    24: {
+        "moment": "24 Нм",
+        "damper-area": "до 2,4",
+        "running-time": "< 45 с (95°)",
+        "noise": "55",
+        "dimensions": _DIMS_8_24,
+        "weight": _WEIGHT_8_24,
+        "shaft-diameter": _SHAFT_8_24,
+        "rotation-direction": _ROTATION_DIP,
+        "power_24": _POWER_12_1,
+        "power_230": _POWER_12_1,
         "transformer-va": "25",
     },
 }
+
+# Public catalog Nm; others (10/20) are retired with redirects.
+CANONICAL_NMS: Final[frozenset[int]] = frozenset(TORQUE_SPECS)
+_RETIRE_NM_REDIRECT: Final[dict[int, int]] = {10: 8, 20: 24}
 
 # Back-compat snapshot of 8 Нм shared rows (tests / docs).
 SHARED_ATTRS: tuple[AttrRow, ...] = (
@@ -227,7 +248,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "Направление вращения",
         "rotation-direction",
         "",
-        "задаётся вручную",
+        _ROTATION_DIP,
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
@@ -241,57 +262,57 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "Угол поворота",
         "rotation-angle",
         "°",
-        "макс. 90°",
+        _ANGLE_95,
         ATTR_GROUP_FUNCTIONAL,
     ),
-    ("Уровень шума", "noise", "дБ(A)", "65", ATTR_GROUP_FUNCTIONAL),
+    ("Уровень шума", "noise", "дБ(A)", "55", ATTR_GROUP_FUNCTIONAL),
     (
         "Индикация положения",
         "position-indication",
         "",
-        "механическая",
+        _POS_INDICATION,
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
         "Степень защиты корпуса",
         "ip-rating",
         "",
-        "IP54",
+        "IP44",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Температура окружающей среды",
         "ambient-temp",
         "°C",
-        "–20…+50 (IEC 721-3-3)",
+        "–20…+50",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Температура хранения",
         "storage-temp",
         "°C",
-        "–30…+80 (IEC 721-3-2)",
+        "–30…+80",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Относительная влажность",
         "humidity",
         "",
-        "95 %, без конденсата (EN 60730-1)",
+        "95 % относительной влажности, без конденсации / согласно EN 60730-1",
         ATTR_GROUP_OPERATING,
     ),
     (
         "Габаритные размеры",
         "dimensions",
         "мм",
-        _DIMS_8_20,
+        _DIMS_8_24,
         ATTR_GROUP_SIZE,
     ),
     (
         "Длина вала заслонки",
         "shaft-length",
         "мм",
-        "≥ 50",
+        "> 50",
         ATTR_GROUP_SIZE,
     ),
     (
@@ -301,7 +322,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "○ 10…20 / □ 10×10…16×16",
         ATTR_GROUP_SIZE,
     ),
-    ("Масса", "weight", "кг", "1,2", ATTR_GROUP_SIZE),
+    ("Масса", "weight", "кг", "1,2…1,3", ATTR_GROUP_SIZE),
     (
         "Сечение провода",
         "wire-cross-section",
@@ -321,6 +342,7 @@ CANONICAL_SLUGS: frozenset[str] = frozenset(
         "dimensions",
         "shaft-diameter",
         "weight",
+        "rotation-direction",
         "voltage",
         "power-consumption",
         "transformer-va",
@@ -438,6 +460,13 @@ def _enrich_sku(
             ATTR_GROUP_FUNCTIONAL,
         ),
         ("Уровень шума", "noise", "дБ(A)", row["noise"], ATTR_GROUP_FUNCTIONAL),
+        (
+            "Направление вращения",
+            "rotation-direction",
+            "",
+            row["rotation-direction"],
+            ATTR_GROUP_FUNCTIONAL,
+        ),
         (
             "Габаритные размеры",
             "dimensions",
@@ -620,5 +649,80 @@ def apply_damqu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 title=_product_title(nm),
                 category_slug=category_slug,
             )
+
+    return summary
+
+
+def _damqu_nm_from_code(sku_code: str) -> int | None:
+    """Any DA..MQU Nm (including retired 10/20), else None."""
+    match = _SKU_RE.fullmatch((sku_code or "").strip())
+    if match is None:
+        return None
+    return int(match.group("nm"))
+
+
+def retire_damqu_noncanonical_nm(*, dry_run: bool = False) -> dict[str, Any]:
+    """Unpublish DA10MQU / DA20MQU and add 301 redirects to DA8 / DA24.
+
+    Mapping: 10 Нм → DA8MQU same edition; 20 Нм → DA24MQU same edition.
+    Product tiles stay in DB (no Product.is_published); catalog hides them
+    when all SKUs are unpublished.
+
+    Returns:
+        Counters: skus_unpublished, redirects, dry_run.
+    """
+    from catalog.urls_paths import catalog_path_for_sku
+    from redirects.models import Redirect
+    from redirects.pathutils import normalize_path
+
+    summary: dict[str, Any] = {
+        "skus_unpublished": 0,
+        "redirects": 0,
+        "dry_run": dry_run,
+    }
+    legacy = (
+        SKU.objects.filter(sku_code__iregex=r"(?i)^da(10|20)mqu")
+        .select_related("product", "product__category")
+        .order_by("sku_code")
+    )
+    for sku in legacy:
+        nm = _damqu_nm_from_code(sku.sku_code)
+        target_nm = _RETIRE_NM_REDIRECT.get(nm) if nm is not None else None
+        if target_nm is None:
+            continue
+        target_code = re.sub(
+            r"(?i)^da(?:10|20)mqu",
+            f"DA{target_nm}MQU",
+            sku.sku_code.strip(),
+            count=1,
+        )
+        target = (
+            SKU.objects.filter(sku_code__iexact=target_code).select_related("product", "product__category").first()
+        )
+        if sku.is_published:
+            summary["skus_unpublished"] += 1
+            if not dry_run:
+                sku.is_published = False
+                sku.save(update_fields=["is_published"])
+
+        if target is None:
+            continue
+        from_path = normalize_path(catalog_path_for_sku(sku))
+        to_path = normalize_path(catalog_path_for_sku(target))
+        if not from_path or not to_path or from_path == to_path:
+            continue
+        if dry_run:
+            summary["redirects"] += 1
+            continue
+        _, created = Redirect.objects.update_or_create(
+            from_path=from_path,
+            defaults={
+                "to_path": to_path,
+                "status_code": 301,
+                "is_active": True,
+            },
+        )
+        if created:
+            summary["redirects"] += 1
 
     return summary
