@@ -78,6 +78,13 @@ if [[ -d deploy/nginx ]]; then
            /etc/nginx/admin-allow.conf.example; \
        fi; \
        ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
+       if [[ -f '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
+             && -f /etc/letsencrypt/live/161.104.19.49.sslip.io/fullchain.pem ]]; then \
+         cp '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
+           /etc/nginx/sites-available/hoocon-sslip-ssl; \
+         ln -sfn /etc/nginx/sites-available/hoocon-sslip-ssl \
+           /etc/nginx/sites-enabled/hoocon-sslip-ssl; \
+       fi; \
        nginx -t && systemctl reload nginx && echo 'nginx reloaded'"
   fi
 fi
