@@ -97,11 +97,7 @@ def announce_content(
     for channel in target:
         if not force and _already_sent(obj, channel):
             continue
-        text = (
-            compose_telegram_announcement(obj)
-            if channel == SocialChannel.TELEGRAM
-            else compose_announcement(obj)
-        )
+        text = compose_telegram_announcement(obj) if channel == SocialChannel.TELEGRAM else compose_announcement(obj)
         post = SocialPost.objects.create(
             content_type=ct,
             object_id=obj.pk,

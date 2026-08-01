@@ -81,12 +81,8 @@ def _post_multipart(
         chunks.append(b"\r\n")
     for name, (filename, content, content_type) in files.items():
         chunks.append(f"--{boundary}\r\n".encode())
-        chunks.append(
-            (
-                f'Content-Disposition: form-data; name="{name}"; '
-                f'filename="{filename}"\r\n'
-            ).encode()
-        )
+        disposition = f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+        chunks.append(disposition.encode())
         chunks.append(f"Content-Type: {content_type}\r\n\r\n".encode())
         chunks.append(content)
         chunks.append(b"\r\n")
