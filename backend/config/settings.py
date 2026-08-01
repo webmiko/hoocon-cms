@@ -342,6 +342,14 @@ GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "G-DLRV7BZ5JP").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
+# Telegram inbound webhook (setWebhook secret_token). Empty = webhook rejects all.
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+# /start cover: local file path preferred; else public HTTPS URL for Telegram.
+TELEGRAM_WELCOME_PHOTO_PATH = os.getenv("TELEGRAM_WELCOME_PHOTO_PATH", "").strip()
+TELEGRAM_WELCOME_PHOTO_URL = os.getenv(
+    "TELEGRAM_WELCOME_PHOTO_URL",
+    "https://hoocon.ru/og-image.jpg",
+).strip()
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -359,6 +367,8 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "240/min",
         "lead_create": "10/hour",
+        # Telegram retries bursts; keep generous but bounded per IP.
+        "telegram_webhook": "120/min",
     },
 }
 
