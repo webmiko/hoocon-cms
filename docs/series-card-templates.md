@@ -93,9 +93,12 @@ siblings на том же Product.
 Не путать с **DAMQU** / **HVA** (другие шаблоны slug; HVA — свой § ниже).
 
 **DAMQU** (ускоренные без пружины): Product.slug
-`privod-vozdushniy-da{n}mqu-{n}nm` (5/8/10/20 Нм), категория
+`privod-vozdushniy-da{n}mqu-{n}nm`. Публичный ряд по EN manuals: **5 / 8 / 16 /
+24 Нм** (`da5mqu-*.pdf`, `da8_16_24mqu*.pdf`). DA10/DA20 — снять
+(`retire_damqu_noncanonical_nm`, 301 → DA8 / DA24). Категория
 `elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata`, collapse BE+FE
-`da\d+mqu`. Ensure gaps: `ensure_ai_catalog_gaps`.
+`da\d+mqu`. Ensure gaps: `ensure_ai_catalog_gaps` (5/8/16/24).
+ETL: `enrich_da8mqu` → `series_copy_damqu.py`.
 
 **DAEU** (электронные отказоустойчивые) — снята с производства, в РФ-каталог
 не входит.
