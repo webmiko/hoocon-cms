@@ -69,7 +69,7 @@ _MONTAGE_NM_FALLBACK: Final[dict[tuple[str, str], dict[int, int]]] = {
     ("da", "fu"): {3: 5},
     ("sa", "mu"): {7: 10, 15: 10},
     ("da", "mu"): {32: 24},
-    # After series→mu: DA5MQU≈DA4/6; DA8/16MQU≈da10:20mqu pack; DA24MQU≈same pack :20.
+    # After series→mu: DA5MQU≈DA4/6; DA8/16/24MQU≈da8:16:24mu montage (10/20 legacy→8/24).
     ("da", "mqu"): {5: 6, 10: 8, 20: 24},
 }
 

@@ -6,6 +6,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
+from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
 from catalog.etl.series_copy_damqu import (
     apply_damqu_enrichment,
     retire_damqu_noncanonical_nm,
@@ -42,5 +43,13 @@ class Command(BaseCommand):
                 f"{prefix}DAMQU enriched: products={stats['products']}, "
                 f"skus={stats['skus']}, attr_writes={stats['attributes']}, "
                 f"by_nm={stats.get('by_nm')}",
+            ),
+        )
+        media = clone_damqu_images_from_donor(dry_run=dry_run)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix}DAMQU media from DA8 → 16/24: "
+                f"targets={media['targets']}, created={media['created']}, "
+                f"updated={media['updated']}, skipped={media['skipped']}",
             ),
         )

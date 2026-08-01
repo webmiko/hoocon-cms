@@ -233,3 +233,86 @@ def test_da20fu24_a_as_uses_d_ds_body_photo(tmp_path: Path) -> None:
         ).count()
         == 0
     )
+
+
+@pytest.mark.django_db
+def test_clone_damqu_images_from_da8_to_16_24() -> None:
+    """DA16/DA24 reuse DA8 gallery rows (same edition)."""
+    from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
+
+    cat = Category.objects.create(name="MQU clone", slug="mqu-clone")
+    png = _png(color=(90, 90, 90))
+    products = {}
+    skus: dict[str, SKU] = {}
+    for nm in (8, 16, 24):
+        products[nm] = Product.objects.create(
+            name=f"DA{nm}MQU",
+            slug=f"privod-vozdushniy-da{nm}mqu-{nm}nm",
+            category=cat,
+        )
+        for ed in ("24-A", "24-D"):
+            code = f"DA{nm}MQU{ed}"
+            skus[code] = SKU.objects.create(
+                product=products[nm],
+                sku_code=code,
+                name=code,
+                slug=f"{code.lower()}-clone",
+                is_published=True,
+            )
+    for code in ("DA8MQU24-A", "DA8MQU24-D"):
+        img = ProductImage(
+            sku=skus[code],
+            alt=f"{code} hero",
+            source_url=f"https://hoocon.ru/.local-assets/media-webp/da10:20mqu-{code[-1].lower()}-product.webp",
+            sort_order=0,
+            is_published=True,
+        )
+        img.image.save(
+            f"{code.lower()}.webp",
+            SimpleUploadedFile(f"{code.lower()}.webp", png, content_type="image/webp"),
+            save=False,
+        )
+        img.full_clean()
+        img.save()
+
+    stats = clone_damqu_images_from_donor()
+    assert stats["targets"] == 4
+    assert stats["created"] == 4
+    for nm in (16, 24):
+        for ed in ("24-A", "24-D"):
+            target = skus[f"DA{nm}MQU{ed}"]
+            assert ProductImage.objects.filter(sku=target, sort_order=0, is_published=True).exists()
+
+
+@pytest.mark.django_db
+def test_damqu_16_24_pack_fallback_uses_da10_mask(tmp_path: Path) -> None:
+    """DA16/DA24 heroes resolve to the same da10:20mqu pack as DA8."""
+    pack = tmp_path / "media-webp"
+    pack.mkdir()
+    (pack / "da10:20mqu-a:as.webp").write_bytes(_png(color=(85, 85, 85)))
+    (pack / "da10:20mqu-d:ds.webp").write_bytes(_png(color=(80, 80, 80)))
+
+    cat = Category.objects.create(name="MQU pack", slug="mqu-pack")
+    skus: list[tuple[SKU, str]] = []
+    for nm, ed, stem in (
+        (16, "A", "da10:20mqu-a:as"),
+        (24, "D", "da10:20mqu-d:ds"),
+    ):
+        product = Product.objects.create(name=f"DA{nm}", slug=f"da{nm}mqu-pack", category=cat)
+        sku = SKU.objects.create(
+            product=product,
+            sku_code=f"DA{nm}MQU24-{ed}",
+            name=f"DA{nm}MQU24-{ed}",
+            slug=f"da{nm}mqu24-{ed.lower()}-pack",
+            is_published=True,
+        )
+        skus.append((sku, stem))
+
+    summary = apply_da_sa_media_webp(dry_run=False, photo_root=pack)
+    assert summary["created"] == 2
+    for sku, stem in skus:
+        assert ProductImage.objects.filter(
+            sku=sku,
+            source_url__contains=f"media-webp/{stem}-product",
+            is_published=True,
+        ).exists()

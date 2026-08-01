@@ -59,11 +59,15 @@ _SKU_RE = re.compile(
 )
 
 # Pack masks without this Nm → reuse neighbour (DA32 ≈ DA24;
-# MQU pack file is still named da10:20mqu → map 8/16/24 onto those masks).
+# MQU pack is still named da10:20mqu — DA8/16/24 all use the :10 body shot).
 _PHOTO_NM_FALLBACK: dict[tuple[str, str], dict[int, int]] = {
     ("da", "mu"): {32: 24},
-    ("da", "mqu"): {8: 10, 16: 10, 24: 20},
+    ("da", "mqu"): {8: 10, 16: 10, 24: 10},
 }
+
+_DAMQU_EDITION_RE = re.compile(
+    r"(?i)^da(?P<nm>\d+)mqu(?P<tail>(?:24|230)-(?:as|ds|a|d))$",
+)
 
 # DA10/15/20 FU modulating editions share the on/off body photo.
 _DAFU_MOD_USES_ON_OFF_BODY_NM: frozenset[int] = frozenset({10, 15, 20})
@@ -323,4 +327,115 @@ def apply_da_sa_media_webp(
             stem_stats["updated"] += 1
         logger.info("da_sa_media_webp %s %s ← %s", action, sku.sku_code, shot.stem)
 
+    return summary
+
+
+def _damqu_edition_tail(sku_code: str) -> tuple[int, str] | None:
+    """Return (nm, ``24-A``-style tail) for DA..MQU, else None."""
+    match = _DAMQU_EDITION_RE.fullmatch((sku_code or "").strip().replace(" ", ""))
+    if match is None:
+        return None
+    return int(match.group("nm")), match.group("tail").upper()
+
+
+def _clone_one_image(
+    *,
+    donor_img: ProductImage,
+    target: SKU,
+    dry_run: bool,
+) -> str:
+    """Upsert one gallery row onto ``target`` from ``donor_img`` bytes."""
+    source_url = (donor_img.source_url or "").strip()
+    existing = None
+    if source_url:
+        existing = ProductImage.objects.filter(sku=target, source_url=source_url).first()
+    if dry_run:
+        return "update" if existing is not None else "create"
+
+    payload = b""
+    if donor_img.image:
+        donor_img.image.open("rb")
+        try:
+            payload = donor_img.image.read()
+        finally:
+            donor_img.image.close()
+    if not payload:
+        return "skipped"
+    stem = Path(getattr(donor_img.image, "name", "") or "photo.webp").name
+    filename = f"{target.sku_code.lower()}-{stem}"
+    alt = (donor_img.alt or f"{target.sku_code} | фото привода")[:300]
+    with transaction.atomic():
+        if existing is None:
+            image = ProductImage(
+                sku=target,
+                alt=alt,
+                source_url=source_url,
+                sort_order=donor_img.sort_order,
+                is_published=donor_img.is_published,
+            )
+            image.image.save(filename, ContentFile(payload), save=False)
+            image.full_clean()
+            image.save()
+            return "create"
+        existing.alt = alt
+        existing.sort_order = donor_img.sort_order
+        existing.is_published = donor_img.is_published
+        existing.image.save(filename, ContentFile(payload), save=False)
+        existing.full_clean()
+        existing.save()
+        return "update"
+
+
+def clone_damqu_images_from_donor(
+    *,
+    donor_nm: int = 8,
+    target_nms: tuple[int, ...] = (16, 24),
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Copy ProductImage rows from DA{donor}MQU onto DA16/DA24 same editions.
+
+    Same chassis as the media-webp ``da10:20mqu`` pack used by DA8. Useful when
+    the pack folder is unavailable on the host (prod) but DA8 already has shots.
+
+    Returns:
+        Counters: created, updated, skipped, targets, dry_run.
+    """
+    summary: dict[str, Any] = {
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "targets": 0,
+        "dry_run": dry_run,
+        "donor_nm": donor_nm,
+        "target_nms": list(target_nms),
+    }
+    donors = {
+        sku.sku_code.upper(): sku
+        for sku in SKU.objects.filter(sku_code__iregex=rf"(?i)^da{donor_nm}mqu").prefetch_related(
+            "images",
+        )
+    }
+    targets = SKU.objects.filter(
+        sku_code__iregex=rf"(?i)^da({'|'.join(str(n) for n in target_nms)})mqu",
+        is_published=True,
+    ).order_by("sku_code")
+    for target in targets:
+        parsed = _damqu_edition_tail(target.sku_code or "")
+        if parsed is None:
+            summary["skipped"] += 1
+            continue
+        _, tail = parsed
+        donor = donors.get(f"DA{donor_nm}MQU{tail}")
+        if donor is None:
+            summary["skipped"] += 1
+            continue
+        summary["targets"] += 1
+        for img in donor.images.all():
+            action = _clone_one_image(donor_img=img, target=target, dry_run=dry_run)
+            if action == "create":
+                summary["created"] += 1
+            elif action == "update":
+                summary["updated"] += 1
+            else:
+                summary["skipped"] += 1
     return summary
