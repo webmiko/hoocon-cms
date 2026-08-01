@@ -1,13 +1,19 @@
-"""Compose plain-text social announcements for Article / News."""
+"""Compose social announcements for Article / News (plain text + Telegram HTML)."""
 
 from __future__ import annotations
 
+import html
+from pathlib import Path
+
 from django.conf import settings
 from django.db import models
+from django.utils.html import strip_tags
 
 from content.models import Article, News
 
 _MAX_EXCERPT_LEN = 280
+# Telegram Bot API caption limit for sendPhoto / sendVideo / …
+_TELEGRAM_CAPTION_MAX = 1024
 
 
 def _public_url(path: str) -> str:
@@ -37,8 +43,23 @@ def content_path(obj: models.Model) -> str:
     raise TypeError(f"Unsupported content type: {type(obj)!r}")
 
 
+def _plain_excerpt(obj: models.Model) -> str:
+    """Plain-text excerpt: strip tags, unescape entities, collapse whitespace."""
+    raw = ""
+    if isinstance(obj, Article):
+        raw = (obj.excerpt or "").strip()
+    if not raw:
+        raw = (getattr(obj, "body", "") or "").strip()
+    text = html.unescape(strip_tags(raw))
+    # strip_tags leaves entity-only leftovers; collapse whitespace.
+    text = " ".join(text.split())
+    if len(text) > _MAX_EXCERPT_LEN:
+        text = text[: _MAX_EXCERPT_LEN - 1].rstrip() + "…"
+    return text
+
+
 def compose_announcement(obj: models.Model) -> str:
-    """Build announcement text for Telegram / VK / MAX.
+    """Build plain-text announcement for VK / MAX (and previews).
 
     Args:
         obj: Article or News instance.
@@ -47,23 +68,7 @@ def compose_announcement(obj: models.Model) -> str:
         Multiline UTF-8 text with title, short body, and absolute URL.
     """
     title = (getattr(obj, "title", "") or "").strip()
-    excerpt = ""
-    if isinstance(obj, Article):
-        excerpt = (obj.excerpt or "").strip()
-    if not excerpt:
-        body = (getattr(obj, "body", "") or "").strip()
-        # Strip coarse HTML tags for social preview.
-        plain = body.replace("<br>", "\n").replace("<br/>", "\n").replace("<p>", "").replace("</p>", "\n")
-        while "<" in plain and ">" in plain:
-            start = plain.find("<")
-            end = plain.find(">", start)
-            if end == -1:
-                break
-            plain = plain[:start] + plain[end + 1 :]
-        excerpt = " ".join(plain.split())
-    if len(excerpt) > _MAX_EXCERPT_LEN:
-        excerpt = excerpt[: _MAX_EXCERPT_LEN - 1].rstrip() + "…"
-
+    excerpt = _plain_excerpt(obj)
     url = _public_url(content_path(obj))
     kind = "Статья" if isinstance(obj, Article) else "Новость"
     lines = [f"{kind}: {title}", ""]
@@ -71,3 +76,76 @@ def compose_announcement(obj: models.Model) -> str:
         lines.extend([excerpt, ""])
     lines.append(url)
     return "\n".join(lines).strip()
+
+
+def compose_telegram_announcement(obj: models.Model) -> str:
+    """Build Telegram HTML announcement (``parse_mode=HTML``).
+
+    Allowed tags are Telegram's HTML subset only (``<b>``, ``<i>``, ``<a>``, …).
+    User content is HTML-escaped so CMS tags never leak into the channel.
+    Length fits ``sendPhoto`` caption (≤1024).
+
+    Args:
+        obj: Article or News instance.
+
+    Returns:
+        Multiline HTML string for ``sendMessage`` / ``sendPhoto`` caption.
+    """
+    title = html.escape((getattr(obj, "title", "") or "").strip())
+    excerpt = html.escape(_plain_excerpt(obj))
+    url = html.escape(_public_url(content_path(obj)))
+    if isinstance(obj, Article):
+        kind_emoji = "📄"
+        kind = "Статья"
+    else:
+        kind_emoji = "📰"
+        kind = "Новость"
+
+    footer = f'<a href="{url}">Читать на сайте →</a>'
+    header = f"{kind_emoji} <b>{kind}: {title}</b>"
+    # Reserve room for blank lines + footer inside caption limit.
+    budget = _TELEGRAM_CAPTION_MAX - len(header) - len(footer) - 4
+    if budget < 0:
+        budget = 0
+    if excerpt and len(excerpt) > budget:
+        excerpt = excerpt[: max(0, budget - 1)].rstrip() + "…"
+
+    lines = [header, ""]
+    if excerpt and budget > 0:
+        lines.extend([excerpt, ""])
+    lines.append(footer)
+    text = "\n".join(lines).strip()
+    if len(text) > _TELEGRAM_CAPTION_MAX:
+        text = text[: _TELEGRAM_CAPTION_MAX - 1].rstrip() + "…"
+    return text
+
+
+def content_cover_path(obj: models.Model) -> Path | None:
+    """Local filesystem path to Article/News cover when the file exists."""
+    cover = getattr(obj, "cover", None)
+    if cover is None or not getattr(cover, "name", None):
+        return None
+    try:
+        path = Path(cover.path)
+    except (ValueError, NotImplementedError, OSError):
+        return None
+    return path if path.is_file() else None
+
+
+def content_cover_url(obj: models.Model) -> str | None:
+    """Absolute public URL for Article/News cover (SITE_URL + /media/…)."""
+    cover = getattr(obj, "cover", None)
+    if cover is None or not getattr(cover, "name", None):
+        return None
+    try:
+        url = str(cover.url or "").strip()
+    except ValueError:
+        return None
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("//"):
+        return f"https:{url}"
+    path = url if url.startswith("/") else f"/{url}"
+    return f"{settings.SITE_URL.rstrip('/')}{path}"

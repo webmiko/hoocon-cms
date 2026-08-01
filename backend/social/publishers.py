@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -42,21 +45,96 @@ def _post_json(
     with urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:  # noqa: S310
         raw = response.read().decode("utf-8", errors="replace")
         status = getattr(response, "status", 200)
+    return int(status), _parse_json_dict(raw)
+
+
+def _parse_json_dict(raw: str) -> dict[str, Any]:
+    """Parse JSON object; wrap non-objects."""
     try:
         data = json.loads(raw) if raw else {}
     except json.JSONDecodeError:
-        data = {"raw": raw[:500]}
+        return {"raw": raw[:500]}
     if not isinstance(data, dict):
-        data = {"raw": data}
-    return int(status), data
+        return {"raw": data}
+    return data
 
 
-def publish_telegram(*, chat_id: str, text: str) -> PublishResult:
-    """Send message via Telegram Bot API.
+def _post_multipart(
+    url: str,
+    *,
+    fields: dict[str, str],
+    files: dict[str, tuple[str, bytes, str]],
+) -> tuple[int, dict[str, Any]]:
+    """POST multipart/form-data (Telegram file upload).
+
+    Args:
+        url: Endpoint URL.
+        fields: Text form fields.
+        files: ``name -> (filename, content, content_type)``.
+    """
+    boundary = f"----HooconBoundary{uuid.uuid4().hex}"
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.append(f"--{boundary}\r\n".encode())
+        chunks.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
+        chunks.append(value.encode("utf-8"))
+        chunks.append(b"\r\n")
+    for name, (filename, content, content_type) in files.items():
+        chunks.append(f"--{boundary}\r\n".encode())
+        chunks.append(
+            (
+                f'Content-Disposition: form-data; name="{name}"; '
+                f'filename="{filename}"\r\n'
+            ).encode()
+        )
+        chunks.append(f"Content-Type: {content_type}\r\n\r\n".encode())
+        chunks.append(content)
+        chunks.append(b"\r\n")
+    chunks.append(f"--{boundary}--\r\n".encode())
+    body = b"".join(chunks)
+    request = Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:  # noqa: S310
+        raw = response.read().decode("utf-8", errors="replace")
+        status = getattr(response, "status", 200)
+    return int(status), _parse_json_dict(raw)
+
+
+def _telegram_api_result(status: int, data: dict[str, Any]) -> PublishResult:
+    """Map Telegram Bot API JSON to PublishResult."""
+    if status >= 400 or not data.get("ok"):
+        desc = str(data.get("description") or data.get("raw") or status)[:300]
+        return PublishResult(ok=False, error=f"Telegram: {desc}")
+    result = data.get("result") if isinstance(data.get("result"), dict) else {}
+    mid = result.get("message_id", "") if isinstance(result, dict) else ""
+    return PublishResult(ok=True, external_id=str(mid))
+
+
+def publish_telegram(
+    *,
+    chat_id: str,
+    text: str,
+    photo_path: Path | str | None = None,
+    photo_url: str | None = None,
+) -> PublishResult:
+    """Send message (or cover photo + caption) via Telegram Bot API.
+
+    Prefer local ``photo_path`` (multipart ``sendPhoto``); else public
+    ``photo_url``; else plain ``sendMessage``. Caption / text uses HTML
+    parse_mode (Telegram HTML subset).
 
     Args:
         chat_id: Target chat / channel id.
-        text: Message body.
+        text: Message body or photo caption (HTML).
+        photo_path: Local cover file path when available.
+        photo_url: Absolute HTTPS URL Telegram can fetch.
 
     Returns:
         PublishResult with Telegram message_id when successful.
@@ -64,26 +142,85 @@ def publish_telegram(*, chat_id: str, text: str) -> PublishResult:
     token = telegram_bot_token()
     if not token or not chat_id.strip():
         return PublishResult(ok=False, skipped=True, error="Telegram не настроен")
+
+    chat = chat_id.strip()
+    path = Path(photo_path) if photo_path else None
+    if path is not None and path.is_file():
+        return _publish_telegram_photo_file(token, chat=chat, caption=text, path=path)
+    if photo_url and photo_url.strip():
+        return _publish_telegram_photo_url(token, chat=chat, caption=text, photo_url=photo_url.strip())
+    return _publish_telegram_message(token, chat=chat, text=text)
+
+
+def _publish_telegram_message(token: str, *, chat: str, text: str) -> PublishResult:
+    """Plain sendMessage with HTML parse_mode."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
         status, data = _post_json(
             url,
             payload={
-                "chat_id": chat_id.strip(),
+                "chat_id": chat,
                 "text": text,
+                "parse_mode": "HTML",
                 "disable_web_page_preview": False,
             },
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_publish_failed error=%s", type(exc).__name__)
         return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
+    return _telegram_api_result(status, data)
 
-    if status >= 400 or not data.get("ok"):
-        desc = str(data.get("description") or data.get("raw") or status)[:300]
-        return PublishResult(ok=False, error=f"Telegram: {desc}")
-    result = data.get("result") if isinstance(data.get("result"), dict) else {}
-    mid = result.get("message_id", "") if isinstance(result, dict) else ""
-    return PublishResult(ok=True, external_id=str(mid))
+
+def _publish_telegram_photo_url(
+    token: str,
+    *,
+    chat: str,
+    caption: str,
+    photo_url: str,
+) -> PublishResult:
+    """sendPhoto with a publicly reachable photo URL."""
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    try:
+        status, data = _post_json(
+            url,
+            payload={
+                "chat_id": chat,
+                "photo": photo_url,
+                "caption": caption,
+                "parse_mode": "HTML",
+            },
+        )
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("telegram_photo_url_failed error=%s", type(exc).__name__)
+        return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
+    return _telegram_api_result(status, data)
+
+
+def _publish_telegram_photo_file(
+    token: str,
+    *,
+    chat: str,
+    caption: str,
+    path: Path,
+) -> PublishResult:
+    """sendPhoto multipart upload from a local cover file."""
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    try:
+        content = path.read_bytes()
+        status, data = _post_multipart(
+            url,
+            fields={
+                "chat_id": chat,
+                "caption": caption,
+                "parse_mode": "HTML",
+            },
+            files={"photo": (path.name, content, content_type)},
+        )
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("telegram_photo_file_failed error=%s", type(exc).__name__)
+        return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
+    return _telegram_api_result(status, data)
 
 
 def publish_vk(*, group_id: str, text: str) -> PublishResult:

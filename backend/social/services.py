@@ -8,7 +8,12 @@ from collections.abc import Sequence
 from django.db import models, transaction
 
 from sitesettings.models import SiteSettings
-from social.compose import compose_announcement
+from social.compose import (
+    compose_announcement,
+    compose_telegram_announcement,
+    content_cover_path,
+    content_cover_url,
+)
 from social.models import SocialChannel, SocialPost, SocialPostStatus
 from social.publishers import PublishResult, publish_max, publish_telegram, publish_vk
 
@@ -40,10 +45,21 @@ def _already_sent(obj: models.Model, channel: SocialChannel) -> bool:
     ).exists()
 
 
-def _dispatch(channel: SocialChannel, site: SiteSettings, text: str) -> PublishResult:
+def _dispatch(
+    channel: SocialChannel,
+    site: SiteSettings,
+    text: str,
+    *,
+    obj: models.Model,
+) -> PublishResult:
     """Call the publisher for one channel."""
     if channel == SocialChannel.TELEGRAM:
-        return publish_telegram(chat_id=site.telegram_chat_id, text=text)
+        return publish_telegram(
+            chat_id=site.telegram_chat_id,
+            text=text,
+            photo_path=content_cover_path(obj),
+            photo_url=content_cover_url(obj),
+        )
     if channel == SocialChannel.VK:
         return publish_vk(group_id=site.vk_group_id, text=text)
     if channel == SocialChannel.MAX:
@@ -75,13 +91,17 @@ def announce_content(
     if not target:
         return []
 
-    text = compose_announcement(obj)
     created: list[SocialPost] = []
     ct = SocialPost.content_type_for(obj)
 
     for channel in target:
         if not force and _already_sent(obj, channel):
             continue
+        text = (
+            compose_telegram_announcement(obj)
+            if channel == SocialChannel.TELEGRAM
+            else compose_announcement(obj)
+        )
         post = SocialPost.objects.create(
             content_type=ct,
             object_id=obj.pk,
@@ -89,7 +109,7 @@ def announce_content(
             status=SocialPostStatus.PENDING,
             message_preview=text[:2000],
         )
-        result = _dispatch(channel, site, text)
+        result = _dispatch(channel, site, text, obj=obj)
         if result.skipped:
             post.mark_skipped(result.error or "skipped")
         elif result.ok:
