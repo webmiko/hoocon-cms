@@ -47,6 +47,12 @@ describe("sizeDiagramSrcForTheme", () => {
         "HVD24-20 | Монтажная схема",
       ),
     ).toBe(true);
+    expect(
+      isTechnicalDiagram(
+        "/media/x_tilda-dims.webp",
+        "схема размеров и подключения к сети для привода вентиляции Hoocon da8mqu",
+      ),
+    ).toBe(true);
     expect(isTechnicalDiagram("/media/x-0.webp", "product photo")).toBe(false);
   });
 

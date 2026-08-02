@@ -51,6 +51,9 @@ export function isTechnicalDiagram(src: string, alt?: string): boolean {
     label.includes("настройка") ||
     label.includes("габаритные размеры") ||
     label.includes("чертёж") ||
+    // Tilda alts: «схема размеров и подключения к сети …»
+    (label.includes("схема") &&
+      (label.includes("размер") || label.includes("подключ"))) ||
     (label.includes("термодатчик") && label.includes("схема"))
   );
 }
