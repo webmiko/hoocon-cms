@@ -25,6 +25,20 @@ def test_build_damqu_analogs_major_brands_only() -> None:
         assert ban not in text
 
 
+def test_build_damqu_analogs_distinct_belimo_by_nm() -> None:
+    """5/8/16/24 Нм map to LMQ / NMQ / SMQ / GMQ — never share one Belimo family."""
+    from catalog.etl.series_copy_major_analogs import belimo_fast_family
+
+    assert belimo_fast_family(5) == "LMQ"
+    assert belimo_fast_family(8) == "NMQ"
+    assert belimo_fast_family(16) == "SMQ"
+    assert belimo_fast_family(24) == "GMQ"
+    assert "Belimo SMQ24A-SR" in build_damqu_analogs(16)
+    assert "Belimo GMQ24A-SR" in build_damqu_analogs(24)
+    assert "Belimo NMQ24A-SR" not in build_damqu_analogs(16)
+    assert "Belimo NMQ24A-SR" not in build_damqu_analogs(24)
+
+
 def test_build_sa7mu_and_hvd_include_belimo() -> None:
     """Smoke SA7 and HVD air lists include Belimo BEE / LM families."""
     sa = build_sa7mu_analogs()

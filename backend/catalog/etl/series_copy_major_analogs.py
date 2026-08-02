@@ -38,13 +38,30 @@ _BELIMO_AIR: Final[dict[int, str]] = {
 }
 
 # Belimo quick-running (HVA-Q / DAMQU / HVD-Q).
+# Official Q rotary bands: LMQ≈4, NMQ≈8, SMQ≈16 Нм; no 24 Нм Q → GMQ class.
 _BELIMO_FAST: Final[dict[int, str]] = {
     5: "LMQ",
     8: "NMQ",
     10: "NMQ",
+    16: "SMQ",
     20: "SMQ",
+    24: "GMQ",
     40: "GMQ",
 }
+
+
+def belimo_fast_family(nm: int) -> str:
+    """Belimo Q-series letters for a torque (never collapse 16/24 onto NMQ)."""
+    if nm in _BELIMO_FAST:
+        return _BELIMO_FAST[nm]
+    if nm <= 6:
+        return "LMQ"
+    if nm <= 12:
+        return "NMQ"
+    if nm <= 20:
+        return "SMQ"
+    return "GMQ"
+
 
 # Siemens OpenAir (on/off base; modulating → …61).
 _SIEMENS_AIR: Final[dict[int, str]] = {
@@ -128,7 +145,7 @@ def _lines_major_air(
     fast: bool,
 ) -> list[str]:
     """Bullet lines for one edition (major brands only)."""
-    family = (_BELIMO_FAST if fast else _BELIMO_AIR).get(nm) or ("NMQ" if fast else "NM")
+    family = belimo_fast_family(nm) if fast else (_BELIMO_AIR.get(nm) or "NM")
     siemens = _SIEMENS_AIR.get(nm, "GLB")
     lines = [
         f"– {_belimo_air(family, voltage, modulating=modulating, aux=aux)}",
@@ -327,7 +344,7 @@ def build_qx_analogs(brand: str, nm: int) -> str:
             s = "S" if aux else ""
             code = f"{brand_u}{voltage}{s}-{nm}QX"
             blocks.append(f"{code} ({voltage} В):")
-            fam = _BELIMO_FAST.get(nm) or "NMQ"
+            fam = belimo_fast_family(nm)
             # Belimo electronic fail-safe: same family class; confirm SuperCap docs.
             bel = _belimo_air(fam, voltage, modulating=modulating, aux=aux)
             blocks.append(f"– {bel} (класс; уточняйте Fail-Safe / SuperCap)")

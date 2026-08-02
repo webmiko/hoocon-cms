@@ -254,7 +254,7 @@ def test_detect_purpose_hvd_is_fire_spring() -> None:
 
 
 def test_infer_fast_actuator() -> None:
-    """Accelerated DA8MQU / HVA → NMQ / BM families."""
+    """Accelerated DAMQU / HVA → L/N/S/GMQ / BM by torque band."""
     assert infer_belimo_codes(
         purpose="fast",
         moment_nm=8.0,
@@ -262,6 +262,20 @@ def test_infer_fast_actuator() -> None:
         control="modulating",
         aux_spdt=2,
     ) == ["NMQ24A-SR-S"]
+    assert infer_belimo_codes(
+        purpose="fast",
+        moment_nm=16.0,
+        voltage="24",
+        control="modulating",
+        aux_spdt=0,
+    ) == ["SMQ24A-SR"]
+    assert infer_belimo_codes(
+        purpose="fast",
+        moment_nm=24.0,
+        voltage="230",
+        control="on_off",
+        aux_spdt=1,
+    ) == ["GMQ230A-S"]
     assert infer_belimo_codes(
         purpose="fast",
         moment_nm=5.0,

@@ -198,9 +198,14 @@ def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
             return "BFN"
         return "BFS"
     if purpose == "fast":
+        # HVA compact uses BM compose path for ≤6; DAMQU/HVD-Q use L/N/S/GMQ.
         if moment_nm <= 6:
             return "BM"
-        return "NMQ"
+        if moment_nm <= 12:
+            return "NMQ"
+        if moment_nm <= 20:
+            return "SMQ"
+        return "GMQ"
     if purpose == "smoke":
         return "CM"
     return None
@@ -226,8 +231,8 @@ def _compose_belimo_article(
         # CM24-L/R style from smoke-removal cards.
         return f"CM{voltage}-L/R"
 
-    if purpose == "fast" and family == "NMQ":
-        code = f"NMQ{voltage}A"
+    if purpose == "fast" and family in {"LMQ", "NMQ", "SMQ", "GMQ"}:
+        code = f"{family}{voltage}A"
         if modulating:
             code += "-SR"
         if aux_spdt >= 1:
