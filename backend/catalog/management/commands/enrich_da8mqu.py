@@ -6,6 +6,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
+from catalog.etl.belimo_analogs import primary_belimo_code_for_sku
 from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
 from catalog.etl.manual_pdfs import clone_damqu_manuals_from_donor
 from catalog.etl.media_webp_extras import demote_tilda_montages_where_local_exists
@@ -14,6 +15,7 @@ from catalog.etl.series_copy_damqu import (
     retire_damqu_noncanonical_nm,
 )
 from catalog.etl.series_copy_major_analogs import apply_major_analogs_enrichment
+from catalog.models import SKU
 
 
 class Command(BaseCommand):
@@ -75,5 +77,28 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"{prefix}major analogs: products={analogs['products']}, "
                 f"skus={analogs['skus']}, skipped_filled={analogs['skipped_filled']}",
+            ),
+        )
+        belimo_n = 0
+        damqu = (
+            SKU.objects.filter(sku_code__iregex=r"(?i)^da\d+mqu", is_published=True)
+            .select_related("product", "product__category")
+            .prefetch_related("attribute_values__attribute")
+            .order_by("sku_code")
+        )
+        for sku in damqu:
+            primary = primary_belimo_code_for_sku(sku)
+            if not primary:
+                continue
+            current = (sku.analog_belimo_code or "").strip()
+            if current.casefold() == primary.casefold():
+                continue
+            belimo_n += 1
+            if not dry_run:
+                sku.analog_belimo_code = primary
+                sku.save(update_fields=["analog_belimo_code"])
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix}DAMQU Belimo card codes: updated={belimo_n}",
             ),
         )
