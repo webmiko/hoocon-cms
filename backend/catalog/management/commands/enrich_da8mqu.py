@@ -13,6 +13,7 @@ from catalog.etl.series_copy_damqu import (
     apply_damqu_enrichment,
     retire_damqu_noncanonical_nm,
 )
+from catalog.etl.series_copy_major_analogs import apply_major_analogs_enrichment
 
 
 class Command(BaseCommand):
@@ -67,5 +68,12 @@ class Command(BaseCommand):
                 f"{prefix}DAMQU manuals from DA8 → 16/24: "
                 f"targets={manuals['targets']}, created={manuals['created']}, "
                 f"updated={manuals['updated']}, skipped={manuals['skipped']}",
+            ),
+        )
+        analogs = apply_major_analogs_enrichment(dry_run=dry_run, force=False)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix}major analogs: products={analogs['products']}, "
+                f"skus={analogs['skus']}, skipped_filled={analogs['skipped_filled']}",
             ),
         )
