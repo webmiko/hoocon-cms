@@ -17,6 +17,15 @@ from catalog.etl.sku_variant import (
 _Builder = Callable[[str], str | None]
 
 
+def damper_area_for_nm(nm: int | float) -> str:
+    """Catalog rule of thumb: ~10 N·m per m² → ``до N м²``.
+
+    Examples: 5 Нм → ``до 0,5 м²``; 10 Нм → ``до 1,0 м²``; 24 Нм → ``до 2,4 м²``.
+    """
+    area = float(nm) / 10.0
+    return f"до {area:.1f} м²".replace(".", ",")
+
+
 def format_damper_area(raw: str) -> str:
     """Canonical damper-area phrase for prose: always ``до N м²``."""
     from catalog.facets.normalize import normalize_area_attribute_value

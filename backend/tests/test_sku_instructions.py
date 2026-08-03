@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from catalog.etl.sku_instructions import instructions_for_sku
+from catalog.etl.sku_instructions import damper_area_for_nm, instructions_for_sku
+
+
+def test_damper_area_for_nm_is_nm_over_ten() -> None:
+    """Catalog rule of thumb: площадь заслонки ≈ Нм / 10."""
+    assert damper_area_for_nm(3) == "до 0,3 м²"
+    assert damper_area_for_nm(5) == "до 0,5 м²"
+    assert damper_area_for_nm(10) == "до 1,0 м²"
+    assert damper_area_for_nm(20) == "до 2,0 м²"
+    assert damper_area_for_nm(24) == "до 2,4 м²"
 
 
 def test_instructions_for_sku_covers_main_actuator_series() -> None:
