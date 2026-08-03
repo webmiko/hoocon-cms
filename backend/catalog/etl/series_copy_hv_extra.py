@@ -287,6 +287,7 @@ def _attach_hvd_folder_media(
     nm: int,
     fast_q: bool,
     dry_run: bool,
+    include_dimensions: bool = True,
 ) -> dict[str, int]:
     root = _photo_root()
     counts = {"created": 0, "updated": 0}
@@ -320,7 +321,7 @@ def _attach_hvd_folder_media(
     from catalog.etl.hva_local_media import _best_raster
 
     product = _best_raster(product_candidates, min_edge=600)
-    dims = _best_raster(dim_candidates, min_edge=400)
+    dims = _best_raster(dim_candidates, min_edge=400) if include_dimensions else None
     wiring = None
     for name in ("hvd-cxema-on-off.webp", f"hvd-{nm}-cxema.webp", "hvd-5-cxema.webp"):
         for base in (folder, root / "hvd-5", root / "hvd-10"):
@@ -617,7 +618,14 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
             )
             summary["skus"] += 1
             if with_media and brand == "HVD":
-                media = _attach_hvd_folder_media(sku, nm=nm, fast_q=True, dry_run=dry_run)
+                # Product/wiring only — dimensions from ``attach_hv_catalog_dimensions``.
+                media = _attach_hvd_folder_media(
+                    sku,
+                    nm=nm,
+                    fast_q=True,
+                    dry_run=dry_run,
+                    include_dimensions=False,
+                )
                 summary["media_created"] += media.get("created", 0)
                 summary["media_updated"] += media.get("updated", 0)
 
@@ -628,6 +636,9 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
         "skipped": manuals.get("skipped", 0),
         "warnings": manuals.get("warnings") or [],
     }
+    from catalog.etl.hv_catalog_dimensions import apply_hv_catalog_dimensions
+
+    summary["catalog_dimensions"] = apply_hv_catalog_dimensions(dry_run=dry_run)
     if with_media:
         from catalog.etl.hva_local_media import apply_hva_local_media
 
@@ -635,4 +646,6 @@ def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False
         hva_media = apply_hva_local_media(dry_run=dry_run)
         summary["media_created"] += hva_media.get("created", 0)
         summary["media_updated"] += hva_media.get("updated", 0)
+        # Re-run after HVA local media so pack razmer cannot win over catalog crops.
+        summary["catalog_dimensions"] = apply_hv_catalog_dimensions(dry_run=dry_run)
     return summary

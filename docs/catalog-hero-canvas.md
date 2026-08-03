@@ -130,6 +130,7 @@ ssh hoocon-prod 'cd /opt/hoocon && docker compose exec -T web bash -lc "
   python manage.py attach_ball_valve_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_hv_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_hv_sku_media --root /app/media/_pack/hv-sku
+  python manage.py attach_hv_catalog_dimensions
   python manage.py attach_da_sa_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_manual_diagrams --series hvdf
 "'
