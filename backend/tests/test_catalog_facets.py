@@ -559,7 +559,7 @@ def test_format_aux_switch_display_hides_absent() -> None:
         format_aux_switch_display,
         normalize_aux_switch_value,
     )
-    from catalog.facets.aux import aux_spdt_count_from_sku
+    from catalog.facets.aux import _looks_like_aux_value, aux_spdt_count_from_sku
 
     assert format_aux_switch_display("Нет") is None
     assert format_aux_switch_display("Да", sku_code="da5fu24-as") == AUX_SWITCH_SPDT_2
@@ -586,8 +586,6 @@ def test_format_aux_switch_display_hides_absent() -> None:
     assert normalize_aux_switch_value("SPDT-2", sku_code="DA2MU230-AS") == AUX_SWITCH_SPDT_1
     assert normalize_aux_switch_value("SPDT-1", sku_code="DA8MU24-AS") == AUX_SWITCH_SPDT_2
     # Edge branches: MQU/EU/H8205 unknowns, generic -as/-dst/-ds/-d, normalize fallbacks.
-    from catalog.facets.aux import _looks_like_aux_value
-
     assert _looks_like_aux_value("") is False
     assert aux_spdt_count_from_sku("H8205-LAV-odd") is None
     assert aux_spdt_count_from_sku("DA4MQU24-A") == 0
