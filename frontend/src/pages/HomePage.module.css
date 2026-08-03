@@ -396,30 +396,36 @@
   container-name: directions-inner;
 }
 
+/* Default / ≤1114px band: snap carousel. Grid override after slide sizing. */
 .directionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-lg);
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 7%;
+  padding-block: var(--space-xs);
+  padding-inline: 7%;
+  margin-inline: calc(-1 * var(--space-md));
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
 
-/* Wide home band (~1114px+): four product pillars per row. */
-@container directions-inner (min-width: 1114px) {
-  .directionGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .directionBlock {
-    min-height: 280px;
-  }
+.directionGrid::-webkit-scrollbar {
+  display: none;
 }
 
 .directionBlock {
   display: flex;
   flex-direction: column;
+  flex: 0 0 86%;
+  width: 86%;
+  max-width: 86%;
   min-width: 0;
   min-height: 320px;
   padding: 0;
   overflow: hidden;
+  scroll-snap-align: center;
   background: var(--glass-bg-strong);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -429,8 +435,17 @@
   color: var(--color-text);
   box-shadow: var(--shadow-soft);
   animation: rise 0.7s var(--ease-out) both;
-  transition: border-color var(--transition), box-shadow var(--transition),
+  transition: opacity 0.28s var(--ease-out, ease),
+    border-color var(--transition), box-shadow var(--transition),
     transform var(--transition-fast), background-color var(--transition);
+}
+
+.directionBlockPeek {
+  opacity: 0.42;
+}
+
+.directionBlockActive {
+  opacity: 1;
 }
 
 .directionBlock:hover {
@@ -453,7 +468,6 @@
   padding: var(--space-md) var(--space-lg);
   box-sizing: border-box;
   background: var(--photo-wash);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .directionImage,
@@ -899,46 +913,7 @@
   }
 }
 
-/* Snap carousel: one active card + translucent side peeks. */
-@media (max-width: 920px) {
-  .directionGrid {
-    display: flex;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 7%;
-    gap: var(--space-md);
-    padding-block: var(--space-xs);
-    padding-inline: 7%;
-    margin-inline: calc(-1 * var(--space-md));
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .directionGrid::-webkit-scrollbar {
-    display: none;
-  }
-
-  .directionBlock {
-    flex: 0 0 86%;
-    width: 86%;
-    max-width: 86%;
-    min-height: 280px;
-    scroll-snap-align: center;
-    opacity: 1;
-    transition: opacity 0.28s var(--ease-out, ease),
-      transform var(--transition-fast), border-color var(--transition),
-      box-shadow var(--transition), background-color var(--transition);
-  }
-
-  .directionBlockPeek {
-    opacity: 0.42;
-  }
-
-  .directionBlockActive {
-    opacity: 1;
-  }
-
+@container directions-inner (max-width: 1114px) {
   .directionBody {
     padding: var(--space-md);
   }
@@ -953,7 +928,7 @@
   }
 }
 
-@media (min-width: 760px) and (max-width: 920px) {
+@container directions-inner (min-width: 760px) and (max-width: 1114px) {
   .directionGrid {
     scroll-padding-inline: 6%;
     padding-inline: 6%;
@@ -963,6 +938,49 @@
     flex: 0 0 47%;
     width: 47%;
     max-width: 47%;
+  }
+}
+
+@container directions-inner (min-width: 980px) and (max-width: 1114px) {
+  .directionGrid {
+    scroll-padding-inline: 4%;
+    padding-inline: 4%;
+  }
+
+  .directionBlock {
+    flex: 0 0 31%;
+    width: 31%;
+    max-width: 31%;
+  }
+}
+
+/* Wide home band (>1114px): four product pillars per row. */
+@container directions-inner (min-width: 1115px) {
+  .directionGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-lg);
+    overflow: visible;
+    overscroll-behavior-x: auto;
+    scroll-snap-type: none;
+    scroll-padding-inline: 0;
+    padding-block: 0;
+    padding-inline: 0;
+    margin-inline: 0;
+  }
+
+  .directionBlock {
+    flex: unset;
+    width: auto;
+    max-width: none;
+    min-height: 280px;
+    scroll-snap-align: unset;
+    opacity: 1;
+  }
+
+  .directionBlockPeek,
+  .directionBlockActive {
+    opacity: 1;
   }
 }
 

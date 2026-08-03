@@ -5,7 +5,8 @@ import { softBreak } from "../utils/softBreak";
 import { catalogCategoryPath } from "../utils/catalogPaths";
 import styles from "../pages/HomePage.module.css";
 
-const CAROUSEL_MQ = "(max-width: 920px)";
+/** Match ``@container directions-inner``: carousel at ≤1114px, 4-up grid above. */
+const CAROUSEL_MAX_PX = 1114;
 
 export type DirectionCategory = {
   slug: string;
@@ -25,8 +26,8 @@ type DirectionsCategoryGridProps = {
 };
 
 /**
- * Category pillars: CSS grid on wide screens; snap carousel ≤920px
- * with one active card and translucent side peeks.
+ * Category pillars: 4-up grid when the directions band is wider than 1114px;
+ * snap carousel at that width and below (opaque fully-in-view cards + peeks).
  */
 export function DirectionsCategoryGrid({
   categories,
@@ -34,16 +35,24 @@ export function DirectionsCategoryGrid({
   DirectionCardImage,
 }: DirectionsCategoryGridProps) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [carousel, setCarousel] = useState(false);
+  const [carousel, setCarousel] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [trackWidth, setTrackWidth] = useState(0);
 
   useEffect(() => {
-    const mq = window.matchMedia(CAROUSEL_MQ);
-    const sync = () => setCarousel(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    const root = trackRef.current;
+    if (!root) return;
+    const band = root.parentElement ?? root;
+
+    const syncMode = () => {
+      const w = band.clientWidth;
+      setCarousel(w <= CAROUSEL_MAX_PX);
+    };
+
+    syncMode();
+    const ro = new ResizeObserver(syncMode);
+    ro.observe(band);
+    return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
@@ -90,7 +99,8 @@ export function DirectionsCategoryGrid({
     };
   }, [carousel, categories.length]);
 
-  const focusCount = carousel && trackWidth >= 840 ? 2 : 1;
+  const focusCount =
+    carousel && trackWidth >= 980 ? 3 : carousel && trackWidth >= 760 ? 2 : 1;
   const activeWindowStart =
     focusCount === 1
       ? activeIndex
