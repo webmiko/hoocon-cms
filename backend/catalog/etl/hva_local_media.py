@@ -39,8 +39,7 @@ logger = logging.getLogger(__name__)
 _SOURCE_URL = "https://hoocon.ru/.local-assets/hva-catalog/hva{nm}{fast}-{kind}.webp"
 _QX_RE = re.compile(r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)qx$")
 SORT_PRODUCT: Final[int] = 0
-# Keep below wiring(5) / AI-catalog dims(8) so gallery order is photo → schema → razmer → AI.
-SORT_LOCAL_DIMENSIONS: Final[int] = 6
+# Wiring stays at 5; dimensions come from ``attach_hv_catalog_dimensions`` (sort=6).
 
 _CANDIDATE_ROOTS: Final[tuple[Path, ...]] = (
     Path.home() / "Yandex.Disk.localized/фото для сайта/архив/foto/HV seria",
@@ -225,18 +224,13 @@ def apply_hva_local_media(
         jobs: list[tuple[str, str, int, Path | None]] = [
             ("product", f"{label} | фото привода", SORT_PRODUCT, paths["product"]),
             (
-                "dimensions",
-                f"{label} | Габаритные размеры привода (мм)",
-                SORT_LOCAL_DIMENSIONS,
-                paths["dimensions"],
-            ),
-            (
                 "wiring",
                 f"{label} | Схема подключения",
                 SORT_WIRING,
                 paths["wiring"],
             ),
         ]
+        # Dimension drawings: ``attach_hv_catalog_dimensions`` (RU 2025 catalog).
         attached_any = False
         for kind, alt, sort_order, path in jobs:
             if path is None or not path.is_file():

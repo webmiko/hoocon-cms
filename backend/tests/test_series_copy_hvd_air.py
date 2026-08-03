@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import pytest
 
-from catalog.etl.series_copy_hvd_air import apply_hvd_air_enrichment
+from catalog.etl.series_copy_hvd_air import TORQUE_SPECS, apply_hvd_air_enrichment
 from catalog.facets.aux import aux_spdt_count_from_sku
 from catalog.facets.highlights import highlights_for_sku
 from catalog.models import SKU, AttributeValue, Category, Product
 from catalog.sku_access import sku_attribute_values, sku_category_slug_or_empty
+
+
+def test_hvd_air_dimensions_match_catalog_2025() -> None:
+    """Catalog pp. 39/41/43/45: H×W×D envelopes for HVD air (no spring)."""
+    assert TORQUE_SPECS[5]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert TORQUE_SPECS[10]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert TORQUE_SPECS[20]["dimensions"] == "191,8 × 103,4 × 68 мм"
+    assert TORQUE_SPECS[40]["dimensions"] == "198,6 × 110,2 × 68 мм"
 
 
 def test_aux_spdt_count_daeu_ds_is_two() -> None:

@@ -1725,16 +1725,16 @@ _HVA_CATALOG_PAGE: Final[dict[tuple[int, bool], int]] = {
     (20, True): 6,
     (40, True): 7,
 }
-# Envelope W × H × D from left-column «Размеры привода» drawings / datasheet.
+# Envelope H × W × D from catalog 2025 «Размеры привода» (same order as HVD air).
 _HVA_ENVELOPE_MM: Final[dict[tuple[int, bool], str]] = {
-    (5, False): "71,1 × 144,1 × 62,1 мм",
-    (5, True): "71,1 × 141,1 × 62,1 мм",
-    (10, False): "167,8 × 88,2 × 68 мм",
+    (5, False): "144,1 × 71,1 × 62,1 мм",
+    (5, True): "144,1 × 71,1 × 62,1 мм",
+    (10, False): "167,8 × 86,2 × 68 мм",
     (10, True): "167,8 × 86,2 × 68 мм",
     (20, False): "191,8 × 103,4 × 68 мм",
     (20, True): "191,8 × 103,4 × 68 мм",
-    (40, False): "180,8 × 99 × 68 мм",
-    (40, True): "198,6 × 104 × 68 мм",
+    (40, False): "198,6 × 110,2 × 68 мм",
+    (40, True): "198,6 × 110,2 × 68 мм",
 }
 # Datasheet Weight row per Nm/fast family (shared by all SKUs of that family).
 _HVA_WEIGHT: Final[dict[tuple[int, bool], str]] = {
