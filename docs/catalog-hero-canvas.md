@@ -43,6 +43,7 @@
 |-------|----------|--------------|--------|
 | Brass 8100 | Yandex `…/media-webp/` | `2-WAY BRASS DNxx.webp`, `3-WAY …` | `attach_ball_valve_media_webp` |
 | HVA/HVD air | тот же `media-webp/` | `hva-5.webp` … `hvd-40qx.webp` | `attach_hv_media_webp` |
+| HVA/HVD per-SKU | Yandex `弹簧复位产品/` | perspective PNG; else frontal PNG/TIFF | `attach_hv_sku_media` |
 | HVD-…F | PDF manuals → ETL | `hvd-{3,5}f-photo(.webp)` | `attach_manual_diagrams --series hvdf` |
 | DA/SA | тот же `media-webp/` | `da8:16:24mu24-d:ds.webp`, `sa5fu-ds.webp`, … | `attach_da_sa_media_webp` |
 | H81 / H8205 | JPEG embeds каталога шаровых | `img_0019…` / `img_0024…` | `attach_manual_diagrams --series h81` + `enrich_ball_valves` (H8205) |
@@ -122,10 +123,13 @@ Pack-файлы **не в git** — отдельно:
 ```bash
 rsync -az "~/Yandex.Disk.localized/фото для сайта/media-webp/" \
   "hoocon-prod:/var/www/hoocon/media/_pack/media-webp/"
+rsync -az "~/Yandex.Disk.localized/фото для сайта/弹簧复位产品/" \
+  "hoocon-prod:/var/www/hoocon/media/_pack/hv-sku/"
 
 ssh hoocon-prod 'cd /opt/hoocon && docker compose exec -T web bash -lc "
   python manage.py attach_ball_valve_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_hv_media_webp --root /app/media/_pack/media-webp
+  python manage.py attach_hv_sku_media --root /app/media/_pack/hv-sku
   python manage.py attach_da_sa_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_manual_diagrams --series hvdf
 "'
