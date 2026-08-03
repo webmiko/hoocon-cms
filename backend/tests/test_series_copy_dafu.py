@@ -203,8 +203,13 @@ def test_dafu_all_aux_editions_are_spdt_2() -> None:
         "da10fu24-as",
         "da10fu24-ds",
         "da20fu230-ds",
+        "da5fu24-as-aux",
+        "da5fu24-ds-aux",
     ):
         assert aux_spdt_count_from_sku(code) == 2, code
+    assert aux_spdt_count_from_sku("da5fu24-a") == 0
+    assert aux_spdt_count_from_sku("da5fu230-d") == 0
+    assert aux_spdt_count_from_sku("da5fu") is None
 
     cat, _ = Category.objects.get_or_create(
         slug="elektroprivody-s-pruzhinnym-vozvratom",
