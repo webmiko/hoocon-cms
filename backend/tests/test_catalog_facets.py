@@ -563,7 +563,9 @@ def test_format_aux_switch_display_hides_absent() -> None:
 
     assert format_aux_switch_display("Нет") is None
     assert format_aux_switch_display("Да", sku_code="da5fu24-as") == AUX_SWITCH_SPDT_2
-    assert format_aux_switch_display("Да", sku_code="da5fu24-ds") == AUX_SWITCH_SPDT_1
+    assert format_aux_switch_display("Да", sku_code="da5fu24-ds") == AUX_SWITCH_SPDT_2
+    assert format_aux_switch_display("Да", sku_code="da10fu24-as") == AUX_SWITCH_SPDT_2
+    assert format_aux_switch_display("Да", sku_code="da10fu24-ds") == AUX_SWITCH_SPDT_2
     assert format_aux_switch_display("Да", description="1 SPDT") == AUX_SWITCH_SPDT_1
     assert format_aux_switch_display("2 SPDT") == AUX_SWITCH_SPDT_2
     assert normalize_aux_switch_value("Да", sku_code="da5fu24-d") == "Нет"
@@ -590,7 +592,6 @@ def test_highlights_aux_switch_shows_none_spdt() -> None:
     """Catalog cards always show aux as Нет / SPDT-1 / SPDT-2."""
     from catalog.facets import (
         AUX_SWITCH_NONE,
-        AUX_SWITCH_SPDT_1,
         AUX_SWITCH_SPDT_2,
         highlights_for_sku,
     )
@@ -611,7 +612,7 @@ def test_highlights_aux_switch_shows_none_spdt() -> None:
 
     cases = (
         ("da3fu230-d", AUX_SWITCH_NONE, AUX_SWITCH_NONE),
-        ("da3fu230-ds", "SPDT-1", AUX_SWITCH_SPDT_1),
+        ("da3fu230-ds", "SPDT-2", AUX_SWITCH_SPDT_2),
         ("da5fu24-as", "SPDT-2", AUX_SWITCH_SPDT_2),
     )
     for sku_code, stored, expected in cases:
@@ -638,21 +639,21 @@ def test_highlights_aux_switch_shows_none_spdt() -> None:
 @pytest.mark.django_db
 def test_highlights_aux_switch_injected_from_sku_code() -> None:
     """Missing aux EAV still yields a card row from the edition suffix."""
-    from catalog.facets import AUX_SWITCH_SPDT_1, highlights_for_sku
+    from catalog.facets import AUX_SWITCH_SPDT_2, highlights_for_sku
     from catalog.models import SKU, Category, Product
 
     cat = Category.objects.create(name="FU", slug="fu-aux-inject")
     product = Product.objects.create(name="DA", slug="da-aux-inject", category=cat)
     sku = SKU.objects.create(
         product=product,
-        name="da3fu230-ds",
+        name="da5fu230-ds",
         slug="hl-inject-ds",
-        sku_code="da3fu230-ds",
+        sku_code="da5fu230-ds",
         is_published=True,
     )
     rows = highlights_for_sku([], limit=8, sku_code=sku.sku_code)
     by_key = {r["key"]: r for r in rows}
-    assert by_key["aux_switch"]["value"] == AUX_SWITCH_SPDT_1
+    assert by_key["aux_switch"]["value"] == AUX_SWITCH_SPDT_2
 
 
 @pytest.mark.django_db
@@ -695,8 +696,8 @@ def test_facets_aux_switch_spdt_only(client) -> None:
     product = Product.objects.create(name="DA", slug="da-aux", category=cat)
     specs = (
         ("da-aux-none", "da5fu24-d-aux", "Нет"),
-        ("da-aux-ds", "da5fu24-ds-aux", "Да"),
-        ("da-aux-as", "da5fu24-as-aux", "Да"),
+        ("da-aux-ds", "DA2MU24-DS", "Да"),
+        ("da-aux-as", "da10fu24-as-aux", "Да"),
     )
     attr = Attribute.objects.create(
         name="Вспомогательный переключатель",

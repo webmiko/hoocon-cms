@@ -206,7 +206,7 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 Управление по исполнению:
 – Открыто/закрыто: суффиксы -D / -DS.
 – Пропорциональное (модулирующее) 0(2)…10 В=: суффиксы -A / -AS (24 В).
-– Вспомогательный переключатель: суффиксы -DS / -AS.
+– Вспомогательный переключатель: 2 SPDT (суффиксы -DS / -AS).
 """.strip(),
 )
 
@@ -272,6 +272,7 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
             ("– Подключите питание 24 В и сигнальный кабель Y / U к клеммам по схеме в инструкции."),
             "",
             "Вспомогательные переключатели (-DS / -AS):",
+            "– Исполнения -DS / -AS: 2 SPDT.",
             "– Используйте контакты для индикации положения в системе управления зданием.",
             "",
             "4. Настройка направления вращения",
@@ -479,7 +480,11 @@ def _sku_description(variant: SkuVariant, torque_nm: int, spec: _TorqueSpec) -> 
     elif variant.control == "on_off":
         lines.append("Управление: открыто/закрыто.")
     if variant.aux_switch is True:
-        lines.append("Вспомогательный переключатель: 1 SPDT (исполнение DS/AS).")
+        from catalog.facets.aux import aux_spdt_count_from_sku
+
+        count = aux_spdt_count_from_sku(variant.code) or 1
+        edition = "AS" if (variant.code or "").casefold().endswith("-as") else "DS"
+        lines.append(f"Вспомогательный переключатель: {count} SPDT (исполнение {edition}).")
     if variant.voltage == "24":
         lines.append("Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
     elif variant.voltage == "230":

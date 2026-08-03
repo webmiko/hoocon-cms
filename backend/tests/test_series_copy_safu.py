@@ -25,11 +25,14 @@ def test_parse_safu_torque_nm() -> None:
 
 
 def test_safu_aux_spdt_is_two() -> None:
+    # DAFU: all -DS/-AS are SPDT-2.
     assert aux_spdt_count_from_sku("sa3fu24-ds") == 2
     assert aux_spdt_count_from_sku("sa5fu230-dst") == 2
     assert normalize_aux_switch_value("SPDT-1", sku_code="sa3fu24-ds") == AUX_SWITCH_SPDT_2
-    # DAFU DS remains SPDT-1.
-    assert aux_spdt_count_from_sku("da5fu24-ds") == 1
+    assert aux_spdt_count_from_sku("da5fu24-ds") == 2
+    assert aux_spdt_count_from_sku("da5fu24-as") == 2
+    assert aux_spdt_count_from_sku("da10fu24-ds") == 2
+    assert aux_spdt_count_from_sku("da3fu24-ds") == 2
 
 
 def test_shared_attrs_manual_override_button() -> None:

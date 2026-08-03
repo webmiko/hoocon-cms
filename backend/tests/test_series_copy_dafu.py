@@ -179,6 +179,8 @@ def test_series_instructions_align_with_shared_attrs() -> None:
     assert "PE" in SERIES_INSTRUCTIONS
     assert "L и N" in SERIES_INSTRUCTIONS
     assert "L, N, PE" not in SERIES_INSTRUCTIONS
+    # Aux: all DA..FU -DS/-AS = 2 SPDT.
+    assert "-DS / -AS: 2 SPDT" in SERIES_INSTRUCTIONS
     # One physical line per bullet — no indented soft-wrap orphans.
     for line in SERIES_INSTRUCTIONS.splitlines():
         assert not line.startswith("  "), line
@@ -186,3 +188,54 @@ def test_series_instructions_align_with_shared_attrs() -> None:
     tools = [line for line in SERIES_INSTRUCTIONS.splitlines() if "мультиметр" in line or "Ключи для фиксации" in line]
     assert len(tools) == 1
     assert "Ключи" in tools[0] and "мультиметр" in tools[0]
+
+
+@pytest.mark.django_db
+def test_dafu_all_aux_editions_are_spdt_2() -> None:
+    """All DA..FU -DS/-AS editions are SPDT-2 (including DA5FU)."""
+    from catalog.facets.aux import AUX_SWITCH_SPDT_2, aux_spdt_count_from_sku
+
+    for code in (
+        "da5fu24-as",
+        "da5fu24-ds",
+        "da5fu230-ds",
+        "da3fu24-ds",
+        "da10fu24-as",
+        "da10fu24-ds",
+        "da20fu230-ds",
+    ):
+        assert aux_spdt_count_from_sku(code) == 2, code
+
+    cat, _ = Category.objects.get_or_create(
+        slug="elektroprivody-s-pruzhinnym-vozvratom",
+        defaults={"name": "Пружина"},
+    )
+    p5, _ = Product.objects.get_or_create(
+        slug="privod-vozdushniy-pruzhina-dafu-5nm",
+        defaults={"name": "DA5FU", "category": cat},
+    )
+    p10, _ = Product.objects.get_or_create(
+        slug="privod-vozdushniy-pruzhina-dafu-10nm",
+        defaults={"name": "DA10FU", "category": cat},
+    )
+    for code, slug, product in (
+        ("DA5FU24-AS", "da5fu24-as", p5),
+        ("DA5FU24-DS", "da5fu24-ds", p5),
+        ("DA10FU24-AS", "da10fu24-as", p10),
+        ("DA10FU24-DS", "da10fu24-ds", p10),
+    ):
+        SKU.objects.update_or_create(
+            sku_code=code,
+            defaults={
+                "product": product,
+                "name": code,
+                "slug": slug,
+                "is_published": True,
+            },
+        )
+    apply_dafu_enrichment()
+    for code in ("DA5FU24-AS", "DA5FU24-DS", "DA10FU24-AS", "DA10FU24-DS"):
+        sku = SKU.objects.get(sku_code=code)
+        aux = AttributeValue.objects.get(sku=sku, attribute__slug="aux-switch").value
+        assert aux == AUX_SWITCH_SPDT_2, code
+        assert "2 SPDT" in (sku.description or ""), code
