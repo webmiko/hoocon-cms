@@ -99,8 +99,7 @@ export function DirectionsCategoryGrid({
     };
   }, [carousel, categories.length]);
 
-  const focusCount =
-    carousel && trackWidth >= 980 ? 3 : carousel && trackWidth >= 760 ? 2 : 1;
+  const focusCount = carousel && trackWidth >= 650 ? 3 : 1;
   const activeWindowStart =
     focusCount === 1
       ? activeIndex

@@ -928,20 +928,8 @@
   }
 }
 
-@container directions-inner (min-width: 760px) and (max-width: 1114px) {
-  .directionGrid {
-    scroll-padding-inline: 6%;
-    padding-inline: 6%;
-  }
-
-  .directionBlock {
-    flex: 0 0 47%;
-    width: 47%;
-    max-width: 47%;
-  }
-}
-
-@container directions-inner (min-width: 980px) and (max-width: 1114px) {
+/* One slide on narrow; three slides from tablet through the carousel band. */
+@container directions-inner (min-width: 650px) and (max-width: 1114px) {
   .directionGrid {
     scroll-padding-inline: 4%;
     padding-inline: 4%;
