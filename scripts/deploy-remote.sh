@@ -12,12 +12,14 @@
 #   IMAGE_TRANSFER=pull|load (default pull)
 #   GHCR_USER + GHCR_TOKEN — login before pull
 #   DEPLOY_APPLY_NGINX=1 (default)
+#   IMAGE_KEEP=3 — max ghcr app image tags/IDs kept on VPS after deploy
 #   WWW_FRONTEND / WWW_STATIC / WWW_MEDIA
 set -euo pipefail
 
 DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH is required}"
 DOCKER_IMAGE="${DOCKER_IMAGE:?DOCKER_IMAGE is required}"
 IMAGE_TRANSFER="${IMAGE_TRANSFER:-pull}"
+IMAGE_KEEP="${IMAGE_KEEP:-3}"
 
 if [[ -n "${SSH_HOST:-}" ]]; then
   SSH_TARGET="${SSH_HOST}"
@@ -125,18 +127,46 @@ fi
 "\${COMPOSE[@]}" up -d --no-build --remove-orphans db redis web celery_worker
 
 echo "Waiting for health..."
+HEALTHY=0
 for i in \$(seq 1 36); do
   if curl -fsS http://127.0.0.1:8000/api/health/ >/dev/null 2>&1; then
     curl -fsS http://127.0.0.1:8000/api/health/
     echo
     "\${COMPOSE[@]}" ps
-    exit 0
+    HEALTHY=1
+    break
   fi
   sleep 5
 done
-echo "ERROR: /api/health/ did not become ready" >&2
-"\${COMPOSE[@]}" logs --tail=80 web >&2 || true
-exit 1
+if [[ "\${HEALTHY}" -ne 1 ]]; then
+  echo "ERROR: /api/health/ did not become ready" >&2
+  "\${COMPOSE[@]}" logs --tail=80 web >&2 || true
+  exit 1
+fi
+
+# Keep newest IMAGE_KEEP unique image IDs for this repo; drop older tags.
+REPO="\${DOCKER_IMAGE%%:*}"
+KEEP="${IMAGE_KEEP}"
+echo "Prune \${REPO} images (keep \${KEEP} newest IDs)"
+mapfile -t IDS < <(
+  docker images "\${REPO}" --format '{{.CreatedAt}}|{{.ID}}' \
+    | sort -r \
+    | cut -d'|' -f2 \
+    | awk '!seen[\$0]++'
+)
+if (( \${#IDS[@]} > KEEP )); then
+  for id in "\${IDS[@]:KEEP}"; do
+    while read -r ref; do
+      [[ -n "\${ref}" ]] || continue
+      echo "rmi \${ref}"
+      docker rmi "\${ref}" || true
+    done < <(
+      docker images "\${REPO}" --format '{{.ID}} {{.Repository}}:{{.Tag}}' \
+        | awk -v id="\${id}" '\$1 == id { print \$2 }'
+    )
+  done
+fi
+docker image prune -f >/dev/null || true
 EOF
 
 echo "Deploy finished."
