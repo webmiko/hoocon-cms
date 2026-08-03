@@ -57,7 +57,7 @@
   border-radius: 4px;
   background: var(--color-inverse);
   color: var(--color-on-inverse);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   white-space: nowrap;
   z-index: 3;
@@ -68,7 +68,7 @@
   min-height: 36px;
   padding: 8px 14px;
   border-radius: var(--radius-sm, 6px);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -81,7 +81,7 @@
 }
 
 .goLink {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--color-link);
   text-decoration: underline;
@@ -113,7 +113,7 @@
 
 .limit {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   width: 100%;
 }

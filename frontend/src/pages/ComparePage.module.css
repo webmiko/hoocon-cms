@@ -19,7 +19,7 @@
 .lead {
   margin: 0;
   max-width: 42rem;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   color: var(--color-text-muted);
 }
@@ -57,7 +57,7 @@
 .loading,
 .error {
   margin: 0 0 16px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .hint {
@@ -80,7 +80,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
 }
@@ -91,7 +91,7 @@
   border: none;
   background: transparent;
   color: var(--color-link);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -128,7 +128,7 @@
   min-width: 640px;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .table th,
@@ -166,7 +166,7 @@
 
 .groupRow th {
   background: var(--color-subtle, #f0f0f0);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -213,7 +213,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  font-size: 22px;
+  font-size: clamp(1.25rem, 0.8vw + 1rem, 1.5rem);
   line-height: 1;
   cursor: pointer;
   color: var(--color-text-muted);
@@ -260,14 +260,14 @@
 }
 
 .addItemName {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 
 .addEmpty {
   padding: 16px 8px;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 @media print {
@@ -296,7 +296,7 @@
 
   .table {
     min-width: 0;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 
   .stickyCol,
@@ -336,7 +336,7 @@
   border-radius: 4px;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   line-height: 1;
   cursor: pointer;
 }
@@ -379,13 +379,13 @@
 }
 
 .skuCode {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .skuName {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.35;
   color: var(--color-text-muted);
   display: -webkit-box;
@@ -395,7 +395,7 @@
 }
 
 .skuCta {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-link);
   text-decoration: none;
@@ -497,7 +497,7 @@
 
 .mobileGroupTitle {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -519,7 +519,7 @@
 
 .mobileAttr {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   line-height: 1.35;
   color: var(--color-text);
@@ -548,14 +548,14 @@
 
 .mobileValue dt {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   word-break: break-word;
 }
 
 .mobileValue dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.4;
   word-break: break-word;
 }
