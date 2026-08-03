@@ -85,16 +85,9 @@ def aux_spdt_count_from_sku(sku_code: str) -> int | None:
         return None
     # DA..FU spring-return air: all -DS/-AS editions are SPDT-2.
     if re.match(r"da\d+fu", code):
-        if (
-            re.search(r"-as(?:$|[^a-z])", code)
-            or code.endswith("-as")
-            or re.search(r"-ds(?:$|[^a-z])", code)
-            or code.endswith("-ds")
-        ):
+        if re.search(r"-as(?:$|[^a-z])", code) or re.search(r"-ds(?:$|[^a-z])", code):
             return 2
-        if re.search(r"-a(?:$|[^a-z])", code) or code.endswith("-a"):
-            return 0
-        if re.search(r"-d(?:$|[^a-z])", code) or code.endswith("-d"):
+        if re.search(r"-a(?:$|[^a-z])", code) or re.search(r"-d(?:$|[^a-z])", code):
             return 0
         return None
     if re.search(r"-as(?:$|[^a-z])", code) or code.endswith("-as"):

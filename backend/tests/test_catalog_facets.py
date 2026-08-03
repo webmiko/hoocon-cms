@@ -585,6 +585,21 @@ def test_format_aux_switch_display_hides_absent() -> None:
     assert aux_spdt_count_from_sku("DA16MU24-DS") == 2
     assert normalize_aux_switch_value("SPDT-2", sku_code="DA2MU230-AS") == AUX_SWITCH_SPDT_1
     assert normalize_aux_switch_value("SPDT-1", sku_code="DA8MU24-AS") == AUX_SWITCH_SPDT_2
+    # Edge branches: MQU/EU/H8205 unknowns, generic -as/-dst/-ds/-d, normalize fallbacks.
+    from catalog.facets.aux import _looks_like_aux_value
+
+    assert _looks_like_aux_value("") is False
+    assert aux_spdt_count_from_sku("H8205-LAV-odd") is None
+    assert aux_spdt_count_from_sku("DA4MQU24-A") == 0
+    assert aux_spdt_count_from_sku("DA4MQU24-D") == 0
+    assert aux_spdt_count_from_sku("DA4MQU24") is None
+    assert aux_spdt_count_from_sku("DA5EU24") is None
+    assert aux_spdt_count_from_sku("LM24-AS") == 2
+    assert aux_spdt_count_from_sku("XX24-DST") == 1
+    assert aux_spdt_count_from_sku("XX24-DS") == 1
+    assert aux_spdt_count_from_sku("XX24-D") == 0
+    assert normalize_aux_switch_value("кастом") == "кастом"
+    assert format_aux_switch_display("кастом") is None
 
 
 @pytest.mark.django_db
