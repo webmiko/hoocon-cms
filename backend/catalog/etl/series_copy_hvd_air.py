@@ -74,7 +74,7 @@ TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
         "moment": "20 Нм",
         "damper-area": "до 2,0 м²",
         "running-time": "≤ 150 с (90°)",
-        "dimensions": "167,8 × 86,2 × 68 мм",
+        "dimensions": "191,8 × 103,4 × 68 мм",
         "weight": "≤ 1,4 кг",
         "shaft-length": "≥ 60 мм",
         "transformer-va": "10 ВА",

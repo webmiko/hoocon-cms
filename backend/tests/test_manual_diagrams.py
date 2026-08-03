@@ -251,7 +251,7 @@ def test_hva_manual_diagrams_backfills_family_weight_without_catalog(
 
     md.apply_hva_manual_diagrams(dry_run=False)
     by = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
-    assert by["dimensions"] == "71,1 × 141,1 × 62,1 мм"
+    assert by["dimensions"] == "144,1 × 71,1 × 62,1 мм"
     assert by["weight"] == "< 0,8 кг"
 
 

@@ -11,7 +11,7 @@ from catalog.etl.manual_pdfs import (
     parse_hva_manual_token,
     sku_codes_for_hva_manual,
 )
-from catalog.etl.series_copy_hva import apply_hva_enrichment, parse_hva_std_q
+from catalog.etl.series_copy_hva import FAMILY_SPECS, apply_hva_enrichment, parse_hva_std_q
 from catalog.models import (
     SKU,
     AttributeValue,
@@ -19,6 +19,17 @@ from catalog.models import (
     Product,
     ProductFile,
 )
+
+
+def test_hva_family_dimensions_match_catalog_2025() -> None:
+    """Catalog pp. 40–54: HVA std/Q envelopes (H×W×D), aligned with HVD air/Q."""
+    assert FAMILY_SPECS[(5, False)]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert FAMILY_SPECS[(5, True)]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert FAMILY_SPECS[(10, False)]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(10, True)]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(20, False)]["dimensions"] == "191,8 × 103,4 × 68 мм"
+    assert FAMILY_SPECS[(40, False)]["dimensions"] == "198,6 × 110,2 × 68 мм"
+    assert FAMILY_SPECS[(40, True)]["dimensions"] == "198,6 × 110,2 × 68 мм"
 
 
 @pytest.mark.parametrize(
@@ -139,7 +150,7 @@ def test_apply_hva_enrichment_fixes_weight_and_wire() -> None:
     assert by_slug["weight"] == "< 0,8 кг"
     assert by_slug["wire-cross-section"] == "0,5 мм²"
     assert by_slug["running-time"] == "< 20 с"
-    assert by_slug["dimensions"] == "71,1 × 141,1 × 62,1 мм"
+    assert by_slug["dimensions"] == "144,1 × 71,1 × 62,1 мм"
 
 
 @pytest.mark.django_db

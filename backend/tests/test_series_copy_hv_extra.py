@@ -43,6 +43,18 @@ def test_qx_damper_area_matches_nm_formula(nm: int, row: dict[str, str]) -> None
     assert row["damper-area"] == damper_area_for_nm(nm)
 
 
+def test_qx_5nm_dimensions_match_datasheet() -> None:
+    """HVA/HVD-5QX and 10QX share chassis 167,8 × 86,2 × 68 мм (catalog 2025)."""
+    assert QX_SPECS[5]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert QX_SPECS[10]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert QX_SPECS[20]["dimensions"] == "191,8 × 103,4 × 68 мм"
+    assert QX_SPECS[40]["dimensions"] == "198,6 × 110,2 × 68 мм"
+    assert HVD_Q_SPECS[5]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert HVD_Q_SPECS[10]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert HVD_Q_SPECS[20]["dimensions"] == "191,8 × 103,4 × 68 мм"
+    assert HVD_Q_SPECS[40]["dimensions"] == "198,6 × 110,2 × 68 мм"
+
+
 @pytest.mark.django_db
 def test_ensure_hvd_q_and_enrich() -> None:
     Category.objects.create(
@@ -80,6 +92,7 @@ def test_ensure_hvd_q_and_enrich() -> None:
     }
     assert qx_by["failsafe-time"] == "< 30 с"
     assert qx_by["charge-time"] == "3 мин 30 с"
+    assert qx_by["dimensions"] == "167,8 × 86,2 × 68 мм"
 
 
 @pytest.mark.django_db
