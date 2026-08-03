@@ -96,7 +96,7 @@
   border-radius: 999px;
   background: var(--color-brand);
   color: var(--color-on-brand);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -126,7 +126,7 @@
   border: none;
   background: none;
   padding: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--color-link);
   cursor: pointer;
   text-decoration: underline;
@@ -173,7 +173,7 @@
 
 .filterSummaryLabel {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--color-text);
 }
@@ -182,7 +182,7 @@
 .filterSummaryValueActive {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -222,7 +222,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.25;
   color: var(--color-text);
   text-align: left;
@@ -268,7 +268,7 @@
   flex-shrink: 0;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .optionRowActive .optionCount {
@@ -295,7 +295,7 @@
   background: var(--color-brand-soft);
   color: var(--color-link);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
@@ -318,7 +318,7 @@
 }
 
 .activeTagRemove {
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
   opacity: 0.7;
 }
@@ -402,7 +402,7 @@
   color: var(--color-primary);
   cursor: pointer;
   text-decoration: underline;
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 4px 2px;
 }
 
@@ -641,7 +641,7 @@
 
 .cardTitle {
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   margin: 0;
   color: var(--color-text);
@@ -658,7 +658,7 @@
 
 .cardEditions {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.3;
   color: var(--color-link);
@@ -667,7 +667,7 @@
 
 .cardCode,
 .cardAnalog {
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin: 0;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -682,7 +682,7 @@
 
 .cardStock {
   margin: 0 0 2px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.2;
@@ -710,7 +710,7 @@
 
 .cardNew {
   margin: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1.2;
@@ -732,7 +732,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
   gap: 8px;
   align-items: baseline;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.3;
 }
 
@@ -789,14 +789,14 @@
 }
 
 .cardPriceOnRequest {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-text-soft);
 }
 
 .cardCta {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-link);
 }

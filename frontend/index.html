@@ -76,88 +76,9 @@
       #root {
         min-height: 100vh;
       }
-      /* Boot splash: mobile / PWA only (≤960px; desktop skips). */
-      #hoocon-splash {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
-        background: #f3f4f7;
-        transition: opacity 0.4s ease, visibility 0.4s ease;
-      }
-      @media (min-width: 961px) {
-        #hoocon-splash {
-          display: none !important;
-        }
-      }
-      html[data-theme="dark"] #hoocon-splash {
-        background: #0f0f0f;
-      }
-      #hoocon-splash[data-done] {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-      }
-      #hoocon-splash .hoocon-splash-logo {
-        display: block;
-        width: min(200px, 56vw);
-        height: auto;
-      }
-      #hoocon-splash .hoocon-splash-logo--dark {
-        display: none;
-      }
-      html[data-theme="dark"] #hoocon-splash .hoocon-splash-logo--light {
-        display: none;
-      }
-      html[data-theme="dark"] #hoocon-splash .hoocon-splash-logo--dark {
-        display: block;
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        #hoocon-splash .hoocon-splash-logo {
-          animation: hoocon-splash-pulse 1.4s ease-in-out infinite;
-        }
-      }
-      @keyframes hoocon-splash-pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.72;
-        }
-      }
     </style>
   </head>
   <body>
-    <div
-      id="hoocon-splash"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-      aria-label="Загрузка Hoocon"
-    >
-      <img
-        class="hoocon-splash-logo hoocon-splash-logo--light"
-        src="/logo.svg"
-        alt="Hoocon"
-        width="200"
-        height="54"
-        decoding="async"
-        fetchpriority="high"
-      />
-      <img
-        class="hoocon-splash-logo hoocon-splash-logo--dark"
-        src="/logo-on-dark.svg"
-        alt=""
-        width="200"
-        height="54"
-        decoding="async"
-        aria-hidden="true"
-      />
-    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -14,7 +14,8 @@
 }
 
 html {
-  font-size: var(--font-size-base);
+  /* Respect browser default font size (do not pin root to px). */
+  font-size: 100%;
   scroll-behavior: smooth;
   overflow-x: clip;
   /* Overscroll / rubber-band past the page matches dark footer */

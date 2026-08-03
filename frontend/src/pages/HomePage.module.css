@@ -488,10 +488,10 @@
   font-weight: 700;
   font-size: clamp(1.05rem, 1.5vw, 1.2rem);
   line-height: 1.3;
-  text-wrap: balance;
+  /* Avoid text-wrap: balance — long RU titles become 4–6 short lines. */
+  text-wrap: pretty;
   min-width: 0;
   overflow-wrap: break-word;
-  word-break: break-word;
   hyphens: none;
 }
 
@@ -906,10 +906,10 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
-    scroll-padding-inline: 11%;
+    scroll-padding-inline: 7%;
     gap: var(--space-md);
     padding-block: var(--space-xs);
-    padding-inline: 11%;
+    padding-inline: 7%;
     margin-inline: calc(-1 * var(--space-md));
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -920,9 +920,9 @@
   }
 
   .directionBlock {
-    flex: 0 0 78%;
-    width: 78%;
-    max-width: 78%;
+    flex: 0 0 86%;
+    width: 86%;
+    max-width: 86%;
     min-height: 280px;
     scroll-snap-align: center;
     opacity: 1;
@@ -939,6 +939,15 @@
     opacity: 1;
   }
 
+  .directionBody {
+    padding: var(--space-md);
+  }
+
+  .directionName {
+    font-size: clamp(0.9375rem, 2.6vw, 1.05rem);
+    line-height: 1.25;
+  }
+
   .directionMedia {
     min-height: 140px;
   }
@@ -946,14 +955,14 @@
 
 @media (min-width: 760px) and (max-width: 920px) {
   .directionGrid {
-    scroll-padding-inline: 8%;
-    padding-inline: 8%;
+    scroll-padding-inline: 6%;
+    padding-inline: 6%;
   }
 
   .directionBlock {
-    flex: 0 0 44%;
-    width: 44%;
-    max-width: 44%;
+    flex: 0 0 47%;
+    width: 47%;
+    max-width: 47%;
   }
 }
 
