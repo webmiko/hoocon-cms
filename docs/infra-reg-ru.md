@@ -57,10 +57,13 @@ A/AAAA сайта указывали на VPS, а MX/TXT почты — на Я�
    lint → build (GHCR + `frontend/dist`) → deploy SSH
    (`scripts/deploy-remote.sh`). Секреты репо: `SSH_PRIVATE_KEY`,
    `SSH_USER`, `SERVER_HOST`, `DEPLOY_PATH`. `.env` на VPS не
-   перезаписывается. Запасной путь: `./scripts/deploy-to-vps.sh`
-   ([manual-deploy.md](manual-deploy.md)). Одноразовый перенос БД:
-   `scripts/sync-db-to-vps.sh`. Квота Free private: **2000 мин/мес** →
-   `./scripts/actions-minutes.py` ([actions-minutes.md](actions-minutes.md)).
+   перезаписывается. После успешного health — prune образов
+   `ghcr.io/…/hoocon-cms` на VPS: оставляем **3** новейших ID
+   (`IMAGE_KEEP`, по умолчанию 3). Запасной путь:
+   `./scripts/deploy-to-vps.sh` ([manual-deploy.md](manual-deploy.md)).
+   Одноразовый перенос БД: `scripts/sync-db-to-vps.sh`. Квота Free
+   private: **2000 мин/мес** → `./scripts/actions-minutes.py`
+   ([actions-minutes.md](actions-minutes.md)).
 
 ---
 
@@ -283,7 +286,7 @@ Rollback web: A снова на `176.57.64.46`. Почту при cutover не �
 | Каталог | `/opt/hoocon/backups/<UTC-stamp>/` |
 | DB | `pg_dump -Fc` из контейнера `db` → `hoocon.dump` |
 | Media | `tar.gz` из `/var/www/hoocon/media` → `media.tar.gz` |
-| Retention | 7 дней (`RETENTION_DAYS`) |
+| Retention | 3 дня (`RETENTION_DAYS`) |
 
 Прогон вручную:
 
