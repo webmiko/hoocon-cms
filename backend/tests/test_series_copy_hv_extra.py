@@ -5,10 +5,13 @@ from __future__ import annotations
 import pytest
 
 from catalog.etl.series_copy_hv_extra import (
+    HVD_Q_SPECS,
+    QX_SPECS,
     apply_hv_extra_enrichment,
     ensure_hv_qx_catalog,
     ensure_hvd_q_catalog,
 )
+from catalog.etl.sku_instructions import damper_area_for_nm
 from catalog.etl.sku_variant import parse_sku_variant
 from catalog.models import SKU, AttributeValue, Category
 
@@ -26,6 +29,18 @@ def test_sku_variant_hv_extra_suffixes(code: str, control: str) -> None:
     variant = parse_sku_variant(code)
     assert variant is not None
     assert variant.control == control
+
+
+@pytest.mark.parametrize(("nm", "row"), sorted(HVD_Q_SPECS.items()))
+def test_hvd_q_damper_area_matches_nm_formula(nm: int, row: dict[str, str]) -> None:
+    """HVD-Q: площадь заслонки = Нм / 10 (10 Нм → до 1,0 м², not 2,0)."""
+    assert row["damper-area"] == damper_area_for_nm(nm)
+
+
+@pytest.mark.parametrize(("nm", "row"), sorted(QX_SPECS.items()))
+def test_qx_damper_area_matches_nm_formula(nm: int, row: dict[str, str]) -> None:
+    """HVA/HVD-QX: площадь заслонки = Нм / 10 (10 Нм → до 1,0 м², not 1,8)."""
+    assert row["damper-area"] == damper_area_for_nm(nm)
 
 
 @pytest.mark.django_db
@@ -65,3 +80,42 @@ def test_ensure_hvd_q_and_enrich() -> None:
     }
     assert qx_by["failsafe-time"] == "< 30 с"
     assert qx_by["charge-time"] == "3 мин 30 с"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "sku_code",
+    [
+        "HVD24-10Q",
+        "HVD24S-10Q",
+        "HVD230-10Q",
+        "HVD230S-10Q",
+        "HVD24-10QX",
+        "HVD24S-10QX",
+        "HVD230-10QX",
+        "HVD230S-10QX",
+        "HVA24-10QX",
+        "HVA24S-10QX",
+        "HVA230-10QX",
+        "HVA230S-10QX",
+    ],
+)
+def test_enriched_10nm_q_qx_damper_area_is_one_m2(sku_code: str) -> None:
+    """Regression: 10 Нм Q/QX must be до 1,0 м² (was 2,0 / 1,8)."""
+    Category.objects.create(
+        name="Воздух",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    Category.objects.create(
+        name="Конденсатор",
+        slug="elektronnye-otkazoustoychivye-vozdushnye-privody",
+    )
+    ensure_hvd_q_catalog(dry_run=False)
+    ensure_hv_qx_catalog(dry_run=False)
+    apply_hv_extra_enrichment(dry_run=False)
+    sku = SKU.objects.get(sku_code=sku_code)
+    area = AttributeValue.objects.get(sku=sku, attribute__slug="damper-area").value
+    moment = AttributeValue.objects.get(sku=sku, attribute__slug="moment").value
+    assert moment == "10 Нм"
+    assert area == damper_area_for_nm(10)
+    assert area == "до 1,0 м²"

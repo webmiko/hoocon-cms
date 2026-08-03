@@ -18,6 +18,7 @@ from django.db import transaction
 from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.manual_diagrams import SORT_WIRING
 from catalog.etl.manual_pdfs import attach_hva_manuals, default_manuals_dir
+from catalog.etl.sku_instructions import damper_area_for_nm
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
     CONTROL_ON_OFF,
@@ -67,7 +68,7 @@ _SHARED_BASE: Final[tuple[AttrRow, ...]] = (
 HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     5: {
         "moment": "5 Нм",
-        "damper-area": "до 0,5 м²",
+        "damper-area": damper_area_for_nm(5),
         "running-time": "< 20 с",
         "noise": "55 дБ",
         "shaft-length": "≥ 50 мм",
@@ -78,7 +79,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     10: {
         "moment": "10 Нм",
-        "damper-area": "до 2,0 м²",
+        "damper-area": damper_area_for_nm(10),
         "running-time": "< 20 с",
         "noise": "55 дБ",
         "shaft-length": "≥ 80 мм",
@@ -89,7 +90,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     20: {
         "moment": "20 Нм",
-        "damper-area": "до 2,0 м²",
+        "damper-area": damper_area_for_nm(20),
         "running-time": "< 20 с",
         "noise": "55 дБ",
         "shaft-length": "≥ 60 мм",
@@ -100,7 +101,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     40: {
         "moment": "40 Нм",
-        "damper-area": "до 4,0 м²",
+        "damper-area": damper_area_for_nm(40),
         "running-time": "< 20 с",
         "noise": "55 дБ",
         "shaft-length": "≥ 60 мм",
@@ -115,7 +116,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
 QX_SPECS: Final[dict[int, dict[str, str]]] = {
     5: {
         "moment": "5 Нм",
-        "damper-area": "до 0,5 м²",
+        "damper-area": damper_area_for_nm(5),
         "running-time": "< 20 с",
         "failsafe-time": "< 30 с",
         "charge-time": "3 мин 30 с",
@@ -128,7 +129,7 @@ QX_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     10: {
         "moment": "10 Нм",
-        "damper-area": "до 1,8 м²",
+        "damper-area": damper_area_for_nm(10),
         "running-time": "< 20 с",
         "failsafe-time": "< 30 с",
         "charge-time": "3 мин 30 с",
@@ -141,7 +142,7 @@ QX_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     20: {
         "moment": "20 Нм",
-        "damper-area": "до 2,0 м²",
+        "damper-area": damper_area_for_nm(20),
         "running-time": "< 20 с",
         "failsafe-time": "< 30 с",
         "charge-time": "3 мин 30 с",
@@ -154,7 +155,7 @@ QX_SPECS: Final[dict[int, dict[str, str]]] = {
     },
     40: {
         "moment": "40 Нм",
-        "damper-area": "до 4,0 м²",
+        "damper-area": damper_area_for_nm(40),
         "running-time": "< 20 с",
         "failsafe-time": "< 30 с",
         "charge-time": "7 мин 30 с",

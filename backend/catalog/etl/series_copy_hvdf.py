@@ -19,6 +19,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.sku_instructions import damper_area_for_nm
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
@@ -118,7 +119,7 @@ _HVDF_5_DIMENSIONS = "158 × 102 × 59 мм"
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
         "moment": "3 Нм",
-        "damper-area": "до 0,5 м²",
+        "damper-area": damper_area_for_nm(3),
         "power": "5 Вт под нагрузкой / 2 Вт в режиме удержания",
         "running-time": "< 75 с / возврат пружины < 25 с",
         "weight": "< 1,3 кг",
@@ -128,7 +129,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     },
     5: {
         "moment": "5 Нм",
-        "damper-area": "до 0,5 м²",
+        "damper-area": damper_area_for_nm(5),
         "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
         "running-time": "< 70 с / возврат пружины < 20 с",
         "weight": "< 1,5 кг",
