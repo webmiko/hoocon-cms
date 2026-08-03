@@ -20,6 +20,18 @@ import styles from "./Layout.module.css";
 export const HERO_KP_CTA_ID = "hero-kp-cta";
 
 /**
+ * Inline factory contact CTAs on /zavod (not «Запросить образец»).
+ * Top: OEM inquiry · bottom: OEM partnership.
+ */
+export const ZAVOD_FACTORY_CTA_SELECTOR = [
+  'a.cta-btn[href^="mailto:hoocon@hoocon.com.cn"][href*="OEM%20inquiry"]',
+  'a.cta-btn[href^="mailto:hoocon@hoocon.com.cn"][href*="OEM%20partnership"]',
+].join(", ");
+
+const ZAVOD_FACTORY_MAILTO =
+  "mailto:hoocon@hoocon.com.cn?subject=OEM%20inquiry%20from%20hoocon.ru";
+
+/**
  * App shell: utility masthead + brand header + main + dark footer.
  *
  * Spec: docs/readiness-backend-ux.md §4.3; prototip-hoocon-shared.css.
@@ -36,19 +48,21 @@ export function Layout() {
     location.pathname.startsWith("/statyi") ||
     location.pathname.startsWith("/novosti");
   const isHome = location.pathname === "/";
-  /** True while home hero «Запросить КП» intersects the viewport (mobile sticky waits). */
-  const [heroKpVisible, setHeroKpVisible] = useState(true);
-  const [homeTrack, setHomeTrack] = useState(isHome);
+  const isZavod = /^\/zavod\/?$/.test(location.pathname);
+  /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
+  const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
+  const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
 
-  // Reset hero visibility when navigating onto the home page.
-  if (isHome !== homeTrack) {
-    setHomeTrack(isHome);
-    if (isHome) {
-      setHeroKpVisible(true);
+  // Reset visibility when entering home or /zavod.
+  if ((isHome || isZavod) !== inlineTrack) {
+    setInlineTrack(isHome || isZavod);
+    if (isHome || isZavod) {
+      setInlineCtaVisible(true);
     }
   }
 
-  const showMobileStickyCta = !hideMobileCta && !(isHome && heroKpVisible);
+  const showMobileStickyCta =
+    !hideMobileCta && !((isHome || isZavod) && inlineCtaVisible);
 
   // Close mobile menu when the route changes (adjust state during render).
   if (menuRoute !== routeKey) {
@@ -69,27 +83,57 @@ export function Layout() {
   }, [showMobileStickyCta]);
 
   useEffect(() => {
-    if (hideMobileCta || !isHome) {
+    if (hideMobileCta || !(isHome || isZavod)) {
       return;
     }
 
     let cancelled = false;
     let observer: IntersectionObserver | null = null;
+    const intersecting = new Map<Element, boolean>();
 
-    function watch(el: Element) {
+    function findInlineCtas(): Element[] {
+      if (isHome) {
+        const hero = document.getElementById(HERO_KP_CTA_ID);
+        return hero ? [hero] : [];
+      }
+      return Array.from(document.querySelectorAll(ZAVOD_FACTORY_CTA_SELECTOR));
+    }
+
+    function syncVisible() {
+      if (cancelled) return;
+      let any = false;
+      for (const visible of intersecting.values()) {
+        if (visible) {
+          any = true;
+          break;
+        }
+      }
+      setInlineCtaVisible(any);
+    }
+
+    function watch(els: Element[]) {
+      intersecting.clear();
+      for (const el of els) {
+        intersecting.set(el, false);
+      }
       observer = new IntersectionObserver(
-        ([entry]) => {
-          if (!cancelled) {
-            setHeroKpVisible(entry.isIntersecting);
+        (entries) => {
+          for (const entry of entries) {
+            intersecting.set(entry.target, entry.isIntersecting);
           }
+          syncVisible();
         },
         { threshold: 0, rootMargin: "0px" },
       );
-      observer.observe(el);
+      for (const el of els) {
+        observer.observe(el);
+      }
+      // Wait for the first IntersectionObserver callback — keep sticky hidden
+      // until we know none of the inline CTAs are on screen.
     }
 
-    const existing = document.getElementById(HERO_KP_CTA_ID);
-    if (existing) {
+    const existing = findInlineCtas();
+    if (existing.length > 0) {
       watch(existing);
       return () => {
         cancelled = true;
@@ -97,12 +141,12 @@ export function Layout() {
       };
     }
 
-    // Home outlet may mount one frame after Layout's effect.
+    // Outlet / CMS body may mount one frame after Layout's effect.
     const mo = new MutationObserver(() => {
-      const el = document.getElementById(HERO_KP_CTA_ID);
-      if (!el) return;
+      const els = findInlineCtas();
+      if (els.length === 0) return;
       mo.disconnect();
-      watch(el);
+      watch(els);
     });
     mo.observe(document.body, { childList: true, subtree: true });
     return () => {
@@ -110,7 +154,7 @@ export function Layout() {
       mo.disconnect();
       observer?.disconnect();
     };
-  }, [hideMobileCta, isHome, routeKey]);
+  }, [hideMobileCta, isHome, isZavod, routeKey]);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -317,7 +361,7 @@ export function Layout() {
       <main
         id="main-content"
         className={
-          hideMobileCta || (isHome && heroKpVisible)
+          !showMobileStickyCta
             ? `${styles.main} ${styles.mainNoStickyCta}`
             : styles.main
         }
@@ -421,13 +465,23 @@ export function Layout() {
       <CompareTray />
 
       {showMobileStickyCta ? (
-        <Link
-          to="/consultation"
-          className={styles.mobileStickyCta}
-          data-brand-cta
-        >
-          Запросить КП
-        </Link>
+        isZavod ? (
+          <a
+            href={ZAVOD_FACTORY_MAILTO}
+            className={styles.mobileStickyCta}
+            data-brand-cta
+          >
+            Связаться с заводом
+          </a>
+        ) : (
+          <Link
+            to="/consultation"
+            className={styles.mobileStickyCta}
+            data-brand-cta
+          >
+            Запросить КП
+          </Link>
+        )
       ) : null}
 
       <CookieConsent />
