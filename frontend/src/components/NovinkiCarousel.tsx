@@ -6,19 +6,22 @@ import styles from "./NovinkiCarousel.module.css";
 
 /** Fixed card height (matches vertical CatalogSkuCard teaser). */
 const SLIDE_HEIGHT_PX = 360;
+/** Slop so sub-pixel scroll/snap still counts as fully in view. */
+const FULL_VIEW_EPS_PX = 2;
 
 type NovinkiCarouselProps = {
   skus: SKUList[];
 };
 
 /**
- * Home «Новинки»: native CSS scroll-snap (same pattern as DirectionsCategoryGrid
- * on mobile) — one active card, translucent peeks, browser-driven slide.
+ * Home «Новинки»: native CSS scroll-snap — fully visible cards stay opaque;
+ * edge peeks dim. Center card lifts/scales slightly on wide layouts.
  */
 export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
   const n = skus.length;
   const trackRef = useRef<HTMLUListElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [opaque, setOpaque] = useState<ReadonlySet<number>>(() => new Set([0]));
 
   useEffect(() => {
     const root = trackRef.current;
@@ -27,18 +30,36 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
     const updateActive = () => {
       const slides = Array.from(root.children) as HTMLElement[];
       if (slides.length === 0) return;
-      const mid = root.scrollLeft + root.clientWidth / 2;
+
+      const rootRect = root.getBoundingClientRect();
+      const midX = rootRect.left + rootRect.width / 2;
+      const full = new Set<number>();
       let best = 0;
       let bestDist = Number.POSITIVE_INFINITY;
+
       slides.forEach((el, i) => {
-        const center = el.offsetLeft + el.offsetWidth / 2;
-        const dist = Math.abs(center - mid);
+        const rect = el.getBoundingClientRect();
+        const inFull =
+          rect.left >= rootRect.left - FULL_VIEW_EPS_PX &&
+          rect.right <= rootRect.right + FULL_VIEW_EPS_PX;
+        if (inFull) {
+          full.add(i);
+        }
+        const center = rect.left + rect.width / 2;
+        const dist = Math.abs(center - midX);
         if (dist < bestDist) {
           bestDist = dist;
           best = i;
         }
       });
+
+      // Fallback: if snap padding leaves none "full", keep the center card opaque.
+      if (full.size === 0) {
+        full.add(best);
+      }
+
       setActiveIndex(best);
+      setOpaque(full);
     };
 
     let raf = 0;
@@ -104,15 +125,19 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
         aria-labelledby="novinki-heading"
       >
         {skus.map((sku, index) => {
-          const active = index === activeIndex;
+          const isOpaque = opaque.has(index);
+          const isCenter = index === activeIndex;
+          const className = [
+            styles.slide,
+            isOpaque ? styles.slideFocus : styles.slidePeek,
+            isCenter ? styles.slideCenter : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
             <li
               key={sku.slug}
-              className={
-                active
-                  ? `${styles.slide} ${styles.slideActive}`
-                  : `${styles.slide} ${styles.slidePeek}`
-              }
+              className={className}
               style={{ height: SLIDE_HEIGHT_PX }}
             >
               <CatalogSkuCard sku={sku} variant="vertical" />

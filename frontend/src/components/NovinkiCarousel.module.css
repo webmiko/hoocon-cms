@@ -43,7 +43,8 @@
 .track {
   list-style: none;
   margin: 0 calc(-1 * var(--space-lg));
-  padding: var(--space-xs) 11%;
+  /* Block padding: room for center lift/scale without clipping. */
+  padding: 0.75rem 11% 0.5rem;
   display: flex;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -76,14 +77,43 @@
   width: 100%;
   max-width: 20rem;
   min-width: 0;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center bottom;
+  transition:
+    transform 0.28s var(--ease-out, ease),
+    box-shadow 0.28s var(--ease-out, ease);
 }
 
 .slidePeek {
   opacity: 0.42;
 }
 
-.slideActive {
+/* Fully in-view cards (one or several on wide screens). */
+.slideFocus {
   opacity: 1;
+}
+
+/* Center of the visible set — subtle lift + ~1.5% scale. */
+.slideCenter > * {
+  transform: translate3d(0, -0.35rem, 0) scale(1.015);
+}
+
+/*
+ * Pointer hover wins: any hovered slide takes the lift/scale;
+ * the scroll-center card settles unless it is the hovered one.
+ */
+@media (hover: hover) {
+  .track:has(.slide:hover) .slideCenter:not(:hover) > * {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .slide:hover {
+    opacity: 1;
+  }
+
+  .slide:hover > * {
+    transform: translate3d(0, -0.35rem, 0) scale(1.015);
+  }
 }
 
 .status {
@@ -118,7 +148,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .slide,
+  .slide > *,
   .navBtn {
     transition: none;
+  }
+
+  .slideCenter > *,
+  .slide:hover > * {
+    transform: none;
   }
 }
