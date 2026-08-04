@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
             model_name="productimage",
             name="image",
             field=models.ImageField(
-                help_text="WebP предпочтительно; JPEG/PNG допустимы. Полный кадр (PDP).",
+                help_text="WebP предпочтительно; JPEG/PNG допустимы. Полный кадр для страницы артикула.",
                 upload_to=catalog.models.product_image_upload_to,
                 validators=[catalog.validators.validate_image_upload],
                 verbose_name="изображение",
