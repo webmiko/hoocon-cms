@@ -20,7 +20,7 @@ NEW_WINDOW_DAYS: int = 30
 # HV wave (2025 catalog fill): all HVA; HVD fast-Q; spring P; capacitor QX.
 _HV_NEWNESS_CODE = re.compile(
     r"(?i)^(?:"
-    r"hva(?:24|230)s?-\d+(?:q|p|qx)?"
+    r"hva(?:24|230)s?-\d+(?:uq|q|p|qx)?"
     r"|hvd(?:24|230)s?-\d+(?:q|qx)"
     r")$",
 )

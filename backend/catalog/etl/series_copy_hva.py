@@ -1,14 +1,14 @@
 """Canonical ТТХ + catalog seed for Hoocon HVA modulating air dampers (no spring).
 
 Source: English datasheets in ``_инструкции-pdf`` (``hva-5.pdf``, ``hva-10q.pdf``, …)
-and Russian HV catalog pages (2025 / Illustrator). Creates missing Products/SKUs
-for Nm lines present in the catalog but not yet on the site.
+and Russian HV catalog / RU manuals. Creates missing Products/SKUs for Nm lines
+present in the catalog / manuals but not yet on the site.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.tech_copy import (
@@ -25,9 +25,11 @@ from catalog.etl.tech_copy import (
 )
 from catalog.models import SKU, Category, Product
 
-# HVA24-5 / HVA24S-5Q — optional aux S, torque, optional fast Q (not P/UQ spring).
+# Speed suffix: "" std, "q" fast, "uq" ultra-fast (``uq`` before ``q`` in regex).
+HvaSpeed = Literal["", "q", "uq"]
+
 _HVA_STD_Q_CODE = re.compile(
-    r"(?i)^hva(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)(?P<fast>q)?$",
+    r"(?i)^hva(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)(?P<speed>uq|q)?$",
 )
 
 AttrRow = tuple[str, str, str, str]
@@ -35,16 +37,28 @@ AttrRow = tuple[str, str, str, str]
 CATEGORY_STD = "elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
 CATEGORY_Q = "elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata"
 
-# Catalog / datasheet families to ensure on the site (std + Q for 5/10/20/40).
-CATALOG_FAMILIES: Final[tuple[tuple[int, bool], ...]] = (
-    (5, False),
-    (5, True),
-    (10, False),
-    (10, True),
-    (20, False),
-    (20, True),
-    (40, False),
-    (40, True),
+# Catalog / datasheet families (std + Q + UQ where manuals exist).
+CATALOG_FAMILIES: Final[tuple[tuple[int, HvaSpeed], ...]] = (
+    (2, ""),
+    (5, ""),
+    (5, "q"),
+    (5, "uq"),
+    (8, "q"),
+    (10, ""),
+    (10, "q"),
+    (20, ""),
+    (20, "q"),
+    (40, ""),
+    (40, "q"),
+)
+
+# New families: seed into Admin, hide from public site until stock/photos ready.
+_UNPUBLISHED_ON_CREATE: Final[frozenset[tuple[int, HvaSpeed]]] = frozenset(
+    {
+        (2, ""),
+        (5, "uq"),
+        (8, "q"),
+    },
 )
 
 _EDITIONS: Final[tuple[tuple[str, bool], ...]] = (
@@ -69,9 +83,20 @@ _SHARED: Final[tuple[AttrRow, ...]] = (
     ("Сечение провода", "wire-cross-section", "мм²", "0,5 мм²"),
 )
 
-# Per Nm / fast-Q family from English datasheets (Dimensions/Weight + Function).
-FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
-    (5, False): {
+# Per Nm / speed family from datasheets + RU manuals (Dimensions/Weight + Function).
+FAMILY_SPECS: Final[dict[tuple[int, HvaSpeed], dict[str, str]]] = {
+    (2, ""): {
+        "moment": "2 Нм",
+        "damper-area": "до 0,2 м²",
+        "running-time": "< 40 с",
+        "noise": "45 дБ",
+        "shaft-length": "≥ 50 мм",
+        "dimensions": "144,1 × 71,1 × 62,1 мм",
+        "weight": "< 0,7 кг",
+        "power-24": "2,5 Вт / 0,5 Вт (удержание)",
+        "power-230": "2,5 Вт / 0,5 Вт (удержание)",
+    },
+    (5, ""): {
         "moment": "5 Нм",
         "damper-area": "до 0,5 м²",
         "running-time": "< 60 с",
@@ -82,7 +107,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "3 Вт / 0,5 Вт (удержание)",
         "power-230": "3 Вт / 0,5 Вт (удержание)",
     },
-    (5, True): {
+    (5, "q"): {
         "moment": "5 Нм",
         "damper-area": "до 0,5 м²",
         "running-time": "< 20 с",
@@ -93,7 +118,29 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "3,5 Вт / 0,5 Вт (удержание)",
         "power-230": "3,5 Вт / 0,5 Вт (удержание)",
     },
-    (10, False): {
+    (5, "uq"): {
+        "moment": "5 Нм",
+        "damper-area": "до 0,5 м²",
+        "running-time": "2,5 с",
+        "noise": "55 дБ",
+        "shaft-length": "≥ 60 мм",
+        "dimensions": "167,8 × 86,2 × 68 мм",
+        "weight": "< 1,2 кг",
+        "power-24": "20 Вт / 2 Вт (удержание)",
+        "power-230": "20 Вт / 2 Вт (удержание)",
+    },
+    (8, "q"): {
+        "moment": "8 Нм",
+        "damper-area": "до 0,8 м²",
+        "running-time": "8 с",
+        "noise": "55 дБ",
+        "shaft-length": "≥ 60 мм",
+        "dimensions": "167,8 × 86,2 × 68 мм",
+        "weight": "< 1,1 кг",
+        "power-24": "12 Вт / 2 Вт (удержание)",
+        "power-230": "12 Вт / 2 Вт (удержание)",
+    },
+    (10, ""): {
         "moment": "10 Нм",
         "damper-area": "до 1,0 м²",
         "running-time": "< 60 с",
@@ -104,7 +151,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "4,5 Вт / 1 Вт (удержание)",
         "power-230": "4,5 Вт / 1 Вт (удержание)",
     },
-    (10, True): {
+    (10, "q"): {
         "moment": "10 Нм",
         "damper-area": "до 1,0 м²",
         "running-time": "< 20 с",
@@ -115,7 +162,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "5 Вт / 1 Вт (удержание)",
         "power-230": "5 Вт / 1 Вт (удержание)",
     },
-    (20, False): {
+    (20, ""): {
         "moment": "20 Нм",
         "damper-area": "до 2,0 м²",
         "running-time": "< 150 с",
@@ -126,7 +173,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "4,5 Вт / 1 Вт (удержание)",
         "power-230": "4,5 Вт / 1 Вт (удержание)",
     },
-    (20, True): {
+    (20, "q"): {
         "moment": "20 Нм",
         "damper-area": "до 2,0 м²",
         "running-time": "< 20 с",
@@ -137,7 +184,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "8 Вт / 1 Вт (удержание)",
         "power-230": "8 Вт / 1 Вт (удержание)",
     },
-    (40, False): {
+    (40, ""): {
         "moment": "40 Нм",
         "damper-area": "до 4,0 м²",
         "running-time": "< 150 с",
@@ -148,7 +195,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
         "power-24": "5 Вт / 1 Вт (удержание)",
         "power-230": "5 Вт / 1 Вт (удержание)",
     },
-    (40, True): {
+    (40, "q"): {
         "moment": "40 Нм",
         "damper-area": "до 4,0 м²",
         "running-time": "< 20 с",
@@ -164,7 +211,7 @@ FAMILY_SPECS: Final[dict[tuple[int, bool], dict[str, str]]] = {
 SERIES_DESCRIPTION = normalize_tech_copy(
     "Электроприводы HVA — пропорциональное управление воздушной заслонкой "
     "без возвратной пружины. Издания 24/230 В с опцией вспомогательных "
-    "переключателей (S). Ускоренные линейки (Q) — короткое время поворота.",
+    "переключателей (S). Ускоренные линейки (Q / UQ) — короткое время поворота.",
 )
 
 SERIES_INSTRUCTIONS = normalize_tech_copy(
@@ -178,40 +225,52 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
 )
 
 
-def parse_hva_std_q(sku_code: str) -> tuple[int, bool, str, bool] | None:
-    """Return ``(nm, is_fast_q, voltage, has_aux)`` for std/Q HVA codes."""
+def parse_hva_std_q(sku_code: str) -> tuple[int, HvaSpeed, str, bool] | None:
+    """Return ``(nm, speed, voltage, has_aux)`` for std/Q/UQ HVA codes."""
     match = _HVA_STD_Q_CODE.match((sku_code or "").strip().replace(" ", ""))
     if match is None:
         return None
+    raw = (match.group("speed") or "").casefold()
+    speed: HvaSpeed
+    if raw == "uq":
+        speed = "uq"
+    elif raw == "q":
+        speed = "q"
+    else:
+        speed = ""
     return (
         int(match.group("nm")),
-        bool(match.group("fast")),
+        speed,
         match.group("volt"),
         bool(match.group("aux")),
     )
 
 
-def hva_sku_code(*, voltage: str, aux: bool, torque_nm: int, fast: bool) -> str:
-    """Build ``HVA24S-10Q`` from edition parts."""
+def hva_sku_code(*, voltage: str, aux: bool, torque_nm: int, speed: HvaSpeed) -> str:
+    """Build ``HVA24S-10Q`` / ``HVA24-5UQ`` from edition parts."""
     s = "S" if aux else ""
-    q = "Q" if fast else ""
-    return f"HVA{voltage}{s}-{torque_nm}{q}"
+    suffix = speed.upper()
+    return f"HVA{voltage}{s}-{torque_nm}{suffix}"
 
 
-def product_slug_for_hva(*, torque_nm: int, fast: bool) -> str:
-    """Product slug for one HVA Nm / Q tile."""
-    if fast:
+def product_slug_for_hva(*, torque_nm: int, speed: HvaSpeed) -> str:
+    """Product slug for one HVA Nm / speed tile."""
+    if speed == "uq":
+        return f"privod-vozdushniy-bez-pruzhini-uskorenniy-hva-uq-{torque_nm}nm"
+    if speed == "q":
         return f"privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-{torque_nm}nm"
     return f"privod-vozdushniy-hva-{torque_nm}nm"
 
 
-def sku_slug_for_hva(code: str, *, torque_nm: int, fast: bool) -> str:
+def sku_slug_for_hva(code: str, *, torque_nm: int, speed: HvaSpeed) -> str:
     """SKU slug = ``{product_slug}-{code.lower()}``."""
-    return f"{product_slug_for_hva(torque_nm=torque_nm, fast=fast)}-{code.lower()}"
+    return f"{product_slug_for_hva(torque_nm=torque_nm, speed=speed)}-{code.lower()}"
 
 
-def _product_title(*, torque_nm: int, fast: bool) -> str:
-    if fast:
+def _product_title(*, torque_nm: int, speed: HvaSpeed) -> str:
+    if speed == "uq":
+        return f"HVA-{torque_nm}UQ | {torque_nm} Нм Привод воздушный без возвратной пружины сверхбыстрого срабатывания"
+    if speed == "q":
         return f"HVA-{torque_nm}Q | {torque_nm} Нм Привод воздушный без возвратной пружины ускоренного срабатывания"
     return (
         f"HVA-{torque_nm} | {torque_nm} Нм Привод воздушный без возвратной "
@@ -219,8 +278,12 @@ def _product_title(*, torque_nm: int, fast: bool) -> str:
     )
 
 
+def _family_label(nm: int, speed: HvaSpeed) -> str:
+    return f"HVA-{nm}{speed.upper()}"
+
+
 def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
-    """Create missing HVA std/Q products and four edition SKUs each."""
+    """Create missing HVA std/Q/UQ products and four edition SKUs each."""
     cat_std = Category.objects.filter(slug=CATEGORY_STD).first()
     cat_q = Category.objects.filter(slug=CATEGORY_Q).first()
     if cat_std is None or cat_q is None:
@@ -238,10 +301,10 @@ def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
 
     products_created = 0
     skus_created = 0
-    for torque_nm, fast in CATALOG_FAMILIES:
-        category = cat_q if fast else cat_std
-        p_slug = product_slug_for_hva(torque_nm=torque_nm, fast=fast)
-        title = _product_title(torque_nm=torque_nm, fast=fast)
+    for torque_nm, speed in CATALOG_FAMILIES:
+        category = cat_q if speed else cat_std
+        p_slug = product_slug_for_hva(torque_nm=torque_nm, speed=speed)
+        title = _product_title(torque_nm=torque_nm, speed=speed)
         product = Product.objects.filter(slug=p_slug).first()
         if product is None:
             if dry_run:
@@ -261,7 +324,7 @@ def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
                 voltage=voltage,
                 aux=aux,
                 torque_nm=torque_nm,
-                fast=fast,
+                speed=speed,
             )
             if SKU.objects.filter(sku_code__iexact=code).exists():
                 continue
@@ -273,10 +336,10 @@ def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
             SKU.objects.create(
                 product=product,
                 name=title[:300],
-                slug=sku_slug_for_hva(code, torque_nm=torque_nm, fast=fast),
+                slug=sku_slug_for_hva(code, torque_nm=torque_nm, speed=speed),
                 sku_code=code,
                 description="",
-                is_published=True,
+                is_published=(torque_nm, speed) not in _UNPUBLISHED_ON_CREATE,
             )
             skus_created += 1
 
@@ -288,7 +351,7 @@ def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
 
 
 def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
-    """Ensure catalog rows, then upsert datasheet ТТХ onto HVA std/Q SKUs."""
+    """Ensure catalog rows, then upsert datasheet ТТХ onto HVA std/Q/UQ SKUs."""
     ensure = ensure_hva_catalog(dry_run=dry_run)
     summary: dict[str, Any] = {
         "skus": 0,
@@ -309,19 +372,19 @@ def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
         if parsed is None:
             summary["skipped"] += 1
             continue
-        nm, fast, voltage, has_aux = parsed
-        row = FAMILY_SPECS.get((nm, fast))
+        nm, speed, voltage, has_aux = parsed
+        row = FAMILY_SPECS.get((nm, speed))
         if row is None:
             summary["skipped"] += 1
             continue
-        family_key = f"HVA-{nm}{'Q' if fast else ''}"
+        family_key = _family_label(nm, speed)
         summary["by_family"].setdefault(family_key, 0)
         summary["by_family"][family_key] += 1
         summary["skus"] += 1
         if dry_run:
             continue
 
-        title = _product_title(torque_nm=nm, fast=fast)
+        title = _product_title(torque_nm=nm, speed=speed)
         product = sku.product
         if product is not None:
             product.name = title[:200]

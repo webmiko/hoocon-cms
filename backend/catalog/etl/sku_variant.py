@@ -141,8 +141,8 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     elif re.fullmatch(r"hvd(?:24|230)s?-\d+q?", code):
         control = "on_off"
         aux = bool(re.match(r"hvd(?:24|230)s-", code))
-    # HVA24-5 / HVA24S-5Q — air damper without spring (modulating). Not QX/P.
-    elif re.fullmatch(r"hva(?:24|230)s?-\d+q?", code):
+    # HVA24-5 / HVA24S-5Q / HVA24-5UQ — air damper without spring (modulating).
+    elif re.fullmatch(r"hva(?:24|230)s?-\d+(?:uq|q)?", code):
         control = "modulating"
         aux = bool(re.match(r"hva(?:24|230)s-", code))
     # Suffixes are hyphen-prefixed edition tags strictly at the code end.

@@ -23,13 +23,16 @@ from catalog.models import (
 
 def test_hva_family_dimensions_match_catalog_2025() -> None:
     """Catalog pp. 40–54: HVA std/Q envelopes (H×W×D), aligned with HVD air/Q."""
-    assert FAMILY_SPECS[(5, False)]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
-    assert FAMILY_SPECS[(5, True)]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
-    assert FAMILY_SPECS[(10, False)]["dimensions"] == "167,8 × 86,2 × 68 мм"
-    assert FAMILY_SPECS[(10, True)]["dimensions"] == "167,8 × 86,2 × 68 мм"
-    assert FAMILY_SPECS[(20, False)]["dimensions"] == "191,8 × 103,4 × 68 мм"
-    assert FAMILY_SPECS[(40, False)]["dimensions"] == "198,6 × 110,2 × 68 мм"
-    assert FAMILY_SPECS[(40, True)]["dimensions"] == "198,6 × 110,2 × 68 мм"
+    assert FAMILY_SPECS[(5, "")]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert FAMILY_SPECS[(5, "q")]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert FAMILY_SPECS[(2, "")]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
+    assert FAMILY_SPECS[(5, "uq")]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(8, "q")]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(10, "")]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(10, "q")]["dimensions"] == "167,8 × 86,2 × 68 мм"
+    assert FAMILY_SPECS[(20, "")]["dimensions"] == "191,8 × 103,4 × 68 мм"
+    assert FAMILY_SPECS[(40, "")]["dimensions"] == "198,6 × 110,2 × 68 мм"
+    assert FAMILY_SPECS[(40, "q")]["dimensions"] == "198,6 × 110,2 × 68 мм"
 
 
 @pytest.mark.parametrize(
@@ -63,14 +66,17 @@ def test_sku_codes_for_hva_manual_exact_body() -> None:
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("HVA24-5", (5, False, "24", False)),
-        ("HVA230S-5Q", (5, True, "230", True)),
+        ("HVA24-5", (5, "", "24", False)),
+        ("HVA230S-5Q", (5, "q", "230", True)),
+        ("HVA24S-5UQ", (5, "uq", "24", True)),
+        ("HVA24-2", (2, "", "24", False)),
+        ("HVA230-8Q", (8, "q", "230", False)),
         ("HVA24-5P", None),
     ],
 )
 def test_parse_hva_std_q(
     code: str,
-    expected: tuple[int, bool, str, bool] | None,
+    expected: tuple[int, str, str, bool] | None,
 ) -> None:
     assert parse_hva_std_q(code) == expected
 
@@ -117,10 +123,18 @@ def test_ensure_hva_catalog_creates_missing_families() -> None:
         slug="elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata",
     )
     stats = ensure_hva_catalog(dry_run=False)
-    assert stats["products_created"] == 8
-    assert stats["skus_created"] == 32
+    assert stats["products_created"] == 11
+    assert stats["skus_created"] == 44
     assert SKU.objects.filter(sku_code="HVA24-10").exists()
     assert SKU.objects.filter(sku_code="HVA230S-40Q").exists()
+    assert SKU.objects.filter(sku_code="HVA24-2").exists()
+    assert SKU.objects.filter(sku_code="HVA24-8Q").exists()
+    assert SKU.objects.filter(sku_code="HVA24-5UQ").exists()
+    # Seeded for Admin/PDF attach, hidden on the public site for now.
+    assert SKU.objects.filter(sku_code="HVA24-2", is_published=False).exists()
+    assert SKU.objects.filter(sku_code="HVA230S-5UQ", is_published=False).exists()
+    assert SKU.objects.filter(sku_code="HVA24-8Q", is_published=False).exists()
+    assert SKU.objects.filter(sku_code="HVA24-10", is_published=True).exists()
 
 
 @pytest.mark.django_db
