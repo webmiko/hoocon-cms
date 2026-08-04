@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.15 beta — 2026-08-04
+
+- Home: below-fold sections mount near the viewport (lazy carousels + deferred
+  categories/novinki API) to cut first-screen JS and network payload.
+
 ### v0.1.14 beta — 2026-08-04
 
 - Catalog/mobile: lightweight `ProductImage.image_card` WebP (≤720px) for
