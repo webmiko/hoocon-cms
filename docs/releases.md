@@ -63,6 +63,14 @@
 
 ## Changelog
 
+### v0.1.14 beta — 2026-08-04
+
+- Catalog/mobile: lightweight `ProductImage.image_card` WebP (≤720px) for
+  list tiles; full hero stays on SKU detail. Backfill:
+  `manage.py generate_product_image_cards`.
+- a11y: carousel tracks keep `role="list"` under flex/grid; region landmark
+  moved off `<ul>`.
+
 ### v0.1.13 beta — 2026-07-30
 
 - Admin: passwordless Email OTP login when `ADMIN_EMAIL_OTP_ENABLED=true`
