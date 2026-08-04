@@ -258,7 +258,11 @@ poetry run python manage.py enrich_safu
 | SKU.sku_code | `HVA{24\|230}[S]-{n}[Q]` | `HVA24S-10`, `HVA230-20Q` |
 
 Линейки в каталоге 2025 (модулирующие): **5 / 10 / 20 / 40** и ускоренные
-**5Q / 10Q / 20Q / 40Q**. Seed: `manage.py enrich_hva --with-media`.
+**5Q / 10Q / 20Q / 40Q**. Дополнительно по RU-мануалам (пока могут быть
+неопубликованы): **2**, **5UQ**, **8Q**. Seed: `manage.py enrich_hva`
+(`--with-media` когда есть pack). Правило: при новых карточках с мануалом
+сразу ТТХ/PDF/фото из `_инструкции-pdf/RU/` /
+`_manuals-ru/HV/assets/<stem>/` (см. `.cursor/rules/cards-from-manuals.mdc`).
 
 ### Каталог / PDP
 
