@@ -18,17 +18,35 @@
   }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0; padding: 0;
+    margin: 0;
+    padding: 0;
     background: var(--bg);
     color: var(--ink);
     font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans", sans-serif;
     font-size: 9pt;
     line-height: 1.35;
   }
+  body {
+    /* Room for fixed .toolbar (updated by JS if toolbar wraps). */
+    padding-top: var(--toolbar-h, 52px);
+  }
   .toolbar {
-    position: sticky; top: 0; z-index: 20;
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    padding: 10px 16px; background: #111; color: #fff; font-size: 13px;
+    /* Fixed to viewport — sticky fails when ancestors scroll/overflow. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #111;
+    color: #fff;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .toolbar a { color: #9cf; }
   .toolbar button {
@@ -43,17 +61,29 @@
     outline-offset: 1px;
   }
   .stage {
-    padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    /* Rigid A4 sheets scroll here — keeps toolbar sticky. */
+    overflow-x: auto;
   }
   .sheet {
     position: relative;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    width: min(297mm, calc(100vw - 24px));
+    /* Fixed A4 landscape — do not shrink with viewport (horizontal scroll). */
+    width: 297mm;
+    height: 210mm;
+    max-width: none;
+    max-height: none;
     aspect-ratio: 297 / 210;
-    height: auto;
-    max-height: calc(min(297mm, 100vw - 24px) * 210 / 297);
+    flex-shrink: 0;
     overflow: hidden;
     background: var(--paper);
     box-shadow: 0 6px 20px rgba(0,0,0,.12);
@@ -226,20 +256,6 @@
     height: auto;
     object-fit: contain;
     object-position: top center;
-  }
-  .sheet-page1 .sheet1-dip-diagram {
-    min-height: 0;
-    max-height: 48mm;
-    overflow: hidden;
-    flex: 0 0 auto;
-  }
-  .sheet-page1 .sheet1-dip-diagram img {
-    display: block;
-    width: 100%;
-    max-height: 48mm;
-    height: auto;
-    object-fit: contain;
-    object-position: left center;
   }
   .sheet-page1 .running-foot {
     grid-row: 3;
@@ -489,22 +505,7 @@
   .wl-v24 { left: 6%; top: 88%; }
   .wl-v230 { left: 38%; top: 88%; }
   .wl-rating { left: 76%; top: 88%; }
-  .sheet-page2 .diagrams .diagram:nth-child(2) img {
-    max-height: 48mm;
-  }
-  .sheet-page2 .diagrams .diagram:nth-child(3) img {
-    max-height: 42mm;
-  }
-  .sheet-page2 .diagrams .diagram-dip > img {
-    max-height: none;
-  }
-  /* Free vertical room for the wide DIP table on A/AS sheet 2. */
-  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board > img {
-    max-height: 28mm !important;
-  }
-  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) img {
-    max-height: 38mm !important;
-  }
+  .sheet-page2 .diagrams .diagram-dip > img { height: auto; max-height: none; }
   .diagrams .banner {
     display: block;
     width: 100%;
@@ -681,21 +682,190 @@
     min-width: 0;
   }
   .product-col .media {
-    /* Sheet cols 7–9 (product-col is sheet cols 7–12 → local 1 / span 3). */
-    grid-column: 1 / span 3;
+    /* Sheet cols 8–9 when local grid is 6 (prefer 2 / span 2 if already patched). */
+    grid-column: 2 / span 2;
     grid-row: 1;
     align-self: center;
     justify-self: center;
-    min-height: 0;
+    position: relative;
     width: 100%;
+    height: var(--media-h, 72mm);
+    min-height: var(--media-h, 72mm);
+    max-height: var(--media-h, 72mm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    isolation: isolate;
+    min-width: 0;
   }
   .sheet-page1 .product-col .product-photo {
     max-width: 100%;
-    max-height: 72mm;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }
+
+  /* Media slots: div is the viewport (clips); image scales inside (product-media model). */
+  .sheet-page1 .aux-diagram-media,
+  .sheet-page1 .sheet1-dip-diagram,
+  .sheet-page1 .unlock-media,
+  .summary-media,
+  .wiring-board,
+  .diagram,
+  .diagram-rotation .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap,
+  .product-col .media,
+  .product-col .product-media {
+    overflow: hidden;
+    isolation: isolate;
+    box-sizing: border-box;
+  }
+  .sheet-page1 .aux-diagram-media {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--aux-h, 72mm);
+    min-height: 0;
+    max-height: var(--aux-h, 72mm);
+  }
+  .sheet-page1 .aux-diagram-media-compact {
+    --aux-h: 36mm;
+    height: var(--aux-h);
+    max-height: var(--aux-h);
+  }
+  .sheet-page1 .aux-diagram-media > img,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  .sheet-page1 .sheet1-dip-diagram {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--dip-h, 48mm);
+    max-height: var(--dip-h, 48mm);
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+  .sheet-page1 .sheet1-dip-diagram img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+  }
+  .wiring-board {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .wiring-board > img,
+  .wiring-board > .photo-crop-wrap {
+    display: block;
+    width: 100%;
+    height: var(--wiring-h, 40mm);
+    max-height: var(--wiring-h, 40mm);
+    min-height: 0;
+    object-fit: contain;
+    object-position: center top;
+  }
+  .wiring-board > .photo-crop-wrap {
+    overflow: hidden;
+  }
+  .wiring-board > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
     width: auto;
     height: auto;
     object-fit: contain;
   }
+  .wiring-board-ru-headers {
+    --wiring-h: 40mm;
+  }
+  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board {
+    --wiring-h: 28mm;
+  }
+  .diagram {
+    position: relative;
+    min-height: 0;
+  }
+  .diagram > img,
+  .diagram > .photo-crop-wrap {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: var(--diagram-h, 44mm);
+    max-height: var(--diagram-h, 44mm);
+    object-fit: contain;
+    object-position: center center;
+  }
+  .diagram > .photo-crop-wrap {
+    overflow: hidden;
+  }
+  .diagram > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  .diagram-wide {
+    --diagram-h: 36mm;
+  }
+  .sheet-page2 .diagram-wide {
+    --diagram-h: 34mm;
+  }
+  .sheet-page2 .diagrams .diagram:nth-child(2) {
+    --diagram-h: 48mm;
+  }
+  .sheet-page2 .diagrams .diagram:nth-child(3) {
+    --diagram-h: 42mm;
+  }
+  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) {
+    --diagram-h: 38mm;
+  }
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {
+    overflow: hidden;
+    max-height: 36mm;
+    height: 100%;
+  }
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-media > img,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
+  }
+
   .doc-title-box {
     grid-column: 2 / span 5;
     grid-row: 2;
@@ -844,12 +1014,6 @@
   .diagram-wide {
     grid-column: 1 / -1;
   }
-  .diagram img { max-width: 100%; max-height: 44mm; object-fit: contain; }
-  .diagram-wide img {
-    max-height: 36mm;
-    width: 100%;
-    object-fit: contain;
-  }
   .data-table {
     width: 100%; border-collapse: collapse; table-layout: fixed;
     margin: 0 0 2.5mm; font-size: 7.2pt;
@@ -861,34 +1025,6 @@
   .data-table tr:first-child td,
   .data-table td.row-section {
     background: #e8e8e8; font-weight: 600; text-align: left;
-  }
-
-  @media (max-width: 900px) {
-    .span-3, .span-4, .span-5, .span-6, .span-7 { grid-column: span 12; }
-    .summary-block { grid-column: span 12; grid-template-columns: 1fr; }
-    .summary-media,
-    .summary-copy { grid-column: 1 / -1; }
-    .sheet2-body .summary-block,
-    .sheet2-body .tech-block,
-    .sheet2-body .diagrams-block {
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }
-    .sheet1-body .sheet1-cols-left,
-    .sheet1-body .sheet1-cols-right {
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }
-    .product-col { grid-template-columns: 1fr; }
-    .product-col .media,
-    .media-meta,
-    .doc-title-box,
-    .torque,
-    .sku-list { grid-column: 1 / -1; }
-    .diagrams { grid-template-columns: 1fr; }
-    .diagram-rotation .rotation-panel { grid-template-columns: 1fr; }
-    .diagram-rotation .rotation-panel .rotation-copy,
-    .diagram-rotation .rotation-panel > img { grid-column: 1 / -1; }
   }
 
   @page { size: A4 landscape; margin: 0; }
@@ -1105,6 +1241,20 @@
       }
     })();
   </script>
-  <script src="assets/photo-crop-tool.js"></script>
+  <script src="assets/photo-crop-tool.js?v=restore5"></script>
+<script>
+  (function () {
+    var bar = document.querySelector(".toolbar");
+    if (!bar) return;
+    function syncToolbarH() {
+      document.body.style.setProperty("--toolbar-h", bar.offsetHeight + "px");
+    }
+    syncToolbarH();
+    window.addEventListener("resize", syncToolbarH);
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(syncToolbarH).observe(bar);
+    }
+  })();
+  </script>
 </body>
 </html>

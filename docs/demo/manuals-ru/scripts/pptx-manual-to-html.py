@@ -824,6 +824,8 @@ class DiagramProfile:
     sheet1_aux_caption: str | None = None
     # Sheet 2 wiring: RU «Привод» / «Вспомогательный переключатель» above cropped PNG.
     wiring_ru_headers: bool = False
+    # Sheet 1: UQ «Ручная разблокировка» above aux (hint cols 1–3, figure 4–6).
+    sheet1_unlock: bool = False
 
 
 DIAGRAM_PROFILES: dict[str, DiagramProfile] = {
@@ -1346,6 +1348,19 @@ LOCKED_MANUAL_STEMS: frozenset[str] = frozenset(
         "sa15fu-ds-dst",
         "sa15mu-ds-dst",
         "sa30mu-ds-dst",
+        # HV — зафиксированные.
+        "hva-2",
+        "hva-5",
+        "hva-5q",
+        "hva-5uq",  # эталон семьи UQ (unlock block)
+        "hva-8q",
+        "hva-10",
+        "hva-10q",
+        "hva-20",
+        "hva-20q",
+        "hva-40",
+        "hva-40q",
+        "hvd-3f-s-st",
     }
 )
 
@@ -1981,13 +1996,15 @@ def _rotation_figure_html(stem: str, profile: DiagramProfile) -> str:
         )
     elif profile.rotation_kind == "thermal_saf72":
         banner = "Термодатчик SAF72"
+        # SA FU: DST; HVD-F: ST (без D — HVD…S / HVD…ST).
+        edition = "ST" if stem.startswith("hvd-") else "DST"
         copy = (
             "<p>Состоит из датчика окружающей среды (TS1) и канального "
             "датчика (TS2).</p>"
             "<p>TS1 размыкается при температуре окружающей среды выше "
             "72&nbsp;°C.</p>"
             "<p>TS2 размыкается при температуре в канале выше 72&nbsp;°C.</p>"
-            "<p>Поставляется с исполнением «DST».</p>"
+            f"<p>Поставляется с исполнением «{edition}».</p>"
         )
         return (
             '<figure class="diagram diagram-wide diagram-rotation diagram-thermal">'
@@ -3298,12 +3315,67 @@ def _summary_parts(summary: str) -> tuple[str, str, str]:
     return heading, intro, list_html
 
 
+# Product media row guide: fixed 5 mm horizontal lines (show-cols only).
+PHOTO_ROW_STEP_MM = 5
+
+
+def _photo_row_guide_html(*, height_mm: int = 72) -> str:
+    """Horizontal guide lines every PHOTO_ROW_STEP_MM; centre line is bold."""
+    step = PHOTO_ROW_STEP_MM
+    mid = float(height_mm) / 2
+    ys: list[float] = []
+    y = 0.0
+    while y <= height_mm + 0.01:
+        ys.append(y)
+        y += step
+    if not any(abs(v - mid) < 0.05 for v in ys):
+        ys.append(mid)
+        ys.sort()
+    parts: list[str] = []
+    for v in ys:
+        cls = "pr-line pr-center" if abs(v - mid) < 0.05 else "pr-line"
+        parts.append(f'<span class="{cls}" style="--pr-y:{v:g}"></span>')
+    return f'<div class="photo-rows" aria-hidden="true">{"".join(parts)}</div>'
+
+
+
+
+UNLOCK_BANNER_RU = "Ручная разблокировка"
+UNLOCK_HINT_RU = (
+    "Нажмите кнопку разблокировки до упора вниз, чтобы разблокировать привод."
+)
+
+
+def stem_has_uq_unlock(stem: str) -> bool:
+    """UQ cover has «Manual unlocking» above aux (stem token …uq)."""
+    return bool(re.search(r"uq(?:$|[^a-z])", stem.lower())) or stem.lower().endswith("uq")
+
+
+def _sheet1_unlock_html(stem: str) -> str:
+    """UQ sheet-1 unlock block: banner + hint (cols 1–3) + unlock.png (cols 4–6)."""
+    return f"""
+            <div class="sheet1-unlock">
+              <h2 class="banner">{html.escape(UNLOCK_BANNER_RU)}</h2>
+              <div class="media unlock-media">
+                <p class="prose unlock-hint">{html.escape(UNLOCK_HINT_RU)}</p>
+                <img src="assets/{html.escape(stem)}/unlock.png" alt="Кнопка разблокировки">
+              </div>
+            </div>"""
+
+
 def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None) -> str:
     stem = doc.stem
-    photo = (
+    # SA hero is slightly shorter — same row step, shorter slot.
+    media_h = 58 if stem.startswith("sa") else 72
+    rows = _photo_row_guide_html(height_mm=media_h)
+    photo_inner = (
         f'<img class="product-photo" src="assets/{stem}/{doc.product_photo}" alt="">'
         if doc.product_photo
         else '<div class="photo-fallback">HOOCON</div>'
+    )
+    photo = (
+        f'<div class="media product-media" style="--media-h:{media_h}mm">'
+        f"{rows}{photo_inner}</div>"
     )
     if diagram_profile is not None:
         diagrams = curated_diagrams_html(stem, diagram_profile)
@@ -3345,6 +3417,11 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
     )
 
     aux_table_html = _html_table(doc.aux_table) or "<p class='muted'>—</p>"
+    unlock_html = ""
+    if diagram_profile is not None and (
+        diagram_profile.sheet1_unlock or stem_has_uq_unlock(stem)
+    ):
+        unlock_html = _sheet1_unlock_html(stem)
     if diagram_profile is not None and diagram_profile.sheet1_aux_diagram:
         # Cols 1–6: aux table | diagram on top; Attention banner+prose full width below.
         dip_html = ""
@@ -3357,6 +3434,7 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
         if aux_caption:
             sheet1_main = f"""
           <div class="stack sheet1-left sheet1-with-aux-diagram">
+            {unlock_html}
             <div class="sheet1-aux-row sheet1-aux-row-captioned">
               <div class="stack sheet1-aux sheet1-aux-main">
                 <h2 class="banner">Вспомогательный переключатель</h2>
@@ -3377,6 +3455,7 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
         else:
             sheet1_main = f"""
           <div class="stack sheet1-left sheet1-with-aux-diagram">
+            {unlock_html}
             <div class="sheet1-aux-row">
               <div class="stack sheet1-aux">
                 <h2 class="banner">Вспомогательный переключатель</h2>
@@ -3505,17 +3584,35 @@ HTML_SHELL = """\
   }}
   * {{ box-sizing: border-box; }}
   html, body {{
-    margin: 0; padding: 0;
+    margin: 0;
+    padding: 0;
     background: var(--bg);
     color: var(--ink);
     font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans", sans-serif;
     font-size: 9pt;
     line-height: 1.35;
   }}
+  body {{
+    /* Room for fixed .toolbar (updated by JS if toolbar wraps). */
+    padding-top: var(--toolbar-h, 52px);
+  }}
   .toolbar {{
-    position: sticky; top: 0; z-index: 20;
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    padding: 10px 16px; background: #111; color: #fff; font-size: 13px;
+    /* Fixed to viewport — sticky fails when ancestors scroll/overflow. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #111;
+    color: #fff;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
   }}
   .toolbar a {{ color: #9cf; }}
   .toolbar button {{
@@ -3530,17 +3627,29 @@ HTML_SHELL = """\
     outline-offset: 1px;
   }}
   .stage {{
-    padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    /* Rigid A4 sheets scroll here — keeps toolbar sticky. */
+    overflow-x: auto;
   }}
   .sheet {{
     position: relative;
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    width: min(297mm, calc(100vw - 24px));
+    /* Fixed A4 landscape — do not shrink with viewport (horizontal scroll). */
+    width: 297mm;
+    height: 210mm;
+    max-width: none;
+    max-height: none;
     aspect-ratio: 297 / 210;
-    height: auto;
-    max-height: calc(min(297mm, 100vw - 24px) * 210 / 297);
+    flex-shrink: 0;
     overflow: hidden;
     background: var(--paper);
     box-shadow: 0 6px 20px rgba(0,0,0,.12);
@@ -3676,6 +3785,45 @@ HTML_SHELL = """\
     overflow: hidden;
     text-overflow: clip;
   }}
+
+  /* UQ family: unlock figure above aux (эталон HV/hva-5uq). */
+  .sheet-page1 .sheet1-unlock {{
+    margin: 0 0 2mm;
+  }}
+  .sheet-page1 .sheet1-unlock .unlock-hint {{
+    grid-column: 1 / span 3;
+    margin: 0;
+    font-size: 8pt;
+    line-height: 1.3;
+    min-width: 0;
+    align-self: center;
+  }}
+  .sheet-page1 .sheet1-unlock .unlock-media {{
+    /* Left half = sheet cols 1–6 → local 6; hint 1–3, figure 4–6. */
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: center;
+    min-height: 36mm;
+    max-height: 40mm;
+  }}
+  .sheet-page1 .sheet1-unlock .unlock-media > img,
+  .sheet-page1 .sheet1-unlock .unlock-media > .photo-crop-wrap {{
+    grid-column: 4 / span 3;
+    width: 100%;
+    min-width: 0;
+    max-height: 40mm;
+    justify-self: stretch;
+  }}
+  .sheet-page1 .sheet1-unlock .unlock-media img {{
+    display: block;
+    max-width: 100%;
+    max-height: 40mm;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center top;
+  }}
   /* Aux table | diagram side-by-side; Attention below spans full 1–6. */
   .sheet-page1 .sheet1-aux-row {{
     display: grid;
@@ -3700,26 +3848,7 @@ HTML_SHELL = """\
     padding-top: 0;
     align-self: start;
   }}
-  .sheet-page1 .aux-diagram-media {{
-    min-height: 0;
-    height: auto;
-    max-height: 72mm;
-    align-items: flex-start;
-  }}
-  .sheet-page1 .aux-diagram {{
-    max-width: 100%;
-    max-height: 72mm;
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-    object-position: top center;
-  }}
-  .sheet-page1 .aux-diagram-media-compact {{
-    max-height: 36mm;
-  }}
-  .sheet-page1 .aux-diagram-compact {{
-    max-height: 36mm;
-  }}
+  .sheet-page1 .aux-diagram-compact {{ max-height: 100%; }}
   .sheet-page1 .aux-diagram-caption {{
     margin: 0;
     padding: 0;
@@ -4236,25 +4365,228 @@ HTML_SHELL = """\
     align-items: center;
     min-width: 0;
   }}
-  .product-col .media {{
-    /* Sheet cols 7–9 (product-col is sheet cols 7–12 → local 1 / span 3). */
-    grid-column: 1 / span 3;
+  .product-col .media,
+  .product-col .product-media {{
+    /* Sheet cols 8–9 (product-col is sheet cols 7–12 → local 2 / span 2). */
+    grid-column: 2 / span 2;
     grid-row: 1;
     align-self: center;
     justify-self: center;
-    min-height: 0;
+    position: relative;
     width: 100%;
+    height: var(--media-h, 72mm);
+    min-height: var(--media-h, 72mm);
+    max-height: var(--media-h, 72mm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    isolation: isolate;
   }}
   .sheet-page1 .product-col .product-photo {{
     max-width: 100%;
-    max-height: 72mm;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }}
+  /* SA FU/MU: shorter media slot (see --media-h on .product-media). */
+  .sheet-page1 .product-col .product-photo[src*="/sa"] {{
+    max-height: 100%;
+  }}
+  /* Media slots: div is the viewport (clips); image scales inside (product-media model). */
+  .sheet-page1 .aux-diagram-media,
+  .sheet-page1 .sheet1-dip-diagram,
+  .sheet-page1 .unlock-media,
+  .summary-media,
+  .wiring-board,
+  .diagram,
+  .diagram-rotation .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {{
+    overflow: hidden;
+    isolation: isolate;
+    box-sizing: border-box;
+  }}
+  .sheet-page1 .aux-diagram-media {{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--aux-h, 72mm);
+    min-height: 0;
+    max-height: var(--aux-h, 72mm);
+  }}
+  .sheet-page1 .aux-diagram-media-compact {{
+    --aux-h: 36mm;
+    height: var(--aux-h);
+    max-height: var(--aux-h);
+  }}
+  .sheet-page1 .aux-diagram-media > img,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap > img {{
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }}
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }}
+  .sheet-page1 .sheet1-dip-diagram {{
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--dip-h, 48mm);
+    max-height: var(--dip-h, 48mm);
+    min-height: 0;
+    flex: 0 0 auto;
+  }}
+  .sheet-page1 .sheet1-dip-diagram img {{
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+  }}
+  .wiring-board {{
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }}
+  .wiring-board > img,
+  .wiring-board > .photo-crop-wrap {{
+    display: block;
+    width: 100%;
+    height: var(--wiring-h, 40mm);
+    max-height: var(--wiring-h, 40mm);
+    min-height: 0;
+    object-fit: contain;
+    object-position: center top;
+  }}
+  .wiring-board > .photo-crop-wrap {{
+    overflow: hidden;
+  }}
+  .wiring-board > .photo-crop-wrap > img {{
+    max-width: 100%;
+    max-height: 100%;
     width: auto;
     height: auto;
     object-fit: contain;
   }}
-  /* SA FU/MU: slightly smaller hero so left body + SAF72 fit without clip. */
-  .sheet-page1 .product-col .product-photo[src*="/sa"] {{
-    max-height: 58mm;
+  .wiring-board-ru-headers {{
+    --wiring-h: 40mm;
+  }}
+  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board {{
+    --wiring-h: 28mm;
+  }}
+  .diagram {{
+    position: relative;
+    min-height: 0;
+  }}
+  .diagram > img,
+  .diagram > .photo-crop-wrap {{
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: var(--diagram-h, 44mm);
+    max-height: var(--diagram-h, 44mm);
+    object-fit: contain;
+    object-position: center center;
+  }}
+  .diagram > .photo-crop-wrap {{
+    overflow: hidden;
+  }}
+  .diagram > .photo-crop-wrap > img {{
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }}
+  .diagram-wide {{
+    --diagram-h: 36mm;
+  }}
+  .sheet-page2 .diagram-wide {{
+    --diagram-h: 34mm;
+  }}
+  .sheet-page2 .diagrams .diagram:nth-child(2) {{
+    --diagram-h: 48mm;
+  }}
+  .sheet-page2 .diagrams .diagram:nth-child(3) {{
+    --diagram-h: 42mm;
+  }}
+  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) {{
+    --diagram-h: 38mm;
+  }}
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {{
+    overflow: hidden;
+    max-height: 36mm;
+    height: 100%;
+  }}
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-media > img,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap > img {{
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
+  }}
+
+
+  /* Green photo-bounds guide (positioned by JS to match visible photo). */
+  .photo-bounds-guide {{
+    display: none;
+    position: absolute;
+    box-sizing: border-box;
+    border: 0.25mm solid rgba(42, 157, 74, 0.95);
+    pointer-events: none;
+    z-index: 4;
+  }}
+  body.show-cols .photo-bounds-guide {{
+    display: block;
+  }}
+  /* 5 mm row guide over product media (show-cols). */
+  .photo-rows {{
+    display: none;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }}
+  body.show-cols .photo-rows {{
+    display: block;
+  }}
+  .photo-rows .pr-line {{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--pr-y) * 1mm);
+    border-top: 0.18mm solid rgba(215, 21, 25, 0.35);
+    height: 0;
+  }}
+  .photo-rows .pr-line.pr-center {{
+    border-top-width: 0.45mm;
+    border-top-color: rgba(215, 21, 25, 0.9);
+    z-index: 1;
   }}
   .doc-title-box {{
     grid-column: 2 / span 5;
@@ -4313,6 +4645,13 @@ HTML_SHELL = """\
     white-space: nowrap;
     text-align: center;
     overflow: hidden;
+  }}
+  /* Product photo is B&W (EN image manuals) → logo + torque match, no brand red. */
+  .theme-mono .logo img {{
+    filter: grayscale(1) contrast(1.05);
+  }}
+  .theme-mono .torque {{
+    color: #1a1a1a;
   }}
   .sku-list {{
     list-style: none;
@@ -4404,12 +4743,6 @@ HTML_SHELL = """\
   .diagram-wide {{
     grid-column: 1 / -1;
   }}
-  .diagram img {{ max-width: 100%; max-height: 44mm; object-fit: contain; }}
-  .diagram-wide img {{
-    max-height: 36mm;
-    width: 100%;
-    object-fit: contain;
-  }}
   .data-table {{
     width: 100%; border-collapse: collapse; table-layout: fixed;
     margin: 0 0 2.5mm; font-size: 7.2pt;
@@ -4423,40 +4756,17 @@ HTML_SHELL = """\
     background: #e8e8e8; font-weight: 600; text-align: left;
   }}
 
-  @media (max-width: 900px) {{
-    .span-3, .span-4, .span-5, .span-6, .span-7 {{ grid-column: span 12; }}
-    .summary-block {{ grid-column: span 12; grid-template-columns: 1fr; }}
-    .summary-media,
-    .summary-copy {{ grid-column: 1 / -1; }}
-    .sheet2-body .summary-block,
-    .sheet2-body .tech-block,
-    .sheet2-body .diagrams-block {{
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }}
-    .sheet1-body .sheet1-cols-left,
-    .sheet1-body .sheet1-cols-right {{
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }}
-    .product-col {{ grid-template-columns: 1fr; }}
-    .product-col .media,
-    .media-meta,
-    .doc-title-box,
-    .torque,
-    .sku-list {{ grid-column: 1 / -1; }}
-    .diagrams {{ grid-template-columns: 1fr; }}
-    .diagram-rotation .rotation-panel {{ grid-template-columns: 1fr; }}
-    .diagram-rotation .rotation-panel .rotation-copy,
-    .diagram-rotation .rotation-panel > img,
-    .diagram-rotation .rotation-panel > .rotation-media {{ grid-column: 1 / -1; }}
-  }}
-
   @page {{ size: A4 landscape; margin: 0; }}
   @media print {{
     html, body {{ background: #fff; }}
     .toolbar {{ display: none !important; }}
-    .col-guide {{ display: none !important; }}
+    .col-guide,
+    .photo-rows,
+    .photo-bounds-guide {{ display: none !important; }}
+    .sheet-page1 .product-col .product-photo,
+    .sheet-page1 .product-col .photo-crop-wrap {{
+      outline: none !important;
+    }}
     .stage {{ padding: 0; gap: 0; }}
     .sheet {{
       box-shadow: none;
@@ -4565,10 +4875,75 @@ HTML_SHELL = """\
         }});
       }}
 
+
+      function photoVisibleBox(media, img) {{
+        var mr = media.getBoundingClientRect();
+        var wrap = img.closest(".photo-crop-wrap.photo-crop-active");
+        /* Dedicated wrap (not product-media) = crop host; else the img. */
+        var el = (wrap && !wrap.classList.contains("product-media")) ? wrap : img;
+        var r = el.getBoundingClientRect();
+        if (!wrap && r.height > mr.height * 1.05) {{
+          var h = img.offsetHeight || r.height;
+          var w = img.offsetWidth || r.width;
+          var cx = r.left + r.width / 2;
+          var cy = r.top + r.height / 2;
+          return {{
+            top: cy - h / 2 - mr.top,
+            bot: cy + h / 2 - mr.top,
+            left: cx - w / 2 - mr.left,
+            right: cx + w / 2 - mr.left,
+            height: h,
+            width: w
+          }};
+        }}
+        return {{
+          top: r.top - mr.top,
+          bot: r.bottom - mr.top,
+          left: r.left - mr.left,
+          right: r.right - mr.left,
+          height: r.height,
+          width: r.width
+        }};
+      }}
+
+      function syncPhotoBoundsGuide() {{
+        if (!document.body.classList.contains("show-cols")) return;
+        document.querySelectorAll(".product-media").forEach(function (media) {{
+          var img = media.querySelector("img.product-photo");
+          if (!img) return;
+          var mr = media.getBoundingClientRect();
+          if (mr.height < 8) return;
+          var guide = media.querySelector(".photo-bounds-guide");
+          if (!guide) {{
+            guide = document.createElement("div");
+            guide.className = "photo-bounds-guide";
+            guide.setAttribute("aria-hidden", "true");
+            media.appendChild(guide);
+          }}
+          /* Crop viewport = the media slot itself (overflow:hidden). */
+          if (media.classList.contains("photo-crop-active")) {{
+            guide.style.top = "0px";
+            guide.style.left = "0px";
+            guide.style.width = mr.width + "px";
+            guide.style.height = mr.height + "px";
+            return;
+          }}
+          var box = photoVisibleBox(media, img);
+          if (box.height < 4) return;
+          guide.style.top = Math.max(0, box.top) + "px";
+          guide.style.left = Math.max(0, box.left) + "px";
+          guide.style.width = Math.min(mr.width, Math.max(0, box.width)) + "px";
+          guide.style.height = Math.min(mr.height, Math.max(0, box.height)) + "px";
+        }});
+      }}
+
       function fitSheet1Type() {{
         fitDocTitle();
         fitTorque();
+        syncPhotoBoundsGuide();
       }}
+
+      window.syncPhotoBoundsGuide = syncPhotoBoundsGuide;
 
       window.addEventListener("load", fitSheet1Type);
       window.addEventListener("resize", fitSheet1Type);
@@ -4578,7 +4953,21 @@ HTML_SHELL = """\
       }}
     }})();
   </script>
-  <script src="assets/photo-crop-tool.js"></script>
+  <script src="assets/photo-crop-tool.js?v=center1"></script>
+  <script>
+  (function () {{
+    var bar = document.querySelector(".toolbar");
+    if (!bar) return;
+    function syncToolbarH() {{
+      document.body.style.setProperty("--toolbar-h", bar.offsetHeight + "px");
+    }}
+    syncToolbarH();
+    window.addEventListener("resize", syncToolbarH);
+    if (typeof ResizeObserver !== "undefined") {{
+      new ResizeObserver(syncToolbarH).observe(bar);
+    }}
+  }})();
+  </script>
 </body>
 </html>
 """

@@ -75,6 +75,12 @@ Curated для генератора / шаблонов: [`assets/`](assets/).
 
 ## Зафиксированный каркас (не ломать)
 
+Экран: лист **жёстко** `297mm × 210mm` (A4 landscape). При узком viewport —
+**горизонтальный скролл** на `.stage` (тулбар `position: fixed`), без сжатия сетки и без `@media` reflow колонок.
+Печать — тот же размер (`@page A4 landscape`).
+
+Медиа-слоты (product / lead / aux / unlock / wiring / dimensions / rotation): контейнер с `overflow: hidden` задаёт кадр; `img` подстраивается через `object-fit: contain` (как `.product-media`).
+
 | Лист | Сетка | Блоки |
 |------|--------|--------|
 | **1** | 12 кол., A4 landscape | Hero → **sheet1-body**: cols **1–6** (aux ± схема; Внимание; контакты) \| cols **7–12** (product 7–9 + media-meta 10–12 + doc-title) → foot |
@@ -122,9 +128,8 @@ JS-fit: `fitDocTitle()` (заголовок документа) и `fitTorque()`
 | `da8-16-24mqu230-d-ds` | **LOCKED готовый** — не пересобирать | `commutating` | S1 |
 
 **Locked manuals** (`LOCKED_MANUAL_STEMS`): HTML + `{DA,SA,HV}/assets/<stem>/`
-не трогать генераторами. Сейчас: **15** DA в `DA/` + **`sa3fu-ds-dst`**,
-**`sa5fu-ds-dst`**, **`sa7mu-ds-dst`**, **`sa10fu-ds-dst`**, **`sa10mu-ds-dst`**,
-**`sa15fu-ds-dst`**, **`sa15mu-ds-dst`** в `SA/`.
+не трогать генераторами. Сейчас: **15** DA в `DA/` + SA
+(`sa3fu`…`sa30mu` DS/DST) + HV **`hva-2`**, **`hva-5`**, **`hva-5q`**, **`hva-5uq`** (эталон UQ), **`hva-8q`**, **`hva-10`**, **`hva-10q`**, **`hva-20`**, **`hva-20q`**, **`hva-40`**, **`hva-40q`**, **`hvd-3f-s-st`**.
 Обход только с `--force`.
 
 **Locked DIP:** `assets/dip-diagram-control-signal-ru.png` (Creator Studio,
@@ -221,23 +226,42 @@ PDF-кропы (`_pdf_clip_png`):
 Комбинированный 24+230 в одном PDF (не V24/V230).
 SAFU — DS/DST + блок SAF72; **SAMU — только DS** (без DST).
 
+
+## Семья UQ (сверхбыстрые HVA)
+
+Эталон: [`HV/hva-5uq.html`](HV/hva-5uq.html). Пустой каркас:
+[`template-uq.html`](template-uq.html).
+
+Отличие cover EN: блок **Manual unlocking method** над aux (у std/Q его нет).
+
+| Элемент | Канон |
+|---------|--------|
+| Баннер | «Ручная разблокировка» |
+| Текст | cols **1–3** (`.unlock-hint`) |
+| Рисунок | cols **4–6** (`unlock.png`, слот 36–40 mm) |
+| Ассет | `assets/<stem>/unlock.png` (подпись RU на рисунке) |
+| Генератор | `DiagramProfile.sheet1_unlock` / `stem_has_uq_unlock()` |
+
+Сейчас в очереди EN только **`hva-5uq`**. Новые `*uq` — клонировать эталон / `template-uq`,
+не std `hva-5`. Locked stems не пересобирать без `--force`.
+
 ### HV/ — очередь (папка готова)
 
-| Ориентир stem | PDF EN |
-|---------------|--------|
-| `hva-2` | `hva-2.pdf` |
-| `hva-5` | `hva-5.pdf` / `HVA-5 instruction.pdf` |
-| `hva-5q` | `hva-5q.pdf` |
-| `hva-5uq` | `hva-5uq.pdf` |
-| `hva-8q` | `hva-8q.pdf` |
-| `hva-10` | `hva-10.pdf` |
-| `hva-10q` | `hva-10q.pdf` |
-| `hva-20` | `hva-20.pdf` |
-| `hva-20q` | `hva-20q.pdf` |
-| `hva-40` | `hva-40.pdf` |
-| `hva-40q` | `hva-40q.pdf` |
-| `hvd-3f-s-st` | `hvd-3f-s_st.pdf` |
-| `hvd-5f-s-st` | `hvd-5f-s_st.pdf` |
+| Ориентир stem | PDF EN | Статус |
+|---------------|--------|--------|
+| `hva-2` | `hva-2.pdf` | **LOCKED** |
+| `hva-5` | `hva-5.pdf` / `HVA-5 instruction.pdf` | **LOCKED** |
+| `hva-5q` | `hva-5q.pdf` | **LOCKED** |
+| `hva-5uq` | `hva-5uq.pdf` | **LOCKED** эталон семьи UQ |
+| `hva-8q` | `hva-8q.pdf` | **LOCKED** |
+| `hva-10` | `hva-10.pdf` | **LOCKED** |
+| `hva-10q` | `hva-10q.pdf` | **LOCKED** |
+| `hva-20` | `hva-20.pdf` | **LOCKED** |
+| `hva-20q` | `hva-20q.pdf` | **LOCKED** |
+| `hva-40` | `hva-40.pdf` | **LOCKED** |
+| `hva-40q` | `hva-40q.pdf` | **LOCKED** |
+| `hvd-3f-s-st` | `hvd-3f-s_st.pdf` | **LOCKED** |
+| `hvd-5f-s-st` | `hvd-5f-s_st.pdf` | |
 
 Пересборка EN→RU:
 
@@ -245,14 +269,22 @@ SAFU — DS/DST + блок SAF72; **SAMU — только DS** (без DST).
 python3 docs/demo/manuals-ru/scripts/en_pdf_to_manuals.py
 ```
 
+## Сетка фото (show-cols)
+
+На листе 1 у `.product-media` — фиксированный слот (`--media-h`: HV/DA **72 mm**,
+SA **58 mm**), `.photo-rows` (линии каждые **5 mm**) и зелёная рамка
+`.photo-bounds-guide` по видимому фото (кнопка **«Колонки»**). В печати скрыты.
+
+Канон в генераторе: `PHOTO_ROW_STEP_MM`, `_photo_row_guide_html`.
+
 ## Кроп фото (печать PDF)
 
 В тулбаре мануала — **«Кроп фото»** ([`assets/photo-crop-tool.js`](assets/photo-crop-tool.js)):
 
-1. Цель: `product` (лист 1) или `lead` (лист 2).
-2. Слайдеры границ (верх / право / низ / лево, %).
-3. `clip-path` применяется **и на экране, и в «Печать / PDF»** (панель скрывается, кроп остаётся).
-4. Чтобы запечь в файл: **Скачать PNG** → заменить `assets/<stem>/product.png` или `lead.png` → **Сброс**.
+1. Цель: любое PNG в листах (product / lead / схемы).
+2. Границы % + zoom; pan; после apply — `window.syncPhotoBoundsAndScale`.
+3. Кроп **и на экране, и в «Печать / PDF»** (панель скрывается).
+4. Запечь: **Скачать PNG** → заменить файл в `assets/<stem>/` → **Сброс**.
 
 Открывать через `http.server` (не `file://`), иначе скачивание PNG может упереться в CORS.
 
