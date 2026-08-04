@@ -162,6 +162,30 @@ def iter_manual_pdfs(manuals_dir: Path, pattern: str = "*.pdf") -> list[Path]:
     return out
 
 
+def _manual_lang_rank(path: Path) -> int:
+    """Sort key: RU (0) before root (1) before EN (2)."""
+    name = path.parent.name
+    if name == "RU":
+        return 0
+    if name == "EN":
+        return 2
+    return 1
+
+
+def _unique_manual_paths(manuals_dir: Path, *patterns: str) -> list[Path]:
+    """Union of ``iter_manual_pdfs`` for several globs (path-deduped, RU-first)."""
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for pattern in patterns:
+        for path in iter_manual_pdfs(manuals_dir, pattern):
+            key = path.resolve()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(path)
+    return out
+
+
 def find_manual_file(manuals_dir: Path, filename: str) -> Path | None:
     """Resolve a basename under ``RU/``, ``EN/``, or the manuals root.
 
@@ -1244,10 +1268,23 @@ def discover_hvd_manuals(
     if not manuals_dir.is_dir():
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
-    for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
+    # Case-sensitive volumes: ``hvd-*`` misses ``HVD-*.pdf`` in RU/.
+    hvd_paths = _unique_manual_paths(
+        manuals_dir,
+        "hvd-*.pdf",
+        "HVD-*.pdf",
+    )
+    hvd_paths.sort(key=lambda p: (_manual_lang_rank(p), p.name.casefold()))
+    seen_nm: set[int] = set()
+    for path in hvd_paths:
         torque_nm = parse_hvd_f_manual_stem(path.name)
         if torque_nm is None:
             warnings.append(f"unrecognized HVD filename: {path.name!r}")
+            continue
+        if torque_nm in seen_nm:
+            warnings.append(
+                f"duplicate HVD manual for {torque_nm}F, skip {path.name!r}",
+            )
             continue
         codes = sku_codes_for_hvd_f_manual(torque_nm, sku_codes)
         if not codes:
@@ -1255,6 +1292,7 @@ def discover_hvd_manuals(
                 f"no catalog SKU for {path.name!r} (expected HVD*S-{torque_nm}F / HVD*ST-{torque_nm}F)",
             )
             continue
+        seen_nm.add(torque_nm)
         matches.append(
             ManualMatch(
                 path=path,
@@ -1375,15 +1413,18 @@ def discover_hva_manuals(
         warnings.append(f"manuals dir missing: {manuals_dir}")
         return matches, warnings
 
-    paths = sorted(
-        {
-            *iter_manual_pdfs(manuals_dir, "hva-*.pdf"),
-            *iter_manual_pdfs(manuals_dir, "HVA-*.pdf"),
-            *iter_manual_pdfs(manuals_dir, "HVA-5 instruction.pdf"),
-        },
+    # Case-sensitive volumes need both lower/upper globs; RU before EN.
+    paths = _unique_manual_paths(
+        manuals_dir,
+        "hva-*.pdf",
+        "HVA-*.pdf",
+        "HVA-5 instruction.pdf",
+    )
+    paths.sort(
         key=lambda p: (
             # Prefer ascii ``hva-5.pdf`` over legacy ``HVA-5 instruction.pdf``.
             0 if _HVA_STEM.fullmatch(normalize_manual_stem(p.name)) else 1,
+            _manual_lang_rank(p),
             p.name.casefold(),
         ),
     )

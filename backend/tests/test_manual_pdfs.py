@@ -128,6 +128,7 @@ def test_sku_codes_for_hvd_f_manual_only_f_editions() -> None:
 
     assert parse_hvd_f_manual_stem("hvd-5f-s_st.pdf") == 5
     assert parse_hvd_f_manual_stem("hvd-3f-s_st.pdf") == 3
+    assert parse_hvd_f_manual_stem("HVD-5F-S_ST.pdf") == 5
     codes = [
         "HVD24-5",
         "HVD24S-5",
@@ -145,6 +146,43 @@ def test_sku_codes_for_hvd_f_manual_only_f_editions() -> None:
         "HVD230ST-5F",
     ]
     assert sku_codes_for_hvd_f_manual(3, codes) == ["HVD24S-3F"]
+
+
+def test_discover_hvd_prefers_ru_uppercase(tmp_path: Path) -> None:
+    """RU ``HVD-*.pdf`` must win over EN ``hvd-*.pdf`` (case-sensitive FS)."""
+    from catalog.etl.manual_pdfs import discover_hvd_manuals
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "EN").mkdir()
+    (tmp_path / "RU" / "HVD-5F-S_ST.pdf").write_bytes(b"%PDF-ru-hvd")
+    (tmp_path / "EN" / "hvd-5f-s_st.pdf").write_bytes(b"%PDF-en-hvd-bigger!!!!!")
+    matches, warnings = discover_hvd_manuals(
+        tmp_path,
+        sku_codes=["HVD24S-5F", "HVD24ST-5F"],
+    )
+    assert len(matches) == 1
+    assert matches[0].path.parent.name == "RU"
+    assert matches[0].path.read_bytes() == b"%PDF-ru-hvd"
+    assert any("duplicate HVD" in w for w in warnings)
+
+
+def test_discover_hva_prefers_ru_over_en(tmp_path: Path) -> None:
+    """When both RU/HVA-5.pdf and EN/hva-5.pdf exist, attach RU bytes."""
+    from catalog.etl.manual_pdfs import discover_hva_manuals
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "EN").mkdir()
+    (tmp_path / "RU" / "HVA-5.pdf").write_bytes(b"%PDF-ru-hva5")
+    (tmp_path / "EN" / "hva-5.pdf").write_bytes(b"%PDF-en-hva5-xxxxxxxx")
+    (tmp_path / "EN" / "hva-10.pdf").write_bytes(b"%PDF-en-only")
+    matches, _warnings = discover_hva_manuals(
+        tmp_path,
+        sku_codes=["HVA24-5", "HVA24-10"],
+    )
+    by_token = {m.kind: m for m in matches}
+    assert by_token["5"].path.parent.name == "RU"
+    assert by_token["5"].path.read_bytes() == b"%PDF-ru-hva5"
+    assert by_token["10"].path.parent.name == "EN"
 
 
 def test_discover_ignores_damu(tmp_path: Path) -> None:

@@ -110,6 +110,9 @@ Belimo (B2B HVAC).
 | Wiring Diagram | Схема подключения |
 | Actuator | Привод |
 | Auxiliary switch | Вспомогательный переключатель |
+| GENERAL DAMPER ACTUATOR | Электропривод воздушной заслонки (общий / MU) |
+| FAST-RUNNING DAMPER ACTUATOR | Электропривод воздушной заслонки ускоренного срабатывания (MQU; не «быстроходный») |
+| Fast-running (damper actuator) | ускоренного срабатывания (канон DAMQU / карточки SKU) |
 | Actuator Dimensions(mm) | Габаритные размеры привода (мм) |
 | Switch The Direction Of Rotation | Переключение направления вращения |
 | Factory setting: Terminal 1,2 has power supply, the actuator rotates anticlockwise. | Заводская настройка: напряжение подаётся на клеммы 1 и 2, привод вращается против часовой стрелки. |

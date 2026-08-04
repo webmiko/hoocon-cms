@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SA5FU …-DS/DST — руководство (RU)</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #555;
+    --line: #222;
+    --banner: #231f20;
+    --red: #d71519;
+    --bg: #ececec;
+    --paper: #fff;
+    --gap: 3mm;
+    --pad: 6mm;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans", sans-serif;
+    font-size: 9pt;
+    line-height: 1.35;
+  }
+  body {
+    /* Room for fixed .toolbar (updated by JS if toolbar wraps). */
+    padding-top: var(--toolbar-h, 52px);
+  }
+  .toolbar {
+    /* Fixed to viewport — sticky fails when ancestors scroll/overflow. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #111;
+    color: #fff;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .toolbar a { color: #9cf; }
+  .toolbar button {
+    border: 0; border-radius: 4px; padding: 8px 14px;
+    background: var(--red); color: #fff; font-weight: 600; cursor: pointer;
+  }
+  .toolbar button.secondary {
+    background: #333;
+  }
+  .toolbar button[aria-pressed="true"] {
+    outline: 2px solid #9cf;
+    outline-offset: 1px;
+  }
+  .stage {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    /* Rigid A4 sheets scroll here — keeps toolbar sticky. */
+    overflow-x: auto;
+  }
+  .sheet {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    /* Fixed A4 landscape — do not shrink with viewport (horizontal scroll). */
+    width: 297mm;
+    height: 210mm;
+    max-width: none;
+    max-height: none;
+    aspect-ratio: 297 / 210;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    padding: var(--pad);
+  }
+  .col-guide {
+    display: none;
+    position: absolute;
+    inset: var(--pad);
+    z-index: 8;
+    pointer-events: none;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--gap);
+  }
+  body.show-cols .col-guide { display: grid; }
+  .col-guide span {
+    min-height: 100%;
+    background: rgba(215, 21, 25, 0.07);
+    outline: 0.2mm dashed rgba(215, 21, 25, 0.4);
+    color: rgba(215, 21, 25, 0.75);
+    font-size: 8pt;
+    font-weight: 700;
+    text-align: center;
+    padding-top: 1.2mm;
+    letter-spacing: 0.02em;
+  }
+  .col-guide span:nth-child(even) {
+    background: rgba(35, 100, 200, 0.07);
+    outline-color: rgba(35, 100, 200, 0.4);
+    color: rgba(35, 80, 160, 0.75);
+  }
+  .grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: start;
+    align-content: start;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+  }
+  .template-voltage-note {
+    margin: 0 0 2mm;
+    padding: 1.5mm 2.5mm;
+    font-size: 7.5pt;
+    line-height: 1.35;
+    background: #f3f4f6;
+    border-left: 2.5pt solid #b91c1c;
+  }
+  .template-voltage-note code {
+    font-size: 0.92em;
+  }
+  .sheet-page1 .grid {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .sheet-page1 .hero {
+    grid-row: 1;
+    align-self: start;
+  }
+  /* Sheet 1 body: two halves — cols 1–6 | 7–12. */
+  .sheet-page1 .sheet1-body {
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: var(--gap);
+    align-self: stretch;
+    min-height: 0;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-cols-left {
+    grid-column: 1 / span 6;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    min-height: 0;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-cols-right {
+    grid-column: 7 / span 6;
+    grid-row: 1;
+    align-self: center;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-left {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-contacts {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5mm;
+    align-items: start;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-contacts .banner {
+    margin: 0 0 0.8mm;
+    padding: 0.55mm 1.2mm;
+    font-size: 7pt;
+  }
+  .sheet-page1 .sheet1-contacts .prose.contacts {
+    font-size: 5.5pt;
+    line-height: 1.15;
+  }
+  .sheet-page1 .sheet1-aux {
+    /* Nested in .sheet1-aux-row — do not set grid-row (that stacked it under the diagram). */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+  .sheet-page1 .sheet1-left .prose,
+  .sheet-page1 .sheet1-aux .prose {
+    flex: 1 1 auto;
+  }
+  .sheet-page1 .sheet1-aux table {
+    font-size: 5.5pt;
+    table-layout: fixed;
+    width: 100%;
+  }
+  .sheet-page1 .sheet1-aux th,
+  .sheet-page1 .sheet1-aux td {
+    padding: 0.45mm 0.4mm;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+  /* Aux table | diagram side-by-side; Attention below spans full 1–6. */
+  .sheet-page1 .sheet1-aux-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+    align-items: start;
+    min-width: 0;
+    flex: 0 1 auto;
+    width: 100%;
+  }
+  .sheet-page1 .sheet1-with-aux-diagram > .banner-follow {
+    margin-top: 1.5mm;
+  }
+  .sheet-page1 .sheet1-with-aux-diagram > .prose {
+    /* Compact so DIP / aux diagrams keep room on sheet 1. */
+    font-size: 6.2pt;
+    line-height: 1.2;
+    flex: 0 1 auto;
+  }
+  .sheet-page1 .sheet1-aux-diagram {
+    min-width: 0;
+    padding-top: 0;
+    align-self: start;
+  }
+  .sheet-page1 .aux-diagram-compact { max-height: 100%; }
+  .sheet-page1 .aux-diagram-caption {
+    margin: 0;
+    padding: 0;
+    font-size: 5.5pt;
+    line-height: 1.25;
+    color: #333;
+  }
+  /* Captioned aux: note + caption share one grid row (same baseline). */
+  .sheet-page1 .sheet1-aux-row-captioned {
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-main {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: stretch;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned .sheet1-aux-diagram {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: stretch;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-note {
+    grid-column: 1;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }
+  .sheet-page1 .sheet1-aux-row-captioned > .aux-diagram-caption {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 1mm 0 0;
+  }
+  .sheet-page1 .running-foot {
+    grid-row: 3;
+  }
+  .sheet-page2 .grid {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .sheet-page2 .hero {
+    grid-row: 1;
+    align-self: start;
+  }
+  .sheet-page2 .sheet2-body {
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--gap);
+    align-content: stretch;
+    align-self: stretch;
+    min-height: 0;
+    min-width: 0;
+    padding-bottom: 1mm;
+  }
+  .sheet-page2 .running-foot {
+    grid-row: 3;
+  }
+  .sheet2-body .summary-block {
+    grid-column: 1 / span 6;
+    grid-row: 1;
+    align-self: start;
+  }
+  .sheet2-body .tech-block {
+    grid-column: 1 / span 6;
+    grid-row: 2;
+    align-self: stretch;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Keep collapsed bottom border inside the clip box. */
+    padding-bottom: 0.35mm;
+  }
+  .sheet2-body .tech-block .banner {
+    flex: 0 0 auto;
+  }
+  /* Div slots shrink under flex; bare <table> items often will not. */
+  .sheet2-body .tech-block .tech-table-slot {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 1.2mm;
+    position: relative;
+    /* Room for the collapsed outer bottom border (overflow:hidden clips it). */
+    padding-bottom: 2px;
+  }
+  /* Electrical (first) slot: size to content so wrapped «Потребляемая мощность»
+     does not clip the following «Сечение…» row. */
+  .sheet2-body .tech-block .tech-table-slot:not(:last-child) {
+    flex: 0 0 auto;
+    overflow: visible;
+    min-height: auto;
+  }
+  .sheet2-body .tech-block .tech-table-slot:not(:last-child) .data-table,
+  .sheet2-body .tech-block .tech-table-slot:not(:last-child) .data-table tbody,
+  .sheet2-body .tech-block .tech-table-slot:not(:last-child) .data-table tr {
+    height: auto;
+  }
+  .sheet2-body .tech-block .tech-table-slot:last-child {
+    margin-bottom: 0;
+  }
+  .sheet2-body .tech-block .tech-table-slot:last-child::after {
+    /* Always-visible bottom edge when cell borders are subpixel-clipped. */
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0.25mm;
+    background: #444;
+    pointer-events: none;
+  }
+  .sheet2-body .tech-block .data-table {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 5.2pt;
+  }
+  .sheet2-body .tech-block .data-table tbody {
+    height: 100%;
+  }
+  .sheet2-body .tech-block .data-table tr {
+    height: calc(100% / var(--tech-rows, 1));
+  }
+  .sheet2-body .tech-block .data-table td {
+    text-align: center;
+    vertical-align: middle;
+    /* ~1–2px vertical gap; horizontal stays readable. */
+    padding: 1px 0.8mm;
+    line-height: 1.1;
+    box-sizing: border-box;
+    border: 0.2mm solid #444;
+  }
+  .sheet2-body .tech-block .data-table tr:last-child td {
+    border-bottom: 0.25mm solid #444;
+  }
+  .sheet2-body .tech-block .data-table td:first-child,
+  .sheet2-body .tech-block .data-table td.row-section {
+    text-align: left;
+  }
+  .sheet2-body .tech-block .data-table tr:first-child td {
+    background: #e8e8e8;
+    font-weight: 650;
+    text-align: center;
+    font-size: 5pt;
+    white-space: nowrap;
+    word-break: normal;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+  .sheet2-body .tech-block .data-table tr:first-child td:first-child {
+    text-align: left;
+  }
+  .sheet2-body .tech-block .data-table tr:first-child td:not(:first-child) {
+    text-align: center;
+  }
+  .sheet2-body .diagrams-block {
+    grid-column: 7 / span 6;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet2-body .diagrams-block .diagrams {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5mm;
+    overflow: hidden;
+  }
+  .sheet2-body .diagrams-block .diagrams > .diagram {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  .sheet2-body .diagrams-block .diagrams > .diagram-dip {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sheet-page2 .lead-heading {
+    font-size: clamp(10pt, 1.8vw, 13pt);
+    margin-bottom: 1mm;
+  }
+  .sheet-page2 .lead-intro {
+    font-size: 7pt;
+    margin-bottom: 1mm;
+    line-height: 1.25;
+  }
+  .sheet-page2 .lead-list {
+    font-size: 7pt;
+    padding-left: 3.2mm;
+    line-height: 1.25;
+  }
+  .sheet-page2 .lead-list li {
+    margin: 0 0 0.4mm;
+  }
+  .sheet-page2 .lead-photo {
+    max-height: 28mm;
+  }
+  .sheet-page2 .banner {
+    margin: 0 0 1.2mm;
+    padding: 0.8mm 1.5mm;
+    font-size: 7.5pt;
+  }
+  .sheet-page2 .data-table {
+    margin: 0 0 1.5mm;
+    font-size: 5.8pt;
+    line-height: 1.2;
+  }
+  .sheet-page2 .data-table td {
+    padding: 0.45mm 0.7mm;
+  }
+  .sheet-page2 .diagram {
+    min-height: 0;
+    padding: 0.8mm;
+  }
+  .sheet-page2 .diagrams {
+    gap: 1.5mm;
+    grid-template-columns: 1fr;
+  }
+  .wiring-ru-headers {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 1mm 2mm;
+    margin: 0 0 1mm;
+    font-size: 7pt;
+    font-weight: 650;
+    line-height: 1.15;
+    text-align: center;
+    color: #111;
+  }
+  .wiring-ru-headers .wrh-act {
+    /* spans both actuator voltage blocks */
+  }
+  .wiring-board .wl {
+    position: absolute;
+    font-size: 5.5pt;
+    font-weight: 650;
+    line-height: 1.1;
+    color: #111;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .wl-p2a { left: 3%; top: 1%; }
+  .wl-p3a { left: 18%; top: 1%; }
+  .wl-p2b { left: 35.5%; top: 0%; }
+  .wl-p3b { left: 50.5%; top: 0%; }
+  .wl-v24 { left: 6%; top: 88%; }
+  .wl-v230 { left: 38%; top: 88%; }
+  .wl-rating { left: 76%; top: 88%; }
+  .sheet-page2 .diagrams .diagram-dip > img { height: auto; max-height: none; }
+  .diagrams .banner {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .diagram-rotation .rotation-panel {
+    display: grid;
+    /* diagrams-block = sheet cols 7–12 → local 6; image on sheet 10–12 = local 4–6. */
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: start;
+    width: 100%;
+    min-height: 0;
+  }
+  .diagram-rotation .rotation-panel .rotation-copy {
+    grid-column: 1 / span 3;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    min-width: 0;
+  }
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media {
+    grid-column: 4 / span 3;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+  }
+  .diagram-rotation .rotation-media {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6mm;
+    min-height: 0;
+  }
+  .diagram-rotation .rotation-media > img {
+    width: 100%;
+    max-height: 34mm !important;
+    object-fit: contain;
+    object-position: top center;
+  }
+  .diagram-rotation .rotation-media > .rotation-label {
+    margin: 0 !important;
+    text-align: center;
+    font-size: 6pt;
+  }
+  .diagram-rotation > .rotation-copy {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5mm 0;
+  }
+  .rotation-copy {
+    font-size: 6pt;
+    line-height: 1.25;
+  }
+  .rotation-copy p {
+    margin: 0 0 0.8mm;
+  }
+  .rotation-table {
+    margin: 0 0 0.8mm !important;
+    font-size: 5.2pt !important;
+    table-layout: fixed;
+    width: 100%;
+  }
+  .rotation-table td {
+    white-space: nowrap;
+    padding: 0.3mm 0.5mm !important;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+  .rotation-table td:first-child {
+    width: 36%;
+  }
+  .rotation-label {
+    margin: 0 !important;
+    font-weight: 650;
+  }
+  .diagram-rotation img {
+    max-height: 36mm !important;
+  }
+  .diagram-rotation.diagram-dip > img {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Definite height so object-fit can scale the whole table (not clip). */
+    height: 0;
+    max-height: none !important;
+    object-fit: contain;
+    object-position: top center;
+    display: block;
+  }
+  .diagram-rotation.diagram-thermal .rotation-panel > img {
+    max-height: 52mm !important;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
+  }
+  .sheet-page2 .note {
+    margin: 1mm 0 0;
+    padding: 1mm 1.5mm;
+    font-size: 6.5pt;
+  }
+  .span-3 { grid-column: span 3; }
+  .span-4 { grid-column: span 4; }
+  .span-5 { grid-column: span 5; }
+  .span-6 { grid-column: span 6; }
+  .span-7 { grid-column: span 7; }
+  .span-12 { grid-column: span 12; }
+  .stack { min-width: 0; }
+  .summary-block {
+    grid-column: 1 / span 6;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: center;
+    min-width: 0;
+  }
+  .summary-media {
+    grid-column: 1 / span 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+  .lead-photo {
+    display: block;
+    max-width: 100%;
+    max-height: 42mm;
+    object-fit: contain;
+  }
+  .summary-copy {
+    grid-column: 3 / span 4;
+    min-width: 0;
+  }
+  .lead-heading {
+    margin: 0 0 1.5mm;
+    font-size: clamp(12pt, 2.2vw, 16pt);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .lead-intro {
+    margin: 0 0 2mm;
+    font-size: 8.5pt;
+  }
+  .lead-list {
+    margin: 0;
+    padding-left: 4mm;
+    font-size: 8.5pt;
+  }
+  .lead-list li {
+    margin: 0 0 0.8mm;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: center;
+    padding-bottom: 2.5mm;
+  }
+  .running-head {
+    grid-column: 1 / span 1;
+    margin: 0;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .running-foot {
+    grid-column: 12 / span 1;
+    margin: 0;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    white-space: nowrap;
+    text-align: right;
+    justify-self: end;
+    align-self: end;
+  }
+  .logo {
+    grid-column: 11 / span 2;
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    flex-shrink: 0;
+  }
+  .logo img {
+    display: block;
+    height: 9mm;
+    width: auto;
+    max-width: 100%;
+  }
+  .product-col {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: center;
+    min-width: 0;
+  }
+  .product-col .media {
+    /* Sheet cols 8–9 when local grid is 6 (prefer 2 / span 2 if already patched). */
+    grid-column: 2 / span 2;
+    grid-row: 1;
+    align-self: center;
+    justify-self: center;
+    position: relative;
+    width: 100%;
+    height: var(--media-h, 72mm);
+    min-height: var(--media-h, 72mm);
+    max-height: var(--media-h, 72mm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    isolation: isolate;
+    min-width: 0;
+  }
+  .sheet-page1 .product-col .product-photo {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }
+
+  /* Media slots: div is the viewport (clips); image scales inside (product-media model). */
+  .sheet-page1 .aux-diagram-media,
+  .sheet-page1 .sheet1-dip-diagram,
+  .sheet-page1 .unlock-media,
+  .summary-media,
+  .wiring-board,
+  .diagram,
+  .diagram-rotation .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap,
+  .product-col .media,
+  .product-col .product-media {
+    overflow: hidden;
+    isolation: isolate;
+    box-sizing: border-box;
+  }
+  .sheet-page1 .aux-diagram-media {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--aux-h, 72mm);
+    min-height: 0;
+    max-height: var(--aux-h, 72mm);
+  }
+  .sheet-page1 .aux-diagram-media-compact {
+    --aux-h: 36mm;
+    height: var(--aux-h);
+    max-height: var(--aux-h);
+  }
+  .sheet-page1 .aux-diagram-media > img,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap,
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
+  }
+  .sheet-page1 .aux-diagram-media > .photo-crop-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+  .sheet-page1 .sheet1-dip-diagram {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: var(--dip-h, 48mm);
+    max-height: var(--dip-h, 48mm);
+    min-height: 0;
+    flex: 0 0 auto;
+  }
+  .sheet-page1 .sheet1-dip-diagram img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+  }
+  .wiring-board {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .wiring-board > img,
+  .wiring-board > .photo-crop-wrap {
+    display: block;
+    width: 100%;
+    height: var(--wiring-h, 40mm);
+    max-height: var(--wiring-h, 40mm);
+    min-height: 0;
+    object-fit: contain;
+    object-position: center top;
+  }
+  .wiring-board > .photo-crop-wrap {
+    overflow: hidden;
+  }
+  .wiring-board > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  .wiring-board-ru-headers {
+    --wiring-h: 40mm;
+  }
+  .sheet-page2 .diagrams:has(.diagram-dip) .wiring-board {
+    --wiring-h: 28mm;
+  }
+  .diagram {
+    position: relative;
+    min-height: 0;
+  }
+  .diagram > img,
+  .diagram > .photo-crop-wrap {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: var(--diagram-h, 44mm);
+    max-height: var(--diagram-h, 44mm);
+    object-fit: contain;
+    object-position: center center;
+  }
+  .diagram > .photo-crop-wrap {
+    overflow: hidden;
+  }
+  .diagram > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  .diagram-wide {
+    --diagram-h: 36mm;
+  }
+  .sheet-page2 .diagram-wide {
+    --diagram-h: 34mm;
+  }
+  .sheet-page2 .diagrams .diagram:nth-child(2) {
+    --diagram-h: 48mm;
+  }
+  .sheet-page2 .diagrams .diagram:nth-child(3) {
+    --diagram-h: 42mm;
+  }
+  .sheet-page2 .diagrams:has(.diagram-dip) .diagram:nth-child(2) {
+    --diagram-h: 38mm;
+  }
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-panel > .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {
+    overflow: hidden;
+    max-height: 36mm;
+    height: 100%;
+  }
+  .diagram-rotation .rotation-panel > img,
+  .diagram-rotation .rotation-media > img,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap > img {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: top center;
+  }
+
+  /* SA FU/MU: slightly smaller hero so left body + SAF72 fit without clip. */
+  .sheet-page1 .product-col .product-photo[src*="/sa"] {
+    max-height: 58mm;
+  }
+  .doc-title-box {
+    grid-column: 2 / span 5;
+    grid-row: 2;
+    container-type: inline-size;
+    container-name: doc-title;
+    width: 100%;
+    min-width: 0;
+    align-self: center;
+  }
+  .doc-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0;
+    width: 100%;
+    overflow: visible;
+    font-size: clamp(9pt, 5.8cqw, 16pt);
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: right;
+  }
+  .doc-title-line {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .media-meta {
+    grid-column: 4 / span 3;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5mm;
+    align-self: center;
+    justify-self: center;
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+    container-type: inline-size;
+    container-name: media-meta;
+  }
+  .torque {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: clamp(14pt, 16cqw, 48pt);
+    font-weight: 700;
+    color: var(--red);
+    line-height: 1.1;
+    white-space: nowrap;
+    text-align: center;
+    overflow: hidden;
+  }
+  .sku-list {
+    list-style: none;
+    margin: 0;
+    padding: 2mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.2mm 1mm;
+    justify-items: center;
+    justify-content: center;
+    align-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    font-size: 8pt;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: var(--banner);
+    color: #fff;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  /* Mixed 24 V + 230 V: left column = 24 V, right = 230 V (column-major). */
+  .sku-list-voltage {
+    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(var(--sku-rows, 1), auto);
+  }
+  .sku-list li {
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .banner {
+    margin: 0 0 2mm; padding: 1.2mm 2mm;
+    background: var(--banner); color: #fff;
+    font-size: 8.5pt; font-weight: 650;
+  }
+  .banner-follow {
+    margin-top: 3.5mm;
+  }
+  .aux-note {
+    margin: 1.5mm 0 0;
+    font-size: 7.5pt;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .attention-block .prose {
+    margin-bottom: 0;
+  }
+  .prose { font-size: 8pt; }
+  .prose.contacts { font-size: 7.5pt; color: var(--muted); }
+  .lead-text { font-size: 8.5pt; }
+  .muted { color: var(--muted); }
+  .note {
+    margin: 2mm 0 0; padding: 1.5mm 2mm;
+    border-left: 0.55mm solid var(--red); font-size: 8pt;
+  }
+  .media {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 48mm; border: none; background: transparent;
+  }
+  .product-photo, .photo-fallback {
+    max-width: 100%; max-height: 62mm; object-fit: contain;
+  }
+  .photo-fallback {
+    display: grid; place-items: center; width: 100%; height: 48mm;
+    color: #bbb; font-weight: 700; letter-spacing: .12em;
+    background: transparent;
+  }
+  .diagrams {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2mm;
+  }
+  .diagram {
+    margin: 0; border: none; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 30mm; padding: 1.5mm;
+  }
+  .diagram:has(> .banner) {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  .diagram > .banner {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+  }
+  .diagram-wide {
+    grid-column: 1 / -1;
+  }
+  .data-table {
+    width: 100%; border-collapse: collapse; table-layout: fixed;
+    margin: 0 0 2.5mm; font-size: 7.2pt;
+  }
+  .data-table td {
+    border: 0.2mm solid #444; padding: 1mm 1.1mm;
+    vertical-align: middle; text-align: center; word-break: break-word;
+  }
+  .data-table tr:first-child td,
+  .data-table td.row-section {
+    background: #e8e8e8; font-weight: 600; text-align: left;
+  }
+
+  @page { size: A4 landscape; margin: 0; }
+  @media print {
+    html, body { background: #fff; }
+    .toolbar { display: none !important; }
+    .col-guide { display: none !important; }
+    .stage { padding: 0; gap: 0; }
+    .sheet {
+      box-shadow: none;
+      width: 297mm;
+      height: 210mm;
+      max-height: 210mm;
+      aspect-ratio: 297 / 210;
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+    .sheet:last-child { page-break-after: auto; }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .summary-block {
+      grid-column: 1 / span 6;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .summary-media { grid-column: 1 / span 2; }
+    .summary-copy { grid-column: 3 / span 4; }
+  }
+</style>
+</head>
+<body class="show-cols">
+  <div class="toolbar">
+    <strong>SA5FU …-DS/DST — руководство (RU)</strong>
+    <span>2 листа / A4 альбом / сетка 12</span>
+    <button type="button" id="toggle-cols" class="secondary" aria-pressed="true">Колонки</button>
+    <button type="button" onclick="window.print()">Печать / PDF</button>
+    <a href="index.html">все инструкции</a>
+  </div>
+  <div class="stage">
+
+<section class="sheet sheet-page1" aria-label="Лист 1">
+  <div class="col-guide" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+  <div class="grid">
+    <header class="span-12 hero">
+      <p class="running-head">hoocon.ru</p>
+      <div class="logo">
+        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
+      </div>
+    </header>
+
+    <div class="span-12 sheet1-body">
+      <div class="sheet1-cols-left">
+
+          <div class="stack sheet1-left sheet1-with-aux-diagram">
+            <div class="sheet1-aux-row">
+              <div class="stack sheet1-aux">
+                <h2 class="banner">Вспомогательный переключатель</h2>
+                <table class="data-table"><tbody><tr><td>Переключатель a</td><td>Клеммы S1, S2</td><td>Клеммы S1, S3</td></tr><tr><td>–5…5°</td><td>Замкнуто</td><td>Разомкнуто</td></tr><tr><td>5…90°</td><td>Разомкнуто</td><td>Замкнуто</td></tr><tr><td>Переключатель b</td><td>Клеммы S4, S5</td><td>Клеммы S4, S6</td></tr><tr><td>–5…80°</td><td>Замкнуто</td><td>Разомкнуто</td></tr><tr><td>80…90°</td><td>Разомкнуто</td><td>Замкнуто</td></tr></tbody></table>
+                <p class="aux-note">*Установите угол переключателя в соответствии с требованием заказчика</p>
+              </div>
+              <div class="sheet1-aux-diagram">
+                <div class="media aux-diagram-media">
+                  <img class="aux-diagram" src="assets/sa5fu-ds-dst/aux-diagram.png" alt="">
+                </div>
+              </div>
+            </div>
+            <h2 class="banner banner-follow">Внимание</h2>
+            <div class="prose">1. Запрещается использовать электропривод заслонки вне указанной области применения, особенно в авиационной технике.<br>2. Вскрытие корпуса привода разрешено только производителю. Внутри нет компонентов, которые пользователь может заменять или ремонтировать.<br>3. Устройство содержит электрические и электронные компоненты, в связи с чем недопустима утилизация вместе с бытовыми отходами. Необходимо соблюдать все действующие правила и инструкции, относящиеся к данной конкретной местности.</div>
+          </div>
+
+        <div class="sheet1-contacts">
+          <div class="stack contacts-ru">
+            <h2 class="banner">ООО «ХОГОН»</h2>
+            <div class="prose contacts">Юридический адрес:<br>143440, Московская область, го. Красногорск, пгт. Путилково,<br>тер. Гринвуд, стр. 7, помещ. 98<br>Многоканальный телефон: 8 800 350-58-98<br>По вопросам сотрудничества: info@hoocon.ru<br>Отдел продаж: sales@hoocon.ru<br>www.hoocon.ru</div>
+          </div>
+          <div class="stack contacts-by">
+            <h2 class="banner">ООО «Чемпион-Тэк»</h2>
+            <div class="prose contacts">Юридический адрес:<br>220030 Минск, пр-т Независимости 32А, пом.11<br>Многоканальный телефон: +375 29 372 6888<br>По вопросам сотрудничества: ichampiontech@yandex.ru</div>
+          </div>
+        </div>
+      </div>
+      <div class="sheet1-cols-right product-col">
+        <div class="media"><img class="product-photo" src="assets/sa5fu-ds-dst/product.png" alt=""></div>
+        <div class="media-meta">
+          <h1 class="torque">5 Нм</h1>
+          <ul class="sku-list sku-list-voltage" style="--sku-rows:1"><li>SA5FU24-DS/DST</li><li>SA5FU230-DS/DST</li></ul>
+        </div>
+        <div class="doc-title-box">
+          <h2 class="doc-title"><span class="doc-title-line">Руководство по эксплуатации</span><span class="doc-title-line">привод противопожарного клапана</span></h2>
+        </div>
+      </div>
+    </div>
+    <p class="running-foot">hoocon.ru</p>
+  </div>
+</section>
+
+<section class="sheet sheet-page2" aria-label="Лист 2">
+  <div class="col-guide" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+  <div class="grid">
+    <header class="span-12 hero">
+      <p class="running-head">hoocon.ru</p>
+      <div class="logo">
+        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
+      </div>
+    </header>
+
+    <div class="span-12 sheet2-body">
+      <div class="span-6 summary-block">
+        <div class="summary-media"><img class="lead-photo" src="assets/sa5fu-ds-dst/lead.png" alt=""></div>
+        <div class="summary-copy">
+          <h2 class="lead-heading">Привод противопожарного клапана — 2-позиционное управление</h2>
+          <p class="lead-intro">Для противопожарных и дымовых клапанов в системах HVAC (отопления, вентиляции и кондиционирования воздуха)</p>
+          <ul class="lead-list"><li>Крутящий момент: 5 Нм</li><li>Время поворота / возврат пружины: &lt; 70 с / &lt; 20 с</li><li>Номинальное напряжение: AC/DC 24 В; AC 100…240 В</li><li>Управление: вкл./выкл. (ON/OFF)</li><li>Исполнения «DS» / «DST» включают 2 группы вспомогательных переключателей.</li><li>Исполнение «DST» — с термодатчиком SAF72.</li></ul>
+        </div>
+      </div>
+
+      <div class="span-6 stack tech-block">
+        <h2 class="banner">Технические характеристики</h2>
+        <div class="tech-table-slot" style="flex:4 0 auto"><table class="data-table" style="--tech-rows:4"><tbody><tr><td></td><td>SA5FU24-DS/DST</td><td>SA5FU230-DS/DST</td></tr><tr><td>Номинальное напряжение</td><td>AC/DC 24 В, 50/60 Гц</td><td>AC 100…240 В, 50/60 Гц</td></tr><tr><td>Потребляемая мощность</td><td colspan="2">5 Вт под нагрузкой<br>3 Вт удержание</td></tr><tr><td>Сечение подключаемых проводов</td><td colspan="2">0,5 мм²</td></tr></tbody></table></div>
+        <div class="tech-table-slot" style="flex:19 1 auto"><table class="data-table" style="--tech-rows:19"><tbody><tr><td class="row-section" colspan="3">Функциональные параметры</td></tr><tr><td>Площадь обслуживаемой заслонки</td><td colspan="2">&lt; 0,5 м²</td></tr><tr><td>Время поворота / возврат пружины</td><td colspan="2">&lt; 70 с / &lt; 20 с</td></tr><tr><td>Направление вращения</td><td colspan="2">для монтажа с противоположной стороны</td></tr><tr><td>Ручное управление</td><td colspan="2">расцепление редуктора кнопкой, с самовозвратом</td></tr><tr><td>Угол поворота</td><td colspan="2">Макс. 95°</td></tr><tr><td>Уровень звуковой мощности</td><td colspan="2">макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины</td></tr><tr><td>Индикация положения</td><td colspan="2">Механический указатель</td></tr><tr><td class="row-section" colspan="3">Условия эксплуатации</td></tr><tr><td>Класс защиты</td><td>III (безопасное сверхнизкое напряжение)</td><td>II (все изолировано / полная изоляция)</td></tr><tr><td>Степень защиты корпуса</td><td colspan="2">IP54</td></tr><tr><td>Температура окружающей среды</td><td colspan="2">–20…+50 °C</td></tr><tr><td>Температура хранения</td><td colspan="2">–40…+70 °C</td></tr><tr><td>Испытание на влажность</td><td colspan="2">5…95 % относительной влажности, без конденсата / EN 60730-1</td></tr><tr><td class="row-section" colspan="3">Габаритные размеры / Масса</td></tr><tr><td>Габаритные размеры<br>(Д × Ш × В)</td><td colspan="2">См. «Габаритные размеры»</td></tr><tr><td>Длина вала заслонки</td><td colspan="2">&lt; 90 мм</td></tr><tr><td>Диаметр вала заслонки</td><td colspan="2">квадратный 12×12 мм (втулки 8×8, 10×10 мм)</td></tr><tr><td>Масса</td><td colspan="2">&lt; 1,5 кг</td></tr></tbody></table></div>
+      </div>
+      <div class="span-6 stack diagrams-block">
+        <h2 class="banner">Схема подключения</h2>
+        <div class="diagrams"><figure class="diagram diagram-wide wiring-figure"><div class="wiring-board wiring-board-ru-headers"><div class="wiring-ru-headers" aria-hidden="true"><span class="wrh wrh-act">Привод</span><span class="wrh wrh-aux">Вспомогательный переключатель</span></div><img src="assets/sa5fu-ds-dst/wiring.png" alt="Схема подключения"></div></figure><figure class="diagram diagram-wide"><h2 class="banner">Габаритные размеры привода (мм)</h2><img src="assets/sa5fu-ds-dst/dimensions.png" alt=""></figure><figure class="diagram diagram-wide diagram-rotation diagram-thermal"><h2 class="banner">Термодатчик SAF72</h2><div class="rotation-panel"><div class="rotation-copy"><p>Состоит из датчика окружающей среды (TS1) и канального датчика (TS2).</p><p>TS1 размыкается при температуре окружающей среды выше 72&nbsp;°C.</p><p>TS2 размыкается при температуре в канале выше 72&nbsp;°C.</p><p>Поставляется с исполнением «DST».</p></div><img src="assets/sa5fu-ds-dst/thermal.png" alt="Термодатчик SAF72"></div></figure></div>
+        
+      </div>
+    </div>
+    <p class="running-foot">hoocon.ru</p>
+  </div>
+</section>
+
+  </div>
+  <script>
+    (function () {
+      var btn = document.getElementById("toggle-cols");
+      if (btn) {
+        btn.addEventListener("click", function () {
+          var on = document.body.classList.toggle("show-cols");
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          window.requestAnimationFrame(fitSheet1Type);
+        });
+      }
+
+      /* Shrink title lines to box width — never ellipsis / clip. Shared size. */
+      function fitDocTitle() {
+        document.querySelectorAll(".doc-title").forEach(function (title) {
+          var box = title.closest(".doc-title-box") || title;
+          var boxW = box.clientWidth;
+          if (boxW < 8) return;
+          var lines = title.querySelectorAll(".doc-title-line");
+          if (!lines.length) lines = [title];
+          var lo = 8;
+          var hi = 18;
+          var best = 8;
+          for (var i = 0; i < 18; i++) {
+            var mid = (lo + hi) / 2;
+            for (var k = 0; k < lines.length; k++) {
+              lines[k].style.fontSize = mid + "pt";
+            }
+            var overflow = false;
+            for (var n = 0; n < lines.length; n++) {
+              if (lines[n].scrollWidth > boxW + 0.5) {
+                overflow = true;
+                break;
+              }
+            }
+            if (overflow) hi = mid;
+            else {
+              best = mid;
+              lo = mid;
+            }
+          }
+          for (var m = 0; m < lines.length; m++) {
+            lines[m].style.fontSize = best + "pt";
+          }
+        });
+      }
+
+      /* Shrink torque headline to media-meta width (e.g. «10 / 15 / 20 Нм»). */
+      function fitTorque() {
+        document.querySelectorAll(".torque").forEach(function (el) {
+          var box = el.closest(".media-meta") || el.parentElement;
+          var boxW = box ? box.clientWidth : 0;
+          if (boxW < 8) return;
+          var lo = 12;
+          var hi = 48;
+          var best = 12;
+          for (var i = 0; i < 20; i++) {
+            var mid = (lo + hi) / 2;
+            el.style.fontSize = mid + "pt";
+            if (el.scrollWidth > boxW + 0.5) hi = mid;
+            else {
+              best = mid;
+              lo = mid;
+            }
+          }
+          el.style.fontSize = best + "pt";
+        });
+      }
+
+      function fitSheet1Type() {
+        fitDocTitle();
+        fitTorque();
+      }
+
+      window.addEventListener("load", fitSheet1Type);
+      window.addEventListener("resize", fitSheet1Type);
+      window.addEventListener("beforeprint", fitSheet1Type);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitSheet1Type);
+      }
+    })();
+  </script>
+  <script src="assets/photo-crop-tool.js?v=restore5"></script>
+<script>
+  (function () {
+    var bar = document.querySelector(".toolbar");
+    if (!bar) return;
+    function syncToolbarH() {
+      document.body.style.setProperty("--toolbar-h", bar.offsetHeight + "px");
+    }
+    syncToolbarH();
+    window.addEventListener("resize", syncToolbarH);
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(syncToolbarH).observe(bar);
+    }
+  })();
+  </script>
+</body>
+</html>
