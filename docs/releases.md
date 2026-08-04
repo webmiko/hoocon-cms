@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.16 beta — 2026-08-05
+
+- Home: server-rendered hero shell (H1/CTA + LCP WebP preload) in Django SPA
+  HTML so FCP/LCP can fire before React mounts.
+
 ### v0.1.15 beta — 2026-08-04
 
 - Home: below-fold sections mount near the viewport (lazy carousels + deferred
