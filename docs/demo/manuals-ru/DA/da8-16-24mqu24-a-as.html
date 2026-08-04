@@ -685,16 +685,20 @@
   }
   .logo {
     grid-column: 11 / span 2;
-    display: flex;
-    align-items: center;
-    justify-self: end;
-    flex-shrink: 0;
-  }
-  .logo img {
     display: block;
+    justify-self: end;
+    align-self: center;
+    flex-shrink: 0;
+    width: 40mm;
     height: 9mm;
-    width: auto;
-    max-width: 100%;
+    /* PNG background + print-color-adjust: Safari Save-as-PDF keeps logo;
+       filtered SVG <img> often vanishes in WebKit print. */
+    background: url("assets/hoocon-logo.png") no-repeat right center / contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .theme-mono .logo {
+    background-image: url("assets/hoocon-logo-mono.png");
   }
   .product-col {
     display: grid;
@@ -1095,9 +1099,7 @@
   <div class="grid">
     <header class="span-12 hero">
       <p class="running-head">hoocon.ru</p>
-      <div class="logo">
-        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
-      </div>
+      <div class="logo" role="img" aria-label="Hoocon"></div>
     </header>
 
     <div class="span-12 sheet1-body">
@@ -1151,9 +1153,7 @@
   <div class="grid">
     <header class="span-12 hero">
       <p class="running-head">hoocon.ru</p>
-      <div class="logo">
-        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
-      </div>
+      <div class="logo" role="img" aria-label="Hoocon"></div>
     </header>
 
     <div class="span-12 sheet2-body">
@@ -1263,7 +1263,7 @@
       }
     })();
   </script>
-  <script src="assets/photo-crop-tool.js?v=restore5"></script>
+  <script src="assets/photo-crop-tool.js?v=ffprint1"></script>
 <script>
   (function () {
     var bar = document.querySelector(".toolbar");
