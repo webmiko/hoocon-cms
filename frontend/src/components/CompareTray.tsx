@@ -61,6 +61,7 @@ export function CompareTray() {
         </div>
         <ul
           className={`${styles.list} u-protect-content`}
+          role="list"
           {...protectedContentHandlers}
         >
           {items.map((item) => (

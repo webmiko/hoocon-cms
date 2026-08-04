@@ -477,7 +477,7 @@ export function HomePage() {
                 <Link to="/gde-kupit">где купить</Link>.
               </p>
             </div>
-            <ul className={styles.partnerLogos}>
+            <ul className={styles.partnerLogos} role="list">
               {HOME_PARTNERS.map((partner) => {
                 const logo = (
                   <img

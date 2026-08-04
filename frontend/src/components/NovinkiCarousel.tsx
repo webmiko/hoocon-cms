@@ -95,7 +95,12 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
   if (n === 0) return null;
 
   return (
-    <div className={styles.carousel}>
+    <div
+      className={styles.carousel}
+      role="region"
+      aria-roledescription="карусель"
+      aria-labelledby="novinki-heading"
+    >
       <div className={styles.toolbar}>
         <button
           type="button"
@@ -117,13 +122,7 @@ export function NovinkiCarousel({ skus }: NovinkiCarouselProps) {
         </button>
       </div>
 
-      <ul
-        ref={trackRef}
-        className={styles.track}
-        role="region"
-        aria-roledescription="карусель"
-        aria-labelledby="novinki-heading"
-      >
+      <ul ref={trackRef} className={styles.track} role="list">
         {skus.map((sku, index) => {
           const isOpaque = opaque.has(index);
           const isCenter = index === activeIndex;

@@ -230,6 +230,7 @@ export function RelatedArticlesCarousel({
       >
         <ul
           className={styles.track}
+          role="list"
           style={{
             gap: GAP_PX,
             transform: `translate3d(${offsetPx}px, 0, 0)`,
