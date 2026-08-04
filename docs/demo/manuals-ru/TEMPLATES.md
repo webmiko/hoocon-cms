@@ -19,6 +19,24 @@ Curated для генератора / шаблонов: [`assets/`](assets/).
 |------|------------|
 | [template-v24.html](template-v24.html) | AC/DC **24 В** |
 | [template-v230.html](template-v230.html) | AC **100…240 В** |
+| [template-kit.html](template-kit.html) / [constructor.html](constructor.html) | Конструктор (полный каркас, пустые слоты) |
+
+---
+
+## Конструктор мануалов
+
+Страница [`constructor.html`](constructor.html) (бланк [`template-kit.html`](template-kit.html)):
+
+1. Редактирование текста и ячеек таблиц (contenteditable).
+2. Слоты изображений (пунктир) — клик → выбрать PNG; затем **Кроп фото**.
+3. Панель таблицы: ± ряд / ± колонка (фокус в ячейке).
+4. Черновик в `localStorage`; **Скачать HTML** / **Печать / PDF**.
+5. Можно открыть V24/V230/UQ с хэшем `#ctor` для того же режима.
+
+Скрипты: [`assets/manual-constructor.js`](assets/manual-constructor.js),
+кроп — [`assets/photo-crop-tool.js`](assets/photo-crop-tool.js).
+
+Открывать через `python3 -m http.server` из `docs/demo/manuals-ru/`.
 
 ---
 
@@ -282,11 +300,14 @@ SA **58 mm**), `.photo-rows` (линии каждые **5 mm**) и зелё�
 В тулбаре мануала — **«Кроп фото»** ([`assets/photo-crop-tool.js`](assets/photo-crop-tool.js)):
 
 1. Цель: любое PNG в листах (product / lead / схемы).
-2. Границы % + zoom; pan; после apply — `window.syncPhotoBoundsAndScale`.
-3. Кроп **и на экране, и в «Печать / PDF»** (панель скрывается).
-4. Запечь: **Скачать PNG** → заменить файл в `assets/<stem>/` → **Сброс**.
+2. Границы % + zoom; pan; после apply — `window.syncPhotoBoundsGuide`.
+3. На экране — `clip-path` + `transform`. Перед печатью кроп **запекается в
+   canvas** (иначе Firefox Save-as-PDF часто сдвигает/ломает клип); после печати
+   восстанавливается live-кроп. Панель скрывается.
+4. Запечь в файл: **Скачать PNG** → заменить в `assets/<stem>/` → **Сброс**.
 
-Открывать через `http.server` (не `file://`), иначе скачивание PNG может упереться в CORS.
+Открывать через `http.server` (не `file://`), иначе canvas/скачивание PNG
+упираются в CORS.
 
 ---
 
