@@ -300,6 +300,8 @@ export interface components {
             readonly image: {
                 readonly id: number;
                 readonly image: string;
+                /** @description Lightweight card/mobile WebP when available. */
+                readonly image_card?: string | null;
                 readonly alt?: string;
             } | null;
         };

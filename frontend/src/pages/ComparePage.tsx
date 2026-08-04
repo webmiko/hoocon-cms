@@ -18,6 +18,7 @@ import { softBreak } from "../utils/softBreak";
 import { compactCardSpecName } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
+import { productCardImageSrc } from "../utils/productImageSrc";
 import styles from "./ComparePage.module.css";
 
 interface CompareRowView {
@@ -135,7 +136,7 @@ export function ComparePage() {
       slug: sku.slug,
       sku_code: sku.sku_code,
       name: sku.name,
-      image: sku.image?.image ?? null,
+      image: productCardImageSrc(sku.image),
     });
     if (result === "limit") {
       setAddError(`Можно сравнить не более ${COMPARE_MAX_SKUS} моделей.`);
@@ -487,6 +488,7 @@ function CompareSkuHead({
   onRemove: () => void;
   compact?: boolean;
 }) {
+  const thumb = productCardImageSrc(sku.image);
   return (
     <div
       className={compact ? `${styles.skuHead} ${styles.skuHeadCompact}` : styles.skuHead}
@@ -499,9 +501,9 @@ function CompareSkuHead({
       >
         ×
       </button>
-      {sku.image?.image ? (
+      {thumb ? (
         <ProtectedProductImage
-          src={sku.image.image}
+          src={thumb}
           alt=""
           frameClassName={styles.skuImage}
           className="u-protect-media"

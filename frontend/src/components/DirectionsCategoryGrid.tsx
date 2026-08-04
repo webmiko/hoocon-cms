@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { softBreak } from "../utils/softBreak";
 import { catalogCategoryPath } from "../utils/catalogPaths";
+import { productCardImageSrc, type ProductImageRef } from "../utils/productImageSrc";
 import styles from "../pages/HomePage.module.css";
 
 /** Match ``@container directions-inner``: carousel at ≤1114px, 4-up grid above. */
@@ -12,7 +13,7 @@ export type DirectionCategory = {
   slug: string;
   name: string;
   description?: string | null;
-  image?: { image?: string | null } | null;
+  image?: ProductImageRef | null;
 };
 
 type DirectionsCategoryGridProps = {
@@ -133,7 +134,7 @@ export function DirectionsCategoryGrid({
           >
             <span className={styles.directionMedia}>
               <DirectionCardImage
-                apiSrc={cat.image?.image}
+                apiSrc={productCardImageSrc(cat.image) ?? undefined}
                 className={styles.directionImage}
                 placeholderClassName={styles.directionImagePlaceholder}
               />

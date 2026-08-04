@@ -287,6 +287,8 @@ HVA-P (пружина, китайский рынок) в РФ-каталог н�
 Медиа: студийные WebP из HV seria (длинная сторона ≤1600); если нет —
 кадр из каталога 2025 при `min_edge ≥ 800`. Дубли героя (Tilda + local)
 чистить: `manage.py audit_optimize_product_images`.
+Лёгкое превью для карточек/мобилок: `ProductImage.image_card` (≤720px,
+q78) — на save и `manage.py generate_product_image_cards`.
 
 ---
 

@@ -21,6 +21,9 @@ DEFAULT_WEBP_QUALITY: int = 90
 WEBP_METHOD: int = 6
 # Cap long edge so CDN originals (often huge) stay light without crop.
 MAX_EDGE_PX: int = 1600
+# Catalog cards / mobile tiles (~360 CSS px ×2 retina); keeps list payload small.
+CARD_MAX_EDGE_PX: int = 720
+CARD_WEBP_QUALITY: int = 78
 
 
 def convert_bytes_to_webp(
@@ -160,3 +163,75 @@ def ensure_field_file_webp(
         ContentFile(webp),
         save=False,
     )
+
+
+def card_webp_basename(filename: str) -> str:
+    """Basename for the card/mobile derivative (``*-card.webp``)."""
+    stem = Path(filename or "image").stem.strip() or "image"
+    if stem.endswith("-card"):
+        return f"{stem}.webp"
+    return f"{stem}-card.webp"
+
+
+def attach_image_card(instance: Any) -> bool:
+    """Build ``image_card`` from ``image`` (save=False); return True if set.
+
+    Args:
+        instance: ``ProductImage`` with a readable ``image`` FieldFile.
+
+    Returns:
+        True when ``image_card`` was written; False when main image is empty
+        or cannot be decoded (invalid fixture bytes stay without a card).
+    """
+    from PIL import UnidentifiedImageError
+
+    field_file = getattr(instance, "image", None)
+    if field_file is None or not getattr(field_file, "name", ""):
+        if getattr(instance, "image_card", None):
+            instance.image_card.delete(save=False)
+            instance.image_card = None
+        return False
+
+    raw = field_file.read()
+    if hasattr(field_file, "seek"):
+        field_file.seek(0)
+    try:
+        card = convert_bytes_to_webp(
+            raw,
+            quality=CARD_WEBP_QUALITY,
+            max_edge=CARD_MAX_EDGE_PX,
+        )
+    except (OSError, UnidentifiedImageError, ValueError):
+        return False
+    basename = card_webp_basename(Path(field_file.name).name)
+    instance.image_card.save(basename, ContentFile(card), save=False)
+    return True
+
+
+def backfill_missing_image_cards(*, limit: int | None = None) -> dict[str, int]:
+    """Generate ``image_card`` for ProductImage rows that lack one.
+
+    Args:
+        limit: Optional max rows to process (None = all missing).
+
+    Returns:
+        Counts: ``scanned``, ``written``, ``errors``.
+    """
+    from catalog.models import ProductImage
+
+    qs = ProductImage.objects.exclude(image="").filter(image_card="").order_by("id")
+    if limit is not None:
+        qs = qs[: max(0, limit)]
+
+    scanned = 0
+    written = 0
+    errors = 0
+    for row in qs.iterator(chunk_size=50):
+        scanned += 1
+        try:
+            if attach_image_card(row):
+                row.save(update_fields=["image_card", "updated_at"])
+                written += 1
+        except (OSError, ValueError):
+            errors += 1
+    return {"scanned": scanned, "written": written, "errors": errors}
