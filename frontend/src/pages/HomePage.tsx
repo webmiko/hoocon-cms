@@ -122,7 +122,7 @@ const HOME_PARTNERS: ReadonlyArray<{
   },
 ];
 
-/** Reference installations — products in service on major sites (~960w for LCP). */
+/** Reference installations — first slide is LCP (sync spa_index.HOME_LCP_IMAGE). */
 const HOME_PROJECTS = [
   {
     name: "Пекинское метро",
@@ -583,6 +583,7 @@ export function HomePage() {
             HOOCON
           </p>
           <h1 className={styles.heroTitle}>
+            {/* Keep copy in sync with backend spa_index HOME_SSR_* (SSR shell). */}
             Электроприводы для вентиляции и кондиционирования
           </h1>
           <p className={styles.heroLead}>

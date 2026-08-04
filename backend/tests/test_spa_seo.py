@@ -29,6 +29,35 @@ def test_spa_home_has_unique_title_and_canonical(client) -> None:
 
 
 @pytest.mark.django_db
+def test_spa_home_preloads_lcp_hero(client) -> None:
+    """GET / ships LCP preload + SSR hero copy before React mounts."""
+    from config.seo.spa_index import HOME_LCP_IMAGE, HOME_SSR_H1
+
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert f'rel="preload" as="image" href="{HOME_LCP_IMAGE}"' in body
+    assert 'id="hoocon-ssr-hero"' in body
+    assert 'id="hoocon-lcp-boot"' in body
+    assert f'src="{HOME_LCP_IMAGE}"' in body
+    assert f"<h1 class=\"hoocon-ssr-hero__title\">{HOME_SSR_H1}</h1>" in body
+    assert "hoocon-ssr-hero-css" in body
+    assert "Смотреть каталог" in body
+
+
+@pytest.mark.django_db
+def test_spa_catalog_skips_home_lcp_boot(client) -> None:
+    """Non-home routes must not inject the home SSR hero."""
+    from config.seo.spa_index import HOME_LCP_IMAGE
+
+    response = client.get("/catalog")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "hoocon-ssr-hero" not in body
+    assert "hoocon-lcp-boot" not in body
+    assert f'rel="preload" as="image" href="{HOME_LCP_IMAGE}"' not in body
+
+@pytest.mark.django_db
 def test_spa_search_is_noindex(client) -> None:
     """GET /search has robots noindex."""
     response = client.get("/search")

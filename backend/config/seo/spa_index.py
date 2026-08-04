@@ -14,6 +14,14 @@ from django.http import Http404, HttpRequest, HttpResponse
 from config.seo.head import apply_seo_head, inject_json_ld, resolve_seo_context
 from config.seo.json_ld import build_json_ld
 
+# Keep in sync with ``frontend/.../HomePage.tsx`` hero (LCP / first paint).
+HOME_LCP_IMAGE = "/home/projects/beijing-metro.webp"
+HOME_SSR_BRAND = "HOOCON"
+HOME_SSR_H1 = "Электроприводы для вентиляции и кондиционирования"
+HOME_SSR_LEAD = (
+    "Подбор по техническим характеристикам, паспорта, аналоги Belimo. Склад в Москве — отгрузка по РФ. КП по запросу."
+)
+
 _index_cache_lock = threading.Lock()
 _index_cache: tuple[int, str] | None = None
 
@@ -83,6 +91,99 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
     return html
 
 
+def _home_ssr_hero_css() -> str:
+    """Critical CSS for the server-rendered home hero (no React, no entry CSS)."""
+    return """
+#hoocon-ssr-hero{position:relative;display:flex;flex-direction:column;justify-content:flex-end;
+min-height:min(78vh,760px);padding:72px 24px 48px;background:#101010;color:#fff;overflow:hidden;
+box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#hoocon-ssr-hero .hoocon-ssr-hero__img{position:absolute;inset:0;width:100%;height:100%;
+object-fit:cover;pointer-events:none}
+#hoocon-ssr-hero .hoocon-ssr-hero__shade{position:absolute;inset:0;pointer-events:none;background:
+linear-gradient(105deg,rgba(12,12,12,.88) 0%,rgba(12,12,12,.55) 45%,rgba(12,12,12,.4) 100%),
+linear-gradient(180deg,rgba(12,12,12,.25) 0%,transparent 40%,rgba(12,12,12,.5) 100%)}
+#hoocon-ssr-hero .hoocon-ssr-hero__brand{position:relative;z-index:1;max-width:1120px;width:100%;
+margin:0 auto}
+#hoocon-ssr-hero .hoocon-ssr-hero__eyebrow{margin:0 0 12px;font-size:12px;font-weight:700;
+letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+#hoocon-ssr-hero .hoocon-ssr-hero__title{margin:0 0 16px;font-size:clamp(1.75rem,4vw + .5rem,2.75rem);
+line-height:1.15;font-weight:700;max-width:18ch}
+#hoocon-ssr-hero .hoocon-ssr-hero__lead{margin:0 0 28px;font-size:1.05rem;line-height:1.45;
+max-width:36rem;color:rgba(255,255,255,.88)}
+#hoocon-ssr-hero .hoocon-ssr-hero__actions{display:flex;flex-wrap:wrap;gap:12px}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta{display:inline-flex;align-items:center;justify-content:center;
+min-height:44px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta--primary{background:#da0e2b;color:#fff}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta--secondary{background:transparent;color:#fff;
+border:1px solid rgba(255,255,255,.55)}
+""".replace("\n", "")
+
+
+def _home_ssr_hero_markup() -> str:
+    """Semantic home hero HTML painted before the SPA JS runs."""
+    brand = escape(HOME_SSR_BRAND)
+    title = escape(HOME_SSR_H1)
+    lead = escape(HOME_SSR_LEAD)
+    img = escape(HOME_LCP_IMAGE, quote=True)
+    return (
+        f'<section id="hoocon-ssr-hero" aria-labelledby="hoocon-ssr-brand">'
+        f'<img class="hoocon-ssr-hero__img" id="hoocon-lcp-boot" src="{img}" alt="" '
+        f'width="960" height="640" decoding="async" fetchpriority="high">'
+        f'<div class="hoocon-ssr-hero__shade" aria-hidden="true"></div>'
+        f'<div class="hoocon-ssr-hero__brand">'
+        f'<p id="hoocon-ssr-brand" class="hoocon-ssr-hero__eyebrow">{brand}</p>'
+        f'<h1 class="hoocon-ssr-hero__title">{title}</h1>'
+        f'<p class="hoocon-ssr-hero__lead">{lead}</p>'
+        f'<div class="hoocon-ssr-hero__actions">'
+        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--primary" href="/catalog">'
+        f"Смотреть каталог</a>"
+        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--secondary" href="/consultation">'
+        f"Запросить КП</a>"
+        f"</div></div></section>"
+    )
+
+
+def inject_home_lcp_hints(html: str, raw_path: str) -> str:
+    """Server-render home hero (image + copy) before React mounts.
+
+    Not full React SSR — a static shell for ``/`` so FCP/LCP can fire from
+    HTML+critical CSS while ``vendor-react`` downloads. ``createRoot`` replaces
+    ``#root`` children on first paint (same hero URL → cached decode).
+
+    Args:
+        html: SPA shell HTML.
+        raw_path: Request path.
+
+    Returns:
+        HTML with home LCP preload + SSR hero, or unchanged for other routes.
+    """
+    path = (raw_path or "/").split("?", 1)[0]
+    if path not in ("/", ""):
+        return html
+
+    preload_marker = f'rel="preload" as="image" href="{HOME_LCP_IMAGE}"'
+    if preload_marker not in html:
+        preload = f'<link rel="preload" as="image" href="{HOME_LCP_IMAGE}" fetchpriority="high" type="image/webp">'
+        script_marker = '<script type="module"'
+        lower = html.lower()
+        idx = lower.find(script_marker)
+        if idx != -1:
+            html = html[:idx] + f"    {preload}\n    " + html[idx:]
+        else:
+            html = html.replace("</head>", f"    {preload}\n  </head>", 1)
+
+    if 'id="hoocon-ssr-hero"' not in html:
+        style = f'<style id="hoocon-ssr-hero-css">{_home_ssr_hero_css()}</style>'
+        html = html.replace("</head>", f"    {style}\n  </head>", 1)
+        boot = _home_ssr_hero_markup()
+        html = html.replace(
+            '<div id="root"></div>',
+            f'<div id="root" style="position:relative;min-height:100vh">{boot}</div>',
+            1,
+        )
+    return html
+
+
 def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpResponse:
     """Build SPA HTML for a route with SEO head and JSON-LD.
 
@@ -100,6 +201,7 @@ def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpRes
     html = load_index_html()
     html = apply_seo_head(html, context, canonical_url=canonical_url)
     html = inject_json_ld(html, build_json_ld(context), nonce=nonce)
+    html = inject_home_lcp_hints(html, raw_path)
     if nonce:
         html = inject_csp_nonce(html, nonce)
 
