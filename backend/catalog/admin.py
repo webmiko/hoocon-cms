@@ -129,7 +129,8 @@ class ProductImageInline(TabularInline):
 
     model = ProductImage
     extra = 0
-    fields = ("image", "alt", "source_url", "sort_order", "is_published")
+    fields = ("image", "image_card", "alt", "source_url", "sort_order", "is_published")
+    readonly_fields = ("image_card",)
 
 
 @admin.register(SKU)

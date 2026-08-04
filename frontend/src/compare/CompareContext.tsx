@@ -13,6 +13,7 @@ import {
   writeCompareStorage,
   type CompareItem,
 } from "./storage";
+import { productCardImageSrc } from "../utils/productImageSrc";
 
 export type { CompareAddResult };
 
@@ -84,7 +85,10 @@ export function CompareProvider({ children }: { children: ReactNode }) {
         slug: string;
         sku_code: string;
         name: string;
-        image?: { image?: string } | null;
+        image?: {
+          image?: string;
+          image_card?: string | null;
+        } | null;
       }>,
     ) => {
       const bySlug = new Map(
@@ -94,7 +98,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
             slug: sku.slug,
             sku_code: sku.sku_code,
             name: sku.name,
-            image: sku.image?.image ?? null,
+            image: productCardImageSrc(sku.image),
           } satisfies CompareItem,
         ]),
       );

@@ -298,13 +298,14 @@ class ProductFileSerializer(serializers.ModelSerializer):
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
-    """Public product image (WebP URL + alt)."""
+    """Public product image (full WebP + optional card preview)."""
 
     image = RelativeImageField(read_only=True)
+    image_card = RelativeImageField(read_only=True)
 
     class Meta:
         model = ProductImage
-        fields = ("id", "image", "alt", "sort_order")
+        fields = ("id", "image", "image_card", "alt", "sort_order")
         read_only_fields = fields
 
 

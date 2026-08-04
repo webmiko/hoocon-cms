@@ -83,3 +83,101 @@ def test_product_image_save_converts_png_to_webp(db: None) -> None:
     with img.image.open("rb") as fh:
         magic = fh.read(12)
     assert magic[:4] == b"RIFF" and magic[8:12] == b"WEBP"
+
+
+def test_product_image_save_builds_image_card(db: None) -> None:
+    """Full hero save also writes a ≤CARD_MAX_EDGE_PX card WebP."""
+    from catalog.etl.webp import CARD_MAX_EDGE_PX
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    cat = Category.objects.create(name="T", slug="t-webp-card")
+    product = Product.objects.create(name="P", slug="p-webp-card", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="S",
+        slug="s-webp-card",
+        sku_code="WEBP-CARD-1",
+    )
+    png = SimpleUploadedFile(
+        "hero.png",
+        _png_bytes((1600, 1200)),
+        content_type="image/png",
+    )
+    img = ProductImage(sku=sku, alt="t", sort_order=0, is_published=True)
+    img.image = png
+    img.save()
+    img.refresh_from_db()
+    assert img.image_card.name
+    assert img.image_card.name.lower().endswith(".webp")
+    with img.image_card.open("rb") as fh:
+        card = fh.read()
+    with Image.open(BytesIO(card)) as decoded:
+        assert max(decoded.size) <= CARD_MAX_EDGE_PX
+    assert len(card) < img.image.size  # type: ignore[operator]
+
+
+def test_backfill_missing_image_cards(db: None) -> None:
+    """Management helper fills empty image_card without touching the hero."""
+    from catalog.etl.webp import backfill_missing_image_cards
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    cat = Category.objects.create(name="T", slug="t-backfill-card")
+    product = Product.objects.create(name="P", slug="p-backfill-card", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="S",
+        slug="s-backfill-card",
+        sku_code="WEBP-CARD-2",
+    )
+    webp = convert_bytes_to_webp(_png_bytes((900, 600)), quality=90, max_edge=900)
+    img = ProductImage(
+        sku=sku,
+        alt="t",
+        sort_order=0,
+        is_published=True,
+    )
+    img.image.save("hero.webp", SimpleUploadedFile("hero.webp", webp, content_type="image/webp"), save=False)
+    # Bypass ProductImage.save card sync: write row then clear card via queryset.
+    from django.db.models import Model
+
+    Model.save(img)
+    ProductImage.objects.filter(pk=img.pk).update(image_card="")
+    img.refresh_from_db()
+    assert not img.image_card
+
+    summary = backfill_missing_image_cards()
+    assert summary["written"] >= 1
+    img.refresh_from_db()
+    assert img.image_card.name
+
+
+def test_sku_list_api_includes_image_card(client, db: None) -> None:
+    """List payload exposes image_card for catalog/mobile clients."""
+    from django.urls import reverse
+
+    from catalog.models import SKU, Category, Product, ProductImage
+
+    cat = Category.objects.create(name="T", slug="t-api-card")
+    product = Product.objects.create(name="P", slug="p-api-card", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="S",
+        slug="s-api-card",
+        sku_code="WEBP-CARD-3",
+        is_published=True,
+    )
+    png = SimpleUploadedFile("hero.png", _png_bytes((800, 600)), content_type="image/png")
+    ProductImage.objects.create(
+        sku=sku,
+        image=png,
+        alt="hero",
+        sort_order=0,
+        is_published=True,
+    )
+    response = client.get(reverse("catalog-sku-list"))
+    assert response.status_code == 200
+    rows = response.json()["results"]
+    row = next(r for r in rows if r["slug"] == "s-api-card")
+    assert row["image"]["image"]
+    assert row["image"]["image_card"]
+    assert row["image"]["image_card"] != row["image"]["image"]

@@ -112,6 +112,13 @@ poetry run python manage.py attach_manual_diagrams --series hvdf
 | H81 / H8205 baked | `isKitCanvasMediaSku(skuCode)` → `{1, 1}` |
 | Brass DN baked | highlight `dn` → `{1, 1}` |
 | Карточка / PDP | `CatalogSkuCard`, `SkuDetailPage` + CSS modules |
+| Card WebP (list/mobile) | API `image_card` ≤720px; FE `productCardImageSrc` |
+
+После attach медиа на VPS — догнать превью:
+
+```bash
+python manage.py generate_product_image_cards
+```
 
 ---
 
@@ -133,6 +140,7 @@ ssh hoocon-prod 'cd /opt/hoocon && docker compose exec -T web bash -lc "
   python manage.py attach_hv_catalog_dimensions
   python manage.py attach_da_sa_media_webp --root /app/media/_pack/media-webp
   python manage.py attach_manual_diagrams --series hvdf
+  python manage.py generate_product_image_cards
 "'
 ```
 

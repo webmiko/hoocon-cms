@@ -258,7 +258,11 @@ poetry run python manage.py enrich_safu
 | SKU.sku_code | `HVA{24\|230}[S]-{n}[Q]` | `HVA24S-10`, `HVA230-20Q` |
 
 Линейки в каталоге 2025 (модулирующие): **5 / 10 / 20 / 40** и ускоренные
-**5Q / 10Q / 20Q / 40Q**. Seed: `manage.py enrich_hva --with-media`.
+**5Q / 10Q / 20Q / 40Q**. Дополнительно по RU-мануалам (пока могут быть
+неопубликованы): **2**, **5UQ**, **8Q**. Seed: `manage.py enrich_hva`
+(`--with-media` когда есть pack). Правило: при новых карточках с мануалом
+сразу ТТХ/PDF/фото из `_инструкции-pdf/RU/` /
+`_manuals-ru/HV/assets/<stem>/` (см. `.cursor/rules/cards-from-manuals.mdc`).
 
 ### Каталог / PDP
 
@@ -283,6 +287,8 @@ HVA-P (пружина, китайский рынок) в РФ-каталог н�
 Медиа: студийные WebP из HV seria (длинная сторона ≤1600); если нет —
 кадр из каталога 2025 при `min_edge ≥ 800`. Дубли героя (Tilda + local)
 чистить: `manage.py audit_optimize_product_images`.
+Лёгкое превью для карточек/мобилок: `ProductImage.image_card` (≤720px,
+q78) — на save и `manage.py generate_product_image_cards`.
 
 ---
 

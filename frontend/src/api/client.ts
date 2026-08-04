@@ -15,7 +15,12 @@ export type { paths, components };
 
 // Category
 export type Category = components["schemas"]["Category"] & {
-  image?: { id: number; image: string; alt?: string } | null;
+  image?: {
+    id: number;
+    image: string;
+    image_card?: string | null;
+    alt?: string;
+  } | null;
 };
 export type CategoryListResponse =
   paths["/api/catalog/categories/"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -23,7 +28,12 @@ export type CategoryListResponse =
 // SKU
 export type SKUList = components["schemas"]["SKUList"] & {
   highlights?: CatalogHighlight[];
-  image?: { id: number; image: string; alt?: string } | null;
+  image?: {
+    id: number;
+    image: string;
+    image_card?: string | null;
+    alt?: string;
+  } | null;
   in_stock?: boolean;
   /** Within the 30-day «Новинки» window (first_published_at). */
   is_new?: boolean;
@@ -50,7 +60,12 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
   highlights?: CatalogHighlight[];
   attributes?: CatalogAttribute[];
   attribute_groups?: CatalogAttributeGroup[];
-  images?: Array<{ id: number; image: string; alt?: string }>;
+  images?: Array<{
+    id: number;
+    image: string;
+    image_card?: string | null;
+    alt?: string;
+  }>;
   lead?: string;
   specs_text?: string;
   analogs_text?: string;

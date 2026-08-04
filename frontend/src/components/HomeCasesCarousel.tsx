@@ -92,7 +92,13 @@ export function HomeCasesCarousel({ projects }: HomeCasesCarouselProps) {
   if (n === 0) return null;
 
   return (
-    <div ref={rootRef} className={styles.root}>
+    <div
+      ref={rootRef}
+      className={styles.root}
+      role={carousel ? "region" : undefined}
+      aria-roledescription={carousel ? "карусель" : undefined}
+      aria-labelledby={carousel ? "cases-heading" : undefined}
+    >
       {carousel ? (
         <div className={styles.toolbar}>
           <button
@@ -119,9 +125,7 @@ export function HomeCasesCarousel({ projects }: HomeCasesCarouselProps) {
       <ul
         ref={trackRef}
         className={carousel ? styles.track : styles.grid}
-        role={carousel ? "region" : undefined}
-        aria-roledescription={carousel ? "карусель" : undefined}
-        aria-labelledby="cases-heading"
+        role="list"
       >
         {projects.map((project, index) => {
           const active = !carousel || index === activeIndex;

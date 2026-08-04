@@ -477,6 +477,7 @@ class ProductImage(models.Model):
         source_url: исходный URL Tilda CDN (unique per SKU).
         sort_order: 0 = primary (карточка каталога).
         is_published: видимость в публичном API.
+        image_card: лёгкий WebP для list/mobile (≤720px); полный кадр в ``image``.
     """
 
     sku: models.ForeignKey = models.ForeignKey(
@@ -490,7 +491,15 @@ class ProductImage(models.Model):
         "изображение",
         upload_to=product_image_upload_to,
         validators=[validate_image_upload],
-        help_text="WebP предпочтительно; JPEG/PNG допустимы.",
+        help_text="WebP предпочтительно; JPEG/PNG допустимы. Полный кадр для страницы артикула.",
+    )
+    image_card: models.ImageField = models.ImageField(
+        "превью карточки",
+        upload_to=product_image_upload_to,
+        blank=True,
+        default="",
+        validators=[validate_image_upload],
+        help_text="Лёгкий WebP для каталога/мобилок (генерируется из полного кадра).",
     )
     alt: models.CharField = models.CharField(
         "альтернативный текст",
@@ -544,9 +553,33 @@ class ProductImage(models.Model):
             validate_image_upload(self.image)
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Persist row; re-encode JPEG/PNG uploads to WebP first."""
-        from catalog.etl.webp import ensure_field_file_webp
+        """Persist row; re-encode JPEG/PNG uploads to WebP; sync card preview."""
+        from catalog.etl.webp import attach_image_card, ensure_field_file_webp
 
+        raw_fields = kwargs.get("update_fields")
+        update_fields: frozenset[str] | None = None
+        if isinstance(raw_fields, (list, tuple, set, frozenset)):
+            update_fields = frozenset(str(name) for name in raw_fields)
+
+        only_card = update_fields is not None and update_fields <= {
+            "image_card",
+            "updated_at",
+        }
+        if only_card:
+            super().save(*args, **kwargs)  # type: ignore[arg-type]
+            return
+
+        sync_card = update_fields is None or "image" in update_fields
         if self.image:
             ensure_field_file_webp(self.image)
+            if sync_card:
+                attach_image_card(self)
+                if update_fields is not None and "image_card" not in update_fields:
+                    kwargs["update_fields"] = [*update_fields, "image_card"]
+        elif sync_card and self.image_card:
+            self.image_card.delete(save=False)
+            self.image_card = ""
+            if update_fields is not None and "image_card" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "image_card"]
+
         super().save(*args, **kwargs)  # type: ignore[arg-type]

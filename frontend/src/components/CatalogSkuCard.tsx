@@ -22,6 +22,7 @@ import { formatEditionCountLabel } from "../utils/editionCountLabel";
 import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import { photoScalePlanFromHighlights } from "../utils/productPhotoScale";
+import { productCardImageSrc } from "../utils/productImageSrc";
 import { softBreak } from "../utils/softBreak";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
@@ -49,7 +50,7 @@ export function CatalogSkuCard({
 }: CatalogSkuCardProps) {
   const location = useLocation();
   const purpose = mediaPurposeFromCategory(sku.category_slug);
-  const imageSrc = sku.image?.image ?? null;
+  const imageSrc = productCardImageSrc(sku.image);
   const photoPlan = photoScalePlanFromHighlights(sku.highlights, sku.sku_code);
   const photoScale = useNormalizedPhotoScale(
     imageSrc,
@@ -140,7 +141,7 @@ export function CatalogSkuCard({
           <p className={styles.cardEditions}>{editionsLabel}</p>
         ) : null}
         {sku.highlights && sku.highlights.length > 0 ? (
-          <ul className={styles.cardSpecs}>
+          <ul className={styles.cardSpecs} role="list">
             {cardHighlights(sku.highlights).map((h) => {
               const unit = specDisplayUnit(h.value, h.unit);
               const label = compactCardSpecName(h.name);
