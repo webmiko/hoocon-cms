@@ -69,14 +69,26 @@ def finished_manuals_dir(
 
 
 def _ensure_family_logo(finished_dir: Path) -> None:
-    """Symlink Hoocon logo into ``{DA,SA,HV}/assets/`` for relative HTML paths."""
+    """Copy Hoocon logo into ``{DA,SA,HV}/assets/`` (real file, not symlink).
+
+    Safari ``file://`` refuses symlink targets outside the HTML folder — logo
+    would be blank on screen and in print. Keep a hard copy next to manuals.
+
+    Print/PDF uses PNG as CSS ``background-image`` (not ``<img>`` SVG + filter):
+    WebKit often drops filtered SVG in «Save as PDF». Mono theme gets a
+    pre-rasterized gray PNG so we never need ``filter: grayscale`` on print.
+    """
     assets = finished_dir / "assets"
     assets.mkdir(parents=True, exist_ok=True)
-    link = assets / "hoocon-logo.svg"
-    target = Path("../../assets/hoocon-logo.svg")
-    if link.is_symlink() or link.is_file():
-        return
-    link.symlink_to(target)
+    src_dir = _MANUALS_RU_DIR / "assets"
+    for name in ("hoocon-logo.svg", "hoocon-logo.png", "hoocon-logo-mono.png"):
+        src = src_dir / name
+        if not src.is_file():
+            raise FileNotFoundError(f"Missing curated logo: {src}")
+        dest = assets / name
+        if dest.is_symlink() or dest.exists():
+            dest.unlink()
+        dest.write_bytes(src.read_bytes())
 
 
 def iter_finished_manual_html(
@@ -3489,9 +3501,7 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
   <div class="grid">
     <header class="span-12 hero">
       <p class="running-head">hoocon.ru</p>
-      <div class="logo">
-        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
-      </div>
+      <div class="logo" role="img" aria-label="Hoocon"></div>
     </header>
 
     <div class="span-12 sheet1-body">
@@ -3530,9 +3540,7 @@ def render_grid(doc: ManualDoc, *, diagram_profile: DiagramProfile | None = None
   <div class="grid">
     <header class="span-12 hero">
       <p class="running-head">hoocon.ru</p>
-      <div class="logo">
-        <img src="assets/hoocon-logo.svg" alt="Hoocon" width="160" height="40">
-      </div>
+      <div class="logo" role="img" aria-label="Hoocon"></div>
     </header>
 
     <div class="span-12 sheet2-body">
@@ -4347,16 +4355,20 @@ HTML_SHELL = """\
   }}
   .logo {{
     grid-column: 11 / span 2;
-    display: flex;
-    align-items: center;
-    justify-self: end;
-    flex-shrink: 0;
-  }}
-  .logo img {{
     display: block;
+    justify-self: end;
+    align-self: center;
+    flex-shrink: 0;
+    width: 40mm;
     height: 9mm;
-    width: auto;
-    max-width: 100%;
+    /* PNG background + print-color-adjust: Safari Save-as-PDF keeps logo;
+       filtered SVG <img> often vanishes in WebKit print. */
+    background: url("assets/hoocon-logo.png") no-repeat right center / contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }}
+  .theme-mono .logo {{
+    background-image: url("assets/hoocon-logo-mono.png");
   }}
   .product-col {{
     display: grid;
@@ -4646,10 +4658,8 @@ HTML_SHELL = """\
     text-align: center;
     overflow: hidden;
   }}
-  /* Product photo is B&W (EN image manuals) → logo + torque match, no brand red. */
-  .theme-mono .logo img {{
-    filter: grayscale(1) contrast(1.05);
-  }}
+  /* Product photo is B&W (EN image manuals) → logo + torque match, no brand red.
+     Mono logo is a separate PNG (see .theme-mono .logo) — no CSS filter in print. */
   .theme-mono .torque {{
     color: #1a1a1a;
   }}
@@ -4953,7 +4963,7 @@ HTML_SHELL = """\
       }}
     }})();
   </script>
-  <script src="assets/photo-crop-tool.js?v=center1"></script>
+  <script src="assets/photo-crop-tool.js?v=ffprint1"></script>
   <script>
   (function () {{
     var bar = document.querySelector(".toolbar");

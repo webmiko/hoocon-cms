@@ -4,6 +4,9 @@
  * Each content image gets its own crop rectangle (edges in % of the source),
  * zoom, and position (posX/posY, 50/50 = centre). Edges move both ways.
  *
+ * Screen uses clip-path + transform. Firefox print often mis-renders that pair,
+ * so beforeprint bakes the same geometry into a canvas bitmap (afterprint restores).
+ *
  * Download PNG to bake into ``assets/<stem>/….png``, then «Сброс».
  */
 (function () {
@@ -80,7 +83,19 @@
   }
 
   function assetKey(img) {
+    var slot = (img.getAttribute("data-slot") || "").trim();
+    if (slot) return slot;
+    var named = (img.getAttribute("data-filename") || "").trim();
+    if (named) {
+      return named.replace(/\.[^.]+$/, "") || named;
+    }
     var src = img.getAttribute("src") || "";
+    if (src.indexOf("data:") === 0) {
+      if (img.classList.contains("product-photo")) return "product";
+      if (img.classList.contains("lead-photo")) return "lead";
+      if (img.classList.contains("aux-diagram")) return "aux-diagram";
+      return "img-" + Array.prototype.indexOf.call(document.images, img);
+    }
     var base = src.split("?")[0].split("/").pop() || "";
     if (base) return base.replace(/\.[^.]+$/, "") || base;
     if (img.classList.contains("product-photo")) return "product";
@@ -112,6 +127,7 @@
         if (img.closest(".photo-crop-panel")) return;
         var src = img.getAttribute("src") || "";
         if (!src || /hoocon-logo/i.test(src)) return;
+        if (img.hasAttribute("data-empty") || img.hidden) return;
         var key = assetKey(img);
         if (seen[key]) return;
         seen[key] = true;
@@ -296,56 +312,151 @@
     }
   }
 
+  /**
+   * Paint screen-equivalent crop into a slot-sized canvas (object-fit:contain
+   * + clip-path inset + translate/scale from centre). Used for Firefox print.
+   */
+  function renderCropIntoSlotCanvas(img, rect, sw, sh) {
+    if (!img || !img.naturalWidth || !img.naturalHeight) return null;
+    if (!(sw > 0) || !(sh > 0)) return null;
+    var dpr = 2;
+    var cw = Math.max(1, Math.round(sw * dpr));
+    var ch = Math.max(1, Math.round(sh * dpr));
+    var canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, cw, ch);
+
+    var nw = img.naturalWidth;
+    var nh = img.naturalHeight;
+    var fit = Math.min(cw / nw, ch / nh);
+    var dw = nw * fit;
+    var dh = nh * fit;
+    var ox = (cw - dw) / 2;
+    var oy = (ch - dh) / 2;
+
+    var z = (rect.zoom != null ? rect.zoom : 100) / 100;
+    var posX = rect.posX != null ? rect.posX : 50;
+    var posY = rect.posY != null ? rect.posY : 50;
+    /* Match applyCrop: translate((pos-50)*2%, …) scale(z), origin centre. */
+    var tx = (((posX - 50) * 2) / 100) * dw;
+    var ty = (((posY - 50) * 2) / 100) * dh;
+    var inset = insetFromRect(rect);
+    var cx = ox + dw / 2;
+    var cy = oy + dh / 2;
+
+    try {
+      ctx.save();
+      /* CSS: transform then clip together — path coords follow CTM. */
+      ctx.translate(cx, cy);
+      ctx.translate(tx, ty);
+      ctx.scale(z, z);
+      ctx.translate(-cx, -cy);
+      ctx.beginPath();
+      ctx.rect(
+        ox + (dw * inset.left) / 100,
+        oy + (dh * inset.top) / 100,
+        (dw * (100 - inset.left - inset.right)) / 100,
+        (dh * (100 - inset.top - inset.bottom)) / 100,
+      );
+      ctx.clip();
+      ctx.drawImage(img, ox, oy, dw, dh);
+      ctx.restore();
+    } catch (err) {
+      return null;
+    }
+    return canvas;
+  }
+
+  function slotSizeFor(img) {
+    var wrap = ensureWrap(img);
+    var r = wrap.getBoundingClientRect();
+    if (r.width >= 4 && r.height >= 4) {
+      return { w: r.width, h: r.height };
+    }
+    return {
+      w: img.clientWidth || img.naturalWidth || 400,
+      h: img.clientHeight || img.naturalHeight || 400,
+    };
+  }
+
+  var printBakeRestore = [];
+
+  function clearPrintBakeStyles(img) {
+    img.style.clipPath = "";
+    img.style.webkitClipPath = "";
+    img.style.transform = "";
+    img.style.transformOrigin = "";
+    img.style.width = "";
+    img.style.height = "";
+    img.style.maxWidth = "";
+    img.style.maxHeight = "";
+    img.style.objectFit = "";
+    img.style.objectPosition = "";
+    img.style.position = "";
+    img.style.left = "";
+    img.style.top = "";
+  }
+
+  function bakeCropsForPrint(targets, state) {
+    restoreCropsAfterPrint();
+    targets.forEach(function (t) {
+      var rect = state[t.key];
+      if (!rect || isIdentity(rect)) return;
+      var img = t.img;
+      if (!img || !img.naturalWidth) return;
+      var slot = slotSizeFor(img);
+      var canvas = renderCropIntoSlotCanvas(img, rect, slot.w, slot.h);
+      if (!canvas) return;
+      /* Insert painted canvas — no async decode race on img.src data-URL. */
+      canvas.setAttribute("aria-hidden", "true");
+      canvas.className = (img.className || "") + " photo-crop-print-bake";
+      canvas.style.display = "block";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.maxWidth = "100%";
+      canvas.style.maxHeight = "100%";
+      canvas.style.objectFit = "fill";
+      canvas.style.clipPath = "none";
+      canvas.style.transform = "none";
+      if (!img.parentNode) return;
+      img.parentNode.insertBefore(canvas, img);
+      img.style.display = "none";
+      printBakeRestore.push({
+        img: img,
+        canvas: canvas,
+        rect: rect,
+      });
+    });
+  }
+
+  function restoreCropsAfterPrint() {
+    if (!printBakeRestore.length) return;
+    var pending = printBakeRestore.slice();
+    printBakeRestore = [];
+    pending.forEach(function (row) {
+      var img = row.img;
+      if (row.canvas && row.canvas.parentNode) {
+        row.canvas.parentNode.removeChild(row.canvas);
+      }
+      if (!img) return;
+      img.style.display = "";
+      clearPrintBakeStyles(img);
+      applyCrop(img, row.rect);
+    });
+  }
+
   function downloadCroppedPng(img, key, rect) {
     if (!img || !img.naturalWidth) {
       window.alert("Нет фото или оно ещё не загрузилось.");
       return;
     }
-    var nw = img.naturalWidth;
-    var nh = img.naturalHeight;
-    var x0 = Math.round((nw * rect.left) / 100);
-    var y0 = Math.round((nh * rect.top) / 100);
-    var x1 = Math.round((nw * rect.right) / 100);
-    var y1 = Math.round((nh * rect.bottom) / 100);
-    var w = Math.max(1, x1 - x0);
-    var h = Math.max(1, y1 - y0);
-
-    var zoom = rect.zoom / 100;
-    var outW;
-    var outH;
-    var dx;
-    var dy;
-    if (zoom >= 1) {
-      // Zoom in: export the center portion of the crop window.
-      var vw = w / zoom;
-      var vh = h / zoom;
-      var sx = x0 + (w - vw) / 2;
-      var sy = y0 + (h - vh) / 2;
-      outW = Math.max(1, Math.round(vw));
-      outH = Math.max(1, Math.round(vh));
-      x0 = Math.round(sx);
-      y0 = Math.round(sy);
-      w = outW;
-      h = outH;
-      dx = 0;
-      dy = 0;
-    } else {
-      // Zoom out: letterbox on white so frame is larger than subject.
-      outW = Math.max(1, Math.round(w / zoom));
-      outH = Math.max(1, Math.round(h / zoom));
-      dx = Math.round((outW - w) / 2);
-      dy = Math.round((outH - h) / 2);
-    }
-
-    var canvas = document.createElement("canvas");
-    canvas.width = outW;
-    canvas.height = outH;
-    var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, outW, outH);
-    try {
-      ctx.drawImage(img, x0, y0, w, h, dx, dy, w, h);
-    } catch (err) {
+    var slot = slotSizeFor(img);
+    var canvas = renderCropIntoSlotCanvas(img, rect, slot.w, slot.h);
+    if (!canvas) {
       window.alert(
         "Не удалось вырезать PNG (CORS). Откройте мануал через http.server, не file://.",
       );
@@ -458,8 +569,11 @@
       "</div>";
     document.body.appendChild(panel);
 
-    var style = document.createElement("style");
-    style.textContent =
+    var style = document.getElementById("photo-crop-tool-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "photo-crop-tool-style";
+      style.textContent =
       ".photo-crop-panel{" +
       "position:fixed;right:12px;bottom:12px;z-index:30;" +
       "width:min(340px,calc(100vw - 24px));padding:0 14px 12px;" +
@@ -513,8 +627,8 @@
       "grid-column:4 / span 3;width:100%;min-width:0;max-height:40mm;" +
       "justify-self:stretch}" +
       "@media print{.photo-crop-panel,#toggle-photo-crop{display:none!important}}";
-    document.head.appendChild(style);
-
+      document.head.appendChild(style);
+    }
     var byKey = Object.create(null);
     targets.forEach(function (t) {
       byKey[t.key] = t;
@@ -776,7 +890,48 @@
         if (!t) return;
         downloadCroppedPng(t.img, key, state[key]);
       });
+
+    /* Firefox: clip-path+transform on <img> ≠ screen in print/PDF. Bake bitmaps. */
+    bakeForPrintImpl = function () {
+      bakeCropsForPrint(targets, state);
+    };
+    if (!printHooksBound) {
+      printHooksBound = true;
+      window.addEventListener("beforeprint", function () {
+        if (bakeForPrintImpl) bakeForPrintImpl();
+      });
+      window.addEventListener("afterprint", restoreCropsAfterPrint);
+      if (typeof window.matchMedia === "function") {
+        var printMql = window.matchMedia("print");
+        var onPrintMql = function (mql) {
+          if (mql.matches) {
+            if (bakeForPrintImpl) bakeForPrintImpl();
+          } else {
+            restoreCropsAfterPrint();
+          }
+        };
+        if (typeof printMql.addEventListener === "function") {
+          printMql.addEventListener("change", onPrintMql);
+        } else if (typeof printMql.addListener === "function") {
+          printMql.addListener(onPrintMql);
+        }
+      }
+    }
   }
+
+  var bakeForPrintImpl = null;
+  var printHooksBound = false;
+
+  function rebuildPhotoCropPanel() {
+    var oldPanel = document.getElementById("photo-crop-panel");
+    if (oldPanel) oldPanel.remove();
+    var oldBtn = document.getElementById("toggle-photo-crop");
+    if (oldBtn) oldBtn.remove();
+    restoreCropsAfterPrint();
+    buildPanel();
+  }
+
+  window.hooconPhotoCropRefresh = rebuildPhotoCropPanel;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", buildPanel);

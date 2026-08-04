@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Шаблон V230 — AC 100…240 В (RU)</title>
+<title>Шаблон UQ — сверхбыстрый HVA (RU)</title>
 <style>
   :root {
     --ink: #1a1a1a;
@@ -243,7 +243,10 @@
     padding-top: 0;
     align-self: start;
   }
-  .sheet-page1 .aux-diagram-compact { max-height: 100%; }
+  /* aux-diagram-media slot rules → Media slots block above. */
+  .sheet-page1 .aux-diagram-compact {
+    max-height: 100%;
+  }
   .sheet-page1 .aux-diagram-caption {
     margin: 0;
     padding: 0;
@@ -277,6 +280,7 @@
     grid-row: 2;
     margin: 1mm 0 0;
   }
+  /* sheet1-dip-diagram slot → Media slots block above. */
   .sheet-page1 .running-foot {
     grid-row: 3;
   }
@@ -316,8 +320,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Keep collapsed bottom border inside the clip box. */
-    padding-bottom: 0.35mm;
   }
   .sheet2-body .tech-block .banner {
     flex: 0 0 auto;
@@ -330,8 +332,6 @@
     flex-direction: column;
     margin: 0 0 1.2mm;
     position: relative;
-    /* Room for the collapsed outer bottom border (overflow:hidden clips it). */
-    padding-bottom: 2px;
   }
   /* Electrical (first) slot: size to content so wrapped «Потребляемая мощность»
      does not clip the following «Сечение…» row. */
@@ -347,17 +347,8 @@
   }
   .sheet2-body .tech-block .tech-table-slot:last-child {
     margin-bottom: 0;
-  }
-  .sheet2-body .tech-block .tech-table-slot:last-child::after {
-    /* Always-visible bottom edge when cell borders are subpixel-clipped. */
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 0.25mm;
-    background: #444;
-    pointer-events: none;
+    /* Let the real table bottom border show (no fake ::after line). */
+    overflow: visible;
   }
   .sheet2-body .tech-block .data-table {
     flex: 1 1 auto;
@@ -454,7 +445,8 @@
     margin: 0 0 0.4mm;
   }
   .sheet-page2 .lead-photo {
-    max-height: 28mm;
+    /* Height follows .summary-block via stretch; no fixed mm cap. */
+    max-height: none;
   }
   .sheet-page2 .banner {
     margin: 0 0 1.2mm;
@@ -477,6 +469,7 @@
     gap: 1.5mm;
     grid-template-columns: 1fr;
   }
+  /* wiring / diagram-wide img → Media slots block above. */
   .wiring-ru-headers {
     display: grid;
     grid-template-columns: 1.55fr 1fr;
@@ -507,7 +500,14 @@
   .wl-v24 { left: 6%; top: 88%; }
   .wl-v230 { left: 38%; top: 88%; }
   .wl-rating { left: 76%; top: 88%; }
-  .sheet-page2 .diagrams .diagram-dip > img { height: auto; max-height: none; }
+  .sheet-page2 .diagrams .diagram-dip {
+    --diagram-h: none;
+    overflow: hidden;
+  }
+  .sheet-page2 .diagrams .diagram-dip > img {
+    height: auto;
+    max-height: none;
+  }
   .diagrams .banner {
     display: block;
     width: 100%;
@@ -518,9 +518,9 @@
     /* diagrams-block = sheet cols 7–12 → local 6; image on sheet 10–12 = local 4–6. */
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--gap);
-    align-items: start;
+    align-items: center;
     width: 100%;
-    min-height: 0;
+    min-height: 28mm;
   }
   .diagram-rotation .rotation-panel .rotation-copy {
     grid-column: 1 / span 3;
@@ -530,11 +530,27 @@
     min-width: 0;
   }
   .diagram-rotation .rotation-panel > img,
-  .diagram-rotation .rotation-panel > .rotation-media {
+  .diagram-rotation .rotation-panel > .rotation-media,
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {
     grid-column: 4 / span 3;
     width: 100%;
     min-width: 0;
     justify-self: stretch;
+    align-self: center;
+    overflow: visible;
+    height: auto;
+    max-height: none;
+  }
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {
+    /* Size to the image; do not clip — crop tool cannot unclip a CSS box. */
+    line-height: 0;
+  }
+  .diagram-rotation .rotation-panel > .photo-crop-wrap > img {
+    width: 100%;
+    height: auto;
+    max-height: 42mm !important;
+    object-fit: contain;
+    object-position: center;
   }
   .diagram-rotation .rotation-media {
     display: flex;
@@ -586,7 +602,11 @@
     font-weight: 650;
   }
   .diagram-rotation img {
-    max-height: 36mm !important;
+    max-height: 42mm !important;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
   }
   .diagram-rotation.diagram-dip > img {
     width: 100%;
@@ -620,18 +640,46 @@
   .stack { min-width: 0; }
   .summary-block {
     grid-column: 1 / span 6;
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
     gap: var(--gap);
-    align-items: center;
     min-width: 0;
   }
+  /* Media height follows .summary-copy (flex stretch). Absolute fill so the
+     lead photo's intrinsic size cannot inflate the row. */
   .summary-media {
-    grid-column: 1 / span 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    flex: 0 0 calc((100% - var(--gap)) * 2 / 6);
+    width: calc((100% - var(--gap)) * 2 / 6);
+    max-width: calc((100% - var(--gap)) * 2 / 6);
+    position: relative;
     min-width: 0;
+    min-height: 0;
+    align-self: stretch;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .summary-media > .photo-crop-wrap,
+  .summary-media > .lead-photo,
+  .summary-media > .photo-fallback {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    line-height: 0;
+  }
+  .summary-media > .photo-crop-wrap > img,
+  .summary-media > .lead-photo {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: none;
+    object-fit: contain;
+    object-position: center;
   }
   .lead-photo {
     display: block;
@@ -639,8 +687,11 @@
     max-height: 42mm;
     object-fit: contain;
   }
+  .summary-block .lead-photo {
+    max-height: none;
+  }
   .summary-copy {
-    grid-column: 3 / span 4;
+    flex: 1 1 0;
     min-width: 0;
   }
   .lead-heading {
@@ -714,8 +765,9 @@
     align-items: center;
     min-width: 0;
   }
-  .product-col .media {
-    /* Sheet cols 8–9 when local grid is 6 (prefer 2 / span 2 if already patched). */
+  .product-col .media,
+  .product-col .product-media {
+    /* Sheet cols 8–9 (product-col is sheet cols 7–12 → local 2 / span 2). */
     grid-column: 2 / span 2;
     grid-row: 1;
     align-self: center;
@@ -731,7 +783,6 @@
     box-sizing: border-box;
     overflow: hidden;
     isolation: isolate;
-    min-width: 0;
   }
   .sheet-page1 .product-col .product-photo {
     max-width: 100%;
@@ -740,6 +791,10 @@
     height: auto;
     object-fit: contain;
     object-position: center center;
+  }
+  /* SA FU/MU: shorter media slot (see --media-h on .product-media). */
+  .sheet-page1 .product-col .product-photo[src*="/sa"] {
+    max-height: 100%;
   }
 
   /* Media slots: div is the viewport (clips); image scales inside (product-media model). */
@@ -750,9 +805,7 @@
   .wiring-board,
   .diagram,
   .diagram-rotation .rotation-media,
-  .diagram-rotation .rotation-panel > .photo-crop-wrap,
-  .product-col .media,
-  .product-col .product-media {
+  .diagram-rotation .rotation-panel > .photo-crop-wrap {
     overflow: hidden;
     isolation: isolate;
     box-sizing: border-box;
@@ -899,9 +952,84 @@
     object-position: top center;
   }
 
-  /* SA FU/MU: slightly smaller hero so left body + SAF72 fit without clip. */
-  .sheet-page1 .product-col .product-photo[src*="/sa"] {
-    max-height: 58mm;
+  /* Green photo-bounds guide (positioned by JS to match visible photo). */
+  .photo-bounds-guide {
+    display: none;
+    position: absolute;
+    box-sizing: border-box;
+    border: 0.25mm solid rgba(42, 157, 74, 0.95);
+    pointer-events: none;
+    z-index: 4;
+  }
+  body.show-cols .photo-bounds-guide {
+    display: block;
+  }
+
+  /* UQ family template (эталон: HV/hva-5uq). Unlock above aux. */
+  .sheet-page1 .sheet1-unlock {
+    margin: 0 0 2mm;
+  }
+  .sheet-page1 .sheet1-unlock .unlock-hint {
+    grid-column: 1 / span 3;
+    margin: 0;
+    font-size: 8pt;
+    line-height: 1.3;
+    min-width: 0;
+    align-self: center;
+  }
+  .sheet-page1 .sheet1-unlock .unlock-media {
+    /* Left half = sheet cols 1–6 → local 6; hint 1–3, figure 4–6. */
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: center;
+    min-height: 36mm;
+    height: 40mm;
+    max-height: 40mm;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .sheet-page1 .sheet1-unlock .unlock-media > img,
+  .sheet-page1 .sheet1-unlock .unlock-media > .photo-crop-wrap {
+    grid-column: 4 / span 3;
+    width: 100%;
+    min-width: 0;
+    max-height: 40mm;
+    justify-self: stretch;
+  }
+  .sheet-page1 .sheet1-unlock .unlock-media img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center top;
+  }
+
+  /* 5 mm row guide over product media (show-cols). */
+  .photo-rows {
+    display: none;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  body.show-cols .photo-rows {
+    display: block;
+  }
+  .photo-rows .pr-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--pr-y) * 1mm);
+    border-top: 0.18mm solid rgba(215, 21, 25, 0.35);
+    height: 0;
+  }
+  .photo-rows .pr-line.pr-center {
+    border-top-width: 0.45mm;
+    border-top-color: rgba(215, 21, 25, 0.9);
+    z-index: 1;
   }
   .doc-title-box {
     grid-column: 2 / span 5;
@@ -960,6 +1088,11 @@
     white-space: nowrap;
     text-align: center;
     overflow: hidden;
+  }
+  /* Product photo is B&W (EN image manuals) → logo + torque match, no brand red.
+     Mono logo is a separate PNG (see .theme-mono .logo) — no CSS filter in print. */
+  .theme-mono .torque {
+    color: #1a1a1a;
   }
   .sku-list {
     list-style: none;
@@ -1051,6 +1184,7 @@
   .diagram-wide {
     grid-column: 1 / -1;
   }
+  /* .diagram img sizing → Media slots block above. */
   .data-table {
     width: 100%; border-collapse: collapse; table-layout: fixed;
     margin: 0 0 2.5mm; font-size: 7.2pt;
@@ -1068,7 +1202,13 @@
   @media print {
     html, body { background: #fff; }
     .toolbar { display: none !important; }
-    .col-guide { display: none !important; }
+    .col-guide,
+    .photo-rows,
+    .photo-bounds-guide { display: none !important; }
+    .sheet-page1 .product-col .product-photo,
+    .sheet-page1 .product-col .photo-crop-wrap {
+      outline: none !important;
+    }
     .stage { padding: 0; gap: 0; }
     .sheet {
       box-shadow: none;
@@ -1088,23 +1228,67 @@
     .span-7 { grid-column: span 7; }
     .summary-block {
       grid-column: 1 / span 6;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      flex-direction: row;
     }
-    .summary-media { grid-column: 1 / span 2; }
-    .summary-copy { grid-column: 3 / span 4; }
+    .summary-media {
+      flex: 0 0 calc((100% - var(--gap)) * 2 / 6);
+      width: calc((100% - var(--gap)) * 2 / 6);
+      max-width: calc((100% - var(--gap)) * 2 / 6);
+      aspect-ratio: auto;
+      min-height: 0;
+    }
+    .summary-copy { flex: 1 1 0; }
     /* Photo crop (clip-path) must remain for print PDF — only hide the UI. */
     .photo-crop-panel,
     #toggle-photo-crop { display: none !important; }
   }
+
+  /* Constructor blank slots */
+  .img-slot { position: relative; cursor: pointer; }
+  .img-slot.is-empty {
+    outline: 1.5px dashed #9aa;
+    outline-offset: -2px;
+    background: repeating-linear-gradient(
+      -45deg, #f7f7f7, #f7f7f7 6px, #efefef 6px, #efefef 12px);
+    min-height: 28mm;
+  }
+  .img-slot .img-slot-label {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4mm;
+    font-size: 9pt;
+    font-weight: 600;
+    color: #666;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .img-slot.is-empty .img-slot-label { display: flex; }
+  .img-slot.is-empty > img[data-empty="1"] { display: none !important; }
+  body.ctor-edit .ctor-editable:focus {
+    outline: 2px solid #4a90d9;
+    outline-offset: 1px;
+  }
+  body.ctor-edit td.ctor-editable:focus {
+    background: #eef5fc;
+  }
+  @media print {
+    .img-slot.is-empty { outline: none; background: #f0f0f0; }
+    .img-slot-label { display: none !important; }
+    #ctor-bar, #ctor-table-tools { display: none !important; }
+  }
 </style>
 </head>
-<body class="show-cols">
+<body class="show-cols" data-constructor-kit="1">
   <div class="toolbar">
-    <strong>Шаблон V230 — AC 100…240 В (RU)</strong>
+    <strong>Бланк конструктора — заполните вручную</strong>
     <span>2 листа / A4 альбом / сетка 12</span>
     <button type="button" id="toggle-cols" class="secondary" aria-pressed="true">Колонки</button>
     <button type="button" onclick="window.print()">Печать / PDF</button>
-    <a href="index.html">все инструкции</a>
+    <a href="constructor.html">← конструктор</a><a href="index.html">все инструкции</a>
   </div>
   <div class="stage">
 
@@ -1119,12 +1303,29 @@
     <div class="span-12 sheet1-body">
       <div class="sheet1-cols-left">
 
-          <div class="stack sheet1-left">
-            <h2 class="banner">Вспомогательный переключатель</h2>
-            <table class="data-table"><tbody><tr><td>Переключатель a</td><td>Клеммы S1, S2</td><td>Клеммы S1, S3</td></tr><tr><td>…°</td><td>Замкнуто</td><td>Разомкнуто</td></tr><tr><td>…°</td><td>Разомкнуто</td><td>Замкнуто</td></tr><tr><td>Переключатель b</td><td>Клеммы S4, S5</td><td>Клеммы S4, S6</td></tr><tr><td>…°</td><td>Разомкнуто</td><td>Замкнуто</td></tr><tr><td>…°</td><td>Замкнуто</td><td>Разомкнуто</td></tr></tbody></table>
-            <p class="aux-note">*Установите угол переключателя в соответствии с требованием заказчика</p>
+          <div class="stack sheet1-left sheet1-with-aux-diagram">
+            
+            <div class="sheet1-unlock">
+              <h2 class="banner">Ручная разблокировка</h2>
+              <div class="media unlock-media img-slot">
+                <p class="prose unlock-hint">Нажмите кнопку разблокировки до упора вниз, чтобы разблокировать привод.</p>
+                <img class="unlock-img" src="" alt="" data-slot="unlock" data-empty="1" hidden><span class="img-slot-label">Разблокировка</span>
+              </div>
+            </div>
+            <div class="sheet1-aux-row">
+              <div class="stack sheet1-aux">
+                <h2 class="banner">Вспомогательный переключатель</h2>
+                <table class="data-table"><tbody><tr><td>Переключатель a</td><td>Клеммы 21, 22</td><td>Клеммы 21, 23</td></tr><tr><td>0–10°</td><td>Замкнуто</td><td>Разомкнуто</td></tr><tr><td>10–90°</td><td>Разомкнуто</td><td>Замкнуто</td></tr><tr><td>Переключатель b</td><td>Клеммы 24, 25</td><td>Клеммы 24, 26</td></tr><tr><td>0–80°</td><td>Разомкнуто</td><td>Замкнуто</td></tr><tr><td>80–90°</td><td>Замкнуто</td><td>Разомкнуто</td></tr></tbody></table>
+                <p class="aux-note">*Установите угол переключателя в соответствии с требованием заказчика</p>
+              </div>
+              <div class="sheet1-aux-diagram">
+                <div class="media aux-diagram-media img-slot">
+                  <img class="aux-diagram" src="" alt="" data-slot="aux-diagram" data-empty="1" hidden><span class="img-slot-label">Схема aux</span>
+                </div>
+              </div>
+            </div>
             <h2 class="banner banner-follow">Внимание</h2>
-            <div class="prose">1. Привод заслонки не разрешается использовать вне указанной области применения, особенно на воздушных судах.<br>2. Корпус привода может вскрываться только изготовителем.<br>3. Устройство содержит электрические и электронные компоненты и не подлежит утилизации с бытовыми отходами.<br>4. Необходимо соблюдать все местные действующие нормы и требования.</div>
+            <div class="prose">1. Запрещается использовать электропривод заслонки вне указанной области применения, особенно в авиационной технике.<br>2. Вскрытие корпуса привода разрешено только производителю. Внутри нет компонентов, которые пользователь может заменять или ремонтировать.<br>3. Устройство содержит электрические и электронные компоненты, в связи с чем недопустима утилизация вместе с бытовыми отходами. Необходимо соблюдать все действующие правила и инструкции, относящиеся к данной конкретной местности.</div>
           </div>
 
         <div class="sheet1-contacts">
@@ -1139,13 +1340,13 @@
         </div>
       </div>
       <div class="sheet1-cols-right product-col">
-        <div class="media"><div class="photo-fallback">HOOCON</div></div>
+        <div class="media product-media img-slot" style="--media-h:72mm"><div class="photo-rows" aria-hidden="true"><span class="pr-line" style="--pr-y:0"></span><span class="pr-line" style="--pr-y:5"></span><span class="pr-line" style="--pr-y:10"></span><span class="pr-line" style="--pr-y:15"></span><span class="pr-line" style="--pr-y:20"></span><span class="pr-line" style="--pr-y:25"></span><span class="pr-line" style="--pr-y:30"></span><span class="pr-line" style="--pr-y:35"></span><span class="pr-line pr-center" style="--pr-y:36"></span><span class="pr-line" style="--pr-y:40"></span><span class="pr-line" style="--pr-y:45"></span><span class="pr-line" style="--pr-y:50"></span><span class="pr-line" style="--pr-y:55"></span><span class="pr-line" style="--pr-y:60"></span><span class="pr-line" style="--pr-y:65"></span><span class="pr-line" style="--pr-y:70"></span></div><img class="product-photo" src="" alt="" data-slot="product" data-empty="1" hidden><span class="img-slot-label">Фото продукта</span></div>
         <div class="media-meta">
           <h1 class="torque">… Нм</h1>
-          <ul class="sku-list"><li>DANMU230-A/AS</li></ul>
+          <ul class="sku-list sku-list-voltage" style="--sku-rows:2"><li>SKU-24-A</li><li>SKU-24-S</li><li>SKU-230-A</li><li>SKU-230-S</li></ul>
         </div>
         <div class="doc-title-box">
-          <h2 class="doc-title"><span class="doc-title-line">Руководство по эксплуатации</span><span class="doc-title-line">шаблон</span></h2>
+          <h2 class="doc-title"><span class="doc-title-line">Руководство по эксплуатации</span><span class="doc-title-line">подставьте тип привода</span></h2>
         </div>
       </div>
     </div>
@@ -1163,22 +1364,22 @@
 
     <div class="span-12 sheet2-body">
       <div class="span-6 summary-block">
-        <div class="summary-media"><div class='photo-fallback'>HOOCON</div></div>
+        <div class="summary-media img-slot"><img class="lead-photo" src="" alt="" data-slot="lead" data-empty="1" hidden><span class="img-slot-label">Фото обзора (lead)</span></div>
         <div class="summary-copy">
-          <h2 class="lead-heading">Пропорциональное / вкл.-выкл. управление — подставить из PDF</h2>
-          <p class="lead-intro">Для управления воздушными регулирующими заслонками в системе ОВК</p>
-          <ul class="lead-list"><li>Крутящий момент: … Нм</li><li>Время поворота: &lt; … с</li><li>Время возврата пружины: &lt; … с</li><li>Номинальное напряжение: AC 100…240 В</li><li>Управление: … (из PDF / глоссарий Belimo RU)</li><li>Исполнение «AS»: … (группы вспом. переключателей)</li></ul>
+          <h2 class="lead-heading">Заголовок серии — подставьте из PDF</h2>
+          <p class="lead-intro">Для управления воздушными заслонками в системах HVAC (отопления, вентиляции и кондиционирования воздуха)</p>
+          <ul class="lead-list"><li>Крутящий момент: 5 Нм</li><li>Время поворота: 2,5 с (90°)</li><li>Номинальное напряжение: AC/DC 24 В; AC 100…240 В</li><li>Упр. сигнал Y: 0(2)…10 В= / 0(4)…20 мА (спецзаказ)</li><li>Обратная связь U: 0(2)…10 В= / 0(4)…20 мА (спецзаказ)</li><li>Исполнение «S» включает 2 группы вспомогательных переключателей.</li></ul>
         </div>
       </div>
 
       <div class="span-6 stack tech-block">
         <h2 class="banner">Технические характеристики</h2>
-        <div class="tech-table-slot" style="flex:4 0 auto"><table class="data-table" style="--tech-rows:4"><tbody><tr><td></td><td>DANMU230-A/AS</td></tr><tr><td>Номинальное напряжение</td><td>AC 100…240 В, 50/60 Гц</td></tr><tr><td>Потребляемая мощность</td><td>… Вт под нагрузкой<br>… Вт удержание</td></tr><tr><td>Сечение подключаемых проводов</td><td>0,5 мм²</td></tr></tbody></table></div>
-        <div class="tech-table-slot" style="flex:18 1 auto"><table class="data-table" style="--tech-rows:18"><tbody><tr><td class="row-section" colspan="2">Функциональные параметры</td></tr><tr><td>Площадь обслуживаемой заслонки</td><td>&lt; … м²</td></tr><tr><td>Направление вращения</td><td>для монтажа с противоположной стороны</td></tr><tr><td>Ручное управление</td><td>… (из PDF)</td></tr><tr><td>Угол поворота</td><td>Макс. 95°</td></tr><tr><td>Уровень звуковой мощности</td><td>макс. … дБ(А) …</td></tr><tr><td>Индикация положения</td><td>Механический указатель</td></tr><tr><td class="row-section" colspan="2">Условия эксплуатации</td></tr><tr><td>Класс защиты</td><td>II (все изолировано / полная изоляция)</td></tr><tr><td>Степень защиты корпуса</td><td>IP…</td></tr><tr><td>Температура окружающей среды</td><td>–20…+50 °C</td></tr><tr><td>Температура хранения</td><td>–40…+70 °C</td></tr><tr><td>Испытание на влажность</td><td>5…95 % относительной влажности</td></tr><tr><td class="row-section" colspan="2">Габаритные размеры / Масса</td></tr><tr><td>Габаритные размеры<br>(Д × Ш × В)</td><td>См. «Габаритные размеры»</td></tr><tr><td>Длина вала заслонки</td><td>&gt; … мм</td></tr><tr><td>Диаметр вала заслонки</td><td>круглый … мм, квадратный … мм</td></tr><tr><td>Масса</td><td>&lt; … кг</td></tr></tbody></table></div>
+        <div class="tech-table-slot" style="flex:5 0 auto"><table class="data-table" style="--tech-rows:5"><tbody><tr><td></td><td>HVA24-5UQ / HVA24S-5UQ</td><td>HVA230-5UQ / HVA230S-5UQ</td></tr><tr><td>Номинальное напряжение</td><td>AC/DC 24 В, 50/60 Гц</td><td>AC 100…240 В, 50/60 Гц</td></tr><tr><td>Потребляемая мощность</td><td colspan="2">20 Вт под нагрузкой<br>2 Вт удержание</td></tr><tr><td>Расчётная мощность трансформатора</td><td colspan="2">50 ВА</td></tr><tr><td>Сечение подключаемых проводов</td><td colspan="2">0,5 мм²</td></tr></tbody></table></div>
+        <div class="tech-table-slot" style="flex:19 1 auto"><table class="data-table" style="--tech-rows:19"><tbody><tr><td class="row-section" colspan="3">Функциональные параметры</td></tr><tr><td>Площадь обслуживаемой заслонки</td><td colspan="2">до 0,5 м²</td></tr><tr><td>Время поворота</td><td colspan="2">2,5 с (90°)</td></tr><tr><td>Направление вращения</td><td colspan="2">ползунком переключателя направления</td></tr><tr><td>Ручное управление</td><td colspan="2">расцепление редуктора кнопкой, с самовозвратом</td></tr><tr><td>Угол поворота</td><td colspan="2">Макс. 90°</td></tr><tr><td>Уровень звуковой мощности</td><td colspan="2">макс. 55 дБ(А)</td></tr><tr><td>Индикация положения</td><td colspan="2">Механический указатель</td></tr><tr><td class="row-section" colspan="3">Условия эксплуатации</td></tr><tr><td>Класс защиты</td><td>III (безопасное сверхнизкое напряжение)</td><td>II (все изолировано / полная изоляция)</td></tr><tr><td>Степень защиты корпуса</td><td colspan="2">IP54</td></tr><tr><td>Температура окружающей среды</td><td colspan="2">–20…+50 °C</td></tr><tr><td>Температура хранения</td><td colspan="2">–30…+80 °C</td></tr><tr><td>Испытание на влажность</td><td colspan="2">5…95 % относительной влажности, без конденсата / EN 60730-1</td></tr><tr><td class="row-section" colspan="3">Габаритные размеры / Масса</td></tr><tr><td>Габаритные размеры<br>(Д × Ш × В)</td><td colspan="2">См. «Габаритные размеры»</td></tr><tr><td>Длина вала заслонки</td><td colspan="2">≥ 60 мм</td></tr><tr><td>Диаметр вала заслонки</td><td colspan="2">круглый 10…20 мм, квадратный 10×10…20×20 мм</td></tr><tr><td>Масса</td><td colspan="2">&lt; 1,2 кг</td></tr></tbody></table></div>
       </div>
       <div class="span-6 stack diagrams-block">
         <h2 class="banner">Схема подключения</h2>
-        <div class="diagrams"><p class='muted'>См. PDF</p></div>
+        <div class="diagrams"><figure class="diagram diagram-wide wiring-figure"><div class="wiring-board wiring-board-ru-headers img-slot"><div class="wiring-ru-headers" aria-hidden="true"><span class="wrh wrh-act">Привод</span><span class="wrh wrh-aux">Вспомогательный переключатель</span></div><img src="" alt="" data-slot="wiring" data-empty="1" hidden><span class="img-slot-label">Схема подключения</span></div></figure><figure class="diagram diagram-wide img-slot"><h2 class="banner">Габаритные размеры привода (мм)</h2><img src="" alt="" data-slot="dimensions" data-empty="1" hidden><span class="img-slot-label">Габариты</span></figure><figure class="diagram diagram-wide diagram-rotation"><h2 class="banner">Изменение направления вращения</h2><div class="rotation-panel img-slot"><div class="rotation-copy"><p>Направление вращения задаётся ползунком реверсивного переключателя (см. рисунок).</p><p>Заводская установка — CW. При соединении линий 1 и 2 привод вращается против часовой стрелки (CCW); при соединении линий 3 и 4 — по часовой стрелке (CW).</p></div><img src="" alt="" data-slot="rotation" data-empty="1" hidden><span class="img-slot-label">Направление вращения</span></div></figure></div>
         
       </div>
     </div>
@@ -1255,10 +1456,75 @@
         });
       }
 
+
+      function photoVisibleBox(media, img) {
+        var mr = media.getBoundingClientRect();
+        var wrap = img.closest(".photo-crop-wrap.photo-crop-active");
+        /* Dedicated wrap (not product-media) = crop host; else the img. */
+        var el = (wrap && !wrap.classList.contains("product-media")) ? wrap : img;
+        var r = el.getBoundingClientRect();
+        if (!wrap && r.height > mr.height * 1.05) {
+          var h = img.offsetHeight || r.height;
+          var w = img.offsetWidth || r.width;
+          var cx = r.left + r.width / 2;
+          var cy = r.top + r.height / 2;
+          return {
+            top: cy - h / 2 - mr.top,
+            bot: cy + h / 2 - mr.top,
+            left: cx - w / 2 - mr.left,
+            right: cx + w / 2 - mr.left,
+            height: h,
+            width: w
+          };
+        }
+        return {
+          top: r.top - mr.top,
+          bot: r.bottom - mr.top,
+          left: r.left - mr.left,
+          right: r.right - mr.left,
+          height: r.height,
+          width: r.width
+        };
+      }
+
+      function syncPhotoBoundsGuide() {
+        if (!document.body.classList.contains("show-cols")) return;
+        document.querySelectorAll(".product-media").forEach(function (media) {
+          var img = media.querySelector("img.product-photo");
+          if (!img) return;
+          var mr = media.getBoundingClientRect();
+          if (mr.height < 8) return;
+          var guide = media.querySelector(".photo-bounds-guide");
+          if (!guide) {
+            guide = document.createElement("div");
+            guide.className = "photo-bounds-guide";
+            guide.setAttribute("aria-hidden", "true");
+            media.appendChild(guide);
+          }
+          /* Crop viewport = the media slot itself (overflow:hidden). */
+          if (media.classList.contains("photo-crop-active")) {
+            guide.style.top = "0px";
+            guide.style.left = "0px";
+            guide.style.width = mr.width + "px";
+            guide.style.height = mr.height + "px";
+            return;
+          }
+          var box = photoVisibleBox(media, img);
+          if (box.height < 4) return;
+          guide.style.top = Math.max(0, box.top) + "px";
+          guide.style.left = Math.max(0, box.left) + "px";
+          guide.style.width = Math.min(mr.width, Math.max(0, box.width)) + "px";
+          guide.style.height = Math.min(mr.height, Math.max(0, box.height)) + "px";
+        });
+      }
+
       function fitSheet1Type() {
         fitDocTitle();
         fitTorque();
+        syncPhotoBoundsGuide();
       }
+
+      window.syncPhotoBoundsGuide = syncPhotoBoundsGuide;
 
       window.fitSheet1Type = fitSheet1Type;
       window.addEventListener("load", fitSheet1Type);

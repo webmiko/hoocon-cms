@@ -45,6 +45,7 @@ _SAFU_NM_SLUG = r"privod-protivopozharniy-\d+nm"
 _HVA_SLUG = (
     r"privod-vozdushniy-hva-\d+nm"
     r"|privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-\d+nm"
+    r"|privod-vozdushniy-bez-pruzhini-uskorenniy-hva-uq-\d+nm"
     r"|privod-vozdushniy-kondensator-hva-\d+qx"
 )
 _HVD_AIR_SLUG = (
