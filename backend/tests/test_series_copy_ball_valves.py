@@ -277,7 +277,23 @@ def test_apply_series_enrichment_sets_three_way_flow_instructions() -> None:
     """3-ходовые BV* получают блок направления потока в instructions."""
     from catalog.models import SKU, Category, Product
 
-    series = next(s for s in load_ball_valve_series() if s.code == "BV315")
+    series = BallValveSeries(
+        code="BV315",
+        product_slug="8100-bv315",
+        product_name="BV315 | Шаровой кран 3-ходовый DN 15",
+        ways="3-ходовый",
+        dn="15",
+        thread="внутренняя G 1/2",
+        drive_series=("DA5MU24",),
+        gallery_urls=(),
+        kvs_by_edition={"a": "1,6"},
+        height_actuator="",
+        height_stem="",
+        valve_length="",
+        valve_od="",
+        center_to_edge="",
+        diff_pressure="0,35",
+    )
     cat = Category.objects.create(name="Шаровые", slug="sharovye-flow-test")
     product = Product.objects.create(
         category=cat,
