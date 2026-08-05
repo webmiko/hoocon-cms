@@ -134,6 +134,12 @@ def test_compatible_positions_adapter_br_ml_only_fu_and_ml_valves() -> None:
     )
     _make_sku(
         category=drives,
+        product_slug="da3fu",
+        sku_slug="da3fu24-ds",
+        sku_code="DA3FU24-DS",
+    )
+    _make_sku(
+        category=drives,
         product_slug="da5fu",
         sku_slug="da5fu24-d",
         sku_code="DA5FU24-D",
@@ -172,7 +178,7 @@ def test_compatible_positions_adapter_br_ml_only_fu_and_ml_valves() -> None:
     rows = compatible_positions_for_sku(br_ml)
     drive_codes = {r["sku_code"] for r in rows if r["role"] == "drive"}
     valve_codes = {r["sku_code"] for r in rows if r["role"] == "valve"}
-    assert drive_codes == {"DA5FU24-D"}
+    assert drive_codes == {"DA3FU24-DS", "DA5FU24-D"}
     assert valve_codes == {"8100-BV220A"}
 
 
