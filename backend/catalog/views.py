@@ -275,7 +275,7 @@ class SKUViewSet(
             )
         return qs
 
-    def filter_queryset(self, queryset: QuerySet[SKU]) -> QuerySet[SKU]:
+    def filter_queryset(self, queryset: QuerySet) -> QuerySet:
         """Apply list filters; ``?new=1`` → stock then date (home + catalog).
 
         Catalog keeps the full 30-day set (paginated). Home passes

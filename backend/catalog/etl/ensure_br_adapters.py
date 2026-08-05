@@ -359,24 +359,21 @@ def _attach_image(
     """
     source_url = local_asset_source_url(stem)
     same_source = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if (
-        same_source is not None
-        and same_source.image
-        and same_source.is_published
-        and not force
-    ):
+    if same_source is not None and same_source.image and same_source.is_published and not force:
         return "exists"
 
-    partner_heroes = ProductImage.objects.filter(
-        sku=sku,
-        is_published=True,
-    ).exclude(image="").filter(source_url__startswith="https://hoocon.spb.ru/")
-    other_local = (
-        ProductImage.objects.filter(sku=sku, is_published=True)
+    partner_heroes = (
+        ProductImage.objects.filter(
+            sku=sku,
+            is_published=True,
+        )
         .exclude(image="")
-        .exclude(pk=getattr(same_source, "pk", None))
-        .exclude(source_url__startswith="https://hoocon.spb.ru/")
+        .filter(source_url__startswith="https://hoocon.spb.ru/")
     )
+    other_local = ProductImage.objects.filter(sku=sku, is_published=True).exclude(image="")
+    if same_source is not None:
+        other_local = other_local.exclude(pk=same_source.pk)
+    other_local = other_local.exclude(source_url__startswith="https://hoocon.spb.ru/")
     if other_local.exists() and not force and same_source is None:
         return "exists"
     # Partner hotlinks are replaced by the local pack even without --force.
@@ -389,7 +386,10 @@ def _attach_image(
         logger.warning("BR adapter image skip %s: %s", stem, exc)
         return "error"
 
-    for row in ProductImage.objects.filter(sku=sku).exclude(pk=getattr(same_source, "pk", None)):
+    stale = ProductImage.objects.filter(sku=sku)
+    if same_source is not None:
+        stale = stale.exclude(pk=same_source.pk)
+    for row in stale:
         is_partner = (row.source_url or "").startswith("https://hoocon.spb.ru/")
         if force or is_partner or upgrade_from_partner:
             if row.is_published:

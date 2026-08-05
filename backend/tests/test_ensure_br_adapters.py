@@ -12,7 +12,7 @@ from catalog.etl.ensure_br_adapters import (
     ensure_br_adapters,
     resolve_adapter_photo_bytes,
 )
-from catalog.etl.webp import enhance_catalog_photo_bytes, enhance_transparent_catalog_photo_bytes
+from catalog.etl.webp import enhance_transparent_catalog_photo_bytes
 from catalog.models import SKU, AttributeValue, Category, ProductImage
 
 
@@ -81,15 +81,13 @@ def test_ensure_br_adapters_creates_cards_and_images() -> None:
     assert hero.image_card  # auto on save
 
     by_slug = {
-        av.attribute.slug: av.value
-        for av in AttributeValue.objects.filter(sku=br_m).select_related("attribute")
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=br_m).select_related("attribute")
     }
     assert by_slug["drive-kind"] == "без возвратной пружины (MU / MQU)"
     assert by_slug["compatible-actuators"] == "DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)"
     assert "не DA" not in by_slug["compatible-actuators"]
     br_ml_attrs = {
-        av.attribute.slug: av.value
-        for av in AttributeValue.objects.filter(sku=br_ml).select_related("attribute")
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=br_ml).select_related("attribute")
     }
     assert br_ml_attrs["compatible-actuators"] == "DA5FU (24/230 В)"
     assert "не DA" not in br_ml_attrs["compatible-actuators"]

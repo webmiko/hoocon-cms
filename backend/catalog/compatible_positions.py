@@ -169,10 +169,7 @@ def _adapters_from_bracket(bracket: str) -> list[SKU]:
         codes.append("BR-ML")
     if not codes:
         return []
-    by_code = {
-        s.sku_code.upper(): s
-        for s in _published_sku_qs().filter(sku_code__in=codes)
-    }
+    by_code = {s.sku_code.upper(): s for s in _published_sku_qs().filter(sku_code__in=codes)}
     return [by_code[c] for c in codes if c in by_code]
 
 

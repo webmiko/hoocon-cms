@@ -147,7 +147,10 @@ def _flatten_near_white(
     width, height = rgb.size
     for y in range(height):
         for x in range(width):
-            r, g, b = pixels[x, y]
+            pixel = pixels[x, y]
+            if not isinstance(pixel, tuple) or len(pixel) < 3:
+                continue
+            r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
             if r >= threshold and g >= threshold and b >= threshold:
                 pixels[x, y] = (255, 255, 255)
     return rgb
