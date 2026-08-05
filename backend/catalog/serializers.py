@@ -433,6 +433,7 @@ class SKUDetailSerializer(SKUListSerializer):
     )
     category_instructions = serializers.SerializerMethodField()
     ball_valve_kit = serializers.SerializerMethodField()
+    compatible_positions = serializers.SerializerMethodField()
     siblings = serializers.SerializerMethodField()
     variant_axes = serializers.SerializerMethodField()
 
@@ -447,6 +448,7 @@ class SKUDetailSerializer(SKUListSerializer):
             "category_description",
             "category_instructions",
             "ball_valve_kit",
+            "compatible_positions",
             "siblings",
             "variant_axes",
             "attributes",
@@ -531,6 +533,12 @@ class SKUDetailSerializer(SKUListSerializer):
         from catalog.ball_valve_kit import build_ball_valve_kit_options
 
         return build_ball_valve_kit_options(obj)
+
+    def get_compatible_positions(self, obj: SKU) -> list[dict[str, Any]]:
+        """Adapter ↔ brass 8100 cross-links for PDP («Совместимые позиции»)."""
+        from catalog.compatible_positions import compatible_positions_for_sku
+
+        return compatible_positions_for_sku(obj)
 
     def _siblings_payload(self, obj: SKU) -> list[dict[str, Any]]:
         """Memoized siblings list for this serializer instance."""

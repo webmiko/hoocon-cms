@@ -78,6 +78,14 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
     bracket_by_drive: Record<string, string>;
     bracket_hint: string;
   } | null;
+  compatible_positions?: Array<{
+    role: "drive" | "valve" | "bracket";
+    name: string;
+    slug: string;
+    sku_code: string;
+    category_slug?: string;
+    image: string | null;
+  }>;
   siblings?: Array<{
     slug: string;
     sku_code: string;
