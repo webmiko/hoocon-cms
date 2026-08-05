@@ -38,6 +38,7 @@ siblings на том же Product.
 | **HVD** (воздух) | 1 Nm/Q-линейка | **да** | без пружины | V / управление (D/DS) | нет |
 | **HVD-F** (дым) | 1 NmF-линейка | **да** | дымоудаление | V / управление (DS/DST) | нет |
 | **8100** (BV) | 1 DN-серия | да | шаровые краны | Kvs (+ body) | **да** |
+| **BR-M / BR-ML** | 1 адаптер | нет | адаптеры | — | нет (сам кронштейн) |
 | **H8101–H8122** | 1 префикс комплекта | да | комплекты | ways/DN/Kvs/body/V/ctrl | нет |
 | **H8205** (LAV) | 1 корпус LAV | да | комплекты | ways/DN/body/V/ctrl(+M) | нет |
 
@@ -376,6 +377,32 @@ dn, ways, **kvs**, material, thread, габариты, **compatible-actuators**,
 + attrs (kvs) + published. Meta Kvs должна совпасть с таблицей
 `BRASS_KIT_BODIES` / `body_meta_for_brass` — иначе picker/siblings покажут
 пустое Kvs.
+
+### Адаптеры / кронштейны BR-M · BR-ML
+
+Отдельные карточки в категории `adaptery` («Адаптеры», не collapse). Артикулы
+совпадают с RFQ-kit (`ball_valve_kit.resolve_bracket_for_drive`):
+
+| SKU | Карточка (коротко) | Product / SKU slug |
+|-----|-------------------|--------------------|
+| **BR-M** | `DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)` | `adapter-br-m` |
+| **BR-ML** | `DA5FU (24/230 В)` | `adapter-br-ml` |
+
+Подробный перечень семейств и изданий (−D/−DS/−A/−AS) — в описании PDP.
+На части DN в 8100 только MU/MQU → в комплекте только BR-M.
+
+PDP поле `compatible_positions` («Совместимые позиции»):
+- адаптер → приводы канона + краны 8100 с этим кронштейном;
+- латунный 8100 → SKU BR-M / BR-ML по attr `bracket`.
+Без ссылок с карточек приводов DA.
+
+Фасеты категории: только **«Совместимый привод»** (`compatible_actuators`),
+не «Управление». На карточке в сетке — та же короткая строка ТТХ.
+
+Ensure: `manage.py ensure_br_adapters` — фото из
+`backend/catalog/etl/data/adapters-br/` (скачаны с партнёра один раз,
+enhance + WebP в media; без hotlink). BR-H (фланцевые ВЧШГ) — отдельная
+карточка при появлении контента; код уже выбирается kit-логикой.
 
 ### ETL
 

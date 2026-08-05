@@ -15,6 +15,7 @@ const FACET_LABEL_SHORT: Record<string, string> = {
   ways: "Тип крана",
   kvs: "Kvs (м³/ч)",
   material: "Материал корпуса",
+  compatible_actuators: "Совместимый привод",
   analog: "Аналоги",
 };
 

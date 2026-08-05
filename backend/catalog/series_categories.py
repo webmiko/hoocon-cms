@@ -42,7 +42,9 @@ _ACTUATOR_SPECS: tuple[tuple[str, str], ...] = (
 )
 
 _BALL_VALVES: tuple[str, str] = ("sharovye-krany", "Шаровые краны")
+_ADAPTERS: tuple[str, str] = ("adaptery", "Адаптеры")
 _KITS: tuple[str, str] = ("komplekty", "Комплекты")
+_ADAPTER_CODES = re.compile(r"(?i)(?:^|[^a-z0-9])br-(?:m|ml|h)(?:[^a-z0-9]|$)")
 
 # H8101…H8122 factory kits + H8205 LAV (valve+actuator cards).
 _H81_KIT_BLOB = re.compile(
@@ -61,6 +63,7 @@ _SLUG_ALIASES: dict[str, str] = {
     "elektroprivod-klapana-dymoudaleniya": ("elektroprivody-dlya-klapanov-dymoudaleniya"),
     "sharoviy-kran-2-hodovoy": "sharovye-krany",
     "sharoviy-kran-3-hodovoy": "sharovye-krany",
+    "adaptery-bv-br": "adaptery",
 }
 
 
@@ -85,7 +88,7 @@ def spec_categories(*, include_ball_valves: bool = True) -> list[SpecCategory]:
     """
     rows = [SpecCategory(slug=slug, name=name, sort_order=i) for i, (slug, name) in enumerate(_ACTUATOR_SPECS)]
     if include_ball_valves:
-        for slug, name in (_BALL_VALVES, _KITS):
+        for slug, name in (_BALL_VALVES, _ADAPTERS, _KITS):
             rows.append(SpecCategory(slug=slug, name=name, sort_order=len(rows)))
     return rows
 
@@ -98,6 +101,11 @@ def kits_category_slug() -> str:
 def ball_valves_category_slug() -> str:
     """Canonical slug for bare ball-valve bodies (``8100-bv*``)."""
     return _BALL_VALVES[0]
+
+
+def adapters_category_slug() -> str:
+    """Canonical slug for mounting adapters (BR-M / BR-ML / BR-H)."""
+    return _ADAPTERS[0]
 
 
 def allowed_slugs(*, include_ball_valves: bool = True) -> frozenset[str]:
@@ -161,6 +169,14 @@ def classify_series_category(product_slug: str, sku_codes: list[str] | None = No
         or "sharovoy-kran-h82" in slug
     ):
         return _KITS[0]
+    # Adapters before BV / «без пружины» tokens in titles.
+    if (
+        _ADAPTER_CODES.search(codes)
+        or "adapter" in slug
+        or "adaptery" in slug
+        or slug.startswith("adapter-br")
+    ):
+        return _ADAPTERS[0]
     if "sharov" in blob or re.search(r"\bbv\d", blob) or "8100-bv" in blob:
         return _BALL_VALVES[0]
     if "dimoudal" in blob or re.search(r"\bsa\d*mu", blob):

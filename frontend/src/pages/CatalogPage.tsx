@@ -49,6 +49,7 @@ const FACET_KEYS = [
   "ways",
   "kvs",
   "material",
+  "compatible_actuators",
   "analog",
 ] as const;
 

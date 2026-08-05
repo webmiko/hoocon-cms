@@ -82,6 +82,13 @@ FACET_DEFS: tuple[FacetDef, ...] = (
         name_substrings=("материал корпуса",),
         legacy_slugs=("material",),
     ),
+    # Adapters (BR-M / BR-ML): drive family compatibility; also BV card highlight.
+    FacetDef(
+        key="compatible_actuators",
+        label="Совместимый привод",
+        name_substrings=("совместимый привод", "совместимость с привод"),
+        legacy_slugs=("compatible-actuators",),
+    ),
     # Belimo codes: card «Аналоги» text, SKU.analog_belimo_code, or ТТХ inference.
     FacetDef(
         key="analog",
@@ -102,9 +109,12 @@ BALL_VALVE_8100_FACET_KEYS: tuple[str, ...] = (
     "material",
 )
 
+ADAPTER_FACET_KEYS: tuple[str, ...] = ("compatible_actuators",)
+
 # Category slug → ordered facet keys (strict subset of FACET_DEFS).
 CATEGORY_FACET_KEYS: dict[str, tuple[str, ...]] = {
     "sharovye-krany": BALL_VALVE_8100_FACET_KEYS,
+    "adaptery": ADAPTER_FACET_KEYS,
 }
 
 # Extra PDP/card rows (not catalog filters): after primary facets.
@@ -141,12 +151,6 @@ EXTRA_HIGHLIGHT_DEFS: tuple[FacetDef, ...] = (
         label="Степень защиты корпуса",
         name_substrings=("степень защиты",),
         legacy_slugs=("ip-rating",),
-    ),
-    FacetDef(
-        key="compatible-actuators",
-        label="Совместимый привод",
-        name_substrings=("совместимый привод",),
-        legacy_slugs=("compatible-actuators",),
     ),
     FacetDef(
         key="bracket",

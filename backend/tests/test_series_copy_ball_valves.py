@@ -267,7 +267,7 @@ def test_apply_bv220_enrichment_cards_and_gallery() -> None:
 
     data = SKUDetailSerializer(sku_a).data
     hl_keys = {h["key"] for h in data["highlights"]}
-    assert {"dn", "ways", "kvs", "compatible-actuators", "bracket"} <= hl_keys
+    assert {"dn", "ways", "kvs", "compatible_actuators", "bracket"} <= hl_keys
 
 
 def test_drive_families_from_mods_first_segment() -> None:
