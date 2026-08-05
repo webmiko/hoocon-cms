@@ -233,8 +233,8 @@ function HomeNovinkiSection() {
       <div className={styles.sectionHead}>
         <h2 id="novinki-heading">Новинки</h2>
         <p className={styles.sectionLead}>
-          На главной — до 20 карточек: сначала в наличии, слева новее. В каталоге
-          с фильтром «Новинки» — все позиции за 30 дней (пагинация), без потолка.
+          Недавние поступления в каталог — чтобы быстро заметить, что появилось
+          в ассортименте.
         </p>
       </div>
       {novinkiLoading ? (
@@ -664,11 +664,8 @@ export function HomePage() {
         <HomeStepsSection />
       </DeferredMount>
 
-      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={360}>
+      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={640}>
         <HomePartnersSection />
-      </DeferredMount>
-
-      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={280}>
         <HomeDeliverySection />
       </DeferredMount>
 
