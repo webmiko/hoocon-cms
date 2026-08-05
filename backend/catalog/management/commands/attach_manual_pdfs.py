@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from catalog.etl.h81_catalog_media import apply_h81_instruction_pdfs
 from catalog.etl.manual_pdfs import (
+    attach_br_adapter_manuals,
     attach_dafu_manuals,
     attach_damqu_manuals,
     attach_damu_manuals,
@@ -53,7 +54,18 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--series",
-            choices=("all", "dafu", "safu", "damu", "damqu", "samu", "hvd", "hva", "h81"),
+            choices=(
+                "all",
+                "dafu",
+                "safu",
+                "damu",
+                "damqu",
+                "samu",
+                "hvd",
+                "hva",
+                "h81",
+                "br",
+            ),
             default="all",
             help="Which series manuals to attach (default: all).",
         )
@@ -91,7 +103,7 @@ class Command(BaseCommand):
             summaries.append(("HVD", attach_hvd_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "hva"}:
             summaries.append(("HVA", attach_hva_manuals(manuals_dir, dry_run=dry_run)))
-        if series in {"all", "h81"}:
+        if series == "h81":
             h81 = apply_h81_instruction_pdfs(dry_run=dry_run)
             self.stdout.write(
                 f"{prefix}H81 instructions created={h81['created']} updated={h81['updated']} skipped={h81['skipped']}",
@@ -102,6 +114,8 @@ class Command(BaseCommand):
                 )
             for warn in h81["warnings"]:
                 self.stdout.write(self.style.WARNING(f"  ! {warn}"))
+        if series in {"all", "br"}:
+            summaries.append(("BR", attach_br_adapter_manuals(manuals_dir, dry_run=dry_run)))
 
         for label, summary in summaries:
             self.stdout.write(

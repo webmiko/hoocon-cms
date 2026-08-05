@@ -40,15 +40,22 @@ HVA modulating air (no spring; ASCII stems after rename)::
     hva-10.pdf / hva-10q.pdf / …      → matching HVA* codes when present
     hva-5uq.pdf                       → special (warn if no SKU)
     # hva-*p.pdf — Chinese spring HVA-P; out of RF catalog (skip)
+
+BR adapters (RU tech sheets; Cyrillic basenames, NFC-normalized)::
+
+    Техничка на кронштейн.pdf      → BR-M + BR-ML
+    техничка штока BR-M.pdf        → BR-M
+    техничка штока BR-ML.pdf       → BR-ML
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -1523,5 +1530,180 @@ def attach_hva_manuals(
                 summary["by_sku"].setdefault(code, []).append(title)
         if dry_run:
             transaction.set_rollback(True)
+    summary["warnings"] = warnings
+    return summary
+
+
+# ─── BR-M / BR-ML adapter tech sheets ───────────────────────────────────────
+
+_BR_ADAPTER_CODES: Final[tuple[str, ...]] = ("BR-M", "BR-ML")
+_BR_BRACKET_TITLE: Final[str] = "Техничка на кронштейн"
+_BR_STEM_TITLE_M: Final[str] = "Техничка штока BR-M"
+_BR_STEM_TITLE_ML: Final[str] = "Техничка штока BR-ML"
+_BR_STORAGE_BASENAME: Final[dict[str, str]] = {
+    _BR_BRACKET_TITLE: "technichka-kronshteyn.pdf",
+    _BR_STEM_TITLE_M: "technichka-shtoka-br-m.pdf",
+    _BR_STEM_TITLE_ML: "technichka-shtoka-br-ml.pdf",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class BrAdapterManualMatch:
+    """One BR adapter tech PDF mapped onto adapter SKU codes."""
+
+    path: Path
+    title: str
+    sku_codes: tuple[str, ...]
+    sort_order: int
+
+
+def _nfc_casefold_name(filename: str) -> str:
+    """NFC + casefold basename without ``.pdf`` (macOS NFD-safe)."""
+    stem = normalize_manual_stem(filename)
+    return unicodedata.normalize("NFC", stem).casefold()
+
+
+def parse_br_adapter_manual_stem(stem: str) -> tuple[str, tuple[str, ...], int] | None:
+    """Map a BR adapter PDF stem to ``(title, sku_codes, sort_order)``.
+
+    Args:
+        stem: Basename with or without ``.pdf`` (may be NFD).
+
+    Returns:
+        Mapping tuple, or ``None`` when the name is not a BR tech sheet.
+    """
+    key = _nfc_casefold_name(stem)
+    if "кронштейн" in key:
+        return _BR_BRACKET_TITLE, _BR_ADAPTER_CODES, 0
+    # BR-ML before BR-M so ``br-m`` is not a substring false positive.
+    if "штока" in key and "br-ml" in key:
+        return _BR_STEM_TITLE_ML, ("BR-ML",), 1
+    if "штока" in key and "br-m" in key:
+        return _BR_STEM_TITLE_M, ("BR-M",), 1
+    return None
+
+
+def discover_br_adapter_manuals(
+    manuals_dir: Path,
+) -> tuple[list[BrAdapterManualMatch], list[str]]:
+    """Scan manuals for BR-M / BR-ML tech sheets.
+
+    Args:
+        manuals_dir: ``_инструкции-pdf`` (or a test tmp dir).
+
+    Returns:
+        ``(matches, warnings)``.
+    """
+    matches: list[BrAdapterManualMatch] = []
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return matches, warnings
+
+    seen_titles: set[str] = set()
+    for path in iter_manual_pdfs(manuals_dir):
+        key = _nfc_casefold_name(path.name)
+        looks_br = "кронштейн" in key or ("штока" in key and "br-m" in key)
+        parsed = parse_br_adapter_manual_stem(path.name)
+        if parsed is None:
+            if looks_br:
+                warnings.append(f"unrecognized BR adapter filename: {path.name!r}")
+            continue
+        title, sku_codes, sort_order = parsed
+        if title in seen_titles:
+            warnings.append(f"duplicate BR adapter manual title {title!r}: {path.name!r}")
+            continue
+        seen_titles.add(title)
+        matches.append(
+            BrAdapterManualMatch(
+                path=path,
+                title=title,
+                sku_codes=sku_codes,
+                sort_order=sort_order,
+            ),
+        )
+    return matches, warnings
+
+
+def attach_br_adapter_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for BR-M / BR-ML from local PDFs.
+
+    Idempotent by ``(sku, title)``; refresh when source PDF size changes.
+
+    Args:
+        manuals_dir: Path to ``_инструкции-pdf``.
+        dry_run: Plan only.
+
+    Returns:
+        Summary counters and warning list.
+    """
+    matches, warnings = discover_br_adapter_manuals(manuals_dir)
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": warnings,
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+
+    code_to_sku = {s.sku_code.casefold(): s for s in SKU.objects.filter(sku_code__in=list(_BR_ADAPTER_CODES))}
+
+    with transaction.atomic():
+        for match in matches:
+            payload = match.path.read_bytes()
+            basename = _BR_STORAGE_BASENAME.get(match.title, _storage_basename(match.path))
+            for code in match.sku_codes:
+                sku = code_to_sku.get(code.casefold())
+                if sku is None:
+                    warnings.append(f"SKU missing in DB: {code}")
+                    continue
+                existing = ProductFile.objects.filter(sku=sku, title=match.title).first()
+                if dry_run:
+                    summary["by_sku"].setdefault(code, []).append(match.title)
+                    summary["created" if existing is None else "updated"] += 1
+                    continue
+                if existing is None:
+                    pf = ProductFile(
+                        sku=sku,
+                        title=match.title,
+                        file_type=ProductFile.FileType.DATASHEET,
+                        is_published=True,
+                        sort_order=match.sort_order,
+                    )
+                    pf.file.save(basename, ContentFile(payload), save=True)
+                    summary["created"] += 1
+                    logger.info(
+                        "manual_pdf_attached sku=%s title=%s",
+                        sku.sku_code,
+                        match.title,
+                    )
+                else:
+                    current_size = existing.file.size if existing.file else 0
+                    dirty = False
+                    if existing.sort_order != match.sort_order:
+                        existing.sort_order = match.sort_order
+                        dirty = True
+                    if current_size != len(payload):
+                        existing.file.save(basename, ContentFile(payload), save=False)
+                        dirty = True
+                        summary["updated"] += 1
+                    elif dirty:
+                        summary["updated"] += 1
+                    else:
+                        summary["skipped"] += 1
+                    if dirty:
+                        existing.save()
+                summary["by_sku"].setdefault(code, []).append(match.title)
+        if dry_run:
+            transaction.set_rollback(True)
+
     summary["warnings"] = warnings
     return summary
