@@ -63,6 +63,12 @@
 
 ## Changelog
 
+### v0.1.17 beta — 2026-08-05
+
+- BR-ML: совместимость с DA3FU и DA5FU; технички PDF кронштейна/штоков.
+- 8100 3-ходовые: инструкция направления потока + схема в галерее.
+- 8100 издания: фото расходного диска Kvs в галерее SKU.
+
 ### v0.1.16 beta — 2026-08-05
 
 - Home: server-rendered hero shell (H1/CTA + LCP WebP preload) in Django SPA
