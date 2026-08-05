@@ -13,6 +13,8 @@ def test_catalog_category_path() -> None:
     assert catalog_category_path("sharovye-krany") == "/catalog/sharovye-krany"
     assert catalog_category_path("") == "/catalog"
     assert catalog_category_path("/x/") == "/catalog/x"
+    assert catalog_category_path("/catalog/sharovye-krany") == "/catalog/sharovye-krany"
+    assert catalog_category_path("catalog/sharovye-krany") == "/catalog/sharovye-krany"
 
 
 def test_catalog_sku_path() -> None:
@@ -22,6 +24,18 @@ def test_catalog_sku_path() -> None:
     )
     assert catalog_sku_path("", "sku") == "/catalog"
     assert catalog_sku_path("cat", "") == "/catalog"
+    assert (
+        catalog_sku_path("/catalog/adaptery", "adapter-br-m")
+        == "/catalog/adaptery/adapter-br-m"
+    )
+    assert (
+        catalog_sku_path("adaptery", "adaptery/adapter-br-m")
+        == "/catalog/adaptery/adapter-br-m"
+    )
+    assert (
+        catalog_sku_path("adaptery", "/catalog/adaptery/adapter-br-ml")
+        == "/catalog/adaptery/adapter-br-ml"
+    )
 
 
 def test_catalog_path_for_sku_uses_related_category() -> None:
