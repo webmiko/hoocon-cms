@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from django.core.files.base import ContentFile
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 # Near-lossless for product photos (лёгкое сжатие, без видимой деградации).
 DEFAULT_WEBP_QUALITY: int = 90
@@ -24,6 +24,136 @@ MAX_EDGE_PX: int = 1600
 # Catalog cards / mobile tiles (~360 CSS px ×2 retina); keeps list payload small.
 CARD_MAX_EDGE_PX: int = 720
 CARD_WEBP_QUALITY: int = 78
+# Floor for small dealer thumbs before PDP encode (LANCZOS upscale + unsharp).
+ENHANCE_TARGET_EDGE_PX: int = 1200
+ENHANCE_WEBP_QUALITY: int = 92
+# Cut-out / remove.bg sources: max edge + lighter WebP for transparent heroes.
+TRANSPARENT_TARGET_EDGE_PX: int = 1600
+TRANSPARENT_WEBP_QUALITY: int = 55
+
+
+def enhance_catalog_photo_bytes(
+    raw: bytes,
+    *,
+    target_edge: int = ENHANCE_TARGET_EDGE_PX,
+    quality: int = ENHANCE_WEBP_QUALITY,
+) -> bytes:
+    """Improve a small product photo and encode as WebP.
+
+    Pipeline for dealer / partner thumbs (~500px)::
+
+        RGB → near-white flatten → autocontrast → slight contrast/color
+        → LANCZOS upscale to ``target_edge`` → UnsharpMask → WebP.
+
+    Args:
+        raw: Source JPEG/PNG/WebP bytes.
+        target_edge: Upscale floor for the long side (no upscale if already larger).
+        quality: WebP quality for the enhanced encode.
+
+    Returns:
+        Enhanced WebP bytes (long edge ≤ ``MAX_EDGE_PX``).
+    """
+    with Image.open(BytesIO(raw)) as img:
+        img.load()
+        rgb = img.convert("RGB")
+
+    rgb = _flatten_near_white(rgb)
+    rgb = ImageOps.autocontrast(rgb, cutoff=0.4)
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.08)
+    rgb = ImageEnhance.Color(rgb).enhance(1.06)
+    rgb = ImageEnhance.Brightness(rgb).enhance(1.02)
+
+    width, height = rgb.size
+    longest = max(width, height)
+    if longest < target_edge:
+        scale = target_edge / float(longest)
+        rgb = rgb.resize(
+            (max(1, int(width * scale)), max(1, int(height * scale))),
+            Image.Resampling.LANCZOS,
+        )
+    if max(rgb.size) > MAX_EDGE_PX:
+        scale = MAX_EDGE_PX / float(max(rgb.size))
+        rgb = rgb.resize(
+            (max(1, int(rgb.size[0] * scale)), max(1, int(rgb.size[1] * scale))),
+            Image.Resampling.LANCZOS,
+        )
+
+    rgb = rgb.filter(ImageFilter.UnsharpMask(radius=1.4, percent=120, threshold=2))
+    out = BytesIO()
+    rgb.save(out, format="WEBP", quality=quality, method=WEBP_METHOD)
+    return out.getvalue()
+
+
+def enhance_transparent_catalog_photo_bytes(
+    raw: bytes,
+    *,
+    target_edge: int = TRANSPARENT_TARGET_EDGE_PX,
+    quality: int = TRANSPARENT_WEBP_QUALITY,
+) -> bytes:
+    """Upscale a cut-out (RGBA) product photo and encode lossy WebP with alpha.
+
+    Pipeline for remove.bg / studio cut-outs (~370px)::
+
+        RGBA → contrast/color on RGB → LANCZOS upscale (+ alpha)
+        → UnsharpMask on RGB → WebP (keeps transparency).
+
+    Args:
+        raw: Source PNG/WebP with alpha.
+        target_edge: Upscale floor for the long side.
+        quality: WebP quality (default 55 for light transparent heroes).
+
+    Returns:
+        Enhanced WebP bytes with alpha (long edge ≤ ``MAX_EDGE_PX``).
+    """
+    with Image.open(BytesIO(raw)) as img:
+        img.load()
+        rgba = img.convert("RGBA")
+
+    rgb = Image.merge("RGB", rgba.split()[:3])
+    alpha = rgba.getchannel("A")
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.06)
+    rgb = ImageEnhance.Color(rgb).enhance(1.04)
+    rgb = ImageEnhance.Sharpness(rgb).enhance(1.15)
+
+    width, height = rgb.size
+    longest = max(width, height)
+    if longest < target_edge:
+        scale = target_edge / float(longest)
+        size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        rgb = rgb.resize(size, Image.Resampling.LANCZOS)
+        alpha = alpha.resize(size, Image.Resampling.LANCZOS)
+    if max(rgb.size) > MAX_EDGE_PX:
+        scale = MAX_EDGE_PX / float(max(rgb.size))
+        size = (max(1, int(rgb.size[0] * scale)), max(1, int(rgb.size[1] * scale)))
+        rgb = rgb.resize(size, Image.Resampling.LANCZOS)
+        alpha = alpha.resize(size, Image.Resampling.LANCZOS)
+
+    rgb = rgb.filter(ImageFilter.UnsharpMask(radius=1.2, percent=110, threshold=2))
+    out_img = Image.merge("RGBA", (*rgb.split(), alpha))
+    out = BytesIO()
+    out_img.save(out, format="WEBP", quality=quality, method=WEBP_METHOD)
+    return out.getvalue()
+
+
+def _flatten_near_white(
+    image: Image.Image,
+    *,
+    threshold: int = 248,
+) -> Image.Image:
+    """Snap near-white studio backdrop pixels to pure white."""
+    rgb = image.convert("RGB") if image.mode != "RGB" else image.copy()
+    pixels = rgb.load()
+    assert pixels is not None
+    width, height = rgb.size
+    for y in range(height):
+        for x in range(width):
+            pixel = pixels[x, y]
+            if not isinstance(pixel, tuple) or len(pixel) < 3:
+                continue
+            r, g, b = int(pixel[0]), int(pixel[1]), int(pixel[2])
+            if r >= threshold and g >= threshold and b >= threshold:
+                pixels[x, y] = (255, 255, 255)
+    return rgb
 
 
 def convert_bytes_to_webp(

@@ -6,6 +6,7 @@ import {
   type LightboxImage,
 } from "../components/ImageLightbox";
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { CompatiblePositions } from "../components/CompatiblePositions";
 import { LeadForm } from "../components/LeadForm";
 import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { Seo } from "../components/Seo";
@@ -813,6 +814,8 @@ export function SkuDetailPage() {
               </div>
             </div>
           ) : null}
+
+          <CompatiblePositions items={sku.compatible_positions ?? []} />
         </div>
 
         <aside className={styles.contentAside}>

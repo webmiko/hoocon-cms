@@ -60,3 +60,21 @@ describe("compactCardSpecName", () => {
     expect(compactCardSpecName("Обратная связь U")).toBe("Обратная связь U");
   });
 });
+
+describe("cardHighlights adapters", () => {
+  it("keeps compatible_actuators for adapter cards", () => {
+    const rows = [
+      {
+        key: "compatible_actuators",
+        name: "Совместимый привод",
+        value: "DA5FU (24/230 В)",
+      },
+      { key: "control", name: "Управление", value: "лишнее" },
+      { key: "runtime", name: "Время", value: "≤ 25 с" },
+    ];
+    expect(cardHighlights(rows).map((h) => h.key)).toEqual([
+      "control",
+      "compatible_actuators",
+    ]);
+  });
+});

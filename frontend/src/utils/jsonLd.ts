@@ -4,6 +4,8 @@
  * Spec: ПЛАН §6 Iter 4 — F9; БЗ SEO-индексация-SPA.md; security-baseline §3.
  */
 
+import { catalogPathForSku } from "./catalogPaths";
+
 const SITE_NAME = "Hoocon";
 const SITE_URL = "https://hoocon.ru";
 
@@ -62,7 +64,10 @@ export const HOME_FAQ_ITEMS: Array<{ question: string; answer: string }> = [
 export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
   const path =
     sku.category_slug && sku.slug
-      ? `/catalog/${sku.category_slug}/${sku.slug}`
+      ? catalogPathForSku({
+          category_slug: sku.category_slug,
+          slug: sku.slug,
+        })
       : `/${sku.slug}`;
   const ld: Record<string, unknown> = {
     "@context": "https://schema.org",

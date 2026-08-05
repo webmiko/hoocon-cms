@@ -254,7 +254,7 @@ export function RelatedArticlesCarousel({
                 data-peek={isPeek ? "true" : undefined}
               >
                 <Link
-                  to={`${basePath}/${article.slug}/`}
+                  to={`${basePath}/${article.slug}`}
                   className={styles.card}
                   tabIndex={inWindow ? 0 : -1}
                 >

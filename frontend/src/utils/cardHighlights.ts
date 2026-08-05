@@ -30,6 +30,7 @@ export const CARD_HIGHLIGHT_ORDER = [
   "ways",
   "kvs",
   "material",
+  "compatible_actuators",
 ] as const;
 
 /**

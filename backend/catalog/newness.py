@@ -2,6 +2,13 @@
 
 Do not use ``created_at`` / ``updated_at`` (ETL noise). Stamp
 ``SKU.first_published_at`` on first public publish or via ``stamp_hv_newness``.
+
+Home carousel / ``?new=1`` list order: in-stock first, then newest
+``first_published_at`` (left / first page = newer).
+
+- Home carousel: FE ``page_size`` = :data:`NOVINKI_CAROUSEL_LIMIT` (20).
+- Catalog ``/catalog?new=1`` (and with ``?category=``): same order and 30-day
+  window, **no** total cap — only DRF page size for pagination.
 """
 
 from __future__ import annotations
@@ -10,12 +17,14 @@ import re
 from datetime import datetime, timedelta
 from typing import Any
 
-from django.db.models import QuerySet
+from django.db.models import Case, F, IntegerField, QuerySet, Value, When
 from django.utils import timezone
 
 from catalog.models import SKU
 
 NEW_WINDOW_DAYS: int = 30
+# Home «Новинки» carousel hard cap (FE ``page_size`` only; catalog is uncapped).
+NOVINKI_CAROUSEL_LIMIT: int = 20
 
 # HV wave (2025 catalog fill): all HVA; HVD fast-Q; spring P; capacitor QX.
 _HV_NEWNESS_CODE = re.compile(
@@ -24,6 +33,8 @@ _HV_NEWNESS_CODE = re.compile(
     r"|hvd(?:24|230)s?-\d+(?:q|qx)"
     r")$",
 )
+
+_NEW_QUERY_TRUE: frozenset[str] = frozenset({"1", "true", "yes", "on"})
 
 
 def new_since(*, now: datetime | None = None) -> datetime:
@@ -38,6 +49,30 @@ def sku_is_new(sku: SKU, *, now: datetime | None = None) -> bool:
     if stamped is None:
         return False
     return stamped >= new_since(now=now)
+
+
+def is_new_query_param(value: str | None) -> bool:
+    """True when ``?new=`` is a truthy flag (same tokens as FilterSet)."""
+    if not value:
+        return False
+    return value.strip().casefold() in _NEW_QUERY_TRUE
+
+
+def novinki_list_order_by() -> tuple[Any, ...]:
+    """Carousel / ``?new=1`` order: in stock → newer ``first_published_at`` → code.
+
+    Newest land on the left; adding a card shifts older ones right and off the
+    FE page (home keeps at most :data:`NOVINKI_CAROUSEL_LIMIT`).
+    """
+    return (
+        Case(
+            When(stock_qty__gt=0, then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        ),
+        F("first_published_at").desc(nulls_last=True),
+        "sku_code",
+    )
 
 
 def ensure_first_published_at(sku: SKU, *, now: datetime | None = None) -> bool:

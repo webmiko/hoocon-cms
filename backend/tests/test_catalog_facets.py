@@ -1141,3 +1141,69 @@ def test_ball_valve_8100_facet_order_and_labels(client) -> None:
     assert labels["ways"] == "Тип крана"
     assert labels["material"] == "Материал корпуса"
     assert labels["kvs"] == "Kvs (м³/ч)"
+
+
+@pytest.mark.django_db
+def test_adapter_category_facets_compatible_actuators_only(client) -> None:
+    """Category adaptery: only «Совместимый привод», not «Управление»."""
+    from catalog.facets import ADAPTER_FACET_KEYS, facet_defs_for_category
+    from catalog.models import (
+        SKU,
+        Attribute,
+        AttributeValue,
+        Category,
+        Product,
+    )
+
+    assert [f.key for f in facet_defs_for_category("adaptery")] == list(
+        ADAPTER_FACET_KEYS,
+    )
+
+    cat = Category.objects.create(name="Адаптеры", slug="adaptery")
+    product = Product.objects.create(name="BR-M", slug="adapter-br-m", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="BR-M",
+        slug="adapter-br-m",
+        sku_code="BR-M",
+        is_published=True,
+    )
+    compat = Attribute.objects.create(
+        name="Совместимый привод",
+        slug="compatible-actuators",
+    )
+    control = Attribute.objects.create(name="Управление", slug="control")
+    AttributeValue.objects.create(
+        sku=sku,
+        attribute=compat,
+        value="DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)",
+    )
+    AttributeValue.objects.create(
+        sku=sku,
+        attribute=control,
+        value="Шаровый кран под электропривод",
+    )
+
+    response = client.get(
+        reverse("catalog-facet-list"),
+        {"category": "adaptery"},
+    )
+    assert response.status_code == 200
+    keys = [row["key"] for row in response.data["results"]]
+    assert keys == ["compatible_actuators"]
+    assert "control" not in keys
+    values = {v["value"] for v in response.data["results"][0]["values"]}
+    assert "DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)" in values
+
+    filtered = client.get(
+        reverse("catalog-sku-list"),
+        {
+            "category": "adaptery",
+            "compatible_actuators": "DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)",
+        },
+    )
+    assert {row["slug"] for row in filtered.data["results"]} == {"adapter-br-m"}
+    highlights = {h["key"] for h in filtered.data["results"][0]["highlights"]}
+    assert "compatible_actuators" in highlights
+    # Facet sidebar for adaptery must not expose «Управление».
+    assert "control" not in keys

@@ -4,6 +4,9 @@
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   margin-top: calc(-1 * var(--space-2xl));
+  /* Shared rhythm: gap between sections; pad inside gray full-bleed bands. */
+  --home-section-gap: var(--space-3xl);
+  --home-band-pad-block: var(--space-2xl);
 }
 
 /* Dark hero — crossfade slider of reference sites + brand overlay */
@@ -280,17 +283,11 @@
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-md);
   max-width: var(--max-width);
-  margin: calc(-1 * var(--space-md)) auto var(--space-3xl);
+  margin: calc(-1 * var(--space-md)) auto var(--home-section-gap);
   padding: 0 var(--space-lg);
   position: relative;
   z-index: 2;
   animation: rise 0.7s var(--ease-out) 0.08s both;
-}
-
-@media (max-width: 768px) {
-  .trust {
-    margin: calc(-1 * var(--space-md)) auto var(--space-2xl);
-  }
 }
 
 .trustItem {
@@ -327,7 +324,7 @@
 
 .section {
   max-width: var(--max-width);
-  margin: 0 auto var(--space-3xl);
+  margin: 0 auto var(--home-section-gap);
   padding: 0 var(--space-lg);
   animation: rise 0.7s var(--ease-out) 0.14s both;
 }
@@ -382,8 +379,8 @@
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  margin-bottom: var(--space-3xl);
-  padding: var(--space-2xl) var(--space-lg);
+  margin-bottom: var(--home-section-gap);
+  padding: var(--home-band-pad-block) var(--space-lg);
   background: var(--color-subtle);
   border-block: 1px solid var(--color-border);
   animation: rise 0.7s var(--ease-out) 0.14s both;
@@ -590,8 +587,8 @@
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  margin-bottom: var(--space-3xl);
-  padding-block: clamp(72px, 10vw, 120px);
+  margin-bottom: 0;
+  padding-block: var(--home-band-pad-block);
   padding-inline: clamp(40px, 6vw, 72px);
   min-height: clamp(360px, 48vw, 480px);
   /* No overflow/isolation — they break background-attachment: fixed. */
@@ -723,8 +720,8 @@
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  margin-bottom: var(--space-3xl);
-  padding: var(--space-2xl) var(--space-lg);
+  margin-bottom: var(--home-section-gap);
+  padding: var(--home-band-pad-block) var(--space-lg);
   background: var(--color-subtle);
   border-block: 1px solid var(--color-border);
   animation: rise 0.7s var(--ease-out) 0.14s both;
@@ -845,8 +842,10 @@
 }
 
 @media (max-width: 1024px) {
-  .directions {
-    padding: var(--space-xl) var(--space-md);
+  .directions,
+  .delivery,
+  .partners {
+    padding-inline: var(--space-md);
   }
 }
 
@@ -874,6 +873,8 @@
 @media (max-width: 768px) {
   .home {
     margin-top: calc(-1 * var(--space-lg));
+    --home-section-gap: var(--space-2xl);
+    --home-band-pad-block: var(--space-xl);
   }
 
   .hero {
@@ -898,10 +899,6 @@
 
   .section {
     padding: 0 var(--space-md);
-  }
-
-  .directions {
-    padding: var(--space-xl) var(--space-md);
   }
 
   .directionBlock {

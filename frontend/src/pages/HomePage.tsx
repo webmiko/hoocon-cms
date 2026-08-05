@@ -219,7 +219,7 @@ function HomeDirectionsSection() {
 /** Novinki API + carousel — both deferred until near viewport. */
 function HomeNovinkiSection() {
   const { data: novinkiData, loading: novinkiLoading } = useAsync(
-    () => api.skus({ new: "1", page_size: "8" }),
+    () => api.skus({ new: "1", page_size: "20" }),
     0,
     "home:novinki",
   );
@@ -233,8 +233,8 @@ function HomeNovinkiSection() {
       <div className={styles.sectionHead}>
         <h2 id="novinki-heading">Новинки</h2>
         <p className={styles.sectionLead}>
-          Линейки, недавно появившиеся в каталоге. Полный список — с фильтром
-          «Новинки».
+          Недавние поступления в каталог — чтобы быстро заметить, что появилось
+          в ассортименте.
         </p>
       </div>
       {novinkiLoading ? (
@@ -664,11 +664,8 @@ export function HomePage() {
         <HomeStepsSection />
       </DeferredMount>
 
-      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={360}>
+      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={640}>
         <HomePartnersSection />
-      </DeferredMount>
-
-      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={280}>
         <HomeDeliverySection />
       </DeferredMount>
 

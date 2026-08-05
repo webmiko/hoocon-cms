@@ -27,6 +27,7 @@ from catalog.facets.copy import (
 )
 from catalog.facets.dedupe import dedupe_attribute_values
 from catalog.facets.defs import (
+    ADAPTER_FACET_KEYS,
     BALL_VALVE_8100_FACET_KEYS,
     CATEGORY_FACET_KEYS,
     EXTRA_HIGHLIGHT_DEFS,
@@ -60,6 +61,7 @@ from catalog.facets.temp_sensor import (
 )
 
 __all__ = [
+    "ADAPTER_FACET_KEYS",
     "AUX_SWITCH_NONE",
     "AUX_SWITCH_SPDT_1",
     "AUX_SWITCH_SPDT_2",

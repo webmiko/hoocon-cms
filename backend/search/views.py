@@ -150,7 +150,7 @@ class SearchView(APIView):
                     "type": "article",
                     "slug": art.slug,
                     "title": art.title,
-                    "url": f"/statyi/{art.slug}/",
+                    "url": f"/statyi/{art.slug}",
                     "snippet": _content_snippet(art.body or ""),
                     "rank": float(art.rank),  # type: ignore[attr-defined]
                 },
@@ -162,7 +162,7 @@ class SearchView(APIView):
                     "type": "news",
                     "slug": news.slug,
                     "title": news.title,
-                    "url": f"/novosti/{news.slug}/",
+                    "url": f"/novosti/{news.slug}",
                     "snippet": _content_snippet(news.body or ""),
                     "rank": float(news.rank),  # type: ignore[attr-defined]
                 },
@@ -174,7 +174,7 @@ class SearchView(APIView):
                     "type": "page",
                     "slug": page.slug,
                     "title": page.title,
-                    "url": f"/{page.slug}/",
+                    "url": f"/{page.slug}",
                     "snippet": _content_snippet(page.body or ""),
                     "rank": float(page.rank),  # type: ignore[attr-defined]
                 },

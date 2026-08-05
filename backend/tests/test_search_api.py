@@ -152,7 +152,8 @@ def test_search_finds_pages(client) -> None:
     types = {r.get("type") for r in body["results"]}
     assert "page" in types
     page_urls = [r["url"] for r in body["results"] if r.get("type") == "page"]
-    assert "/o-kompanii/" in page_urls
+    assert "/o-kompanii" in page_urls
+    assert "/o-kompanii/" not in page_urls
 
 
 @pytest.mark.django_db
@@ -262,13 +263,17 @@ def test_search_result_url_is_canonical_path(client) -> None:
     response = client.get("/api/search/", {"q": "привод"})
     body = response.json()
     for item in body["results"]:
+        assert not item["url"].endswith("/") or item["url"] == "/"
         if item["type"] == "sku":
             assert item["url"].startswith("/catalog/")
             assert item["url"].count("/") >= 3
+            assert "/catalog/catalog/" not in item["url"]
         elif item["type"] == "article":
-            assert "/statyi/" in item["url"]
+            assert item["url"].startswith("/statyi/")
+            assert item["url"] == f"/statyi/{item['slug']}"
         elif item["type"] == "news":
-            assert "/novosti/" in item["url"]
+            assert item["url"].startswith("/novosti/")
+            assert item["url"] == f"/novosti/{item['slug']}"
 
 
 def test_search_title_for_sku_uses_full_article_code() -> None:
