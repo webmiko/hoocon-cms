@@ -136,7 +136,15 @@ class Article(_ContentBase):
         blank=True,
         null=True,
         validators=[validate_image_upload],
-        help_text="Обложка статьи (JPEG/PNG/WebP).",
+        help_text="Обложка для светлой темы (JPEG/PNG/WebP → WebP).",
+    )
+    cover_dark: models.ImageField = models.ImageField(
+        "обложка (тёмная тема)",
+        upload_to=article_cover_upload_to,
+        blank=True,
+        null=True,
+        validators=[validate_image_upload],
+        help_text="Обложка для тёмной темы (JPEG/PNG/WebP → WebP). Пусто = как светлая.",
     )
     # Postgres FTS vector (auto-maintained by DB trigger; see migration).
     # Spec: ПЛАН §6 Iter 3 — FTS на Article (SearchVector title + body).
@@ -157,6 +165,8 @@ class Article(_ContentBase):
 
         if self.cover:
             ensure_field_file_webp(self.cover)
+        if self.cover_dark:
+            ensure_field_file_webp(self.cover_dark)
         super().save(*args, **kwargs)  # type: ignore[arg-type]
 
 

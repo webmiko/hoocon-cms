@@ -52,6 +52,7 @@ class ArticleAdmin(SocialAnnounceAdminMixin, _ContentBaseAdmin):
         "slug",
         "excerpt",
         "cover",
+        "cover_dark",
         "body",
         "is_published",
         "published_at",
