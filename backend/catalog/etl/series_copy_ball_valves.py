@@ -107,6 +107,39 @@ FLANGED_CONTROL_SUFFIXES = ("A", "AS", "D", "DS")
 LEGACY_FLANGED_BODY_CODES: tuple[str, ...] = tuple(row[0] for row in FLANGED_STD_BODY_ROWS)
 logger = logging.getLogger(__name__)
 
+# 3-way brass bodies (BV3xx): flow-path notes from plant «Направление потоков…» sheet.
+# Not attached as ProductFile — lives in Product.instructions (PDP tab).
+THREE_WAY_FLOW_INSTRUCTIONS = normalize_tech_copy(
+    """
+Инструкция по направлению потока для 3-ходового шарового крана Hoocon
+
+На корпусе порты обозначены A, B и C. Направление потока зависит от угла
+поворота шара (0…90°) и положения привода.
+
+1. Заводское состояние (по умолчанию)
+
+– Порты AB соединены с AC (состояние 1: AB → AC).
+
+2. Крайние положения
+
+– 0° (против часовой стрелки до упора): соединение через AC.
+– 90° (по часовой стрелке до упора): соединение через BC.
+
+3. Промежуточные состояния при повороте
+
+– Состояние 2: ABC → AB.
+– Состояние 3: BC → ABC.
+– Состояние 4: AC → BC.
+
+4. Монтаж
+
+– Сориентируйте корпус по маркировке портов A / B / C до установки привода.
+– Направление вращения привода (L/R) должно соответствовать требуемой
+  логике переключения потока.
+– После монтажа проверьте фактический путь потока на крайних положениях.
+""".strip(),
+)
+
 DEFAULT_STORE_CSV = (
     Path(__file__).resolve().parents[3]
     / ".."
@@ -1537,7 +1570,12 @@ def apply_series_enrichment(
     product.name = series.product_name[:200]
     product.description = _series_description(series)
     product.specs_text = ""
-    product.save(update_fields=["name", "description", "specs_text"])
+    if "3-ходов" in (series.ways or "").casefold():
+        product.instructions = THREE_WAY_FLOW_INSTRUCTIONS
+    elif (product.instructions or "").strip():
+        # 2-way: drop stale flow notes if a previous run left them.
+        product.instructions = ""
+    product.save(update_fields=["name", "description", "specs_text", "instructions"])
 
     skus = list(SKU.objects.filter(product=product).order_by("sku_code"))
     attrs = 0

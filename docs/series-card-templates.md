@@ -360,6 +360,12 @@ dn, ways, **kvs**, material, thread, габариты, **compatible-actuators**,
 - Soft-nav: URL + overlay Kvs/артикула до ответа API.
 - **`ball_valve_kit`**: да (только «голый» BV, не H81/H8205). Нужен текст
   Attribute `compatible-actuators`.
+- **3-ходовые (BV3xx):** вкладка инструкции — блок «Направление потока»
+  (заводское AB→AC, крайние 0°/90°); из внутреннего листа, не ProductFile.
+  В галерее — та же логика картинкой (`attach_ball_valve_flow_scheme`,
+  `sort_order=25`), только BV3xx.
+- **Галерея издания:** фото расходного диска Kvs (`attach_ball_valve_kvs_discs`,
+  `sort_order=30`) — не заменяет hero DN.
 
 ### Сборка вручную (новый DN или новая буква Kvs)
 
@@ -386,9 +392,9 @@ dn, ways, **kvs**, material, thread, габариты, **compatible-actuators**,
 | SKU | Карточка (коротко) | Product / SKU slug |
 |-----|-------------------|--------------------|
 | **BR-M** | `DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)` | `adapter-br-m` |
-| **BR-ML** | `DA5FU (24/230 В)` | `adapter-br-ml` |
+| **BR-ML** | `DA3FU, DA5FU (24/230 В)` | `adapter-br-ml` |
 
-Подробный перечень семейств и изданий (−D/−DS/−A/−AS) — в описании PDP.
+Подробный перечень семейств и исполнений (−D/−DS/−A/−AS) — в описании PDP.
 На части DN в 8100 только MU/MQU → в комплекте только BR-M.
 
 PDP поле `compatible_positions` («Совместимые позиции»):
@@ -401,8 +407,10 @@ PDP поле `compatible_positions` («Совместимые позиции»):
 
 Ensure: `manage.py ensure_br_adapters` — фото из
 `backend/catalog/etl/data/adapters-br/` (скачаны с партнёра один раз,
-enhance + WebP в media; без hotlink). BR-H (фланцевые ВЧШГ) — отдельная
-карточка при появлении контента; код уже выбирается kit-логикой.
+enhance + WebP в media; без hotlink). Технички PDF (кронштейн + штоки):
+`manage.py attach_manual_pdfs --series br` из `_инструкции-pdf/RU/`.
+BR-H (фланцевые ВЧШГ) — отдельная карточка при появлении контента;
+код уже выбирается kit-логикой.
 
 ### ETL
 
@@ -412,6 +420,11 @@ poetry run python manage.py enrich_ball_valves
 poetry run python manage.py enrich_ball_valves --series BV220
 # герои DN из media-webp (2-WAY/3-WAY BRASS DNxx.webp):
 poetry run python manage.py attach_ball_valve_media_webp
+# кроп расходного диска Kvs в галерею издания (A–E):
+poetry run python manage.py attach_ball_valve_kvs_discs
+# схема направления потока — только 3-ходовые BV3xx:
+poetry run python -m catalog.etl.generate_ball_valve_flow_scheme
+poetry run python manage.py attach_ball_valve_flow_scheme
 # паспорт серии PDF в Документы (без кропов в галерею):
 poetry run python manage.py attach_8100_catalog_media
 ```

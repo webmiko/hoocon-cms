@@ -262,12 +262,58 @@ def test_apply_bv220_enrichment_cards_and_gallery() -> None:
     assert "BR-ML" not in by_slug["compatible-actuators"]
     assert by_slug["bracket"] == "BR-M / BR-ML (для DA…FU)"
     assert ProductImage.objects.filter(sku=sku_a).count() == 3
+    product.refresh_from_db()
+    assert (product.instructions or "").strip() == ""
 
     from catalog.serializers import SKUDetailSerializer
 
     data = SKUDetailSerializer(sku_a).data
     hl_keys = {h["key"] for h in data["highlights"]}
     assert {"dn", "ways", "kvs", "compatible_actuators", "bracket"} <= hl_keys
+
+
+@pytest.mark.django_db
+def test_apply_series_enrichment_sets_three_way_flow_instructions() -> None:
+    """3-ходовые BV* получают блок направления потока в instructions."""
+    from catalog.models import SKU, Category, Product
+
+    series = BallValveSeries(
+        code="BV315",
+        product_slug="8100-bv315",
+        product_name="BV315 | Шаровой кран 3-ходовый DN 15",
+        ways="3-ходовый",
+        dn="15",
+        thread="внутренняя G 1/2",
+        drive_series=("DA5MU24",),
+        gallery_urls=(),
+        kvs_by_edition={"a": "1,6"},
+        height_actuator="",
+        height_stem="",
+        valve_length="",
+        valve_od="",
+        center_to_edge="",
+        diff_pressure="0,35",
+    )
+    cat = Category.objects.create(name="Шаровые", slug="sharovye-flow-test")
+    product = Product.objects.create(
+        category=cat,
+        name="old",
+        slug=series.product_slug,
+        description="old",
+    )
+    SKU.objects.create(
+        product=product,
+        name="old",
+        slug=f"{series.product_slug}-a",
+        sku_code="8100-bv315a",
+        is_published=True,
+    )
+    apply_series_enrichment(series, import_images=False, attach_pdf=False)
+    product.refresh_from_db()
+    text = product.instructions or ""
+    assert "направлению потока" in text.casefold()
+    assert "AB → AC" in text
+    assert "заводское" in text.casefold()
 
 
 def test_drive_families_from_mods_first_segment() -> None:
