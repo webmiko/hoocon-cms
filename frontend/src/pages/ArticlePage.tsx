@@ -4,6 +4,7 @@ import { RelatedArticlesCarousel } from "../components/RelatedArticlesCarousel";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { Seo } from "../components/Seo";
+import { ThemeAwareCover } from "../components/ThemeAwareCover";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
@@ -118,10 +119,12 @@ export function ArticlePage() {
 
         {article.cover ? (
           <figure className={styles.coverFigure}>
-            <img
-              className={styles.cover}
-              src={article.cover}
+            <ThemeAwareCover
+              light={article.cover}
+              dark={article.cover_dark}
               alt={article.title}
+              imgClassName={styles.cover}
+              loading="eager"
             />
           </figure>
         ) : null}

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
+import { ThemeAwareCover } from "../components/ThemeAwareCover";
 import { api } from "../api/client";
 import type { Article } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -70,10 +71,10 @@ export function ArticlesListPage() {
           >
             <div className={styles.featuredMedia}>
               {featured.cover ? (
-                <img
-                  className={styles.featuredCover}
-                  src={featured.cover}
-                  alt=""
+                <ThemeAwareCover
+                  light={featured.cover}
+                  dark={featured.cover_dark}
+                  imgClassName={styles.featuredCover}
                   loading="eager"
                 />
               ) : (
@@ -99,10 +100,10 @@ export function ArticlesListPage() {
               <Link to={`/statyi/${article.slug}`} className={styles.itemLink}>
                 <div className={styles.itemMedia}>
                   {article.cover ? (
-                    <img
-                      className={styles.itemCover}
-                      src={article.cover}
-                      alt=""
+                    <ThemeAwareCover
+                      light={article.cover}
+                      dark={article.cover_dark}
+                      imgClassName={styles.itemCover}
                       loading="lazy"
                     />
                   ) : (
