@@ -57,7 +57,8 @@ primary-ключ в H1 или первом абзаце (plan-serp-top5 §10.6).
 | P2-2 | `fu-vs-eu-fail-safe` | Пружина FU vs электронный EU | FAQ fail-safe; спецификация |
 | P2-3 | `vspomogatelnyy-pereklyuchatel` | Вспомогательный переключатель S | tech-copy §переключатели |
 | P2-4 | `komplekt-sharovoy-kran-privod` | Комплект кран + привод | `/catalog/komplekty`, ball_valve_kit |
-| P2-5 | `pasport-i-sertifikaty-v-zayavke` | Что приложить к ПБ / смете | company/zavod; без ложных сертификатов |
+| P2-5 | `sertifikaty-ce-ul-eac-elektroprivody-ovk` | CE / UL / EAC: допуск и приёмка приводов | company/zavod; без ложных сертификатов на бренд; документы на SKU |
+| P2-5b | `pasport-i-sertifikaty-v-zayavke` | Что приложить к ПБ / смете (короткий чек‑лист) | пересекается с P2-5; можно якорь/ссылка |
 
 ### Приоритет 3 (доверие / снабжение)
 
