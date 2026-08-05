@@ -219,7 +219,7 @@ function HomeDirectionsSection() {
 /** Novinki API + carousel — both deferred until near viewport. */
 function HomeNovinkiSection() {
   const { data: novinkiData, loading: novinkiLoading } = useAsync(
-    () => api.skus({ new: "1", page_size: "8" }),
+    () => api.skus({ new: "1", page_size: "20" }),
     0,
     "home:novinki",
   );
@@ -233,8 +233,8 @@ function HomeNovinkiSection() {
       <div className={styles.sectionHead}>
         <h2 id="novinki-heading">Новинки</h2>
         <p className={styles.sectionLead}>
-          Линейки, недавно появившиеся в каталоге. Полный список — с фильтром
-          «Новинки».
+          На главной — до 20 карточек: сначала в наличии, слева новее. В каталоге
+          с фильтром «Новинки» — все позиции за 30 дней (пагинация), без потолка.
         </p>
       </div>
       {novinkiLoading ? (

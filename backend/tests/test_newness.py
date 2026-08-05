@@ -11,6 +11,8 @@ from rest_framework.test import APIClient
 from catalog.models import SKU, Category, Product
 from catalog.newness import (
     NEW_WINDOW_DAYS,
+    NOVINKI_CAROUSEL_LIMIT,
+    novinki_list_order_by,
     sku_is_new,
     stamp_hv_newness,
 )
@@ -133,3 +135,114 @@ def test_api_new_filter_and_is_new_flag() -> None:
     body = detail.json()
     assert body["is_new"] is True
     assert body.get("first_published_at")
+
+
+@pytest.mark.django_db
+def test_api_new_orders_stock_then_newest_first() -> None:
+    """``?new=1``: in stock before OOS; within group newer ``first_published_at`` left."""
+    cat = Category.objects.create(name="Air", slug="air-novinki-order")
+    now = timezone.now()
+
+    def _sku(
+        *,
+        code: str,
+        slug: str,
+        stock: int,
+        published_at,
+    ) -> SKU:
+        product = Product.objects.create(
+            name=code,
+            slug=f"prod-{slug}",
+            category=cat,
+        )
+        return SKU.objects.create(
+            product=product,
+            sku_code=code,
+            name=code,
+            slug=slug,
+            is_published=True,
+            stock_qty=stock,
+            first_published_at=published_at,
+        )
+
+    older_stock = _sku(
+        code="NEW-OLD-STOCK",
+        slug="new-old-stock",
+        stock=3,
+        published_at=now - timedelta(days=5),
+    )
+    newer_oos = _sku(
+        code="NEW-FRESH-OOS",
+        slug="new-fresh-oos",
+        stock=0,
+        published_at=now - timedelta(hours=1),
+    )
+    newest_stock = _sku(
+        code="NEW-FRESH-STOCK",
+        slug="new-fresh-stock",
+        stock=2,
+        published_at=now,
+    )
+    _sku(
+        code="NEW-ANCIENT",
+        slug="new-ancient",
+        stock=5,
+        published_at=now - timedelta(days=60),
+    )
+
+    client = APIClient()
+    response = client.get(
+        "/api/catalog/skus/",
+        {"new": "1", "page_size": str(NOVINKI_CAROUSEL_LIMIT)},
+    )
+    assert response.status_code == 200
+    codes = [row["sku_code"] for row in response.json().get("results") or []]
+    assert "NEW-ANCIENT" not in codes
+    assert codes.index(newest_stock.sku_code) < codes.index(older_stock.sku_code)
+    assert codes.index(older_stock.sku_code) < codes.index(newer_oos.sku_code)
+
+
+@pytest.mark.django_db
+def test_api_new_catalog_has_no_hard_cap_beyond_page() -> None:
+    """Catalog ``?new=1`` returns full 30-day count; page_size only paginates."""
+    cat = Category.objects.create(name="Air", slug="air-novinki-uncapped")
+    now = timezone.now()
+    for i in range(NOVINKI_CAROUSEL_LIMIT + 5):
+        product = Product.objects.create(
+            name=f"N{i}",
+            slug=f"novinki-uncapped-{i}",
+            category=cat,
+        )
+        SKU.objects.create(
+            product=product,
+            sku_code=f"UNCAPPED-{i:02d}",
+            name=f"UNCAPPED-{i:02d}",
+            slug=f"uncapped-{i:02d}",
+            is_published=True,
+            stock_qty=1 if i % 2 == 0 else 0,
+            first_published_at=now - timedelta(hours=i),
+        )
+
+    client = APIClient()
+    page1 = client.get(
+        "/api/catalog/skus/",
+        {"new": "1", "page_size": str(NOVINKI_CAROUSEL_LIMIT)},
+    )
+    assert page1.status_code == 200
+    body = page1.json()
+    assert body["count"] >= NOVINKI_CAROUSEL_LIMIT + 5
+    assert len(body["results"]) == NOVINKI_CAROUSEL_LIMIT
+    assert body.get("next")
+
+    page2 = client.get(
+        "/api/catalog/skus/",
+        {"new": "1", "page": "2", "page_size": str(NOVINKI_CAROUSEL_LIMIT)},
+    )
+    assert page2.status_code == 200
+    assert len(page2.json()["results"]) >= 5
+
+
+@pytest.mark.django_db
+def test_novinki_list_order_by_matches_expected_keys() -> None:
+    keys = novinki_list_order_by()
+    assert len(keys) == 3

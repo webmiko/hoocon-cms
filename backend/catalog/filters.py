@@ -141,7 +141,8 @@ class AttributeQueryFilterBackend(BaseFilterBackend):
                 "required": False,
                 "in": "query",
                 "description": (
-                    "Только новинки (first_published_at за последние 30 суток). Значения: 1 / true / yes."
+                    "Только новинки (first_published_at за последние 30 суток). "
+                    "Порядок: в наличии, затем newer first. Значения: 1 / true / yes."
                 ),
                 "schema": {"type": "string", "enum": ["1", "true", "yes"]},
             },

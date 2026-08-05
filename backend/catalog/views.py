@@ -29,6 +29,7 @@ from catalog.filters import (
     SKUFilterSet,
 )
 from catalog.models import SKU, AttributeValue, Category, ProductFile, ProductImage
+from catalog.newness import is_new_query_param, novinki_list_order_by
 from catalog.ordering import annotate_moment_nm, catalog_list_order_by
 from catalog.serializers import (
     CategorySerializer,
@@ -272,6 +273,17 @@ class SKUViewSet(
                     queryset=ProductFile.objects.filter(is_published=True),
                 ),
             )
+        return qs
+
+    def filter_queryset(self, queryset: QuerySet[SKU]) -> QuerySet[SKU]:
+        """Apply list filters; ``?new=1`` → stock then date (home + catalog).
+
+        Catalog keeps the full 30-day set (paginated). Home passes
+        ``page_size=20`` for the carousel cap only.
+        """
+        qs = super().filter_queryset(queryset)
+        if self.action == "list" and is_new_query_param(self.request.query_params.get("new")):
+            return qs.order_by(*novinki_list_order_by())
         return qs
 
     def get_serializer_class(self) -> type[SKUListSerializer]:
