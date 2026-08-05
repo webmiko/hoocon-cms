@@ -64,8 +64,9 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/media\//],
       },
+      // Dev SW intercepts ``/src/*.tsx`` and yields a blank #root — keep PWA prod-only.
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
     }),
     // After PWA HTML inject — last transformIndexHtml wins for stylesheet links.
