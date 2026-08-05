@@ -583,8 +583,34 @@ NEWS_H8205_BODY = f"""
 <p><a href="/catalog/komplekty">Смотреть H8205-LAV в каталоге</a></p>
 """.strip()
 
+_NEWS_BR_SLUG = "launch-br-adapters"
+_NEWS_BR_TITLE = "В каталоге: адаптеры BR-M и BR-ML для шаровых кранов"
+_NEWS_BR_COVER_SKU = "BR-M"
+
+NEWS_BR_BODY = f"""
+<p>В каталоге опубликованы адаптеры (кронштейны)
+<strong>BR-M</strong> и <strong>BR-ML</strong> — для установки электропривода
+на латунные шаровые краны серии&nbsp;8100.</p>
+<p><strong>BR-M</strong> — под приводы без возвратной пружины
+(DA…MU / DA…MQU, 24/230&nbsp;В). <strong>BR-ML</strong> — под приводы
+с пружинным возвратом: <strong>DA3FU</strong> и <strong>DA5FU</strong>
+(24/230&nbsp;В).</p>
+<p>На карточках — совместимые семейства приводов, индексы партнёра и
+технички PDF (кронштейн и шток). В RFQ-комплекте «кран + привод» кронштейн
+подбирается автоматически. Остатки на складе — на карточках.</p>
+<p>Для расчёта цены и срока отгрузки оставьте
+<a href="/consultation">заявку на КП</a> или позвоните {_PHONE}.</p>
+<p>
+  <a href="/catalog/adaptery">Адаптеры в каталоге</a>
+  ·
+  <a href="/catalog/adaptery/adapter-br-m">BR-M</a>
+  ·
+  <a href="/catalog/adaptery/adapter-br-ml">BR-ML</a>
+</p>
+""".strip()
+
 # News from Tilda /news are imported by ``scrape_hoocon_news`` (covers + body).
-# Seed creates a bootstrap HVA item when empty and upserts H8205-LAV + covers.
+# Seed creates a bootstrap HVA item when empty and upserts H8205-LAV / BR + covers.
 
 
 class Command(BaseCommand):
@@ -741,6 +767,29 @@ class Command(BaseCommand):
             self.stdout.write(f"news {_NEWS_H8205_SLUG}: cover already set")
         else:
             self.stdout.write(self.style.WARNING(f"news {_NEWS_H8205_SLUG}: cover not attached (SKU image?)"))
+
+        br_news, br_created = News.objects.update_or_create(
+            slug=_NEWS_BR_SLUG,
+            defaults={
+                "title": _NEWS_BR_TITLE,
+                "body": NEWS_BR_BODY,
+                "is_published": True,
+            },
+        )
+        if br_news.published_at is None:
+            br_news.published_at = now
+            br_news.save(update_fields=["published_at", "updated_at"])
+        self.stdout.write(f"news {br_news.slug}: {'created' if br_created else 'updated'}")
+
+        if attach_sku_cover_to_news(
+            news_slug=_NEWS_BR_SLUG,
+            sku_code=_NEWS_BR_COVER_SKU,
+        ):
+            self.stdout.write(f"news {_NEWS_BR_SLUG}: cover from {_NEWS_BR_COVER_SKU}")
+        elif br_news.cover:
+            self.stdout.write(f"news {_NEWS_BR_SLUG}: cover already set")
+        else:
+            self.stdout.write(self.style.WARNING(f"news {_NEWS_BR_SLUG}: cover not attached (SKU image?)"))
 
         self.stdout.write(
             self.style.SUCCESS(
