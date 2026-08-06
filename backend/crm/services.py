@@ -255,9 +255,10 @@ def create_outbound_email(
 def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet[Client]:
     """Limit CRM clients for a non-superuser manager.
 
-    Visible when: assigned to the manager, linked to a scoped lead, or the
-    manager authored an activity on the card (timeline access without unlocking
-    foreign leads — Lead inline stays scoped separately).
+    Superuser / «Админ» / «Аналитик» see all. Otherwise visible when: assigned
+    to the manager, linked to a scoped lead, or the manager authored an
+    activity on the card (timeline access without unlocking foreign leads —
+    Lead inline stays scoped separately).
 
     Args:
         queryset: base Client queryset.
@@ -266,9 +267,10 @@ def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet
     Returns:
         Filtered Client queryset.
     """
+    from accounts.roles import staff_sees_all_leads
     from leads.services import scope_leads_for_manager
 
-    if getattr(user, "is_superuser", False):
+    if staff_sees_all_leads(user):
         return queryset
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return queryset.none()
@@ -292,7 +294,9 @@ def scope_activities_for_manager(
     Returns:
         Filtered Activity queryset.
     """
-    if getattr(user, "is_superuser", False):
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
         return queryset
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return queryset.none()
@@ -316,7 +320,9 @@ def scope_emails_for_manager(
     Returns:
         Filtered EmailMessage queryset.
     """
-    if getattr(user, "is_superuser", False):
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
         return queryset
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return queryset.none()

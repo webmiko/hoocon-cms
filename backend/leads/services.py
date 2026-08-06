@@ -55,7 +55,11 @@ def parse_notify_emails(raw: str) -> list[str]:
 
 
 def manager_rotation_queryset() -> QuerySet[Any]:
-    """Active staff in group «Менеджер» with a non-empty login email.
+    """Pool for auto-assignment: only **active** managers.
+
+    Filters: ``is_active=True``, ``is_staff=True``, group «Менеджер»,
+    non-empty login email. Inactive users never receive new round-robin
+    assignments (and should not get ``assign_manager`` notify).
 
     Returns:
         User queryset ordered by primary key (stable round-robin order).
@@ -134,8 +138,8 @@ def assign_lead_round_robin(lead: Lead) -> Any | None:
 def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
     """Pick notification To: addresses for a new lead.
 
-    ``assign_manager`` + assignee with email → that User.email.
-    Otherwise → ``LEAD_NOTIFY_EMAIL`` (sales@ list).
+    ``assign_manager`` + **active** assignee with email → that User.email.
+    Inactive / missing assignee → ``LEAD_NOTIFY_EMAIL`` (sales@ list).
 
     Args:
         lead: Lead (use ``select_related("assignee")`` when possible).
@@ -149,7 +153,7 @@ def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
     site = SiteSettings.load()
     if site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
         assignee = getattr(lead, "assignee", None)
-        if assignee is not None:
+        if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
             addr = (getattr(assignee, "email", "") or "").strip()
             if addr:
                 return parse_notify_emails(addr)
@@ -181,7 +185,8 @@ def count_new_leads(*, user: Any | None = None) -> int:
 def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lead]:
     """Limit leads for a working manager in Admin.
 
-    Superuser sees all. A regular staff manager sees:
+    Superuser / «Админ» / «Аналитик» see all (see ``staff_sees_all_leads``).
+    A regular staff manager sees:
     - unassigned new leads (shared pool: NEW and assignee IS NULL);
     - leads assigned to them (``assignee``), including NEW with assignee;
     - leads they finished (``processed_by``);
@@ -197,7 +202,9 @@ def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lea
     Returns:
         Filtered queryset (``.distinct()`` when joins are needed).
     """
-    if getattr(user, "is_superuser", False):
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
         return queryset
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return queryset.none()
@@ -486,18 +493,23 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     """Build subject, plain text, and HTML bodies for a new-lead email.
 
     Args:
-        lead: saved Lead instance (with optional sku).
+        lead: saved Lead instance (with optional sku / assignee).
 
     Returns:
         Tuple of (subject, text_body, html_body).
     """
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
     admin_url = build_lead_admin_url(lead.pk)
-    inbox_url = (getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru") + new_leads_changelist_url()
+    inbox_url = site_url + new_leads_changelist_url()
+    assignee = getattr(lead, "assignee", None)
+    assignee_display = manager_display_name(assignee) if assignee is not None else ""
     context = {
         "lead": lead,
+        "site_url": site_url,
         "admin_url": admin_url,
         "inbox_url": inbox_url,
         "lead_type_display": lead.get_lead_type_display(),
+        "assignee_display": assignee_display,
     }
     subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
     text_body = render_to_string("leads/email/new_lead.txt", context).strip()

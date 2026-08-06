@@ -227,3 +227,95 @@ def test_take_in_work_admin_action_reports_skipped() -> None:
     owned.refresh_from_db()
     assert free.assignee_id == mgr_a.pk
     assert owned.assignee_id == mgr_b.pk
+
+
+@pytest.mark.django_db
+def test_analyst_sees_all_leads_and_foreign_clients() -> None:
+    """Аналитик is unscoped: foreign in-progress leads and clients are visible."""
+    from django.contrib.auth.models import Group
+
+    from accounts.roles import GROUP_ANALYST
+    from accounts.services import ensure_staff_groups
+    from crm.services import scope_clients_for_manager
+    from leads.services import scope_leads_for_manager
+
+    ensure_staff_groups()
+    analyst = User.objects.create_user(
+        username="analyst-scope",
+        email="analyst-scope@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    analyst.groups.add(Group.objects.get(name=GROUP_ANALYST))
+    other = User.objects.create_user(
+        username="analyst-other-mgr",
+        email="analyst-other-mgr@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    foreign = CrmClient.objects.create(
+        name="Other Buyer",
+        email="analyst-foreign@example.com",
+        assignee=other,
+    )
+    foreign_lead = Lead.objects.create(
+        name="Other Lead",
+        email="analyst-foreign@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+        client=foreign,
+    )
+    visible_leads = set(
+        scope_leads_for_manager(Lead.objects.all(), analyst).values_list("pk", flat=True),
+    )
+    assert foreign_lead.pk in visible_leads
+    visible_clients = set(
+        scope_clients_for_manager(CrmClient.objects.all(), analyst).values_list(
+            "pk",
+            flat=True,
+        ),
+    )
+    assert foreign.pk in visible_clients
+
+
+@pytest.mark.django_db
+def test_analyst_stats_page_includes_other_managers_leads() -> None:
+    """Stats for Аналитик are not limited to own assignee scope."""
+    from django.contrib.auth.models import Group
+
+    from accounts.roles import GROUP_ANALYST
+    from accounts.services import ensure_staff_groups
+    from leads.services import build_lead_processing_stats, scope_leads_for_manager
+
+    ensure_staff_groups()
+    analyst = User.objects.create_user(
+        username="analyst-stats",
+        email="analyst-stats@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    analyst.groups.add(Group.objects.get(name=GROUP_ANALYST))
+    other = User.objects.create_user(
+        username="stats-other-mgr",
+        email="stats-other-mgr@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    Lead.objects.create(
+        name="Theirs IP",
+        email="stats-theirs@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+    )
+    scoped = scope_leads_for_manager(Lead.objects.all(), analyst)
+    stats = build_lead_processing_stats(queryset=scoped)
+    assert stats["totals"]["in_progress"] == 1
+
+    client = Client()
+    client.force_login(analyst)
+    response = client.get(reverse("admin:leads_lead_stats"))
+    assert response.status_code == 200

@@ -71,6 +71,50 @@ def test_manager_rotation_queryset_requires_group_and_email() -> None:
 
 
 @pytest.mark.django_db
+def test_inactive_manager_excluded_from_rotation_and_notify() -> None:
+    """is_active=False: not in RR pool; assign_manager notify falls back to sales@."""
+    ensure_staff_groups()
+    active = _make_manager(username="rr-active", email="active-mgr@hoocon.ru")
+    inactive = User.objects.create_user(
+        username="rr-inactive",
+        email="inactive-mgr@hoocon.ru",
+        password="password12",
+        is_staff=True,
+        is_active=False,
+    )
+    inactive.groups.add(Group.objects.get(name=GROUP_MANAGER))
+
+    pks = set(manager_rotation_queryset().values_list("pk", flat=True))
+    assert active.pk in pks
+    assert inactive.pk not in pks
+
+    site = _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
+    site.lead_rr_last_user = inactive
+    site.save(update_fields=["lead_rr_last_user", "updated_at"])
+
+    lead = Lead.objects.create(
+        name="Skip inactive",
+        email="skip-inactive@example.com",
+        message="x" * 20,
+    )
+    picked = assign_lead_round_robin(lead)
+    assert picked is not None
+    assert picked.pk == active.pk
+    lead.refresh_from_db()
+    assert lead.assignee_id == active.pk
+
+    _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_MANAGER)
+    orphan = Lead.objects.create(
+        name="Inactive assignee",
+        email="orphan-inactive@example.com",
+        message="x" * 20,
+        assignee=inactive,
+    )
+    with override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru"):
+        assert resolve_lead_notify_recipients(orphan) == ["sales@hoocon.ru"]
+
+
+@pytest.mark.django_db
 def test_assign_off_mode_leaves_assignee_empty() -> None:
     """Mode off: assign_lead_round_robin is a no-op."""
     _make_manager(username="rr-off-mgr", email="off-mgr@hoocon.ru")
