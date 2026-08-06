@@ -12,6 +12,8 @@ Email: {{ lead.email }}
 Сообщение:
 {{ lead.message }}
 
+{% if assignee_display %}Ответственный менеджер: {{ assignee_display }}
+{% endif %}
 —
 Заявка создана: {{ lead.created_at|date:"Y-m-d H:i" }}
 Открыть в Admin: {{ admin_url }}
