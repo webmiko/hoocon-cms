@@ -54,12 +54,114 @@ def parse_notify_emails(raw: str) -> list[str]:
     return result
 
 
+def manager_rotation_queryset() -> QuerySet[Any]:
+    """Active staff in group «Менеджер» with a non-empty login email.
+
+    Returns:
+        User queryset ordered by primary key (stable round-robin order).
+    """
+    from accounts.roles import GROUP_MANAGER
+
+    return (
+        User.objects.filter(
+            is_active=True,
+            is_staff=True,
+            groups__name=GROUP_MANAGER,
+        )
+        .exclude(email="")
+        .order_by("pk")
+        .distinct()
+    )
+
+
+def assign_lead_round_robin(lead: Lead) -> Any | None:
+    """Assign the next manager from the rotation pool to ``lead``.
+
+    Only runs when SiteSettings ``lead_routing_mode`` is an assign mode.
+    Empty pool → no-op (returns None). Uses ``select_for_update`` on the
+    SiteSettings singleton so concurrent creates advance the cursor safely.
+
+    Args:
+        lead: saved Lead (preferably already linked to a CRM Client).
+
+    Returns:
+        Assigned User, or None when mode is off / pool empty.
+    """
+    from sitesettings.models import SiteSettings
+
+    with transaction.atomic():
+        SiteSettings.load()
+        site = SiteSettings.objects.select_for_update().get(
+            pk=SiteSettings.SINGLETON_PK,
+        )
+        mode = site.lead_routing_mode
+        if mode not in (
+            SiteSettings.LeadRoutingMode.ASSIGN_SALES,
+            SiteSettings.LeadRoutingMode.ASSIGN_MANAGER,
+        ):
+            return None
+
+        managers = list(manager_rotation_queryset())
+        if not managers:
+            return None
+
+        last_id = site.lead_rr_last_user_id
+        ids = [user.pk for user in managers]
+        if last_id is not None and last_id in ids:
+            pick = managers[(ids.index(last_id) + 1) % len(managers)]
+        else:
+            pick = managers[0]
+
+        site.lead_rr_last_user = pick
+        site.save(update_fields=["lead_rr_last_user", "updated_at"])
+
+        locked = Lead.objects.select_for_update().get(pk=lead.pk)
+        locked.assignee = pick
+        locked.save(update_fields=["assignee", "updated_at"])
+
+        if locked.client_id:
+            from crm.models import Client as CrmClient
+
+            client = CrmClient.objects.select_for_update().get(pk=locked.client_id)
+            if client.assignee_id is None:
+                client.assignee = pick
+                client.save(update_fields=["assignee", "updated_at"])
+
+        lead.refresh_from_db()
+        return pick
+
+
+def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
+    """Pick notification To: addresses for a new lead.
+
+    ``assign_manager`` + assignee with email → that User.email.
+    Otherwise → ``LEAD_NOTIFY_EMAIL`` (sales@ list).
+
+    Args:
+        lead: Lead (use ``select_related("assignee")`` when possible).
+
+    Returns:
+        Deduplicated recipient list (may be empty if env unset).
+    """
+    from sitesettings.models import SiteSettings
+
+    sales = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+    site = SiteSettings.load()
+    if site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
+        assignee = getattr(lead, "assignee", None)
+        if assignee is not None:
+            addr = (getattr(assignee, "email", "") or "").strip()
+            if addr:
+                return parse_notify_emails(addr)
+    return sales
+
+
 def count_new_leads(*, user: Any | None = None) -> int:
     """Return unread new leads for the admin sticker / dashboard.
 
-    Counts leads with status=new and seen_at IS NULL (pool for all managers).
+    Counts leads with status=new and seen_at IS NULL.
     When ``user`` is set and is not a superuser, count is limited to leads
-    visible via :func:`scope_leads_for_manager` (still includes the NEW pool).
+    visible via :func:`scope_leads_for_manager` (unassigned NEW pool + own).
 
     Args:
         user: optional staff user for scoped counting.
@@ -80,8 +182,8 @@ def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lea
     """Limit leads for a working manager in Admin.
 
     Superuser sees all. A regular staff manager sees:
-    - new leads (shared pool);
-    - leads assigned to them (``assignee``);
+    - unassigned new leads (shared pool: NEW and assignee IS NULL);
+    - leads assigned to them (``assignee``), including NEW with assignee;
     - leads they finished (``processed_by``);
     - leads on CRM clients they own (``client.assignee``).
 
@@ -101,7 +203,7 @@ def scope_leads_for_manager(queryset: QuerySet[Lead], user: Any) -> QuerySet[Lea
         return queryset.none()
 
     return queryset.filter(
-        Q(status=Lead.LeadStatus.NEW)
+        Q(status=Lead.LeadStatus.NEW, assignee__isnull=True)
         | Q(assignee_id=user.pk)
         | Q(processed_by_id=user.pk)
         | Q(client__assignee_id=user.pk),

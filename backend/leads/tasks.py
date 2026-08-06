@@ -3,9 +3,9 @@
 Spec: ПЛАН §6 Iter 3 — Celery email; docs/security-baseline.md §3 (PII не в логах).
 
 Контракт:
-- send_lead_notification(lead_id): multipart email менеджерам из
-  LEAD_NOTIFY_EMAIL (comma/semicolon). Тело — для менеджера (с PII),
-  логи Celery — только lead_id + lead_type.
+- send_lead_notification(lead_id): multipart email получателям из
+  resolve_lead_notify_recipients (sales@ или User.email менеджера).
+  Тело — для менеджера (с PII), логи Celery — только lead_id + lead_type.
 - Вызов через transaction.on_commit в view.
 """
 
@@ -17,7 +17,7 @@ from django.core.mail import EmailMultiAlternatives
 
 from config.logging_utils import setup_logger
 from leads.models import Lead
-from leads.services import parse_notify_emails, render_lead_notification
+from leads.services import render_lead_notification, resolve_lead_notify_recipients
 
 logger = setup_logger("hoocon.leads")
 
@@ -35,14 +35,14 @@ def send_lead_notification(self: object, lead_id: int) -> None:
         Retries up to 3 times with 60s backoff on transient SMTP errors.
     """
     try:
-        lead = Lead.objects.select_related("sku").get(pk=lead_id)
+        lead = Lead.objects.select_related("sku", "assignee").get(pk=lead_id)
     except Lead.DoesNotExist:
         logger.warning("Lead not found: lead_id=%s (skipping notification)", lead_id)
         return
 
-    recipients = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+    recipients = resolve_lead_notify_recipients(lead)
     if not recipients:
-        logger.warning("LEAD_NOTIFY_EMAIL not set; skipping lead_id=%s", lead_id)
+        logger.warning("No lead notify recipients; skipping lead_id=%s", lead_id)
         return
 
     subject, text_body, html_body = render_lead_notification(lead)

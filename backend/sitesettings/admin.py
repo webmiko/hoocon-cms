@@ -82,6 +82,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
     )
     list_display_links = ("__str__",)
     readonly_fields = (
+        "lead_rr_last_user",
         "telegram_token_status",
         "vk_token_status",
         "max_token_status",
@@ -92,6 +93,17 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Каталог",
             {"fields": ("show_prices_on_site",)},
+        ),
+        (
+            "Заявки с сайта",
+            {
+                "fields": ("lead_routing_mode", "lead_rr_last_user"),
+                "description": (
+                    "Куда слать уведомление о новой заявке и назначать ли "
+                    "ответственного менеджера (группа «Менеджер»). Письмо "
+                    "менеджеру уходит на адрес из профиля пользователя."
+                ),
+            },
         ),
         (
             "Счётчики аналитики",
