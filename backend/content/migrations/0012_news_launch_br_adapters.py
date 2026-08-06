@@ -9,7 +9,7 @@ from django.db import migrations
 from django.utils import timezone
 
 _NEWS_SLUG = "launch-br-adapters"
-_NEWS_TITLE = "Анонс: адаптеры BR-M и BR-ML для шаровых кранов"
+_NEWS_TITLE = "В каталоге: адаптеры BR-M и BR-ML для шаровых кранов"
 _COVER_SKU = "BR-M"
 _PHONE = "8 800 350-58-98"
 

@@ -566,7 +566,7 @@ NEWS_H8205_BODY = f"""
 """.strip()
 
 _NEWS_BR_SLUG = "launch-br-adapters"
-_NEWS_BR_TITLE = "Анонс: адаптеры BR-M и BR-ML для шаровых кранов"
+_NEWS_BR_TITLE = "В каталоге: адаптеры BR-M и BR-ML для шаровых кранов"
 _NEWS_BR_COVER_SKU = "BR-M"
 
 NEWS_BR_BODY = f"""
