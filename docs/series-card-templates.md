@@ -392,7 +392,7 @@ dn, ways, **kvs**, material, thread, габариты, **compatible-actuators**,
 | SKU | Карточка (коротко) | Product / SKU slug |
 |-----|-------------------|--------------------|
 | **BR-M** | `DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)` | `adapter-br-m` |
-| **BR-ML** | `DA3FU, DA5FU (24/230 В)` | `adapter-br-ml` |
+| **BR-ML** | `DA5FU (24/230 В)` | `adapter-br-ml` |
 
 Подробный перечень семейств и исполнений (−D/−DS/−A/−AS) — в описании PDP.
 На части DN в 8100 только MU/MQU → в комплекте только BR-M.

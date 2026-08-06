@@ -76,7 +76,7 @@ class BrAdapterSpec:
 # Short attr for catalog card / facet; detail stays in description.
 # Families for linking: catalog.compatible_positions.
 _BR_M_ACTUATORS: Final[str] = "DA4MU…DA16MU, DA8MQU…DA16MQU (24/230 В)"
-_BR_ML_ACTUATORS: Final[str] = "DA3FU, DA5FU (24/230 В)"
+_BR_ML_ACTUATORS: Final[str] = "DA5FU (24/230 В)"
 
 _ADAPTERS: Final[tuple[BrAdapterSpec, ...]] = (
     BrAdapterSpec(
@@ -106,7 +106,7 @@ _ADAPTERS: Final[tuple[BrAdapterSpec, ...]] = (
 Совместимость по каталогу шаровых 8100 (не вся серия DA):
 – DA4MU, DA6MU, DA8MU, DA8MQU, DA16MU, DA16MQU — 24 В и 230 В;
 – исполнения −D / −DS / −A / −AS.
-Не подходит для DA…FU (нужен BR-ML). Конкретный момент и напряжение
+Не подходит для DA5FU (нужен BR-ML). Конкретный момент и напряжение
 на DN — в карточке крана («совместимый привод»).
 """.strip(),
         ),
@@ -118,7 +118,7 @@ _ADAPTERS: Final[tuple[BrAdapterSpec, ...]] = (
         name="BR-ML | Адаптер под привод с возвратной пружиной",
         drive_kind="с возвратной пружиной (FU)",
         compatible_actuators=_BR_ML_ACTUATORS,
-        partner_indexes="DA3FU24, DA3FU230, DA5FU24, DA5FU230",
+        partner_indexes="DA5FU24, DA5FU230",
         asset_stem="br-ml",
         partner_url=(
             "https://hoocon.spb.ru/production/catalog/adaptery-bv-br/"
@@ -131,13 +131,13 @@ _ADAPTERS: Final[tuple[BrAdapterSpec, ...]] = (
 (8100 / 8100Q-BV…).
 
 Назначение:
-– Соединяет привод DA…FU с корпусом латунного крана 8100.
-– В RFQ выбирается автоматически для серий DA…FU
+– Соединяет привод DA5FU с корпусом латунного крана 8100.
+– В RFQ выбирается автоматически для серии DA5FU
   (см. комплектацию шаровых кранов).
 
 Совместимость по каталогу шаровых 8100 (не вся серия DA):
-– DA3FU24 и DA3FU230 (−D / −DS);
-– DA5FU24 и DA5FU230 (−D / −DS / −A / −AS).
+– только DA5FU24 и DA5FU230;
+– исполнения −D / −DS / −A / −AS.
 Не подходит для DA…MU / DA…MQU (нужен BR-M). На части DN в 8100
 перечислены только MU/MQU — там BR-ML в комплекте не используется.
 """.strip(),

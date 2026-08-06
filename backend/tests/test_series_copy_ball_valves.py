@@ -136,12 +136,13 @@ def test_diff_pressure_mpa_defaults_only_when_blank() -> None:
 
 
 def test_format_compatible_actuators_bracket_only_with_fu() -> None:
-    """Drives and bracket are separate; BR-ML only when DA…FU is listed."""
+    """Drives and bracket are separate; BR-ML only when DA5FU is listed."""
     drives = format_compatible_actuators(("DA5FU24", "DA6MU24"))
     assert "DA5FU24" in drives
     assert "BR-M" not in drives
-    assert format_bracket(("DA5FU24", "DA6MU24")) == ("BR-M / BR-ML (для DA…FU)")
+    assert format_bracket(("DA5FU24", "DA6MU24")) == ("BR-M / BR-ML (для DA5FU)")
     assert format_bracket(("DA6MU24", "DA8MQU24")) == "BR-M"
+    assert format_bracket(("DA3FU24", "DA6MU24")) == "BR-M"
 
 
 @requires_store_csv
@@ -166,7 +167,7 @@ def test_load_ball_valve_series_from_csv() -> None:
     assert "DA6MU24" in bv220.drive_series
     assert "DA5FU24" in bv220.drive_series
     assert "DA8MQU24" in bv220.drive_series
-    assert bv220.bracket == "BR-M / BR-ML (для DA…FU)"
+    assert bv220.bracket == "BR-M / BR-ML (для DA5FU)"
     assert len(bv220.gallery_urls) == 3
 
     bv315 = by_code["BV315"]
@@ -260,7 +261,7 @@ def test_apply_bv220_enrichment_cards_and_gallery() -> None:
     assert "DA6MU24" in by_slug["compatible-actuators"]
     assert "DA5FU24" in by_slug["compatible-actuators"]
     assert "BR-ML" not in by_slug["compatible-actuators"]
-    assert by_slug["bracket"] == "BR-M / BR-ML (для DA…FU)"
+    assert by_slug["bracket"] == "BR-M / BR-ML (для DA5FU)"
     assert ProductImage.objects.filter(sku=sku_a).count() == 3
     product.refresh_from_db()
     assert (product.instructions or "").strip() == ""

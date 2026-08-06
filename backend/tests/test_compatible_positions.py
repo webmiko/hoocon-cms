@@ -17,8 +17,8 @@ def test_bracket_uses_adapter_substring_safe() -> None:
     assert bracket_uses_adapter("BR-ML", "BR-ML") is True
     assert bracket_uses_adapter("BR-ML", "BR-M") is False
     assert bracket_uses_adapter("BR-M", "BR-M") is True
-    assert bracket_uses_adapter("BR-M / BR-ML (для DA…FU)", "BR-M") is True
-    assert bracket_uses_adapter("BR-M / BR-ML (для DA…FU)", "BR-ML") is True
+    assert bracket_uses_adapter("BR-M / BR-ML (для DA5FU)", "BR-M") is True
+    assert bracket_uses_adapter("BR-M / BR-ML (для DA5FU)", "BR-ML") is True
 
 
 def _make_category(slug: str, name: str) -> Category:
@@ -94,7 +94,7 @@ def test_compatible_positions_adapter_br_m_drives_and_valves() -> None:
         valve_both,
         slug="bracket",
         name="Кронштейн",
-        value="BR-M / BR-ML (для DA…FU)",
+        value="BR-M / BR-ML (для DA5FU)",
     )
     valve_m_only = _make_sku(
         category=valves,
@@ -160,7 +160,7 @@ def test_compatible_positions_adapter_br_ml_only_fu_and_ml_valves() -> None:
         valve_both,
         slug="bracket",
         name="Кронштейн",
-        value="BR-M / BR-ML (для DA…FU)",
+        value="BR-M / BR-ML (для DA5FU)",
     )
     valve_m_only = _make_sku(
         category=valves,
@@ -178,7 +178,7 @@ def test_compatible_positions_adapter_br_ml_only_fu_and_ml_valves() -> None:
     rows = compatible_positions_for_sku(br_ml)
     drive_codes = {r["sku_code"] for r in rows if r["role"] == "drive"}
     valve_codes = {r["sku_code"] for r in rows if r["role"] == "valve"}
-    assert drive_codes == {"DA3FU24-DS", "DA5FU24-D"}
+    assert drive_codes == {"DA5FU24-D"}
     assert valve_codes == {"8100-BV220A"}
 
 
@@ -208,7 +208,7 @@ def test_compatible_positions_valve_lists_brackets() -> None:
         valve,
         slug="bracket",
         name="Кронштейн",
-        value="BR-M / BR-ML (для DA…FU)",
+        value="BR-M / BR-ML (для DA5FU)",
     )
 
     rows = compatible_positions_for_sku(valve)
