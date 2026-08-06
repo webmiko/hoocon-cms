@@ -53,9 +53,9 @@ class StaffUserCreationForm(AdminUserCreationForm):
             self.fields.pop("usable_password", None)
         elif "usable_password" in self.fields:
             self.fields["usable_password"].label = "Вход по постоянному паролю"
-            self.fields["usable_password"].help_text = (
-                "Если выкл. — пароль не задаётся (удобно, когда вход только по одноразовому коду на почту)."
-            )
+            self.fields[
+                "usable_password"
+            ].help_text = "Если выкл. — пароль не задаётся (удобно, когда вход только по одноразовому коду на почту)."
             self.fields["usable_password"].choices = [
                 ("true", "Задать пароль"),
                 ("false", "Без пароля (код на почту)"),
@@ -120,7 +120,9 @@ class StaffUserChangeForm(UserChangeForm):
         self.fields["email"].required = True
         self.fields["email"].label = "Логин (эл. почта)"
         self.fields["email"].widget = UnfoldAdminEmailInputWidget()
-        self.fields["email"].help_text = (
+        self.fields[
+            "email"
+        ].help_text = (
             "Совпадает с логином. Вход в админку — одноразовый код на эту почту; сюда же уходят письма о заявках."
         )
         self.fields["first_name"].required = True
@@ -130,9 +132,9 @@ class StaffUserChangeForm(UserChangeForm):
         if "username" in self.fields:
             self.fields["username"].help_text = "Служебное поле: при сохранении подставляется из почты."
         if "password" in self.fields and admin_email_otp_enabled():
-            self.fields["password"].help_text = (
-                "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
-            )
+            self.fields[
+                "password"
+            ].help_text = "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
 
     def clean_email(self) -> str:
         """Normalize email; unique among other users."""
