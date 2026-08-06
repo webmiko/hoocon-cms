@@ -5,47 +5,41 @@ Source of truth for manuals: repo symlink ``_инструкции-pdf``
 subfolders ``RU/`` (translated) and ``EN/`` (still English). Discovery
 scans both (RU first) plus any leftover flat files in the root.
 
-Filename conventions (DAFU)::
+Filename conventions (DAFU, RU preferred UPPER)::
 
-    da5fu-d:ds.pdf      → DA5FU …-D / …-DS (24 В and 230 В)
-    da5fu24-a:as.pdf    → DA5FU24-A / DA5FU24-AS
+    DA5FU-D_DS.pdf / da5fu-d:ds.pdf   → DA5FU …-D / …-DS (24 В and 230 В)
+    DA5FU24-A_AS.pdf / da5fu24-a:as.pdf → DA5FU24-A / DA5FU24-AS
 
 SAFU (fire/smoke)::
 
-    sa3fu-ds_dst.pdf                         → SA3FU …-DS / …-DST
-    SA3FU-DS_DST — руководство (RU).pdf      → same (RU preferred over EN)
+    SA3FU-DS_DST.pdf / sa3fu-ds_dst.pdf → SA3FU …-DS / …-DST
 
-DAMU / DAMQU (no spring, English manuals)::
+DAMU / DAMQU (no spring)::
 
-    da2mu-a_as.pdf                 → DA2MU …-A / …-AS (24 В and 230 В)
-    da2mu-d_ds.pdf                 → DA2MU …-D / …-DS
-    da4_6mu-a_as.pdf               → DA4MU + DA6MU …-A / …-AS
-    da8_16_24_32mu24-d_ds.pdf      → DA8/16/24/32MU24 …-D / …-DS
-    da8_16_24mqu230-a_as.pdf       → DA8MQU230 …-A / …-AS (…16/24 if present)
+    DA2MU-A_AS.pdf / da2mu-a_as.pdf           → DA2MU …-A / …-AS
+    DA4_6MU-D_DS.pdf / da4_6mu-d_ds.pdf       → DA4MU + DA6MU …-D / …-DS
+    da8_16_24_32mu24-d_ds.pdf                 → DA8/16/24/32MU24 …-D / …-DS
+    DA5MQU-A_AS.pdf / da5mqu-a_as.pdf         → DA5MQU …-A / …-AS
 
 SAMU (smoke, no spring)::
 
-    sa10mu-ds_dst.pdf                        → SA10MU …-DS / …-DST (EN)
-    SA10MU-DS — руководство (RU).pdf         → SA10MU …-DS only (RU preferred)
+    SA10MU-DS.pdf / sa10mu-ds_dst.pdf         → SA10MU …-DS
 
 HVD fire/smoke F-series (spring return; not air HVD-5)::
 
-    hvd-3f-s_st.pdf                → HVD24/230 S/ST-3F
-    hvd-5f-s_st.pdf                → HVD24/230 S/ST-5F
+    HVD-3F-S_ST.pdf / hvd-3f-s_st.pdf         → HVD24/230 S/ST-3F
 
-HVA modulating air (no spring; ASCII stems after rename)::
+HVA modulating air (no spring; ASCII stems)::
 
-    hva-5.pdf / HVA-5 instruction.pdf → HVA24/230[S]-5
-    hva-5q.pdf                        → HVA24/230[S]-5Q
-    hva-10.pdf / hva-10q.pdf / …      → matching HVA* codes when present
-    hva-5uq.pdf                       → special (warn if no SKU)
+    HVA-5.pdf / hva-5.pdf                     → HVA24/230[S]-5
+    HVA-5Q.pdf / hva-5q.pdf                   → HVA24/230[S]-5Q
     # hva-*p.pdf — Chinese spring HVA-P; out of RF catalog (skip)
 
 BR adapters (RU tech sheets; Cyrillic basenames, NFC-normalized)::
 
     Техничка на кронштейн.pdf      → BR-M + BR-ML
-    техничка штока BR-M.pdf        → BR-M
-    техничка штока BR-ML.pdf       → BR-ML
+    Техничка штока BR-M.pdf        → BR-M
+    Техничка штока BR-ML.pdf       → BR-ML
 """
 
 from __future__ import annotations
@@ -199,6 +193,8 @@ def find_manual_file(manuals_dir: Path, filename: str) -> Path | None:
     Args:
         manuals_dir: ``_инструкции-pdf`` root.
         filename: Exact basename (e.g. ``шаровые краны серии 8100.pdf``).
+            Lookup is case-insensitive so ``da5fu-d_ds.pdf`` finds
+            ``DA5FU-D_DS.pdf`` on case-sensitive volumes.
 
     Returns:
         First existing file (RU preferred), or None.
@@ -206,10 +202,15 @@ def find_manual_file(manuals_dir: Path, filename: str) -> Path | None:
     if not filename or not manuals_dir.is_dir():
         return None
     name = Path(filename).name
+    want = name.casefold()
     for directory in _manual_search_dirs(manuals_dir):
-        candidate = directory / name
-        if candidate.is_file():
-            return candidate
+        if not directory.is_dir():
+            continue
+        # Prefer iterdir so the returned Path keeps on-disk casing
+        # (case-insensitive volumes accept ``da5fu…`` for ``DA5FU…``).
+        for path in directory.iterdir():
+            if path.is_file() and path.name.casefold() == want:
+                return path
     return None
 
 
