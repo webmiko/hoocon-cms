@@ -1,0 +1,32 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block title %}Резервные коды | {{ site_title }}{% endblock %}
+
+{% block content %}
+  <div class="max-w-2xl">
+    <h1 class="text-xl font-semibold mb-4">Резервные коды супер-админа</h1>
+    <p class="mb-4 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+      Сохраните коды офлайн (менеджер паролей или бумажный сейф). Каждый код
+      одноразовый. Показаны <strong>только сейчас</strong> — повторно их увидеть нельзя.
+      Предыдущие неиспользованные коды этого пользователя аннулированы.
+    </p>
+    <p class="mb-2 text-sm">Пользователь: <strong>{{ target_user.email }}</strong></p>
+    <ul class="font-mono text-lg tracking-wider my-6 space-y-2 select-all">
+      {% for code in recovery_codes %}
+        <li class="border border-base-200 dark:border-base-700 rounded-default px-4 py-2 bg-white dark:bg-base-900">
+          {{ code }}
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="mb-6 text-sm text-amber-700 dark:text-amber-400">
+      Закройте эту страницу после сохранения. Коды больше не будут показаны.
+    </p>
+    <a
+      href="{{ back_url }}"
+      class="inline-flex items-center justify-center px-4 py-2 rounded-default bg-primary-600 text-white text-sm font-medium"
+    >
+      Вернуться к пользователю
+    </a>
+  </div>
+{% endblock %}

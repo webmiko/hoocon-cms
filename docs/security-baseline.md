@@ -1,6 +1,6 @@
 # Security baseline: Hoocon CMS (secure by default)
 
-Дата: 2026-07-19 (обновлено 2026-07-26: антиспам без сторонней CAPTCHA)  
+Дата: 2026-07-19 (обновлено 2026-08-07: break-glass супер-админа при Email OTP)  
 Опора: внутренняя база знаний (безопасность кода, OWASP Top 10:2025,
 Django/DRF, Frontend SPA, инфра TLS/Docker) и стандарты разработки §0 / §4.
 
@@ -90,6 +90,13 @@ Admin, файлы, SPA, VPS.
   `ADMIN_EMAIL_OTP_ALLOWED_EMAILS`; progressive delay на неверный код;
   rate limit запросов кода по IP (+ django-axes). При `false` —
   классический пароль (локалка/CI/авария).
+  **Break-glass супер-админа** (только `is_superuser`, при OTP on):
+  (1) постоянный пароль — `/admin/login/?mode=password`;
+  (2) заранее сгенерированные одноразовые коды `XXXX-XXXX`
+  (`accounts.SuperuserRecoveryCode`, hash в БД; plaintext один раз в
+  Admin) — `/admin/login/?mode=recovery` или то же поле на `/admin/otp/`.
+  При сбое SMTP для супер-админа сессия verify всё равно открывается
+  под резервный код. Обычный staff — только email OTP.
 
 ### 3.3 Файлы и ETL
 

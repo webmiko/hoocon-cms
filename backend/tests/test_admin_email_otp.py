@@ -192,8 +192,11 @@ def test_otp_delivery_failure_shows_error() -> None:
             "/admin/login/",
             {"username": admin_user.username, "next": "/admin/"},
         )
-    assert response.status_code == 200
-    assert client.session.get("admin_otp_user_id") is None
+    # Superuser break-glass: still open verify session for recovery code.
+    assert response.status_code == 302
+    assert response["Location"].endswith("/admin/otp/")
+    assert client.session.get("admin_otp_user_id") == admin_user.pk
+    assert client.session.get("admin_otp_email_failed") is True
     assert len(mail.outbox) == 0
 
 

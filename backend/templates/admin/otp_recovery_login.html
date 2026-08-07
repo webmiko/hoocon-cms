@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block content %}
-  {% include "unfold/helpers/unauthenticated_title.html" with title="HOOCON CMS" subtitle=_("С возвращением в") %}
+  {% include "unfold/helpers/unauthenticated_title.html" with title="HOOCON CMS" subtitle=_("Аварийный вход") %}
 
   {% include "unfold/helpers/messages.html" %}
 
@@ -24,30 +24,29 @@
   {% endif %}
 
   <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark">
-    Введите логин или email — одноразовый код придёт на почту аккаунта.
+    Введите логин и один сохранённый резервный код супер-админа (формат XXXX-XXXX).
+    Код сгорает после успешного входа.
   </p>
 
   <form action="{{ app_path }}" method="post" id="login-form">
     {% csrf_token %}
+    <input type="hidden" name="mode" value="recovery">
     {% if next %}
       <input type="hidden" name="next" value="{{ next }}">
     {% endif %}
     {% include "unfold/helpers/field.html" with field=form.username %}
+    {% include "unfold/helpers/field.html" with field=form.recovery_code %}
 
     <div class="flex flex-col gap-3 mt-6">
       {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
-        Получить код
-        <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">
-          arrow_forward
-        </span>
+        Войти
       {% endcomponent %}
     </div>
   </form>
 
   <p class="mt-8 text-sm text-font-subtle-light dark:text-font-subtle-dark">
-    Супер-админ, если письмо не доходит:
-    <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">войти паролем</a>
-    или
-    <a href="{{ recovery_login_url }}" class="text-primary-600 underline dark:text-primary-400">резервным кодом</a>.
+    <a href="{{ otp_login_url }}" class="text-primary-600 underline dark:text-primary-400">Код на почту</a>
+    ·
+    <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">Пароль</a>
   </p>
 {% endblock %}
