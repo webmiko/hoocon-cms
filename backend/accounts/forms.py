@@ -141,9 +141,9 @@ class StaffUserChangeForm(UserChangeForm):
                     "(ссылка «войти паролем» на экране входа)."
                 )
             else:
-                self.fields["password"].help_text = (
-                    "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
-                )
+                self.fields[
+                    "password"
+                ].help_text = "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
 
     def clean_email(self) -> str:
         """Normalize email; unique among other users."""
