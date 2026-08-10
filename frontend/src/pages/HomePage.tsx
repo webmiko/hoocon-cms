@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DeferredMount } from "../components/DeferredMount";
@@ -7,6 +7,10 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
+import {
+  adoptHomeSsrLcpImage,
+  homeSsrLcpBootPresent,
+} from "../utils/adoptHomeSsrLcpImage";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./HomePage.module.css";
 
@@ -515,6 +519,9 @@ export function HomePage() {
   const [loadedHeroSlides, setLoadedHeroSlides] = useState<ReadonlySet<number>>(
     () => new Set([0]),
   );
+  /** Full-page boot: adopt the same ``<img>`` node so mobile LCP is not reset. */
+  const [useSsrBoot] = useState(() => homeSsrLcpBootPresent());
+  const lcpHostRef = useRef<HTMLLIElement>(null);
 
   // Adjust loaded set during render (same pattern as Layout menuRoute).
   if (!loadedHeroSlides.has(heroSlide)) {
@@ -522,6 +529,14 @@ export function HomePage() {
     next.add(heroSlide);
     setLoadedHeroSlides(next);
   }
+
+  useLayoutEffect(() => {
+    const host = lcpHostRef.current;
+    if (!host || !useSsrBoot) {
+      return;
+    }
+    adoptHomeSsrLcpImage(host, styles.heroSlideImg);
+  }, [useSsrBoot]);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -554,24 +569,29 @@ export function HomePage() {
             {HOME_PROJECTS.map((project, index) => (
               <li
                 key={project.name}
+                ref={index === 0 ? lcpHostRef : undefined}
                 className={
                   index === heroSlide
                     ? `${styles.heroSlide} ${styles.heroSlideActive}`
                     : styles.heroSlide
                 }
               >
-                {loadedHeroSlides.has(index) ? (
-                  <img
-                    className={styles.heroSlideImg}
-                    src={project.image}
-                    alt=""
-                    width={project.width}
-                    height={project.height}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    decoding="async"
-                    fetchPriority={index === 0 ? "high" : "auto"}
-                  />
-                ) : null}
+                {index === 0 && useSsrBoot
+                  ? null
+                  : loadedHeroSlides.has(index)
+                    ? (
+                      <img
+                        className={styles.heroSlideImg}
+                        src={project.image}
+                        alt=""
+                        width={project.width}
+                        height={project.height}
+                        loading={index === 0 ? "eager" : "lazy"}
+                        decoding={index === 0 ? "sync" : "async"}
+                        fetchPriority={index === 0 ? "high" : "auto"}
+                      />
+                    )
+                    : null}
               </li>
             ))}
           </ul>

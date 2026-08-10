@@ -40,9 +40,13 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert 'id="hoocon-ssr-hero"' in body
     assert 'id="hoocon-lcp-boot"' in body
     assert f'src="{HOME_LCP_IMAGE}"' in body
+    assert 'decoding="sync"' in body
     assert f'<h1 class="hoocon-ssr-hero__title">{HOME_SSR_H1}</h1>' in body
     assert "hoocon-ssr-hero-css" in body
     assert "Смотреть каталог" in body
+    # Outside ``#root`` so createRoot does not wipe the LCP img.
+    assert body.index('id="hoocon-ssr-hero"') < body.index('id="root"')
+    assert '<div id="root"></div>' in body
 
 
 @pytest.mark.django_db
