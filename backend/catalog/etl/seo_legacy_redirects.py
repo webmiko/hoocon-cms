@@ -19,7 +19,7 @@ from pathlib import Path
 from django.db.models import Prefetch
 
 from catalog.etl.normalize import PRODUCT_SLUG_REMAP
-from catalog.models import Product, SKU
+from catalog.models import SKU, Product
 from catalog.series_categories import legacy_slug_aliases
 from catalog.urls_paths import catalog_path_for_sku
 from redirects.models import Redirect
