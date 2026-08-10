@@ -119,6 +119,8 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
     assert "--hoocon-primary: #dc1313" in css
     assert "--hoocon-primary-hover: #b01010" in css
+    assert "--hoocon-primary-on-dark: #f87171" in css
+    assert ".dark .hoocon-dash__panel-head a" in css
     assert ".hoocon-admin-lead-sticker" in css
     assert "hoocon-admin-lead-sticker__count" in css
     assert ".hoocon-lead-status--new" in css
@@ -130,6 +132,8 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert ".hoocon-nav-shell" in css
     assert ".hoocon-admin-header" in css
     assert ".hoocon-all-apps-panel" in css
+    assert ".hoocon-all-apps-flyout" in css
+    assert "z-index: 80" in css
     assert "min(28rem" in css
     assert ".hoocon-integrations" in css
     assert ".hoocon-integrations__actions" in css

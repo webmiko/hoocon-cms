@@ -26,6 +26,8 @@
   --hoocon-glass-border: rgba(255, 255, 255, 0.12);
   --hoocon-quiet: #a3a3a3;
   --hoocon-hairline: rgba(255, 255, 255, 0.1);
+  /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1 */
+  --hoocon-primary-on-dark: #f87171;
 }
 
 .hoocon-admin-lead-sticker {
@@ -625,6 +627,36 @@ a.hoocon-leads-stats-link {
   text-decoration: none;
 }
 
+.dark .hoocon-dash__panel-head a,
+.dark .hoocon-dash__alert-link {
+  color: var(--hoocon-primary-on-dark);
+}
+
+.dark .hoocon-dash__quick a:hover,
+.dark .hoocon-dash__cards .hoocon-lead-stats__value a:hover,
+.dark .hoocon-admin-lead-sticker:hover {
+  color: var(--hoocon-primary-on-dark) !important;
+}
+
+/*
+ * Unfold Tailwind primary-* as text on dark backgrounds.
+ * primary-500/600 (#dc1313 / #b01010) fail AA normal text on #171717.
+ */
+.dark .text-primary-500,
+.dark .text-primary-600,
+.dark .hover\:text-primary-500:hover,
+.dark .hover\:text-primary-600:hover,
+.dark .group-hover\:text-primary-500,
+.dark .group-hover\:text-primary-600,
+.dark .group:hover .group-hover\:text-primary-500,
+.dark .group:hover .group-hover\:text-primary-600,
+.dark .dark\:text-primary-500,
+.dark .dark\:hover\:text-primary-500:hover,
+.dark .dark\:group-hover\:text-primary-500,
+.dark .group:hover .dark\:group-hover\:text-primary-500 {
+  color: var(--hoocon-primary-on-dark) !important;
+}
+
 .hoocon-dash__feed {
   list-style: none;
   margin: 0;
@@ -880,7 +912,14 @@ kbd.hoocon-sidebar-shortcut > span {
   }
 }
 
-/* All applications flyout: wider than Unfold w-80 so RU labels fit; wrap, don’t truncate. */
+/* All applications flyout: wider than Unfold w-80 so RU labels fit; wrap, don’t truncate.
+ * z-index must live here — Unfold’s built CSS has no Tailwind z-[80] utility, so the
+ * class alone left z-index:auto and the panel painted under peek sidebar / user block.
+ */
+.hoocon-all-apps-flyout {
+  z-index: 80;
+}
+
 .hoocon-all-apps-panel {
   box-sizing: border-box;
   width: min(28rem, calc(100vw - 4.5rem));
