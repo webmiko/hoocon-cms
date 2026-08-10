@@ -122,3 +122,21 @@ def test_csp_disabled_in_debug() -> None:
         client = Client()
         response = client.get("/api/health/")
         assert "Content-Security-Policy-Report-Only" in response.headers
+
+
+@pytest.mark.django_db
+def test_csp_admin_allows_unsafe_eval_for_alpine() -> None:
+    """Admin CSP allows unsafe-eval so Unfold Alpine x-data can run."""
+    client = Client()
+    response = client.get("/admin/login/")
+    csp = _csp_value(response)
+    assert "'unsafe-eval'" in csp
+    assert "script-src" in csp
+
+
+@pytest.mark.django_db
+def test_csp_public_html_forbids_unsafe_eval() -> None:
+    """Public SPA CSP stays without unsafe-eval."""
+    client = Client()
+    response = client.get("/")
+    assert "'unsafe-eval'" not in _csp_value(response)
