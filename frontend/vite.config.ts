@@ -62,7 +62,17 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,jpg,jpeg,webp}"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/media\//],
+        // Keep Django SEO/LLM text endpoints out of the SPA shell fallback.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/admin\//,
+          /^\/media\//,
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/,
+          /^\/llms\.txt$/,
+          /^\/llm\.txt$/,
+          /^\/llms-full\.txt$/,
+        ],
       },
       // Dev SW intercepts ``/src/*.tsx`` and yields a blank #root — keep PWA prod-only.
       devOptions: {
