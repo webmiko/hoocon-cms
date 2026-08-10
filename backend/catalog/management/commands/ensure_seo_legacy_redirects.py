@@ -45,9 +45,7 @@ class Command(BaseCommand):
             action="store_true",
             help="Write deploy/nginx/redirects.map after upserts.",
         )
-        default_out = (
-            Path(__file__).resolve().parents[4] / "deploy" / "nginx" / "redirects.map"
-        )
+        default_out = Path(__file__).resolve().parents[4] / "deploy" / "nginx" / "redirects.map"
         parser.add_argument(
             "--output",
             type=str,
