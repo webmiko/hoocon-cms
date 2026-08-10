@@ -131,6 +131,7 @@ def test_nginx_conf_enables_https_apex() -> None:
     """TLS cutover: LE paths, :443 for apex, HTTP→HTTPS and www→apex."""
     content = NGINX_CONF.read_text(encoding="utf-8")
     assert "listen 443 ssl" in content
+    assert "http2 on" in content
     assert "/etc/letsencrypt/live/hoocon.ru/fullchain.pem" in content
     assert "return 301 https://hoocon.ru$request_uri" in content
     assert "include /etc/nginx/hoocon-site.inc" in content
