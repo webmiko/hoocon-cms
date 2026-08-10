@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Сгенерировать резервные коды | {{ site_title }}{% endblock %}
+
+{% block content %}
+  <div class="max-w-xl">
+    <h1 class="text-xl font-semibold mb-4">Сгенерировать резервные коды</h1>
+    <p class="mb-4 text-sm">
+      Пользователь: <strong>{{ target_user.email }}</strong><br>
+      Сейчас неиспользованных: <strong>{{ unused_count }}</strong>
+    </p>
+    <p class="mb-6 text-sm text-amber-700 dark:text-amber-400">
+      Будет создано 10 новых кодов. Все старые (в том числе неиспользованные)
+      будут удалены. Текст кодов покажется один раз — сохраните офлайн.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <button
+        type="submit"
+        class="inline-flex items-center justify-center px-4 py-2 rounded-default bg-primary-600 text-white text-sm font-medium"
+      >
+        Сгенерировать
+      </button>
+      <a href="{{ back_url }}" class="ml-4 text-sm underline">Отмена</a>
+    </form>
+  </div>
+{% endblock %}

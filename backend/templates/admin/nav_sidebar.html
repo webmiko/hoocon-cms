@@ -23,7 +23,9 @@
             if (this.isDesktopNav()) this.sidebarPeek = true;
         },
         endPeek() {
-            this.sidebarPeek = false;
+            // Keep peek while «Все приложения» is open so the flyout left
+            // (panelWidth) does not collapse under the expanded sidebar.
+            if (!this.openAllApplications) this.sidebarPeek = false;
         },
     }"
 >

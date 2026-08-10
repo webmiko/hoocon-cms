@@ -132,9 +132,18 @@ class StaffUserChangeForm(UserChangeForm):
         if "username" in self.fields:
             self.fields["username"].help_text = "Служебное поле: при сохранении подставляется из почты."
         if "password" in self.fields and admin_email_otp_enabled():
-            self.fields[
-                "password"
-            ].help_text = "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
+            instance = getattr(self, "instance", None)
+            if instance is not None and getattr(instance, "is_superuser", False):
+                self.fields["password"].help_text = (
+                    "Обычный вход — одноразовый код на почту. "
+                    "Постоянный пароль — аварийный вход супер-админа, "
+                    "если письмо с кодом не доходит "
+                    "(ссылка «войти паролем» на экране входа)."
+                )
+            else:
+                self.fields[
+                    "password"
+                ].help_text = "Вход в админку — одноразовым кодом на почту. Постоянный пароль обычно не нужен."
 
     def clean_email(self) -> str:
         """Normalize email; unique among other users."""

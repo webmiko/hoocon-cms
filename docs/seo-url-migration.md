@@ -92,6 +92,17 @@ privod-vozdushniy-pruzhina-dafu-20nm
 **301 с опечаток:** [redirects-slug-typo-seed.csv](redirects-slug-typo-seed.csv)
 (`import_redirects` + `RedirectMiddleware` + nginx map).
 
+**Пересборка целей после смены category/SKU slug:**
+
+```bash
+cd backend
+poetry run python manage.py ensure_seo_legacy_redirects --export-nginx
+```
+
+Пишет 301: `/{product}`, `/{sku}`, `/tproduct/…`, `/catalog/tproduct/…`,
+старые `/catalog/{tilda-cat}/{product}`, `/statyi/tpost/…`, `/sale`,
+`/sitemap`, лендинг заслонок; также `apply_*_slug_renames` (статьи/новости).
+
 ### 2.2 `sitemap-store.xml` — Tilda Store (нужны 301)
 
 **Шаблон ЧПУ шаровых кранов (утверждено 2026-07-19):**
@@ -116,7 +127,9 @@ privod-vozdushniy-pruzhina-dafu-20nm
 | `/tproduct/…-da8mqu-…` | `/privod-vozdushniy-da8mqu-8nm` |
 
 На cutover перепроверить sitemap-store и дописать новые строки в CSV
-→ загрузка в `Redirect`.
+→ `manage.py ensure_seo_legacy_redirects` (обновляет `to_path` на живой
+nested SKU + `/catalog/tproduct/…`) → `export_nginx_redirects` / флаг
+`--export-nginx`.
 
 ### 2.3 Технические / мусорные URL Tilda
 
@@ -177,6 +190,8 @@ http / www    → 301 https://hoocon.ru
 - [ ] Выгрузка актуальных sitemap.xml + sitemap-store.xml в день релиза
 - [x] CSV редиректов залит; выборочный curl ~20 URL **по IP**
   (`scripts/check-url-inventory.sh`, Host: `hoocon.ru`) — до DNS cutover
+- [x] `ensure_seo_legacy_redirects` + nginx map: flat/`tproduct`/`tpost`/static
+  → живые nested URL (инвентарь Яндекса 2026-08-10)
 - [ ] Новый `sitemap.xml` только с канонами (без `/tproduct/`) — после cutover
 - [ ] GSC / Яндекс.Вебмастер: смена sitemap, мониторинг 404
 - [ ] Метрика: цели на новых URL; сверка трафика 2–4 недели

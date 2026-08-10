@@ -3,9 +3,12 @@
 {% if sidebar_show_all_applications and app_list|length > 0 %}
     <div class="mt-auto">
         <a
-            class="cursor-pointer flex items-center h-[64px] px-6 py-3 hover:text-primary-600 dark:hover:text-primary-500"
+            class="cursor-pointer flex items-center h-[64px] px-6 py-3 hover:text-primary-600 dark:hover:text-primary-400"
             title="{% trans 'All applications' %}"
-            x-on:click="openAllApplications = !openAllApplications"
+            x-on:click="
+                openAllApplications = !openAllApplications;
+                if (openAllApplications && isDesktopNav()) sidebarPeek = true;
+            "
         >
             <span class="material-symbols-outlined md-18 mr-3 shrink-0">
                 apps
@@ -16,18 +19,15 @@
             </span>
         </a>
 
-        {# fixed: escapes #nav-sidebar overflow-x:hidden (72px rail clips absolute flyout) #}
+        {% comment %}
+        fixed flyout: CSS z-index (Unfold has no z-[80]); left=panelWidth() so peek
+        does not cover the panel; escapes #nav-sidebar overflow-x:hidden.
+        {% endcomment %}
         <div
-            class="hoocon-all-apps-flyout fixed bottom-0 top-0 z-[80] max-md:!left-0"
+            class="hoocon-all-apps-flyout fixed bottom-0 top-0 max-md:!left-0"
             x-cloak
             x-show="openAllApplications"
-            x-bind:style="{
-                left: (
-                    window.innerWidth < 1024
-                        ? 0
-                        : (document.getElementById('nav-sidebar')?.offsetWidth || 72)
-                ) + 'px'
-            }"
+            x-bind:style="{ left: (window.innerWidth < 1024 ? 0 : panelWidth()) + 'px' }"
         >
             <div class="absolute bg-base-900/20 backdrop-blur-xs bottom-0 left-0 right-0 top-0 z-10 w-screen dark:bg-base-900/80"></div>
 
@@ -47,7 +47,7 @@
                                 <li>
                                     <a
                                         href="{{ model.admin_url }}"
-                                        class="block break-words leading-snug hover:text-primary-600 dark:hover:text-primary-500"
+                                        class="block break-words leading-snug hover:text-primary-600 dark:hover:text-primary-400"
                                     >
                                         {{ model.name }}
                                     </a>
