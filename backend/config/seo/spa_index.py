@@ -93,10 +93,11 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
 
 def _home_ssr_hero_css() -> str:
     """Critical CSS for the server-rendered home hero (no React, no entry CSS)."""
+    # Fixed overlay outside ``#root`` so ``createRoot`` cannot wipe the LCP img.
     return """
-#hoocon-ssr-hero{position:relative;display:flex;flex-direction:column;justify-content:flex-end;
-min-height:min(78vh,760px);padding:72px 24px 48px;background:#101010;color:#fff;overflow:hidden;
-box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#hoocon-ssr-hero{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;
+justify-content:flex-end;min-height:100vh;padding:72px 24px 48px;background:#101010;color:#fff;
+overflow:hidden;box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #hoocon-ssr-hero .hoocon-ssr-hero__img{position:absolute;inset:0;width:100%;height:100%;
 object-fit:cover;pointer-events:none}
 #hoocon-ssr-hero .hoocon-ssr-hero__shade{position:absolute;inset:0;pointer-events:none;background:
@@ -128,7 +129,7 @@ def _home_ssr_hero_markup() -> str:
     return (
         f'<section id="hoocon-ssr-hero" aria-labelledby="hoocon-ssr-brand">'
         f'<img class="hoocon-ssr-hero__img" id="hoocon-lcp-boot" src="{img}" alt="" '
-        f'width="960" height="640" decoding="async" fetchpriority="high">'
+        f'width="960" height="640" decoding="sync" fetchpriority="high">'
         f'<div class="hoocon-ssr-hero__shade" aria-hidden="true"></div>'
         f'<div class="hoocon-ssr-hero__brand">'
         f'<p id="hoocon-ssr-brand" class="hoocon-ssr-hero__eyebrow">{brand}</p>'
@@ -147,8 +148,9 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     """Server-render home hero (image + copy) before React mounts.
 
     Not full React SSR — a static shell for ``/`` so FCP/LCP can fire from
-    HTML+critical CSS while ``vendor-react`` downloads. ``createRoot`` replaces
-    ``#root`` children on first paint (same hero URL → cached decode).
+    HTML+critical CSS while ``vendor-react`` downloads. The shell is a
+    **sibling before** ``#root`` so ``createRoot`` does not destroy the LCP
+    ``<img>``; HomePage adopts that node into the React hero on mount.
 
     Args:
         html: SPA shell HTML.
@@ -176,9 +178,10 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
         style = f'<style id="hoocon-ssr-hero-css">{_home_ssr_hero_css()}</style>'
         html = html.replace("</head>", f"    {style}\n  </head>", 1)
         boot = _home_ssr_hero_markup()
+        # Outside ``#root``: LCP img survives createRoot; React adopts it.
         html = html.replace(
             '<div id="root"></div>',
-            f'<div id="root" style="position:relative;min-height:100vh">{boot}</div>',
+            f'{boot}<div id="root"></div>',
             1,
         )
     return html
