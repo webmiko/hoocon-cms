@@ -122,14 +122,19 @@ def apply_article_slug_renames() -> list[tuple[str, str]]:
             old_article.slug = new_slug
             old_article.save(update_fields=["slug", "updated_at"])
 
-        Redirect.objects.update_or_create(
-            from_path=normalize_path(f"/statyi/{old_slug}"),
-            defaults={
-                "to_path": normalize_path(f"/statyi/{new_slug}"),
-                "status_code": Redirect.HTTP_MOVED_PERMANENTLY,
-                "is_active": True,
-            },
-        )
+        target = normalize_path(f"/statyi/{new_slug}")
+        for from_slug_path in (
+            normalize_path(f"/statyi/{old_slug}"),
+            normalize_path(f"/statyi/tpost/{old_slug}"),
+        ):
+            Redirect.objects.update_or_create(
+                from_path=from_slug_path,
+                defaults={
+                    "to_path": target,
+                    "status_code": Redirect.HTTP_MOVED_PERMANENTLY,
+                    "is_active": True,
+                },
+            )
         applied.append((old_slug, new_slug))
 
     relocate_all_article_covers()

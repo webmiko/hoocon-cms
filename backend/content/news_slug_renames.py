@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 # old slug (Tilda / scrape) → canonical public slug
 NEWS_SLUG_RENAMES: dict[str, str] = {
     "4s6cri8961-aquatherm-2025": "aquatherm-2025",
+    # Underscore breaks SSR SLUG_RE (a-z0-9- only) → hard 404 on /novosti/…
+    "mirklimata_2025": "mirklimata-2025",
 }
 
 
