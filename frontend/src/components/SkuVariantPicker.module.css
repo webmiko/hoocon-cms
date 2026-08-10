@@ -1,0 +1,43 @@
+.picker {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border, #d0d4d8) 80%, transparent);
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted, #5c6570);
+}
+
+.axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.85rem;
+}
+
+.axis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 6.5rem;
+}
+
+.axisLabel {
+  font-size: 0.75rem;
+  color: var(--color-muted, #5c6570);
+}
+
+.select {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border, #c5ccd3);
+  border-radius: 4px;
+  background: var(--color-surface, #fff);
+  color: inherit;
+  max-width: 11rem;
+}

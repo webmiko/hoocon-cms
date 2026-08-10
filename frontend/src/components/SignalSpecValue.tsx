@@ -1,0 +1,54 @@
+import { Link } from "react-router-dom";
+
+import { SoftBreakText } from "./SoftBreakText";
+
+/** FAQ section explaining current-mode special order (seed_site_content). */
+export const SIGNAL_MA_SPECIAL_ORDER_HREF = "/faq#signal-ma-special-order";
+
+const SPECIAL_ORDER_MARK = "(спецзаказ)";
+
+interface SignalSpecValueProps {
+  value: string;
+  /** When true, «спецзаказ» is a link (PDP / card footnote — not nested in <a>). */
+  linkNote?: boolean;
+  className?: string;
+}
+
+/**
+ * Render Y/U signal value; turn «(спецзаказ)» into FAQ link when allowed.
+ */
+export function SignalSpecValue({
+  value,
+  linkNote = true,
+  className,
+}: SignalSpecValueProps) {
+  const idx = value.indexOf(SPECIAL_ORDER_MARK);
+  if (idx < 0 || !linkNote) {
+    return (
+      <span className={className}>
+        <SoftBreakText text={value} />
+      </span>
+    );
+  }
+
+  const before = value.slice(0, idx);
+  const after = value.slice(idx + SPECIAL_ORDER_MARK.length);
+
+  return (
+    <span className={className}>
+      {before ? <SoftBreakText text={before} /> : null}
+      (
+      <Link
+        to={SIGNAL_MA_SPECIAL_ORDER_HREF}
+        className="signalSpecNoteLink"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
+        спецзаказ
+      </Link>
+      )
+      {after ? <SoftBreakText text={after} /> : null}
+    </span>
+  );
+}

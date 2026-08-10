@@ -1,0 +1,323 @@
+<p class="hero-dek">
+  Сводная спецификация модельного ряда HOOCON: крутящий момент, время хода, питание и
+  сигнал управления по семействам. Ниже — ориентир для подбора; точные коды и паспорта —
+  в <a href="/catalog">каталоге</a>.
+</p>
+
+<p class="dash-note">
+  Дашборд — быстрый обзор. Детали по семействам — в секциях ниже и в карточках SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Семейства (доля строк спецификации · ориентир)</p>
+    <div class="donut-wrap">
+      <div class="donut donut--platforms" title="Семейства"></div>
+      <ul class="legend">
+        <li><span class="swatch swatch--a"></span>Воздушные MU / MQU</li>
+        <li><span class="swatch swatch--b"></span>Авар. возврат EU / FU</li>
+        <li><span class="swatch swatch--c"></span>ПБ / дым SA · HV</li>
+        <li><span class="swatch swatch--d"></span>Прочие исполнения</li>
+      </ul>
+    </div>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Типовой ряд момента</p>
+    <ul class="vbar">
+      <li><span class="vbar__col vbar__col--h25"></span><span class="vbar__label">2–4<br />Нм</span></li>
+      <li><span class="vbar__col vbar__col--h45"></span><span class="vbar__label">6–8<br />Нм</span></li>
+      <li><span class="vbar__col vbar__col--h70"></span><span class="vbar__label">16<br />Нм</span></li>
+      <li><span class="vbar__col vbar__col--h95"></span><span class="vbar__label">24+<br />Нм</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Скорость хода · относительно MU</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">MU · стандарт</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--45"></span></span>
+        <span class="hbar__val">десятки с</span>
+      </li>
+      <li>
+        <span class="hbar__label">MQU · ускоренный</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--80"></span></span>
+        <span class="hbar__val">секунды</span>
+      </li>
+      <li>
+        <span class="hbar__label">HV …Q</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">2,5–7&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">Пружина FU</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--70"></span></span>
+        <span class="hbar__val">возврат &lt;&nbsp;30&nbsp;с</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Как читать линейку</h2>
+<p>
+  Шесть семейств — как в каталоге. В таблицах: крутящий момент и время хода,
+  питание 24&nbsp;В / 230&nbsp;В, управление
+  (<strong>Открыто/закрыто</strong>, <strong>2-/3-позиционное</strong> или
+  <strong>пропорциональное</strong>), шаблон артикула. Суффиксы
+  <strong>D</strong> (Открыто/закрыто), <strong>A</strong> (пропорциональное),
+  <strong>S</strong> (вспомогательный переключатель) и термодатчик
+  <strong>T</strong> — в карточке SKU. Пропорциональное (модулирующее) —
+  сигнал Y <strong>0(2)…10&nbsp;В=</strong> (0(4)…20&nbsp;мА — спецзаказ).
+</p>
+<p>
+  <strong>Fail-safe</strong> (аварийный возврат) — при пропадании питания привод
+  сам уводит заслонку в безопасное положение: <strong>FU</strong> — пружиной
+  (механический возврат), <strong>EU</strong> — электронной схемой (без пружины).
+  Без fail-safe привод остаётся в текущем положении. Кратко также в
+  <a href="/faq#fail-safe">вопросах и ответах</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table series-table--map">
+<thead>
+<tr>
+  <th>Семейство</th>
+  <th>Задача</th>
+  <th>Крутящий момент</th>
+  <th>Особенность</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>DA…MU</td>
+  <td>Воздушные заслонки</td>
+  <td>2–32&nbsp;Нм</td>
+  <td>Без пружины, стандартный ход</td>
+</tr>
+<tr>
+  <td>DA…MQU</td>
+  <td>Быстрый воздух</td>
+  <td>8–16&nbsp;Нм</td>
+  <td>Ускоренный ход (секунды)</td>
+</tr>
+<tr>
+  <td>DA…EU</td>
+  <td>Отказоустойчивые без пружины</td>
+  <td>8–24&nbsp;Нм</td>
+  <td>Электронный fail-safe</td>
+</tr>
+<tr>
+  <td>DA…FU</td>
+  <td>Воздух + пружина</td>
+  <td>3–20&nbsp;Нм</td>
+  <td>Пружинный fail-safe</td>
+</tr>
+<tr>
+  <td>SA…FU</td>
+  <td>ОЗК / дым</td>
+  <td>3–20&nbsp;Нм</td>
+  <td>Пружина; опция термодатчика&nbsp;T</td>
+</tr>
+<tr>
+  <td>SA…MU</td>
+  <td>Клапаны дымоудаления</td>
+  <td>10–30&nbsp;Нм</td>
+  <td>Без пружины, серия ПБ</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="family-block">
+<h2>Воздушные без пружинного возврата (MU)</h2>
+<p>
+  Общеобменная вентиляция и воздушные заслонки. Питание AC/DC&nbsp;24&nbsp;В или
+  AC&nbsp;100–240&nbsp;В; управление Открыто/закрыто, 2-/3-позиционное или
+  пропорциональное; вспомогательный переключатель — опция.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Время хода</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>2&nbsp;Нм</td><td>&lt;&nbsp;30&nbsp;с</td><td>DA2MU24(230)-D(A)(S)</td></tr>
+<tr><td>4&nbsp;Нм</td><td>&lt;&nbsp;50&nbsp;с</td><td>DA4MU24(230)-D(A)(S)</td></tr>
+<tr><td>6&nbsp;Нм</td><td>&lt;&nbsp;70&nbsp;с</td><td>DA6MU24(230)-D(A)(S)</td></tr>
+<tr><td>8&nbsp;Нм</td><td>&lt;&nbsp;55&nbsp;с</td><td>DA8MU24(230)-D(A)(S)</td></tr>
+<tr><td>16&nbsp;Нм</td><td>&lt;&nbsp;100&nbsp;с</td><td>DA16MU24(230)-D(A)(S)</td></tr>
+<tr><td>24&nbsp;Нм</td><td>&lt;&nbsp;160&nbsp;с</td><td>DA24MU24(230)-D(A)(S)</td></tr>
+<tr><td>32&nbsp;Нм</td><td>по паспорту</td><td>DA32MU24(230)-D(A)(S)</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">
+    Семейство MU в каталоге →
+  </a>
+</p>
+</div>
+
+<div class="family-block">
+<h2>Ускоренные без пружины (MQU)</h2>
+<p>
+  Тот же контур, что MU, но ход за секунды — когда важно быстро перекрыть поток
+  без пружинного возврата. Управление — как у MU (Открыто/закрыто или пропорциональное).
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Время хода</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>8&nbsp;Нм</td><td>≈&nbsp;8&nbsp;с</td><td>DA8MQU24(230)-D(A)(S)</td></tr>
+<tr><td>16&nbsp;Нм</td><td>≈&nbsp;16&nbsp;с</td><td>DA16MQU24(230)-D(A)(S)</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata">
+    Семейство MQU в каталоге →
+  </a>
+</p>
+</div>
+
+<div class="family-block">
+<h2>Электронные отказоустойчивые (EU)</h2>
+<p>
+  Электронный fail-safe без механической пружины: при пропадании питания —
+  безопасное положение за счёт электронной схемы. Питание AC/DC&nbsp;24&nbsp;В;
+  время хода / возврата — пара значений в строке.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Ход / возврат</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>8&nbsp;Нм</td><td>&lt;&nbsp;55&nbsp;с / &lt;&nbsp;80&nbsp;с</td><td>DA8EU24-D(S)</td></tr>
+<tr><td>16&nbsp;Нм</td><td>&lt;&nbsp;100&nbsp;с / &lt;&nbsp;180&nbsp;с</td><td>DA16EU24-D(S)</td></tr>
+<tr><td>24&nbsp;Нм</td><td>&lt;&nbsp;160&nbsp;с / &lt;&nbsp;280&nbsp;с</td><td>DA24EU24-D(S)</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektronnye-otkazoustoychivye-vozdushnye-privody">
+    Семейство EU в каталоге →
+  </a>
+</p>
+</div>
+
+<div class="family-block">
+<h2>С пружинным возвратом (FU)</h2>
+<p>
+  Механический fail-safe: пружина закрывает (или открывает) заслонку при
+  отключении питания. Время в таблице — ход / возврат пружины.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Ход / пружина</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>3&nbsp;Нм</td><td>&lt;&nbsp;75&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>DA3FU24(230)-D(S)</td></tr>
+<tr><td>5&nbsp;Нм</td><td>&lt;&nbsp;70&nbsp;с / &lt;&nbsp;20&nbsp;с</td><td>DA5FU24(230)-D(S)</td></tr>
+<tr><td>10&nbsp;Нм</td><td>&lt;&nbsp;100&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>DA10FU24(230)-D(S)</td></tr>
+<tr><td>15&nbsp;Нм</td><td>&lt;&nbsp;150&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>DA15FU24(230)-D(S)</td></tr>
+<tr><td>20&nbsp;Нм</td><td>&lt;&nbsp;180&nbsp;с / ≈&nbsp;30&nbsp;с</td><td>DA20FU24(230)-D(S)</td></tr>
+<tr>
+  <td>5&nbsp;Нм</td>
+  <td>&lt;&nbsp;100&nbsp;с / &lt;&nbsp;20&nbsp;с</td>
+  <td>DA5FU24-A(S) · пропорциональное</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">
+    Семейство FU в каталоге →
+  </a>
+</p>
+</div>
+
+<div class="family-block">
+<h2>Противопожарные и дымовые (SA FU)</h2>
+<p>
+  Для огнезадерживающих клапанов: пружинный возврат, вспомогательный переключатель
+  во всех моделях. Управление — Открыто/закрыто. Исполнение <strong>-DST</strong> —
+  с термодатчиком.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Ход / пружина</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>3&nbsp;Нм</td><td>&lt;&nbsp;75&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>SA3FU24(230)-DS(T)</td></tr>
+<tr><td>5&nbsp;Нм</td><td>&lt;&nbsp;70&nbsp;с / &lt;&nbsp;20&nbsp;с</td><td>SA5FU24(230)-DS(T)</td></tr>
+<tr><td>10&nbsp;Нм</td><td>&lt;&nbsp;100&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>SA10FU24(230)-DS(T)</td></tr>
+<tr><td>15&nbsp;Нм</td><td>&lt;&nbsp;150&nbsp;с / &lt;&nbsp;25&nbsp;с</td><td>SA15FU24(230)-DS(T)</td></tr>
+<tr><td>20&nbsp;Нм</td><td>&lt;&nbsp;180&nbsp;с / ≈&nbsp;30&nbsp;с</td><td>SA20FU24(230)-DS(T)</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektroprivody-protivopozharnye-i-dymovye">
+    Семейство SA FU в каталоге →
+  </a>
+</p>
+</div>
+
+<div class="family-block">
+<h2>Клапаны дымоудаления (SA MU)</h2>
+<p>
+  Приводы для клапанов дымоудаления без пружины: управление Открыто/закрыто,
+  2-/3-позиционное; вспомогательный переключатель во всех моделях. Не путать
+  с SA FU для ОЗК.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--spec">
+<thead>
+<tr><th>Крутящий момент</th><th>Время хода</th><th>Шаблон модели</th></tr>
+</thead>
+<tbody>
+<tr><td>10&nbsp;Нм</td><td>&lt;&nbsp;45&nbsp;с</td><td>SA10MU24(230)-DS(T)</td></tr>
+<tr><td>15&nbsp;Нм</td><td>&lt;&nbsp;30&nbsp;с</td><td>SA15MU24(230)-DS(T)</td></tr>
+<tr><td>30&nbsp;Нм</td><td>&lt;&nbsp;115&nbsp;с</td><td>SA30MU24(230)-DS(T)</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  <a class="catalog-link" href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">
+    Семейство SA MU в каталоге →
+  </a>
+</p>
+</div>
+
+<h2>Типовой вес</h2>
+<p>
+  Ориентир по массе одной модели. Варианты 24/230&nbsp;В и D/A/S одной мощности
+  обычно совпадают по весу; точное значение — в паспорте SKU.
+</p>
+<div class="table-scroll">
+<table class="series-table series-table--mass">
+<thead>
+<tr><th>Семейство</th><th>Крутящий момент</th><th>Масса</th></tr>
+</thead>
+<tbody>
+<tr><td>DA MU</td><td>2&nbsp;Нм</td><td>0,5&nbsp;кг</td></tr>
+<tr><td>DA MU</td><td>4–6&nbsp;Нм</td><td>0,8&nbsp;кг</td></tr>
+<tr><td>DA MU</td><td>8–32&nbsp;Нм</td><td>1,2&nbsp;кг</td></tr>
+<tr><td>DA MQU</td><td>8–16&nbsp;Нм</td><td>1,2&nbsp;кг</td></tr>
+<tr><td>DA FU</td><td>5&nbsp;Нм</td><td>1,8&nbsp;кг</td></tr>
+<tr><td>DA FU</td><td>10&nbsp;Нм</td><td>2,6&nbsp;кг</td></tr>
+<tr><td>SA FU</td><td>5&nbsp;Нм</td><td>2,0&nbsp;кг</td></tr>
+<tr><td>SA FU</td><td>10&nbsp;Нм</td><td>2,8&nbsp;кг</td></tr>
+<tr><td>SA MU</td><td>10&nbsp;Нм</td><td>1,8&nbsp;кг</td></tr>
+<tr><td>SA MU</td><td>30&nbsp;Нм</td><td>2,5&nbsp;кг</td></tr>
+</tbody>
+</table>
+</div>
+<p class="footnote">
+  * Модели SA…MU-DST по массе близки к SA…MU-DS. Спецификация — ориентир для подбора;
+  для проекта сверяйте паспорт в <a href="/catalog">каталоге</a> или
+  <a href="/consultation">запросите КП</a>.
+</p>

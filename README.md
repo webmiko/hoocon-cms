@@ -1,39 +1,63 @@
-# README — Hoocon CMS
+# Hoocon CMS
 
-Новый стек сайта и CMS компании Hoocon (B2B HVAC / электроприводы ОВК).
-Замена Tilda-сайта [hoocon.ru](https://hoocon.ru) на управляемую платформу:
-каталог с фильтрами, глобальный поиск, контент, без онлайн-корзины.
+B2B-сайт и CMS для HVAC (электроприводы ОВК): каталог с фильтрами, поиск,
+контент, заявки RFQ. Замена Tilda-сайта [hoocon.ru](https://hoocon.ru).
 
-## Что добавить в новый проект (обязательный минимум)
+**Без онлайн-корзины и оплаты в v1** — заявки RFQ вместо checkout.
 
-1. **`AGENTS.md`** в корне — копия шаблона базы знаний
-   (`Универсальная-база-знаний/ШАБЛОН-КОРНЕВОГО-AGENTS.md`).
-2. **Симлинк** `_Универсальная-база-знаний` → канон
-   `/Users/niko/GitHub/Универсальная-база-знаний`
-   (скрипт `…/scripts/link-to-project.sh`).
+## Стек
 
-Больше ничего из базы **не копировать**.
+| Слой | Выбор |
+|------|--------|
+| Backend | Django + DRF, PostgreSQL, Celery / Redis |
+| Admin | Django Admin (Unfold) |
+| Frontend | React + TypeScript + Vite |
+| Prod | VPS / DNS **reg.ru** + почта **Яндекс 360**, Docker Compose, GitHub Actions |
 
-## Документы
+Python 3.12–3.13.
 
-| Файл | Содержание |
-|------|------------|
-| [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md) | Цель, scope, декомпозиция, этапы |
-| [docs/admin-vs-wagtail.md](docs/admin-vs-wagtail.md) | Admin vs Wagtail |
-| [docs/market-analysis.md](docs/market-analysis.md) | Рынок RU + EU/EN HVAC B2B |
-| [docs/stack-decision.md](docs/stack-decision.md) | Выбор стека backend/frontend |
-| [docs/kb-update-proposals.md](docs/kb-update-proposals.md) | Что вынести в базу знаний |
+## Репозиторий
 
-Соседний репозиторий контента/данных Tilda: `../hoocon/`.
+```text
+backend/     Django apps (catalog, leads, search, …), API, ETL
+frontend/    Публичный SPA
+docs/        Проектная документация (wiki-индекс: docs/README.md)
+scripts/     Checkup, деплой-хелперы
+```
 
-## Быстрый старт агента
+## Документация
 
-1. Прочитать [AGENTS.md](AGENTS.md) → `_Универсальная-база-знаний/AGENTS.md`.
-2. Новый проект: `_Универсальная-база-знаний/ТОЧКА-ВХОДА-ИИ-НОВЫЙ-ПРОЕКТ-И-ПЛАН.md`.
-3. Веб: `_Универсальная-база-знаний/04-Инструкции-разработки/ВЕБ-РАЗРАБОТКА-Кастомный-стек/`.
-4. Согласовать [ПЛАН-ПРОЕКТА.md](ПЛАН-ПРОЕКТА.md), затем код по инструкции v2.0.
+Полный индекс (wiki в репозитории): [`docs/README.md`](docs/README.md).
+
+Ключевые темы:
+
+| Тема | Файл |
+|------|------|
+| Версии релизов | [docs/releases.md](docs/releases.md) |
+| Безопасность | [docs/security-baseline.md](docs/security-baseline.md) |
+| SEO / URL | [docs/seo-url-migration.md](docs/seo-url-migration.md) |
+| Инфраструктура | [docs/infra-reg-ru.md](docs/infra-reg-ru.md) |
+| ETL / качество данных | [docs/data-quality-etl.md](docs/data-quality-etl.md) |
+| Карточки серий | [docs/series-card-templates.md](docs/series-card-templates.md) |
+
+## Локальный запуск (кратко)
+
+```bash
+# Backend
+cp .env.example .env   # заполнить секреты локально, не коммитить
+cd backend && poetry install
+poetry run python manage.py migrate
+poetry run python manage.py runserver
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+Docker: `docker-compose.yml` (dev) / `docker-compose.prod.yml` (prod).
+
+Перед коммитом: `./scripts/pre-commit-checkup.sh`.
 
 ## Статус
 
-2026-07-19: репозиторий создан, БЗ подключена, план и исследование рынка
-зафиксированы. Код приложения ещё не стартовал.
+Публичный каталог, поиск, RFQ, Admin/ETL и деплой на reg.ru в работе
+на ветке `develop`. Версия продукта — см. [docs/releases.md](docs/releases.md).

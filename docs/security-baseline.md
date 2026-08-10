@@ -1,20 +1,12 @@
 # Security baseline: Hoocon CMS (secure by default)
 
-Дата: 2026-07-19  
-Опора БЗ (канон): `_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/`
-— прежде всего [Безопасность-кода.md][kb-sec], [OWASP Top 10:2025][kb-owasp],
-[Django-DRF][kb-drf], [Frontend SPA][kb-fe], [Инфра TLS/Docker][kb-infra],
-AGENTS.md §0 и §4.
+Дата: 2026-07-19 (обновлено 2026-08-07: break-glass супер-админа при Email OTP)  
+Опора: внутренняя база знаний (безопасность кода, OWASP Top 10:2025,
+Django/DRF, Frontend SPA, инфра TLS/Docker) и стандарты разработки §0 / §4.
 
 Принцип: **безопасность с итерации 1**, не «потом на prod».  
 Нет корзины/оплаты в v1 — поверхность уже уже; остаются: публичные формы,
 Admin, файлы, SPA, VPS.
-
-[kb-sec]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Безопасность-кода.md
-[kb-owasp]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/OWASP-Top-10-2025.md
-[kb-drf]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Django-DRF-безопасность.md
-[kb-fe]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Frontend-безопасность-SPA-и-JS.md
-[kb-infra]: ../_Универсальная-база-знаний/03-Стандарты-и-шаблоны/безопасность/Инфраструктура-TLS-Docker-секреты.md
 
 ---
 
@@ -25,7 +17,7 @@ Admin, файлы, SPA, VPS.
 | Staff Admin / сессии | Брутфорс, CSRF, XSS в Admin | HTTPS, CSRF, rate limit login, сильные пароли |
 | Публичный RFQ `POST /api/leads/` | Спам, injection, PII scrape | Serializer validate, honeypot, throttle, CSRF/API |
 | Каталог / цены в БД | Утечка цен через API | `show_prices` + serializer; нет цены по умолчанию |
-| PDF / media | Path traversal, malware upload | allowlist MIME, size, storage вне URL-угадывания |
+| PDF / media | Path traversal, malware upload, hotlink | allowlist MIME, size; nginx+Django Referer allowlist on `/media/` |
 | SEO head / JSON-LD | XSS через контент | whitelist полей, `html.escape`, без сырого HTML |
 | SMTP / `.env` | Утечка секретов | только env; не в логах; `.gitignore` |
 | Зависимости | Supply chain | poetry.lock, npm lock, `pip-audit` в CI |
@@ -58,21 +50,61 @@ Admin, файлы, SPA, VPS.
 - Prod: `DJANGO_SECRET_KEY` **обязателен**; insecure default запрещён при
   `DEBUG=False` (`ImproperlyConfigured`).
 - `DJANGO_DEBUG=False` на VPS; `ALLOWED_HOSTS` явный список.
+- **Postgres обязателен** для `migrate` (FTS/GIN/triggers). `USE_SQLITE=True` —
+  только аварийный/ограниченный режим; полный локальный стек — Postgres.
 - Prod cookies: `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, HSTS,
   `SECURE_SSL_REDIRECT` (за reverse proxy — `SECURE_PROXY_SSL_HEADER`).
+- **COOP** (`SECURE_CROSS_ORIGIN_OPENER_POLICY`): default off на HTTP IP
+  (браузер игнорирует заголовок → шум в консоли/Lighthouse). После домена+TLS:
+  `DJANGO_SECURE_CROSS_ORIGIN_OPENER_POLICY=same-origin`.
+- Prod: Redis `CACHES` для DRF throttle (не LocMem per-worker).
+- OpenAPI `/api/schema/`, `/api/docs/` — только staff при `DEBUG=False`.
 
 ### 3.2 Django / DRF
 
 - CSRF включён для session; CORS — whitelist origin (Vite/prod domain), не `*`.
-- Публичные POST (leads): `AnonRateThrottle` + honeypot-поле.
+- Публичные POST (leads и будущие auth/чат-формы): `AnonRateThrottle` +
+  honeypot-поле.
+  **Политика CSRF (v1):** SPA берёт токен через `GET /api/csrf/` и шлёт
+  `X-CSRFToken` на `POST /api/leads/` (см. `frontend/src/api/client.ts`).
+  Throttle shared через Redis `CACHES` в prod (`DJANGO_CACHE_URL` / DB 2).
+  **Антиспам без сторонних сервисов:** не подключаем reCAPTCHA, hCaptcha,
+  Turnstile и аналоги (ни виджет, ни серверный SDK). Защита — свой стек:
+  honeypot, throttle, CSRF, валидация длины/полей; при эскалации спама —
+  усилить timing/min-submit и лимиты, не внешний CAPTCHA.
+  **Эталон:** `lms-backend` `config/form_protection.py` (+ challenge,
+  Origin) и `config/admin_otp.py` (6-значный код на email). В БЗ-каноне
+  паттерн ещё не оформлен — кандидат в
+  [kb-update-proposals.md](kb-update-proposals.md) §5.
+  **Яндекс ID** (OAuth) — отдельный IdP для входа клиентов, не CAPTCHA;
+  план: [plan-client-auth.md](plan-client-auth.md) §7; `client_secret` только
+  backend; после callback — session, не JWT в localStorage.
+- **Соцсети / боты:** токены и chat ID — только Admin (`SiteSettings`) или
+  `.env` (fallback). В `GET /api/settings/public/` — только analytics IDs.
 - Сериализаторы: explicit fields; mass assignment закрыт.
 - Ошибки API: без stack trace клиенту; логировать `type(e).__name__`.
 - Admin: только staff; опц. IP allowlist nginx на `/admin/` (prod).
+  **Email OTP:** при `ADMIN_EMAIL_OTP_ENABLED=true` вход без пароля —
+  логин/email → 6-значный код на почту (`config/admin_otp.py`). SMTP
+  обязателен. TTL кода 5 мин (дефолт 300 с); allowlist
+  `ADMIN_EMAIL_OTP_ALLOWED_EMAILS`; progressive delay на неверный код;
+  rate limit запросов кода по IP (+ django-axes). При `false` —
+  классический пароль (локалка/CI/авария).
+  **Break-glass супер-админа** (только `is_superuser`, при OTP on):
+  (1) постоянный пароль — `/admin/login/?mode=password`;
+  (2) заранее сгенерированные одноразовые коды `XXXX-XXXX`
+  (`accounts.SuperuserRecoveryCode`, hash в БД; plaintext один раз в
+  Admin) — `/admin/login/?mode=recovery` или то же поле на `/admin/otp/`.
+  При сбое SMTP для супер-админа сессия verify всё равно открывается
+  под резервный код. Обычный staff — только email OTP.
 
 ### 3.3 Файлы и ETL
 
 - Upload: max size, allowlist `pdf/jpeg/png/webp`; имя генерировать сервером.
 - Path: resolve + `is_relative_to(MEDIA_ROOT)`.
+- Hotlink: Referer allowlist на `/media/` (nginx `valid_referers` +
+  `MediaHotlinkMiddleware`); пустой Referer разрешён (прямая вкладка / PDF в
+  почте). Чужой сайт с `<img src="https://hoocon…/media/…">` → 403.
 - ETL: не исполнять код из CSV/HTML; quarantine (см. data-quality-etl).
 
 ### 3.4 Frontend (React)
@@ -104,7 +136,7 @@ Admin, файлы, SPA, VPS.
 | **3** | Lead: validate + honeypot + throttle; маскировка PII в логах Celery |
 | **4** | CSP headers (draft); нет DOM XSS; consent для Метрики |
 | **5** | `check --deploy`; TLS/HSTS; CSP prod; nginx admin harden; CI pip-audit + npm audit |
-| **Всегда** | AGENTS §4 перед коммитом/деплоем; ruff; mypy |
+| **Всегда** | чеклист стандартов перед коммитом/деплоем; ruff; mypy |
 
 ---
 
@@ -149,10 +181,10 @@ frontend build
 - [ ] `poetry run pip-audit` / CI green
 - [ ] Для UI: нет `dangerouslySetInnerHTML` на user/CMS HTML без sanitize
 
-Полный pre-deploy: AGENTS.md §4 + [infra-reg-ru.md](infra-reg-ru.md) cutover.
+Полный pre-deploy: стандарты разработки (чеклист коммита/деплоя) +
+[infra-reg-ru.md](infra-reg-ru.md) cutover.
 
-Перед каждым коммитом: `./scripts/pre-commit-checkup.sh`
-(правило `.cursor/rules/pre-commit-checkup.mdc`).
+Перед каждым коммитом: `./scripts/pre-commit-checkup.sh`.
 
 ---
 

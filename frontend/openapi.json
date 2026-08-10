@@ -1,0 +1,1552 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Hoocon CMS API",
+        "version": "0.1.0",
+        "description": "B2B catalog and content API for Hoocon HVAC actuators."
+    },
+    "paths": {
+        "/api/catalog/categories/": {
+            "get": {
+                "operationId": "catalog_categories_list",
+                "description": "GET /api/catalog/categories/ — public category list.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedCategoryList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/catalog/skus/": {
+            "get": {
+                "operationId": "catalog_skus_list",
+                "description": "GET /api/catalog/skus/ and /api/catalog/skus/{slug}/.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "category",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedSKUListList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/catalog/skus/{sku_slug}/files/": {
+            "get": {
+                "operationId": "catalog_skus_files_list",
+                "description": "GET (public) + POST (staff) /api/catalog/skus/{sku_slug}/files/.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "sku_slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedProductFileUploadList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog_skus_files_create",
+                "description": "Upload a PDF to the SKU identified by sku_slug in the URL.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "sku_slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductFileUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductFileUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductFileUpload"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductFileUpload"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/catalog/skus/{slug}/": {
+            "get": {
+                "operationId": "catalog_skus_retrieve",
+                "description": "GET /api/catalog/skus/ and /api/catalog/skus/{slug}/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SKUDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/articles/": {
+            "get": {
+                "operationId": "content_articles_list",
+                "description": "GET /api/content/articles/ and /api/content/articles/{slug}/.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedArticleList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/articles/{slug}/": {
+            "get": {
+                "operationId": "content_articles_retrieve",
+                "description": "GET /api/content/articles/ and /api/content/articles/{slug}/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Article"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/news/": {
+            "get": {
+                "operationId": "content_news_list",
+                "description": "GET /api/content/news/ and /api/content/news/{slug}/.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedNewsList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/news/{slug}/": {
+            "get": {
+                "operationId": "content_news_retrieve",
+                "description": "GET /api/content/news/ and /api/content/news/{slug}/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/News"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/pages/": {
+            "get": {
+                "operationId": "content_pages_list",
+                "description": "GET /api/content/pages/ and /api/content/pages/{slug}/.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedPageList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/content/pages/{slug}/": {
+            "get": {
+                "operationId": "content_pages_retrieve",
+                "description": "GET /api/content/pages/ and /api/content/pages/{slug}/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Page"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/leads/": {
+            "post": {
+                "operationId": "leads_create",
+                "description": "Handle POST: validate, honeypot check, create, schedule email.\n\nArgs:\n    request: DRF request with lead payload.\n\nReturns:\n    201 with serialized lead (PII-safe: no email/phone in response),\n    or 201 silent drop if honeypot is filled (no lead created),\n    or 400 on validation errors.",
+                "tags": [
+                    "leads"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Lead"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Lead"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Lead"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Lead"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/schema/": {
+            "get": {
+                "operationId": "schema_retrieve",
+                "description": "OpenApi3 schema for this API. Format can be selected via content negotiation.\n\n- YAML: application/vnd.oai.openapi\n- JSON: application/vnd.oai.openapi+json",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "format",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "json",
+                                "yaml"
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "lang",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "af",
+                                "ar",
+                                "ar-dz",
+                                "ast",
+                                "az",
+                                "be",
+                                "bg",
+                                "bn",
+                                "br",
+                                "bs",
+                                "ca",
+                                "ckb",
+                                "cs",
+                                "cy",
+                                "da",
+                                "de",
+                                "dsb",
+                                "el",
+                                "en",
+                                "en-au",
+                                "en-gb",
+                                "eo",
+                                "es",
+                                "es-ar",
+                                "es-co",
+                                "es-mx",
+                                "es-ni",
+                                "es-ve",
+                                "et",
+                                "eu",
+                                "fa",
+                                "fi",
+                                "fr",
+                                "fy",
+                                "ga",
+                                "gd",
+                                "gl",
+                                "he",
+                                "hi",
+                                "hr",
+                                "hsb",
+                                "ht",
+                                "hu",
+                                "hy",
+                                "ia",
+                                "id",
+                                "ig",
+                                "io",
+                                "is",
+                                "it",
+                                "ja",
+                                "ka",
+                                "kab",
+                                "kk",
+                                "km",
+                                "kn",
+                                "ko",
+                                "ky",
+                                "lb",
+                                "lt",
+                                "lv",
+                                "mk",
+                                "ml",
+                                "mn",
+                                "mr",
+                                "ms",
+                                "my",
+                                "nb",
+                                "ne",
+                                "nl",
+                                "nn",
+                                "os",
+                                "pa",
+                                "pl",
+                                "pt",
+                                "pt-br",
+                                "ro",
+                                "ru",
+                                "sk",
+                                "sl",
+                                "sq",
+                                "sr",
+                                "sr-latn",
+                                "sv",
+                                "sw",
+                                "ta",
+                                "te",
+                                "tg",
+                                "th",
+                                "tk",
+                                "tr",
+                                "tt",
+                                "udm",
+                                "ug",
+                                "uk",
+                                "ur",
+                                "uz",
+                                "vi",
+                                "zh-hans",
+                                "zh-hant"
+                            ]
+                        }
+                    }
+                ],
+                "tags": [
+                    "schema"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/vnd.oai.openapi": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            },
+                            "application/yaml": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            },
+                            "application/vnd.oai.openapi+json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/search/": {
+            "get": {
+                "operationId": "search_retrieve",
+                "description": "Handle GET: parse `q`, run FTS on all three models, return paginated.\n\nArgs:\n    request: DRF request with optional `q` query parameter.\n\nReturns:\n    200 with paginated results: {count, next, previous, results}.\n    Each result: {type, slug, title, url}.",
+                "tags": [
+                    "search"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {
+                        "basicAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SearchResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Article": {
+                "type": "object",
+                "description": "Expert article (/statyi/<slug>) with cover + excerpt.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "excerpt": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Краткий анонс для списка /statyi (без HTML)."
+                    },
+                    "cover": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Обложка статьи (локальный MEDIA URL)."
+                    },
+                    "body": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_published": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Видимость в публичном API."
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "body",
+                    "cover",
+                    "created_at",
+                    "excerpt",
+                    "id",
+                    "is_published",
+                    "published_at",
+                    "slug",
+                    "title",
+                    "updated_at"
+                ]
+            },
+            "AttributeValue": {
+                "type": "object",
+                "description": "ТТХ row for SKU detail: slug of Attribute + value + unit.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "value": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug",
+                    "unit",
+                    "value"
+                ]
+            },
+            "Category": {
+                "type": "object",
+                "description": "Public category list/detail fields.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "parent": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Родительская категория (None для корня дерева)."
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "description",
+                    "id",
+                    "name",
+                    "parent",
+                    "slug"
+                ]
+            },
+            "FileTypeEnum": {
+                "enum": [
+                    "datasheet",
+                    "certificate",
+                    "catalog",
+                    "other"
+                ],
+                "type": "string",
+                "description": "* `datasheet` - Паспорт / datasheet\n* `certificate` - Сертификат\n* `catalog` - Каталог\n* `other` - Прочее"
+            },
+            "Lead": {
+                "type": "object",
+                "description": "Serializer for public Lead creation (RFQ / consultation / replacement).\n\nOnly client-facing fields are writable; status/timestamps are read-only.\n`email` and `phone` are write-only (PII-safe response). `website` is a\nhoneypot field — the view silently drops submissions where it's filled.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "lead_type": {
+                        "$ref": "#/components/schemas/LeadTypeEnum"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "writeOnly": true,
+                        "maxLength": 254
+                    },
+                    "phone": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "maxLength": 50
+                    },
+                    "company": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "sku": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "SKU, по которому пришла заявка (опц.; SET_NULL при удалении SKU)."
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "nullable": true,
+                        "description": "Количество (для RFQ)."
+                    },
+                    "analog_belimo_code": {
+                        "type": "string",
+                        "description": "Код аналога Belimo (для replacement).",
+                        "maxLength": 100
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "website": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "default": "",
+                        "description": "Honeypot — leave empty (hidden from real users)."
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "email",
+                    "id",
+                    "message",
+                    "name",
+                    "status",
+                    "updated_at"
+                ]
+            },
+            "LeadTypeEnum": {
+                "enum": [
+                    "rfq",
+                    "consultation",
+                    "replacement"
+                ],
+                "type": "string",
+                "description": "* `rfq` - Запрос КП\n* `consultation` - Консультация\n* `replacement` - Подбор замены"
+            },
+            "News": {
+                "type": "object",
+                "description": "Company news item (/novosti/<slug>).",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "body": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_published": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Видимость в публичном API."
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "body",
+                    "created_at",
+                    "id",
+                    "is_published",
+                    "published_at",
+                    "slug",
+                    "title",
+                    "updated_at"
+                ]
+            },
+            "Page": {
+                "type": "object",
+                "description": "Public CMS page (/<slug>).",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "body": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "is_published": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Видимость в публичном API."
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "body",
+                    "created_at",
+                    "id",
+                    "is_published",
+                    "published_at",
+                    "slug",
+                    "title",
+                    "updated_at"
+                ]
+            },
+            "PaginatedArticleList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Article"
+                        }
+                    }
+                }
+            },
+            "PaginatedCategoryList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Category"
+                        }
+                    }
+                }
+            },
+            "PaginatedNewsList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/News"
+                        }
+                    }
+                }
+            },
+            "PaginatedPageList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Page"
+                        }
+                    }
+                }
+            },
+            "PaginatedProductFileUploadList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductFileUpload"
+                        }
+                    }
+                }
+            },
+            "PaginatedSKUListList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?page=2"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SKUList"
+                        }
+                    }
+                }
+            },
+            "ProductFileUpload": {
+                "type": "object",
+                "description": "Serializer for staff upload (POST) and public read (GET).",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 300
+                    },
+                    "file": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Только PDF; лимит и magic bytes — catalog.validators."
+                    },
+                    "file_type": {
+                        "$ref": "#/components/schemas/FileTypeEnum"
+                    },
+                    "is_published": {
+                        "type": "boolean",
+                        "description": "Видимость файла в публичном каталоге / PDP."
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0,
+                        "description": "Порядок в блоке «Документы» (меньше = выше)."
+                    }
+                },
+                "required": [
+                    "file",
+                    "id",
+                    "title"
+                ]
+            },
+            "SKUDetail": {
+                "type": "object",
+                "description": "SKU PDP payload: list fields + attributes + files.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "sku_code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Артикул (уникален, не пуст), напр. HVA-5NM или BV215."
+                    },
+                    "analog_belimo_code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Код аналога Belimo (задел для AnalogMap P1)."
+                    },
+                    "category_slug": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "product_slug": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."
+                    },
+                    "price_on_request": {
+                        "type": "boolean",
+                        "description": "True when prices are hidden (RFQ policy).",
+                        "readOnly": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "attributes": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AttributeValue"
+                        },
+                        "readOnly": true
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "description": "Return only published ProductFile rows, ordered.",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "analog_belimo_code",
+                    "attributes",
+                    "category_slug",
+                    "description",
+                    "files",
+                    "id",
+                    "name",
+                    "price",
+                    "price_on_request",
+                    "product_slug",
+                    "sku_code",
+                    "slug"
+                ]
+            },
+            "SKUList": {
+                "type": "object",
+                "description": "SKU card for list: no nested ТТХ; price gated by SiteSettings.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "sku_code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Артикул (уникален, не пуст), напр. HVA-5NM или BV215."
+                    },
+                    "analog_belimo_code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Код аналога Belimo (задел для AnalogMap P1)."
+                    },
+                    "category_slug": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "product_slug": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."
+                    },
+                    "price_on_request": {
+                        "type": "boolean",
+                        "description": "True when prices are hidden (RFQ policy).",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "analog_belimo_code",
+                    "category_slug",
+                    "id",
+                    "name",
+                    "price",
+                    "price_on_request",
+                    "product_slug",
+                    "sku_code",
+                    "slug"
+                ]
+            },
+            "SearchResponse": {
+                "type": "object",
+                "description": "Paginated search response (DRF PageNumberPagination shape).",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SearchResultItem"
+                        }
+                    }
+                },
+                "required": [
+                    "count",
+                    "next",
+                    "previous",
+                    "results"
+                ]
+            },
+            "SearchResultItem": {
+                "type": "object",
+                "description": "One item in the unified search results list.",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "Тип результата: sku | article | news."
+                    },
+                    "slug": {
+                        "type": "string",
+                        "description": "Slug (path-сегмент) найденной записи."
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Заголовок (H1) найденной записи."
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "Канонический path (напр. /<slug>/, /statyi/<slug>/)."
+                    },
+                    "snippet": {
+                        "type": "string",
+                        "description": "Краткое описание (для SKU — lead с PDP; для CMS — начало body)."
+                    }
+                },
+                "required": [
+                    "slug",
+                    "snippet",
+                    "title",
+                    "type",
+                    "url"
+                ]
+            },
+            "StatusEnum": {
+                "enum": [
+                    "new",
+                    "in_progress",
+                    "done"
+                ],
+                "type": "string",
+                "description": "* `new` - Новая\n* `in_progress` - В работе\n* `done` - Завершена"
+            }
+        },
+        "securitySchemes": {
+            "basicAuth": {
+                "type": "http",
+                "scheme": "basic"
+            },
+            "cookieAuth": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "sessionid"
+            }
+        }
+    }
+}

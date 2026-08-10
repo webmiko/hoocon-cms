@@ -1,0 +1,14 @@
+# Override: web/celery from GHCR image (no build on VPS).
+# DOCKER_IMAGE=ghcr.io/org/hoocon-cms:sha \
+#   docker compose -f docker-compose.yml -f docker-compose.hub.yml up -d
+services:
+  web:
+    build: !reset null
+    image: ${DOCKER_IMAGE:?Set DOCKER_IMAGE}
+    # Explicit pull in scripts/deploy-remote.sh; avoid re-auth on restart.
+    pull_policy: missing
+
+  celery_worker:
+    build: !reset null
+    image: ${DOCKER_IMAGE}
+    pull_policy: missing

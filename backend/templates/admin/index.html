@@ -1,0 +1,198 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  {% if hoocon_dashboard %}
+  <section class="hoocon-dash" aria-label="Дашборд">
+    <header class="hoocon-dash__head">
+      <div>
+        <h1 class="hoocon-dash__title">Панель управления</h1>
+        <p class="hoocon-dash__sub">
+          Статистика, оповещения и последние изменения по клиентам и заявкам
+          ({{ hoocon_dashboard.period_days }} дн.)
+          · {{ RELEASE_LABEL }}
+        </p>
+      </div>
+      <nav class="hoocon-dash__quick" aria-label="Быстрые ссылки">
+        {% if hoocon_dashboard.links.leads %}
+          <a href="{{ hoocon_dashboard.links.leads }}">Заявки</a>
+        {% endif %}
+        {% if hoocon_dashboard.links.leads_stats %}
+          <a href="{{ hoocon_dashboard.links.leads_stats }}">Статистика заявок</a>
+        {% endif %}
+        {% if hoocon_dashboard.links.clients %}
+          <a href="{{ hoocon_dashboard.links.clients }}">Клиенты</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    {% if hoocon_dashboard.notifications %}
+    <section class="hoocon-dash__alerts" aria-label="Оповещения">
+      <h2 class="hoocon-dash__h2">Оповещения</h2>
+      <ul class="hoocon-dash__alert-list">
+        {% for note in hoocon_dashboard.notifications %}
+        <li class="hoocon-dash__alert hoocon-dash__alert--{{ note.level }}">
+          <div>
+            <p class="hoocon-dash__alert-title">{{ note.title }}</p>
+            {% if note.hint %}<p class="hoocon-dash__alert-hint">{{ note.hint }}</p>{% endif %}
+          </div>
+          {% if note.url %}
+            <a class="hoocon-dash__alert-link" href="{{ note.url }}">Открыть</a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if hoocon_dashboard.cards %}
+    <section class="hoocon-lead-stats__cards hoocon-dash__cards" aria-label="Сводка">
+      {% for card in hoocon_dashboard.cards %}
+      <article class="hoocon-lead-stats__card{% if card.accent %} hoocon-lead-stats__card--accent{% endif %}">
+        <p class="hoocon-lead-stats__label">{{ card.label }}</p>
+        <p class="hoocon-lead-stats__value">
+          {% if card.url %}<a href="{{ card.url }}">{{ card.value }}</a>{% else %}{{ card.value }}{% endif %}
+        </p>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if hoocon_dashboard.chart %}
+    <section class="hoocon-dash__chart" aria-label="Инфографика заявок">
+      <h2 class="hoocon-dash__h2">Заявки по статусам</h2>
+      <ul class="hoocon-dash__bars">
+        {% for bar in hoocon_dashboard.chart %}
+        <li class="hoocon-dash__bar hoocon-dash__bar--{{ bar.key }}">
+          <div class="hoocon-dash__bar-meta">
+            <span>{{ bar.label }}</span>
+            <strong>{{ bar.count }}</strong>
+          </div>
+          <div class="hoocon-dash__bar-track" aria-hidden="true">
+            <span class="hoocon-dash__bar-fill" style="width: {{ bar.pct }}%"></span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <div class="hoocon-dash__grid">
+      {% if hoocon_dashboard.recent_leads is not None %}
+      <section class="hoocon-dash__panel" aria-label="Последние заявки">
+        <div class="hoocon-dash__panel-head">
+          <h2 class="hoocon-dash__h2">Последние заявки</h2>
+          {% if hoocon_dashboard.links.leads %}
+            <a href="{{ hoocon_dashboard.links.leads }}">Все →</a>
+          {% endif %}
+        </div>
+        {% if hoocon_dashboard.recent_leads %}
+        <ul class="hoocon-dash__feed">
+          {% for item in hoocon_dashboard.recent_leads %}
+          <li>
+            <a href="{{ item.url }}">
+              <span class="hoocon-dash__feed-title">{{ item.name }}</span>
+              <span class="hoocon-dash__feed-meta">
+                {{ item.company }} ·
+                <span class="hoocon-lead-status hoocon-lead-status--{{ item.status_key }}">{{ item.status }}</span>
+              </span>
+              <time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"d.m.Y H:i" }}</time>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="hoocon-dash__empty">Пока нет заявок в вашей зоне видимости.</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if hoocon_dashboard.recent_clients is not None %}
+      <section class="hoocon-dash__panel" aria-label="Клиенты CRM">
+        <div class="hoocon-dash__panel-head">
+          <h2 class="hoocon-dash__h2">Клиенты (обновления)</h2>
+          {% if hoocon_dashboard.links.clients %}
+            <a href="{{ hoocon_dashboard.links.clients }}">Все →</a>
+          {% endif %}
+        </div>
+        {% if hoocon_dashboard.recent_clients %}
+        <ul class="hoocon-dash__feed">
+          {% for item in hoocon_dashboard.recent_clients %}
+          <li>
+            <a href="{{ item.url }}">
+              <span class="hoocon-dash__feed-title">{{ item.email }}</span>
+              <span class="hoocon-dash__feed-meta">{{ item.name }} · {{ item.company }}</span>
+              <time datetime="{{ item.updated_at|date:'c' }}">{{ item.updated_at|date:"d.m.Y H:i" }}</time>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="hoocon-dash__empty">Клиентов пока нет.</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if hoocon_dashboard.recent_activities is not None %}
+      <section class="hoocon-dash__panel" aria-label="Активности CRM">
+        <div class="hoocon-dash__panel-head">
+          <h2 class="hoocon-dash__h2">Работа с клиентами</h2>
+          {% if hoocon_dashboard.links.activities %}
+            <a href="{{ hoocon_dashboard.links.activities }}">Все →</a>
+          {% endif %}
+        </div>
+        {% if hoocon_dashboard.recent_activities %}
+        <ul class="hoocon-dash__feed">
+          {% for item in hoocon_dashboard.recent_activities %}
+          <li>
+            <a href="{{ item.url }}">
+              <span class="hoocon-dash__feed-title">{{ item.subject }}</span>
+              <span class="hoocon-dash__feed-meta">
+                {{ item.type }} · {{ item.client }} · {{ item.author }}
+              </span>
+              <time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"d.m.Y H:i" }}</time>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="hoocon-dash__empty">Активностей пока нет.</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      <section class="hoocon-dash__panel" aria-label="Изменения в админке">
+        <div class="hoocon-dash__panel-head">
+          <h2 class="hoocon-dash__h2">Изменения в админке</h2>
+        </div>
+        {% if hoocon_dashboard.admin_log %}
+        <ul class="hoocon-dash__feed">
+          {% for item in hoocon_dashboard.admin_log %}
+          <li>
+            {% if item.url %}<a href="{{ item.url }}">{% else %}<div>{% endif %}
+              <span class="hoocon-dash__feed-title">{{ item.object }}</span>
+              <span class="hoocon-dash__feed-meta">
+                {{ item.action }} · {{ item.user }}
+                {% if item.model %} · {{ item.model }}{% endif %}
+              </span>
+              <time datetime="{{ item.time|date:'c' }}">{{ item.time|date:"d.m.Y H:i" }}</time>
+            {% if item.url %}</a>{% else %}</div>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="hoocon-dash__empty">Пока нет записей журнала по CRM / заявкам / каталогу.</p>
+        {% endif %}
+      </section>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="flex flex-col lg:flex-row lg:gap-8 hoocon-dash__apps">
+    <div class="grow">
+      {% include "unfold/helpers/app_list_default.html" %}
+    </div>
+
+    {% include "unfold/helpers/history.html" %}
+  </div>
+{% endblock %}

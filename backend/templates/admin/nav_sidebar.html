@@ -1,0 +1,47 @@
+{% load i18n unfold %}
+
+{# Desktop (≥1024): 72px rail + hover peek. Mobile: full overlay only. #}
+<div
+    class="hoocon-nav-shell relative z-60 shrink-0"
+    x-bind:class="{ 'hoocon-nav-shell--open': sidebarOpen }"
+    x-data="{
+        railWidth: 72,
+        sidebarPeek: false,
+        isDesktopNav() { return window.innerWidth >= 1024; },
+        isNavExpanded() {
+            // Mobile overlay is always full menu; desktop expands only on peek.
+            return this.isDesktopNav() ? this.sidebarPeek : true;
+        },
+        panelWidth() {
+            if (!this.isDesktopNav() || this.sidebarPeek) {
+                const raw = Number(this.sidebarWidth) || 288;
+                return Math.min(360, Math.max(260, raw));
+            }
+            return this.railWidth;
+        },
+        startPeek() {
+            if (this.isDesktopNav()) this.sidebarPeek = true;
+        },
+        endPeek() {
+            this.sidebarPeek = false;
+        },
+    }"
+>
+    <div
+        id="nav-sidebar"
+        class="hoocon-nav-panel bg-base-50 border-r border-base-200 dark:border-base-800 dark:bg-base-900 {% element_classes 'navigation' %}"
+        x-bind:class="{
+            'hoocon-sidebar-rail': isDesktopNav() && !sidebarPeek,
+            'hoocon-sidebar-peek': isDesktopNav() && sidebarPeek,
+        }"
+        x-bind:style="`width: ${panelWidth()}px`"
+        x-on:mouseenter="startPeek()"
+        x-on:mouseleave="endPeek()"
+    >
+        {% if templates.navigation %}
+            {% include templates.navigation %}
+        {% else %}
+            {% include "unfold/helpers/navigation.html" %}
+        {% endif %}
+    </div>
+</div>

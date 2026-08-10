@@ -1,0 +1,211 @@
+"""Tests for catalog.etl.html_text — HTML → structured product copy."""
+
+from __future__ import annotations
+
+from catalog.etl.html_text import (
+    clean_polluted_description,
+    compose_product_description,
+    ensure_safety_in_instructions,
+    extract_embedded_store_html,
+    extract_product_text_blocks,
+    extract_safety_notice,
+    extract_tilda_tabs,
+    filter_analogs_for_sku,
+    html_to_structured_text,
+    html_to_text,
+    is_noise_line,
+    strip_tilda_page_chrome,
+)
+
+
+def test_html_to_text_strips_tags() -> None:
+    assert html_to_text("<p>Hello<br/>world</p>") == "Hello\nworld"
+    assert html_to_text("") == ""
+    assert html_to_text("   ") == ""
+
+
+def test_html_to_structured_text_lists_and_sections() -> None:
+    """Convert Tilda HTML lists into section titles and bullet lines."""
+    raw = (
+        "<strong>Общие характеристики:</strong><br />"
+        "– Крутящий момент: 10 Нм<br />"
+        "– Управление:<br />"
+        "<ul>"
+        '<li data-list="bullet"><strong>(D/DS)</strong> – открыто/закрыто</li>'
+        '<li data-list="bullet"><strong>(A/AS)</strong> – плавное управление</li>'
+        "</ul>"
+        "– Площадь заслонки: до 1 м²"
+    )
+    text = html_to_structured_text(raw)
+    assert "Общие характеристики:" in text
+    assert "– Крутящий момент: 10 Нм" in text
+    assert "Управление:" in text
+    assert "– (D/DS) – открыто/закрыто" in text
+    assert "<" not in text
+    assert "class=" not in text
+
+
+def test_compose_skips_legal_noise_and_keeps_store_descr() -> None:
+    """Meta lead + store descr HTML become a clean card description."""
+    descr = '<ul><li data-list="bullet">Диаметр: DN15</li><li data-list="bullet">Вид: 2-ходовый</li></ul>'
+    text = compose_product_description(
+        meta_description="Шаровые краны Hoocon DN15. Рабочее давление до 2.0 МПа.",
+        html_blocks=[descr],
+    )
+    assert "Шаровые краны Hoocon DN15" in text
+    assert "– Диаметр: DN15" in text
+    assert "– Вид: 2-ходовый" in text
+
+
+def test_clean_polluted_description_drops_chrome() -> None:
+    """Strip leftover attribute fragments from a polluted scrape."""
+    raw = (
+        "Нормальный лид про привод 10 Нм.\n\n"
+        '– label="Навигационное меню"\n'
+        '– btnflex__text">Позвонить\n'
+        "– Крутящий момент: 10 Нм\n"
+    )
+    cleaned = clean_polluted_description(raw)
+    assert "Навигационное" not in cleaned
+    assert "Позвонить" not in cleaned
+    assert "– Крутящий момент: 10 Нм" in cleaned
+    assert is_noise_line('label="Навигационное меню"')
+
+
+def test_dedupe_description_lines_keeps_first() -> None:
+    """Repeated bullets are collapsed."""
+    from catalog.etl.html_text import dedupe_description_lines
+
+    raw = "Лид.\n\n– Сечение провода: 0,5 мм²\n– Напряжение: 24 В\n– Сечение провода: 0,5 мм²\n"
+    cleaned = dedupe_description_lines(raw)
+    assert cleaned.count("Сечение провода") == 1
+    assert "Напряжение: 24 В" in cleaned
+
+
+def test_extract_embedded_store_html_from_json() -> None:
+    """descr JSON with torque hint is extracted."""
+    page = (
+        r'{"descr":"<p>Крутящий момент 8 Нм для заслонки</p>",'
+        r'"text":"<p>коротко</p>"}'
+    )
+    blocks = extract_embedded_store_html(page)
+    assert blocks
+    assert "момент" in html_to_text(blocks[0]).casefold()
+
+
+def test_extract_product_text_blocks_ranks_specs() -> None:
+    page = (
+        '<div field="text">'
+        "<p>Общие характеристики. Крутящий момент 10 Нм IP54.</p>"
+        "</div>"
+        '<div field="text">'
+        "<p>Подготовка к установке. Монтаж привода. Инструменты.</p>"
+        "</div>"
+    )
+    blocks = extract_product_text_blocks(page)
+    assert blocks
+    assert "момент" in html_to_text(blocks[0]).casefold()
+
+
+def test_extract_tilda_tabs_maps_options_to_rec_blocks() -> None:
+    html = """
+    <select>
+      <option value="111">Описание</option>
+      <option value="222">Характеристики</option>
+    </select>
+    <div id="rec111" class="r">
+    <div field="text"><p>Электропривод воздушной заслонки 8 Нм для ОВК систем.</p></div>
+    </div>
+    <div id="rec222" class="r">
+    <div field="text"><p>Крутящий момент: 8 Нм. Степень защиты IP54 корпус привода.</p></div>
+    </div>
+    """
+    tabs = extract_tilda_tabs(html)
+    assert "description" in tabs
+    assert "specs" in tabs
+    assert "8 Нм" in tabs["specs"] or "момент" in tabs["specs"].casefold()
+    assert extract_tilda_tabs("") == {}
+
+
+def test_extract_tilda_tabs_t819_content_panels() -> None:
+    html = """
+    <button aria-controls="content-tab1_99" type="button">Описание</button>
+    <button aria-controls="content-tab2_99" type="button">Характеристики</button>
+    <div id="content-tab1_99" class="t819__content">
+      <p>Приводы серии SA..FU для противопожарных клапанов 5 Нм.</p>
+    </div>
+    <div id="content-tab2_99" class="t819__content">
+      <p>Крутящий момент: 5 Нм. Площадь заслонки до 0,5 м² IP54.</p>
+    </div>
+    """
+    tabs = extract_tilda_tabs(html)
+    assert "description" in tabs
+    assert "specs" in tabs
+    assert "5 Нм" in tabs["specs"]
+
+
+def test_extract_safety_notice_and_ensure() -> None:
+    html = (
+        "<strong>Оповещение по безопасности</strong><br>"
+        "1. Привод нельзя использовать вне области применения, особенно в самолетах.<br><br>"
+        "2. Корпус может вскрываться только производителем.<br><br>"
+        "3. Нельзя утилизировать как бытовые отходы."
+    )
+    safety = extract_safety_notice(html)
+    assert safety.startswith("ВНИМАНИЕ:")
+    assert "самолет" in safety.casefold() or "авиац" in safety.casefold() or "самолет" in html.casefold()
+    assert safety.count("– ") >= 2
+    merged = ensure_safety_in_instructions(
+        "Инструкция по установке SA..FU\n\n1. Монтаж привода\n– Закрепите вал.",
+        safety,
+    )
+    assert merged.index("ВНИМАНИЕ:") < merged.index("1. Монтаж")
+    assert ensure_safety_in_instructions(merged, safety) == merged
+
+
+def test_filter_analogs_for_sku_keeps_matching_block() -> None:
+    text = """
+Аналоги привода DA3FU24-DS
+– Belimo LM24A-S
+Аналоги привода DA3FU230-DS
+– Belimo LM230A-S
+"""
+    out = filter_analogs_for_sku(text, "da3fu230-d")
+    assert "LM230A" in out
+    assert "LM24A" not in out
+    assert filter_analogs_for_sku("", "x") == ""
+    assert filter_analogs_for_sku(text, "") == text.strip()
+
+
+def test_strip_tilda_page_chrome_cuts_footer() -> None:
+    """Truncate analogs / tab copy before Tilda footer chrome."""
+    good = (
+        "Список приводов с близкими характеристиками SA20FU\n"
+        "– Belimo BF24-T\n"
+        "При выборе аналога учитывайте крутящий момент."
+    )
+    junk = (
+        "\n\nBUY NOW Load more\n"
+        "Разделы сайта\nКаталог продукции\n"
+        "Ваш запрос\nЗапросить КП\n"
+        "Принять все Настройка\n"
+        "Куки, необходимые для правильной работы сайта"
+    )
+    cleaned = strip_tilda_page_chrome(good + junk)
+    assert "Belimo BF24-T" in cleaned
+    assert "BUY NOW" not in cleaned
+    assert "Разделы сайта" not in cleaned
+    assert "Ваш запрос" not in cleaned
+    assert strip_tilda_page_chrome("") == ""
+
+
+def test_clean_and_filter_strip_tilda_chrome() -> None:
+    """Stored polluted analogs lose chrome via clean + filter paths."""
+    raw = "Аналоги привода SA20FU24-DS\n– Belimo BF24\n\nСмотрите также из этого раздела\nBUY NOW\nВаше Имя\nВаш Phone"
+    cleaned = clean_polluted_description(raw)
+    assert "Belimo BF24" in cleaned
+    assert "BUY NOW" not in cleaned
+    assert "Ваше Имя" not in cleaned
+    filtered = filter_analogs_for_sku(raw, "sa20fu24-ds")
+    assert "Belimo BF24" in filtered
+    assert "BUY NOW" not in filtered

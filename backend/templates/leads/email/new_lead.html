@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Новая заявка #{{ lead.pk }} — Hoocon</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f7;color:#2a2a2a;
+             font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+         style="background:#f3f4f7;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+               style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;
+                      border:1px solid rgba(30,30,40,0.08);
+                      box-shadow:0 12px 40px rgba(20,20,30,0.06);">
+
+          {# ── Masthead (как тёмный header сайта) ── #}
+          <tr>
+            <td style="background:#141414;padding:22px 28px 20px;">
+              <a href="{{ site_url }}" style="text-decoration:none;">
+                <span style="font-family:Montserrat,Helvetica,Arial,sans-serif;
+                             font-size:22px;font-weight:700;letter-spacing:0.04em;
+                             color:#da0e2b;">HOOCON</span>
+              </a>
+              <div style="margin-top:6px;font-size:12px;line-height:1.4;color:#a3a3a3;">
+                Приводы и арматура для инженерных систем
+              </div>
+            </td>
+          </tr>
+
+          {# ── Intro ── #}
+          <tr>
+            <td style="padding:28px 28px 8px;">
+              <div style="display:inline-block;padding:4px 10px;border-radius:6px;
+                          background:rgba(218,14,43,0.09);color:#b80c24;
+                          font-size:12px;font-weight:600;letter-spacing:0.02em;">
+                {{ lead_type_display }}
+              </div>
+              <h1 style="margin:14px 0 8px;font-family:Montserrat,Helvetica,Arial,sans-serif;
+                         font-size:22px;font-weight:700;line-height:1.25;color:#2a2a2a;">
+                Новая заявка #{{ lead.pk }}
+              </h1>
+              <p style="margin:0;font-size:15px;color:#5a5a5a;">
+                Поступила с сайта
+                <a href="{{ site_url }}" style="color:#b80c24;text-decoration:none;font-weight:600;">hoocon.ru</a>
+              </p>
+            </td>
+          </tr>
+
+          {# ── Specs ── #}
+          <tr>
+            <td style="padding:16px 28px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="border-collapse:collapse;">
+                <tr>
+                  <td style="padding:10px 0;width:34%;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Имя
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;font-weight:600;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {{ lead.name }}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Компания
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {{ lead.company|default:"—" }}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Email
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    <a href="mailto:{{ lead.email }}"
+                       style="color:#b80c24;text-decoration:none;font-weight:600;">{{ lead.email }}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Телефон
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {% if lead.phone %}
+                    <a href="tel:{{ lead.phone }}" style="color:#2a2a2a;text-decoration:none;">{{ lead.phone }}</a>
+                    {% else %}—{% endif %}
+                  </td>
+                </tr>
+                {% if lead.sku %}
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    SKU
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {{ lead.sku.sku_code }}
+                    <span style="color:#6f6f6f;font-weight:400;"> · {{ lead.sku.name }}</span>
+                  </td>
+                </tr>
+                {% endif %}
+                {% if lead.quantity %}
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Количество
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {{ lead.quantity }}
+                  </td>
+                </tr>
+                {% endif %}
+                {% if lead.analog_belimo_code %}
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Аналог Belimo
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {{ lead.analog_belimo_code }}
+                  </td>
+                </tr>
+                {% endif %}
+              </table>
+            </td>
+          </tr>
+
+          {# ── Message ── #}
+          <tr>
+            <td style="padding:12px 28px 8px;">
+              <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;
+                          text-transform:uppercase;color:#6f6f6f;margin-bottom:8px;">
+                Сообщение
+              </div>
+              <div style="padding:14px 16px;background:#f8f9fb;border-radius:12px;
+                          border:1px solid rgba(30,30,40,0.08);
+                          font-size:15px;color:#2a2a2a;white-space:pre-wrap;">{{ lead.message }}</div>
+            </td>
+          </tr>
+
+          {% if assignee_display %}
+          {# ── Assignee ── #}
+          <tr>
+            <td style="padding:16px 28px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="background:rgba(218,14,43,0.07);border-radius:12px;
+                            border:1px solid rgba(218,14,43,0.16);">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;color:#2a2a2a;">
+                    Ответственный менеджер:
+                    <strong style="color:#b80c24;">{{ assignee_display }}</strong>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {% endif %}
+
+          {# ── CTA ── #}
+          <tr>
+            <td style="padding:24px 28px 8px;" align="left">
+              <a href="{{ admin_url }}"
+                 style="display:inline-block;padding:12px 22px;background:#da0e2b;color:#ffffff;
+                        font-size:14px;font-weight:700;text-decoration:none;border-radius:10px;
+                        letter-spacing:0.01em;">
+                Открыть заявку в Admin
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 28px;font-size:13px;color:#6f6f6f;">
+              <a href="{{ inbox_url }}" style="color:#b80c24;text-decoration:none;">Все новые заявки</a>
+              <span style="color:#a3a3a3;"> · </span>
+              создано {{ lead.created_at|date:"Y-m-d H:i" }}
+            </td>
+          </tr>
+
+          {# ── Footer ── #}
+          <tr>
+            <td style="background:#0f0f0f;padding:18px 28px;">
+              <a href="{{ site_url }}"
+                 style="font-family:Montserrat,Helvetica,Arial,sans-serif;
+                        font-size:13px;font-weight:700;letter-spacing:0.04em;
+                        color:#da0e2b;text-decoration:none;">HOOCON</a>
+              <span style="font-size:12px;color:#737373;"> · B2B HVAC</span>
+              <div style="margin-top:6px;font-size:12px;color:#737373;">
+                Служебное письмо CRM — не отвечайте на него клиенту с этого адреса.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

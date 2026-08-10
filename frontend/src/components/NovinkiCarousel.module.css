@@ -1,0 +1,160 @@
+.carousel {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--space-lg);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.navBtn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.navBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+  color: var(--color-link-hover);
+}
+
+.navBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.navBtn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Same snap pattern as DirectionsCategoryGrid @ ≤649px. */
+.track {
+  list-style: none;
+  margin: 0 calc(-1 * var(--space-lg));
+  /* Block padding: room for center lift/scale without clipping. */
+  padding: 0.75rem 11% 0.5rem;
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 11%;
+  gap: var(--space-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  flex: 0 0 78%;
+  width: 78%;
+  max-width: 78%;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  scroll-snap-align: center;
+  opacity: 1;
+  transition: opacity 0.28s var(--ease-out, ease);
+}
+
+.slide > * {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 20rem;
+  min-width: 0;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center bottom;
+  transition:
+    transform 0.28s var(--ease-out, ease),
+    box-shadow 0.28s var(--ease-out, ease);
+}
+
+.slidePeek {
+  opacity: 0.42;
+}
+
+/* Fully in-view cards (one or several on wide screens). */
+.slideFocus {
+  opacity: 1;
+}
+
+/* Center of the visible set — subtle lift + ~1.5% scale. */
+.slideCenter > * {
+  transform: translate3d(0, -0.35rem, 0) scale(1.015);
+}
+
+/*
+ * Pointer hover wins: any hovered slide takes the lift/scale;
+ * the scroll-center card settles unless it is the hovered one.
+ */
+@media (hover: hover) {
+  .track:has(.slide:hover) .slideCenter:not(:hover) > * {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .slide:hover {
+    opacity: 1;
+  }
+
+  .slide:hover > * {
+    transform: translate3d(0, -0.35rem, 0) scale(1.015);
+  }
+}
+
+.status {
+  margin: var(--space-md) 0 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 650px) {
+  .track {
+    margin: 0;
+    padding-inline: var(--space-sm);
+    scroll-padding-inline: var(--space-sm);
+    gap: var(--space-lg);
+  }
+
+  .slide {
+    flex: 0 0 min(20rem, 42%);
+    width: min(20rem, 42%);
+    max-width: min(20rem, 42%);
+  }
+}
+
+@media (min-width: 960px) {
+  .slide {
+    flex: 0 0 min(20rem, 30%);
+    width: min(20rem, 30%);
+    max-width: min(20rem, 30%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .slide > *,
+  .navBtn {
+    transition: none;
+  }
+
+  .slideCenter > *,
+  .slide:hover > * {
+    transform: none;
+  }
+}

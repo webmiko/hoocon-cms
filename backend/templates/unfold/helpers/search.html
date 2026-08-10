@@ -1,0 +1,24 @@
+{% load i18n %}
+
+{% if sidebar_show_search %}
+    <div class="mb-2.5 mx-3 relative hoocon-sidebar-search" x-on:click="$dispatch('opencommand')">
+        <div class="bg-white border border-base-200 cursor-pointer flex flex-row items-center gap-1 min-h-[38px] px-3 rounded-default relative shadow-xs w-full focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-primary-600 dark:bg-base-900 dark:border-base-700">
+            <span class="material-symbols-outlined md-18 text-base-400 shrink-0">manage_search</span>
+
+            <div class="grow font-medium min-w-0 overflow-hidden py-2 text-font-subtle-light truncate focus:outline-hidden dark:bg-base-900 dark:text-font-subtle-dark hoocon-sidebar-label">
+                {% trans 'Search apps and models...' %}
+            </div>
+
+            {# Compact kbd; only when pinned — rail/peek hide via CSS + x-show. #}
+            <kbd
+                class="hoocon-sidebar-shortcut bg-base-50 border border-base-200 font-sans text-xs text-subtle rounded-xs px-1 whitespace-nowrap dark:bg-white/[.04] dark:border-base-700"
+                x-show="sidebarOpen"
+                x-cloak
+            >
+                <span class="font-medium">
+                    {% if 'Macintosh' in request.META.HTTP_USER_AGENT %}⌘K{% else %}Ctrl + K{% endif %}
+                </span>
+            </kbd>
+        </div>
+    </div>
+{% endif %}

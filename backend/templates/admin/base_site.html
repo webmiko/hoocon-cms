@@ -1,0 +1,22 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}
+  {% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_("Django site admin") }}
+{% endblock %}
+
+{% block branding %}
+  {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  {% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_COUNT_URL %}
+  <script
+    src="{% static 'admin/js/hoocon-admin-leads-sticker.js' %}?v={{ STATIC_VERSION }}"
+    defer
+    data-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"
+    data-poll-ms="60000"
+  ></script>
+  {% endif %}
+{% endblock %}

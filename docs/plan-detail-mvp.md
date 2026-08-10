@@ -1,7 +1,7 @@
 # Детализация плана MVP: боль → фича → тест
 
 Дата: 2026-07-19  
-Базовый план: [ПЛАН-ПРОЕКТА.md](../ПЛАН-ПРОЕКТА.md)  
+Базовый план: план проекта (scope / MVP-критерии).  
 Контекст: [market-analysis.md](market-analysis.md),
 [seo-url-migration.md](seo-url-migration.md),
 [infra-reg-ru.md](infra-reg-ru.md).  
@@ -23,7 +23,7 @@
 | S8 | Docker local + CI | Качество | compose db/redis; GHA | ruff/mypy/pytest green |
 | S9 | Цены в БД, скрыты + флаг | Дилеры открывают цены; мы — по политике | `SiteSettings.show_prices` | API без цены по умолчанию |
 | S10 | Git private; prod после MVP | Контроль релиза | remote private | — |
-| S11 | VPS/DNS/mail reg.ru | Одна платформа | compose+nginx+SMTP | письмо Lead на sales@ |
+| S11 | VPS/DNS reg.ru + mail Яндекс 360 | Хост + почта | compose+nginx+SMTP 360 | письмо Lead на sales@ |
 | S12 | **SEO URL / 301** | Не потерять позиции | slug 1:1 + Redirect + nginx | инвентарь 200/301 |
 
 Вне v1 без изменений: корзина, ЛК дилера, BIM, EN, Meilisearch, Wagtail.
@@ -41,7 +41,7 @@
 | M5 | pytest catalog+leads; ruff/mypy CI | GHA green |
 | M6 | **Все path из seo-url §2.1 → 200** | curl/pytest redirects |
 | M7 | **Все `/tproduct/…` из карты → 301** | pytest Redirect |
-| M8 | SMTP Lead через ящик reg.ru (staging/prod) | лог Celery + входящее |
+| M8 | SMTP Lead через ящик Яндекс 360 (staging/prod) | лог Celery + входящее |
 
 **N = вся продукция каталога.** Снимок 2026-07-19: `total=39` в
 `../hoocon/data/hoocon_catalog_api.json` (25 ЧПУ `/privod-*` + 14
@@ -60,7 +60,7 @@ sitemap и догрузить.
 |------|-------|-------------------------|
 | Backend | Django+DRF | `slug`, Redirect, spa head, FTS |
 | DB | Postgres | FTS; один инстанс на VPS |
-| Queue | Celery+Redis | email через SMTP reg.ru |
+| Queue | Celery+Redis | email через SMTP Яндекс 360 |
 | Front | React+Vite | маршруты = старые path |
 | Edge | nginx на VPS | 301 map, TLS, CSP, static |
 | Search v1 | Postgres FTS | без Meilisearch на маленьком VPS |
@@ -130,7 +130,7 @@ hoocon-cms/
 |--------|------|------|
 | nginx TLS CSP | infra | curl https |
 | redirects.map из Redirect | SEO | полный инвентарь |
-| SMTP reg.ru | лиды | реальное письмо |
+| SMTP Яндекс 360 | лиды | реальное письмо |
 | CI + deploy SSH | качество | pipeline |
 | Cutover чеклист | риск | [seo-url §5](seo-url-migration.md) |
 

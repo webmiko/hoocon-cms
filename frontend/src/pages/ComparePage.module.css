@@ -1,0 +1,602 @@
+.page {
+  max-width: var(--container-max, 1120px);
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+
+.header {
+  margin: 0 0 20px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2vw + 1rem, 2rem);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.lead {
+  margin: 0;
+  max-width: 42rem;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.lead a {
+  color: var(--color-link);
+}
+
+.empty {
+  padding: 32px 20px;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-surface);
+}
+
+.empty p {
+  margin: 0 0 16px;
+  color: var(--color-text-muted);
+}
+
+.emptyCta {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-brand-control);
+  color: var(--color-on-brand-control);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hint,
+.loading,
+.error {
+  margin: 0 0 16px;
+  font-size: var(--font-size-sm);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger, #b00020);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clear,
+.share {
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--color-link);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.clear:hover,
+.share:hover {
+  text-decoration: underline;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: min(70vh, 900px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+  text-align: left;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--color-subtle, #f5f5f5);
+  font-weight: 600;
+  box-shadow: 0 1px 0 var(--color-border);
+}
+
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 140px;
+  max-width: 200px;
+  background: var(--color-surface);
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.table thead .stickyCol {
+  z-index: 5;
+  left: 0;
+  background: var(--color-subtle, #f5f5f5);
+}
+
+.groupRow th {
+  background: var(--color-subtle, #f0f0f0);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.addDialog {
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-lg, 12px);
+  max-width: min(420px, calc(100vw - 32px));
+  width: 100%;
+  background: transparent;
+}
+
+.addDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.addPanel {
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+}
+
+.addHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.addTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-family: var(--font-display);
+}
+
+.addClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: clamp(1.25rem, 0.8vw + 1rem, 1.5rem);
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.addSearchLabel {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.addSearch {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.addList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.addItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.addItem:hover {
+  background: var(--color-subtle, #f5f5f5);
+}
+
+.addItemName {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.addEmpty {
+  padding: 16px 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+
+  .mobileOnly,
+  .mobileCompare {
+    display: none !important;
+  }
+
+  .desktopOnly {
+    display: block !important;
+  }
+
+  .page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .scroll {
+    overflow: visible;
+    border: none;
+  }
+
+  .table {
+    min-width: 0;
+    font-size: 0.6875rem;
+  }
+
+  .stickyCol,
+  .table thead th {
+    position: static;
+    box-shadow: none;
+  }
+
+  .skuImage,
+  .skuImagePlaceholder {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+.skuCol {
+  min-width: 168px;
+  max-width: 220px;
+}
+
+.skuHead {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  padding-top: 4px;
+}
+
+.colRemove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.colRemove:hover {
+  background: var(--color-subtle);
+  color: var(--color-text);
+}
+
+.skuImage,
+.skuImagePlaceholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--color-subtle);
+}
+
+.skuImage :global(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skuImagePlaceholder {
+  display: block;
+}
+
+.skuLink {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text);
+  text-decoration: none;
+  padding-right: 20px;
+}
+
+.skuLink:hover {
+  color: var(--color-link);
+}
+
+.skuCode {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.skuName {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.skuCta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.skuCta:hover {
+  text-decoration: underline;
+}
+
+.diffRow td,
+.diffRow th {
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+}
+
+.diffRow .stickyCol {
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+}
+
+.noDiff {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 24px 16px !important;
+}
+
+.mobileOnly {
+  display: none;
+}
+
+.desktopOnly {
+  display: block;
+}
+
+.mobileCompare {
+  display: none;
+}
+
+.mobileProducts {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobileProduct {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-surface);
+}
+
+.skuHeadCompact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 6px;
+  padding-top: 0;
+  align-items: start;
+}
+
+.skuHeadCompact .skuImage,
+.skuHeadCompact .skuImagePlaceholder {
+  grid-row: 1 / span 2;
+  width: 56px;
+  height: 56px;
+}
+
+.skuHeadCompact .skuLink {
+  padding-right: 28px;
+}
+
+.skuHeadCompact .skuName {
+  -webkit-line-clamp: 2;
+}
+
+.skuHeadCompact .skuCta {
+  grid-column: 2;
+}
+
+.skuHeadCompact .colRemove {
+  top: -4px;
+  right: -4px;
+}
+
+.mobileSpecs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobileGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobileGroupTitle {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.mobileRow {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-surface);
+}
+
+.mobileDiff {
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+  border-color: color-mix(in srgb, var(--color-brand) 28%, var(--color-border));
+}
+
+.mobileAttr {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.mobileValues {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileValue {
+  display: grid;
+  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: baseline;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.mobileValue:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.mobileValue dt {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.mobileValue dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .desktopOnly {
+    display: none;
+  }
+
+  .mobileOnly,
+  .mobileCompare {
+    display: block;
+  }
+
+  .toolbar {
+    gap: 10px 14px;
+  }
+
+  .page {
+    padding-bottom: 64px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .diffRow td,
+  .diffRow th,
+  .diffRow .stickyCol {
+    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  }
+
+  .mobileDiff {
+    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  }
+}
+
+:global([data-theme="dark"]) .diffRow td,
+:global([data-theme="dark"]) .diffRow th,
+:global([data-theme="dark"]) .diffRow .stickyCol {
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+}
+
+:global([data-theme="dark"]) .mobileDiff {
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+}

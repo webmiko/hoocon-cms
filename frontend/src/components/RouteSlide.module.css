@@ -1,0 +1,43 @@
+/* Card ride for mobile / PWA — list → detail up, back down. */
+
+.stage {
+  min-height: 0;
+}
+
+.slideUp {
+  animation: routeCardUp 340ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+.slideDown {
+  animation: routeCardDown 300ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1))
+    both;
+}
+
+@keyframes routeCardUp {
+  from {
+    opacity: 0.72;
+    transform: translate3d(0, 22%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes routeCardDown {
+  from {
+    opacity: 0.78;
+    transform: translate3d(0, -10%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slideUp,
+  .slideDown {
+    animation: none;
+  }
+}

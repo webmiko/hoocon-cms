@@ -1,0 +1,16 @@
+{% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_URL %}
+<a
+  href="{{ HOOCON_NEW_LEADS_URL }}"
+  class="hoocon-admin-lead-sticker{% if HOOCON_NEW_LEADS_COUNT %} hoocon-admin-lead-sticker--active{% endif %}"
+  id="hoocon-admin-lead-sticker"
+  title="Новые непросмотренные заявки"
+  aria-label="Новые непросмотренные заявки: {{ HOOCON_NEW_LEADS_COUNT }}"
+  {% if not HOOCON_NEW_LEADS_COUNT %}hidden{% endif %}
+>
+  <span class="hoocon-admin-lead-sticker__label">Заявки</span>
+  <span
+    class="hoocon-admin-lead-sticker__count"
+    data-hoocon-new-leads-count
+  >{{ HOOCON_NEW_LEADS_COUNT }}</span>
+</a>
+{% endif %}

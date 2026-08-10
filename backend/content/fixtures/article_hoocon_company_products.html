@@ -1,0 +1,371 @@
+<p class="hero-dek">
+  Технический обзор платформ HOOCON для ОВК: воздушные заслонки, ОЗК и дымоудаление,
+  ускоренные серии HV, аварийный возврат (fail-safe) и сигналы управления.
+  Завод, OEM и контакты — на странице <a href="/zavod">«Завод»</a>.
+  Свод по семействам DA/SA —
+  в <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации модельного ряда</a>.
+</p>
+
+<ul class="stats">
+  <li><span class="num">5–20</span><span class="label">Нм типовой ряд HV</span></li>
+  <li><span class="num">2,5–7</span><span class="label">с ускоренный ход</span></li>
+  <li><span class="num">BLDC</span><span class="label">бесщёточный привод HV</span></li>
+  <li><span class="num">≥10<sup>5</sup></span><span class="label">циклов редуктора</span></li>
+</ul>
+
+<ul class="lead-links">
+  <li><a href="/catalog">Каталог SKU →</a></li>
+  <li><a href="/consultation">Заявка на КП →</a></li>
+  <li><a href="/zavod">Завод · OEM →</a></li>
+  <li><a href="/company">ООО «Хогон» →</a></li>
+</ul>
+
+<figure class="figure--product">
+  <img
+    src="/media/article_inline/hoocon-kompaniya-i-produktsiya/products-actuators.webp"
+    alt="Приводы воздушных заслонок HOOCON"
+    width="691"
+    height="762"
+    loading="lazy"
+    decoding="async"
+  />
+  <figcaption>Воздушные приводы: компактный корпус, зажим вала, кабельные вводы</figcaption>
+</figure>
+
+<h2>Платформы и назначение</h2>
+<p>
+  Шесть семейств воздушных приводов — как в каталоге. В артикулах DA/SA суффиксы
+  <strong>MU / MQU / FU / EU</strong>; у HV — <strong>…Q / …E / …F</strong>.
+  Управление в фасетах:
+  <strong>Открыто/закрыто</strong>, <strong>2-/3-позиционное</strong>,
+  <strong>пропорциональное</strong>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table series-table--platforms">
+<thead>
+<tr>
+  <th>Серия</th>
+  <th>Задача</th>
+  <th>Конструктив</th>
+  <th>Типовые коды</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>DA</td>
+  <td>Воздушные заслонки</td>
+  <td>MU · MQU · FU · EU</td>
+  <td>DAMU, DAMQU, DAFU, DAEU</td>
+</tr>
+<tr>
+  <td>SA</td>
+  <td>ОЗК / дым</td>
+  <td>FU · MU</td>
+  <td>SAFU, SAMU</td>
+</tr>
+<tr>
+  <td>HV …Q</td>
+  <td>Ускоренные воздушные</td>
+  <td>BLDC, без пружины</td>
+  <td>HVA…Q, HVD…Q</td>
+</tr>
+<tr>
+  <td>HV …E / …F</td>
+  <td>ПБ / дымоудаление</td>
+  <td>электронный / пружинный fail-safe</td>
+  <td>HVA/HVD …E, …F</td>
+</tr>
+<tr>
+  <td>Клапаны</td>
+  <td>Вода / отопление</td>
+  <td>эл. клапаны, шаровые</td>
+  <td>
+    <a href="/catalog/sharovye-krany">шаровые</a> ·
+    <a href="/catalog/komplekty">комплекты</a>
+  </td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<ul class="card-grid">
+  <li><strong>MU</strong><span>Стандартный ход, без пружины</span></li>
+  <li><strong>MQU</strong><span>Ускоренный ход, без пружины</span></li>
+  <li><strong>FU</strong><span>Пружинный возврат (механический fail-safe)</span></li>
+  <li><strong>EU</strong><span>Электронный fail-safe (без пружины)</span></li>
+</ul>
+<p>
+  <strong>Fail-safe</strong> (аварийный возврат) — при пропадании питания привод
+  уводит заслонку в безопасное положение. Кратко в
+  <a href="/faq#fail-safe">вопросах и ответах</a>.
+</p>
+
+<p class="dash-note">
+  Ориентиры по линейке HV и fail-safe — для сканирования; точные ТТХ в карточке SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">HV · момент → время хода</p>
+    <ul class="vbar">
+      <li>
+        <span class="vbar__col vbar__col--h35"></span>
+        <span class="vbar__label">5&nbsp;Нм<br />≈2,5&nbsp;с</span>
+      </li>
+      <li>
+        <span class="vbar__col vbar__col--h55"></span>
+        <span class="vbar__label">8&nbsp;Нм<br />≈4&nbsp;с</span>
+      </li>
+      <li>
+        <span class="vbar__col vbar__col--h95"></span>
+        <span class="vbar__label">20&nbsp;Нм<br />≈7&nbsp;с</span>
+      </li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Fail-safe · типы</p>
+    <div class="donut-wrap">
+      <div class="donut donut--drives" title="Типы fail-safe"></div>
+      <ul class="legend">
+        <li><span class="swatch swatch--a"></span>MU · стандарт</li>
+        <li><span class="swatch swatch--b"></span>MQU · ускоренный</li>
+        <li><span class="swatch swatch--c"></span>FU / …F · пружина</li>
+        <li><span class="swatch swatch--d"></span>EU / …E · электронный</li>
+      </ul>
+    </div>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Ресурс и гарантия</p>
+    <ul class="meter-list">
+      <li>
+        <span class="meter-list__label">BLDC vs щёточный</span>
+        <span class="meter"><span class="meter__fill meter__fill--100"></span></span>
+        <span class="meter-list__val">×3</span>
+      </li>
+      <li>
+        <span class="meter-list__label">Ресурс редуктора</span>
+        <span class="meter"><span class="meter__fill meter__fill--90"></span></span>
+        <span class="meter-list__val">≥10⁵</span>
+      </li>
+      <li>
+        <span class="meter-list__label">Гарантия РФ</span>
+        <span class="meter"><span class="meter__fill meter__fill--80"></span></span>
+        <span class="meter-list__val">24&nbsp;мес.</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="family-block">
+<h2>Серия HV: момент и время хода</h2>
+<p>
+  Линейка HV — быстрое позиционирование заслонок. HVA и HVD: компактный корпус,
+  бесщёточный двигатель; суффиксы в артикуле задают питание, сигнал и fail-safe
+  (…Q ускоренный без пружины, …E электронный, …F пружинный).
+</p>
+
+<figure class="figure--product">
+  <img
+    src="/media/article_inline/hoocon-kompaniya-i-produktsiya/product-hv.webp"
+    alt="Ускоренный привод серии HV"
+    width="341"
+    height="385"
+    loading="lazy"
+    decoding="async"
+  />
+  <figcaption>HV — BLDC, стабильное время хода по рядам момента</figcaption>
+</figure>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Крутящий момент</th>
+  <th>Типовое время хода</th>
+  <th>Примечание</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>5&nbsp;Нм</td><td>≈&nbsp;2,5&nbsp;с</td><td>HV …Q · ориентир</td></tr>
+<tr><td>8&nbsp;Нм</td><td>≈&nbsp;4&nbsp;с</td><td>HV …Q · ориентир</td></tr>
+<tr><td>20&nbsp;Нм</td><td>≈&nbsp;7&nbsp;с</td><td>HV …Q · ориентир</td></tr>
+</tbody>
+</table>
+</div>
+<p>
+  Точные значения — в карточке SKU: питание 24&nbsp;В / 230&nbsp;В, управление
+  Открыто/закрыто или пропорциональное, вспомогательный переключатель — опция.
+</p>
+</div>
+
+<div class="family-block">
+<h2>Двигатель и ресурс</h2>
+
+<figure>
+  <img
+    src="/media/article_inline/hoocon-kompaniya-i-produktsiya/motor-compare.webp"
+    alt="Сравнение щёточного и бесщёточного двигателя"
+    width="1008"
+    height="351"
+    loading="lazy"
+    decoding="async"
+  />
+  <figcaption>Бесщёточный vs щёточный: ресурс выше примерно в 3 раза</figcaption>
+</figure>
+
+<figure class="figure--product">
+  <img
+    src="/media/article_inline/hoocon-kompaniya-i-produktsiya/specs-mabuchi.webp"
+    alt="Двигатель MABUCHI в приводе HOOCON"
+    width="898"
+    height="733"
+    loading="lazy"
+    decoding="async"
+  />
+  <figcaption>Промышленный двигатель · ресурс редуктора ≥100&nbsp;000 циклов</figcaption>
+</figure>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Параметр</th>
+  <th>Ориентир</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Тип двигателя (HV)</td>
+  <td>Бесщёточный (BLDC); vs щёточный ≈&nbsp;×3 ресурс</td>
+</tr>
+<tr>
+  <td>Ресурс редуктора</td>
+  <td>≥&nbsp;100&nbsp;000 циклов</td>
+</tr>
+<tr>
+  <td>Fail-safe</td>
+  <td>пружина FU / …F или электронный EU / …E — <a href="/faq#fail-safe">FAQ</a></td>
+</tr>
+<tr>
+  <td>Гарантия (РФ)</td>
+  <td>24&nbsp;месяца (ООО «Хогон»)</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="family-block">
+<h2>Сигналы управления</h2>
+<p>
+  Как в каталоге. Пропорциональное (модулирующее) — сигнал Y
+  <strong>0(2)…10&nbsp;В=</strong>; режим
+  <strong>0(4)…20&nbsp;мА</strong> — спецзаказ
+  (<a href="/faq#signal-ma-special-order">пояснение в FAQ</a>).
+</p>
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Управление</th>
+  <th>Сигнал / суффикс</th>
+  <th>Применение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Открыто/закрыто</td>
+  <td>D · 2-позиционное</td>
+  <td>Дискретные заслонки, ОЗК</td>
+</tr>
+<tr>
+  <td>2-/3-позиционное</td>
+  <td>по паспорту SKU</td>
+  <td>Позиционное позиционирование</td>
+</tr>
+<tr>
+  <td>Пропорциональное</td>
+  <td>A · Y 0(2)…10&nbsp;В=</td>
+  <td>Модулирующее регулирование</td>
+</tr>
+<tr>
+  <td>Вспом. переключатель</td>
+  <td>S</td>
+  <td>Обратная связь положения</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<h2>Семейства в каталоге</h2>
+<ul>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">
+      Воздушные без пружины (MU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata">
+      Ускоренные без пружины (MQU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektronnye-otkazoustoychivye-vozdushnye-privody">
+      Электронный fail-safe (EU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">
+      Пружинный возврат (FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-protivopozharnye-i-dymovye">
+      Противопожарные и дымовые (SA FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">
+      Клапаны дымоудаления (SA MU) →
+    </a>
+  </li>
+</ul>
+
+<h2>Эволюция линейки</h2>
+<ol class="timeline">
+  <li><span class="year">1998</span> серия DA — первое поколение воздушных</li>
+  <li><span class="year">2015</span> серия HV — BLDC и ускоренный ход</li>
+  <li><span class="year">2017</span> электрические клапаны</li>
+  <li><span class="year">2019</span> водяные клапаны</li>
+  <li><span class="year">→</span> взрывозащищённые контроллеры</li>
+</ol>
+
+<h2>Типовые объекты</h2>
+<ul class="card-grid">
+  <li>
+    <strong>Метро и ВСМ</strong>
+    <span>Пекин, Шанхай, Тяньцзинь, Харбин… · Пекин–Шэньян</span>
+  </li>
+  <li>
+    <strong>Аэропорты и автопром</strong>
+    <span>Дасин · Сяошань T4 · SAIC-GM · CRRC</span>
+  </li>
+  <li>
+    <strong>Недвижимость</strong>
+    <span>Shanghai Tower · SOHO · Wanda Plaza</span>
+  </li>
+  <li>
+    <strong>Энергетика</strong>
+    <span>ГЭС «Санься» · АЭС Даявань</span>
+  </li>
+</ul>
+
+<p class="footnote">
+  Подбор модели и ТТХ — в <a href="/catalog">каталоге</a>.
+  Прямой OEM с завода, сертификаты и контакты производителя —
+  на странице <a href="/zavod">«Завод»</a>.
+  Поставки в РФ — <a href="/company">ООО «Хогон»</a>.
+  Применение в вентиляции —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">статья</a>.
+</p>

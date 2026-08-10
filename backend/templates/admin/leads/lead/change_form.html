@@ -1,0 +1,49 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block form_top %}
+  {{ block.super }}
+  {% if not lead_view_mode and original %}
+    <input type="hidden" name="_lead_edit" value="1">
+  {% endif %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+  {% if lead_view_mode %}
+    <div class="hoocon-lead-view-actions-spacer" aria-hidden="true"></div>
+    <div class="submit-row hoocon-lead-view-actions" role="toolbar" aria-label="Действия заявки">
+      <a
+        href="{% url 'admin:leads_lead_changelist' %}"
+        class="hoocon-lead-view-actions__back"
+      >
+        Вернуться к списку
+      </a>
+      {% if lead_edit_url %}
+        <a
+          href="{{ lead_edit_url }}"
+          class="hoocon-admin-open hoocon-admin-lead-open hoocon-lead-view-actions__edit"
+        >
+          Редактировать
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="hoocon-lead-view-actions-spacer" aria-hidden="true"></div>
+    <div class="hoocon-lead-view-actions hoocon-lead-view-actions--edit" role="toolbar">
+      <a
+        href="{% url 'admin:leads_lead_changelist' %}"
+        class="hoocon-lead-view-actions__back"
+      >
+        Вернуться к списку
+      </a>
+      {% if lead_view_url %}
+        <a href="{{ lead_view_url }}" class="hoocon-lead-view-actions__back">
+          К просмотру
+        </a>
+      {% endif %}
+      <div class="hoocon-lead-view-actions__saves">
+        {{ block.super }}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

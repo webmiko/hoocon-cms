@@ -1,0 +1,142 @@
+<p class="hero-dek">
+  Исполнительное оборудование ОВК: электроприводы воздушных заслонок, огнезадерживающих
+  клапанов и шаровых кранов. Ниже — типовые узлы и критерии подбора; точные артикулы —
+  в <a href="/catalog">каталоге</a>.
+</p>
+
+<p class="dash-note">
+  Дашборд — ориентир по долям задач. Подбор момента и сигналов — по паспорту заслонки
+  и карточке SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Задачи исполнительных узлов</p>
+    <div class="donut-wrap">
+      <div class="donut donut--platforms" title="Задачи"></div>
+      <ul class="legend">
+        <li><span class="swatch swatch--a"></span>Воздушные заслонки</li>
+        <li><span class="swatch swatch--b"></span>ОЗК / дым</li>
+        <li><span class="swatch swatch--c"></span>Шаровые краны</li>
+        <li><span class="swatch swatch--d"></span>Прочие клапаны</li>
+      </ul>
+    </div>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Питание и управление · ориентир</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">24&nbsp;В</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--70"></span></span>
+        <span class="hbar__val">АСУ&nbsp;ТП</span>
+      </li>
+      <li>
+        <span class="hbar__label">230&nbsp;В</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--55"></span></span>
+        <span class="hbar__val">щитовые</span>
+      </li>
+      <li>
+        <span class="hbar__label">пропорциональное</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--80"></span></span>
+        <span class="hbar__val">0(2)…10&nbsp;В=</span>
+      </li>
+      <li>
+        <span class="hbar__label">пружинный возврат</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">fail-safe FU</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Роль в системе ОВК</h2>
+<p>
+  Системы отопления, вентиляции и кондиционирования включают нагревательные блоки,
+  кондиционирующее оборудование, вентиляционные модули, распределительную сеть и
+  автоматику. Исполнительные устройства — электроприводы и запорная арматура —
+  переводят команды контроллера в движение заслонок и клапанов, в том числе
+  в аварийных режимах.
+</p>
+
+<h2>Электроприводы воздушных заслонок</h2>
+<p>
+  Привод поворачивает лопатки и регулирует расход воздуха. В составе узла — двигатель,
+  редуктор и механизм фиксации положения. Для штатного регулирования применяют
+  <strong>пропорциональное</strong> управление (сигнал Y <strong>0(2)…10&nbsp;В=</strong>)
+  или <strong>Открыто/закрыто</strong>; для безопасного положения при пропадании
+  питания — <strong>пружинный возврат</strong> (fail-safe <strong>FU</strong>) или
+  электронный fail-safe (<strong>EU</strong>). Подробнее о сигналах —
+  в <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации модельного ряда</a>.
+</p>
+<p>Критерии подбора:</p>
+<ul>
+  <li>питание <strong>24&nbsp;В</strong> или <strong>230&nbsp;В</strong>;</li>
+  <li>допустимая площадь заслонки и крутящий момент (Нм);</li>
+  <li>наличие пружинного возврата или EU — по задаче;</li>
+  <li>степень защиты корпуса, температурный диапазон, совместимость с контроллером.</li>
+</ul>
+<p>
+  Семейства без пружины —
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">MU / MQU</a>;
+  с пружинным возвратом —
+  <a href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">FU</a>.
+</p>
+
+<h2>Приводы огнезадерживающих клапанов (ОЗК)</h2>
+<p>
+  ОЗК перекрывает воздуховод при пожаре и не даёт огню и дыму распространяться по
+  каналам. В штатном режиме клапан открыт; по сигналу пожарной автоматики или при
+  отключении питания привод с <strong>пружинным возвратом</strong> закрывает створки.
+  Типовое время возврата пружины — до <strong>25&nbsp;с</strong>; возможна опция
+  термодатчика <strong>T</strong>.
+</p>
+<p>
+  Для ОЗК и дымовых контуров — серия
+  <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU</a>.
+  Не путать с воздушными DA на огнезадерживающих клапанах —
+  см. <a href="/faq#fail-safe">fail-safe в FAQ</a> и
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение приводов</a>.
+</p>
+
+<h2>Электроприводы шаровых кранов</h2>
+<p>
+  Узел регулирует поток теплоносителя в контурах отопления, охлаждения и ГВС.
+  Функции: <strong>Открыто/закрыто</strong>, <strong>пропорциональное</strong>
+  (для 2-/3-ходовых кранов), аварийное перекрытие. Корпус — чугун или латунь,
+  шар — нержавеющая сталь, уплотнение — фторопласт; допускается ручной дубль
+  при отказе автоматики.
+</p>
+<p>
+  Краны и комплекты «кран + привод» —
+  <a href="/catalog/sharovye-krany">шаровые краны</a>,
+  <a href="/catalog/komplekty">комплекты</a>.
+</p>
+
+<h2>Что смотреть в каталоге</h2>
+<ul>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">
+      Воздушные без пружины (MU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">
+      С пружинным возвратом (FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-protivopozharnye-i-dymovye">
+      Противопожарные и дымовые (SA FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/sharovye-krany">
+      Шаровые краны →
+    </a>
+  </li>
+</ul>
+<p>
+  Подбор по объекту и КП —
+  <a href="/consultation">заявка на консультацию</a>.
+  Обзор платформ HOOCON —
+  <a href="/statyi/hoocon-kompaniya-i-produktsiya">компания и продукция</a>.
+</p>

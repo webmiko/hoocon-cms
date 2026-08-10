@@ -1,0 +1,3 @@
+from_path,to_path,status_code,note
+/privod-protivipozharniy-3nm,/privod-protivopozharniy-3nm,301,typo protivi→protivo (противопожарный)
+/privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm,/privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm,301,typo bezpruzhini→bez-pruzhini (дефис как у серии DAMU)

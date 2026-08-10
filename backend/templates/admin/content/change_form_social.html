@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  {% if social_announce_url and original.is_published %}
+    <li>
+      <a href="{{ social_announce_url }}" class="historylink">
+        {% trans "Опубликовать в соцсети" %}
+      </a>
+    </li>
+  {% endif %}
+{% endblock %}

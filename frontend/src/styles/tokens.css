@@ -1,0 +1,274 @@
+/**
+ * Hoocon design tokens — industrial B2B, airy glass surfaces.
+ *
+ * Spec: docs/readiness-backend-ux.md §4.2; docs/design-system.md.
+ * Brand red only; soft frosted glass (not neon / purple glassmorphism).
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Brand — logo red from public/logo.svg (#da0e2b); keep brandColors.ts in sync. */
+  --color-brand: #da0e2b;
+  --color-brand-hover: #b80c24;
+  --color-brand-deep: #b80c24;
+  --color-brand-deeper: #8f0a1c;
+  --color-brand-soft: color-mix(in srgb, var(--color-brand) 9%, transparent);
+  --color-on-brand: #ffffff;
+  /* Solid chrome CTA fill (header / sticky) — same as logo in both themes. */
+  --color-brand-fill: var(--color-brand);
+  --color-brand-fill-hover: var(--color-brand-hover);
+  --color-on-brand-fill: var(--color-on-brand);
+  /* Label on brand-control / data-brand-cta (may differ from ink on-brand in dark). */
+  --color-on-brand-control: var(--color-on-brand-fill);
+  /* Brand as ink on surfaces (dark theme remaps brand for WCAG AA). */
+  --color-brand-ink: var(--color-brand);
+
+  --color-primary: var(--color-brand);
+  --color-primary-hover: var(--color-brand-hover);
+  --color-on-primary: var(--color-on-brand);
+
+  /* Text links — separate from brand fill so dark theme can stay AA */
+  --color-link: var(--color-brand-hover);
+  --color-link-hover: var(--color-brand);
+
+  /* Text — muted ≥ 4.5:1 on #fff / #f3f4f7 (WCAG AA normal text) */
+  --color-text: #2a2a2a;
+  --color-text-soft: #5a5a5a;
+  --color-text-muted: #6f6f6f;
+  --color-link-visited: #9a1a6a;
+
+  /* Surfaces */
+  --color-bg: #f3f4f7;
+  --color-surface: #ffffff;
+  --color-subtle: #f8f9fb;
+  --color-border: rgba(30, 30, 40, 0.08);
+  --color-border-strong: rgba(30, 30, 40, 0.14);
+  --color-masthead: #141414;
+  --color-footer: #0f0f0f;
+  --color-hero: #101010;
+  /* Inverse controls (search submit): dark fill on light page */
+  --color-inverse: #2a2a2a;
+  --color-on-inverse: #ffffff;
+  --color-inverse-hover: #111111;
+  --color-placeholder: #e8eaef;
+
+  /* Frosted glass (матовое стекло) — плотнее, читаемее на градиентах */
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-bg-strong: rgba(255, 255, 255, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-blur: 18px;
+  --glass-saturate: 1.2;
+
+  /*
+   * Controls (кнопки / CTA): сильный blur + слегка прозрачная заливка,
+   * чтобы текст/фото под кнопкой не конкурировали с подписью.
+   */
+  --control-blur: 32px;
+  --control-saturate: 1.35;
+  /*
+   * ≥94% so on-brand-fill stays ≥4.5:1 even when backdrop-filter blends a
+   * bright page through the fill. Mix from brand-fill (logo), not brand-ink.
+   * 88% was AA on flat white but washed out under blur.
+   */
+  --color-brand-control: color-mix(in srgb, var(--color-brand-fill) 94%, transparent);
+  --color-brand-control-hover: color-mix(
+    in srgb,
+    var(--color-brand-fill-hover) 96%,
+    transparent
+  );
+  --color-inverse-control: color-mix(in srgb, var(--color-inverse) 88%, transparent);
+  --color-inverse-control-hover: color-mix(
+    in srgb,
+    var(--color-inverse-hover) 94%,
+    transparent
+  );
+  --color-primary-control: var(--color-brand-control);
+  --color-primary-control-hover: var(--color-brand-control-hover);
+
+  /* Soft page wash */
+  --gradient-page:
+    radial-gradient(ellipse 80% 55% at 8% -5%, color-mix(in srgb, var(--color-brand) 7%, transparent), transparent 52%),
+    radial-gradient(ellipse 55% 45% at 92% 5%, rgba(40, 40, 50, 0.04), transparent 48%),
+    linear-gradient(165deg, #f8f9fb 0%, #f1f2f6 48%, #eceef3 100%);
+
+  --gradient-hero:
+    radial-gradient(ellipse 90% 70% at 85% -10%, color-mix(in srgb, var(--color-brand) 32%, transparent), transparent 58%),
+    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(255, 255, 255, 0.04), transparent 50%),
+    linear-gradient(155deg, #0a0a0a 0%, #161616 42%, #121212 100%);
+
+  /*
+   * Product photo wash (transparent WebP cutouts) — one backdrop for all
+   * categories. Purpose aliases kept for existing data-purpose selectors.
+   */
+  --photo-wash: linear-gradient(
+    165deg,
+    #d8dbe2 0%,
+    #e8eaef 48%,
+    #f2f3f6 100%
+  );
+  --photo-wash-valve: var(--photo-wash);
+  --photo-wash-air: var(--photo-wash);
+  --photo-wash-smoke: var(--photo-wash);
+  --photo-wash-fire: var(--photo-wash);
+
+  /* Semantic */
+  --color-danger: #b01010;
+  --color-success: #2d6a4f;
+
+  --color-badge-default: #eef0f3;
+  --color-badge-sku: var(--color-brand);
+  --color-badge-article: #555555;
+  --color-badge-news: #2d6a4f;
+  --color-on-badge: #ffffff;
+
+  /* Elevation — soft, single layer */
+  --shadow: 0 12px 40px rgba(20, 20, 30, 0.06);
+  --shadow-soft: 0 4px 20px rgba(20, 20, 30, 0.04);
+  --shadow-header: 0 1px 0 rgba(20, 20, 30, 0.05);
+
+  /*
+   * Border radius — concentric scale (шаг ≈ 4px).
+   * Крупнее блок → крупнее радиус, чтобы кривизна визуально совпадала
+   * при наложении (r_outer ≈ r_inner + gap).
+   * xs: badges/chips · sm: controls · md: tiles/cards · lg: large cards · xl: bands
+   */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius: var(--radius-md);
+
+  /* Spacing — больше воздуха */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 28px;
+  --space-xl: 48px;
+  --space-2xl: 80px;
+  --space-3xl: 112px;
+
+  /* Typography — rem + clamp; html root stays 100% (browser default ≈16px). */
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Montserrat", var(--font-sans);
+  --font-size-sm: clamp(0.8125rem, 0.2vw + 0.75rem, 0.875rem);
+  --font-size-base: clamp(0.9375rem, 0.25vw + 0.85rem, 1.0625rem);
+  --font-size-lg: clamp(1.0625rem, 0.4vw + 0.9rem, 1.25rem);
+  --font-size-xl: clamp(1.25rem, 1vw + 1rem, 1.75rem);
+  --font-size-2xl: clamp(1.5rem, 1.5vw + 1.1rem, 2.25rem);
+  --font-size-hero: clamp(1.75rem, 4vw + 0.5rem, 2.75rem);
+  --bento-gap: var(--space-md);
+
+  /* Layout + motion */
+  --max-width: 1200px;
+  --header-height: 68px;
+  --masthead-height: 32px;
+  --bottom-chrome: 0px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition: 280ms var(--ease-out);
+  --transition-fast: 180ms var(--ease-out);
+}
+
+/*
+ * Dark theme — page chrome only.
+ * Masthead / hero / footer stay dark bands (shared brand chrome).
+ * Applied via documentElement.dataset.theme (see theme.ts + index.html FOUC).
+ */
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  /*
+   * Brand ink lifted for links on dark surfaces (#da0e2b alone ~3.6:1).
+   * Chrome CTA fills stay logo red + white (--color-brand-fill).
+   */
+  --color-brand: #ff7070;
+  --color-brand-hover: #ff9a9a;
+  --color-brand-deep: #e85555;
+  --color-brand-deeper: #c94444;
+  --color-brand-ink: var(--color-brand);
+  --color-brand-soft: color-mix(in srgb, var(--color-brand) 22%, transparent);
+  --color-on-brand: #121214;
+  --color-brand-fill: #da0e2b;
+  --color-brand-fill-hover: #b80c24;
+  --color-on-brand-fill: #ffffff;
+  /* Brand CTAs: solid logo fill + white (not translucent coral + dark ink). */
+  --color-brand-control: var(--color-brand-fill);
+  --color-brand-control-hover: var(--color-brand-fill-hover);
+  --color-on-brand-control: var(--color-on-brand-fill);
+  --color-primary-control: var(--color-brand-control);
+  --color-primary-control-hover: var(--color-brand-control-hover);
+  --color-link: var(--color-brand);
+  --color-link-hover: var(--color-brand-hover);
+
+  /* Body text — muted lifted for ≥4.5:1 on subtle/surface */
+  --color-text: #e8e8ea;
+  --color-text-soft: #b8b8c0;
+  --color-text-muted: #9a9aa3;
+  --color-link-visited: #d08aba;
+  --color-danger: #ff6b6b;
+  --color-success: #4caf7a;
+
+  --color-bg: #121214;
+  --color-surface: #1c1c20;
+  --color-subtle: #24242a;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-inverse: #e8e8ea;
+  --color-on-inverse: #121214;
+  --color-inverse-hover: #ffffff;
+  --color-placeholder: #2a2a32;
+
+  --glass-bg: rgba(22, 22, 28, 0.92);
+  --glass-bg-strong: rgba(28, 28, 34, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.1);
+
+  --gradient-page:
+    radial-gradient(ellipse 80% 55% at 8% -5%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 52%),
+    radial-gradient(ellipse 55% 45% at 92% 5%, rgba(80, 80, 100, 0.12), transparent 48%),
+    linear-gradient(165deg, #16161a 0%, #121214 48%, #0e0e12 100%);
+
+  /* Product photo wash — graphite gradient (all categories). */
+  --photo-wash: linear-gradient(
+    165deg,
+    #3a3a42 0%,
+    #2a2a32 48%,
+    #1c1c22 100%
+  );
+  --photo-wash-valve: var(--photo-wash);
+  --photo-wash-air: var(--photo-wash);
+  --photo-wash-smoke: var(--photo-wash);
+  --photo-wash-fire: var(--photo-wash);
+
+  --color-badge-default: #2a2a32;
+  /* Keep dark fill + white label (light #a8a8b0 + white failed AA) */
+  --color-badge-article: #55555e;
+
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.28);
+  --shadow-header: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --bottom-chrome: calc(72px + env(safe-area-inset-bottom, 0px));
+    --masthead-height: 0px;
+    --space-2xl: 64px;
+    --space-3xl: 80px;
+  }
+
+  /* Articles / news: no sticky CTA — no reserved bottom gap */
+  html[data-sticky-cta="off"] {
+    --bottom-chrome: 0px;
+  }
+}
+
+html.cookie-banner-open {
+  --cookie-chrome: 120px;
+}
+
+@media (max-width: 768px) {
+  html.cookie-banner-open {
+    --cookie-chrome: 160px;
+  }
+}

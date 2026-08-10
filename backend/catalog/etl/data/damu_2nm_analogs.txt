@@ -1,0 +1,35 @@
+Список аналогов для привода заслонки Hoocon серии DA..MU 2 Нм
+
+Аналоги для DA2MU24-D/DS (24 В, 2Нм):
+
+– Dastech DA-02N24A
+– Nanotek LM 24 B
+– Belimo CM24-L/R
+– Sputnik AR24-2-S
+– Lufberg DA02N24S
+– BVM TM24-2
+– Siemens GSD326.1E (версия на 24В)
+– Gruner 225-24Т-05-S2
+
+Аналоги для DA2MU24-A/AS (24 В, 2Нм):
+
+– Belimo LM24A-SR
+– Belimo LM24A-SR-S
+
+Аналоги для DA2MU230-D/DS (230 В, 2Нм):
+
+– Dastech DA-02N220A
+– Nanotek LM 230 B (4НМ)
+– Belimo CM230-L/R
+– Sputnik AR230-2-S
+– Lufberg DA02N220S
+– BVM TM230-2
+– Siemens GSD326.1E
+– Gruner 225-230Т-05-S2 (5НМ)
+
+Аналоги для DA2MU230-A/AS (230 В, 2Нм):
+
+– Belimo LM230A-SR
+– Belimo LM230A-SR-S
+
+Важно: При выборе аналога необходимо проверить соответствие всех технических параметров конкретной системе вентиляции, включая размер вала, направление вращения и требуемое усилие.

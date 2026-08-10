@@ -20,11 +20,11 @@
 
 | Блок | Статус | Где |
 |------|--------|-----|
-| Цель, scope, MVP-критерии | Готово | `ПЛАН-ПРОЕКТА.md` |
+| Цель, scope, MVP-критерии | Готово | план проекта |
 | Рынок + боли клиентов | Готово | `market-analysis.md` |
 | Стек Django/DRF + React | Готово | `stack-decision.md` |
 | SEO URL + 301 + BV ЧПУ | Готово | `seo-url-migration.md`, seed CSV |
-| Infra reg.ru (VPS/DNS/mail) | Зафиксировано | `infra-reg-ru.md` |
+| Infra reg.ru VPS/DNS + почта Яндекс 360 | Зафиксировано | `infra-reg-ru.md` |
 | Детализация боль→фича→тест | Готово | `plan-detail-mvp.md` |
 | Poetry env + Django skeleton | Есть | `backend/` |
 | Vite React scaffold | Есть | `frontend/` |
@@ -41,8 +41,8 @@
 | Полный инвентарь **PDF/фото** по SKU | Карточки без файлов | ETL итерация 2 + гейты качества |
 | Схема атрибутов (момент, В, сигнал…) как словарь | Кривые фильтры | Итерация 1 + [data-quality-etl.md](data-quality-etl.md) |
 | Контент статей/новостей для импорта | Пустые `/statyi` | Итерация 3; тексты **не** as-is с Tilda |
-| VPS reg.ru + DNS/SMTP в бою | Не блокер кода | Итерация 5 |
-| Docker Desktop локально | Не поднять Postgres | Сейчас (или USE_SQLITE) |
+| VPS reg.ru + DNS + SMTP 360 в бою | Не блокер кода | Итерация 5 |
+| Docker Desktop локально | Не поднять Postgres | Поднять Postgres (FTS/GIN). `USE_SQLITE` — не для полного migrate |
 | Утверждённый макет mobile sticky CTA | Мелкие правки | Итерация 4 (есть в прототипе) |
 | Remote GitHub private | Процесс | По команде |
 
@@ -62,7 +62,7 @@ nginx (prod) → Django (gunicorn)
                  ├─ DRF public read API
                  ├─ spa_index_view (SEO head)
                  ├─ services/ (бизнес-логика, не в views)
-                 └─ Celery → SMTP reg.ru
+                 └─ Celery → SMTP Яндекс 360
 Postgres ← catalog / content / leads / redirects
 Redis ← Celery broker
 ```
@@ -168,6 +168,9 @@ skip-link; performance budget CWV.
 4. **Карточка (PDP):** фото + таблица атрибутов + документы + аналоги +
    «Запрос КП» (SLA в подписи).
 5. **Контент:** статьи/новости как у OEM support, не блог-lifestyle.
+   Числа, доли, сроки, KPI — **графики и дашборды** (HTML/CSS-классы,
+   `cms-body-charts.css`),
+   не стена текста. Референс: `/zavod`.
 
 ### 4.4 Соответствие «направлению» HVAC
 
@@ -180,7 +183,8 @@ skip-link; performance budget CWV.
 
 ### 4.5 Перенос в React
 
-- CSS variables из §4.2 → `frontend/src/styles/tokens.css`.
+- CSS variables из §4.2 → `frontend/src/styles/tokens.css`
+  (см. также [design-system.md](design-system.md)).
 - Компоненты layout по прототипу (Header, Filters, SkuCard, PdpBuy).
 - Контент hero — реальные фото продукции (из media ETL), не абстрактный
   градиент.
@@ -196,7 +200,7 @@ skip-link; performance budget CWV.
 | Понятен UX/дизайн? | Да (§4), канон = прототипы Hoocon |
 | Весь каталог в scope? | Да (~39 SKU) |
 | SEO URL? | Да |
-| Prod reg.ru учтён? | Да |
+| Prod reg.ru VPS/DNS + Яндекс 360 почта? | Да |
 | Блокер до итерации 1? | Нет (Docker/Postgres — удобство, не стоп) |
 
 Рекомендация: после вашего «ок» по этому документу — **итерация 1**

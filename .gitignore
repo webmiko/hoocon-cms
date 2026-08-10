@@ -1,26 +1,119 @@
-# KB symlink target content is outside repo; keep link name ignored if needed
-# (symlink itself can be committed as symlink — git stores it; KB not tracked)
+# Hoocon CMS .gitignore
+# Опора: каноничный шаблон БЗ/LMS, адаптированный под проект.
+# docs/ в git; локальные агент/план — не на GitHub.
 
-__pycache__/
-*.py[cod]
+# Виртуальное окружение
 .venv/
 venv/
-.env
-.env.*
-!.env.example
-.mypy_cache/
-.ruff_cache/
-.pytest_cache/
-.coverage
-htmlcov/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
 dist/
 build/
-node_modules/
-frontend/dist/
-backend/db.sqlite3
-backend/staticfiles/
-backend/media/
+
+# Логи
 *.log
-.DS_Store
+logs/*
+!logs/.gitkeep
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Cursor + вход агента / план — только локально
+.cursor/
+AGENTS.md
+ПЛАН-ПРОЕКТА.md
+
+# Локальные "_" пути (симлинки или каталоги): БЗ, PDF-инструкции и пр.
+# Без завершающего «/» — иначе symlink не матчится как directory.
+_*
+_инструкции-pdf
+_Универсальная-база-знаний
+
+# Локальные override Compose (не коммитить)
+docker-compose.override.yml
+docker-compose.dev.yml
+docker-compose.local.yml
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Локальные дампы / артефакты деплоя (не коммитить)
+.deploy-tmp/
+.local/
+
+# Загрузки (media) и collectstatic
+media/
+backend/media/
+backend/staticfiles/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/dev-dist/
+node_modules/
+
+# Demo slide raster exports (PNG/PDF)
+docs/demo/export/
+
+# RU manual HTML / constructor — local only (also matched by ``_*`` above).
+# Not for prod site; not tracked on develop after untrack.
+_manuals-ru/
+
+# Coverage / tooling artifacts
+backend/coverage.json
+coverage.json
+
+# Базы данных
+*.db
+*.sqlite
+*.sqlite3
+*.db3
+
+# Отчёты и тесты
+reports/
+temp_reports/
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# Временные файлы
+*.tmp
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Git (отдельный репозиторий)
+.git_local/
+
+# Шаблоны коммитов (не коммитить)
+.git_commit_template

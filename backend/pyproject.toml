@@ -1,6 +1,6 @@
 [project]
 name = "hoocon-cms"
-version = "0.1.0"
+version = "0.1.19"
 description = "B2B CMS and catalog for Hoocon HVAC actuators (Django + DRF)"
 license = "Proprietary"
 authors = [{ name = "niko" }]
@@ -19,6 +19,10 @@ dependencies = [
     "django-celery-beat (>=2.9.0,<3.0.0)",
     "whitenoise (>=6.6,<7)",
     "gunicorn (>=23.0,<24)",
+    "django-axes (>=8.3.1,<9.0.0)",
+    "django-unfold (>=0.101.0,<0.102.0)",
+    "pypdfium2 (>=5.12.1,<6.0.0)",
+    "openpyxl (>=3.1,<4)",
 ]
 
 [tool.poetry]
@@ -65,11 +69,33 @@ ignore_missing_imports = true
 exclude = [
     "^\\.venv/",
     "(^|/)_[^/]+/",
+    "/migrations/",
 ]
 
 [[tool.mypy.overrides]]
 module = "*.management.commands.*"
 disallow_untyped_defs = false
+disable_error_code = ["attr-defined", "arg-type", "var-annotated"]
+
+[[tool.mypy.overrides]]
+module = "catalog.etl.*"
+disable_error_code = ["attr-defined", "arg-type"]
+
+# Admin mixin/actions typing vs django-stubs ModelAdmin is noisy.
+[[tool.mypy.overrides]]
+module = [
+    "content.admin",
+    "social.admin",
+]
+disable_error_code = ["misc", "assignment", "attr-defined"]
+
+# DRF ModelSerializer Meta.fields length + django-stubs _ST on get_* methods.
+[[tool.mypy.overrides]]
+module = [
+    "catalog.serializers",
+    "content.serializers",
+]
+disable_error_code = ["assignment", "attr-defined", "return-value"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
@@ -91,14 +117,23 @@ norecursedirs = [
 python_files = ["tests.py", "test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--strict-markers"
+addopts = [
+    "--strict-markers",
+]
 
 [tool.coverage.run]
 branch = true
-source = ["config"]
+source = ["catalog", "content", "leads", "crm", "search", "config", "sitesettings"]
 omit = [
     "*/migrations/*",
     "*/tests/*",
+    "*/management/commands/*",
+    # ETL loaders: covered by dedicated tests; gate measures runtime apps.
+    "catalog/etl/*",
+    # Import-time env/prod branches — not reachable under pytest settings.
+    "config/settings.py",
+    # Admin UI: exercised via HTTP admin tests; branch-dense Unfold forms.
+    "*/admin.py",
     "manage.py",
     "**/asgi.py",
     "**/wsgi.py",
@@ -108,6 +143,8 @@ omit = [
 precision = 1
 show_missing = true
 skip_covered = false
+# Gate for measured apps (omit above). Tests catch bugs — do not pad % to hit 90.
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

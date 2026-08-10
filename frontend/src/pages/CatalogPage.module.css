@@ -1,0 +1,1150 @@
+.page {
+  min-width: 0;
+}
+
+.catalog {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+.sidebar {
+  background: var(--glass-bg);
+  backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  position: sticky;
+  top: calc(var(--masthead-height) + var(--header-height) + var(--space-md));
+  max-height: calc(100vh - var(--masthead-height) - var(--header-height) - var(--space-xl));
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filtersDesktop {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: inherit;
+  min-height: 0;
+}
+
+.filterStickyHead {
+  flex: 0 0 auto;
+  z-index: 2;
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--glass-bg);
+  backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
+}
+
+.filterStickyHead .filterPanelHead {
+  margin-bottom: 0;
+  padding: 0;
+}
+
+.filterScroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filterScroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.filtersMobile {
+  display: none;
+}
+
+.filtersMobileSummary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 10px 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filtersMobileSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filtersMobileBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.filterPanel {
+  min-width: 0;
+}
+
+.filterPanelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding: 0 2px;
+}
+
+.filterPanelTitle {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.clearFacets {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--color-link);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.filterSection {
+  border-top: 1px solid var(--color-border);
+  min-width: 0;
+}
+
+.filterSection:first-of-type {
+  border-top: none;
+}
+
+.filterSummary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 2px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filterSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filterSummary::after {
+  content: "";
+  flex-shrink: 0;
+  width: 0.4em;
+  height: 0.4em;
+  border-right: 1.5px solid var(--color-text-muted);
+  border-bottom: 1.5px solid var(--color-text-muted);
+  transform: rotate(45deg);
+  transition: transform var(--transition-fast);
+}
+
+.filterSection[open] > .filterSummary::after {
+  transform: rotate(-135deg);
+  margin-top: 3px;
+}
+
+.filterSummaryLabel {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.filterSummaryValue,
+.filterSummaryValueActive {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterSummaryValue {
+  color: var(--color-text-muted);
+}
+
+.filterSummaryValueActive {
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+.categoryNav,
+.optionList {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.optionRow,
+.optionRowActive {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.optionRow:hover {
+  background: var(--color-bg);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.optionRow:focus-visible,
+.optionRowActive:focus-visible,
+.filterSummary:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.optionRowActive {
+  background: var(--color-brand-soft);
+  border-color: color-mix(in srgb, var(--color-brand) 28%, transparent);
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+.optionRowActive:hover {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.optionText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.optionCount {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+}
+
+.optionRowActive .optionCount {
+  color: var(--color-link);
+}
+
+.activeTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-md);
+}
+
+.activeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-soft);
+  color: var(--color-link);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.activeTag:hover {
+  border-color: var(--color-brand);
+}
+
+.activeTagLabel {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.activeTagValue {
+  font-weight: 700;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeTagRemove {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.content {
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.searchForm {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: min(100%, 22rem);
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.searchForm:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: 0;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.searchInput:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.searchButton {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-primary-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color var(--transition);
+}
+
+.searchButton:hover {
+  background: var(--color-primary-control-hover);
+}
+
+.clearSearch {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.75rem;
+  padding: 4px 2px;
+}
+
+.status,
+.error {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.emptyIcon {
+  font-size: 2.5rem;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.emptyHint {
+  color: var(--color-text-soft);
+  margin: 0;
+}
+
+.emptyCta {
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: var(--color-brand-control);
+  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
+  color: var(--color-on-brand-control);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.emptyCta:hover {
+  background: var(--color-brand-control-hover);
+  transform: translateY(-1px);
+}
+
+.grid {
+  display: grid;
+  /* One card per row in the catalog content column (~sidebar + filters). */
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  container-type: inline-size;
+  container-name: catalog-grid;
+  align-items: start;
+}
+
+.card {
+  position: relative;
+  display: grid;
+  /* Photo share adapts with card/grid width — keeps media cell less “tall & skinny”. */
+  --card-photo: minmax(7rem, 32%);
+  --card-wash-gradient: var(--photo-wash);
+  grid-template-columns: var(--card-photo) minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition), box-shadow var(--transition),
+    transform var(--transition-fast), background-color var(--transition);
+}
+
+/* Stretched hit target — FAQ «спецзаказ» sits above via .cardInteractive. */
+.cardHit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardInteractive {
+  position: relative;
+  z-index: 2;
+}
+
+/* Narrower grid → slightly wider photo column so cover shows the product. */
+@container catalog-grid (max-width: 720px) {
+  .card {
+    --card-photo: minmax(7.5rem, 38%);
+  }
+}
+
+@container catalog-grid (max-width: 520px) {
+  .card {
+    --card-photo: minmax(7rem, 42%);
+  }
+}
+
+.card:hover {
+  /* Gradient border from photo wash (radius-safe via background-clip). */
+  border-color: transparent;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    var(--card-wash-gradient, var(--photo-wash)) border-box;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--color-text);
+  transform: translateY(-2px);
+}
+
+.cardMedia,
+.cardMediaPlaceholder {
+  --media-pad-inline: 40px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 7rem;
+  /* Stretch with the card body so the wash fills the whole photo column. */
+  height: 100%;
+  align-self: stretch;
+  margin: 0;
+  /* Side air on the media block; product WebPs stay full-bleed (no baked margins). */
+  padding: 0 var(--media-pad-inline);
+  box-sizing: border-box;
+  background: var(--photo-wash);
+  background-size: 100% 100%;
+  border-right: none;
+  overflow: hidden;
+  line-height: 0;
+}
+
+/* Baked canvas packs already include margins — no CSS inset. */
+.cardMedia[data-purpose="valve"],
+.cardMediaPlaceholder[data-purpose="valve"],
+.cardMedia[data-purpose="air"],
+.cardMediaPlaceholder[data-purpose="air"],
+.cardMedia[data-purpose="smoke"],
+.cardMediaPlaceholder[data-purpose="smoke"],
+.cardMedia[data-purpose="fire"],
+.cardMediaPlaceholder[data-purpose="fire"] {
+  --media-pad-inline: 0px;
+  padding: 0;
+}
+
+.cardCompare {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+}
+
+.cardMediaPlaceholder {
+  display: block;
+}
+
+/* ProtectedProductImage frame fills the photo column (wash stays behind). */
+.cardMedia > span {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.cardImage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+  flex-shrink: 1;
+  background: transparent;
+  transform: scale(var(--photo-scale, 1));
+  transform-origin: center center;
+}
+
+.cardMedia[data-purpose="valve"] .cardImage,
+.cardMedia[data-purpose="air"] .cardImage,
+.cardMedia[data-purpose="smoke"] .cardImage,
+.cardMedia[data-purpose="fire"] .cardImage {
+  width: auto;
+  height: auto;
+  max-width: min(100%, calc(100% * var(--photo-scale, 1)));
+  max-height: min(100%, calc(100% * var(--photo-scale, 1)));
+  transform: none;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: none;
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.cardEditions {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-link);
+  letter-spacing: 0.01em;
+}
+
+.cardCode,
+.cardAnalog {
+  font-size: 0.6875rem;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: none;
+}
+
+.cardCode {
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cardStock {
+  margin: 0 0 2px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.cardStockIn {
+  color: var(--color-success, #1a7f4e);
+}
+
+.cardStockOut {
+  color: var(--color-text-muted);
+}
+
+.cardMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.65rem;
+  margin: 0 0 2px;
+}
+
+.cardMetaRow .cardStock {
+  margin: 0;
+}
+
+.cardNew {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--color-brand, #0b3d5c);
+}
+
+.cardSpecs {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.cardSpecs li {
+  display: grid;
+  /* Value prefers max-content (one line); label takes leftover and wraps first.
+     minmax(0, …) lets the value column shrink and wrap only if still tight. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.cardSpecName {
+  color: var(--color-text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cardSpecValue {
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  /* Wrap only after the label column has already given up space. */
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/*
+ * Narrow phone (.container ≲ 391px → viewport ~420px with --space-md):
+ * value may wrap; label and value share vertical center.
+ */
+@media (max-width: 420px) {
+  .cardSpecs li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .cardSpecName,
+  .cardSpecValue {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.cardAnalog {
+  color: var(--color-link);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardPriceOnRequest {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.cardCta {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: 0;
+  width: 100%;
+}
+
+.listFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.showMore {
+  min-width: 12rem;
+  padding: var(--space-sm) var(--space-xl);
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.showMore:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-on-primary, #fff);
+}
+
+.showMore:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.loadMoreError {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger, #b42318);
+  text-align: center;
+}
+
+.pageButton {
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.pageButton:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.categoryOverview {
+  margin: 0 0 var(--space-xl);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  background: var(--glass-bg);
+}
+
+.categoryDesc {
+  margin-bottom: var(--space-md);
+}
+
+.categoryLead {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text);
+  line-height: 1.55;
+  font-size: var(--font-size-sm);
+}
+
+.categoryDocTitle {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.categorySection {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+.categoryQuote {
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  border: none;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.categorySubsection {
+  margin: var(--space-sm) 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.categoryList {
+  margin: 0 0 var(--space-sm);
+  padding-left: var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.categoryInstToggle {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-link);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.categoryInstBody {
+  margin-top: var(--space-md);
+}
+
+/* Tablet: keep hover calm next to sticky filters. */
+@media (max-width: 1024px) {
+  .card:hover {
+    transform: none;
+  }
+}
+
+/*
+ * Vertical cards when .container ≲ 906px
+ * (container width ≈ viewport − 2×--space-lg → ~960px viewport).
+ */
+@media (max-width: 960px) {
+  /* Keep filter rail beside vertical cards; narrower so the grid still fits. */
+  .catalog {
+    grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+    gap: var(--space-md);
+  }
+
+  /* Cards hug content — don't stretch to the tallest card in the row. */
+  .grid {
+    align-items: start;
+  }
+
+  /* Photo top / copy bottom — height follows content (no equal halves / 70vh).
+   * Skip .cardVertical (home Новинки carousel keeps a fixed 453px frame). */
+  .card:not(.cardVertical) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    min-height: 0;
+    height: auto;
+  }
+
+  .card:not(.cardVertical) .cardMedia,
+  .card:not(.cardVertical) .cardMediaPlaceholder {
+    min-height: 0;
+    height: auto;
+    max-height: 16rem;
+    width: 100%;
+    border-right: none;
+    border-bottom: none;
+    padding: 0 var(--media-pad-inline, 40px);
+  }
+
+  .card:not(.cardVertical) .cardMediaPlaceholder {
+    min-height: 7.5rem;
+  }
+
+  /* Full card width; keep portrait cutouts inside a capped band. */
+  .card:not(.cardVertical) .cardImage {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: 16rem;
+    object-fit: contain;
+    object-position: center center;
+    display: block;
+  }
+
+  .card:not(.cardVertical) .cardBody {
+    min-height: 0;
+    overflow: visible;
+  }
+}
+
+/*
+ * Stack filters under the toolbar at viewport ≤700px
+ * (.container ≲ 668px with --space-md padding).
+ */
+@media (max-width: 700px) {
+  .catalog {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .filtersDesktop {
+    display: none;
+  }
+
+  .filtersMobile {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--glass-bg);
+    overflow: hidden;
+  }
+
+  .filtersMobile[open] .filtersMobileSummary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .filtersMobile .filterPanel {
+    padding: var(--space-md);
+  }
+
+  .toolbar {
+    flex-direction: column;
+  }
+
+  .searchForm {
+    width: 100%;
+  }
+
+  .searchInput {
+    /* ≥16px — prevent iOS focus zoom (see global.css). */
+    font-size: 16px;
+  }
+
+  .activeTagValue {
+    max-width: 9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover {
+    transform: none;
+  }
+
+  .filterSummary::after {
+    transition: none;
+  }
+}
+
+/*
+ * Home «Новинки» carousel: photo = 1/3 card; body copy through editions only
+ * (stock → code → title → «N вариантов»), no ТТХ / footer chrome.
+ */
+.card.cardVertical {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 2fr;
+  align-items: stretch;
+  width: 100%;
+  max-width: 20rem; /* 320px — matches NovinkiCarousel MAX_SLIDE_PX */
+  height: 22.5rem; /* ~360px — photo ⅓, text through editions */
+  max-height: 22.5rem;
+  overflow: hidden;
+}
+
+.card.cardVertical .cardMedia,
+.card.cardVertical .cardMediaPlaceholder {
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  width: 100%;
+  align-self: stretch;
+  overflow: hidden;
+  border-right: none;
+  border-bottom: none;
+  padding: 0 var(--media-pad-inline, 40px);
+  background-size: 100% 100%;
+}
+
+.card.cardVertical .cardMedia > span {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.card.cardVertical .cardImage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+}
+
+.card.cardVertical .cardBody {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 12px;
+}
+
+.card.cardVertical .cardMetaRow,
+.card.cardVertical .cardCode,
+.card.cardVertical .cardEditions {
+  flex-shrink: 0;
+}
+
+.card.cardVertical .cardTitle {
+  flex-shrink: 0;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+/* Carousel teaser stops at editions count — hide specs / price row. */
+.card.cardVertical .cardSpecs,
+.card.cardVertical .cardFooter {
+  display: none;
+}

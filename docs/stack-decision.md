@@ -42,7 +42,8 @@
 3. `leads` — Inquiry / RFQ / «замена привода» (без оплаты).
 4. `search` — индексация каталога + статей.
 5. `media` — файлы datasheet, изображения (S3/локально).
-6. `accounts` — staff/роли (контент / каталог / заявки).
+6. `accounts` — staff Groups **Админ / Менеджер / Аналитик**
+   (`manage.py sync_staff_groups`; матрица в `accounts/roles.py`).
 
 ### API
 
@@ -108,9 +109,9 @@
 - Репозиторий на GitHub — **private**.
 - Разработка и запуск — локально (Docker Compose).
 - Публичный деплой — отдельный этап после готовности MVP.
-- **Prod-хост:** VPS reg.ru; домен и почта там же
-  ([infra-reg-ru.md](infra-reg-ru.md)). SMTP заявок — ящики reg.ru,
-  не внешний ESP по умолчанию.
+- **Prod-хост:** VPS + DNS на reg.ru; почта — Яндекс 360 (~1 год)
+  ([infra-reg-ru.md](infra-reg-ru.md)). SMTP заявок — `smtp.yandex.ru`,
+  не ESP вроде SendGrid по умолчанию.
 
 ---
 

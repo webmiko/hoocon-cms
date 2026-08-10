@@ -1,0 +1,421 @@
+"""Tests for catalog.etl.normalize (TDD: red → green → refactor).
+
+Spec: docs/data-quality-etl.md §4.1 — extract → normalize/validate → load.
+Падающий ряд → QuarantineError, не в prod без review.
+
+Normalize — чистые функции без Django ORM: тестируются быстро и изолированно.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+FIXTURE = Path(__file__).parent / "fixtures" / "etl_catalog_sample.json"
+
+
+def _load_raw() -> dict:
+    """Load the sample fixture as the raw Tilda API payload."""
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+
+# ── extract ────────────────────────────────────────────────────────
+
+
+def test_extract_products_returns_list() -> None:
+    """extract_products yields raw product dicts from JSON payload."""
+    from catalog.etl.extract import extract_products
+
+    raw = _load_raw()
+    products = list(extract_products(raw))
+    assert len(products) == 3
+    assert products[0]["title"].startswith("SA3FU")
+
+
+def test_extract_categories_returns_tree() -> None:
+    """extract_categories yields (parent, child) tuples from filters."""
+    from catalog.etl.extract import extract_categories
+
+    raw = _load_raw()
+    cats = list(extract_categories(raw))
+    # 2 top-level + 3 subcategories = 5 total entries.
+    assert len(cats) == 5
+    # Each entry: (id, name, parent_id_or_None)
+    top_names = {c[1] for c in cats if c[2] is None}
+    assert "Электропривод воздушной заслонки" in top_names
+    assert "Специальная противопожарная серия" in top_names
+
+
+def test_extract_categories_preserves_parent_id_zero() -> None:
+    """top_id=0 must remain parent 0, not None (0 is falsy but valid)."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "id": 0,
+                            "value": "Root Zero",
+                            "subparts": [{"id": 10, "value": "Child Of Zero"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert (0, "Root Zero", None) in cats
+    assert (10, "Child Of Zero", 0) in cats
+
+
+def test_extract_categories_skips_subparts_when_parent_id_missing() -> None:
+    """Subparts without a parent id must not become top-level categories."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "value": "Broken Parent",
+                            "subparts": [{"id": 20, "value": "Orphan Child"}],
+                        },
+                        {
+                            "id": 1,
+                            "value": "Good Parent",
+                            "subparts": [{"id": 21, "value": "Good Child"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert (20, "Orphan Child", None) not in cats
+    assert not any(c[0] == 20 for c in cats)
+    assert (1, "Good Parent", None) in cats
+    assert (21, "Good Child", 1) in cats
+
+
+def test_extract_categories_keeps_parent_id_when_parent_name_empty() -> None:
+    """Parent id without name is still passed so load can quarantine the child."""
+    from catalog.etl.extract import extract_categories
+
+    payload = {
+        "filters": {
+            "filters": [
+                {
+                    "label": "Назначение",
+                    "values": [
+                        {
+                            "id": 99,
+                            "value": "",
+                            "subparts": [{"id": 30, "value": "Child Of Nameless"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    cats = list(extract_categories(payload))
+    assert not any(c[0] == 99 for c in cats)
+    assert (30, "Child Of Nameless", 99) in cats
+
+
+# ── normalize_slug ──────────────────────────────────────────────────
+
+
+def test_normalize_slug_strips_leading_slash() -> None:
+    """buttonlink '/privod-...-3nm' → 'privod-...-3nm'."""
+    from catalog.etl.normalize import normalize_slug
+
+    assert normalize_slug("/privod-protivipozharniy-3nm") == "privod-protivopozharniy-3nm"
+
+
+def test_normalize_slug_remaps_bezpruzhini_typo() -> None:
+    """Missing hyphen in bezpruzhini is corrected to bez-pruzhini."""
+    from catalog.etl.normalize import PRODUCT_SLUG_REMAP, normalize_slug
+
+    key = "privod-vozdushniy-bezpruzhini-uskorenniy-hva-q-5nm"
+    assert isinstance(PRODUCT_SLUG_REMAP[key], str)
+    assert normalize_slug(f"/{key}") == "privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-5nm"
+
+
+def test_normalize_slug_rejects_empty() -> None:
+    """Empty slug raises QuarantineError."""
+    from catalog.etl.normalize import QuarantineError, normalize_slug
+
+    with pytest.raises(QuarantineError):
+        normalize_slug("")
+    with pytest.raises(QuarantineError):
+        normalize_slug("   ")
+
+
+def test_normalize_slug_rejects_uppercase_and_spaces() -> None:
+    """Slug must be [a-z0-9-]+ — uppercase/spaces rejected."""
+    from catalog.etl.normalize import QuarantineError, normalize_slug
+
+    with pytest.raises(QuarantineError):
+        normalize_slug("Privod-3NM")
+    with pytest.raises(QuarantineError):
+        normalize_slug("privod 3nm")
+
+
+def test_normalize_slug_accepts_valid_lowercase() -> None:
+    """Valid lowercase slugs pass."""
+    from catalog.etl.normalize import normalize_slug
+
+    assert normalize_slug("privod-vozdushniy-hva-5nm") == "privod-vozdushniy-hva-5nm"
+    assert normalize_slug("sharovoy-kran-bv215") == "sharovoy-kran-bv215"
+
+
+# ── normalize_product ──────────────────────────────────────────────
+
+
+def test_normalize_product_with_buttonlink_succeeds() -> None:
+    """Product with valid buttonlink normalizes to NormalizedProduct."""
+    from catalog.etl.normalize import NormalizedProduct, normalize_product
+
+    raw = _load_raw()
+    np = normalize_product(raw["products"][0])
+    assert isinstance(np, NormalizedProduct)
+    assert np.slug == "privod-protivopozharniy-3nm"
+    assert np.name.startswith("SA3FU")
+    assert len(np.skus) == 2
+    assert np.skus[0].sku_code == "sa3fu24-ds"
+    assert np.skus[1].sku_code == "sa3fu24-as"
+
+
+def test_normalize_product_without_buttonlink_quarantines() -> None:
+    """Product with empty buttonlink raises QuarantineError (BV-series)."""
+    from catalog.etl.normalize import QuarantineError, normalize_product
+
+    raw = _load_raw()
+    with pytest.raises(QuarantineError):
+        normalize_product(raw["products"][2])
+
+
+def test_normalize_product_extracts_category_from_partuids() -> None:
+    """Category is resolved from product.partuids (deepest subcategory)."""
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    np = normalize_product(raw["products"][0])
+    # partuids=[368052664042, 826899277672]; 368052664042 is the subcategory
+    # "Электропривод противопожарного клапана".
+    assert np.category_id == 368052664042
+
+
+def test_normalize_product_handles_partuids_as_json_string() -> None:
+    """Tilda sometimes stores partuids as a JSON-encoded string, not a list.
+
+    Regression guard: real hoocon_catalog_api.json has partuids as
+    '[368052664042,826899277672]' (string), not [368052664042, 826899277672].
+    """
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    product = raw["products"][0]
+    # Simulate the real-world string encoding.
+    import json
+
+    product["partuids"] = json.dumps(product["partuids"])
+    np = normalize_product(product)
+    assert np.category_id == 368052664042
+
+
+def test_normalize_product_extracts_attributes_from_editions() -> None:
+    """Edition option values (Мощность, Напряжение) become SKU attributes."""
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    np = normalize_product(raw["products"][0])
+    sku0 = np.skus[0]
+    attrs = {a.title: a.value for a in sku0.attributes}
+    assert attrs["Мощность"] == "3 Нм"
+    assert attrs["Напряжение (В)"] == "24 В"
+    assert attrs["Управление"] == "Открыто/закрыто"
+
+
+def test_normalize_edition_control_uses_sku_code_heuristics() -> None:
+    """«Управление» on HVD editions maps to ON/OFF via sku_code, not floating."""
+    from catalog.etl.normalize import _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    sku = _normalize_edition(
+        {
+            "sku": "HVD24-5",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="hvd-5",
+        product_name="HVD-5",
+    )
+    attrs = {a.title: a.value for a in sku.attributes}
+    assert attrs["Управление"] == CONTROL_ON_OFF
+
+
+def test_normalize_edition_control_uses_category_slug_heuristics() -> None:
+    """Spring category slug maps «2-/3» to ON/OFF even without FU/SA in code."""
+    from catalog.etl.normalize import _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_FLOATING, CONTROL_ON_OFF
+
+    spring = _normalize_edition(
+        {
+            "sku": "da2mu24-d",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="spring-mu",
+        product_name="Spring MU",
+        category_slug="elektroprivody-s-pruzhinnym-vozvratom",
+    )
+    assert {a.title: a.value for a in spring.attributes}["Управление"] == CONTROL_ON_OFF
+
+    air = _normalize_edition(
+        {
+            "sku": "da2mu24-d",
+            "price": "",
+            "Управление": "2-/3-позиционное",
+        },
+        product_slug="air-mu",
+        product_name="Air MU",
+        category_slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    assert {a.title: a.value for a in air.attributes}["Управление"] == CONTROL_FLOATING
+
+
+def test_normalize_product_passes_category_slug_from_map() -> None:
+    """normalize_product resolves leaf category slug for control heuristics."""
+    from catalog.etl.normalize import normalize_product
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    spring_id = 9001
+    np = normalize_product(
+        {
+            "uid": "1",
+            "title": "Пружинный привод",
+            "buttonlink": "/privod-pruzhinnyy",
+            "partuids": [spring_id],
+            "editions": [
+                {
+                    "sku": "da2mu24-d",
+                    "price": "",
+                    "Управление": "2-/3-позиционное",
+                },
+            ],
+        },
+        category_slugs={spring_id: "elektroprivody-s-pruzhinnym-vozvratom"},
+    )
+    assert np.skus[0].attributes[0].value == CONTROL_ON_OFF
+
+
+def test_normalize_edition_normalizes_product_level_attributes() -> None:
+    """Product characteristics must get the same control/tech-copy pass as editions."""
+    from catalog.etl.normalize import NormalizedAttribute, _normalize_edition
+    from catalog.etl.tech_copy import CONTROL_ON_OFF
+
+    sku = _normalize_edition(
+        {"sku": "HVD24-5", "price": ""},
+        product_slug="hvd-5",
+        product_name="HVD-5",
+        product_attributes=(
+            NormalizedAttribute(title="Управление", value="Открыто/Закрыто"),
+            NormalizedAttribute(title="Защита", value="класс защиты IP54"),
+        ),
+    )
+    attrs = {a.title: a.value for a in sku.attributes}
+    assert attrs["Управление"] == CONTROL_ON_OFF
+    assert attrs["Защита"] == "Степень защиты корпуса IP54"
+
+
+def test_normalize_edition_without_sku_quarantines() -> None:
+    """Edition with empty sku raises QuarantineError."""
+    from catalog.etl.normalize import QuarantineError, normalize_product
+
+    raw = _load_raw()
+    product = raw["products"][0]
+    product["editions"][0]["sku"] = ""
+    with pytest.raises(QuarantineError):
+        normalize_product(product)
+
+
+def test_normalize_sku_slug_derived_from_product_and_sku_code() -> None:
+    """SKU slug = product_slug + '-' + sku_code (URL-stable, unique)."""
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    np = normalize_product(raw["products"][0])
+    assert np.skus[0].slug == "privod-protivopozharniy-3nm-sa3fu24-ds"
+    assert np.skus[1].slug == "privod-protivopozharniy-3nm-sa3fu24-as"
+
+
+def test_normalize_product_price_empty_becomes_none() -> None:
+    """Empty string price in edition becomes None (RFQ policy)."""
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    np = normalize_product(raw["products"][0])
+    assert np.skus[0].price is None
+
+
+def test_normalize_product_price_numeric_parsed() -> None:
+    """Numeric string price is parsed to Decimal."""
+    from decimal import Decimal
+
+    from catalog.etl.normalize import normalize_product
+
+    raw = _load_raw()
+    product = raw["products"][0]
+    product["editions"][0]["price"] = "1234.50"
+    np = normalize_product(product)
+    assert np.skus[0].price == Decimal("1234.50")
+
+
+# ── normalize_category ─────────────────────────────────────────────
+
+
+def test_normalize_category_generates_slug_from_name() -> None:
+    """Category slug is slugified from Russian name (no Tilda path for cats)."""
+    from catalog.etl.normalize import normalize_category
+
+    cat = normalize_category(
+        cid=431110420892,
+        name="Электропривод воздушной заслонки",
+        parent_id=None,
+    )
+    assert cat.slug == "elektroprivod-vozdushnoy-zaslonki"
+    assert cat.name == "Электропривод воздушной заслонки"
+    assert cat.tilda_id == 431110420892
+
+
+def test_normalize_category_subcategory_keeps_parent() -> None:
+    """Subcategory normalizes with parent_id preserved."""
+    from catalog.etl.normalize import normalize_category
+
+    cat = normalize_category(
+        cid=494950843642,
+        name="Электропривод воздушный с возвратной пружиной",
+        parent_id=431110420892,
+    )
+    assert cat.parent_id == 431110420892
+    assert cat.slug == "elektroprivod-vozdushniy-s-vozvratnoy-pruzhinoy"
+
+
+# ── quarantine ──────────────────────────────────────────────────────
+
+
+def test_quarantine_error_carries_reason_and_payload() -> None:
+    """QuarantineError exposes .reason and .payload for CSV logging."""
+    from catalog.etl.normalize import QuarantineError
+
+    err = QuarantineError("empty slug", {"uid": "123", "title": "BV215"})
+    assert err.reason == "empty slug"
+    assert err.payload["uid"] == "123"

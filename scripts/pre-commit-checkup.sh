@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pre-commit checkup — обязательная проверка перед коммитом (Hoocon CMS).
-# Backend: ruff, format, mypy, pytest, pip-audit, секреты, длина строк, hotspots.
+# Backend: ruff, format, mypy, pytest, pip-audit, секреты, длина строк, hotspots,
+# ревью diff (баги / стандарты БЗ / security).
 # Выход: 0 — чисто, 1 — есть проблемы.
 set -euo pipefail
 
@@ -20,7 +21,10 @@ fail() { echo -e "${RED}✗ $1${NC}"; FAIL=$((FAIL + 1)); }
 warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
 
 BACKEND="$ROOT/backend"
-export USE_SQLITE="${USE_SQLITE:-True}"
+# Postgres — рабочая БД проекта (docs/infra-reg.py.md). Локально поднимается
+# через docker compose up -d или Homebrew postgresql@18. SQLite — только fallback
+# при отсутствии Postgres (явно USE_SQLITE=True).
+export USE_SQLITE="${USE_SQLITE:-False}"
 
 echo "══════════════════════════════════════════════════"
 echo "  Pre-commit checkup (hoocon-cms)"
@@ -48,31 +52,35 @@ else
 fi
 
 # ── 3. mypy ──────────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run mypy config manage.py) >/dev/null 2>&1; then
+if (cd "$BACKEND" && poetry run mypy config leads crm catalog content manage.py) >/dev/null 2>&1; then
   ok "mypy — чисто"
 else
-  fail "mypy — ошибки типов (cd backend && poetry run mypy config manage.py)"
+  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content manage.py)"
 fi
 
-# ── 4. pytest (exit 5 = нет тестов — допустимо на каркасе) ───
+# ── 4. pytest + coverage ≥ 90% (exit 5 = нет тестов — допустимо на каркасе) ───
+# Порог — сторож на измеряемом коде; не писать тесты ради процента (см. БЗ §0.8).
 set +e
-(cd "$BACKEND" && poetry run pytest -q)
+(cd "$BACKEND" && poetry run pytest -q \
+  --cov --cov-report=term-missing:skip-covered --cov-fail-under=90)
 PYTEST_CODE=$?
 set -e
 if [ "$PYTEST_CODE" -eq 0 ]; then
-  ok "pytest — тесты прошли"
+  ok "pytest — тесты прошли (coverage ≥ 90%)"
 elif [ "$PYTEST_CODE" -eq 5 ]; then
   warn "pytest — тестов пока нет (exit 5); после catalog — обязательны"
   ok "pytest — каркас без тестов принят"
 else
-  fail "pytest — ошибки (cd backend && poetry run pytest -q)"
+  fail "pytest — ошибки или coverage < 90% (cd backend && poetry run pytest -q --cov --cov-fail-under=90)"
 fi
 
 # ── 5. pip-audit ─────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1; then
+# PyPI advisory API иногда таймаутится; OSV — запасной сервис (тот же --strict).
+if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1 \
+  || (cd "$BACKEND" && poetry run pip-audit --strict --vulnerability-service osv) >/dev/null 2>&1; then
   ok "pip-audit — нет уязвимостей"
 else
-  warn "pip-audit — есть уязвимости (cd backend && poetry run pip-audit --strict)"
+  fail "pip-audit — есть уязвимости (cd backend && poetry run pip-audit --strict)"
 fi
 
 # ── 6. Diff / staging ────────────────────────────────────────
@@ -94,10 +102,16 @@ if [ -n "$STAGED" ]; then
   PY_FILES=$(echo "$STAGED" | grep -E '\.py$' || true)
   if [ -n "$PY_FILES" ]; then
     # shellcheck disable=SC2086
-    SECRETS=$(echo "$PY_FILES" | xargs grep -lE \
-      '(sk_live_|sk_test_|SECRET_KEY\s*=\s*["\x27][^"\x27]{16,}|password\s*=\s*["\x27][^"\x27]{8,}|EMAIL_HOST_PASSWORD\s*=\s*["\x27][^"\x27]+)' \
-      2>/dev/null || true)
-    # Allow insecure default string only in settings with getenv fallback pattern checked manually
+    # Ignore fixture markers like password="test-pass-not-secret" in tests.
+    SECRETS=$(
+      echo "$PY_FILES" | xargs grep -nE \
+        '(sk_live_|sk_test_|SECRET_KEY\s*=\s*["\x27][^"\x27]{16,}|password\s*=\s*["\x27][^"\x27]{8,}|EMAIL_HOST_PASSWORD\s*=\s*["\x27][^"\x27]+)' \
+        2>/dev/null \
+        | grep -vE 'not-secret|change-me|ci-secret|ci-db-password|password12' \
+        | cut -d: -f1 \
+        | sort -u \
+        || true
+    )
     if [ -z "$SECRETS" ]; then
       ok "Нет хардкоженных секретов в .py"
     else
@@ -140,9 +154,9 @@ if out:
   fi
 fi
 
-# ── 8. print() вне tests/ ────────────────────────────────────
+# ── 8. print() вне tests/ (не CLI scripts/) ───────────────────
 if [ -n "$PY_FILES" ]; then
-  NON_TEST_PY=$(echo "$PY_FILES" | grep -vE '(^|/)tests/' || true)
+  NON_TEST_PY=$(echo "$PY_FILES" | grep -vE '(^|/)tests/|(^|/)scripts/' || true)
   if [ -n "$NON_TEST_PY" ]; then
     # shellcheck disable=SC2086
     PRINTS=$(echo "$NON_TEST_PY" | xargs grep -lE '^\s*print\(' 2>/dev/null | grep -v '__pycache__' || true)
@@ -151,6 +165,8 @@ if [ -n "$PY_FILES" ]; then
     else
       fail "print() найден (используй logger): $PRINTS"
     fi
+  else
+    ok "Нет print() вне tests/"
   fi
 fi
 
@@ -176,7 +192,23 @@ else
   warn "scripts/security-hotspot-check.sh отсутствует или не executable"
 fi
 
-# ── 11. Frontend lint (если менялся frontend/) ───────────────
+# ── 11. Ревью diff: баги · БЗ · безопасность ─────────────────
+REVIEW_PY="$ROOT/scripts/diff-quality-review.py"
+if [ -f "$REVIEW_PY" ]; then
+  set +e
+  REVIEW_OUT=$(python3 "$REVIEW_PY" 2>&1)
+  REVIEW_OK=$?
+  set -e
+  if [ "$REVIEW_OK" -eq 0 ]; then
+    ok "Ревью diff — баги / стандарты БЗ / security"
+  else
+    fail "Ревью diff (баги/БЗ/security):"$'\n'"$REVIEW_OUT"
+  fi
+else
+  fail "scripts/diff-quality-review.py отсутствует"
+fi
+
+# ── 12. Frontend lint (если менялся frontend/) ───────────────
 FE_CHANGED=$(echo "$STAGED" | grep -E '^frontend/' || true)
 if [ -n "$FE_CHANGED" ] && [ -f "$ROOT/frontend/package.json" ]; then
   if (cd "$ROOT/frontend" && npm run lint) >/dev/null 2>&1; then

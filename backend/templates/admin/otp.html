@@ -1,0 +1,99 @@
+{% extends "unfold/layouts/unauthenticated.html" %}
+
+{% load i18n static unfold %}
+
+{% block title %}
+  {{ title }} | {{ site_title }}
+{% endblock %}
+
+{% block content %}
+  {% include "unfold/helpers/unauthenticated_title.html" with title="HOOCON CMS" subtitle=_("С возвращением в") %}
+
+  {% include "unfold/helpers/messages.html" %}
+
+  {% if error %}
+    <div class="flex flex-col gap-4 mb-8 *:mb-0">
+      {% include "unfold/helpers/messages/error.html" with error=error %}
+    </div>
+  {% endif %}
+
+  {% if email_failed %}
+    <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark" id="otp-hint-id">
+      Письмо с кодом не удалось отправить
+      {% if masked_email %}на {{ masked_email }}{% endif %}.
+      Введите резервный код супер-админа (XXXX-XXXX) или
+      <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">войдите паролем</a>.
+    </p>
+  {% else %}
+    <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark" id="otp-hint-id">
+      Мы отправили одноразовый код на {{ masked_email }}.
+      Введите его, чтобы войти в админку.
+      {% if allow_recovery_hint %}
+        Супер-админ может вместо него ввести сохранённый резервный код.
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <form method="post" action="{% url 'admin:otp' %}" novalidate>
+    {% csrf_token %}
+    <div class="form-field flex flex-col group mb-4">
+      <div class="flex gap-2 flex-col">
+        <label for="id_otp_code" class="block font-semibold mb-2 text-font-important-light text-sm dark:text-font-important-dark">
+          {% if email_failed %}Резервный код{% else %}Код из письма{% endif %}
+        </label>
+        <input
+          type="text"
+          name="otp_code"
+          id="id_otp_code"
+          {% if email_failed %}
+            inputmode="text"
+            autocomplete="one-time-code"
+            maxlength="20"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="XXXX-XXXX"
+          {% else %}
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="20"
+            pattern="[0-9A-Za-z \-]*"
+          {% endif %}
+          required
+          autofocus
+          aria-describedby="otp-hint-id"
+          class="border border-base-200 bg-white font-medium px-3 py-2 rounded-default shadow-xs text-font-default-light text-sm focus:outline-2 focus:-outline-offset-2 focus:outline-primary-600 dark:bg-base-900 dark:border-base-700 dark:text-font-default-dark w-full tracking-[0.35em] text-center text-xl font-semibold"
+        />
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3 mt-6">
+      {% component "unfold/components/button.html" with submit=1 variant="primary" class="w-full" %}
+        Подтвердить
+      {% endcomponent %}
+      {% if not email_failed %}
+        {% component "unfold/components/button.html" with submit=1 form="otp-resend-form" variant="secondary" class="w-full" %}
+          Отправить снова
+        {% endcomponent %}
+      {% else %}
+        {% component "unfold/components/button.html" with submit=1 form="otp-resend-form" variant="secondary" class="w-full" %}
+          Повторить отправку письма
+        {% endcomponent %}
+      {% endif %}
+      {% component "unfold/components/button.html" with href=otp_cancel_url variant="secondary" class="w-full" %}
+        Отмена
+      {% endcomponent %}
+    </div>
+  </form>
+
+  <form id="otp-resend-form" method="post" action="{{ otp_resend_url }}" hidden>
+    {% csrf_token %}
+  </form>
+
+  {% if allow_recovery_hint %}
+    <p class="mt-8 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+      <a href="{{ recovery_login_url }}" class="text-primary-600 underline dark:text-primary-400">Отдельная форма резервного кода</a>
+      ·
+      <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">Пароль</a>
+    </p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HOOCON — аудит топ‑20 конкурентов</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+
+    :root {
+      --brand: #dc1313;
+      --brand-deep: #b01010;
+      --brand-soft: rgba(220, 19, 19, 0.1);
+      --ink: #1c1c1c;
+      --muted: #5a5a5a;
+      --line: rgba(28, 28, 28, 0.1);
+      --old: #8a8a8a;
+      --old-bg: #ececec;
+      --ok: #1a7a45;
+      --warn: #b45309;
+      --surface: rgba(255, 255, 255, 0.88);
+      --radius: 18px;
+      --shadow: 0 16px 48px rgba(20, 20, 30, 0.07);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --max: 1120px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "IBM Plex Sans", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(220, 19, 19, 0.12), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(90, 90, 90, 0.08), transparent 50%),
+        linear-gradient(165deg, #f7f7f8 0%, #efefef 45%, #f4f1f1 100%);
+      line-height: 1.45;
+    }
+    a { color: var(--brand-deep); }
+    .wrap { width: min(100% - 2rem, var(--max)); margin-inline: auto; }
+
+    .hero {
+      min-height: min(88vh, 760px);
+      display: grid;
+      align-content: end;
+      padding: 2.5rem 0 3.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -20% -35% 35%;
+      height: 70%;
+      background:
+        linear-gradient(135deg, transparent 30%, rgba(220, 19, 19, 0.08) 50%, transparent 70%),
+        repeating-linear-gradient(-18deg, transparent, transparent 18px, rgba(28,28,28,0.035) 18px, rgba(28,28,28,0.035) 19px);
+      pointer-events: none;
+      mask-image: linear-gradient(to top, black 20%, transparent);
+    }
+    .brand-mark {
+      font-family: Montserrat, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.4rem, 8vw, 4.6rem);
+      letter-spacing: -0.04em;
+      line-height: 0.92;
+      color: var(--brand);
+      margin: 0 0 1.1rem;
+      text-wrap: balance;
+      animation: rise 0.8s var(--ease) both;
+    }
+    .brand-mark span {
+      display: block;
+      color: var(--ink);
+      font-size: 0.36em;
+      letter-spacing: 0.16em;
+      font-weight: 700;
+      margin-top: 0.5rem;
+    }
+    .hero h1 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.3rem, 3vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.7rem;
+      max-width: 22ch;
+      text-wrap: balance;
+      animation: rise 0.8s var(--ease) 0.08s both;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      max-width: 42ch;
+      animation: rise 0.8s var(--ease) 0.14s both;
+    }
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin-top: 1.75rem;
+      animation: rise 0.8s var(--ease) 0.2s both;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .pill i {
+      width: 8px; height: 8px; border-radius: 2px;
+      background: var(--brand); display: inline-block;
+    }
+    .pill.muted i { background: var(--old); }
+
+    section { padding: 3.25rem 0; }
+    .section-head { display: grid; gap: 0.4rem; margin-bottom: 1.6rem; }
+    .section-head h2 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.3rem, 2.8vw, 1.7rem);
+      font-weight: 700; letter-spacing: -0.02em; margin: 0; text-wrap: balance;
+    }
+    .section-head p { margin: 0; color: var(--muted); max-width: 58ch; }
+
+    .panel {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.35rem 1.45rem;
+    }
+    .note {
+      font-size: 0.88rem; color: var(--muted);
+      border-left: 3px solid var(--brand);
+      padding-left: 0.85rem; margin: 0 0 1rem;
+    }
+
+    .pain { display: grid; grid-template-columns: 1.05fr 1fr; gap: 1.15rem; }
+    @media (max-width: 800px) { .pain { grid-template-columns: 1fr; } }
+    .big-stat .num {
+      font-family: Montserrat, sans-serif; font-weight: 800;
+      font-size: clamp(3.2rem, 9vw, 5rem);
+      letter-spacing: -0.05em; line-height: 0.95; color: var(--old);
+    }
+    .big-stat .num em { font-style: normal; color: var(--brand); }
+    .big-stat .label { font-weight: 600; color: var(--muted); font-size: 0.95rem; margin-top: 0.35rem; }
+
+    .toc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    @media (max-width: 800px) { .toc { grid-template-columns: 1fr; } }
+    .toc a {
+      text-decoration: none; color: inherit; display: grid; gap: 0.25rem;
+      padding: 0.95rem 1rem; border-radius: 14px; border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .toc strong { font-family: Montserrat, sans-serif; font-size: 0.95rem; }
+    .toc span { font-size: 0.82rem; color: var(--muted); }
+
+    .table-wrap {
+      overflow: auto; border-radius: var(--radius); border: 1px solid var(--line);
+      background: var(--surface); box-shadow: var(--shadow); max-height: 100%;
+    }
+    table.rank {
+      width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 0;
+    }
+    table.rank th, table.rank td {
+      padding: 0.55rem 0.6rem; text-align: left;
+      border-bottom: 1px solid var(--line); vertical-align: top;
+    }
+    table.rank th {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--muted); background: rgba(0,0,0,0.03);
+    }
+    table.rank tr:last-child td { border-bottom: 0; }
+    table.rank .n {
+      font-family: Montserrat, sans-serif; font-weight: 800; color: var(--brand); width: 1.8rem;
+    }
+    .type {
+      display: inline-block; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.03em;
+      padding: 0.12rem 0.35rem; border-radius: 4px;
+      background: var(--old-bg); color: var(--muted);
+    }
+    .type.oem { background: var(--brand-soft); color: var(--brand-deep); }
+    .type.us { background: #e8f6ee; color: var(--ok); }
+    .score { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .score.hi { color: var(--ok); }
+    .score.mid { color: var(--warn); }
+    .score.lo { color: var(--old); }
+
+    .matrix { display: grid; gap: 0.85rem; }
+    .matrix-row {
+      display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr;
+      gap: 0.85rem; align-items: center;
+    }
+    @media (max-width: 640px) { .matrix-row { grid-template-columns: 1fr; gap: 0.35rem; } }
+    .matrix-label { font-size: 0.9rem; font-weight: 600; }
+    .bars { display: grid; gap: 0.35rem; }
+    .bar-track {
+      height: 14px; border-radius: 4px; background: rgba(0,0,0,0.05); overflow: hidden;
+    }
+    .bar-track > span {
+      display: block; height: 100%; width: 0; border-radius: 4px;
+      transition: width 1s var(--ease);
+    }
+    .bar-track.old > span { background: #9a9a9a; }
+    .bar-track.peer > span { background: #6b7280; }
+    .bar-track.new > span { background: var(--brand); }
+    .bar-meta {
+      display: flex; justify-content: space-between;
+      font-size: 0.72rem; color: var(--muted); font-weight: 500;
+    }
+    .compare-legend {
+      display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;
+      font-size: 0.85rem; font-weight: 600;
+    }
+    .compare-legend span::before {
+      content: ""; display: inline-block; width: 10px; height: 10px;
+      border-radius: 2px; margin-right: 0.4rem; vertical-align: -1px;
+    }
+    .compare-legend .l-old::before { background: #9a9a9a; }
+    .compare-legend .l-peer::before { background: #6b7280; }
+    .compare-legend .l-new::before { background: var(--brand); }
+
+    .caps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; }
+    @media (max-width: 900px) { .caps { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .caps { grid-template-columns: 1fr; } }
+    .cap {
+      padding: 1.1rem 1.15rem; border-radius: var(--radius);
+      border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow);
+      display: grid; gap: 0.45rem;
+    }
+    .cap h3 {
+      margin: 0; font-family: Montserrat, sans-serif; font-size: 0.98rem; font-weight: 700;
+    }
+    .cap p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+
+    .cards-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; }
+    @media (max-width: 800px) { .cards-3 { grid-template-columns: 1fr; } }
+
+    .side {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+      overflow: hidden; border-radius: var(--radius);
+      border: 1px solid var(--line); box-shadow: var(--shadow);
+    }
+    @media (max-width: 720px) { .side { grid-template-columns: 1fr; } }
+    .side > div { padding: 1.25rem 1.35rem; }
+    .side .was { background: #f3f3f3; }
+    .side .now {
+      background: linear-gradient(160deg, #fff 0%, #fff5f5 100%);
+      border-left: 1px solid var(--line);
+    }
+    @media (max-width: 720px) {
+      .side .now { border-left: none; border-top: 1px solid var(--line); }
+    }
+    .side h3 {
+      margin: 0 0 0.75rem; font-family: Montserrat, sans-serif;
+      font-size: 0.9rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .side .was h3 { color: var(--old); }
+    .side .now h3 { color: var(--brand); }
+    .side ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+    .side li { font-size: 0.88rem; padding-left: 1.2rem; position: relative; }
+    .side .was li::before {
+      content: "–"; position: absolute; left: 0; color: var(--old); font-weight: 700;
+    }
+    .side .now li::before {
+      content: ""; position: absolute; left: 0; top: 0.35rem;
+      width: 0.55rem; height: 0.55rem; background: var(--brand); border-radius: 2px;
+      clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 18%, 80% 0, 36% 62%);
+    }
+
+    .verdict { padding: 3rem 0 4.5rem; }
+    .verdict-box {
+      border-radius: calc(var(--radius) + 4px);
+      padding: clamp(1.5rem, 4vw, 2.4rem);
+      background:
+        linear-gradient(135deg, rgba(28,28,28,0.96), rgba(40,20,20,0.94)),
+        radial-gradient(600px 280px at 90% 10%, rgba(220,19,19,0.35), transparent);
+      color: #fff; box-shadow: var(--shadow); display: grid; gap: 1.25rem;
+    }
+    .verdict-box h2 {
+      font-family: Montserrat, sans-serif;
+      font-size: clamp(1.35rem, 3vw, 1.85rem);
+      margin: 0; letter-spacing: -0.02em; max-width: 24ch; text-wrap: balance;
+    }
+    .verdict-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    @media (max-width: 720px) { .verdict-grid { grid-template-columns: 1fr; } }
+    .verdict-grid div { padding: 0.9rem 0; border-top: 1px solid rgba(255,255,255,0.15); }
+    .verdict-grid strong {
+      display: block; font-family: Montserrat, sans-serif; font-size: 1.2rem; margin-bottom: 0.25rem;
+    }
+    .verdict-grid span { font-size: 0.88rem; opacity: 0.75; }
+    .foot { padding: 0 0 2.5rem; font-size: 0.8rem; color: var(--muted); text-align: center; }
+
+    .fmt {
+      position: fixed; top: 0.85rem; left: 0.85rem; z-index: 10;
+      display: flex; gap: 0.35rem;
+      background: rgba(255,255,255,0.92); border: 1px solid var(--line);
+      border-radius: 999px; padding: 0.25rem; box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    .fmt button {
+      appearance: none; border: 0; cursor: pointer; font: inherit;
+      font-size: 0.72rem; font-weight: 700; padding: 0.35rem 0.65rem;
+      border-radius: 999px; color: var(--muted); background: transparent;
+    }
+    .fmt button.on { background: var(--brand); color: #fff; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .bar-track > span { width: var(--w, auto); }
+    }
+
+
+    /* Screen only: gray canvas + rounded cards with gradients */
+    @media screen {
+      body.slides-phone,
+      body.slides-a4 {
+        background: #cfcfd2;
+        padding: 1.25rem 0 2.5rem;
+      }
+      body.slides-phone .slide,
+      body.slides-a4 .slide {
+        margin: 0 auto 1.25rem;
+        border-radius: 18px;
+        box-shadow: 0 10px 36px rgba(20, 20, 30, 0.18);
+        background:
+          radial-gradient(900px 420px at 8% -10%, rgba(220, 19, 19, 0.1), transparent 55%),
+          linear-gradient(165deg, #f7f7f8 0%, #efefef 50%, #f4f1f1 100%);
+      }
+      body.slides-phone .slide {
+        width: min(calc(100% - 1.25rem), 390px);
+        aspect-ratio: 9 / 19.5;
+        padding: 18px 16px 20px;
+        border-radius: 28px;
+      }
+      body.slides-a4 .slide {
+        width: min(calc(100% - 1.5rem), 297mm);
+        aspect-ratio: 297 / 210;
+        padding: 8mm 10mm;
+        border-radius: 6px;
+      }
+    }
+
+    /* —— Shared slide layout (screen + print) —— */
+    @media screen, print {
+      body.slides-phone .fmt,
+      body.slides-a4 .fmt { position: fixed; }
+
+      body.slides-phone .slide,
+      body.slides-a4 .slide {
+        overflow: hidden;
+        display: grid;
+        align-content: stretch;
+        box-sizing: border-box;
+      }
+      body.slides-phone .slide > .wrap,
+      body.slides-a4 .slide > .wrap {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        display: grid;
+        align-content: center;
+        gap: 0.65rem;
+        overflow: hidden;
+      }
+      body.slides-phone .hero,
+      body.slides-a4 .hero {
+        min-height: 0;
+        align-content: center;
+      }
+      body.slides-phone .hero::before,
+      body.slides-a4 .hero::before { display: none; }
+      /* Do not zero padding here — it overrides .slide edge insets */
+      body.slides-phone .foot,
+      body.slides-a4 .foot {
+        padding: 0.5rem 0 0;
+        margin: 0;
+        text-align: center;
+      }
+      body.slides-phone .verdict > .wrap,
+      body.slides-a4 .verdict > .wrap {
+        align-content: center;
+        gap: 0.65rem;
+      }
+
+      /* Edge insets — must beat section/hero base padding */
+      body.slides-phone header.slide,
+      body.slides-phone section.slide {
+        padding: 22px 24px 26px;
+      }
+      body.slides-a4 header.slide,
+      body.slides-a4 section.slide {
+        padding: 8mm 10mm;
+      }
+
+      body.slides-phone .brand-mark {
+        font-size: clamp(1.85rem, 11vw, 2.55rem);
+        margin-bottom: 0.55rem;
+      }
+      body.slides-phone .brand-mark span { font-size: 0.28em; letter-spacing: 0.06em; }
+      body.slides-phone .hero h1 { font-size: 1.15rem; max-width: none; margin-bottom: 0.45rem; }
+      body.slides-phone .hero p { font-size: 0.88rem; max-width: none; }
+      body.slides-phone .hero-meta { margin-top: 0.9rem; gap: 0.45rem 0.75rem; }
+      body.slides-phone .pill { font-size: 0.75rem; }
+      body.slides-phone .section-head { margin-bottom: 0.55rem; gap: 0.2rem; }
+      body.slides-phone .section-head h2 { font-size: 1.12rem; }
+      body.slides-phone .section-head p { font-size: 0.8rem; max-width: none; }
+      body.slides-phone .panel { padding: 0.7rem 0.75rem; border-radius: 14px; }
+      body.slides-phone .pain,
+      body.slides-phone .side { grid-template-columns: 1fr; gap: 0.55rem; }
+      body.slides-phone .side .now { border-left: none; border-top: 1px solid var(--line); }
+      body.slides-phone .big-stat .num { font-size: clamp(2.4rem, 14vw, 3.4rem); }
+      body.slides-phone .compare-legend { font-size: 0.72rem; margin-bottom: 0.4rem; }
+      body.slides-phone .matrix { gap: 0.35rem; }
+      body.slides-phone .matrix-row { grid-template-columns: 1fr; gap: 0.15rem; }
+      body.slides-phone .matrix-label { font-size: 0.78rem; }
+      body.slides-phone .bar-meta { font-size: 0.62rem; }
+      body.slides-phone .bar-track { height: 8px; }
+      body.slides-phone .caps { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+      body.slides-phone .cards-3 { grid-template-columns: 1fr; gap: 0.4rem; }
+      body.slides-phone .cap { padding: 0.55rem; gap: 0.25rem; border-radius: 12px; }
+      body.slides-phone .cap h3 { font-size: 0.82rem; }
+      body.slides-phone .cap p { font-size: 0.68rem; line-height: 1.3; }
+      body.slides-phone .toc { grid-template-columns: 1fr; gap: 0.4rem; }
+      body.slides-phone .toc a { padding: 0.55rem 0.65rem; }
+      body.slides-phone .side > div { padding: 0.65rem 0.7rem; }
+      body.slides-phone .side h3 { font-size: 0.78rem; margin-bottom: 0.4rem; }
+      body.slides-phone .side li { font-size: 0.74rem; }
+      body.slides-phone .side ul { gap: 0.28rem; }
+      body.slides-phone .verdict-box { padding: 0.85rem 0.9rem; gap: 0.55rem; border-radius: 16px; }
+      body.slides-phone .verdict-box h2 { font-size: 1.05rem; max-width: none; }
+      body.slides-phone .verdict-grid { grid-template-columns: 1fr; gap: 0.15rem; }
+      body.slides-phone .verdict-grid strong { font-size: 1rem; }
+      body.slides-phone .verdict-grid span { font-size: 0.75rem; }
+      body.slides-phone .foot { font-size: 0.62rem; line-height: 1.35; }
+      body.slides-phone .note { font-size: 0.72rem; margin-bottom: 0.55rem; }
+      body.slides-phone table.rank { font-size: 0.68rem; }
+      body.slides-phone table.rank th,
+      body.slides-phone table.rank td { padding: 0.35rem 0.3rem; }
+      body.slides-phone .hide-phone { display: none !important; }
+      body.slides-phone .table-wrap { box-shadow: none; max-height: 100%; }
+
+      body.slides-phone .slide:has(.table-wrap) > .wrap {
+        align-content: center;
+        gap: 0.35rem;
+      }
+      body.slides-phone .slide:has(.table-wrap) .section-head {
+        margin-bottom: 0;
+        gap: 0.08rem;
+      }
+      body.slides-phone .slide:has(.table-wrap) .section-head h2 { font-size: 1.02rem; }
+      body.slides-phone .slide:has(.table-wrap) .section-head p {
+        font-size: 0.66rem;
+        line-height: 1.25;
+      }
+      body.slides-phone .slide:has(.table-wrap) .table-wrap {
+        border-radius: 12px;
+        width: 100%;
+      }
+      body.slides-phone .slide:has(.table-wrap) table.rank {
+        font-size: 0.72rem;
+        line-height: 1.15;
+      }
+      body.slides-phone .slide:has(.table-wrap) table.rank th,
+      body.slides-phone .slide:has(.table-wrap) table.rank td {
+        padding: 0.38rem 0.32rem;
+        vertical-align: middle;
+      }
+      body.slides-phone .slide:has(.table-wrap) .type {
+        font-size: 0.58rem;
+        padding: 0.1rem 0.3rem;
+      }
+      body.slides-phone .slide:has(.table-wrap) .foot {
+        padding-top: 0.2rem;
+        font-size: 0.58rem;
+      }
+
+      body.slides-a4 .brand-mark {
+        font-size: clamp(1.85rem, 4.5vw, 2.8rem);
+        margin-bottom: 0.45rem;
+      }
+      body.slides-a4 .brand-mark span { font-size: 0.32em; }
+      body.slides-a4 .hero h1 { font-size: clamp(1.15rem, 2vw, 1.45rem); margin-bottom: 0.4rem; }
+      body.slides-a4 .hero p { font-size: 0.88rem; }
+      body.slides-a4 .hero-meta { margin-top: 0.65rem; gap: 0.4rem 0.7rem; }
+      body.slides-a4 .pill { font-size: 0.72rem; }
+      /* Force landscape grids — ignore viewport max-width breakpoints */
+      body.slides-a4 .toc { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+      body.slides-a4 .toc a { padding: 0.55rem 0.65rem; }
+      body.slides-a4 .toc strong { font-size: 0.88rem; }
+      body.slides-a4 .toc span { font-size: 0.72rem; }
+      body.slides-a4 .caps { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+      body.slides-a4 .cards-3 { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+      body.slides-a4 .pain { grid-template-columns: 1.05fr 1fr; gap: 0.55rem; }
+      body.slides-a4 .side {
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        margin-top: 0.4rem !important;
+      }
+      body.slides-a4 .side .now {
+        border-top: none;
+        border-left: 1px solid var(--line);
+      }
+      body.slides-a4 .side > div { padding: 0.7rem 0.85rem; }
+      body.slides-a4 .side h3 { font-size: 0.82rem; margin-bottom: 0.35rem; }
+      body.slides-a4 .side li { font-size: 0.78rem; }
+      body.slides-a4 .side ul { gap: 0.28rem; }
+      body.slides-a4 .matrix-row {
+        grid-template-columns: 8.5rem 1fr;
+        gap: 0.4rem;
+        align-items: center;
+      }
+      body.slides-a4 .matrix-label { font-size: 0.78rem; }
+      body.slides-a4 .bar-meta { font-size: 0.62rem; }
+      body.slides-a4 .section-head { margin-bottom: 0.4rem; gap: 0.12rem; }
+      body.slides-a4 .section-head h2 { font-size: clamp(1.05rem, 1.8vw, 1.3rem); }
+      body.slides-a4 .section-head p { font-size: 0.78rem; max-width: none; }
+      body.slides-a4 .note { font-size: 0.78rem; margin-bottom: 0.45rem; }
+      body.slides-a4 .panel { padding: 0.65rem 0.75rem; }
+      body.slides-a4 .matrix { gap: 0.28rem; }
+      body.slides-a4 .compare-legend { font-size: 0.72rem; margin-bottom: 0.35rem; gap: 0.75rem; }
+      body.slides-a4 .bar-track { height: 8px; }
+      body.slides-a4 .bars { gap: 0.22rem; }
+      body.slides-a4 .cap { padding: 0.55rem 0.65rem; gap: 0.22rem; border-radius: 12px; }
+      body.slides-a4 .cap h3 { font-size: 0.85rem; }
+      body.slides-a4 .cap p { font-size: 0.7rem; line-height: 1.3; }
+      body.slides-a4 .big-stat .num { font-size: clamp(2.2rem, 5vw, 3.2rem); }
+      body.slides-a4 .verdict-box { padding: 0.85rem 1rem; gap: 0.55rem; }
+      body.slides-a4 .verdict-box h2 { font-size: clamp(1.1rem, 2vw, 1.4rem); }
+      body.slides-a4 .verdict-grid { grid-template-columns: repeat(3, 1fr); gap: 0.35rem; }
+      body.slides-a4 .verdict-grid strong { font-size: 1.05rem; }
+      body.slides-a4 .verdict-grid span { font-size: 0.72rem; }
+      body.slides-a4 .foot { font-size: 0.62rem; padding-top: 0.25rem; }
+      body.slides-a4 .slide > .wrap { gap: 0.4rem; align-content: center; }
+      body.slides-a4 .table-wrap {
+        box-shadow: none;
+        border-radius: 10px;
+      }
+      body.slides-a4 table.rank {
+        font-size: 0.68rem;
+        line-height: 1.2;
+      }
+      body.slides-a4 table.rank th {
+        font-size: 0.58rem;
+        padding: 0.28rem 0.35rem;
+      }
+      body.slides-a4 table.rank td { padding: 0.28rem 0.35rem; }
+      body.slides-a4 .type { font-size: 0.55rem; padding: 0.08rem 0.28rem; }
+      body.slides-a4 .slide:has(.table-wrap) > .wrap { gap: 0.25rem; }
+      body.slides-a4 .slide:has(.table-wrap) .section-head { margin-bottom: 0.15rem; }
+      /* Сила/Слабость — иначе 10 строк не влезают в 210mm */
+      body.slides-a4 .hide-a4-narrow { display: none !important; }
+    }
+
+    /* Phone / A4 page size — JS syncs @page to current format */
+    @page {
+      margin: 0;
+      background: #fff;
+    }
+
+    /* Flat print: white paper, no radius, no decorative fills (Cmd+P) */
+    @media print {
+      html, body,
+      body.slides-phone,
+      body.slides-a4 {
+        background: #fff !important;
+        background-image: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        color: #1c1c1c !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+      }
+      .fmt { display: none !important; }
+      .slide {
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        filter: none !important;
+        background: #fff !important;
+        background-image: none !important;
+        max-width: none !important;
+        max-height: none !important;
+        aspect-ratio: auto !important;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        overflow: hidden !important;
+      }
+      body.slides-phone .slide {
+        width: 103.2mm !important;
+        height: 223.5mm !important;
+        min-height: 223.5mm !important;
+        padding: 14px 14px 16px !important;
+      }
+      body.slides-a4 .slide {
+        width: 297mm !important;
+        height: 210mm !important;
+        min-height: 210mm !important;
+        padding: 8mm 10mm !important;
+      }
+      .slide:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .panel,
+      .cap,
+      .toc a,
+      .table-wrap,
+      .verdict-box,
+      .side > div,
+      .type,
+      .pill {
+        background: #fff !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+      .verdict-box {
+        border: 1px solid #ddd !important;
+        color: #1c1c1c !important;
+      }
+      .verdict-box h2,
+      .verdict-grid strong,
+      .verdict-grid span { color: #1c1c1c !important; opacity: 1 !important; }
+      .table-wrap { border: 1px solid #ddd !important; }
+      .cap,
+      .toc a,
+      .panel,
+      .side > div { border: 1px solid #ddd !important; }
+      .side .now {
+        background: #fff !important;
+        border-left: 1px solid #ddd !important;
+      }
+      .side .was { background: #fff !important; }
+      table.rank th { background: #f5f5f5 !important; }
+      *, *::before, *::after {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        animation: none !important;
+        border-radius: 0 !important;
+      }
+      a { text-decoration: none !important; }
+      .bar-track > span { transition: none !important; }
+    }
+
+  </style>
+</head>
+<body>
+  <nav class="fmt" aria-label="Формат слайдов">
+    <button type="button" data-fmt="phone" class="on">Phone</button>
+    <button type="button" data-fmt="a4">A4</button>
+  </nav>
+
+  <header class="hero slide">
+    <div class="wrap">
+      <p class="brand-mark">HOOCON<span>MARKET AUDIT · 2026-07-30</span></p>
+      <h1>Топ‑20 сайтов ниши vs новый Hoocon CMS</h1>
+      <p>
+        Аудит витрин компаний в сегменте электроприводов ОВК / аналогов Belimo.
+        Сравнение с дилерами, OEM и текущим hoocon.ru (Tilda).
+      </p>
+      <div class="hero-meta">
+        <span class="pill"><i></i>Ниша: приводы / ОЗК / дымоудаление</span>
+        <span class="pill muted"><i></i>SERP‑прокси (Яндекс captcha)</span>
+        <span class="pill"><i></i>B2B · без корзины</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Как читали выдачу</h2>
+        <p>Прямой Яндекс недоступен боту — список по коммерческим запросам ниши.</p>
+      </div>
+      <p class="note">
+        Запросы: «электроприводы для вентиляции», «аналоги Belimo», бренды
+        Lufberg / Dastech / Nanotek / Hoocon. Дата: <strong>2026-07-30</strong>.
+        Без маркетплейсов. Позиции относительные.
+      </p>
+      <nav class="toc" aria-label="Содержание">
+        <a href="#market"><strong>01 · Рынок</strong><span>~70% топа — дилеры</span></a>
+        <a href="#top20"><strong>02 · Топ‑20</strong><span>OEM + дилеры</span></a>
+        <a href="#scores"><strong>03 · Критерии</strong><span>Фильтры → RFQ</span></a>
+        <a href="#gaps"><strong>04 · Разрывы</strong><span>И план 90 дней</span></a>
+        <a href="#verdict"><strong>05 · Вывод</strong><span>Ставка Hoocon</span></a>
+        <a href="#verdict"><strong>Phone / A4</strong><span>Переключатель слева сверху</span></a>
+      </nav>
+    </div>
+  </section>
+
+  <section class="slide" id="market">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Картина рынка</h2>
+        <p>Выдачу делят дилеры с корзиной и OEM разного качества.</p>
+      </div>
+      <div class="pain">
+        <div class="panel big-stat">
+          <div class="num">~<em>70%</em></div>
+          <div class="label">топа — дилеры / мультибренд с ценой. OEM реже, но сильнее по доверию «от завода».</div>
+        </div>
+        <div class="panel">
+          <div class="caps" style="grid-template-columns:1fr;box-shadow:none;border:0;padding:0;background:transparent">
+            <article class="cap" style="box-shadow:none;border:0;padding:0.4rem 0">
+              <h3>Дилер</h3>
+              <p>Цена, аналог Belimo, корзина — заявка уходит дилеру.</p>
+            </article>
+            <article class="cap" style="box-shadow:none;border:0;padding:0.4rem 0">
+              <h3>OEM</h3>
+              <p>Каталог / PDF / КП. Часто слабый UX — инженер уходит к дилеру.</p>
+            </article>
+            <article class="cap" style="box-shadow:none;border:0;padding:0.4rem 0">
+              <h3>Hoocon CMS</h3>
+              <p>OEM‑доверие + скорость подбора дилера, без корзины.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="top20">
+    <div class="wrap">
+        <div class="section-head">
+          <h2>Топ‑20 сайтов · 1–10</h2>
+          <p>OEM и дилеры ниши ОВК / аналоги Belimo. Оценка — путь инженера, не SEO‑ранг.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="rank">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Сайт</th>
+                <th>Тип</th>
+                <th class="hide-phone">Роль</th>
+                <th class="hide-phone hide-a4-narrow">Сила</th>
+                <th class="hide-phone hide-a4-narrow">Слабость</th>
+                <th>/10</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td class="n">1</td>
+              <td><a href="https://panoramavent.com/" rel="noopener">panoramavent.com</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Аналоги Belimo, 8 брендов</td>
+              <td class="hide-phone hide-a4-narrow">Контент замены 1:1</td>
+              <td class="hide-phone hide-a4-narrow">Не OEM</td>
+              <td class="score mid">7.0</td>
+            </tr>
+            <tr>
+              <td class="n">2</td>
+              <td><a href="https://privods.com/" rel="noopener">privods.com</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Цены + коллекции</td>
+              <td class="hide-phone hide-a4-narrow">Глубокий e-com</td>
+              <td class="hide-phone hide-a4-narrow">Нет OEM-бренда</td>
+              <td class="score mid">6.8</td>
+            </tr>
+            <tr>
+              <td class="n">3</td>
+              <td><a href="https://dastech.ru/" rel="noopener">dastech.ru</a></td>
+              <td><span class="type oem">OEM</span></td>
+              <td class="hide-phone">Конкурент-бренд</td>
+              <td class="hide-phone hide-a4-narrow">Кейсы, современный сайт</td>
+              <td class="hide-phone hide-a4-narrow">Меньше фасетов</td>
+              <td class="score hi">7.6</td>
+            </tr>
+            <tr>
+              <td class="n">4</td>
+              <td>hoocon.ru (Tilda)</td>
+              <td><span class="type us">наш · сейчас</span></td>
+              <td class="hide-phone">Бренд в выдаче</td>
+              <td class="hide-phone hide-a4-narrow">Узнаваемость</td>
+              <td class="hide-phone hide-a4-narrow">Слабые фильтры</td>
+              <td class="score mid">5.2</td>
+            </tr>
+            <tr>
+              <td class="n">5</td>
+              <td><a href="https://gs-ing.ru/" rel="noopener">gs-ing.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Lufberg/Nanotek</td>
+              <td class="hide-phone hide-a4-narrow">ТТХ + аналоги</td>
+              <td class="hide-phone hide-a4-narrow">Мультибренд</td>
+              <td class="score mid">6.5</td>
+            </tr>
+            <tr>
+              <td class="n">6</td>
+              <td><a href="https://4asu.ru/" rel="noopener">4asu.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Агрегатор АСУ ТП</td>
+              <td class="hide-phone hide-a4-narrow">Ширина ассортимента</td>
+              <td class="hide-phone hide-a4-narrow">Нет фокуса OEM</td>
+              <td class="score mid">6.2</td>
+            </tr>
+            <tr>
+              <td class="n">7</td>
+              <td><a href="https://ensotec.ru/" rel="noopener">ensotec.ru</a></td>
+              <td><span class="type oem">OEM</span></td>
+              <td class="hide-phone">Производитель ENSO</td>
+              <td class="hide-phone hide-a4-narrow">Прямой заказ</td>
+              <td class="hide-phone hide-a4-narrow">Устаревший UX</td>
+              <td class="score mid">5.8</td>
+            </tr>
+            <tr>
+              <td class="n">8</td>
+              <td><a href="https://nanotek.msk.ru/" rel="noopener">nanotek.msk.ru</a></td>
+              <td><span class="type oem">OEM / витрина</span></td>
+              <td class="hide-phone">Nanotek + аналоги</td>
+              <td class="hide-phone hide-a4-narrow">Замены Belimo</td>
+              <td class="hide-phone hide-a4-narrow">Мало фасетов</td>
+              <td class="score mid">6.0</td>
+            </tr>
+            <tr>
+              <td class="n">9</td>
+              <td><a href="https://t-sfera.com/" rel="noopener">t-sfera.com</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Раздел приводов</td>
+              <td class="hide-phone hide-a4-narrow">Подбор/замена</td>
+              <td class="hide-phone hide-a4-narrow">Общий вент-магазин</td>
+              <td class="score mid">5.9</td>
+            </tr>
+            <tr>
+              <td class="n">10</td>
+              <td><a href="https://techno-rus.ru/" rel="noopener">techno-rus.ru</a></td>
+              <td><span class="type oem">OEM</span></td>
+              <td class="hide-phone">TECHNO</td>
+              <td class="hide-phone hide-a4-narrow">Свой бренд</td>
+              <td class="hide-phone hide-a4-narrow">Каталог слабее</td>
+              <td class="score mid">5.7</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+        <div class="section-head">
+          <h2>Топ‑20 сайтов · 11–20</h2>
+          <p>OEM и дилеры ниши ОВК / аналоги Belimo. Оценка — путь инженера, не SEO‑ранг.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="rank">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Сайт</th>
+                <th>Тип</th>
+                <th class="hide-phone">Роль</th>
+                <th class="hide-phone hide-a4-narrow">Сила</th>
+                <th class="hide-phone hide-a4-narrow">Слабость</th>
+                <th>/10</th>
+              </tr>
+            </thead>
+            <tbody>
+            <tr>
+              <td class="n">11</td>
+              <td><a href="https://iecon.ru/" rel="noopener">iecon.ru</a></td>
+              <td><span class="type oem">OEM</span></td>
+              <td class="hide-phone">IECON / АЕКОН</td>
+              <td class="hide-phone hide-a4-narrow">Таблицы ТТХ</td>
+              <td class="hide-phone hide-a4-narrow">Тяжёлый каталог</td>
+              <td class="score mid">6.1</td>
+            </tr>
+            <tr>
+              <td class="n">12</td>
+              <td><a href="https://ingvent.ru/" rel="noopener">ingvent.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Belimo</td>
+              <td class="hide-phone hide-a4-narrow">Наличие Москва</td>
+              <td class="hide-phone hide-a4-narrow">Оригинал, не аналоги</td>
+              <td class="score mid">5.5</td>
+            </tr>
+            <tr>
+              <td class="n">13</td>
+              <td><a href="https://belimo-m.ru/" rel="noopener">belimo-m.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Каталог Belimo</td>
+              <td class="hide-phone hide-a4-narrow">Глубина серий</td>
+              <td class="hide-phone hide-a4-narrow">Дорогой сегмент</td>
+              <td class="score mid">5.4</td>
+            </tr>
+            <tr>
+              <td class="n">14</td>
+              <td><a href="https://lufter-ekb.ru/" rel="noopener">lufter-ekb.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Оригинал Belimo</td>
+              <td class="hide-phone hide-a4-narrow">Доверие</td>
+              <td class="hide-phone hide-a4-narrow">Дорого</td>
+              <td class="score mid">5.3</td>
+            </tr>
+            <tr>
+              <td class="n">15</td>
+              <td>fresh-air.moscow</td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">Розница</td>
+              <td class="hide-phone hide-a4-narrow">Цена в карточке</td>
+              <td class="hide-phone hide-a4-narrow">Мало UX</td>
+              <td class="score lo">4.8</td>
+            </tr>
+            <tr>
+              <td class="n">16</td>
+              <td><a href="https://tkpss.ru/" rel="noopener">tkpss.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">LIGRESS</td>
+              <td class="hide-phone hide-a4-narrow">Прайс</td>
+              <td class="hide-phone hide-a4-narrow">Устаревший каркас</td>
+              <td class="score lo">4.6</td>
+            </tr>
+            <tr>
+              <td class="n">17</td>
+              <td><a href="https://lufberg.by/" rel="noopener">lufberg.by</a></td>
+              <td><span class="type oem">OEM-сеть</span></td>
+              <td class="hide-phone">Lufberg BY</td>
+              <td class="hide-phone hide-a4-narrow">Официальная линейка</td>
+              <td class="hide-phone hide-a4-narrow">Не РФ-домен</td>
+              <td class="score mid">5.0</td>
+            </tr>
+            <tr>
+              <td class="n">18</td>
+              <td><a href="https://ovk-climat.ru/" rel="noopener">ovk-climat.ru</a></td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">PDF брендов</td>
+              <td class="hide-phone hide-a4-narrow">Документы</td>
+              <td class="hide-phone hide-a4-narrow">Слабый product UX</td>
+              <td class="score lo">4.7</td>
+            </tr>
+            <tr>
+              <td class="n">19</td>
+              <td>Vilmann / AIR SC</td>
+              <td><span class="type">дилер</span></td>
+              <td class="hide-phone">В таблицах аналогов</td>
+              <td class="hide-phone hide-a4-narrow">Присутствие</td>
+              <td class="hide-phone hide-a4-narrow">Свои сайты слабее</td>
+              <td class="score lo">4.5</td>
+            </tr>
+            <tr>
+              <td class="n">20</td>
+              <td><strong>Hoocon CMS</strong></td>
+              <td><span class="type us">наш · цель</span></td>
+              <td class="hide-phone">Эталон сравнения</td>
+              <td class="hide-phone hide-a4-narrow">Фасеты · PDF · RFQ</td>
+              <td class="hide-phone hide-a4-narrow">Нужны HTTPS+индекс</td>
+              <td class="score hi">8.4</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      <p class="foot" style="padding:0.4rem 0 0">Оценка /10 — UX «найти → PDF → заявка», не позиция в Яндексе.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="scores">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Критерии инженера</h2>
+        <p>Типичный дилер топа · Tilda · новый CMS.</p>
+      </div>
+      <div class="compare-legend">
+        <span class="l-old">Дилер топа</span>
+        <span class="l-peer">hoocon.ru Tilda</span>
+        <span class="l-new">Hoocon CMS</span>
+      </div>
+      <div class="panel">
+        <div class="matrix" id="matrix">
+          <div class="matrix-row">
+            <div class="matrix-label">Фасет‑фильтры</div>
+            <div class="bars">
+              <div class="bar-meta"><span>цена / бренд</span><span>момент · 24/230</span></div>
+              <div class="bar-track old"><span data-w="55"></span></div>
+              <div class="bar-track peer"><span data-w="30"></span></div>
+              <div class="bar-track new"><span data-w="92"></span></div>
+            </div>
+          </div>
+          <div class="matrix-row">
+            <div class="matrix-label">Поиск артикула</div>
+            <div class="bars">
+              <div class="bar-meta"><span>у сильных</span><span>FTS / SKU</span></div>
+              <div class="bar-track old"><span data-w="65"></span></div>
+              <div class="bar-track peer"><span data-w="40"></span></div>
+              <div class="bar-track new"><span data-w="90"></span></div>
+            </div>
+          </div>
+          <div class="matrix-row">
+            <div class="matrix-label">Аналоги Belimo</div>
+            <div class="bars">
+              <div class="bar-meta"><span>хабы дилеров</span><span>раздел CMS</span></div>
+              <div class="bar-track old"><span data-w="88"></span></div>
+              <div class="bar-track peer"><span data-w="55"></span></div>
+              <div class="bar-track new"><span data-w="80"></span></div>
+            </div>
+          </div>
+          <div class="matrix-row">
+            <div class="matrix-label">PDF / RFQ / бренд</div>
+            <div class="bars">
+              <div class="bar-meta"><span>корзина</span><span>CRM + OEM</span></div>
+              <div class="bar-track old"><span data-w="45"></span></div>
+              <div class="bar-track peer"><span data-w="50"></span></div>
+              <div class="bar-track new"><span data-w="92"></span></div>
+            </div>
+          </div>
+          <div class="matrix-row">
+            <div class="matrix-label">Сравнение SKU</div>
+            <div class="bars">
+              <div class="bar-meta"><span>редко</span><span>таблица ТТХ</span></div>
+              <div class="bar-track old"><span data-w="25"></span></div>
+              <div class="bar-track peer"><span data-w="10"></span></div>
+              <div class="bar-track new"><span data-w="90"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Три архетипа</h2>
+        <p>Что видит инженер за 20 секунд.</p>
+      </div>
+      <div class="cards-3">
+        <article class="cap">
+          <h3>Дилер топа</h3>
+          <p>Цена и «аналог Belimo». Быстрая покупка — бренд OEM вторичен.</p>
+        </article>
+        <article class="cap">
+          <h3>hoocon.ru · Tilda</h3>
+          <p>Бренд есть, фильтры слабые, Store/JS SEO. В подборе проигрывает дилерам.</p>
+        </article>
+        <article class="cap">
+          <h3>Hoocon CMS</h3>
+          <p>Фасеты, поиск, PDF, сравнение, RFQ. OEM без корзины.</p>
+        </article>
+      </div>
+      <div class="side" style="margin-top:0.75rem">
+        <div class="was">
+          <h3>Обходят нас</h3>
+          <ul>
+            <li>SEO‑хабы «аналоги Belimo»</li>
+            <li>Цены в сниппетах</li>
+            <li>Кейсы Dastech</li>
+            <li>Старые домены в индексе</li>
+          </ul>
+        </div>
+        <div class="now">
+          <h3>CMS сильнее</h3>
+          <ul>
+            <li>Подбор по ТТХ</li>
+            <li>Сравнение + поиск SKU</li>
+            <li>PDF + RFQ в CRM</li>
+            <li>Чистый бренд OEM</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="gaps">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Разрывы и 90 дней</h2>
+        <p>После TLS — минимум, чтобы отбирать трафик у дилеров.</p>
+      </div>
+      <div class="caps">
+        <article class="cap">
+          <h3>Контент Belimo</h3>
+          <p>Посадочные серии + таблицы соответствий.</p>
+        </article>
+        <article class="cap">
+          <h3>SEO домена</h3>
+          <p>HTTPS, 301, sitemap, индекс SKU.</p>
+        </article>
+        <article class="cap">
+          <h3>Доказательства OEM</h3>
+          <p>Объекты, завод, сертификаты на PDP.</p>
+        </article>
+        <article class="cap">
+          <h3>0–14 дн.</h3>
+          <p>TLS + 301 + Метрика / Search Console.</p>
+        </article>
+        <article class="cap">
+          <h3>14–60 дн.</h3>
+          <p>Хабы аналогов + кейсы OEM.</p>
+        </article>
+        <article class="cap">
+          <h3>60–90 дн.</h3>
+          <p>«Где купить» + SLA RFQ ≤ 2 ч.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide verdict" id="verdict">
+    <div class="wrap">
+      <div class="verdict-box">
+        <h2>В топе правят дилеры. Выигрывает OEM, удобнее дилера</h2>
+        <div class="verdict-grid">
+          <div>
+            <strong>Рынок</strong>
+            <span>~70% топа — мультибренд с ценой</span>
+          </div>
+          <div>
+            <strong>CMS</strong>
+            <span>Сильнее Tilda и большинства OEM; не хватает SEO‑хабов</span>
+          </div>
+          <div>
+            <strong>Ставка</strong>
+            <span>Подбор + PDF + RFQ + бренд, не корзина</span>
+          </div>
+        </div>
+      </div>
+      <p class="foot">
+        SERP‑прокси 2026-07-30 · Яндекс captcha · стиль как project-defense ·
+        Phone / A4 слева сверху · Печать Cmd/Ctrl+P
+      </p>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function fillBars(root) {
+        root.querySelectorAll("[data-w]").forEach(function (el) {
+          el.style.width = el.getAttribute("data-w") + "%";
+        });
+      }
+      function syncPrintPageSize() {
+        var a4 = document.body.classList.contains("slides-a4");
+        var el = document.getElementById("print-page-size");
+        if (!el) {
+          el = document.createElement("style");
+          el.id = "print-page-size";
+          document.head.appendChild(el);
+        }
+        el.textContent = a4
+          ? "@page{size:A4 landscape;margin:0;background:#fff}"
+          : "@page{size:103.2mm 223.5mm;margin:0;background:#fff}";
+      }
+      function setFormat(fmt) {
+        document.body.classList.remove("slides-phone", "slides-a4");
+        document.body.classList.add(fmt === "a4" ? "slides-a4" : "slides-phone");
+        document.querySelectorAll(".fmt button").forEach(function (btn) {
+          btn.classList.toggle("on", btn.getAttribute("data-fmt") === fmt);
+        });
+        try { localStorage.setItem("competitors-audit-fmt", fmt); } catch (e) {}
+        syncPrintPageSize();
+        fillBars(document);
+      }
+      var params = new URLSearchParams(location.search);
+      var saved = "";
+      try { saved = localStorage.getItem("competitors-audit-fmt") || ""; } catch (e) {}
+      var initial = params.get("format") || saved || "phone";
+      if (initial !== "a4" && initial !== "phone") initial = "phone";
+      setFormat(initial);
+      document.querySelectorAll(".fmt button").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          setFormat(btn.getAttribute("data-fmt"));
+        });
+      });
+      window.addEventListener("beforeprint", function () {
+        syncPrintPageSize();
+        fillBars(document);
+      });
+      if (reduce) { fillBars(document); return; }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          fillBars(entry.target);
+          io.unobserve(entry.target);
+        });
+      }, { threshold: 0.2 });
+      var matrix = document.getElementById("matrix");
+      if (matrix) io.observe(matrix);
+    })();
+  </script>
+</body>
+</html>

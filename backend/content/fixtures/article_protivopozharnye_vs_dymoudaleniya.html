@@ -1,0 +1,167 @@
+<p class="hero-dek">
+  Противопожарные клапаны закрываются при пожаре, клапаны дымоудаления — открываются.
+  Приводы, питание и категория электроснабжения для этих контуров различаются;
+  ниже — ориентир для проектирования.
+</p>
+
+<p class="dash-note">
+  Дашборд — противоположные безопасные положения. Конкретный артикул — в карточке
+  SKU и проекте ПБ.
+</p>
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Безопасное положение при пожаре</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">ОЗК · противопожарный</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">закрыто</span>
+      </li>
+      <li>
+        <span class="hbar__label">Дымоудаление</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">открыто</span>
+      </li>
+      <li>
+        <span class="hbar__label">возврат пружины</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--85"></span></span>
+        <span class="hbar__val">≤&nbsp;25&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">категория питания дым</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--100"></span></span>
+        <span class="hbar__val">I</span>
+      </li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Семейства в каталоге</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">SA FU</span><span class="kpi-tiles__lab">ОЗК · закрыть</span></li>
+      <li><span class="kpi-tiles__num">SA MU</span><span class="kpi-tiles__lab">дым · открыть</span></li>
+      <li><span class="kpi-tiles__num">FU</span><span class="kpi-tiles__lab">пружина</span></li>
+      <li><span class="kpi-tiles__num">III→I</span><span class="kpi-tiles__lab">категория ЭС</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Функциональное назначение</h2>
+<p>
+  В системах противопожарной защиты электроприводы вентиляционных клапанов
+  выполняют противоположные функции:
+</p>
+<ul>
+  <li>
+    <strong>Противопожарные (огнезадерживающие) клапаны</strong> при пожаре
+    <strong>закрываются</strong> и блокируют распространение огня и дыма по каналам.
+  </li>
+  <li>
+    <strong>Клапаны дымоудаления</strong> при пожаре <strong>открываются</strong>
+    и обеспечивают отвод дыма из защищаемых зон.
+  </li>
+</ul>
+
+<h2>Типы приводов</h2>
+<p>Для управления применяют:</p>
+<ol>
+  <li>
+    Электромеханические приводы с <strong>пружинным возвратом</strong>
+    (fail-safe <strong>FU</strong>) — для противопожарных клапанов и ОЗК.
+  </li>
+  <li>
+    Приводы без пружины с удержанием положения при подаче питания — для
+    клапанов дымоудаления (семейство
+    <a href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">SA MU</a>).
+  </li>
+</ol>
+
+<h2>Принцип управления</h2>
+<p>
+  <strong>Противопожарный привод</strong> переводит клапан в безопасное положение
+  при <em>отключении</em> электропитания: пружина закрывает ОЗК. Это основа
+  fail-safe — подробнее в <a href="/faq#fail-safe">FAQ</a>.
+</p>
+<p>
+  <strong>Привод дымоудаления</strong> требует <em>подачи</em> напряжения для
+  открытия клапана и удержания его в рабочем положении на время эвакуации
+  и тушения.
+</p>
+
+<h2>Электроснабжение</h2>
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Параметр</th>
+  <th>Противопожарный клапан (ОЗК)</th>
+  <th>Клапан дымоудаления</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Категория надёжности ЭС</strong></td>
+  <td>Допускается III категория</td>
+  <td>Требуется I категория</td>
+</tr>
+<tr>
+  <td><strong>Резервирование питания</strong></td>
+  <td>Закрытие пружиной при обесточивании</td>
+  <td>Обязательно — удержание открытого положения</td>
+</tr>
+<tr>
+  <td><strong>Типовое управление</strong></td>
+  <td>Открыто/закрыто + пружинный возврат</td>
+  <td>Открыто/закрыто, контроль положения</td>
+</tr>
+<tr>
+  <td><strong>Семейство в каталоге</strong></td>
+  <td>
+    <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU</a>
+  </td>
+  <td>
+    <a href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">SA MU</a>
+  </td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Практика проектирования</h2>
+<ol>
+  <li>
+    В дымоудалении резервируйте электропитание: одновременное открытие всех
+    клапанов создаёт пиковую нагрузку на вентиляторы.
+  </li>
+  <li>
+    Для ОЗК критична скорость срабатывания — привод с мощной возвратной пружиной
+    и время возврата по паспорту ≤&nbsp;25&nbsp;с.
+  </li>
+  <li>
+    Учитывайте температурный режим, требуемый момент (Нм), контроль положения
+    и среду установки.
+  </li>
+</ol>
+<p>
+  Использование клапанов с тепловым замком в новых системах не допускается;
+  цепи управления должны быть защищены и связаны с пожарной автоматикой.
+</p>
+
+<h2>Где искать в каталоге</h2>
+<ul>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-protivopozharnye-i-dymovye">
+      Противопожарные и дымовые (SA FU) →
+    </a>
+  </li>
+  <li>
+    <a class="catalog-link" href="/catalog/elektroprivody-dlya-klapanov-dymoudaleniya">
+      Клапаны дымоудаления (SA MU) →
+    </a>
+  </li>
+</ul>
+<p>
+  Контекст применения —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение приводов в вентиляции</a>.
+  Подбор по объекту —
+  <a href="/consultation">заявка на консультацию</a>.
+</p>
