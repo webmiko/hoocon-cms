@@ -9,7 +9,7 @@ from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs, format
 from catalog.models import SKU, Attribute
 from catalog.sku_access import sku_attribute_values, sku_category_slug_or_empty
 
-_FU_DRIVE_RE = re.compile(r"(?i)da\d*fu")
+_FU_DRIVE_RE = re.compile(r"(?i)da5fu")
 _DRIVE_FAMILY_RE = re.compile(r"(?i)\b(da[a-z0-9]+)\b")
 _BALL_VALVE_CATEGORY = "sharovye-krany"
 _DRIVE_SUFFIXES: tuple[str, ...] = ("-D", "-DS", "-A", "-AS")
@@ -38,7 +38,7 @@ def parse_drive_families(text: str) -> list[str]:
 def resolve_bracket_for_drive(drive_family: str, *, flanged: bool = False) -> str:
     """Pick bracket SKU for a selected drive family.
 
-    BR-H for flanged ВЧШГ valves; BR-ML only for DA…FU on brass; else BR-M.
+    BR-H for flanged ВЧШГ valves; BR-ML only for DA5FU on brass; else BR-M.
 
     Args:
         drive_family: Base article, e.g. ``DA5FU24`` or ``DA6MU24``.

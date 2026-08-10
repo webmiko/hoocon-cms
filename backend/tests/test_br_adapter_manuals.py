@@ -22,8 +22,9 @@ from catalog.etl.manual_pdfs import (
     [
         ("Техничка на кронштейн", (_BR_BRACKET_TITLE, ("BR-M", "BR-ML"), 0)),
         ("техничка штока BR-M", (_BR_STEM_TITLE_M, ("BR-M",), 1)),
+        ("Техничка штока BR-M", (_BR_STEM_TITLE_M, ("BR-M",), 1)),
         ("техничка штока BR-ML", (_BR_STEM_TITLE_ML, ("BR-ML",), 1)),
-        ("техничка штока BR-ML.pdf", (_BR_STEM_TITLE_ML, ("BR-ML",), 1)),
+        ("Техничка штока BR-ML.pdf", (_BR_STEM_TITLE_ML, ("BR-ML",), 1)),
         ("da5fu-d:ds", None),
     ],
 )

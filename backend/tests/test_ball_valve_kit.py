@@ -21,6 +21,7 @@ def test_parse_drive_families_from_compatible_actuators_text() -> None:
 
 def test_resolve_bracket_for_drive_fu_vs_mu() -> None:
     assert resolve_bracket_for_drive("DA5FU24") == "BR-ML"
+    assert resolve_bracket_for_drive("DA3FU24") == "BR-M"
     assert resolve_bracket_for_drive("DA6MU24") == "BR-M"
 
 

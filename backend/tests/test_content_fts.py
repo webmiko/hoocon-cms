@@ -130,14 +130,15 @@ def test_news_fts_matches_body() -> None:
     News.objects.create(
         title="Анонс",
         slug="anons-1",
-        body="Запустили производство электроприводов в России.",
+        body="Запустили производство ксилоквантов в России.",
     )
     News.objects.create(
         title="Другая новость",
         slug="novost-2",
         body="Открыли новый склад.",
     )
-    q = SearchQuery("электропривод", config="russian")
+    # Unique token — seed news (e.g. BR adapters) must not collide.
+    q = SearchQuery("ксилоквант", config="russian")
     found = News.objects.filter(search_vector=q)
     assert found.count() == 1
     assert found.first().slug == "anons-1"

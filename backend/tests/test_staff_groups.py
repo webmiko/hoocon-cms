@@ -39,7 +39,7 @@ def test_admin_group_has_full_catalog_and_sitesettings() -> None:
 
 
 def test_manager_group_can_work_leads_without_delete_or_settings() -> None:
-    """Менеджер: RFQ/CRM write, no delete lead, no sitesettings."""
+    """Менеджер: RFQ/CRM write, catalog view, no delete, no content/settings."""
     ensure_staff_groups()
     group = Group.objects.get(name=GROUP_MANAGER)
     codenames = set(group.permissions.values_list("codename", flat=True))
@@ -51,20 +51,29 @@ def test_manager_group_can_work_leads_without_delete_or_settings() -> None:
     assert "add_emailmessage" in codenames
     assert "view_sku" in codenames
     assert "change_sku" not in codenames
+    assert "view_page" not in codenames
+    assert "view_socialpost" not in codenames
     assert "change_sitesettings" not in codenames
     assert "delete_sitesettings" not in codenames
+    assert "view_user" in codenames
 
 
-def test_analyst_group_is_read_only() -> None:
-    """Аналитик: view leads/catalog/CRM, no write."""
+def test_analyst_group_is_read_only_same_surface_as_manager() -> None:
+    """Аналитик: view leads/catalog/CRM (+ view_user), no write, no content."""
     ensure_staff_groups()
     group = Group.objects.get(name=GROUP_ANALYST)
     codenames = set(group.permissions.values_list("codename", flat=True))
     assert "view_lead" in codenames
     assert "view_sku" in codenames
     assert "view_client" in codenames
+    assert "view_user" in codenames
     assert "add_lead" not in codenames
     assert "change_lead" not in codenames
+    assert "delete_lead" not in codenames
+    assert "change_client" not in codenames
+    assert "view_page" not in codenames
+    assert "view_redirect" not in codenames
+    assert "view_socialpost" not in codenames
     assert "change_sitesettings" not in codenames
 
 

@@ -89,10 +89,10 @@ def test_ensure_br_adapters_creates_cards_and_images() -> None:
     br_ml_attrs = {
         av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=br_ml).select_related("attribute")
     }
-    assert br_ml_attrs["compatible-actuators"] == "DA3FU, DA5FU (24/230 В)"
+    assert br_ml_attrs["compatible-actuators"] == "DA5FU (24/230 В)"
     assert "не DA" not in br_ml_attrs["compatible-actuators"]
     assert "DA4MU" in br_m.description
-    assert "DA3FU24" in br_ml.description
+    assert "DA3FU" not in br_ml.description
     assert "DA5FU24" in br_ml.description
     for omitted in (
         "manufacturer",

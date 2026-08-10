@@ -43,4 +43,11 @@
       {% endcomponent %}
     </div>
   </form>
+
+  <p class="mt-8 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    Супер-админ, если письмо не доходит:
+    <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">войти паролем</a>
+    или
+    <a href="{{ recovery_login_url }}" class="text-primary-600 underline dark:text-primary-400">резервным кодом</a>.
+  </p>
 {% endblock %}

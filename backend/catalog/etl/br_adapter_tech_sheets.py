@@ -85,8 +85,8 @@ _SPECS: Final[tuple[BrTechSheetSpec, ...]] = (
         geometry_box=(80, 40, 1100, 1500),
     ),
     BrTechSheetSpec(
-        disk_names=("техничка штока BR-M.pdf",),
-        out_name="техничка штока BR-M.pdf",
+        disk_names=("Техничка штока BR-M.pdf", "техничка штока BR-M.pdf"),
+        out_name="Техничка штока BR-M.pdf",
         zh_png="shtok-br-m-zh.png",
         title="Соединительный шток Hoocon BR-M",
         subtitle="Для приводов без возвратной пружины (MU / MQU)",
@@ -100,8 +100,8 @@ _SPECS: Final[tuple[BrTechSheetSpec, ...]] = (
         geometry_box=(160, 15, 1000, 1540),
     ),
     BrTechSheetSpec(
-        disk_names=("техничка штока BR-ML.pdf",),
-        out_name="техничка штока BR-ML.pdf",
+        disk_names=("Техничка штока BR-ML.pdf", "техничка штока BR-ML.pdf"),
+        out_name="Техничка штока BR-ML.pdf",
         zh_png="shtok-br-ml-zh.png",
         title="Соединительный шток Hoocon BR-ML",
         subtitle="Для приводов с возвратной пружиной (FU); удлинённый (+35)",
@@ -296,7 +296,8 @@ def rebuild_br_adapter_tech_pdfs(
 def main() -> None:
     """CLI entry: ``python -m catalog.etl.br_adapter_tech_sheets``."""
     logging.basicConfig(level=logging.INFO)
-    print(rebuild_br_adapter_tech_pdfs())
+    summary = rebuild_br_adapter_tech_pdfs()
+    logger.info("BR tech rebuild done: %s", summary)
 
 
 if __name__ == "__main__":

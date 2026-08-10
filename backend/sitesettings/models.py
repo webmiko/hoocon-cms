@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.db import models
 
 
@@ -22,7 +23,21 @@ class SiteSettings(models.Model):
     задаются в Admin (поле ниже) или запасным вариантом в ``.env``
     (TELEGRAM_BOT_TOKEN / VK_ACCESS_TOKEN / MAX_BOT_TOKEN). В публичный API
     токены и chat ID **не** попадают.
+
+    Маршрутизация заявок (``lead_routing_mode``) — только Admin; в публичный
+    API не отдаётся.
     """
+
+    class LeadRoutingMode(models.TextChoices):
+        OFF = "off", "Выкл — всё на общий ящик отдела продаж, без автоназначения"
+        ASSIGN_SALES = (
+            "assign_sales",
+            "Назначать менеджеру, письмо на общий ящик отдела продаж",
+        )
+        ASSIGN_MANAGER = (
+            "assign_manager",
+            "Назначать менеджеру, письмо менеджеру",
+        )
 
     SINGLETON_PK = 1
 
@@ -30,6 +45,31 @@ class SiteSettings(models.Model):
         "показывать цены на сайте",
         default=False,
         help_text=("Показывать цены в публичном API и на сайте. По умолчанию выкл. — цены скрыты (политика RFQ)."),
+    )
+
+    # ── Lead routing (Admin only; not in public settings API) ──
+    lead_routing_mode: models.CharField = models.CharField(
+        "распределение заявок",
+        max_length=32,
+        choices=LeadRoutingMode.choices,
+        default=LeadRoutingMode.OFF,
+        help_text=(
+            "Пул — только сотрудники группы «Менеджер» со статусом «Активен», "
+            "статусом персонала и адресом в профиле (логин). Неактивные в очередь "
+            "и письма не попадают. Выкл: письмо на LEAD_NOTIFY_EMAIL, без "
+            "назначения. «Назначать…»: равномерная очередь; при одном менеджере "
+            "всегда он. Пустой пул = как Выкл."
+        ),
+    )
+    lead_rr_last_user: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="последний назначенный в очереди",
+        help_text="Курсор очереди распределения (служебное; меняется автоматически).",
+        limit_choices_to={"is_staff": True},
     )
 
     # ── Analytics (public counter IDs; loaded after cookie consent) ──

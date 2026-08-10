@@ -75,7 +75,9 @@ else
 fi
 
 # ── 5. pip-audit ─────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1; then
+# PyPI advisory API иногда таймаутится; OSV — запасной сервис (тот же --strict).
+if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1 \
+  || (cd "$BACKEND" && poetry run pip-audit --strict --vulnerability-service osv) >/dev/null 2>&1; then
   ok "pip-audit — нет уязвимостей"
 else
   fail "pip-audit — есть уязвимости (cd backend && poetry run pip-audit --strict)"

@@ -121,7 +121,7 @@ export function BallValveKitFields({
           {selection.includeBracket ? (
             <p className={styles.kitHint}>
               Кронштейн: <strong>{selection.bracket}</strong>
-              {selection.bracket === "BR-ML" ? " (для серии DA…FU)" : ""}
+              {selection.bracket === "BR-ML" ? " (для серии DA5FU)" : ""}
             </p>
           ) : null}
         </div>

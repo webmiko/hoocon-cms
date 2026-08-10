@@ -37,6 +37,8 @@ def test_apply_article_slug_renames_renames_and_redirects() -> None:
     assert redir.to_path == f"/statyi/{new_slug}"
     assert redir.status_code == 301
     assert redir.is_active is True
+    tpost = Redirect.objects.get(from_path=f"/statyi/tpost/{old_slug}")
+    assert tpost.to_path == f"/statyi/{new_slug}"
 
 
 @pytest.mark.django_db

@@ -218,6 +218,18 @@ def test_iter_manual_pdfs_prefers_ru_subdir(tmp_path: Path) -> None:
     assert find_manual_file(tmp_path, "sa3fu-ds_dst.pdf") is not None
 
 
+def test_find_manual_file_case_insensitive(tmp_path: Path) -> None:
+    """RU UPPER stems resolve when callers still pass EN-style lowercase."""
+    from catalog.etl.manual_pdfs import find_manual_file
+
+    (tmp_path / "RU").mkdir()
+    (tmp_path / "RU" / "DA5FU-D_DS.pdf").write_bytes(b"%PDF-ru-upper")
+    found = find_manual_file(tmp_path, "da5fu-d_ds.pdf")
+    assert found is not None
+    assert found.name == "DA5FU-D_DS.pdf"
+    assert found.read_bytes() == b"%PDF-ru-upper"
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [

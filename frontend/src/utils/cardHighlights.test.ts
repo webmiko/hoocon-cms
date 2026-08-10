@@ -67,7 +67,7 @@ describe("cardHighlights adapters", () => {
       {
         key: "compatible_actuators",
         name: "Совместимый привод",
-        value: "DA3FU, DA5FU (24/230 В)",
+        value: "DA5FU (24/230 В)",
       },
       { key: "control", name: "Управление", value: "лишнее" },
       { key: "runtime", name: "Время", value: "≤ 25 с" },

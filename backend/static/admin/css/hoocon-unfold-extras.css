@@ -26,6 +26,8 @@
   --hoocon-glass-border: rgba(255, 255, 255, 0.12);
   --hoocon-quiet: #a3a3a3;
   --hoocon-hairline: rgba(255, 255, 255, 0.1);
+  /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1 */
+  --hoocon-primary-on-dark: #f87171;
 }
 
 .hoocon-admin-lead-sticker {
@@ -625,6 +627,36 @@ a.hoocon-leads-stats-link {
   text-decoration: none;
 }
 
+.dark .hoocon-dash__panel-head a,
+.dark .hoocon-dash__alert-link {
+  color: var(--hoocon-primary-on-dark);
+}
+
+.dark .hoocon-dash__quick a:hover,
+.dark .hoocon-dash__cards .hoocon-lead-stats__value a:hover,
+.dark .hoocon-admin-lead-sticker:hover {
+  color: var(--hoocon-primary-on-dark) !important;
+}
+
+/*
+ * Unfold Tailwind primary-* as text on dark backgrounds.
+ * primary-500/600 (#dc1313 / #b01010) fail AA normal text on #171717.
+ */
+.dark .text-primary-500,
+.dark .text-primary-600,
+.dark .hover\:text-primary-500:hover,
+.dark .hover\:text-primary-600:hover,
+.dark .group-hover\:text-primary-500,
+.dark .group-hover\:text-primary-600,
+.dark .group:hover .group-hover\:text-primary-500,
+.dark .group:hover .group-hover\:text-primary-600,
+.dark .dark\:text-primary-500,
+.dark .dark\:hover\:text-primary-500:hover,
+.dark .dark\:group-hover\:text-primary-500,
+.dark .group:hover .dark\:group-hover\:text-primary-500 {
+  color: var(--hoocon-primary-on-dark) !important;
+}
+
 .hoocon-dash__feed {
   list-style: none;
   margin: 0;
@@ -880,7 +912,14 @@ kbd.hoocon-sidebar-shortcut > span {
   }
 }
 
-/* All applications flyout: wider than Unfold w-80 so RU labels fit; wrap, don’t truncate. */
+/* All applications flyout: wider than Unfold w-80 so RU labels fit; wrap, don’t truncate.
+ * z-index must live here — Unfold’s built CSS has no Tailwind z-[80] utility, so the
+ * class alone left z-index:auto and the panel painted under peek sidebar / user block.
+ */
+.hoocon-all-apps-flyout {
+  z-index: 80;
+}
+
 .hoocon-all-apps-panel {
   box-sizing: border-box;
   width: min(28rem, calc(100vw - 4.5rem));
@@ -1053,4 +1092,141 @@ kbd.hoocon-sidebar-shortcut > span {
   color: var(--hoocon-quiet);
   font-size: 0.75rem;
   line-height: 1.35;
+}
+
+/* Admin text fields: quiet default, brand border when active.
+   Explicit [type=…] so :focus beats the base rule (long :not() chains win specificity). */
+#content-main form .field-line input[type="text"],
+#content-main form .field-line input[type="email"],
+#content-main form .field-line input[type="password"],
+#content-main form .field-line input[type="number"],
+#content-main form .field-line input[type="url"],
+#content-main form .field-line input[type="tel"],
+#content-main form .field-line input[type="search"],
+#content-main form .form-row input[type="text"],
+#content-main form .form-row input[type="email"],
+#content-main form .form-row input[type="password"],
+#content-main form .form-row input[type="number"],
+#content-main form .form-row input[type="url"],
+#content-main form .form-row input[type="tel"],
+#content-main form .form-row input[type="search"],
+#content-main form .aligned textarea,
+#content-main form .aligned select {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  width: 100%;
+  max-width: 42rem;
+  padding: 0.55rem 0.85rem !important;
+  color: inherit !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: rgba(30, 30, 40, 0.14) !important;
+  border-radius: var(--hoocon-radius) !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
+  outline: none !important;
+  transition: border-color 0.15s var(--hoocon-ease), box-shadow 0.15s var(--hoocon-ease);
+}
+
+.dark #content-main form .field-line input[type="text"],
+.dark #content-main form .field-line input[type="email"],
+.dark #content-main form .field-line input[type="password"],
+.dark #content-main form .field-line input[type="number"],
+.dark #content-main form .field-line input[type="url"],
+.dark #content-main form .field-line input[type="tel"],
+.dark #content-main form .field-line input[type="search"],
+.dark #content-main form .form-row input[type="text"],
+.dark #content-main form .form-row input[type="email"],
+.dark #content-main form .form-row input[type="password"],
+.dark #content-main form .form-row input[type="number"],
+.dark #content-main form .form-row input[type="url"],
+.dark #content-main form .form-row input[type="tel"],
+.dark #content-main form .form-row input[type="search"],
+.dark #content-main form .aligned textarea,
+.dark #content-main form .aligned select {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: var(--hoocon-surface-muted) !important;
+  box-shadow: none;
+}
+
+#content-main form .field-line input[type="text"]:focus,
+#content-main form .field-line input[type="email"]:focus,
+#content-main form .field-line input[type="password"]:focus,
+#content-main form .field-line input[type="number"]:focus,
+#content-main form .field-line input[type="url"]:focus,
+#content-main form .field-line input[type="tel"]:focus,
+#content-main form .field-line input[type="search"]:focus,
+#content-main form .form-row input[type="text"]:focus,
+#content-main form .form-row input[type="email"]:focus,
+#content-main form .form-row input[type="password"]:focus,
+#content-main form .form-row input[type="number"]:focus,
+#content-main form .form-row input[type="url"]:focus,
+#content-main form .form-row input[type="tel"]:focus,
+#content-main form .form-row input[type="search"]:focus,
+#content-main form .field-line:focus-within input[type="text"],
+#content-main form .field-line:focus-within input[type="email"],
+#content-main form .field-line:focus-within input[type="password"],
+#content-main form .field-line:focus-within input[type="number"],
+#content-main form .field-line:focus-within input[type="url"],
+#content-main form .field-line:focus-within input[type="tel"],
+#content-main form .field-line:focus-within input[type="search"],
+#content-main form .form-row:focus-within input[type="text"],
+#content-main form .form-row:focus-within input[type="email"],
+#content-main form .form-row:focus-within input[type="password"],
+#content-main form .form-row:focus-within input[type="number"],
+#content-main form .form-row:focus-within input[type="url"],
+#content-main form .form-row:focus-within input[type="tel"],
+#content-main form .form-row:focus-within input[type="search"],
+#content-main form .aligned textarea:focus,
+#content-main form .aligned select:focus {
+  border-color: var(--hoocon-primary) !important;
+  border-width: 2px !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
+}
+
+.dark #content-main form .field-line input[type="text"]:focus,
+.dark #content-main form .field-line input[type="email"]:focus,
+.dark #content-main form .field-line input[type="password"]:focus,
+.dark #content-main form .field-line input[type="number"]:focus,
+.dark #content-main form .field-line input[type="url"]:focus,
+.dark #content-main form .field-line input[type="tel"]:focus,
+.dark #content-main form .field-line input[type="search"]:focus,
+.dark #content-main form .form-row input[type="text"]:focus,
+.dark #content-main form .form-row input[type="email"]:focus,
+.dark #content-main form .form-row input[type="password"]:focus,
+.dark #content-main form .form-row input[type="number"]:focus,
+.dark #content-main form .form-row input[type="url"]:focus,
+.dark #content-main form .form-row input[type="tel"]:focus,
+.dark #content-main form .form-row input[type="search"]:focus,
+.dark #content-main form .field-line:focus-within input[type="text"],
+.dark #content-main form .field-line:focus-within input[type="email"],
+.dark #content-main form .field-line:focus-within input[type="password"],
+.dark #content-main form .field-line:focus-within input[type="number"],
+.dark #content-main form .field-line:focus-within input[type="url"],
+.dark #content-main form .field-line:focus-within input[type="tel"],
+.dark #content-main form .field-line:focus-within input[type="search"],
+.dark #content-main form .form-row:focus-within input[type="text"],
+.dark #content-main form .form-row:focus-within input[type="email"],
+.dark #content-main form .form-row:focus-within input[type="password"],
+.dark #content-main form .form-row:focus-within input[type="number"],
+.dark #content-main form .form-row:focus-within input[type="url"],
+.dark #content-main form .form-row:focus-within input[type="tel"],
+.dark #content-main form .form-row:focus-within input[type="search"],
+.dark #content-main form .aligned textarea:focus,
+.dark #content-main form .aligned select:focus {
+  border-color: var(--hoocon-primary) !important;
+  box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
+}
+
+/* Changelist search shell — brand border when focused. */
+#changelist-search > div {
+  transition: border-color 0.15s var(--hoocon-ease);
+}
+
+#changelist-search > div:focus-within {
+  border-color: var(--hoocon-primary) !important;
+  border-width: 2px !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
 }

@@ -28,7 +28,7 @@ BR_M_DRIVE_PREFIXES: Final[tuple[str, ...]] = (
     "DA16MU",
     "DA16MQU",
 )
-BR_ML_DRIVE_PREFIXES: Final[tuple[str, ...]] = ("DA3FU", "DA5FU")
+BR_ML_DRIVE_PREFIXES: Final[tuple[str, ...]] = ("DA5FU",)
 
 _DRIVE_LIMIT: Final[int] = 8
 _VALVE_LIMIT: Final[int] = 8

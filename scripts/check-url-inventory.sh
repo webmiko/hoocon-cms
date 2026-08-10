@@ -31,11 +31,17 @@ PATHS=(
   "/sitemap.xml|200"
   "/llms.txt|200"
   "/privod-protivipozharniy-3nm|301,302"
+  "/privod-vozdushniy-hvd-5nm|301,302"
   "/tproduct/629593806372-bv215-sharovoi-kran-2-hodovii-dn-15|301,302"
+  "/catalog/tproduct/437694431492-bv240-sharovoi-kran-2-hodovii-dn-40|301,302"
+  "/statyi/tpost/ispolnitelnoe-oborudovanie-ovk|301,302"
+  "/sale|301,302"
+  "/sitemap|301,302"
+  "/elektroprivody-dlya-zaslonok-ventilyatsii|301,302"
+  "/news/mirklimata_2025|301,302"
   "/catalog/|301,302"
   "/index.html|301,302"
 )
-
 pass=0
 fail=0
 

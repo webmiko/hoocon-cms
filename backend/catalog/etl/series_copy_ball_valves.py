@@ -149,7 +149,7 @@ DEFAULT_STORE_CSV = (
     / "store-12190035-SHarovie_krani-202604281115.csv"
 )
 
-_FU_SERIES_RE = re.compile(r"(?i)da\d*fu")
+_FU_SERIES_RE = re.compile(r"(?i)da5fu")
 _SERIES_RE = re.compile(r"\b(BV\d{3,4})\b", re.I)
 # Brass editions: bv215a (optional bare body for legacy lookups).
 _SKU_BODY_RE = re.compile(r"(?i)^(?:8100-)?bv(?P<num>\d{3,4})(?P<ed>[a-e])?$")
@@ -176,9 +176,9 @@ def format_compatible_actuators(series: tuple[str, ...]) -> str:
 
 
 def format_bracket(series: tuple[str, ...]) -> str:
-    """Build «кронштейн»; BR-ML only when DA…FU is listed."""
+    """Build «кронштейн»; BR-ML only when DA5FU is listed."""
     if any(_FU_SERIES_RE.search(item) for item in series):
-        return "BR-M / BR-ML (для DA…FU)"
+        return "BR-M / BR-ML (для DA5FU)"
     return "BR-M"
 
 

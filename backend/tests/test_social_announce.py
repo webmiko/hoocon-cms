@@ -228,6 +228,7 @@ def test_site_settings_admin_blank_token_keeps_existing(django_user_model) -> No
         f"/admin/sitesettings/sitesettings/{site.pk}/change/",
         {
             "show_prices_on_site": "",
+            "lead_routing_mode": "off",
             "yandex_metrika_id": "",
             "ga4_measurement_id": "",
             "social_announce_on_publish": "",

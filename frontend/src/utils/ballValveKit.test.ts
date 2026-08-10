@@ -10,11 +10,11 @@ const kit = {
   drive_families: ["DA5FU24", "DA6MU24"],
   suffixes: ["-D", "-DS", "-A", "-AS"],
   bracket_by_drive: { DA5FU24: "BR-ML", DA6MU24: "BR-M" },
-  bracket_hint: "BR-M / BR-ML (для DA…FU)",
+  bracket_hint: "BR-M / BR-ML (для DA5FU)",
 };
 
 describe("ballValveKit", () => {
-  it("resolves BR-ML only for DA…FU", () => {
+  it("resolves BR-ML only for DA5FU", () => {
     expect(resolveBracketForDrive(kit, "DA5FU24")).toBe("BR-ML");
     expect(resolveBracketForDrive(kit, "DA6MU24")).toBe("BR-M");
   });

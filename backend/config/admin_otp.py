@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 SESSION_USER_ID = "admin_otp_user_id"
 SESSION_NEXT = "admin_otp_next"
 SESSION_SENT_AT = "admin_otp_sent_at"
+# True when challenge was opened without an emailed code (SMTP fail / recovery-only).
+SESSION_EMAIL_FAILED = "admin_otp_email_failed"
 
 _OTP_DIGITS = 6
 _MASK_LOCAL_KEEP = 1
@@ -183,9 +185,34 @@ def clear_admin_otp_challenge(request: HttpRequest) -> None:
     user_id = request.session.pop(SESSION_USER_ID, None)
     request.session.pop(SESSION_NEXT, None)
     request.session.pop(SESSION_SENT_AT, None)
+    request.session.pop(SESSION_EMAIL_FAILED, None)
     session_key = request.session.session_key
     if user_id is not None and session_key:
         cache.delete(_cache_key(int(user_id), session_key))
+
+
+def pending_otp_email_failed(request: HttpRequest) -> bool:
+    """True when pending challenge has no emailed OTP (SMTP failed for superuser)."""
+    return bool(request.session.get(SESSION_EMAIL_FAILED))
+
+
+def begin_admin_otp_session(
+    request: HttpRequest,
+    user: AbstractBaseUser,
+    *,
+    next_url: str,
+    email_failed: bool = False,
+) -> None:
+    """Stash pending staff user in session without (re)sending an email OTP."""
+    _ensure_session_key(request)
+    request.session[SESSION_USER_ID] = user.pk
+    request.session[SESSION_NEXT] = next_url
+    request.session[SESSION_SENT_AT] = time.time()
+    if email_failed:
+        request.session[SESSION_EMAIL_FAILED] = True
+    else:
+        request.session.pop(SESSION_EMAIL_FAILED, None)
+    request.session.modified = True
 
 
 def pending_admin_otp_user_id(request: HttpRequest) -> int | None:
@@ -319,10 +346,7 @@ def start_admin_otp_challenge(
         raise AdminOtpDeliveryError("Не удалось отправить код на email.") from exc
 
     _store_challenge(int(user.pk), session_key, code)
-    request.session[SESSION_USER_ID] = user.pk
-    request.session[SESSION_NEXT] = next_url
-    request.session[SESSION_SENT_AT] = time.time()
-    request.session.modified = True
+    begin_admin_otp_session(request, user, next_url=next_url, email_failed=False)
     logger.info("Admin OTP challenge started for user pk=%s", user.pk)
 
 
@@ -356,6 +380,7 @@ def resend_admin_otp(request: HttpRequest) -> None:
 
     _store_challenge(int(user.pk), session_key, code)
     request.session[SESSION_SENT_AT] = time.time()
+    request.session.pop(SESSION_EMAIL_FAILED, None)
     request.session.modified = True
 
 
@@ -372,11 +397,20 @@ def peek_admin_otp_next_url(request: HttpRequest, *, fallback: str) -> str:
     return fallback
 
 
+def _try_recovery_code(user: AbstractBaseUser, raw_code: str) -> bool:
+    """Consume a superuser recovery code when present; False if unused / invalid."""
+    if not getattr(user, "is_superuser", False):
+        return False
+    from accounts.recovery_codes import consume_recovery_code
+
+    return consume_recovery_code(user, raw_code)
+
+
 def verify_admin_otp(
     request: HttpRequest,
     raw_code: str,
 ) -> tuple[AbstractBaseUser, str]:
-    """Validate code; on success clear challenge and return (user, next_url)."""
+    """Validate emailed OTP or superuser recovery code; return (user, next_url)."""
     user = get_pending_admin_otp_user(request)
     if user is None:
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
@@ -387,8 +421,18 @@ def verify_admin_otp(
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
 
+    # Superuser may paste a saved recovery code even when email OTP is missing/wrong.
+    if _try_recovery_code(user, raw_code):
+        clear_admin_otp_challenge(request)
+        return user, next_url
+
     challenge = _load_challenge(int(user.pk), session_key)
+    email_failed = pending_otp_email_failed(request)
     if challenge is None:
+        if email_failed and getattr(user, "is_superuser", False):
+            raise AdminOtpVerifyError(
+                "Неверный резервный код. Введите сохранённый код формата XXXX-XXXX.",
+            )
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Код истёк. Войдите снова.")
 
@@ -404,7 +448,9 @@ def verify_admin_otp(
     code = normalize_otp_input(raw_code)
     if len(code) != _OTP_DIGITS:
         _bump_attempts(int(user.pk), session_key, challenge)
-        raise AdminOtpVerifyError(f"Введите {_OTP_DIGITS}-значный код.")
+        raise AdminOtpVerifyError(
+            f"Введите {_OTP_DIGITS}-значный код из письма или резервный код супер-админа (XXXX-XXXX).",
+        )
 
     expected = challenge.code_hash
     actual = hash_otp_code(code)

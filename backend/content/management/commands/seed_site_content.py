@@ -593,11 +593,12 @@ NEWS_BR_BODY = f"""
 на латунные шаровые краны серии&nbsp;8100.</p>
 <p><strong>BR-M</strong> — под приводы без возвратной пружины
 (DA…MU / DA…MQU, 24/230&nbsp;В). <strong>BR-ML</strong> — под приводы
-с пружинным возвратом: <strong>DA3FU</strong> и <strong>DA5FU</strong>
+с пружинным возвратом: только серия <strong>DA5FU</strong>
 (24/230&nbsp;В).</p>
 <p>На карточках — совместимые семейства приводов, индексы партнёра и
-технички PDF (кронштейн и шток). В RFQ-комплекте «кран + привод» кронштейн
-подбирается автоматически. Остатки на складе — на карточках.</p>
+технички PDF (кронштейн и шток). В RFQ для шаровых 8100 кронштейн
+подставляется автоматически: <strong>BR-ML</strong> для DA5FU,
+иначе <strong>BR-M</strong> (для фланцевых ВЧШГ — BR-H).</p>
 <p>Для расчёта цены и срока отгрузки оставьте
 <a href="/consultation">заявку на КП</a> или позвоните {_PHONE}.</p>
 <p>
@@ -784,12 +785,15 @@ class Command(BaseCommand):
         if attach_sku_cover_to_news(
             news_slug=_NEWS_BR_SLUG,
             sku_code=_NEWS_BR_COVER_SKU,
+            force=False,
         ):
             self.stdout.write(f"news {_NEWS_BR_SLUG}: cover from {_NEWS_BR_COVER_SKU}")
         elif br_news.cover:
             self.stdout.write(f"news {_NEWS_BR_SLUG}: cover already set")
         else:
-            self.stdout.write(self.style.WARNING(f"news {_NEWS_BR_SLUG}: cover not attached (SKU image?)"))
+            self.stdout.write(
+                self.style.WARNING(f"news {_NEWS_BR_SLUG}: cover not attached (SKU image?)"),
+            )
 
         self.stdout.write(
             self.style.SUCCESS(

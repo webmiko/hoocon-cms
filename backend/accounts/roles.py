@@ -4,19 +4,23 @@ Groups (Russian names as shown in Admin → Groups):
 
 * **Админ** — full write on project apps (catalog, content, leads, CRM,
   redirects, site settings, social). Not a Django superuser: no auth
-  user/group management.
-* **Менеджер** — RFQ + CRM workflow (add/change, no delete); catalog/content
-  read for SKU context; ``view_user`` for assignee FK.
-* **Аналитик** — read-only catalog / content / leads / CRM / redirects.
+  user/group management. Sees all leads/CRM (no manager scope).
+* **Менеджер** — RFQ + CRM workflow (add/change, no delete); catalog
+  view-only for SKU context; ``view_user`` for assignee FK. Scoped to
+  own leads/clients (+ shared NEW pool). Support chat (``supportchat``):
+  view/add/change, no delete — when that app ships.
+* **Аналитик** — same surface as manager but **view-only**; sees all
+  leads/CRM/stats across managers (unscoped). Support chat: view-only
+  when the app ships.
 
 Sync with ``manage.py sync_staff_groups`` (idempotent). Users still need
-``is_staff=True`` to open Admin; scoping for managers is separate
-(``scope_*_for_manager``).
+``is_staff=True`` to open Admin; scoping is ``scope_*_for_manager`` +
+:func:`staff_sees_all_leads`.
 """
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 # Group names (exact strings stored in auth_group.name).
 GROUP_ADMIN: Final = "Админ"
@@ -27,6 +31,11 @@ STAFF_GROUP_NAMES: Final[tuple[str, ...]] = (
     GROUP_ADMIN,
     GROUP_MANAGER,
     GROUP_ANALYST,
+)
+
+# Groups that bypass manager lead/CRM scope (see all rows + full stats).
+_UNSCOPED_GROUP_NAMES: Final[frozenset[str]] = frozenset(
+    {GROUP_ADMIN, GROUP_ANALYST},
 )
 
 # (app_label, model meta.model_name) — Django default CRUD uses model_name.
@@ -92,22 +101,21 @@ _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
     | _VIEW_USER
 )
 
+# Manager: leads + CRM write (no delete), catalog view, view_user.
+# Content/social intentionally omitted. supportchat — when app exists.
 _MANAGER_PERMS: Final[frozenset[tuple[str, str]]] = (
     _write_no_delete("leads", ("lead",))
     | _write_no_delete("crm", _CRM_MODELS)
     | _view_only("catalog", _CATALOG_MODELS)
-    | _view_only("content", _CONTENT_MODELS)
-    | _view_only("social", ("socialpost",))
     | _VIEW_USER
 )
 
+# Analyst: same surface as manager, view-only (+ view_user for assignee labels).
 _ANALYST_PERMS: Final[frozenset[tuple[str, str]]] = (
-    _view_only("catalog", _CATALOG_MODELS)
-    | _view_only("content", _CONTENT_MODELS)
-    | _view_only("leads", ("lead",))
+    _view_only("leads", ("lead",))
     | _view_only("crm", _CRM_MODELS)
-    | _view_only("redirects", ("redirect",))
-    | _view_only("social", ("socialpost",))
+    | _view_only("catalog", _CATALOG_MODELS)
+    | _VIEW_USER
 )
 
 STAFF_GROUP_PERMISSIONS: Final[dict[str, frozenset[tuple[str, str]]]] = {
@@ -115,3 +123,25 @@ STAFF_GROUP_PERMISSIONS: Final[dict[str, frozenset[tuple[str, str]]]] = {
     GROUP_MANAGER: _MANAGER_PERMS,
     GROUP_ANALYST: _ANALYST_PERMS,
 }
+
+
+def staff_sees_all_leads(user: Any) -> bool:
+    """Whether Admin lead/CRM querysets skip manager scoping.
+
+    Superuser, group «Админ», and group «Аналитик» see every lead/client
+    (analysts are view-only via permissions; admins have full write).
+
+    Args:
+        user: Django user (may be anonymous).
+
+    Returns:
+        True when scope helpers must return the unfiltered queryset.
+    """
+    if getattr(user, "is_superuser", False):
+        return True
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return False
+    groups = getattr(user, "groups", None)
+    if groups is None:
+        return False
+    return groups.filter(name__in=_UNSCOPED_GROUP_NAMES).exists()
