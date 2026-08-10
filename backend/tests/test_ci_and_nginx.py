@@ -14,7 +14,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
 NGINX_CONF = ROOT / "deploy" / "nginx" / "hoocon.conf"
+NGINX_SITE_INC = ROOT / "deploy" / "nginx" / "hoocon-site.inc"
 REDIRECTS_MAP = ROOT / "deploy" / "nginx" / "redirects.map"
+
+
+def _nginx_site_text() -> str:
+    """hoocon.conf + shared site body (locations live in the .inc)."""
+    return NGINX_CONF.read_text(encoding="utf-8") + "\n" + NGINX_SITE_INC.read_text(encoding="utf-8")
 
 
 def test_ci_workflow_file_exists() -> None:
@@ -68,11 +74,12 @@ def test_ci_workflow_triggers_on_develop_and_main() -> None:
 def test_nginx_conf_file_exists() -> None:
     """The nginx site config exists at the expected path."""
     assert NGINX_CONF.exists(), f"Missing nginx config: {NGINX_CONF}"
+    assert NGINX_SITE_INC.exists(), f"Missing nginx site include: {NGINX_SITE_INC}"
 
 
 def test_nginx_conf_has_api_proxy() -> None:
     """nginx config proxies /api/ to the Django upstream."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "location /api/" in content
     assert "proxy_pass" in content
     assert "upstream hoocon_app" in content
@@ -80,7 +87,7 @@ def test_nginx_conf_has_api_proxy() -> None:
 
 def test_nginx_conf_has_security_headers() -> None:
     """nginx config sets baseline security headers (nosniff, frame-deny)."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "X-Content-Type-Options" in content
     assert "nosniff" in content
     assert "X-Frame-Options" in content
@@ -88,14 +95,14 @@ def test_nginx_conf_has_security_headers() -> None:
 
 def test_nginx_conf_has_lead_rate_limit() -> None:
     """nginx config rate-limits /api/leads/ (anti-spam backstop)."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "lead_limit" in content
     assert "location /api/leads/" in content
 
 
 def test_nginx_conf_has_spa_fallback() -> None:
     """nginx config proxies HTML SPA routes to Django (@spa)."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "try_files" in content
     assert "@spa" in content
     assert "proxy_pass" in content
@@ -103,7 +110,7 @@ def test_nginx_conf_has_spa_fallback() -> None:
 
 def test_nginx_conf_strips_trailing_slash() -> None:
     """nginx 301-rewrites trailing slash (БЗ canonical without /)."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "rewrite ^/(.*)/$ /$1 permanent" in content
     assert "location = /index.html" in content
 
@@ -116,8 +123,18 @@ def test_nginx_conf_has_redirects_map_placeholder() -> None:
 
 def test_nginx_conf_has_admin_block() -> None:
     """nginx config has an /admin/ block (IP allowlist stub for Iter 5)."""
-    content = NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
     assert "location /admin/" in content
+
+
+def test_nginx_conf_enables_https_apex() -> None:
+    """TLS cutover: LE paths, :443 for apex, HTTP→HTTPS and www→apex."""
+    content = NGINX_CONF.read_text(encoding="utf-8")
+    assert "listen 443 ssl" in content
+    assert "/etc/letsencrypt/live/hoocon.ru/fullchain.pem" in content
+    assert "return 301 https://hoocon.ru$request_uri" in content
+    assert "include /etc/nginx/hoocon-site.inc" in content
+    assert "hoocon-site.inc" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 
 def test_redirects_map_file_exists() -> None:
