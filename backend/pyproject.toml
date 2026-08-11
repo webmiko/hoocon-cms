@@ -1,6 +1,6 @@
 [project]
 name = "hoocon-cms"
-version = "0.1.19"
+version = "0.1.21"
 description = "B2B CMS and catalog for Hoocon HVAC actuators (Django + DRF)"
 license = "Proprietary"
 authors = [{ name = "niko" }]
@@ -23,6 +23,7 @@ dependencies = [
     "django-unfold (>=0.101.0,<0.102.0)",
     "pypdfium2 (>=5.12.1,<6.0.0)",
     "openpyxl (>=3.1,<4)",
+    "pywebpush (>=2.0,<3)",
 ]
 
 [tool.poetry]

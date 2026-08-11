@@ -47,6 +47,8 @@ urlpatterns = [
     path("api/catalog/", include("catalog.urls")),
     path("api/content/", include("content.urls")),
     path("api/leads/", include("leads.urls")),
+    path("api/support/", include("supportchat.urls")),
+    path("api/webpush/", include("webpush.urls")),
     path("api/settings/", include("sitesettings.urls")),
     path("api/integrations/", include("social.urls")),
     path("api/", include("search.urls")),

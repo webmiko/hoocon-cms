@@ -2,59 +2,53 @@
  * Granular cookie consent (152-ФЗ / GDPR-style).
  *
  * Essential cookies are always on (site + CSRF/forms). Analytics (Metrika/GA4)
- * loads only after explicit opt-in. Preference JSON lives in localStorage.
+ * and marketing push require explicit opt-in. Preference JSON in localStorage.
  */
 
 export const COOKIE_CONSENT_STORAGE_KEY = "hoocon-cookie-consent";
-export const COOKIE_CONSENT_VERSION = 1;
+export const COOKIE_CONSENT_VERSION = 2;
 export const COOKIE_CONSENT_CHANGE_EVENT = "hoocon-cookie-consent";
 export const COOKIE_CONSENT_OPEN_EVENT = "hoocon-cookie-consent-open";
 
 export type CookieConsentState = {
-  version: typeof COOKIE_CONSENT_VERSION;
+  version: number;
   /** Always true — site operation, CSRF, form protection. Not user-togglable. */
   essential: true;
   /** Optional: Yandex Metrika / GA4 after explicit consent. */
   analytics: boolean;
+  /** Optional: marketing / news Web Push (after Notification permission). */
+  marketing: boolean;
   updatedAt: string;
 };
 
 /**
  * Build a consent snapshot.
- *
- * Args:
- *   analytics: Whether optional analytics cookies are allowed.
- *
- * Returns:
- *   CookieConsentState ready to persist.
  */
-export function buildCookieConsent(analytics: boolean): CookieConsentState {
+export function buildCookieConsent(
+  analytics: boolean,
+  marketing: boolean = false,
+): CookieConsentState {
   return {
     version: COOKIE_CONSENT_VERSION,
     essential: true,
     analytics,
+    marketing,
     updatedAt: new Date().toISOString(),
   };
 }
 
 /**
  * Parse stored consent, including legacy "accepted" / "declined" strings.
- *
- * Args:
- *   raw: localStorage value or null.
- *
- * Returns:
- *   Parsed state, or null if the user has not chosen yet.
  */
 export function parseCookieConsent(raw: string | null): CookieConsentState | null {
   if (raw === null || raw === "") {
     return null;
   }
   if (raw === "accepted") {
-    return buildCookieConsent(true);
+    return buildCookieConsent(true, false);
   }
   if (raw === "declined") {
-    return buildCookieConsent(false);
+    return buildCookieConsent(false, false);
   }
   try {
     const data = JSON.parse(raw) as Partial<CookieConsentState>;
@@ -68,6 +62,7 @@ export function parseCookieConsent(raw: string | null): CookieConsentState | nul
       version: COOKIE_CONSENT_VERSION,
       essential: true,
       analytics: data.analytics,
+      marketing: typeof data.marketing === "boolean" ? data.marketing : false,
       updatedAt:
         typeof data.updatedAt === "string" && data.updatedAt
           ? data.updatedAt
@@ -81,9 +76,6 @@ export function parseCookieConsent(raw: string | null): CookieConsentState | nul
 /**
  * Read consent from localStorage.
  * Migrates legacy "accepted" / "declined" strings to JSON in place.
- *
- * Returns:
- *   Consent state or null when unset / storage unavailable.
  */
 export function readCookieConsent(): CookieConsentState | null {
   try {
@@ -98,7 +90,18 @@ export function readCookieConsent(): CookieConsentState | null {
       }
       return migrated;
     }
-    return parseCookieConsent(raw);
+    const parsed = parseCookieConsent(raw);
+    if (parsed && raw) {
+      try {
+        const data = JSON.parse(raw) as Partial<CookieConsentState>;
+        if (typeof data.marketing !== "boolean") {
+          localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(parsed));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -106,9 +109,6 @@ export function readCookieConsent(): CookieConsentState | null {
 
 /**
  * Persist consent and notify same-tab listeners.
- *
- * Args:
- *   state: Consent to store.
  */
 export function writeCookieConsent(state: CookieConsentState): void {
   try {
@@ -123,15 +123,14 @@ export function writeCookieConsent(state: CookieConsentState): void {
 
 /**
  * Whether analytics scripts may load.
- *
- * Args:
- *   state: Current consent or null.
- *
- * Returns:
- *   True only after explicit analytics opt-in.
  */
 export function isAnalyticsAllowed(state: CookieConsentState | null): boolean {
   return state?.analytics === true;
+}
+
+/** Whether marketing Web Push may be offered / subscribed. */
+export function isMarketingAllowed(state: CookieConsentState | null): boolean {
+  return state?.marketing === true;
 }
 
 /** Ask CookieConsent UI to open the preferences panel. */
