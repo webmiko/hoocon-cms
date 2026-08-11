@@ -113,12 +113,27 @@ def _telegram_api_result(status: int, data: dict[str, Any]) -> PublishResult:
     return PublishResult(ok=True, external_id=str(mid))
 
 
+def telegram_api_call(method: str, payload: dict[str, Any] | None = None) -> PublishResult:
+    """POST JSON to ``https://api.telegram.org/bot<token>/<method>``."""
+    token = telegram_bot_token()
+    if not token:
+        return PublishResult(ok=False, skipped=True, error="Telegram не настроен")
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    try:
+        status, data = _post_json(url, payload=payload or {})
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("telegram_api_%s_failed error=%s", method, type(exc).__name__)
+        return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
+    return _telegram_api_result(status, data)
+
+
 def publish_telegram(
     *,
     chat_id: str,
     text: str,
     photo_path: Path | str | None = None,
     photo_url: str | None = None,
+    reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """Send message (or cover photo + caption) via Telegram Bot API.
 
@@ -131,6 +146,7 @@ def publish_telegram(
         text: Message body or photo caption (HTML).
         photo_path: Local cover file path when available.
         photo_url: Absolute HTTPS URL Telegram can fetch.
+        reply_markup: Optional ReplyKeyboard / InlineKeyboard markup dict.
 
     Returns:
         PublishResult with Telegram message_id when successful.
@@ -142,24 +158,62 @@ def publish_telegram(
     chat = chat_id.strip()
     path = Path(photo_path) if photo_path else None
     if path is not None and path.is_file():
-        return _publish_telegram_photo_file(token, chat=chat, caption=text, path=path)
+        return _publish_telegram_photo_file(
+            token,
+            chat=chat,
+            caption=text,
+            path=path,
+            reply_markup=reply_markup,
+        )
     if photo_url and photo_url.strip():
-        return _publish_telegram_photo_url(token, chat=chat, caption=text, photo_url=photo_url.strip())
-    return _publish_telegram_message(token, chat=chat, text=text)
+        return _publish_telegram_photo_url(
+            token,
+            chat=chat,
+            caption=text,
+            photo_url=photo_url.strip(),
+            reply_markup=reply_markup,
+        )
+    return _publish_telegram_message(
+        token,
+        chat=chat,
+        text=text,
+        reply_markup=reply_markup,
+    )
 
 
-def _publish_telegram_message(token: str, *, chat: str, text: str) -> PublishResult:
+def _attach_reply_markup(
+    payload: dict[str, Any],
+    reply_markup: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Copy payload and add reply_markup when provided."""
+    if reply_markup is None:
+        return payload
+    out = dict(payload)
+    out["reply_markup"] = reply_markup
+    return out
+
+
+def _publish_telegram_message(
+    token: str,
+    *,
+    chat: str,
+    text: str,
+    reply_markup: dict[str, Any] | None = None,
+) -> PublishResult:
     """Plain sendMessage with HTML parse_mode."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
         status, data = _post_json(
             url,
-            payload={
-                "chat_id": chat,
-                "text": text,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": False,
-            },
+            payload=_attach_reply_markup(
+                {
+                    "chat_id": chat,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": False,
+                },
+                reply_markup,
+            ),
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_publish_failed error=%s", type(exc).__name__)
@@ -173,18 +227,22 @@ def _publish_telegram_photo_url(
     chat: str,
     caption: str,
     photo_url: str,
+    reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """sendPhoto with a publicly reachable photo URL."""
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     try:
         status, data = _post_json(
             url,
-            payload={
-                "chat_id": chat,
-                "photo": photo_url,
-                "caption": caption,
-                "parse_mode": "HTML",
-            },
+            payload=_attach_reply_markup(
+                {
+                    "chat_id": chat,
+                    "photo": photo_url,
+                    "caption": caption,
+                    "parse_mode": "HTML",
+                },
+                reply_markup,
+            ),
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_photo_url_failed error=%s", type(exc).__name__)
@@ -198,19 +256,23 @@ def _publish_telegram_photo_file(
     chat: str,
     caption: str,
     path: Path,
+    reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """sendPhoto multipart upload from a local cover file."""
     url = f"https://api.telegram.org/bot{token}/sendPhoto"
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    fields = {
+        "chat_id": chat,
+        "caption": caption,
+        "parse_mode": "HTML",
+    }
+    if reply_markup is not None:
+        fields["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
     try:
         content = path.read_bytes()
         status, data = _post_multipart(
             url,
-            fields={
-                "chat_id": chat,
-                "caption": caption,
-                "parse_mode": "HTML",
-            },
+            fields=fields,
             files={"photo": (path.name, content, content_type)},
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:

@@ -70,8 +70,70 @@ def test_telegram_webhook_start_sends_photo(settings, tmp_path) -> None:
     raw = req.data
     assert b"4242" in raw
     assert b"HOOCON" in raw
-    assert b"hoocon_moscow" in raw
+    assert "Перейти в канал".encode() in raw
+    assert "На сайт".encode() in raw
+    assert "Помощь".encode() in raw
+    assert b"reply_markup" in raw
     assert b"WEBPFAKE" in raw
+
+
+@pytest.mark.django_db
+def test_telegram_webhook_menu_button_channel(settings) -> None:
+    """Reply-keyboard «Перейти в канал» triggers channel action (not ingest)."""
+    settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":9}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        response = APIClient().post(
+            reverse("telegram-webhook"),
+            data={
+                "update_id": 20,
+                "message": {
+                    "message_id": 4,
+                    "chat": {"id": 11, "type": "private"},
+                    "text": "Перейти в канал",
+                },
+            },
+            format="json",
+            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+        )
+    assert response.status_code == 200
+    req = mocked.call_args.args[0]
+    assert "sendMessage" in req.full_url
+    body = json.loads(req.data.decode("utf-8"))
+    assert "hoocon_moscow" in body["text"]
+    assert body["reply_markup"]["keyboard"][0][0]["text"] == "Перейти в канал"
+    assert body["reply_markup"]["is_persistent"] is True
+
+
+@pytest.mark.django_db
+def test_sync_telegram_bot_menu_calls_set_my_commands(settings) -> None:
+    """Management helper posts setMyCommands with RU descriptions."""
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":true}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    from social.telegram_bot import sync_bot_commands
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        result = sync_bot_commands()
+    assert result.ok
+    req = mocked.call_args.args[0]
+    assert "setMyCommands" in req.full_url
+    body = json.loads(req.data.decode("utf-8"))
+    by_cmd = {row["command"]: row["description"] for row in body["commands"]}
+    assert by_cmd["channel"] == "Перейти в канал"
+    assert by_cmd["site"] == "На сайт"
+    assert by_cmd["help"] == "Помощь"
 
 
 @pytest.mark.django_db
@@ -200,8 +262,11 @@ def test_telegram_webhook_channel_command_sends_message(settings) -> None:
 
 def test_parse_bot_command_strips_bot_suffix() -> None:
     """Command parser accepts /start@BotName form."""
-    from social.telegram_bot import parse_bot_command
+    from social.telegram_bot import parse_bot_command, resolve_menu_action
 
     assert parse_bot_command("/start@HooconMsk_bot") == "start"
     assert parse_bot_command("/HELP") == "help"
     assert parse_bot_command("hello") is None
+    assert resolve_menu_action("Перейти в канал") == "channel"
+    assert resolve_menu_action("На сайт") == "site"
+    assert resolve_menu_action("Помощь") == "help"

@@ -1,4 +1,4 @@
-"""Telegram bot: welcome commands + free-text support inbox ingest."""
+"""Telegram bot: welcome commands + reply keyboard + free-text support ingest."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 
 from django.conf import settings
 
-from social.publishers import PublishResult, publish_telegram
+from social.publishers import PublishResult, publish_telegram, telegram_api_call
 
 logger = logging.getLogger("hoocon.social")
 
@@ -19,6 +19,39 @@ _COMMAND_RE = re.compile(
 _TELEGRAM_CAPTION_MAX = 1024
 _CHANNEL_URL = "https://t.me/hoocon_moscow"
 _DEFAULT_WELCOME_STATIC = Path("static/social/telegram-welcome.webp")
+
+# Reply-keyboard labels → internal command names (interaction buttons).
+BTN_CHANNEL = "Перейти в канал"
+BTN_SITE = "На сайт"
+BTN_HELP = "Помощь"
+
+_MENU_TEXT_ALIASES: dict[str, str] = {
+    BTN_CHANNEL.lower(): "channel",
+    BTN_SITE.lower(): "site",
+    BTN_HELP.lower(): "help",
+    "канал": "channel",
+    "сайт": "site",
+}
+
+BOT_COMMANDS: list[dict[str, str]] = [
+    {"command": "start", "description": "Начать"},
+    {"command": "channel", "description": "Перейти в канал"},
+    {"command": "site", "description": "На сайт"},
+    {"command": "help", "description": "Помощь"},
+]
+
+
+def main_menu_keyboard() -> dict[str, Any]:
+    """Persistent reply keyboard: Перейти в канал · На сайт · Помощь."""
+    return {
+        "keyboard": [
+            [{"text": BTN_CHANNEL}],
+            [{"text": BTN_SITE}, {"text": BTN_HELP}],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+        "input_field_placeholder": "Напишите вопрос менеджеру…",
+    }
 
 
 def welcome_photo_path() -> Path | None:
@@ -45,13 +78,12 @@ def welcome_photo_url() -> str:
 
 def compose_welcome_caption() -> str:
     """HTML caption for /start and /help (Telegram HTML subset, ≤1024)."""
-    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
     text = (
         "<b>HOOCON</b> — электроприводы и арматура для вентиляции и ОВК.\n\n"
-        f'Канал: <a href="{_CHANNEL_URL}">@hoocon_moscow</a>\n'
-        f'Каталог: <a href="{site}">hoocon.ru</a>\n'
-        f'Заявка / RFQ: <a href="{site}/consultation">на сайте</a>\n\n'
-        "Команды: /channel · /site · /help\n"
+        "Кнопки меню:\n"
+        f"• <b>{BTN_CHANNEL}</b> — официальный Telegram-канал\n"
+        f"• <b>{BTN_SITE}</b> — каталог и заявки на сайте\n"
+        f"• <b>{BTN_HELP}</b> — эта подсказка\n\n"
         "Или просто напишите сообщение — ответит менеджер."
     )
     if len(text) > _TELEGRAM_CAPTION_MAX:
@@ -60,19 +92,19 @@ def compose_welcome_caption() -> str:
 
 
 def compose_channel_reply() -> str:
-    """Plain HTML reply for /channel."""
-    return f'Официальный канал: <a href="{_CHANNEL_URL}">Hoocon Москва</a>'
+    """Reply for «Канал» / /channel — opens via Telegram deep link in text."""
+    return f"Официальный канал Hoocon: {_CHANNEL_URL}\nНажмите ссылку или откройте @hoocon_moscow."
 
 
 def compose_site_reply() -> str:
-    """Plain HTML reply for /site."""
+    """Reply for «Сайт» / /site."""
     site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-    return f'Сайт и каталог: <a href="{site}">hoocon.ru</a>'
+    return f"Сайт и каталог: {site}\nЗаявка / RFQ: {site}/consultation"
 
 
 def compose_fallback_reply() -> str:
     """Reply when the message is not a known command."""
-    return "Пока доступны команды: /start · /channel · /site · /help"
+    return f"Доступны кнопки: {BTN_CHANNEL} · {BTN_SITE} · {BTN_HELP}.\nИли напишите вопрос менеджеру обычным текстом."
 
 
 def parse_bot_command(text: str) -> str | None:
@@ -91,6 +123,20 @@ def parse_bot_command(text: str) -> str | None:
     if match is None:
         return None
     return match.group("cmd").lower()
+
+
+def resolve_menu_action(text: str) -> str | None:
+    """Map /commands and reply-keyboard labels to action names."""
+    command = parse_bot_command(text)
+    if command is not None:
+        return command
+    key = (text or "").strip().lower()
+    return _MENU_TEXT_ALIASES.get(key)
+
+
+def sync_bot_commands() -> PublishResult:
+    """Register BotFather-style command menu (setMyCommands)."""
+    return telegram_api_call("setMyCommands", {"commands": BOT_COMMANDS})
 
 
 def _display_name_from_message(message: dict[str, Any]) -> str:
@@ -143,7 +189,11 @@ def _ingest_support_text(
         return None
 
     if auto is not None:
-        return publish_telegram(chat_id=chat_id, text=auto.body)
+        return publish_telegram(
+            chat_id=chat_id,
+            text=auto.body,
+            reply_markup=main_menu_keyboard(),
+        )
     return None
 
 
@@ -169,11 +219,12 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     if not isinstance(text, str) or not text.strip():
         return None
 
-    command = parse_bot_command(text)
+    action = resolve_menu_action(text)
     chat_key = str(chat_id)
     display_name = _display_name_from_message(message)
+    keyboard = main_menu_keyboard()
 
-    if command in {"start", "help"}:
+    if action in {"start", "help"}:
         caption = compose_welcome_caption()
         local = welcome_photo_path()
         result = publish_telegram(
@@ -181,18 +232,35 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
             text=caption,
             photo_path=local,
             photo_url=None if local is not None else welcome_photo_url(),
+            reply_markup=keyboard,
         )
         if not result.ok and not result.skipped:
             logger.warning("telegram_welcome_photo_failed falling_back_to_text")
-            return publish_telegram(chat_id=chat_key, text=caption)
+            return publish_telegram(
+                chat_id=chat_key,
+                text=caption,
+                reply_markup=keyboard,
+            )
         return result
 
-    if command == "channel":
-        return publish_telegram(chat_id=chat_key, text=compose_channel_reply())
-    if command == "site":
-        return publish_telegram(chat_id=chat_key, text=compose_site_reply())
-    if command is not None:
-        return publish_telegram(chat_id=chat_key, text=compose_fallback_reply())
+    if action == "channel":
+        return publish_telegram(
+            chat_id=chat_key,
+            text=compose_channel_reply(),
+            reply_markup=keyboard,
+        )
+    if action == "site":
+        return publish_telegram(
+            chat_id=chat_key,
+            text=compose_site_reply(),
+            reply_markup=keyboard,
+        )
+    if action is not None:
+        return publish_telegram(
+            chat_id=chat_key,
+            text=compose_fallback_reply(),
+            reply_markup=keyboard,
+        )
 
     return _ingest_support_text(
         chat_id=chat_key,
