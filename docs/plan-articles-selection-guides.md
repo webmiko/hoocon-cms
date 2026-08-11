@@ -1,7 +1,8 @@
 # План статей для подбора приводов (инженер / снабжение)
 
-Дата: 2026-07-27  
-Статус: **черновик плана** (не контент в БД).  
+Дата: 2026-07-27 (обновлено 2026-08-11)  
+Статус: **P1 Iter A+B в seed** — 5 статей + обложки; отложенная публикация  
+1 статья / 2 дня (МСК). API/sitemap/поиск скрывают `published_at` в будущем.  
 SERP топ-5 (аудит → дорожка): [plan-serp-top5.md](plan-serp-top5.md).  
 Ключи KPI и правила в тексте: [plan-serp-top5.md §9–§10](plan-serp-top5.md#9-kpi-запросы-канон-для-serp-и-статей).  
 Канон терминов: [tech-copy-belimo-ru.md](tech-copy-belimo-ru.md).  
@@ -252,11 +253,23 @@ P1-5 скорость ──► спецификация MU/MQU, компани�
 
 ## 5. Следующий шаг
 
-По готовности: **Iter A** — черновик fixture `article_podbor_privoda_po_momentu…`  
-по разделу P1-1 + правка FAQ (одна формула).  
-Команда: «пиши P1-1» или «сначала унифицируй формулу момента в FAQ».
+**Сделано (2026-08-11):** Iter A+B — fixtures + covers + `ARTICLE_*` в
+`seed_site_content`; расписание `published_at` (МСК):
 
-Продвижение в выдаче (топ-5, хабы, техфундамент 0–14 дн.):  
+| Slug | Go-live |
+|------|---------|
+| `sertifikaty-ce-ul-eac-elektroprivody-ovk` | 2026-08-06 09:00 (live) |
+| `podbor-privoda-po-momentu-i-ploshchadi` | 2026-08-11 09:00 (live) |
+| `tipy-upravleniya-privodom` | 2026-08-13 09:00 |
+| `pitanie-24-ili-230-v` | 2026-08-15 09:00 |
+| `mu-mqu-hv-kogda-nuzhen-uskorennyy` | 2026-08-17 09:00 |
+| `analog-belimo-hoocon` | 2026-08-19 09:00 |
+
+Локальный превью отложенных: `CONTENT_SHOW_SCHEDULED=True` в `.env`.
+Новость: `articles-podbor-i-sertifikaty`.
+
+Дальше: Iter C (P2 суффиксы / fail-safe / S); опц. унификация формулы момента
+в FAQ (риск §4.1). Продвижение в выдаче:
 [plan-serp-top5.md](plan-serp-top5.md).
 
 [kb-web-copy]: ../_Универсальная-база-знаний/04-Инструкции-разработки/ЕДИНЫЙ_ПРОМПТ_ВЕБ_РАЗРАБОТКИ.md#6-создание-контента-и-текстов--критично

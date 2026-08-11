@@ -1,0 +1,227 @@
+<p class="hero-dek">
+  <strong>Как выбрать электропривод для заслонки</strong> — сначала оценить требуемый
+  крутящий момент в Нм, затем открыть
+  <a href="/catalog">каталог</a> с фильтром по моменту. Ниже — ориентир по площади
+  и давлению; точные значения — в таблице производителя заслонки и паспорте SKU.
+</p>
+
+<p class="dash-note">
+  Формулы ниже — ориентир для первичного подбора. Истина — паспорт заслонки и
+  карточка привода в каталоге.
+</p>
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Коэффициенты Kтип · ориентир</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">Круглая · 1,0</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--55"></span></span>
+        <span class="hbar__val">база</span>
+      </li>
+      <li>
+        <span class="hbar__label">Прямоуг. · 1,4</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--75"></span></span>
+        <span class="hbar__val">+40%</span>
+      </li>
+      <li>
+        <span class="hbar__label">Шибер · 1,8</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">+80%</span>
+      </li>
+      <li>
+        <span class="hbar__label">Kзапас</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--65"></span></span>
+        <span class="hbar__val">×1,3</span>
+      </li>
+    </ul>
+    <p class="dash-panel__foot">
+      Пример: 0,96&nbsp;м² × 450&nbsp;Па × 1,4 × 1,3 ≈ 7,9&nbsp;Нм → ряд <strong>10&nbsp;Нм</strong>.
+    </p>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Ряд момента в каталоге</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">2–4</span><span class="kpi-tiles__lab">Нм</span></li>
+      <li><span class="kpi-tiles__num">6–8</span><span class="kpi-tiles__lab">Нм</span></li>
+      <li><span class="kpi-tiles__num">10–16</span><span class="kpi-tiles__lab">Нм</span></li>
+      <li><span class="kpi-tiles__num">20–32</span><span class="kpi-tiles__lab">Нм</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Ответ в двух шагах</h2>
+<p>
+  <strong>Подбор привода по крутящему моменту</strong> начинается с данных заслонки:
+  площадь прохода S (м²) или диаметр D (м), расчётное давление P (Па), тип створки
+  и запас на старение и загрязнение. Считаете Mтреб, округляете вверх до ступени
+  ряда Hoocon (2, 4, 6, 8, 10, 16, 20, 24, 32&nbsp;Нм) и проверяете в
+  <a href="/catalog">каталоге</a> фасет «Крутящий момент».
+</p>
+<p>
+  Параллельно фиксируйте питание (24&nbsp;В или 230&nbsp;В —
+  см. <a href="/statyi/pitanie-24-ili-230-v">24&nbsp;В или 230&nbsp;В</a>),
+  тип управления и нужен ли пружинный возврат. Обзор семейств —
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация модельного
+  ряда</a> и <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение
+  в вентиляции</a>.
+</p>
+
+<h2>Что запросить из проекта</h2>
+<ul>
+  <li><strong>Площадь или диаметр</strong> — S из чертежа или D для круглой заслонки
+    (S = π&nbsp;r²; при Ø&nbsp;0,2&nbsp;м ≈ 0,0314&nbsp;м²).</li>
+  <li><strong>Давление</strong> — расчётное P на заслонку (часто 200…600&nbsp;Па для
+    ОВК; для ОЗК — по паспорту клапана).</li>
+  <li><strong>Тип заслонки</strong> — круглая, прямоугольная, шиберная (влияет на Kтип).</li>
+  <li><strong>Запас</strong> — Kзапас ≈ 1,3; при P &gt; 1000&nbsp;Па увеличивайте
+    запас (ориентир до ~40&nbsp;%).</li>
+  <li><strong>Назначение</strong> — обычная вентиляция, ОЗК, дымоудаление (семейство
+    SA, не DA).</li>
+</ul>
+
+<h2>Основная формула-ориентир</h2>
+<p>
+  Для прямоугольных и типовых заслонок удобна модель:
+</p>
+<p>
+  <strong>Mтреб = S × P × Kтип × Kзапас</strong>
+</p>
+<p>
+  где Mтреб — требуемый момент (Нм), S — площадь (м²), P — давление (Па);
+  Kтип: круглая 1,0; прямоугольная 1,4; шибер 1,8; Kзапас ≈ 1,3.
+  Результат — <em>ориентир</em>; сверяйте с таблицей OEM заслонки.
+</p>
+
+<h2>Пример расчёта</h2>
+<p>
+  Прямоугольная заслонка 1200×800&nbsp;мм: S = 0,96&nbsp;м²; P = 450&nbsp;Па;
+  Kтип = 1,4; Kзапас = 1,3.
+</p>
+<p>
+  Mтреб = 0,96 × 450 × 1,4 × 1,3 ≈ <strong>7,9&nbsp;Нм</strong> → выбираем ступень
+  ряда <strong>10&nbsp;Нм</strong> (не 8&nbsp;Нм: округление вверх по ряду).
+  В каталоге откройте
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">воздушные
+  без пружины</a> с фильтром 10&nbsp;Нм и задайте питание и управление.
+</p>
+
+<h2>Альтернативный ориентир из FAQ</h2>
+<p>
+  Если известен только диаметр круглой заслонки, во
+  <a href="/faq">вопросах и ответах</a> дана эмпирическая оценка:
+</p>
+<p>
+  <strong>M ≈ (D³ × P × k) / C</strong>
+</p>
+<p>
+  D — диаметр (м), P — давление (Па), k ≈ 0,5…3 (зависит от конструкции),
+  C ≈ 2000…4000. Это второй ориентир, не замена таблицы заслонки.
+  При расхождении формул приоритет — паспорт заслонки и испытания.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Тип заслонки</th>
+  <th>Kтип</th>
+  <th>Заметка</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Круглая</td>
+  <td>1,0</td>
+  <td>Базовый случай; часто есть таблица OEM</td>
+</tr>
+<tr>
+  <td>Прямоугольная</td>
+  <td>1,4</td>
+  <td>Усиление на 40&nbsp;% к круговой аналогии</td>
+</tr>
+<tr>
+  <td>Шиберная</td>
+  <td>1,8</td>
+  <td>Максимальный Kтип в этой модели</td>
+</tr>
+<tr>
+  <td>Запас Kзапас</td>
+  <td>≈1,3</td>
+  <td>Стандарт; при высоком P — увеличить</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Когда «с потолка» не считать</h2>
+<ul>
+  <li>
+    <strong>Огнезадерживающие клапаны (ОЗК)</strong> — момент и время из паспорта
+    клапана; семейство <strong>SA…FU</strong>, не DA…MU.
+    <strong>SA ≠ DA</strong> на противопожарных контурах — жёсткое правило
+    (<a href="/faq">FAQ</a>).
+  </li>
+  <li>
+    <strong>Дымоудаление</strong> — отдельные нормы по времени хода; см.
+    <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение</a>.
+  </li>
+  <li>
+    <strong>Заслонка с таблицей момента</strong> — берите значение производителя,
+    добавьте запас, не пересчитывайте «с нуля» без причины.
+  </li>
+</ul>
+
+<h2>После расчёта момента</h2>
+<ol>
+  <li>Открыть <a href="/catalog">каталог</a>, фасет «Крутящий момент» — нужная ступень.</li>
+  <li>Задать напряжение (<a href="/statyi/pitanie-24-ili-230-v">24 или 230&nbsp;В</a>).</li>
+  <li>Выбрать управление (<a href="/statyi/tipy-upravleniya-privodom">типы управления</a>).</li>
+  <li>Проверить время хода — при жёстких сроках см.
+    <a href="/statyi/mu-mqu-hv-kogda-nuzhen-uskorennyy">MU, MQU и HV</a>.</li>
+  <li>Скачать паспорт SKU; при замене конкурента —
+    <a href="/replacement">заявка на аналог</a>.</li>
+</ol>
+
+<h2>Частые ошибки</h2>
+<ul>
+  <li>Округление момента вниз (8&nbsp;Нм вместо 10&nbsp;Нм при 7,9&nbsp;Нм).</li>
+  <li>Игнорирование типа створки (Kтип).</li>
+  <li>DA вместо SA на ОЗК «по моменту».</li>
+  <li>Путаница ускоренного хода (MQU/HV) с fail-safe (FU/EU).</li>
+  <li>Одна формула без сверки с таблицей заслонки.</li>
+</ul>
+
+<div class="note">
+  <strong>Чек‑лист подбора по моменту</strong>
+  <ul>
+    <li>S или D, P, тип заслонки, назначение (ОВК / ОЗК / дым).</li>
+    <li>Mтреб по формуле-ориентиру + сверка с OEM.</li>
+    <li>Ступень ряда Нм вверх; фильтр в каталоге.</li>
+    <li>Питание, управление, fail-safe, время хода.</li>
+    <li>Паспорт SKU; при вопросах — <a href="/consultation">консультация</a>.</li>
+  </ul>
+</div>
+
+<h2>FAQ</h2>
+<details open>
+  <summary>Достаточно ли одной формулы?</summary>
+  <p>
+    Нет. Формула — ориентир; при наличии таблицы производителя заслонки
+    она первична. Две эмпирические модели (S×P и D³) могут дать разный результат —
+    сверяйте с паспортом.
+  </p>
+</details>
+<details>
+  <summary>Можно ли взять привод «с запасом» на 32&nbsp;Нм «на всякий случай»?</summary>
+  <p>
+    Избыточный момент увеличивает габариты и цену; запас — через Kзапас и ступень
+    ряда, не через максимальную линейку без расчёта.
+  </p>
+</details>
+<details>
+  <summary>Где смотреть точный момент Hoocon?</summary>
+  <p>
+    В карточке SKU и <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации
+    ряда</a>; фильтр «Крутящий момент» в <a href="/catalog">каталоге</a>.
+  </p>
+</details>

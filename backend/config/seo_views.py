@@ -14,6 +14,7 @@ from catalog.models import SKU, Category
 from catalog.urls_paths import catalog_category_path, catalog_path_for_sku
 from config.seo.routes import PUBLIC_STATIC_ROUTES
 from content.models import Article, News, Page
+from content.views import publicly_visible
 
 _SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
@@ -166,15 +167,15 @@ class SitemapXmlView(View):
         for sku in SKU.objects.filter(is_published=True).select_related("product__category").order_by("slug"):
             urls.append(f"{base}{catalog_path_for_sku(sku)}")
 
-        for page in Page.objects.filter(is_published=True).order_by("slug"):
+        for page in publicly_visible(Page).order_by("slug"):
             path = f"/{page.slug}"
             if path not in PUBLIC_STATIC_ROUTES:
                 urls.append(f"{base}{path}")
 
-        for art in Article.objects.filter(is_published=True).order_by("slug"):
+        for art in publicly_visible(Article).order_by("slug"):
             urls.append(f"{base}/statyi/{art.slug}")
 
-        for news in News.objects.filter(is_published=True).order_by("slug"):
+        for news in publicly_visible(News).order_by("slug"):
             urls.append(f"{base}/novosti/{news.slug}")
 
         # Deduplicate while preserving order.

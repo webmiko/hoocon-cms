@@ -1,12 +1,14 @@
 """Public read-only content API: Page / Article / News (list + detail).
 
 Spec: ПЛАН §6 Iter 3–4; docs/readiness-backend-ux.md §2.3.
-GET only (AllowAny); published items only.
+GET only (AllowAny); published items only (respects future published_at).
 """
 
 from __future__ import annotations
 
-from django.db.models import QuerySet
+from django.db import models
+from django.db.models import Q, QuerySet
+from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import AllowAny
 
@@ -17,6 +19,21 @@ from content.serializers import (
     NewsSerializer,
     PageSerializer,
 )
+
+
+def publicly_visible(model: type[models.Model]) -> QuerySet:
+    """``is_published``; hide future ``published_at`` unless preview flag.
+
+    Local QA: set ``CONTENT_SHOW_SCHEDULED=True`` (see ``.env.example``) to
+    preview staggered articles/news before go-live. Prod keeps the flag off.
+    """
+    from django.conf import settings
+
+    qs = model._default_manager.filter(is_published=True)
+    if getattr(settings, "CONTENT_SHOW_SCHEDULED", False):
+        return qs
+    now = timezone.now()
+    return qs.filter(Q(published_at__isnull=True) | Q(published_at__lte=now))
 
 
 class _ContentViewSet(
@@ -35,7 +52,7 @@ class _ContentViewSet(
         qs = self.queryset
         assert qs is not None
         model = qs.model
-        return model.objects.filter(is_published=True).order_by(
+        return publicly_visible(model).order_by(
             "-published_at",
             "-created_at",
         )

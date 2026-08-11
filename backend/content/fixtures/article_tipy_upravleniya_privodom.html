@@ -1,0 +1,198 @@
+<p class="hero-dek">
+  <strong>Типы электроприводов для вентиляции</strong> в каталоге Hoocon задаются тремя
+  значениями фасета: <strong>Открыто/закрыто</strong>,
+  <strong>2-/3-позиционное</strong> и <strong>пропорциональное</strong>
+  (модулирующее). Сигнал пропорциональных — Y <strong>0(2)…10&nbsp;В=</strong>;
+  0(4)…20&nbsp;мА — только спецзаказ. Ниже — как согласовать привод с контроллером
+  и BMS.
+</p>
+
+<p class="dash-note">
+  Таблица — канон фасета «Управление». Точная схема и уставки — в паспорте SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Три типа управления</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">D</span><span class="kpi-tiles__lab">Открыто/закрыто</span></li>
+      <li><span class="kpi-tiles__num">2-/3</span><span class="kpi-tiles__lab">позиционное</span></li>
+      <li><span class="kpi-tiles__num">A</span><span class="kpi-tiles__lab">пропорциональное</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Типовые сценарии</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">ОЗК · on/off</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">+ пружина</span>
+      </li>
+      <li>
+        <span class="hbar__label">ПВУ · пропорц.</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--75"></span></span>
+        <span class="hbar__val">0…10&nbsp;В=</span>
+      </li>
+      <li>
+        <span class="hbar__label">Шибер · 2-/3</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--55"></span></span>
+        <span class="hbar__val">редко</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Три значения фасета «Управление»</h2>
+<p>
+  В спецификации и каталоге Hoocon тип управления — не «плавное регулирование»,
+  а три канонические значения. Пропорциональное = модулирующее: угол или ход
+  следует аналоговому сигналу. Подробнее о семействах —
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация ряда</a>
+  и <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение в
+  вентиляции</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Фасет каталога</th>
+  <th>Суффикс артикула</th>
+  <th>Сигнал / логика</th>
+  <th>Когда выбирать</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Открыто/закрыто</strong></td>
+  <td><strong>D</strong> (DS, DAS…)</td>
+  <td>Два крайних положения; вкл./выкл.</td>
+  <td>ОЗК, дым, простые заслонки без регулирования расхода</td>
+</tr>
+<tr>
+  <td><strong>2-/3-позиционное</strong></td>
+  <td>в прозе / по паспорту</td>
+  <td>Промежуточные фиксированные позиции</td>
+  <td>Редкие шиберы и спецконтуры по ТЗ</td>
+</tr>
+<tr>
+  <td><strong>Пропорциональное</strong></td>
+  <td><strong>A</strong> (AS, AAS…)</td>
+  <td>Y <strong>0(2)…10&nbsp;В=</strong></td>
+  <td>Регулирование расхода, ПВУ, VAV, интеграция с BMS</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Суффиксы D и A в артикуле</h2>
+<p>
+  В коде Hoocon суффикс <strong>D</strong> соответствует Открыто/закрыто;
+  <strong>A</strong> — пропорциональное. Дополнительные буквы:
+  <strong>S</strong> — вспомогательный переключатель (SPDT),
+  <strong>T</strong> — термодатчик (часто на SA FU для ОЗК). Не смешивайте
+  тип управления с наличием пружины: fail-safe — ось FU/EU, не буква D/A.
+  См. <a href="/faq#fail-safe">fail-safe в FAQ</a>.
+</p>
+<p>
+  Питание 24&nbsp;В или 230&nbsp;В выбирается отдельно —
+  <a href="/statyi/pitanie-24-ili-230-v">24&nbsp;В или 230&nbsp;В</a>.
+  Момент — <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">подбор по
+  моменту</a>.
+</p>
+
+<h2>Сигнал Y 0(2)…10&nbsp;В=</h2>
+<p>
+  Заводская уставка пропорциональных приводов Hoocon — напряжение
+  <strong>0(2)…10&nbsp;В=</strong> (часто 0…10&nbsp;В=). Контроллер BMS или
+  ПЛК выдаёт аналоговый выход; привод позиционирует заслонку пропорционально
+  сигналу. Это <strong>пропорциональное (модулирующее)</strong> управление, не
+  дискретное Открыто/закрыто.
+</p>
+<p>
+  Режим <strong>0(4)…20&nbsp;мА</strong> — <strong>только спецзаказ</strong>
+  (заводская установка / DIP). Подробности —
+  <a href="/faq#signal-ma-special-order">FAQ: сигнал мА — спецзаказ</a>.
+  В русском ТТХ пишите «мА», не «mA».
+</p>
+
+<h2>Когда Открыто/закрыто, когда пропорциональное</h2>
+<ul>
+  <li>
+    <strong>ОЗК и дымовые клапаны</strong> — обычно Открыто/закрыто + пружинный
+    возврат (SA…FU, DS). Пропорциональное на ОЗК — только если явно в ТЗ и
+    паспорте клапана; типовой контур — дискретный.
+    См. <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение
+    в вентиляции</a>.
+  </li>
+  <li>
+    <strong>Приточно-вытяжные установки, VAV</strong> — пропорциональное (A),
+    сигнал 0…10&nbsp;В= с контроллера.
+  </li>
+  <li>
+    <strong>Рециркуляция, байпас</strong> — часто Открыто/закрыто, если нет
+    задачи пропорционального регулирования расхода.
+  </li>
+  <li>
+    <strong>2-/3-позиционное</strong> — узкие случаи; сверяйте с паспортом
+    контроллера и привода.
+  </li>
+</ul>
+
+<h2>Согласование с каталогом</h2>
+<p>
+  В <a href="/catalog">каталоге</a> задайте фасет «Управление» и напряжение.
+  Для воздушных без пружины —
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">MU / MQU</a>;
+  с пружиной —
+  <a href="/catalog/elektroprivody-s-pruzhinnym-vozvratom">FU</a>;
+  противопожарные —
+  <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU</a>.
+  При ускоренном ходу без пружины —
+  <a href="/statyi/mu-mqu-hv-kogda-nuzhen-uskorennyy">MU, MQU и HV</a>.
+</p>
+
+<h2>Частые ошибки</h2>
+<ul>
+  <li>Путаница «пропорциональное» и «плавный ход» (механика ≠ тип сигнала).</li>
+  <li>Заказ A (пропорциональное) без аналогового выхода на контроллере.</li>
+  <li>Ожидание 4…20&nbsp;мА «из коробки» — это спецзаказ.</li>
+  <li>D на ОЗК без пружины FU — нарушение логики fail-safe.</li>
+  <li>Игнорирование вспомогательного переключателя S для сигнализации положения.</li>
+</ul>
+
+<div class="note">
+  <strong>Чек‑лист по типу управления</strong>
+  <ul>
+    <li>Задача: дискрет / регулирование расхода / ОЗК.</li>
+    <li>Выход контроллера: релейный или 0…10&nbsp;В=.</li>
+    <li>Суффикс D или A; при необходимости S, T.</li>
+    <li>мА — только спецзаказ (<a href="/faq#signal-ma-special-order">FAQ</a>).</li>
+    <li>Фильтр «Управление» в <a href="/catalog">каталоге</a>.</li>
+    <li>Вопросы — <a href="/consultation">консультация</a>.</li>
+  </ul>
+</div>
+
+<h2>FAQ</h2>
+<details open>
+  <summary>Чем пропорциональное отличается от Открыто/закрыто?</summary>
+  <p>
+    Открыто/закрыто — два крайних положения по дискретному командному сигналу.
+    Пропорциональное — непрерывное позиционирование по аналоговому сигналу
+    0(2)…10&nbsp;В= (модулирующее управление).
+  </p>
+</details>
+<details>
+  <summary>Нужен ли 0…10&nbsp;В= на всех MU?</summary>
+  <p>
+    Нет. MU доступны в D и A; выбор по задаче. Для регулирования — A;
+    для простых заслонок — D.
+  </p>
+</details>
+<details>
+  <summary>Можно ли заменить Belimo LM…A на Hoocon с тем же сигналом?</summary>
+  <p>
+    Сигнал — одна из осей сравнения; полная замена — по чеклисту на
+    <a href="/replacement">странице замены</a> и в статье
+    <a href="/statyi/analog-belimo-hoocon">аналог Belimo</a>.
+  </p>
+</details>

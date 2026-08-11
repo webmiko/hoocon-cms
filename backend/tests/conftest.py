@@ -34,6 +34,8 @@ def _spa_index_html(settings) -> None:
     """Serve the SPA SEO fixture for catch-all spa_index_view in tests."""
     settings.SPA_INDEX_HTML = str(_SPA_FIXTURE)
     settings.SITE_URL = "https://hoocon.ru"
+    # Prod-like: hide future published_at (local .env may enable preview).
+    settings.CONTENT_SHOW_SCHEDULED = False
     from config.seo.spa_index import clear_index_html_cache
 
     clear_index_html_cache()

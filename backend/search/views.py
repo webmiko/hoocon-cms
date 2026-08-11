@@ -33,6 +33,7 @@ from catalog.models import SKU
 from catalog.urls_paths import catalog_path_for_sku
 from content.etl.tilda_articles import strip_html_to_text
 from content.models import Article, News, Page
+from content.views import publicly_visible
 from search.serializers import SearchResponseSerializer
 
 _SNIPPET_MAX_LEN = 220
@@ -206,7 +207,8 @@ class SearchView(APIView):
     def _search_articles(query: SearchQuery) -> QuerySet[Article]:
         """FTS on published Articles, ranked by SearchRank."""
         return (
-            Article.objects.filter(is_published=True, search_vector=query)
+            publicly_visible(Article)
+            .filter(search_vector=query)
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "slug")
         )
@@ -215,7 +217,8 @@ class SearchView(APIView):
     def _search_news(query: SearchQuery) -> QuerySet[News]:
         """FTS on published News, ranked by SearchRank."""
         return (
-            News.objects.filter(is_published=True, search_vector=query)
+            publicly_visible(News)
+            .filter(search_vector=query)
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "slug")
         )
@@ -224,7 +227,8 @@ class SearchView(APIView):
     def _search_pages(query: SearchQuery) -> QuerySet[Page]:
         """FTS on published CMS pages, ranked by SearchRank."""
         return (
-            Page.objects.filter(is_published=True, search_vector=query)
+            publicly_visible(Page)
+            .filter(search_vector=query)
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "slug")
         )

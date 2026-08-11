@@ -198,6 +198,26 @@ def test_sitemap_includes_published_articles(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sitemap_excludes_future_published_at_articles(client) -> None:
+    """sitemap.xml omits articles with published_at in the future."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from content.models import Article
+
+    Article.objects.create(
+        title="Soon",
+        slug="article-soon",
+        body="",
+        is_published=True,
+        published_at=timezone.now() + timedelta(days=3),
+    )
+    response = client.get("/sitemap.xml")
+    assert "/statyi/article-soon" not in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_sitemap_includes_published_news(client) -> None:
     """sitemap.xml includes /novosti/<slug> for published news."""
     from content.models import News

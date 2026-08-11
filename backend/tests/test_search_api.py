@@ -134,6 +134,32 @@ def test_search_finds_articles(client) -> None:
 
 
 @pytest.mark.django_db
+def test_search_hides_future_published_at_articles(client) -> None:
+    """Search must not return articles with published_at in the future."""
+    from datetime import timedelta
+
+    from django.contrib.postgres.search import SearchVector
+    from django.utils import timezone
+
+    from content.models import Article
+
+    future = timezone.now() + timedelta(days=5)
+    art = Article.objects.create(
+        title="Будущий гайд по заслонкам XYZUNIQ",
+        slug="future-guide",
+        body="<p>Будущий гайд по заслонкам XYZUNIQ</p>",
+        is_published=True,
+        published_at=future,
+    )
+    Article.objects.filter(pk=art.pk).update(
+        search_vector=SearchVector("title", "body", config="russian"),
+    )
+    response = client.get("/api/search/", {"q": "XYZUNIQ"})
+    slugs = [r["slug"] for r in response.json()["results"] if r.get("type") == "article"]
+    assert "future-guide" not in slugs
+
+
+@pytest.mark.django_db
 def test_search_finds_news(client) -> None:
     """Search finds published News by title/body."""
     _seed_search_data()

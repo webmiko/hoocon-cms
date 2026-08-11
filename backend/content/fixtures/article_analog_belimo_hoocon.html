@@ -1,0 +1,232 @@
+<p class="hero-dek">
+  <strong>Аналог Belimo</strong> и замена на Hoocon — не копирование артикула в одну
+  строку. Сравнение по осям: момент (Нм), fail-safe, 24/230&nbsp;В, тип управления,
+  вспомогательный переключатель S, термодатчик T, IP. Оформите заявку на
+  <a href="/replacement">странице замены</a> с кодом Belimo и фото шильдика.
+  Таблицу «LM… = DA…» без валидации здесь не публикуем.
+</p>
+
+<p class="dash-note">
+  Метод подбора, не матрица кроссов. Пары Belimo↔Hoocon — только после ревью
+  инженера или проверенного AnalogMap.
+</p>
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Оси сравнения при замене</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">Момент · Нм</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">первый шаг</span>
+      </li>
+      <li>
+        <span class="hbar__label">Fail-safe</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">FU / EU / нет</span>
+      </li>
+      <li>
+        <span class="hbar__label">24 / 230&nbsp;В</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--85"></span></span>
+        <span class="hbar__val">не смешивать</span>
+      </li>
+      <li>
+        <span class="hbar__label">Сигнал D / A</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--80"></span></span>
+        <span class="hbar__val">0…10&nbsp;В=</span>
+      </li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Жёсткие запреты</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">SA≠DA</span><span class="kpi-tiles__lab">на ОЗК</span></li>
+      <li><span class="kpi-tiles__num">FU≠MU</span><span class="kpi-tiles__lab">fail-safe</span></li>
+      <li><span class="kpi-tiles__num">24≠230</span><span class="kpi-tiles__lab">питание</span></li>
+      <li><span class="kpi-tiles__num">A≠D</span><span class="kpi-tiles__lab">сигнал</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Замена ≠ копипаст кода</h2>
+<p>
+  Запрос «<strong>замена belimo</strong>» на объекте обычно означает: сохранить
+  функцию (момент, возврат, сигнал, крепление), а не найти буквальный клон
+  маркировки. Терминология паспортов Hoocon сверена со стилем русских каталогов
+  белимо как <em>образец перевода</em>, не как гарантированная таблица соответствия
+  артикулов.
+</p>
+<p>
+  Первый шаг — расчёт или выписка момента:
+  <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">подбор по моменту</a>.
+  Затем питание (<a href="/statyi/pitanie-24-ili-230-v">24 или 230&nbsp;В</a>)
+  и управление (<a href="/statyi/tipy-upravleniya-privodom">типы управления</a>).
+  Обзор семейств —
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация ряда</a>,
+  контекст —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение в вентиляции</a>.
+</p>
+
+<h2>Чеклист осей сравнения</h2>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Ось</th>
+  <th>Что сверить</th>
+  <th>Ошибка при замене</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Крутящий момент</strong></td>
+  <td>Нм на шильдике и в паспорте; ступень ряда Hoocon вверх</td>
+  <td>Меньший момент — заслонка не закроется</td>
+</tr>
+<tr>
+  <td><strong>Fail-safe</strong></td>
+  <td>Пружина FU / электронный EU / без возврата (MU, MQU)</td>
+  <td>MU вместо FU на ОЗК — нарушение логики ПБ</td>
+</tr>
+<tr>
+  <td><strong>Напряжение</strong></td>
+  <td>24&nbsp;В AC/DC или 100…240&nbsp;В AC</td>
+  <td>24 vs 230 — несовместимы</td>
+</tr>
+<tr>
+  <td><strong>Управление</strong></td>
+  <td>Открыто/закрыто (D) или пропорциональное (A), 0(2)…10&nbsp;В=</td>
+  <td>A без аналогового выхода BMS</td>
+</tr>
+<tr>
+  <td><strong>S / T</strong></td>
+  <td>Вспомогательный переключатель, термодатчик на SA FU</td>
+  <td>Потеря сигнализации положения</td>
+</tr>
+<tr>
+  <td><strong>IP / среда</strong></td>
+  <td>Степень защиты корпуса, температура</td>
+  <td>IP54 вместо IP65 в канале</td>
+</tr>
+<tr>
+  <td><strong>Время хода</strong></td>
+  <td>Стандарт MU vs MQU/HV vs возврат пружины</td>
+  <td>MQU «для скорости» вместо FU на ОЗК</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Жёсткие запреты</h2>
+<ul>
+  <li>
+    <strong>SA…FU → DA…MU</strong> (и любые SA/FU → DA/MU) на
+    <strong>огнезадерживающих клапанах</strong>. SA и DA — разные семейства
+    для разных задач; см. <a href="/faq">FAQ</a>.
+  </li>
+  <li>
+  <strong>FU → MU/MQU</strong>, если в проекте нужен пружинный возврат при
+  отключении питания (<a href="/faq#fail-safe">fail-safe</a>).
+  </li>
+  <li>
+    Подмена <strong>24&nbsp;В</strong> и <strong>230&nbsp;В</strong> «с адаптером
+    на стройке» без проекта.
+  </li>
+  <li>
+    Замена <strong>пропорционального</strong> на <strong>Открыто/закрыто</strong>
+    без изменения контроллера.
+  </li>
+</ul>
+<p>
+  Ускоренный ход (MQU, HV) не заменяет fail-safe — см.
+  <a href="/statyi/mu-mqu-hv-kogda-nuzhen-uskorennyy">MU, MQU и HV</a>.
+</p>
+
+<h2>Как оформить заявку на замену</h2>
+<p>
+  На <a href="/replacement">/replacement</a> укажите:
+</p>
+<ol>
+  <li>Полный код Belimo с шильдика (или фото шильдика).</li>
+  <li>Напряжение питания и тип сигнала (D/A, 0…10&nbsp;В=).</li>
+  <li>Назначение: ОВК / ОЗК / дым / кран.</li>
+  <li>Момент, если известен; площадь заслонки и давление — если нет.</li>
+  <li>Фото крепления (вал, площадка) при ретрофите.</li>
+</ol>
+<p>
+  После проверки осей подборщик предложит артикул Hoocon из
+  <a href="/catalog">каталога</a> или запросит дополнительные данные.
+  Сложные случаи — <a href="/consultation">консультация</a>.
+</p>
+
+<h2>Что не делать до валидации</h2>
+<ul>
+  <li>Публиковать и заказывать по «матрице LM… = DA…» из непроверенных источников.</li>
+  <li>Ориентироваться только на внешний вид корпуса.</li>
+  <li>Игнорировать суффиксы S, T, DS, AS в коде.</li>
+  <li>Считать, что один момент на шильдике гарантирует совместимость вала.</li>
+</ul>
+<p>
+  В репозитории Hoocon непроверенные пары AnalogMap помечены как риск —
+  используйте метод и форму замены, не автоматический кросс.
+</p>
+
+<h2>Типовые сценарии замены</h2>
+<ul>
+  <li>
+    <strong>ПВУ, пропорциональная заслонка</strong> — момент, A, 0…10&nbsp;В=,
+    24 или 230&nbsp;В → MU или MQU по времени хода.
+  </li>
+  <li>
+    <strong>ОЗК</strong> — только SA FU, Открыто/закрыто, пружина, часто T;
+    категория <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU</a>.
+  </li>
+  <li>
+    <strong>Ретрофит 230&nbsp;В on/off</strong> — D, …230-DS, момент по расчёту;
+    проверить вал и ход.
+  </li>
+</ul>
+
+<h2>Частые ошибки</h2>
+<ul>
+  <li>Замена «по артикулу конкурента» без осей ТТХ.</li>
+  <li>DA на ОЗК «потому что момент совпал».</li>
+  <li>Путаница ускоренного MQU с пружинным FU.</li>
+  <li>Заказ мА без спецзаказа (<a href="/faq#signal-ma-special-order">FAQ</a>).</li>
+</ul>
+
+<div class="note">
+  <strong>Чек‑лист замены Belimo → Hoocon</strong>
+  <ul>
+    <li>Код + фото шильдика → <a href="/replacement">/replacement</a>.</li>
+    <li>Момент (Нм), fail-safe, 24/230&nbsp;В, D/A, S/T, IP.</li>
+    <li>SA FU на ОЗК — не DA/MU.</li>
+    <li>Каталог + паспорт SKU после подбора.</li>
+    <li><a href="/consultation">Консультация</a> при расхождении с ТЗ.</li>
+  </ul>
+</div>
+
+<h2>FAQ</h2>
+<details open>
+  <summary>Есть ли готовая таблица Belimo = Hoocon?</summary>
+  <p>
+    Нет в открытой статье. Подбор — по осям ТТХ и заявка на
+    <a href="/replacement">замену</a>. Автоматические кроссы без валидации
+    рискованны.
+  </p>
+</details>
+<details>
+  <summary>Можно ли SA10FU230-DS заменить на DA10…?</summary>
+  <p>
+    Нет. SA ≠ DA на противопожарных клапанах — жёсткое правило
+    (<a href="/faq">FAQ</a>).
+  </p>
+</details>
+<details>
+  <summary>Что проверить на объекте перед заказом?</summary>
+  <p>
+    Шильдик, проводка (24/230), сигнал с контроллера, крепление, назначение
+    клапана. Момент — <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">расчёт</a>
+    или паспорт заслонки.
+  </p>
+</details>

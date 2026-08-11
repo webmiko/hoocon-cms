@@ -11,7 +11,9 @@ Usage::
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -508,19 +510,52 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "CE, UL и EAC для электроприводов ОВК: допуск и приёмка по региону, "
         "что сверять в карточке SKU и чем знаки не заменяют подбор момента."
     ),
+    "podbor-privoda-po-momentu-i-ploshchadi": (
+        "Как выбрать электропривод для заслонки: подбор по крутящему моменту "
+        "через площадь и давление (ориентир), затем ряд Нм в каталоге."
+    ),
+    "tipy-upravleniya-privodom": (
+        "Типы электроприводов для вентиляции: Открыто/закрыто, 2-/3 и "
+        "пропорциональное с сигналом 0(2)…10 В=; мА — спецзаказ."
+    ),
+    "pitanie-24-ili-230-v": (
+        "Электропривод 230 В или 24 В: как выбрать номинал по щиту и АСУ, класс защиты III/II и IP — разные оси."
+    ),
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": (
+        "MU, MQU и HV: когда нужна скорость хода; ориентиры секунд и почему ускоренный привод не заменяет fail-safe."
+    ),
+    "analog-belimo-hoocon": (
+        "Аналог Belimo / замена белимо на Hoocon: чеклист осей ТТХ и форма "
+        "/replacement без непроверенной таблицы кроссов."
+    ),
 }
 
 # Titles for articles created from fixtures (not only rewritten from Tilda scrape).
 ARTICLE_TITLES: dict[str, str] = {
     "sertifikaty-ce-ul-eac-elektroprivody-ovk": "CE, UL и EAC для электроприводов ОВК",
+    "podbor-privoda-po-momentu-i-ploshchadi": ("Подбор привода по площади и давлению: как выбрать момент"),
+    "tipy-upravleniya-privodom": ("Типы управления приводом: Открыто/закрыто, 2-/3 и 0–10 В"),
+    "pitanie-24-ili-230-v": "24 В или 230 В: что выбрать для электропривода",
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": ("MU, MQU и HV: когда нужна ускоренная перекладка"),
+    "analog-belimo-hoocon": "Замена Belimo на Hoocon: как подбирать аналог",
 }
 
 ARTICLE_COVERS: dict[str, Path] = {
     "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac_cover_light.webp"),
+    "podbor-privoda-po-momentu-i-ploshchadi": (_FIXTURES_DIR / "article_podbor_privoda_cover.webp"),
+    "tipy-upravleniya-privodom": (_FIXTURES_DIR / "article_tipy_upravleniya_cover.webp"),
+    "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_230_cover.webp"),
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv_cover.webp"),
+    "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_cover.webp"),
 }
 
 ARTICLE_COVERS_DARK: dict[str, Path] = {
     "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac_cover_dark.webp"),
+    "podbor-privoda-po-momentu-i-ploshchadi": (_FIXTURES_DIR / "article_podbor_privoda_cover_dark.webp"),
+    "tipy-upravleniya-privodom": (_FIXTURES_DIR / "article_tipy_upravleniya_cover_dark.webp"),
+    "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_230_cover_dark.webp"),
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv_cover_dark.webp"),
+    "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_cover_dark.webp"),
 }
 
 # Full body rewrite (replaces Tilda scrape). Excerpt still from ARTICLE_EXCERPTS.
@@ -537,7 +572,29 @@ ARTICLE_BODIES: dict[str, Path] = {
     "sharovye-krany-vidy-konstruktsiya": (_FIXTURES_DIR / "article_sharovye_krany.html"),
     "ventilyatsiya-v-metro": (_FIXTURES_DIR / "article_ventilyatsiya_v_metro.html"),
     "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac.html"),
+    "podbor-privoda-po-momentu-i-ploshchadi": (_FIXTURES_DIR / "article_podbor_privoda_po_momentu.html"),
+    "tipy-upravleniya-privodom": (_FIXTURES_DIR / "article_tipy_upravleniya_privodom.html"),
+    "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_ili_230.html"),
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv.html"),
+    "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_hoocon.html"),
 }
+
+
+def _article_publish_schedule() -> dict[str, datetime]:
+    """Staggered go-live (Europe/Moscow). Live now: sertifikaty + podbor."""
+    msk = ZoneInfo("Europe/Moscow")
+    return {
+        # Already on site (keep stable go-live for seed rewrites).
+        "sertifikaty-ce-ul-eac-elektroprivody-ovk": datetime(2026, 8, 6, 9, 0, tzinfo=msk),
+        # Live with news (2026-08-11).
+        "podbor-privoda-po-momentu-i-ploshchadi": datetime(2026, 8, 11, 9, 0, tzinfo=msk),
+        # Preview locally via CONTENT_SHOW_SCHEDULED; prod waits.
+        "tipy-upravleniya-privodom": datetime(2026, 8, 13, 9, 0, tzinfo=msk),
+        "pitanie-24-ili-230-v": datetime(2026, 8, 15, 9, 0, tzinfo=msk),
+        "mu-mqu-hv-kogda-nuzhen-uskorennyy": datetime(2026, 8, 17, 9, 0, tzinfo=msk),
+        "analog-belimo-hoocon": datetime(2026, 8, 19, 9, 0, tzinfo=msk),
+    }
+
 
 _LEAD_MARKER = 'data-hoocon-lead="1"'
 
@@ -610,8 +667,27 @@ NEWS_BR_BODY = f"""
 </p>
 """.strip()
 
+_NEWS_GUIDES_SLUG = "articles-podbor-i-sertifikaty"
+_NEWS_GUIDES_TITLE = "Новые статьи: подбор привода и сертификаты CE/UL/EAC"
+_NEWS_GUIDES_COVER = _FIXTURES_DIR / "article_podbor_privoda_cover.webp"
+
+NEWS_GUIDES_BODY = """
+<p>В разделе <a href="/statyi">«Статьи»</a> — два практических материала для
+подбора и приёмки электроприводов ОВК.</p>
+<p><strong>Подбор по моменту.</strong>
+<a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">Подбор привода по
+площади и давлению</a>: как оценить крутящий момент через площадь и
+перепад давления, затем перейти к ряду Н·м в каталоге.</p>
+<p><strong>Сертификаты.</strong>
+<a href="/statyi/sertifikaty-ce-ul-eac-elektroprivody-ovk">CE, UL и EAC для
+электроприводов ОВК</a>: что сверять в карточке SKU по региону поставки и
+чем знаки не заменяют расчёт момента.</p>
+<p>Остальные гайды серии (типы управления, 24/230&nbsp;В, MU/MQU/HV, аналог
+Belimo) выходят по расписанию.</p>
+""".strip()
+
 # News from Tilda /news are imported by ``scrape_hoocon_news`` (covers + body).
-# Seed creates a bootstrap HVA item when empty and upserts H8205-LAV / BR + covers.
+# Seed creates a bootstrap HVA item when empty and upserts H8205-LAV / BR / guides.
 
 
 class Command(BaseCommand):
@@ -649,10 +725,12 @@ class Command(BaseCommand):
         excerpts_done = 0
         bodies_done = 0
         covers_done = 0
+        publish_at = _article_publish_schedule()
         for slug, body_path in ARTICLE_BODIES.items():
             article = Article.objects.filter(slug=slug).first()
             body_html = body_path.read_text(encoding="utf-8")
             excerpt = ARTICLE_EXCERPTS.get(slug, "")
+            go_live = publish_at.get(slug, now)
             if article is None:
                 article_title = ARTICLE_TITLES.get(slug)
                 if not article_title:
@@ -664,10 +742,10 @@ class Command(BaseCommand):
                     body=body_html,
                     excerpt=excerpt,
                     is_published=True,
-                    published_at=now,
+                    published_at=go_live,
                 )
                 bodies_done += 1
-                self.stdout.write(f"article body: {slug} (created)")
+                self.stdout.write(f"article body: {slug} (created, published_at={go_live.isoformat()})")
             else:
                 article.body = body_html
                 if excerpt:
@@ -676,6 +754,9 @@ class Command(BaseCommand):
                 if slug in ARTICLE_TITLES and article.title != ARTICLE_TITLES[slug]:
                     article.title = ARTICLE_TITLES[slug]
                     update_fields.append("title")
+                if slug in publish_at and article.published_at != go_live:
+                    article.published_at = go_live
+                    update_fields.append("published_at")
                 article.save(update_fields=update_fields)
                 bodies_done += 1
                 self.stdout.write(f"article body: {slug}")
@@ -794,6 +875,30 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING(f"news {_NEWS_BR_SLUG}: cover not attached (SKU image?)"),
             )
+
+        guides, guides_created = News.objects.update_or_create(
+            slug=_NEWS_GUIDES_SLUG,
+            defaults={
+                "title": _NEWS_GUIDES_TITLE,
+                "body": NEWS_GUIDES_BODY,
+                "is_published": True,
+            },
+        )
+        if guides.published_at is None:
+            guides.published_at = now
+            guides.save(update_fields=["published_at", "updated_at"])
+        self.stdout.write(f"news {guides.slug}: {'created' if guides_created else 'updated'}")
+        if not guides.cover and _NEWS_GUIDES_COVER.is_file():
+            from django.core.files.base import ContentFile
+
+            guides.cover.save(
+                _NEWS_GUIDES_COVER.name,
+                ContentFile(_NEWS_GUIDES_COVER.read_bytes()),
+                save=True,
+            )
+            self.stdout.write(f"news {_NEWS_GUIDES_SLUG}: cover from fixture")
+        elif guides.cover:
+            self.stdout.write(f"news {_NEWS_GUIDES_SLUG}: cover already set")
 
         self.stdout.write(
             self.style.SUCCESS(

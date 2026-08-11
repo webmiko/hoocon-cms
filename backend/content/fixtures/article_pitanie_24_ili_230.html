@@ -1,0 +1,190 @@
+<p class="hero-dek">
+  <strong>Электропривод 230&nbsp;В или 24&nbsp;В — что выбрать</strong> — вопрос
+  согласования с щитом и АСУ, а не «что лучше в целом». В каталоге Hoocon два
+  канонических номинала: AC/DC <strong>24&nbsp;В</strong> и AC
+  <strong>100…240&nbsp;В</strong> (в проектах часто «230&nbsp;В»). Ниже — сценарии,
+  класс защиты и как не путать его с IP.
+</p>
+
+<p class="dash-note">
+  Номиналы — из карточки SKU. ПУЭ и проект щита определяют, что допустимо на объекте.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Номиналы в каталоге</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">24&nbsp;В</span><span class="kpi-tiles__lab">AC/DC</span></li>
+      <li><span class="kpi-tiles__num">100…240&nbsp;В</span><span class="kpi-tiles__lab">AC · «230»</span></li>
+      <li><span class="kpi-tiles__num">III</span><span class="kpi-tiles__lab">класс · 24&nbsp;В</span></li>
+      <li><span class="kpi-tiles__num">II</span><span class="kpi-tiles__lab">класс · 230&nbsp;В</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Типовые сценарии щита</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">BMS · 24&nbsp;В</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--80"></span></span>
+        <span class="hbar__val">БСНН · III</span>
+      </li>
+      <li>
+        <span class="hbar__label">Силовой щит</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">230&nbsp;В · II</span>
+      </li>
+      <li>
+        <span class="hbar__label">ПВУ шкаф</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--65"></span></span>
+        <span class="hbar__val">зависит от ТЗ</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Два номинала в линейке Hoocon</h2>
+<p>
+  В фасете «Напряжение» каталога фиксируются:
+</p>
+<ul>
+  <li><strong>AC/DC 24&nbsp;В, 50/60&nbsp;Гц</strong> — типичный номинал для
+    контуров АСУ&nbsp;ТП и BMS с БСНН.</li>
+  <li><strong>AC 100…240&nbsp;В, 50/60&nbsp;Гц</strong> — широкий диапазон;
+    в спецификациях и на объекте часто говорят «230&nbsp;В».</li>
+</ul>
+<p>
+  На одной ступени момента (например, 10&nbsp;Нм) обычно есть издания 24 и 230 —
+  суффикс в артикуле (…230-DS / …24-DS). Момент и управление выбираются
+  отдельно: <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">подбор по
+  моменту</a>, <a href="/statyi/tipy-upravleniya-privodom">типы управления</a>.
+  Обзор ряда —
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация</a>,
+  контекст —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Номинал</th>
+  <th>Класс защиты</th>
+  <th>Типовой щит</th>
+  <th>Заметка</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>AC/DC 24&nbsp;В</td>
+  <td>III (БСНН)</td>
+  <td>АСУ, BMS, шкаф автоматики</td>
+  <td>Общий минус с контроллером; короткие линии</td>
+</tr>
+<tr>
+  <td>AC 100…240&nbsp;В</td>
+  <td>II (полная изоляция)</td>
+  <td>Силовой / распределительный щит</td>
+  <td>«230&nbsp;В» в проекте; длинные трассы к заслонке</td>
+</tr>
+<tr>
+  <td>Степень IP</td>
+  <td>—</td>
+  <td>Корпус привода</td>
+  <td>IP54 / IP65 — не «класс защиты III/II»</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Класс защиты III и II — не IP</h2>
+<p>
+  <strong>Класс защиты</strong> по электробезопасности (III — безопасное сверхнизкое
+  напряжение; II — полная изоляция) <strong>не</strong> заменяет
+  <strong>степень защиты корпуса</strong> IP54, IP65 и т.п. Не пишите
+  «класс защиты IP54» — это разные параметры. IP — от пыли и влаги в канале;
+  класс III/II — от удара током при обслуживании.
+</p>
+<p>
+  Подробнее о параметрах семейств —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение в
+  вентиляции</a> и <a href="/faq">FAQ</a>.
+</p>
+
+<h2>Когда 24&nbsp;В</h2>
+<ul>
+  <li>Шкаф АСУ&nbsp;ТП / BMS уже с БСНН 24&nbsp;В и готовыми выходами.</li>
+  <li>Короткая трасса от шкафа к заслонке; общая шина с контроллером.</li>
+  <li>Требование заказчика к низковольтному контуру на объекте.</li>
+  <li>Интеграция с ПЛК с релейными / аналоговыми модулями 24&nbsp;В.</li>
+</ul>
+<p>
+  В <a href="/catalog">каталоге</a> задайте фасет «Напряжение» → 24&nbsp;В и
+  нужный момент. Пример линейки —
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">MU без
+  пружины</a>.
+</p>
+
+<h2>Когда 230&nbsp;В (100…240&nbsp;В)</h2>
+<ul>
+  <li>Заслонка далеко от шкафа автоматики; прокладка от силового щита.</li>
+  <li>На объекте нет выделенного 24&nbsp;В на группу заслонок.</li>
+  <li>Ретрофит: существующая проводка 230&nbsp;В к старым приводам.</li>
+  <li>Мощные приводы на крупных заслонках, где 24&nbsp;В не предусмотрен в ТЗ.</li>
+</ul>
+<p>
+  При замене конкурента напряжение — критичная ось: ошибка 24 vs 230 недопустима.
+  Чеклист —
+  <a href="/statyi/analog-belimo-hoocon">аналог Belimo</a> и
+  <a href="/replacement">форма замены</a>.
+</p>
+
+<h2>Согласование с проектом</h2>
+<ol>
+  <li>Определить, откуда питается группа заслонок (АСУ или силовой щит).</li>
+  <li>Зафиксировать номинал в спецификации (24&nbsp;В или 230&nbsp;В).</li>
+  <li>Открыть <a href="/catalog">каталог</a>, фасет «Напряжение» + момент + управление.</li>
+  <li>Сверить класс защиты и IP в паспорте SKU.</li>
+  <li>При сомнениях — <a href="/consultation">заявка на консультацию</a>.</li>
+</ol>
+
+<h2>Частые ошибки</h2>
+<ul>
+  <li>«Подойдёт любой» — 24&nbsp;В и 230&nbsp;В не взаимозаменяемы.</li>
+  <li>Путаница класса III/II со степенью IP.</li>
+  <li>Заказ 24&nbsp;В без БСНН-источника в щите.</li>
+  <li>Игнорирование частоты 50/60&nbsp;Гц в паспорте (для AC).</li>
+  <li>Смешение напряжения питания и сигнала 0…10&nbsp;В= (разные контуры).</li>
+</ul>
+
+<div class="note">
+  <strong>Чек‑лист по напряжению</strong>
+  <ul>
+    <li>Источник: АСУ 24&nbsp;В или щит 230&nbsp;В.</li>
+    <li>Артикул: …24-… или …230-… в коде SKU.</li>
+    <li>Класс защиты III или II — отдельно от IP.</li>
+    <li>Фасет «Напряжение» в <a href="/catalog">каталоге</a>.</li>
+    <li>При замене — фото шильдика на <a href="/replacement">/replacement</a>.</li>
+  </ul>
+</div>
+
+<h2>FAQ</h2>
+<details open>
+  <summary>Можно ли запитать 24&nbsp;В привод от 230&nbsp;В щита?</summary>
+  <p>
+    Только через отдельный источник 24&nbsp;В (БСНН) по проекту. Не подключать
+    24&nbsp;В привод напрямую к 230&nbsp;В.
+  </p>
+</details>
+<details>
+  <summary>«230&nbsp;В» в артикуле — строго 230?</summary>
+  <p>
+    Номинал в ТТХ — AC 100…240&nbsp;В. Суффикс 230 в коде — издание для
+    типового российского щита; диапазон шире одного числа.
+  </p>
+</details>
+<details>
+  <summary>Где смотреть напряжение в Hoocon?</summary>
+  <p>
+    Фасет «Напряжение» в <a href="/catalog">каталоге</a>, паспорт SKU и
+    <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация ряда</a>.
+  </p>
+</details>

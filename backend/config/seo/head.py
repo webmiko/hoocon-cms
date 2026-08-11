@@ -78,8 +78,9 @@ def _resolve_article(path: str) -> SeoHeadContext | None:
         return None
     slug = validate_slug(path.removeprefix("/statyi/").split("/", 1)[0])
     from content.models import Article
+    from content.views import publicly_visible
 
-    article = Article.objects.filter(slug=slug, is_published=True).first()
+    article = publicly_visible(Article).filter(slug=slug).first()
     if article is None:
         return None
     published = article.published_at.isoformat() if article.published_at else None
@@ -107,8 +108,9 @@ def _resolve_news(path: str) -> SeoHeadContext | None:
         return None
     slug = validate_slug(path.removeprefix("/novosti/").split("/", 1)[0])
     from content.models import News
+    from content.views import publicly_visible
 
-    news = News.objects.filter(slug=slug, is_published=True).first()
+    news = publicly_visible(News).filter(slug=slug).first()
     if news is None:
         return None
     published = news.published_at.isoformat() if news.published_at else None
@@ -136,8 +138,9 @@ def _resolve_page(path: str) -> SeoHeadContext | None:
         return None
     slug = validate_slug(path.lstrip("/"))
     from content.models import Page
+    from content.views import publicly_visible
 
-    page = Page.objects.filter(slug=slug, is_published=True).first()
+    page = publicly_visible(Page).filter(slug=slug).first()
     if page is None:
         return None
     static = PUBLIC_STATIC_ROUTES.get(path, {})

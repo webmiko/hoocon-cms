@@ -38,6 +38,10 @@ SECRET_KEY = os.getenv(
 # Fail closed: require explicit DJANGO_DEBUG=True for local; prod omits it.
 DEBUG = _env_bool("DJANGO_DEBUG", default=False)
 
+# Local QA: show CMS items with published_at in the future (articles/news).
+# Prod must keep False so staggered go-live stays hidden until the date.
+CONTENT_SHOW_SCHEDULED = _env_bool("CONTENT_SHOW_SCHEDULED", default=False)
+
 if not DEBUG and (not SECRET_KEY or SECRET_KEY.startswith("django-insecure")):
     raise ImproperlyConfigured(
         "Set DJANGO_SECRET_KEY in the environment when DJANGO_DEBUG=False",

@@ -85,8 +85,9 @@ def test_article_fts_matches_title() -> None:
     """FTS query on Article matches by title."""
     from content.models import Article
 
+    # Unique stem — seed guides must not collide (подбор/привод appear there).
     Article.objects.create(
-        title="Как подобрать электропривод",
+        title="Как подобрать ксилоквантный привод",
         slug="kak-podobrat-1",
         body="",
     )
@@ -95,10 +96,10 @@ def test_article_fts_matches_title() -> None:
         slug="drugoy-1",
         body="",
     )
-    q = SearchQuery("подобрать", config="russian")
+    q = SearchQuery("ксилоквантный", config="russian")
     found = Article.objects.filter(search_vector=q)
     assert found.count() == 1
-    assert found.first().title == "Как подобрать электропривод"
+    assert found.first().title == "Как подобрать ксилоквантный привод"
 
 
 @pytest.mark.django_db
@@ -109,14 +110,14 @@ def test_article_fts_matches_body() -> None:
     Article.objects.create(
         title="Гайд",
         slug="gayd-1",
-        body="Подбор привода по моменту и напряжению.",
+        body="Подбор ксилоквантного привода по моменту и напряжению.",
     )
     Article.objects.create(
         title="Другой гайд",
         slug="gayd-2",
         body="Совершенно другая тема без нужных слов.",
     )
-    q = SearchQuery("подбор", config="russian")
+    q = SearchQuery("ксилоквантного", config="russian")
     found = Article.objects.filter(search_vector=q)
     assert found.count() == 1
     assert found.first().slug == "gayd-1"
@@ -165,11 +166,11 @@ def test_article_fts_title_ranks_higher_than_body() -> None:
     body_art = Article.objects.create(
         title="Краткий гайд",
         slug="body-match",
-        body="Здесь упоминается подбор электропривода для ОВК.",
+        body="Здесь упоминается ксилоквантный привод для ОВК.",
     )
     # Title match (weight A) — should rank higher.
     title_art = Article.objects.create(
-        title="Подбор электропривода для ОВК",
+        title="Ксилоквантный привод для ОВК",
         slug="title-match",
         body="Здесь нет нужных слов в теле.",
     )
@@ -179,9 +180,9 @@ def test_article_fts_title_ranks_higher_than_body() -> None:
     # Verify the trigger assigned correct weights in the vector.
     body_vec = str(body_art.search_vector)
     title_vec = str(title_art.search_vector)
-    # 'подбор' must appear with weight B in body-match, weight A in title-match.
-    assert "'подбор':" in body_vec and "B" in body_vec.split("'подбор':")[1][:2]
-    assert "'подбор':" in title_vec and "A" in title_vec.split("'подбор':")[1][:2]
+    # Unique token — seed guides use «подбор» and would collide.
+    assert "'ксилоквантн':" in body_vec and "B" in body_vec.split("'ксилоквантн':")[1][:2]
+    assert "'ксилоквантн':" in title_vec and "A" in title_vec.split("'ксилоквантн':")[1][:2]
 
     # Raw ts_rank (passing SearchVectorField directly) ranks title above body.
     from django.db import connection
@@ -191,8 +192,10 @@ def test_article_fts_title_ranks_higher_than_body() -> None:
             """
             SELECT slug
             FROM content_article
-            WHERE search_vector @@ plainto_tsquery('russian', 'подбор')
-            ORDER BY ts_rank(search_vector, plainto_tsquery('russian', 'подбор')) DESC
+            WHERE search_vector @@ plainto_tsquery('russian', 'ксилоквантный')
+            ORDER BY ts_rank(
+              search_vector, plainto_tsquery('russian', 'ксилоквантный')
+            ) DESC
             """,
         )
         slugs = [row[0] for row in cur.fetchall()]

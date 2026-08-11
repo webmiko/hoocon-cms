@@ -67,6 +67,69 @@ def test_article_list_returns_published_only(client) -> None:
 
 
 @pytest.mark.django_db
+def test_article_future_published_at_hidden(client) -> None:
+    """is_published + future published_at must not appear in public API."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from content.models import Article
+
+    future = timezone.now() + timedelta(days=2)
+    past = timezone.now() - timedelta(hours=1)
+    Article.objects.create(
+        title="Soon",
+        slug="soon",
+        body="x",
+        is_published=True,
+        published_at=future,
+    )
+    Article.objects.create(
+        title="Live",
+        slug="live",
+        body="x",
+        is_published=True,
+        published_at=past,
+    )
+    Article.objects.create(
+        title="Null pub",
+        slug="null-pub",
+        body="x",
+        is_published=True,
+        published_at=None,
+    )
+    list_slugs = [a["slug"] for a in client.get("/api/content/articles/").json()["results"]]
+    assert "live" in list_slugs
+    assert "null-pub" in list_slugs
+    assert "soon" not in list_slugs
+    assert client.get("/api/content/articles/soon/").status_code == 404
+    assert client.get("/api/content/articles/live/").status_code == 200
+
+
+@pytest.mark.django_db
+def test_article_future_visible_when_show_scheduled(client, settings) -> None:
+    """CONTENT_SHOW_SCHEDULED previews staggered articles before go-live."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from content.models import Article
+
+    settings.CONTENT_SHOW_SCHEDULED = True
+    future = timezone.now() + timedelta(days=2)
+    Article.objects.create(
+        title="Soon",
+        slug="soon-preview",
+        body="x",
+        is_published=True,
+        published_at=future,
+    )
+    assert client.get("/api/content/articles/soon-preview/").status_code == 200
+    slugs = [a["slug"] for a in client.get("/api/content/articles/").json()["results"]]
+    assert "soon-preview" in slugs
+
+
+@pytest.mark.django_db
 def test_article_detail_by_slug(client) -> None:
     """GET /api/content/articles/{slug}/ returns article detail."""
     from content.models import Article

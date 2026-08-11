@@ -1,0 +1,215 @@
+<p class="hero-dek">
+  Семейства <strong>MU</strong>, <strong>MQU</strong> и <strong>HV…Q</strong> отличаются
+  временем хода, а не только моментом. Стандартный MU — десятки–сотни секунд;
+  MQU и HV — ускоренный ход в секунды. Это <strong>не</strong> fail-safe:
+  пружинный FU и электронный EU — отдельная ось. Ниже — ориентиры и когда
+  ускорение действительно нужно.
+</p>
+
+<p class="dash-note">
+  Секунды в таблице — ориентир из спецификации; точное время — в паспорте SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Время хода · ориентир</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">MU · стандарт</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--40"></span></span>
+        <span class="hbar__val">30–150&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">MQU · 8/16&nbsp;Нм</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--75"></span></span>
+        <span class="hbar__val">≈8 / ≈16&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">HV …Q · BLDC</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">2,5–7&nbsp;с</span>
+      </li>
+      <li>
+        <span class="hbar__label">FU · пружина</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--70"></span></span>
+        <span class="hbar__val">возврат &lt;30&nbsp;с</span>
+      </li>
+    </ul>
+  </div>
+  <div class="dash-panel">
+    <p class="dash-panel__title">Ускорение ≠ fail-safe</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">MQU</span><span class="kpi-tiles__lab">быстро · без пружины</span></li>
+      <li><span class="kpi-tiles__num">FU</span><span class="kpi-tiles__lab">пружина · возврат</span></li>
+      <li><span class="kpi-tiles__num">EU</span><span class="kpi-tiles__lab">электронный</span></li>
+      <li><span class="kpi-tiles__num">MU</span><span class="kpi-tiles__lab">стандарт</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Задача: скорость vs аварийный возврат</h2>
+<p>
+  <strong>MU</strong> (DA…MU, SA…MU) — стандартный ход без пружинного возврата.
+  Время открытия/закрытия — от десятков до сотен секунд (например, DA2
+  &lt;30&nbsp;с … DA24 &lt;160&nbsp;с — ориентир из
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации ряда</a>).
+  Подходит для типовой вентиляции, где нормы не требуют секундного хода.
+</p>
+<p>
+  <strong>MQU</strong> и <strong>HV…Q</strong> — ускоренный ход <strong>без
+  пружины</strong>. Нужны, когда ТЗ или норма задаёт короткое время перемещения
+  заслонки, но fail-safe не требуется (или обеспечен отдельно). Не путать с
+  <strong>FU</strong> (пружинный возврат) и <strong>EU</strong> (электронный
+  fail-safe) — см. <a href="/faq#fail-safe">FAQ fail-safe</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Семейство</th>
+  <th>Момент · ориентир</th>
+  <th>Время хода · ориентир</th>
+  <th>Пружина / fail-safe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>DA…MU</td>
+  <td>2–32&nbsp;Нм</td>
+  <td>Десятки–сотни с (&lt;30…&lt;160&nbsp;с по ступеням)</td>
+  <td>Нет; остаётся в положении при отключении</td>
+</tr>
+<tr>
+  <td>DA…MQU</td>
+  <td>8 / 16&nbsp;Нм</td>
+  <td>≈8&nbsp;с при 8&nbsp;Нм; ≈16&nbsp;с при 16&nbsp;Нм</td>
+  <td>Нет пружины; ускоренный ход</td>
+</tr>
+<tr>
+  <td>HV…Q</td>
+  <td>5 / 8 / 20&nbsp;Нм</td>
+  <td>5&nbsp;Нм ≈2,5&nbsp;с; 8&nbsp;Нм ≈4&nbsp;с; 20&nbsp;Нм ≈7&nbsp;с (BLDC)</td>
+  <td>Нет; BLDC, высокая скорость</td>
+</tr>
+<tr>
+  <td>DA…FU / SA…FU</td>
+  <td>3–20&nbsp;Нм</td>
+  <td>Рабочий ход + возврат пружины &lt;30&nbsp;с</td>
+  <td>Пружинный fail-safe</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Когда достаточно MU</h2>
+<ul>
+  <li>Обычные заслонки ПВУ, рециркуляции, байпаса без жёсткого лимита секунд.</li>
+  <li>Регулирование расхода пропорциональным приводом (A) — скорость не критична.</li>
+  <li>Бюджет и простота: MU — базовая линейка на ступени момента.</li>
+</ul>
+<p>
+  Подбор момента —
+  <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">по площади и давлению</a>.
+  Категория —
+  <a href="/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata">воздушные
+  без пружинного возврата</a>.
+  Контекст применения —
+  <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение в
+  вентиляции</a>.
+</p>
+
+<h2>Когда нужен MQU</h2>
+<ul>
+  <li>ТЗ: время хода ≤15…20&nbsp;с на 8–16&nbsp;Нм без пружины.</li>
+  <li>Промышленные каналы, быстрый отклик шибера, но без нормы fail-safe.</li>
+  <li>Замена ускоренных приводов конкурента на 8/16&nbsp;Нм.</li>
+</ul>
+<p>
+  Категория —
+  <a href="/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata">ускоренные
+  без пружинного возврата (MQU)</a>. Питание и сигнал —
+  <a href="/statyi/pitanie-24-ili-230-v">24 или 230&nbsp;В</a>,
+  <a href="/statyi/tipy-upravleniya-privodom">типы управления</a>.
+</p>
+
+<h2>Когда нужен HV…Q</h2>
+<ul>
+  <li>Максимальная скорость на 5–20&nbsp;Нм (ориентир 2,5–7&nbsp;с, BLDC).</li>
+  <li>Объекты с жёсткими циклами и высоким ресурсом (пром, метро — см.
+    <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение</a>).</li>
+  <li>Когда MQU ещё медленнее нормы, но пружина не нужна.</li>
+</ul>
+<p>
+  Сверяйте категорию в <a href="/catalog">каталоге</a>: HV может быть в линейке
+  ускоренных или в общей «без пружины» — по актуальной витрине.
+</p>
+
+<h2>Ускоренный ход ≠ fail-safe</h2>
+<p>
+  <strong>MQU и HV</strong> ускоряют <em>рабочий</em> ход при наличии питания.
+  При пропадании питания заслонка <strong>остаётся</strong> в текущем положении
+  (как MU). Для аварийного закрытия/открытия нужны:
+</p>
+<ul>
+  <li><strong>FU</strong> — пружинный механический возврат;</li>
+  <li><strong>EU</strong> — электронный fail-safe без пружины.</li>
+</ul>
+<p>
+  ОЗК и дым — обычно SA…FU с нормой на время <em>возврата</em> пружины, не MQU.
+  Подробнее —
+  <a href="/faq#fail-safe">FAQ</a> и
+  <a href="/catalog/elektroprivody-protivopozharnye-i-dymovye">SA FU</a>.
+</p>
+
+<h2>Согласование с проектом</h2>
+<ol>
+  <li>Выписать из ТЗ / нормы: время хода и нужен ли fail-safe.</li>
+  <li>Если fail-safe — FU/EU, не MQU/HV «для скорости».</li>
+  <li>Если только скорость без пружины — MQU или HV по таблице ориентиров.</li>
+  <li>Момент — <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">расчёт</a>.</li>
+  <li>Паспорт SKU; вопросы — <a href="/consultation">консультация</a>.</li>
+</ol>
+
+<h2>Частые ошибки</h2>
+<ul>
+  <li>MQU на ОЗК вместо SA FU («быстрее» ≠ «безопаснее при отключении»).</li>
+  <li>MU на дымоудаление с нормой ≤25&nbsp;с — не пройдёт по времени.</li>
+  <li>Игнорирование разницы рабочего хода и времени возврата пружины.</li>
+  <li>Точные секунды из статьи без сверки с паспортом конкретного артикула.</li>
+</ul>
+
+<div class="note">
+  <strong>Чек‑лист MU / MQU / HV</strong>
+  <ul>
+    <li>Норма: время хода (с) и fail-safe (да/нет).</li>
+    <li>Без пружины: MU (медленно) → MQU → HV (быстро).</li>
+    <li>С пружиной: FU / SA FU — не MQU.</li>
+    <li>Каталог: <a href="/catalog">фильтры</a> по семейству и моменту.</li>
+    <li>Замена — <a href="/replacement">/replacement</a>,
+      <a href="/statyi/analog-belimo-hoocon">аналог Belimo</a>.</li>
+  </ul>
+</div>
+
+<h2>FAQ</h2>
+<details open>
+  <summary>MQU заменяет FU, если быстрее?</summary>
+  <p>
+    Нет. MQU не обеспечивает пружинный возврат при пропадании питания.
+    Для fail-safe — FU или EU.
+  </p>
+</details>
+<details>
+  <summary>SA…MU — для дымоудаления?</summary>
+  <p>
+    Возможно по ТЗ, если норма по времени и логике клапана допускает MU без
+    пружины. Типовой ОЗК — SA FU. См.
+    <a href="/statyi/primenenie-privodov-v-sistemah-ventilyatsii">применение</a>.
+  </p>
+</details>
+<details>
+  <summary>Где точные секунды для заказа?</summary>
+  <p>
+    Паспорт SKU и <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация
+    ряда</a>; таблица в этой статье — ориентир.
+  </p>
+</details>
