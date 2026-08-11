@@ -51,8 +51,8 @@ def test_channels_hides_tokens(settings) -> None:
     assert channels == [
         {
             "channel": "telegram_bot",
-            "label": "Чат в Telegram",
-            "deep_link": "https://t.me/hoocon_bot",
+            "label": "Написать в Telegram",
+            "deep_link": "https://t.me/hoocon_bot?start=support",
         },
         {
             "channel": "telegram_channel",

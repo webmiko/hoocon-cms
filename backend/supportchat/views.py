@@ -55,11 +55,12 @@ class SupportChannelsView(APIView):
         if site.telegram_enabled:
             bot = getattr(settings, "TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
             if bot:
+                # Deep-link opens a 1:1 chat with the bot (not the public channel).
                 channels.append(
                     {
                         "channel": "telegram_bot",
-                        "label": "Чат в Telegram",
-                        "deep_link": f"https://t.me/{bot}",
+                        "label": "Написать в Telegram",
+                        "deep_link": f"https://t.me/{bot}?start=support",
                     },
                 )
             channel = getattr(settings, "TELEGRAM_CHANNEL_USERNAME", "").strip().lstrip("@")

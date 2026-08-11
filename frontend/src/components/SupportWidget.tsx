@@ -479,8 +479,8 @@ export function SupportWidget() {
               <div className={styles.empty}>
                 <p className={styles.emptyTitle}>Чем помочь?</p>
                 <p className={styles.emptyText}>
-                  Вопрос по приводам, арматуре или КП — ответим здесь. Или
-                  откройте чат с ботом / канал в Telegram ниже.
+                  Вопрос по приводам, арматуре или КП — ответим здесь. Удобнее в
+                  Telegram — напишите боту кнопкой ниже.
                 </p>
               </div>
             ) : (
@@ -509,19 +509,21 @@ export function SupportWidget() {
           </div>
 
           <div className={styles.footerBar}>
-            {channels.length > 0 ? (
+            {channels.some((ch) => ch.channel === "telegram_bot") ? (
               <div className={styles.channels}>
-                {channels.map((ch) => (
-                  <a
-                    key={ch.channel}
-                    className={styles.channelChip}
-                    href={ch.deep_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {ch.label}
-                  </a>
-                ))}
+                {channels
+                  .filter((ch) => ch.channel === "telegram_bot")
+                  .map((ch) => (
+                    <a
+                      key={ch.channel}
+                      className={styles.channelChip}
+                      href={ch.deep_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {ch.label}
+                    </a>
+                  ))}
               </div>
             ) : null}
 
