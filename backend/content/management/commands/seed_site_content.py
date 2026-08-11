@@ -504,6 +504,23 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "Противопожарные клапаны vs клапаны дымоудаления: какие приводы "
         "нужны и чем отличаются требования к управлению."
     ),
+    "sertifikaty-ce-ul-eac-elektroprivody-ovk": (
+        "CE, UL и EAC для электроприводов ОВК: допуск и приёмка по региону, "
+        "что сверять в карточке SKU и чем знаки не заменяют подбор момента."
+    ),
+}
+
+# Titles for articles created from fixtures (not only rewritten from Tilda scrape).
+ARTICLE_TITLES: dict[str, str] = {
+    "sertifikaty-ce-ul-eac-elektroprivody-ovk": "CE, UL и EAC для электроприводов ОВК",
+}
+
+ARTICLE_COVERS: dict[str, Path] = {
+    "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac_cover_light.webp"),
+}
+
+ARTICLE_COVERS_DARK: dict[str, Path] = {
+    "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac_cover_dark.webp"),
 }
 
 # Full body rewrite (replaces Tilda scrape). Excerpt still from ARTICLE_EXCERPTS.
@@ -519,6 +536,7 @@ ARTICLE_BODIES: dict[str, Path] = {
     "ognezaderzhivayushchii-klapan": (_FIXTURES_DIR / "article_ognezaderzhivayushchii_klapan.html"),
     "sharovye-krany-vidy-konstruktsiya": (_FIXTURES_DIR / "article_sharovye_krany.html"),
     "ventilyatsiya-v-metro": (_FIXTURES_DIR / "article_ventilyatsiya_v_metro.html"),
+    "sertifikaty-ce-ul-eac-elektroprivody-ovk": (_FIXTURES_DIR / "article_sertifikaty_ce_ul_eac.html"),
 }
 
 _LEAD_MARKER = 'data-hoocon-lead="1"'
@@ -583,7 +601,13 @@ NEWS_BR_BODY = f"""
 иначе <strong>BR-M</strong> (для фланцевых ВЧШГ — BR-H).</p>
 <p>Для расчёта цены и срока отгрузки оставьте
 <a href="/consultation">заявку на КП</a> или позвоните {_PHONE}.</p>
-<p><a href="/catalog/adaptery">Смотреть адаптеры в каталоге</a></p>
+<p>
+  <a href="/catalog/adaptery">Адаптеры в каталоге</a>
+  ·
+  <a href="/catalog/adaptery/adapter-br-m">BR-M</a>
+  ·
+  <a href="/catalog/adaptery/adapter-br-ml">BR-ML</a>
+</p>
 """.strip()
 
 # News from Tilda /news are imported by ``scrape_hoocon_news`` (covers + body).
@@ -624,17 +648,62 @@ class Command(BaseCommand):
 
         excerpts_done = 0
         bodies_done = 0
+        covers_done = 0
         for slug, body_path in ARTICLE_BODIES.items():
             article = Article.objects.filter(slug=slug).first()
+            body_html = body_path.read_text(encoding="utf-8")
+            excerpt = ARTICLE_EXCERPTS.get(slug, "")
             if article is None:
-                self.stdout.write(self.style.WARNING(f"article missing: {slug}"))
-                continue
-            article.body = body_path.read_text(encoding="utf-8")
-            if slug in ARTICLE_EXCERPTS:
-                article.excerpt = ARTICLE_EXCERPTS[slug]
-            article.save(update_fields=["excerpt", "body", "updated_at"])
-            bodies_done += 1
-            self.stdout.write(f"article body: {slug}")
+                article_title = ARTICLE_TITLES.get(slug)
+                if not article_title:
+                    self.stdout.write(self.style.WARNING(f"article missing: {slug}"))
+                    continue
+                article = Article.objects.create(
+                    slug=slug,
+                    title=article_title,
+                    body=body_html,
+                    excerpt=excerpt,
+                    is_published=True,
+                    published_at=now,
+                )
+                bodies_done += 1
+                self.stdout.write(f"article body: {slug} (created)")
+            else:
+                article.body = body_html
+                if excerpt:
+                    article.excerpt = excerpt
+                update_fields = ["excerpt", "body", "updated_at"]
+                if slug in ARTICLE_TITLES and article.title != ARTICLE_TITLES[slug]:
+                    article.title = ARTICLE_TITLES[slug]
+                    update_fields.append("title")
+                article.save(update_fields=update_fields)
+                bodies_done += 1
+                self.stdout.write(f"article body: {slug}")
+
+            # Theme covers are always WebP fixtures; re-save so seed refreshes assets.
+            cover_path = ARTICLE_COVERS.get(slug)
+            if cover_path is not None and cover_path.is_file():
+                from django.core.files.base import ContentFile
+
+                article.cover.save(
+                    cover_path.name,
+                    ContentFile(cover_path.read_bytes()),
+                    save=True,
+                )
+                covers_done += 1
+                self.stdout.write(f"article cover (light): {slug}")
+
+            dark_path = ARTICLE_COVERS_DARK.get(slug)
+            if dark_path is not None and dark_path.is_file():
+                from django.core.files.base import ContentFile
+
+                article.cover_dark.save(
+                    dark_path.name,
+                    ContentFile(dark_path.read_bytes()),
+                    save=True,
+                )
+                covers_done += 1
+                self.stdout.write(f"article cover_dark: {slug}")
 
         for slug, excerpt in ARTICLE_EXCERPTS.items():
             if slug in ARTICLE_BODIES:
@@ -728,6 +797,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Done: pages={pages_done}, article_bodies={bodies_done}, articles={excerpts_done}, news={news_action}"
+                f"Done: pages={pages_done}, article_bodies={bodies_done}, "
+                f"article_covers={covers_done}, articles={excerpts_done}, news={news_action}"
             )
         )

@@ -153,6 +153,7 @@ export type Page = components["schemas"]["Page"];
 export type Article = components["schemas"]["Article"] & {
   excerpt?: string;
   cover?: string | null;
+  cover_dark?: string | null;
   related_skus?: Array<{
     name: string;
     slug: string;

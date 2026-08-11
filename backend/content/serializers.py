@@ -44,6 +44,7 @@ class ArticleListSerializer(_ContentSerializer):
     """Article card for /statyi list (no related SKUs)."""
 
     cover = RelativeImageField(read_only=True, allow_null=True)
+    cover_dark = RelativeImageField(read_only=True, allow_null=True)
 
     class Meta(_ContentSerializer.Meta):
         model = Article
@@ -53,6 +54,7 @@ class ArticleListSerializer(_ContentSerializer):
             "slug",
             "excerpt",
             "cover",
+            "cover_dark",
             "body",
             "is_published",
             "published_at",
