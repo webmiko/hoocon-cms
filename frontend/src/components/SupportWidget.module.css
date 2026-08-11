@@ -186,6 +186,31 @@
   font-weight: 600;
 }
 
+.pushRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0 1rem 0.5rem;
+}
+
+.pushBtn {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-subtle);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.pushStatus {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
 .composer {
   display: grid;
   grid-template-columns: 1fr auto;

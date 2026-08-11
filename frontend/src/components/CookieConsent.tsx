@@ -1,5 +1,5 @@
 /**
- * Cookie consent banner + preferences (essential vs optional analytics).
+ * Cookie consent banner + preferences (essential vs analytics vs marketing).
  *
  * Spec: ПЛАН §6 Iter 4 — F10; docs/security-baseline.md §privacy; БЗ §8.6.
  */
@@ -11,6 +11,7 @@ import {
   buildCookieConsent,
   COOKIE_CONSENT_OPEN_EVENT,
   isAnalyticsAllowed,
+  isMarketingAllowed,
   readCookieConsent,
   writeCookieConsent,
   type CookieConsentState,
@@ -33,12 +34,16 @@ export function CookieConsent() {
   const [analyticsDraft, setAnalyticsDraft] = useState(() =>
     isAnalyticsAllowed(readCookieConsent()),
   );
+  const [marketingDraft, setMarketingDraft] = useState(() =>
+    isMarketingAllowed(readCookieConsent()),
+  );
   const settingsTitleId = useId();
 
   useEffect(() => {
     function onOpen() {
       const current = readCookieConsent();
       setAnalyticsDraft(isAnalyticsAllowed(current));
+      setMarketingDraft(isMarketingAllowed(current));
       setMode("settings");
     }
     window.addEventListener(COOKIE_CONSENT_OPEN_EVENT, onOpen);
@@ -75,10 +80,11 @@ export function CookieConsent() {
     };
   }, [mode]);
 
-  function persist(analytics: boolean) {
-    const state: CookieConsentState = buildCookieConsent(analytics);
+  function persist(analytics: boolean, marketing: boolean) {
+    const state: CookieConsentState = buildCookieConsent(analytics, marketing);
     writeCookieConsent(state);
     setAnalyticsDraft(analytics);
+    setMarketingDraft(marketing);
     setMode("hidden");
   }
 
@@ -100,8 +106,7 @@ export function CookieConsent() {
           </h2>
           <p className={styles.panelLead}>
             Обязательные cookie нужны для работы сайта и защиты форм.
-            Аналитику включаем только после вашего согласия — можно изменить
-            в любой момент.
+            Аналитику и новости включаем только после вашего согласия.
           </p>
 
           <ul className={styles.categoryList}>
@@ -137,6 +142,24 @@ export function CookieConsent() {
                 <span>Разрешить аналитические cookie</span>
               </label>
             </li>
+            <li className={styles.category}>
+              <div className={styles.categoryHead}>
+                <span className={styles.categoryName}>Новости и акции</span>
+                <span className={styles.categoryBadgeOptional}>Необязательные</span>
+              </div>
+              <p className={styles.categoryDesc}>
+                Push-уведомления о новостях и предложениях Hoocon в браузере
+                (PWA). Можно отключить в любой момент.
+              </p>
+              <label className={styles.switchRow}>
+                <input
+                  type="checkbox"
+                  checked={marketingDraft}
+                  onChange={(event) => setMarketingDraft(event.target.checked)}
+                />
+                <span>Разрешить маркетинговые уведомления</span>
+              </label>
+            </li>
           </ul>
 
           <p className={styles.panelNote}>
@@ -151,21 +174,21 @@ export function CookieConsent() {
             <button
               type="button"
               className={styles.acceptButton}
-              onClick={() => persist(analyticsDraft)}
+              onClick={() => persist(analyticsDraft, marketingDraft)}
             >
               Сохранить
             </button>
             <button
               type="button"
               className={styles.secondaryButton}
-              onClick={() => persist(true)}
+              onClick={() => persist(true, true)}
             >
               Принять все
             </button>
             <button
               type="button"
               className={styles.declineButton}
-              onClick={() => persist(false)}
+              onClick={() => persist(false, false)}
             >
               Только обязательные
             </button>
@@ -184,7 +207,7 @@ export function CookieConsent() {
       <div className={styles.content}>
         <p className={styles.text}>
           Используем обязательные cookie для работы сайта и защиты форм.
-          Аналитические — только с вашего согласия. Подробности — в
+          Аналитику и новости — только с вашего согласия. Подробности — в
           {" "}
           <Link to="/privacy-policy" className={styles.link}>
             политике конфиденциальности
@@ -195,14 +218,14 @@ export function CookieConsent() {
           <button
             type="button"
             className={styles.acceptButton}
-            onClick={() => persist(true)}
+            onClick={() => persist(true, true)}
           >
             Принять все
           </button>
           <button
             type="button"
             className={styles.declineButton}
-            onClick={() => persist(false)}
+            onClick={() => persist(false, false)}
           >
             Только обязательные
           </button>

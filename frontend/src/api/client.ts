@@ -372,4 +372,29 @@ export const api = {
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },
+
+  webpushVapidPublicKey(): Promise<{ public_key: string; configured: boolean }> {
+    return apiFetch("/api/webpush/vapid-public-key/");
+  },
+
+  webpushSubscribe(data: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    topic_support?: boolean;
+    topic_marketing?: boolean;
+  }): Promise<{ id: number; topic_support: boolean; topic_marketing: boolean }> {
+    return apiFetch("/api/webpush/subscribe/", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
+
+  webpushUnsubscribe(endpoint: string): Promise<{ deleted: number }> {
+    return apiFetch("/api/webpush/unsubscribe/", {
+      method: "POST",
+      body: JSON.stringify({ endpoint }),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
 };

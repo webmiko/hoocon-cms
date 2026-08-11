@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
+import { pushSupported, subscribeWebPush } from "../utils/webPush";
 import styles from "./SupportWidget.module.css";
 
 type ChatMessage = {
@@ -30,6 +31,7 @@ export function SupportWidget() {
   const [channels, setChannels] = useState<ChannelLink[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pushStatus, setPushStatus] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef(0);
 
@@ -86,6 +88,20 @@ export function SupportWidget() {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
+
+  async function enablePush() {
+    setPushStatus("");
+    try {
+      const ok = await subscribeWebPush({ topic_support: true });
+      setPushStatus(
+        ok
+          ? "Уведомления об ответах включены"
+          : "Не удалось включить (нужен HTTPS / разрешение)",
+      );
+    } catch {
+      setPushStatus("Не удалось включить уведомления");
+    }
+  }
 
   async function ensureStarted() {
     if (started) return;
@@ -209,6 +225,15 @@ export function SupportWidget() {
                   {ch.label}
                 </a>
               ))}
+            </div>
+          ) : null}
+
+          {pushSupported() ? (
+            <div className={styles.pushRow}>
+              <button type="button" className={styles.pushBtn} onClick={() => void enablePush()}>
+                Уведомлять об ответе
+              </button>
+              {pushStatus ? <span className={styles.pushStatus}>{pushStatus}</span> : null}
             </div>
           ) : null}
 
