@@ -304,4 +304,72 @@ export const api = {
       },
     });
   },
+
+  // ── Support chat ───────────────────────────────────────────────────
+  supportSchedule(): Promise<{
+    timezone: string;
+    is_open_now: boolean;
+    next_open_at: string | null;
+    auto_reply_outside_hours: string;
+    days: Array<{
+      weekday: number;
+      is_closed: boolean;
+      intervals: Array<{ start: string; end: string }>;
+    }>;
+  }> {
+    return apiFetch("/api/support/schedule/");
+  },
+
+  supportChannels(): Promise<{
+    channels: Array<{ channel: string; label: string; deep_link: string }>;
+  }> {
+    return apiFetch("/api/support/channels/");
+  },
+
+  supportStartConversation(data: {
+    display_name?: string;
+    contact_email?: string;
+  }): Promise<{ id: number | null; channel: string }> {
+    return apiFetch("/api/support/conversations/", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
+
+  supportMessages(after?: number): Promise<{
+    messages: Array<{
+      id: number;
+      direction: string;
+      body: string;
+      outside_hours: boolean;
+      created_at: string;
+    }>;
+  }> {
+    const qs = after != null ? `?after=${after}` : "";
+    return apiFetch(`/api/support/conversations/current/messages/${qs}`);
+  },
+
+  supportSendMessage(body: string): Promise<{
+    message: {
+      id: number;
+      direction: string;
+      body: string;
+      outside_hours: boolean;
+      created_at: string;
+    };
+    auto_reply?: {
+      id: number;
+      direction: string;
+      body: string;
+      outside_hours: boolean;
+      created_at: string;
+    };
+  }> {
+    return apiFetch("/api/support/conversations/current/messages/", {
+      method: "POST",
+      body: JSON.stringify({ body }),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
 };

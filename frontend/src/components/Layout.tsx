@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CompareProvider } from "../compare/CompareContext";
 import { CompareTray } from "./CompareTray";
 import { CookieConsent } from "./CookieConsent";
+import { SupportWidget } from "./SupportWidget";
 import { Analytics } from "./Analytics";
 import { DesktopNav } from "./DesktopNav";
 import { RouteSlideOutlet } from "./RouteSlideOutlet";
@@ -493,6 +494,7 @@ export function Layout() {
       ) : null}
 
       <CookieConsent />
+      <SupportWidget />
     </CompareProvider>
   );
 }

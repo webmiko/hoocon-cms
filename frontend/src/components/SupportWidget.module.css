@@ -1,0 +1,252 @@
+.root {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
+  z-index: 440;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.panel,
+.fab {
+  pointer-events: auto;
+}
+
+.fab {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  min-width: 3.25rem;
+  height: 3.25rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow);
+  transition: background 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.fab:hover {
+  background: var(--color-brand-hover);
+  transform: translateY(-1px);
+}
+
+.panel {
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: support-in 280ms var(--ease-out);
+}
+
+@keyframes support-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.status {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.banner {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.field input {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  background: var(--color-surface);
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 140px;
+}
+
+.empty {
+  margin: auto 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.bubbleIn,
+.bubbleOut {
+  max-width: 88%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubbleIn {
+  align-self: flex-start;
+  background: var(--color-subtle);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.bubbleOut {
+  align-self: flex-end;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+  padding: 0 1rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.channels a {
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.composer textarea {
+  font: inherit;
+  font-size: 0.875rem;
+  resize: none;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.composer button {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  padding: 0 0.85rem;
+  background: var(--color-inverse);
+  color: var(--color-on-inverse);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0 1rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-brand);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .root {
+    right: 12px;
+    bottom: calc(12px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
+  }
+
+  .meta {
+    grid-template-columns: 1fr;
+  }
+}
