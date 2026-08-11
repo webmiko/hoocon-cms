@@ -272,13 +272,34 @@ class SupportScheduleInterval(models.Model):
         verbose_name_plural = "интервалы"
         ordering = ("start_time",)
 
+    def clean(self) -> None:
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.start_time is not None and self.end_time is not None:
+            if self.start_time >= self.end_time:
+                raise ValidationError({"end_time": "Время «по» должно быть позже «с»."})
+
     def __str__(self) -> str:
         return f"{self.start_time}–{self.end_time}"
 
 
 def touch_conversation_message(conversation: Conversation, *, inbound: bool) -> None:
-    """Update last_message_at and staff unread counter."""
-    conversation.last_message_at = timezone.now()
+    """Update last_message_at and staff unread counter (atomic unread bump)."""
+    from django.db.models import F
+
+    now = timezone.now()
     if inbound:
-        conversation.staff_unread_count = (conversation.staff_unread_count or 0) + 1
-    conversation.save(update_fields=["last_message_at", "staff_unread_count", "updated_at"])
+        Conversation.objects.filter(pk=conversation.pk).update(
+            last_message_at=now,
+            staff_unread_count=F("staff_unread_count") + 1,
+            updated_at=now,
+        )
+    else:
+        Conversation.objects.filter(pk=conversation.pk).update(
+            last_message_at=now,
+            updated_at=now,
+        )
+    conversation.refresh_from_db(
+        fields=["last_message_at", "staff_unread_count", "updated_at"],
+    )

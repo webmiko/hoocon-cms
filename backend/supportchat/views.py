@@ -53,13 +53,22 @@ class SupportChannelsView(APIView):
         site = SiteSettings.load()
         channels: list[dict[str, str]] = []
         if site.telegram_enabled:
-            username = getattr(settings, "TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
-            if username:
+            bot = getattr(settings, "TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
+            if bot:
                 channels.append(
                     {
-                        "channel": "telegram",
-                        "label": "Telegram",
-                        "deep_link": f"https://t.me/{username}",
+                        "channel": "telegram_bot",
+                        "label": "Чат в Telegram",
+                        "deep_link": f"https://t.me/{bot}",
+                    },
+                )
+            channel = getattr(settings, "TELEGRAM_CHANNEL_USERNAME", "").strip().lstrip("@")
+            if channel:
+                channels.append(
+                    {
+                        "channel": "telegram_channel",
+                        "label": "Канал Telegram",
+                        "deep_link": f"https://t.me/{channel}",
                     },
                 )
         # VK / MAX: only when enabled + we have a public deep link later.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -121,6 +122,10 @@ def add_inbound_message(
 
     text = _sanitize_body(body)
     open_now = is_open_now()
+    # Web inbound on a closed thread must reopen (same as messenger).
+    if conversation.status == ConversationStatus.CLOSED:
+        conversation.status = ConversationStatus.OPEN
+        conversation.save(update_fields=["status", "updated_at"])
     inbound = Message.objects.create(
         conversation=conversation,
         direction=MessageDirection.INBOUND,
@@ -138,7 +143,14 @@ def add_inbound_message(
     if not open_now:
         schedule = ensure_default_schedule()
         reply_text = (schedule.auto_reply_outside_hours or "").strip()
-        if reply_text:
+        # At most one outside-hours auto-reply per conversation per 24h.
+        already = Message.objects.filter(
+            conversation=conversation,
+            direction=MessageDirection.SYSTEM,
+            outside_hours=True,
+            created_at__gte=timezone.now() - timedelta(hours=24),
+        ).exists()
+        if reply_text and not already:
             auto = Message.objects.create(
                 conversation=conversation,
                 direction=MessageDirection.SYSTEM,
@@ -207,11 +219,13 @@ def staff_public_name(user: AbstractBaseUser | None) -> str:
     return "Поддержка"
 
 
-def message_sender_name(message: Message) -> str:
-    """Visitor-facing name next to a chat bubble."""
+def message_sender_name(message: Message, *, staff_view: bool = False) -> str:
+    """Name next to a chat bubble (visitor UI or Admin messenger)."""
     if message.direction == MessageDirection.INBOUND:
         label = (message.conversation.display_name or "").strip()
-        return label[:80] if label else "Вы"
+        if label:
+            return label[:80]
+        return "Клиент" if staff_view else "Вы"
     if message.direction == MessageDirection.SYSTEM:
         return "Hoocon"
     author_name = staff_public_name(message.author)

@@ -41,7 +41,7 @@ def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
                 "id": msg.pk,
                 "direction": msg.direction,
                 "body": msg.body,
-                "sender_name": message_sender_name(msg),
+                "sender_name": message_sender_name(msg, staff_view=True),
                 "outside_hours": msg.outside_hours,
                 "created_at_iso": msg.created_at.isoformat(),
                 "created_at_label": local.strftime("%d.%m.%Y %H:%M"),
@@ -135,7 +135,21 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Conversation]:
-        return super().get_queryset(request).select_related("assignee").prefetch_related("messages")
+        from django.db.models import OuterRef, Subquery
+
+        last_msg = Message.objects.filter(conversation_id=OuterRef("pk")).order_by(
+            "-created_at",
+            "-id",
+        )
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("assignee")
+            .annotate(
+                _last_body=Subquery(last_msg.values("body")[:1]),
+                _last_direction=Subquery(last_msg.values("direction")[:1]),
+            )
+        )
 
     @admin.display(description="Inbox", ordering="staff_unread_count")
     def unread_badge(self, obj: Conversation) -> str:
@@ -157,12 +171,12 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
 
     @admin.display(description="Последнее")
     def last_preview(self, obj: Conversation) -> str:
-        msgs = list(obj.messages.all())
-        if not msgs:
+        body = getattr(obj, "_last_body", None)
+        direction = getattr(obj, "_last_direction", None)
+        if not body:
             return "—"
-        last = msgs[-1]
-        prefix = "← " if last.direction == "inbound" else "→ "
-        text = (last.body or "").replace("\n", " ").strip()
+        prefix = "← " if direction == "inbound" else "→ "
+        text = str(body).replace("\n", " ").strip()
         if len(text) > 56:
             text = text[:55].rstrip() + "…"
         return f"{prefix}{text}"
@@ -204,11 +218,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         after_raw = (request.GET.get("after") or "").strip()
         after_id = int(after_raw) if after_raw.isdigit() else 0
         payload = _chat_messages_for_admin(conversation, after_id=after_id)
-        if conversation.staff_unread_count and request.user.has_perm(
-            "supportchat.change_conversation",
-        ):
-            conversation.staff_unread_count = 0
-            conversation.save(update_fields=["staff_unread_count", "updated_at"])
+        # Read-only poll — do not clear unread on GET (change_view marks read).
         response = JsonResponse({"messages": payload})
         response["Cache-Control"] = "no-store"
         return response

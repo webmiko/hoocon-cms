@@ -35,6 +35,7 @@ def test_schedule_endpoint_public() -> None:
 @pytest.mark.django_db
 def test_channels_hides_tokens(settings) -> None:
     settings.TELEGRAM_BOT_USERNAME = "hoocon_bot"
+    settings.TELEGRAM_CHANNEL_USERNAME = "hoocon_moscow"
     from sitesettings.models import SiteSettings
 
     site = SiteSettings.load()
@@ -46,7 +47,19 @@ def test_channels_hides_tokens(settings) -> None:
     assert resp.status_code == 200
     body = resp.content.decode()
     assert "secret-token-value" not in body
-    assert resp.json()["channels"][0]["deep_link"] == "https://t.me/hoocon_bot"
+    channels = resp.json()["channels"]
+    assert channels == [
+        {
+            "channel": "telegram_bot",
+            "label": "Чат в Telegram",
+            "deep_link": "https://t.me/hoocon_bot",
+        },
+        {
+            "channel": "telegram_channel",
+            "label": "Канал Telegram",
+            "deep_link": "https://t.me/hoocon_moscow",
+        },
+    ]
 
 
 @pytest.mark.django_db
@@ -286,4 +299,106 @@ def test_admin_messages_poll_returns_new_inbound() -> None:
     assert payload[0]["body"] == "Второе без F5"
     assert payload[0]["direction"] == MessageDirection.INBOUND
     conv.refresh_from_db()
-    assert conv.staff_unread_count == 0
+    # Poll is read-only — unread clears only on change_view / mark-read action.
+    assert conv.staff_unread_count == 1
+
+
+@pytest.mark.django_db
+def test_admin_poll_sender_name_for_anonymous_inbound() -> None:
+    """Staff messenger shows «Клиент» when inbound has no display_name."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel, Message, MessageDirection
+    from supportchat.services import message_sender_name
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-name",
+        email="support-name@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-anon",
+        display_name="",
+        status="open",
+    )
+    msg = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="hi",
+    )
+    assert message_sender_name(msg) == "Вы"
+    assert message_sender_name(msg, staff_view=True) == "Клиент"
+
+    client = Client()
+    client.force_login(staff)
+    url = reverse("admin:supportchat_conversation_messages_poll", args=[conv.pk])
+    resp = client.get(url)
+    assert resp.status_code == 200
+    assert resp.json()["messages"][0]["sender_name"] == "Клиент"
+
+
+@pytest.mark.django_db
+def test_touch_conversation_message_bumps_unread_atomically() -> None:
+    """Concurrent inbound bumps must not lose counts (F() expression)."""
+    from supportchat.models import Channel, touch_conversation_message
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-unread",
+        display_name="U",
+        status="open",
+        staff_unread_count=0,
+    )
+    touch_conversation_message(conv, inbound=True)
+    touch_conversation_message(conv, inbound=True)
+    conv.refresh_from_db()
+    assert conv.staff_unread_count == 2
+
+
+@pytest.mark.django_db
+def test_inbound_reopens_closed_web_conversation() -> None:
+    ensure_default_schedule()
+    from supportchat.models import Channel, ConversationStatus
+    from supportchat.services import add_inbound_message
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-closed",
+        display_name="C",
+        status=ConversationStatus.CLOSED,
+        staff_unread_count=0,
+    )
+    with patch("supportchat.services.is_open_now", return_value=True):
+        add_inbound_message(conv, "снова пишу")
+    conv.refresh_from_db()
+    assert conv.status == ConversationStatus.OPEN
+    assert conv.staff_unread_count == 1
+
+
+@pytest.mark.django_db
+def test_outside_hours_auto_reply_once_per_day() -> None:
+    ensure_default_schedule()
+    from supportchat.models import Channel, Message, MessageDirection
+    from supportchat.services import add_inbound_message
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-auto",
+        display_name="A",
+    )
+    with patch("supportchat.services.is_open_now", return_value=False):
+        _in1, auto1 = add_inbound_message(conv, "первый")
+        _in2, auto2 = add_inbound_message(conv, "второй")
+    assert auto1 is not None
+    assert auto2 is None
+    assert (
+        Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.SYSTEM,
+            outside_hours=True,
+        ).count()
+        == 1
+    )
