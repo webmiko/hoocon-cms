@@ -63,6 +63,11 @@
 
 ## Changelog
 
+### v0.1.21 beta — 2026-08-11
+
+- Web Push (PWA): уведомления чата (staff + посетитель) и маркетинговые
+  рассылки из Admin; VAPID + custom service worker.
+
 ### v0.1.20 beta — 2026-08-11
 
 - Support chat: виджет на сайте, Admin «Поддержка» (inbox + ответ),

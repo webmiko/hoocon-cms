@@ -120,6 +120,10 @@ Admin, файлы, SPA, VPS.
   (`support_message`); IDOR только своя session; honeypot на start/message;
   публичные `/api/support/channels|schedule/` без bot tokens; Telegram
   webhook secret как у `/api/integrations/telegram/webhook/`; текст only.
+- **Web Push** (`webpush`): VAPID keys только в `.env`; публичный API отдаёт
+  только public key; marketing-topic только после cookie `marketing` +
+  Notification permission; payload без PII (без email/телефона); 410 →
+  удаление подписки. Ops: [webpush-ops.md](webpush-ops.md).
 
 ### 3.5 Infra (итерация 5, заложить в конфиги заранее)
 
