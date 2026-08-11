@@ -1,15 +1,27 @@
 .banner {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(72px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(
+    12px + env(safe-area-inset-bottom, 0px) + var(--bottom-chrome, 0px) +
+      var(--cookie-chrome, 0px)
+  );
   z-index: 430;
-  max-width: 420px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: min(420px, 100%);
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0.85rem 1rem;
-  background: var(--color-surface);
+  padding: 0.95rem 1rem;
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--glass-bg-strong, var(--color-surface));
+  backdrop-filter: saturate(var(--glass-saturate, 1.2)) blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: saturate(var(--glass-saturate, 1.2))
+    blur(var(--glass-blur, 12px));
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow);
   animation: mkt-in 320ms var(--ease-out);
 }
@@ -17,7 +29,7 @@
 @keyframes mkt-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -25,11 +37,41 @@
   }
 }
 
-.text {
-  margin: 0 0 0.65rem;
-  font-size: 0.875rem;
-  line-height: 1.4;
+.iconWrap {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-brand) 14%, transparent);
+  color: var(--color-brand);
+}
+
+.icon {
+  display: block;
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--color-text);
+}
+
+.text {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text-soft);
+  overflow-wrap: anywhere;
 }
 
 .actions {
@@ -42,16 +84,33 @@
 .secondary {
   appearance: none;
   border: none;
-  border-radius: 8px;
-  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  min-height: 2.35rem;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background 160ms var(--ease-out),
+    transform 160ms var(--ease-out),
+    opacity 160ms var(--ease-out);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .primary {
-  background: var(--color-brand);
-  color: var(--color-on-brand);
+  background: var(--color-brand-control, var(--color-brand));
+  color: var(--color-on-brand-control, var(--color-on-brand));
+  box-shadow: var(--shadow);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-brand-control-hover, var(--color-brand));
+  transform: translateY(-1px);
 }
 
 .secondary {
@@ -60,16 +119,28 @@
   border: 1px solid var(--color-border);
 }
 
+.secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-brand) 35%, var(--color-border));
+  color: var(--color-text);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
 .status {
-  margin: 0.5rem 0 0;
+  margin: 0.55rem 0 0;
   font-size: 0.75rem;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 721px) {
   .banner {
     left: auto;
-    right: 16px;
+    right: max(16px, env(safe-area-inset-right, 0px));
     margin: 0;
   }
 }

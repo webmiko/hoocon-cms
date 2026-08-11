@@ -3,7 +3,7 @@
  * Deferred (not on critical LCP path); dismissible for 14 days.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import {
   COOKIE_CONSENT_CHANGE_EVENT,
@@ -40,8 +40,30 @@ function dismiss() {
   }
 }
 
+function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d={
+          "M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22Zm7-6.2V11a7 7 0 1 0-14 0v4.8L3 18v1h18v-1l-2-2.2Z"
+        }
+      />
+    </svg>
+  );
+}
+
 export function MarketingPushPrompt() {
+  const titleId = useId();
   const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -86,37 +108,57 @@ export function MarketingPushPrompt() {
 
   async function enable() {
     setStatus("");
-    const result = await subscribeWebPush({ topic_marketing: true });
-    if (result.ok) {
-      setStatus("Готово — будем присылать новости");
-      dismiss();
-      window.setTimeout(() => setVisible(false), 2000);
-    } else {
-      setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
+    setBusy(true);
+    try {
+      const result = await subscribeWebPush({ topic_marketing: true });
+      if (result.ok) {
+        setStatus("Готово — будем присылать новости");
+        dismiss();
+        window.setTimeout(() => setVisible(false), 2000);
+      } else {
+        setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <aside className={styles.banner} aria-label="Уведомления о новостях">
-      <p className={styles.text}>
-        Включить уведомления о новостях и предложениях Hoocon?
-      </p>
-      <div className={styles.actions}>
-        <button type="button" className={styles.primary} onClick={() => void enable()}>
-          Включить
-        </button>
-        <button
-          type="button"
-          className={styles.secondary}
-          onClick={() => {
-            dismiss();
-            setVisible(false);
-          }}
-        >
-          Не сейчас
-        </button>
+    <aside className={styles.banner} aria-labelledby={titleId}>
+      <div className={styles.iconWrap} aria-hidden="true">
+        <BellIcon className={styles.icon} />
       </div>
-      {status ? <p className={styles.status}>{status}</p> : null}
+      <div className={styles.body}>
+        <p id={titleId} className={styles.title}>
+          Новости Hoocon в браузере
+        </p>
+        <p className={styles.text}>
+          Включить push о новинках и предложениях? Можно отключить в настройках
+          cookie.
+        </p>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.primary}
+            disabled={busy}
+            onClick={() => void enable()}
+          >
+            {busy ? "Подключаем…" : "Включить"}
+          </button>
+          <button
+            type="button"
+            className={styles.secondary}
+            disabled={busy}
+            onClick={() => {
+              dismiss();
+              setVisible(false);
+            }}
+          >
+            Не сейчас
+          </button>
+        </div>
+        {status ? <p className={styles.status}>{status}</p> : null}
+      </div>
     </aside>
   );
 }
