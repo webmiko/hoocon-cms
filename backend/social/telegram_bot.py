@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 from pathlib import Path
@@ -17,10 +18,22 @@ _COMMAND_RE = re.compile(
     r"^/(?P<cmd>[a-zA-Z0-9_]+)(?:@(?P<bot>[A-Za-z0-9_]+))?(?:\s|$)",
 )
 _TELEGRAM_CAPTION_MAX = 1024
-_CHANNEL_URL = "https://t.me/hoocon_moscow"
+_DEFAULT_CHANNEL_USERNAME = "hoocon_moscow"
 _DEFAULT_WELCOME_STATIC = Path("static/social/telegram-welcome.webp")
 
-# Reply-keyboard labels → internal command names (interaction buttons).
+
+def telegram_channel_username() -> str:
+    """Public channel @username (no @) for menu replies and deep links."""
+    raw = getattr(settings, "TELEGRAM_CHANNEL_USERNAME", "").strip().lstrip("@")
+    return raw or _DEFAULT_CHANNEL_USERNAME
+
+
+def telegram_channel_url() -> str:
+    """HTTPS t.me URL for the official channel."""
+    return f"https://t.me/{telegram_channel_username()}"
+
+
+# Reply-keyboard labels → internal command names (exact button text only).
 BTN_CHANNEL = "Перейти в канал"
 BTN_SITE = "На сайт"
 BTN_HELP = "Помощь"
@@ -29,8 +42,6 @@ _MENU_TEXT_ALIASES: dict[str, str] = {
     BTN_CHANNEL.lower(): "channel",
     BTN_SITE.lower(): "site",
     BTN_HELP.lower(): "help",
-    "канал": "channel",
-    "сайт": "site",
 }
 
 BOT_COMMANDS: list[dict[str, str]] = [
@@ -81,9 +92,9 @@ def compose_welcome_caption() -> str:
     text = (
         "<b>HOOCON</b> — электроприводы и арматура для вентиляции и ОВК.\n\n"
         "Кнопки меню:\n"
-        f"• <b>{BTN_CHANNEL}</b> — официальный Telegram-канал\n"
-        f"• <b>{BTN_SITE}</b> — каталог и заявки на сайте\n"
-        f"• <b>{BTN_HELP}</b> — эта подсказка\n\n"
+        f"• <b>{html.escape(BTN_CHANNEL)}</b> — официальный Telegram-канал\n"
+        f"• <b>{html.escape(BTN_SITE)}</b> — каталог и заявки на сайте\n"
+        f"• <b>{html.escape(BTN_HELP)}</b> — эта подсказка\n\n"
         "Или просто напишите сообщение — ответит менеджер."
     )
     if len(text) > _TELEGRAM_CAPTION_MAX:
@@ -93,29 +104,29 @@ def compose_welcome_caption() -> str:
 
 def compose_channel_reply() -> str:
     """Reply for «Канал» / /channel — opens via Telegram deep link in text."""
-    return f"Официальный канал Hoocon: {_CHANNEL_URL}\nНажмите ссылку или откройте @hoocon_moscow."
+    username = telegram_channel_username()
+    url = telegram_channel_url()
+    return f"Официальный канал Hoocon: {html.escape(url)}\nНажмите ссылку или откройте @{html.escape(username)}."
 
 
 def compose_site_reply() -> str:
     """Reply for «Сайт» / /site."""
     site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-    return f"Сайт и каталог: {site}\nЗаявка / RFQ: {site}/consultation"
+    safe = html.escape(site)
+    return f"Сайт и каталог: {safe}\nЗаявка / RFQ: {safe}/consultation"
 
 
 def compose_fallback_reply() -> str:
     """Reply when the message is not a known command."""
-    return f"Доступны кнопки: {BTN_CHANNEL} · {BTN_SITE} · {BTN_HELP}.\nИли напишите вопрос менеджеру обычным текстом."
+    return (
+        f"Доступны кнопки: {html.escape(BTN_CHANNEL)} · "
+        f"{html.escape(BTN_SITE)} · {html.escape(BTN_HELP)}.\n"
+        "Или напишите вопрос менеджеру обычным текстом."
+    )
 
 
 def parse_bot_command(text: str) -> str | None:
-    """Extract command name from message text (without leading slash).
-
-    Args:
-        text: Raw ``message.text`` (may include ``@BotName`` suffix).
-
-    Returns:
-        Lowercased command or None.
-    """
+    """Extract command name from message text (without leading slash)."""
     raw = (text or "").strip()
     if not raw.startswith("/"):
         return None
@@ -137,6 +148,17 @@ def resolve_menu_action(text: str) -> str | None:
 def sync_bot_commands() -> PublishResult:
     """Register BotFather-style command menu (setMyCommands)."""
     return telegram_api_call("setMyCommands", {"commands": BOT_COMMANDS})
+
+
+def message_plain_text(message: dict[str, Any]) -> str | None:
+    """Prefer ``text``, fall back to photo/document ``caption``."""
+    text = message.get("text")
+    if isinstance(text, str) and text.strip():
+        return text
+    caption = message.get("caption")
+    if isinstance(caption, str) and caption.strip():
+        return caption
+    return None
 
 
 def _display_name_from_message(message: dict[str, Any]) -> str:
@@ -191,32 +213,27 @@ def _ingest_support_text(
     if auto is not None:
         return publish_telegram(
             chat_id=chat_id,
-            text=auto.body,
+            text=html.escape(auto.body),
             reply_markup=main_menu_keyboard(),
         )
     return None
 
 
 def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
-    """Process one Bot API update; send a reply when applicable.
-
-    Args:
-        update: Parsed Telegram Update object.
-
-    Returns:
-        PublishResult when a reply was attempted; None when ignored.
-    """
+    """Process one Bot API update; send a reply when applicable."""
     message = update.get("message")
     if not isinstance(message, dict):
         return None
     chat = message.get("chat")
     if not isinstance(chat, dict):
         return None
+    if chat.get("type") != "private":
+        return None
     chat_id = chat.get("id")
     if chat_id is None:
         return None
-    text = message.get("text")
-    if not isinstance(text, str) or not text.strip():
+    text = message_plain_text(message)
+    if text is None:
         return None
 
     action = resolve_menu_action(text)
@@ -256,6 +273,7 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
             reply_markup=keyboard,
         )
     if action is not None:
+        # Unknown /command — hint, do not invent free-text ingest for slash cmds.
         return publish_telegram(
             chat_id=chat_key,
             text=compose_fallback_reply(),

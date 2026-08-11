@@ -15,7 +15,7 @@ from social.telegram_bot import BOT_COMMANDS, sync_bot_commands
 class Command(BaseCommand):
     """Register reply-menu commands: channel / site / help / start."""
 
-    help = "Sync Telegram Bot API setMyCommands (Канал / Сайт / Помощь)."
+    help = "Sync Telegram Bot API setMyCommands (start / channel / site / help — RU descriptions)."
 
     def handle(self, *args: object, **options: object) -> None:
         del args, options

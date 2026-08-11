@@ -365,8 +365,17 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 # Telegram inbound webhook (setWebhook secret_token). Empty = webhook rejects all.
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
-# Public deep-link username for support widget (t.me/<name>); empty = hide TG link.
+# Public deep-link username for support widget (t.me/<name>); empty = hide TG bot link.
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "").strip()
+# Public channel for widget / bot menu (t.me/<name>); default official Hoocon channel.
+TELEGRAM_CHANNEL_USERNAME = (
+    os.getenv(
+        "TELEGRAM_CHANNEL_USERNAME",
+        "hoocon_moscow",
+    )
+    .strip()
+    .lstrip("@")
+)
 # /start cover: local file path preferred; else public HTTPS URL for Telegram.
 TELEGRAM_WELCOME_PHOTO_PATH = os.getenv("TELEGRAM_WELCOME_PHOTO_PATH", "").strip()
 TELEGRAM_WELCOME_PHOTO_URL = os.getenv(

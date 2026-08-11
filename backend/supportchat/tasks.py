@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
 
 from celery import shared_task
@@ -28,11 +29,14 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
     if conversation.channel == Channel.WEB:
         return "web_poll"
     if conversation.channel == Channel.TELEGRAM:
+        # Idempotent: avoid duplicate TG sends on Celery retry after success.
+        if (msg.external_message_id or "").strip():
+            return "already_delivered"
         from social.publishers import publish_telegram
 
         result = publish_telegram(
             chat_id=conversation.external_user_id,
-            text=msg.body,
+            text=html.escape(msg.body),
         )
         if result.skipped:
             logger.warning("support_tg_outbound_skipped message_id=%s", message_id)

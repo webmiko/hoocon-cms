@@ -270,3 +270,104 @@ def test_parse_bot_command_strips_bot_suffix() -> None:
     assert resolve_menu_action("Перейти в канал") == "channel"
     assert resolve_menu_action("На сайт") == "site"
     assert resolve_menu_action("Помощь") == "help"
+    # Former short aliases must not steal free-text (full button labels only).
+    assert resolve_menu_action("канал") is None
+    assert resolve_menu_action("сайт") is None
+    assert resolve_menu_action("перейти в канал") == "channel"
+
+
+@pytest.mark.django_db
+def test_telegram_webhook_photo_caption_goes_to_support_inbox(settings) -> None:
+    """Photo/document caption is ingested when ``text`` is absent."""
+    settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from supportchat.models import Channel, Conversation, Message
+    from supportchat.schedule import ensure_default_schedule
+
+    ensure_default_schedule()
+    with patch("social.publishers.urlopen") as mocked:
+        with patch("supportchat.services.is_open_now", return_value=True):
+            response = APIClient().post(
+                reverse("telegram-webhook"),
+                data={
+                    "update_id": 40,
+                    "message": {
+                        "message_id": 88,
+                        "chat": {"id": 555, "type": "private"},
+                        "from": {"first_name": "Anna"},
+                        "caption": "фото с вопросом",
+                        "photo": [{"file_id": "x"}],
+                    },
+                },
+                format="json",
+                HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+            )
+    assert response.status_code == 200
+    mocked.assert_not_called()
+    conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="555")
+    assert Message.objects.filter(conversation=conv, body="фото с вопросом").count() == 1
+
+
+@pytest.mark.django_db
+def test_staff_reply_escapes_html_for_telegram(settings) -> None:
+    """Outbound Telegram text escapes HTML so visitor tags are not parsed."""
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from django.contrib.auth import get_user_model
+
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import add_staff_reply
+    from supportchat.tasks import deliver_outbound_message
+
+    user = get_user_model().objects.create_user(
+        username="esc@hoocon.ru",
+        email="esc@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="1001",
+        display_name="Client",
+    )
+    msg = add_staff_reply(conv, 'Цена <b>100</b> & "ок"', author=user)
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":56}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        assert deliver_outbound_message(msg.pk) == "telegram_ok"
+    body = json.loads(mocked.call_args.args[0].data.decode("utf-8"))
+    assert body["text"] == "Цена &lt;b&gt;100&lt;/b&gt; &amp; &quot;ок&quot;"
+
+
+@pytest.mark.django_db
+def test_staff_reply_skips_when_already_delivered(settings) -> None:
+    """Celery retry must not send Telegram again after external_message_id set."""
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from django.contrib.auth import get_user_model
+
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import add_staff_reply
+    from supportchat.tasks import deliver_outbound_message
+
+    user = get_user_model().objects.create_user(
+        username="dedupe@hoocon.ru",
+        email="dedupe@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="42",
+        display_name="Client",
+    )
+    msg = add_staff_reply(conv, "уже ушло", author=user)
+    msg.external_message_id = "tg-99"
+    msg.save(update_fields=["external_message_id"])
+
+    with patch("social.publishers.urlopen") as mocked:
+        assert deliver_outbound_message(msg.pk) == "already_delivered"
+    mocked.assert_not_called()
