@@ -25,6 +25,28 @@ WEBPUSH_VAPID_SUBJECT=mailto:noreply@hoocon.ru
 
 Проверка: `GET /api/webpush/vapid-public-key/` → `{"configured": true, ...}`.
 
+## Браузерный push-сервис
+
+Подписка (`PushManager.subscribe`) идёт **не на наш VPS**, а в push-сервис
+браузера:
+
+| Браузер | Сервис |
+|---------|--------|
+| Chrome / Edge / Android | Google FCM |
+| Firefox | Mozilla Autopush |
+| Safari (iOS) | Apple — обычно только после «На экран „Домой“» (PWA) |
+
+Если UI пишет «Push-сервис браузера недоступен» /
+`AbortError: push service not available`:
+
+- встроенный браузер Cursor / Electron — push часто нет, это нормально;
+- Chrome без доступа к FCM (сеть / регион / без Google services) — попробуйте
+  Firefox или установленный PWA;
+- iOS Safari без PWA — установите сайт на Домой, затем включите снова.
+
+VAPID на сервере при этом может быть `configured: true` — ключи наши в
+порядке, падает именно клиентский push endpoint.
+
 ## Кто что получает
 
 | Тема | Кто подписывается | Триггер |
@@ -34,7 +56,7 @@ WEBPUSH_VAPID_SUBJECT=mailto:noreply@hoocon.ru
 | `topic_marketing` | После cookie «Новости» + баннер «Включить» | Admin → Web Push → рассылка |
 
 iOS: push в Safari обычно только после «На экран „Домой“» (PWA). Основной
-target v1 — Chrome / Edge / Android.
+target v1 — Chrome / Edge / Android (где FCM доступен).
 
 ## Admin
 

@@ -11,7 +11,11 @@ import {
   readCookieConsent,
   type CookieConsentState,
 } from "../utils/cookieConsent";
-import { pushSupported, subscribeWebPush } from "../utils/webPush";
+import {
+  pushSupported,
+  subscribeWebPush,
+  subscribeWebPushStatusRu,
+} from "../utils/webPush";
 import styles from "./MarketingPushPrompt.module.css";
 
 const DISMISS_KEY = "hoocon-marketing-push-dismissed-until";
@@ -65,13 +69,13 @@ export function MarketingPushPrompt() {
 
   async function enable() {
     setStatus("");
-    const ok = await subscribeWebPush({ topic_marketing: true });
-    if (ok) {
+    const result = await subscribeWebPush({ topic_marketing: true });
+    if (result.ok) {
       setStatus("Готово — будем присылать новости");
       dismiss();
       window.setTimeout(() => setVisible(false), 2000);
     } else {
-      setStatus("Нужно разрешение уведомлений в браузере");
+      setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
     }
   }
 
