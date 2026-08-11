@@ -16,12 +16,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /** Some engines want a detached ArrayBuffer, not a Uint8Array view. */
-function applicationServerKeyBytes(publicKey: string): BufferSource {
+function applicationServerKeyBytes(publicKey: string): ArrayBuffer {
   const bytes = urlBase64ToUint8Array(publicKey);
   return bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
-  );
+  ) as ArrayBuffer;
 }
 
 export function pushSupported(): boolean {
