@@ -85,6 +85,9 @@ export function NewsPage() {
           <p className={styles.eyebrow}>Новость</p>
           <h1 className={styles.title}>{news.title}</h1>
           <div className={styles.meta}>
+            {news.category ? (
+              <span className={styles.badge}>{news.category.name}</span>
+            ) : null}
             {news.published_at ? (
               <time dateTime={news.published_at}>
                 {new Date(news.published_at).toLocaleDateString("ru-RU", {

@@ -141,6 +141,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/content/news-categories/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/content/news-categories/ — published rubrics. */
+        get: operations["content_news_categories_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/content/pages/": {
         parameters: {
             query?: never;
@@ -361,6 +378,10 @@ export interface components {
             readonly body: string;
             /** @description Обложка новости (JPEG/PNG/WebP). */
             readonly cover: string | null;
+            readonly category: {
+                readonly slug: string;
+                readonly name: string;
+            } | null;
             /** @description Видимость в публичном API. */
             readonly is_published: boolean;
             /**
@@ -372,6 +393,13 @@ export interface components {
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
+        };
+        /** @description Published news rubric for /novosti filter chips. */
+        NewsCategory: {
+            readonly id: number;
+            readonly name: string;
+            readonly slug: string;
+            readonly sort_order: number;
         };
         /** @description Public CMS page (/<slug>). */
         Page: {
@@ -753,6 +781,10 @@ export interface operations {
     content_news_list: {
         parameters: {
             query?: {
+                /** @description NewsCategory.slug filter. */
+                category?: string;
+                /** @description newest (default) | oldest */
+                ordering?: "newest" | "oldest";
                 /** @description A page number within the paginated result set. */
                 page?: number;
             };
@@ -768,6 +800,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedNewsList"];
+                };
+            };
+        };
+    };
+    content_news_categories_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsCategory"][];
                 };
             };
         };

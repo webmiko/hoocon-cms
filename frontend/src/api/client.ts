@@ -164,6 +164,14 @@ export type Article = components["schemas"]["Article"] & {
 };
 export type News = components["schemas"]["News"] & {
   cover?: string | null;
+  category?: { slug: string; name: string } | null;
+};
+
+export type NewsCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  sort_order: number;
 };
 
 // Lead (request payload)
@@ -269,8 +277,21 @@ export const api = {
     return apiFetch(`/api/content/articles/${slug}/`);
   },
 
-  news(): Promise<{ count: number; results: News[] }> {
-    return apiFetch("/api/content/news/");
+  news(params?: {
+    category?: string;
+    ordering?: "newest" | "oldest";
+    page?: number;
+  }): Promise<{ count: number; results: News[] }> {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set("category", params.category);
+    if (params?.ordering) qs.set("ordering", params.ordering);
+    if (params?.page) qs.set("page", String(params.page));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch(`/api/content/news/${suffix}`);
+  },
+
+  newsCategories(): Promise<NewsCategory[]> {
+    return apiFetch("/api/content/news-categories/");
   },
 
   newsDetail(slug: string): Promise<News> {
