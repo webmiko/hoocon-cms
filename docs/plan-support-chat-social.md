@@ -1,8 +1,9 @@
 # План: чат поддержки — виджет сайта + Telegram / VK / MAX
 
 Дата: 2026-07-20  
-Обновлено: 2026-07-26 (Admin «Поддержка»; очередь auth → ЛК → чат)  
-Статус: **согласован**; код — **после** Iter 5 (VPS + HTTPS + домен + почта)  
+Обновлено: 2026-08-11 (ship web + Admin + Telegram; VK/MAX — следующий PR)  
+Статус: **в работе / частично shipped** — web виджет + Admin inbox + Telegram;
+VK/MAX adapters — после токенов в SiteSettings.  
 Цель: единый inbox в Admin; клиент пишет с **виджета на сайте** и/или из
 мессенджеров (TG / VK / MAX); менеджер отвечает в одном месте; чат живой
 по **настраиваемому рабочему расписанию**.
@@ -325,9 +326,9 @@ Admin reply → Celery → bot API private message
 
 | Зависимость | Статус |
 |-------------|--------|
-| Iter 5: VPS, HTTPS, домен, SMTP | ☐ гейт |
-| Токены SiteSettings | ✅ |
-| Celery/Redis prod | ☐ с Iter 5 |
+| Iter 5: VPS, HTTPS, домен, SMTP | ✅ |
+| Токены SiteSettings | ✅ TG; VK/MAX — pending |
+| Celery/Redis prod | ✅ |
 | CSP / cookie для виджета | учесть при CSP prod |
 
 Слот: **после Iter 5**, в рамках усиления (Iter 6) — приоритетный блок

@@ -116,6 +116,10 @@ Admin, файлы, SPA, VPS.
 - Нет open redirect с `?next=` без allowlist.
 - Зависимости npm: lockfile; не подключать произвольный third-party JS без SRI/нужды.
 - Метрика/аналитика — после cookie consent (CSP учёт).
+- **Support chat** (`supportchat`): виджет — session + CSRF + throttle
+  (`support_message`); IDOR только своя session; honeypot на start/message;
+  публичные `/api/support/channels|schedule/` без bot tokens; Telegram
+  webhook secret как у `/api/integrations/telegram/webhook/`; текст only.
 
 ### 3.5 Infra (итерация 5, заложить в конфиги заранее)
 
