@@ -1,7 +1,11 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import { pushSupported, subscribeWebPush } from "../utils/webPush";
+import {
+  pushSupported,
+  subscribeWebPush,
+  subscribeWebPushStatusRu,
+} from "../utils/webPush";
 import styles from "./SupportWidget.module.css";
 
 type ChatMessage = {
@@ -13,6 +17,24 @@ type ChatMessage = {
 };
 
 type ChannelLink = { channel: string; label: string; deep_link: string };
+
+function mergeMessages(
+  prev: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
+  if (!incoming.length) return prev;
+  const seen = new Set(prev.map((m) => m.id));
+  const merged = [...prev];
+  for (const m of incoming) {
+    if (!seen.has(m.id)) merged.push(m);
+  }
+  return merged;
+}
+
+function maxMessageId(messages: ChatMessage[], fallback = 0): number {
+  if (!messages.length) return fallback;
+  return Math.max(fallback, ...messages.map((m) => m.id));
+}
 
 /**
  * Floating support chat (web channel) with Telegram deep link.
@@ -34,6 +56,7 @@ export function SupportWidget() {
   const [pushStatus, setPushStatus] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef(0);
+  const resumeOnceRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +79,34 @@ export function SupportWidget() {
     };
   }, []);
 
+  // On open: resume session + full history (PWA reload must see staff replies).
+  useEffect(() => {
+    if (!open) {
+      resumeOnceRef.current = false;
+      return;
+    }
+    if (resumeOnceRef.current) return;
+    resumeOnceRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await api.fetchCsrfToken();
+        await api.supportStartConversation({});
+        if (cancelled) return;
+        setStarted(true);
+        const data = await api.supportMessages();
+        if (cancelled) return;
+        setMessages(data.messages);
+        lastIdRef.current = maxMessageId(data.messages);
+      } catch {
+        /* first message path still works via ensureStarted */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open || !started) return;
     const tick = async () => {
@@ -63,20 +114,10 @@ export function SupportWidget() {
         const after = lastIdRef.current > 0 ? lastIdRef.current : undefined;
         const data = await api.supportMessages(after);
         if (!data.messages.length) return;
-        setMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const merged = [...prev];
-          for (const m of data.messages) {
-            if (!seen.has(m.id)) merged.push(m);
-          }
-          return merged;
-        });
-        lastIdRef.current = Math.max(
-          lastIdRef.current,
-          ...data.messages.map((m) => m.id),
-        );
+        setMessages((prev) => mergeMessages(prev, data.messages));
+        lastIdRef.current = maxMessageId(data.messages, lastIdRef.current);
       } catch {
-        /* ignore poll errors */
+        /* ignore transient poll errors (network); do not starve UI */
       }
     };
     void tick();
@@ -92,11 +133,11 @@ export function SupportWidget() {
   async function enablePush() {
     setPushStatus("");
     try {
-      const ok = await subscribeWebPush({ topic_support: true });
+      const result = await subscribeWebPush({ topic_support: true });
       setPushStatus(
-        ok
+        result.ok
           ? "Уведомления об ответах включены"
-          : "Не удалось включить (нужен HTTPS / разрешение)",
+          : subscribeWebPushStatusRu(result),
       );
     } catch {
       setPushStatus("Не удалось включить уведомления");
@@ -124,11 +165,8 @@ export function SupportWidget() {
       const result = await api.supportSendMessage(body);
       const next = [result.message];
       if (result.auto_reply) next.push(result.auto_reply);
-      setMessages((prev) => [...prev, ...next]);
-      lastIdRef.current = Math.max(
-        lastIdRef.current,
-        ...next.map((m) => m.id),
-      );
+      setMessages((prev) => mergeMessages(prev, next));
+      lastIdRef.current = maxMessageId(next, lastIdRef.current);
       setDraft("");
       if (result.message.outside_hours) setIsOpenNow(false);
     } catch (err) {
@@ -230,10 +268,16 @@ export function SupportWidget() {
 
           {pushSupported() ? (
             <div className={styles.pushRow}>
-              <button type="button" className={styles.pushBtn} onClick={() => void enablePush()}>
+              <button
+                type="button"
+                className={styles.pushBtn}
+                onClick={() => void enablePush()}
+              >
                 Уведомлять об ответе
               </button>
-              {pushStatus ? <span className={styles.pushStatus}>{pushStatus}</span> : null}
+              {pushStatus ? (
+                <span className={styles.pushStatus}>{pushStatus}</span>
+              ) : null}
             </div>
           ) : null}
 

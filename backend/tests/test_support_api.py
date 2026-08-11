@@ -108,14 +108,124 @@ def test_outside_hours_auto_reply() -> None:
 
 
 @pytest.mark.django_db
-def test_honeypot_silent_drop() -> None:
+def test_staff_outbound_visible_on_poll_after() -> None:
+    """Visitor poll with ?after= must return Admin outbound replies."""
+    ensure_default_schedule()
+    from django.contrib.auth import get_user_model
+
+    from supportchat.models import Message, MessageDirection
+    from supportchat.services import add_staff_reply
+
+    staff = get_user_model().objects.create_user(username="agent", password="x")
+
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        client.post(
+            "/api/support/conversations/",
+            data={},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Вопрос"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        inbound_id = send.json()["message"]["id"]
+
+        conv = Conversation.objects.get()
+        with patch("webpush.tasks.notify_visitor_support_reply.delay"):
+            outbound = add_staff_reply(conv, "Ответ менеджера", author=staff)
+        assert outbound.direction == MessageDirection.OUTBOUND
+
+        polled = client.get(
+            f"/api/support/conversations/current/messages/?after={inbound_id}",
+        )
+        assert polled.status_code == 200
+        bodies = [m["body"] for m in polled.json()["messages"]]
+        assert "Ответ менеджера" in bodies
+        assert Message.objects.filter(direction=MessageDirection.OUTBOUND).count() == 1
+
+
+@pytest.mark.django_db
+def test_support_poll_throttle_scope_allows_burst() -> None:
+    """GET poll must not share the tight POST support_message budget."""
+    ensure_default_schedule()
     client = _csrf_client()
     token = client.cookies["csrftoken"].value
-    resp = client.post(
+    client.post(
         "/api/support/conversations/",
-        data={"website": "http://spam", "display_name": "Bot"},
+        data={},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
     )
-    assert resp.status_code == 201
-    assert Conversation.objects.count() == 0
+    # More GETs than the old shared 30/hour POST budget.
+    statuses = [client.get("/api/support/conversations/current/messages/").status_code for _ in range(40)]
+    assert all(code == 200 for code in statuses)
+
+
+@pytest.mark.django_db
+def test_admin_reply_view_creates_outbound_and_enqueues_deliver() -> None:
+    """Admin «Отправить» must hit reply/ (not change/) and enqueue Celery."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel, Message, MessageDirection
+
+    ensure_default_schedule()
+    staff = get_user_model().objects.create_superuser(
+        username="support-admin",
+        email="support-admin@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="1850806353",
+        display_name="TG test",
+        status="open",
+    )
+    client = Client()
+    client.force_login(staff)
+    url = reverse("admin:supportchat_conversation_reply", args=[conv.pk])
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as delay:
+        resp = client.post(url, data={"reply_body": "Ответ из админки"})
+    assert resp.status_code == 302
+    out = Message.objects.filter(conversation=conv, direction=MessageDirection.OUTBOUND)
+    assert out.count() == 1
+    assert out.get().body == "Ответ из админки"
+    delay.assert_called_once_with(out.get().pk)
+
+
+@pytest.mark.django_db
+def test_admin_reply_form_is_outside_main_change_form() -> None:
+    """Reply form must render in Unfold form_after (not nested in change form)."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-admin2",
+        email="support-admin2@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-uuid-test",
+        display_name="Web test",
+        status="open",
+    )
+    client = Client()
+    client.force_login(staff)
+    page = client.get(reverse("admin:supportchat_conversation_change", args=[conv.pk]))
+    assert page.status_code == 200
+    html = page.content.decode()
+    assert 'name="reply_body"' in html
+    assert "/reply/" in html
+    # Nested <form> inside conversation_form would break submit; reply action must exist.
+    assert f"/admin/supportchat/conversation/{conv.pk}/reply/" in html

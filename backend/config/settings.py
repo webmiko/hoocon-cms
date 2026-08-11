@@ -398,7 +398,10 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "240/min",
         "lead_create": "10/hour",
-        "support_message": "30/hour",
+        # POST start/send only — keep tight against spam.
+        "support_message": "60/hour",
+        # GET poll every ~4s needs headroom (15/min); separate from POST scope.
+        "support_poll": "120/minute",
         "webpush_subscribe": "30/hour",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",

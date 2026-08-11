@@ -28,6 +28,7 @@ from supportchat.services import (
 logger = setup_logger("hoocon.supportchat")
 
 _MSG_THROTTLE = "support_message"
+_POLL_THROTTLE = "support_poll"
 
 
 class SupportScheduleView(APIView):
@@ -102,7 +103,16 @@ class CurrentMessagesView(APIView):
 
     permission_classes = (AllowAny,)
     throttle_classes = [ScopedRateThrottle]
+    # Default for POST; GET overrides via get_throttles().
     throttle_scope = _MSG_THROTTLE
+
+    def get_throttles(self) -> list:
+        """Poll GETs use a higher rate than POST send/start."""
+        if self.request.method == "GET":
+            self.throttle_scope = _POLL_THROTTLE
+        else:
+            self.throttle_scope = _MSG_THROTTLE
+        return super().get_throttles()
 
     def get(self, request: Request) -> Response:
         conv = get_web_conversation(request._request)

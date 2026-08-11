@@ -1,7 +1,9 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
-{% block after_related_objects %}
+{# Must be outside the main change <form> (Unfold: form_after). Nested forms
+   are invalid HTML — browsers submit Save on change/, never hit reply/. #}
+{% block form_after %}
 {{ block.super }}
 {% if reply_url and original %}
 <section class="hoocon-support-reply" style="margin:1.5rem 0;padding:1rem;border:1px solid #e5e7eb;border-radius:8px;">
