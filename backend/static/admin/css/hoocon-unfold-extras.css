@@ -1246,3 +1246,167 @@ body.login select,
   font-size: 16px !important;
   max-height: none;
 }
+
+/* ── Changelist stacked cards (mobile / overflow; JS: hoocon-admin-tables.js) ─
+ * Hide empty / dash-only fields so Lead/Support cards stay scannable.
+ */
+table.hoocon-admin-card-table.hoocon-admin-table-stacked {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  table-layout: auto;
+  box-sizing: border-box;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked thead {
+  display: none;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.95rem 0.75rem;
+  border: 1px solid var(--hoocon-glass-border);
+  border-radius: var(--hoocon-radius);
+  background: var(--hoocon-surface);
+  box-shadow: none;
+  overflow: visible;
+  cursor: pointer;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr.selected,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr:has(.action-select:checked) {
+  background: var(--hoocon-surface-muted);
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 32%) minmax(0, 1fr);
+  column-gap: 0.75rem;
+  align-items: baseline;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0.45rem 0;
+  border: none;
+  border-bottom: 1px solid var(--hoocon-hairline);
+  text-align: left;
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td:last-child,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th:last-child {
+  border-bottom: none;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td::before,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 0;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--hoocon-quiet);
+  text-align: left;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox {
+  display: inline-flex !important;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  gap: 0.45rem;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0.15rem 0 0.5rem !important;
+  margin: 0;
+  border-bottom: 1px solid var(--hoocon-hairline);
+  text-align: left !important;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox::before {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 1.2;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox .action-select {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+/* Empty / dash-only fields (JS adds .hoocon-admin-cell-blank). */
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td:empty,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th:empty,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.hoocon-admin-cell-blank,
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th.hoocon-admin-cell-blank {
+  display: none !important;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_lead,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_lead,
+#changelist table.hoocon-admin-table-stacked tbody td.field-open_link,
+#changelist table.hoocon-admin-table-stacked tbody th.field-open_link {
+  padding-top: 0.55rem !important;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody td.field-unread_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-unread_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody td.field-channel_badge::before,
+#changelist table.hoocon-admin-table-stacked tbody th.field-channel_badge::before {
+  display: none;
+}
+
+#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge,
+#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge,
+#changelist table.hoocon-admin-table-stacked tbody td.field-unread_badge,
+#changelist table.hoocon-admin-table-stacked tbody th.field-unread_badge {
+  order: -1;
+  margin-bottom: 0.15rem;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.inline-group .tabular {
+  overflow-x: clip;
+  max-width: 100%;
+  min-width: 0;
+}

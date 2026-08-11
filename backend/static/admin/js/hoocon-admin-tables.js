@@ -16,11 +16,17 @@
   const STACK_MQ = "(max-width: 767px)";
   const STACKED_CLASS = "hoocon-admin-table-stacked";
   const CARD_CLASS = "hoocon-admin-card-table";
+  const BLANK_CLASS = "hoocon-admin-cell-blank";
   /** Extra room so we stack before columns become unreadable. */
   const FIT_SLACK_PX = 12;
   /** Minimum width per data column for a usable table (not cards). */
   const MIN_DATA_COL_PX = 104;
   const MIN_CHECKBOX_COL_PX = 44;
+  const BLANK_TEXT = new Set(["", "—", "–", "-", "−", "n/a", "N/A"]);
+  const KEEP_CELL_CLASS_RE = new RegExp(
+    String.raw`(?:^|\s)(?:action-checkbox|field-open_link|field-open_lead|` +
+      String.raw`field-status_badge|field-unread_badge|field-channel_badge)(?:\s|$)`,
+  );
 
   /** @type {WeakMap<HTMLTableElement, ResizeObserver>} */
   const observers = new WeakMap();
@@ -61,6 +67,28 @@
 
       if (label) {
         cell.setAttribute("data-label", label);
+      }
+    });
+  }
+
+  /**
+   * Mark empty / dash-only cells so stacked cards hide them.
+   * Keeps checkbox, open link, and status/unread badges visible.
+   *
+   * @param {HTMLTableRowElement} row
+   */
+  function markBlankCells(row) {
+    Array.from(row.cells).forEach((cell) => {
+      cell.classList.remove(BLANK_CLASS);
+      if (KEEP_CELL_CLASS_RE.test(cell.className)) {
+        return;
+      }
+      if (cell.querySelector("input, select, textarea, button, img, svg")) {
+        return;
+      }
+      const text = (cell.textContent || "").replace(/\s+/g, " ").trim();
+      if (BLANK_TEXT.has(text)) {
+        cell.classList.add(BLANK_CLASS);
       }
     });
   }
@@ -214,7 +242,10 @@
       return;
     }
 
-    Array.from(body.rows).forEach((row) => applyRowLabels(row, labels));
+    Array.from(body.rows).forEach((row) => {
+      applyRowLabels(row, labels);
+      markBlankCells(row);
+    });
     watchTable(table);
   }
 
@@ -241,6 +272,7 @@
           mutation.addedNodes.forEach((node) => {
             if (node instanceof HTMLTableRowElement && node.parentElement === body) {
               applyRowLabels(node, labels);
+              markBlankCells(node);
             }
           });
         });

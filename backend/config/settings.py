@@ -312,6 +312,7 @@ UNFOLD = {
     ],
     "SCRIPTS": [
         "config.unfold_callbacks.admin_live_badges_js",
+        "config.unfold_callbacks.admin_tables_js",
     ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     "SIDEBAR": {

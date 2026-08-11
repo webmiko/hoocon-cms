@@ -124,6 +124,23 @@ def admin_live_badges_js(request: HttpRequest) -> str:
     return url
 
 
+def admin_tables_js(request: HttpRequest) -> str:
+    """Changelist card stack + blank-cell hide (cache-busted)."""
+    del request
+    url = static("admin/js/hoocon-admin-tables.js")
+    from django.conf import settings
+
+    version = getattr(settings, "BUILD_SHA", "").strip()
+    if not version and settings.DEBUG:
+        path = settings.BASE_DIR / "static/admin/js/hoocon-admin-tables.js"
+        if path.is_file():
+            version = str(int(path.stat().st_mtime))
+    if version:
+        sep = "&" if "?" in url else "?"
+        return f"{url}{sep}v={version}"
+    return url
+
+
 def _can_view_leads(request: HttpRequest) -> bool:
     """Staff with leads.view_lead (superuser included via has_perm)."""
     user = getattr(request, "user", None)

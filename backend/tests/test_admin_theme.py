@@ -34,6 +34,7 @@ def test_admin_index_uses_unfold_and_hoocon_branding() -> None:
     assert "unfold" in html.lower()
     assert "hoocon-unfold-extras.css" in html
     assert "hoocon-admin-leads-sticker.js" in html
+    assert "hoocon-admin-tables.js" in html
     assert "hoocon-admin.css" not in html
     assert "hoocon-admin-overrides.css" not in html
     assert "Hoocon" in html
@@ -137,6 +138,9 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "min(28rem" in css
     assert ".hoocon-integrations" in css
     assert ".hoocon-integrations__actions" in css
+    assert "hoocon-admin-table-stacked" in css
+    assert "hoocon-admin-cell-blank" in css
+    assert "hoocon-admin-card-table" in css
 
 
 @pytest.mark.django_db
@@ -194,6 +198,7 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "apple-touch-admin.png" in html
     assert "/admin/manifest.webmanifest" in html
     assert "hoocon-admin-live-badges.js" in html
+    assert "hoocon-admin-tables.js" in html
     assert 'name="theme-color" content="#5a626c"' in html
 
     manifest = client.get("/admin/manifest.webmanifest")
