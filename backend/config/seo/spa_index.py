@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import secrets
 import threading
@@ -144,6 +145,64 @@ def _home_ssr_hero_markup() -> str:
     )
 
 
+_ENTRY_MODULE_RE = re.compile(
+    r'<script\b[^>]*\btype=["\']module["\'][^>]*\bsrc=["\']([^"\']+)["\'][^>]*>\s*</script>',
+    re.IGNORECASE,
+)
+_MODULEPRELOAD_RE = re.compile(
+    r'<link\b[^>]*\brel=["\']modulepreload["\'][^>]*>\s*',
+    re.IGNORECASE,
+)
+
+
+def _defer_home_entry_until_lcp(html: str) -> str:
+    """Start the SPA entry module only after the LCP boot image has loaded.
+
+    On Slow 4G, ``modulepreload`` + large ``vendor-react`` contend with the hero
+    WebP and block the main thread before the image can paint — LCP stays ~3–4s.
+    Waiting for ``#hoocon-lcp-boot`` ``load`` (with a safety timeout) lets the
+    SSR hero become LCP before JS download/parse.
+
+    Args:
+        html: Home HTML that already contains the SSR LCP boot image.
+
+    Returns:
+        HTML with modulepreloads removed and entry script deferred.
+    """
+    match = _ENTRY_MODULE_RE.search(html)
+    if not match:
+        return html
+
+    src = match.group(1)
+    src_js = json.dumps(src)
+    html = _MODULEPRELOAD_RE.sub("", html)
+    # Inline loader gets a CSP nonce via ``inject_csp_nonce`` (runs after this).
+    loader = (
+        '<script type="module">'
+        "(function(){"
+        f"var src={src_js};"
+        "var started=false;"
+        "function boot(){"
+        "if(started)return;"
+        "started=true;"
+        'var s=document.createElement("script");'
+        's.type="module";'
+        's.crossOrigin="";'
+        "s.src=src;"
+        "document.head.appendChild(s);"
+        "}"
+        'var img=document.getElementById("hoocon-lcp-boot");'
+        "if(img&&!img.complete){"
+        'img.addEventListener("load",boot,{once:true});'
+        'img.addEventListener("error",boot,{once:true});'
+        "}else{boot();}"
+        "setTimeout(boot,2500);"
+        "})();"
+        "</script>"
+    )
+    return _ENTRY_MODULE_RE.sub(loader, html, count=1)
+
+
 def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     """Server-render home hero (image + copy) before React mounts.
 
@@ -151,6 +210,7 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     HTML+critical CSS while ``vendor-react`` downloads. The shell is a
     **sibling before** ``#root`` so ``createRoot`` does not destroy the LCP
     ``<img>``; HomePage adopts that node into the React hero on mount.
+    Entry JS is deferred until the boot image loads (mobile LCP).
 
     Args:
         html: SPA shell HTML.
@@ -184,7 +244,8 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
             f'{boot}<div id="root"></div>',
             1,
         )
-    return html
+
+    return _defer_home_entry_until_lcp(html)
 
 
 def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpResponse:

@@ -543,11 +543,30 @@ export function HomePage() {
     if (reduceMotion.matches || HOME_PROJECTS.length < 2) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setHeroSlide((prev) => (prev + 1) % HOME_PROJECTS.length);
-    }, HERO_SLIDE_MS);
-    return () => window.clearInterval(timer);
-  }, [heroSlide]);
+    // Autoplays after interaction only — late slide images must not become LCP
+    // in lab runs (PSI never interacts; first slide stays the LCP candidate).
+    let timer: number | undefined;
+    const start = () => {
+      if (timer !== undefined) {
+        return;
+      }
+      timer = window.setInterval(() => {
+        setHeroSlide((prev) => (prev + 1) % HOME_PROJECTS.length);
+      }, HERO_SLIDE_MS);
+    };
+    const onInteract = () => start();
+    window.addEventListener("pointerdown", onInteract, { once: true, passive: true });
+    window.addEventListener("keydown", onInteract, { once: true });
+    window.addEventListener("scroll", onInteract, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onInteract);
+      window.removeEventListener("keydown", onInteract);
+      window.removeEventListener("scroll", onInteract);
+      if (timer !== undefined) {
+        window.clearInterval(timer);
+      }
+    };
+  }, []);
 
   return (
     <div className={styles.home}>

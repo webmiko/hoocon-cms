@@ -60,9 +60,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,jpg,jpeg,webp}"],
-        navigateFallback: "/index.html",
-        // Keep Django SEO/LLM text endpoints out of the SPA shell fallback.
+        // Do not precache HTML / navigateFallback to index.html — that bypasses
+        // Django spa_index (SSR SEO head + LCP boot hero) for SW-controlled tabs.
+        globPatterns: ["**/*.{js,css,svg,png,ico,woff2,jpg,jpeg,webp}"],
+        navigateFallback: null,
+        // Keep Django SEO/LLM text endpoints out of any future SPA fallback.
         navigateFallbackDenylist: [
           /^\/api\//,
           /^\/admin\//,
