@@ -87,7 +87,8 @@ Admin, файлы, SPA, VPS.
   **Email OTP:** при `ADMIN_EMAIL_OTP_ENABLED=true` вход без пароля —
   логин/email → 6-значный код на почту (`config/admin_otp.py`). SMTP
   обязателен. TTL кода 5 мин (дефолт 300 с); allowlist
-  `ADMIN_EMAIL_OTP_ALLOWED_EMAILS`; progressive delay на неверный код;
+  `ADMIN_EMAIL_OTP_ALLOWED_EMAILS` (адреса и/или домены `@hoocon.ru`);
+  progressive delay на неверный код;
   rate limit запросов кода по IP (+ django-axes). При `false` —
   классический пароль (локалка/CI/авария).
   **Break-glass супер-админа** (только `is_superuser`, при OTP on):
