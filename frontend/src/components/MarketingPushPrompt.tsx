@@ -12,6 +12,7 @@ import {
   type CookieConsentState,
 } from "../utils/cookieConsent";
 import {
+  hasBrowserPushSubscription,
   pushSupported,
   subscribeWebPush,
   subscribeWebPushStatusRu,
@@ -44,22 +45,38 @@ export function MarketingPushPrompt() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      if (!pushSupported() || isDismissed()) return;
-      if (!isMarketingAllowed(readCookieConsent())) return;
-      setVisible(true);
+      void (async () => {
+        if (!pushSupported() || isDismissed()) return;
+        if (!isMarketingAllowed(readCookieConsent())) return;
+        // Already subscribed in this browser — do not nag after reload.
+        if (await hasBrowserPushSubscription()) {
+          dismiss();
+          return;
+        }
+        if (!cancelled) setVisible(true);
+      })();
     }, 4000);
 
     function onConsent(event: Event) {
       const detail = (event as CustomEvent<CookieConsentState>).detail;
-      if (isMarketingAllowed(detail) && pushSupported() && !isDismissed()) {
+      void (async () => {
+        if (!isMarketingAllowed(detail) || !pushSupported() || isDismissed()) {
+          setVisible(false);
+          return;
+        }
+        if (await hasBrowserPushSubscription()) {
+          dismiss();
+          setVisible(false);
+          return;
+        }
         setVisible(true);
-      } else if (!isMarketingAllowed(detail)) {
-        setVisible(false);
-      }
+      })();
     }
     window.addEventListener(COOKIE_CONSENT_CHANGE_EVENT, onConsent);
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
       window.removeEventListener(COOKIE_CONSENT_CHANGE_EVENT, onConsent);
     };

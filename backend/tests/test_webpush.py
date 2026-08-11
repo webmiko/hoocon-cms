@@ -56,6 +56,46 @@ def test_subscribe_support_links_session() -> None:
     WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
     WEBPUSH_VAPID_PRIVATE_KEY="test-private",
 )
+def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
+    """Page reload re-POSTs the same endpoint — must not drop topics."""
+    client = _csrf_client()
+    token = client.cookies["csrftoken"].value
+    payload = {
+        "endpoint": "https://push.example/sub/persist",
+        "keys": {"p256dh": "p256", "auth": "authkey"},
+        "topic_support": True,
+    }
+    first = client.post(
+        "/api/webpush/subscribe/",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert first.status_code == 201
+    sub = PushSubscription.objects.get(endpoint="https://push.example/sub/persist")
+    session_a = sub.session_key
+    assert sub.topic_support is True
+
+    # Simulate reload: same browser endpoint, marketing added, support kept via OR.
+    second = client.post(
+        "/api/webpush/subscribe/",
+        data={**payload, "topic_marketing": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert second.status_code == 201
+    assert PushSubscription.objects.filter(endpoint=payload["endpoint"]).count() == 1
+    sub.refresh_from_db()
+    assert sub.topic_support is True
+    assert sub.topic_marketing is True
+    assert sub.session_key == session_a
+
+
+@pytest.mark.django_db
+@override_settings(
+    WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
+    WEBPUSH_VAPID_PRIVATE_KEY="test-private",
+)
 def test_unsubscribe() -> None:
     upsert_subscription(
         endpoint="https://push.example/gone",

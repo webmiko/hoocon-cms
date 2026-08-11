@@ -1,5 +1,8 @@
 /**
  * Browser / PWA Web Push subscribe helpers (VAPID).
+ *
+ * PushSubscription lives in the browser across reloads; we re-POST to Django
+ * so session_key / topics stay bound after refresh.
  */
 
 import { api } from "../api/client";
@@ -55,6 +58,20 @@ async function getRegistration(): Promise<ServiceWorkerRegistration | null> {
   }
 }
 
+/** True when the browser already has a PushSubscription (survives reload). */
+export async function hasBrowserPushSubscription(): Promise<boolean> {
+  if (!pushSupported()) return false;
+  if (Notification.permission !== "granted") return false;
+  const registration = await getRegistration();
+  if (!registration) return false;
+  try {
+    const existing = await registration.pushManager.getSubscription();
+    return Boolean(existing);
+  } catch {
+    return false;
+  }
+}
+
 export type SubscribeWebPushResult =
   | { ok: true }
   | {
@@ -87,8 +104,69 @@ function classifySubscribeError(err: unknown): SubscribeWebPushResult {
   return { ok: false, reason: "subscribe_failed", detail: message };
 }
 
+function looksLikeVapidMismatch(err: unknown): boolean {
+  const message = (
+    err instanceof Error ? err.message : String(err)
+  ).toLowerCase();
+  return (
+    message.includes("applicationserverkey") ||
+    message.includes("application server key") ||
+    message.includes("gcm sender id") ||
+    message.includes("vapid")
+  );
+}
+
+async function postSubscriptionToApi(
+  subscription: PushSubscription,
+  topics: { topic_support?: boolean; topic_marketing?: boolean },
+): Promise<SubscribeWebPushResult> {
+  const json = subscription.toJSON();
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    return { ok: false, reason: "subscribe_failed" };
+  }
+  try {
+    await api.fetchCsrfToken();
+    await api.webpushSubscribe({
+      endpoint: json.endpoint,
+      keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+      topic_support: Boolean(topics.topic_support),
+      topic_marketing: Boolean(topics.topic_marketing),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "api_error",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * If the browser already has a subscription, re-POST it to Django (session bind).
+ * Returns null when there is nothing to sync (caller may prompt to subscribe).
+ */
+export async function syncExistingWebPush(topics: {
+  topic_support?: boolean;
+  topic_marketing?: boolean;
+}): Promise<SubscribeWebPushResult | null> {
+  if (!pushSupported()) return null;
+  if (Notification.permission !== "granted") return null;
+  const registration = await getRegistration();
+  if (!registration) return null;
+  let existing: PushSubscription | null;
+  try {
+    existing = await registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+  if (!existing) return null;
+  return postSubscriptionToApi(existing, topics);
+}
+
 /**
  * Subscribe to push topics and POST endpoint to Django.
+ * Keeps an existing browser subscription across reloads (does not drop it).
  */
 export async function subscribeWebPush(topics: {
   topic_support?: boolean;
@@ -115,16 +193,6 @@ export async function subscribeWebPush(topics: {
   const registration = await getRegistration();
   if (!registration) return { ok: false, reason: "no_service_worker" };
 
-  try {
-    await api.fetchCsrfToken();
-  } catch (err) {
-    return {
-      ok: false,
-      reason: "api_error",
-      detail: err instanceof Error ? err.message : String(err),
-    };
-  }
-
   let subscription: PushSubscription;
   try {
     const existing = await registration.pushManager.getSubscription();
@@ -135,7 +203,11 @@ export async function subscribeWebPush(topics: {
         applicationServerKey: applicationServerKeyBytes(meta.public_key),
       }));
   } catch (err) {
-    // Stale subscription bound to an old VAPID key — drop and retry once.
+    // Only drop the browser sub when the key clearly mismatches — never on
+    // transient errors (that would make push «fly off» after a refresh).
+    if (!looksLikeVapidMismatch(err)) {
+      return classifySubscribeError(err);
+    }
     try {
       const stale = await registration.pushManager.getSubscription();
       if (stale) await stale.unsubscribe();
@@ -148,25 +220,7 @@ export async function subscribeWebPush(topics: {
     }
   }
 
-  const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-    return { ok: false, reason: "subscribe_failed" };
-  }
-  try {
-    await api.webpushSubscribe({
-      endpoint: json.endpoint,
-      keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-      topic_support: Boolean(topics.topic_support),
-      topic_marketing: Boolean(topics.topic_marketing),
-    });
-  } catch (err) {
-    return {
-      ok: false,
-      reason: "api_error",
-      detail: err instanceof Error ? err.message : String(err),
-    };
-  }
-  return { ok: true };
+  return postSubscriptionToApi(subscription, topics);
 }
 
 /** Short RU status for SupportWidget / marketing prompt. */

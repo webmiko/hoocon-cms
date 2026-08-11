@@ -58,6 +58,16 @@ VAPID на сервере при этом может быть `configured: true`
 iOS: push в Safari обычно только после «На экран „Домой“» (PWA). Основной
 target v1 — Chrome / Edge / Android (где FCM доступен).
 
+## Persist после reload
+
+`PushSubscription` хранится в браузере (не в React state). После F5:
+
+1. виджет чата вызывает `syncExistingWebPush` и снова POSTit endpoint →
+   Django (перепривязка `session_key` / topics);
+2. UI показывает «Уведомления включены», без повторного запроса permission;
+3. `unsubscribe()` вызывается только при явной смене VAPID-ключа, не при
+   обычной ошибке сети.
+
 ## Admin
 
 - Список подписок: **Web Push**
