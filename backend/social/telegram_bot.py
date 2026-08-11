@@ -1,4 +1,4 @@
-"""Minimal Telegram bot commands (welcome with cover; not full support chat)."""
+"""Telegram bot: welcome commands + free-text support inbox ingest."""
 
 from __future__ import annotations
 
@@ -51,7 +51,8 @@ def compose_welcome_caption() -> str:
         f'Канал: <a href="{_CHANNEL_URL}">@hoocon_moscow</a>\n'
         f'Каталог: <a href="{site}">hoocon.ru</a>\n'
         f'Заявка / RFQ: <a href="{site}/consultation">на сайте</a>\n\n'
-        "Команды: /channel · /site · /help"
+        "Команды: /channel · /site · /help\n"
+        "Или просто напишите сообщение — ответит менеджер."
     )
     if len(text) > _TELEGRAM_CAPTION_MAX:
         return text[: _TELEGRAM_CAPTION_MAX - 1].rstrip() + "…"
@@ -92,6 +93,60 @@ def parse_bot_command(text: str) -> str | None:
     return match.group("cmd").lower()
 
 
+def _display_name_from_message(message: dict[str, Any]) -> str:
+    """Best-effort display name from Telegram ``from`` user."""
+    sender = message.get("from")
+    if not isinstance(sender, dict):
+        return ""
+    parts = [
+        str(sender.get("first_name") or "").strip(),
+        str(sender.get("last_name") or "").strip(),
+    ]
+    name = " ".join(p for p in parts if p).strip()
+    if name:
+        return name
+    username = str(sender.get("username") or "").strip()
+    return f"@{username}" if username else ""
+
+
+def _ingest_support_text(
+    *,
+    chat_id: str,
+    text: str,
+    message: dict[str, Any],
+    display_name: str,
+) -> PublishResult | None:
+    """Store free-form text in support inbox; optional outside-hours auto-reply."""
+    from supportchat.models import Channel
+    from supportchat.services import (
+        SupportChatError,
+        add_inbound_message,
+        get_or_create_messenger_conversation,
+    )
+
+    external_message_id = str(message.get("message_id") or "").strip()
+    try:
+        conversation = get_or_create_messenger_conversation(
+            Channel.TELEGRAM,
+            chat_id,
+            display_name=display_name,
+        )
+        _inbound, auto = add_inbound_message(
+            conversation,
+            text,
+            external_message_id=external_message_id,
+            raw_payload={"telegram_message_id": message.get("message_id")},
+            display_name=display_name,
+        )
+    except SupportChatError:
+        logger.warning("telegram_support_ingest_rejected chat_id=%s", chat_id)
+        return None
+
+    if auto is not None:
+        return publish_telegram(chat_id=chat_id, text=auto.body)
+    return None
+
+
 def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     """Process one Bot API update; send a reply when applicable.
 
@@ -116,6 +171,7 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
 
     command = parse_bot_command(text)
     chat_key = str(chat_id)
+    display_name = _display_name_from_message(message)
 
     if command in {"start", "help"}:
         caption = compose_welcome_caption()
@@ -127,7 +183,6 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
             photo_url=None if local is not None else welcome_photo_url(),
         )
         if not result.ok and not result.skipped:
-            # Photo failed — still try text-only welcome.
             logger.warning("telegram_welcome_photo_failed falling_back_to_text")
             return publish_telegram(chat_id=chat_key, text=caption)
         return result
@@ -137,8 +192,11 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     if command == "site":
         return publish_telegram(chat_id=chat_key, text=compose_site_reply())
     if command is not None:
-        # Unknown slash-command (not free-form support chat).
         return publish_telegram(chat_id=chat_key, text=compose_fallback_reply())
 
-    # Ignore plain text — support inbox is out of scope for this webhook.
-    return None
+    return _ingest_support_text(
+        chat_id=chat_key,
+        text=text,
+        message=message,
+        display_name=display_name,
+    )

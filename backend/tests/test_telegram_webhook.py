@@ -75,27 +75,94 @@ def test_telegram_webhook_start_sends_photo(settings, tmp_path) -> None:
 
 
 @pytest.mark.django_db
-def test_telegram_webhook_ignores_non_command_without_send(settings) -> None:
-    """Plain text does not trigger a Bot API call (not a support inbox)."""
+def test_telegram_webhook_plain_text_goes_to_support_inbox(settings) -> None:
+    """Free-form text creates a support Conversation + Message (no Bot API send)."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from supportchat.models import Channel, Conversation, Message
+    from supportchat.schedule import ensure_default_schedule
+
+    ensure_default_schedule()
     client = APIClient()
     with patch("social.publishers.urlopen") as mocked:
-        response = client.post(
-            reverse("telegram-webhook"),
-            data={
-                "update_id": 11,
-                "message": {
-                    "message_id": 2,
-                    "chat": {"id": 1, "type": "private"},
-                    "text": "здравствуйте",
+        with patch("supportchat.services.is_open_now", return_value=True):
+            response = client.post(
+                reverse("telegram-webhook"),
+                data={
+                    "update_id": 11,
+                    "message": {
+                        "message_id": 2,
+                        "chat": {"id": 777, "type": "private"},
+                        "from": {"first_name": "Ivan", "last_name": "Petrov"},
+                        "text": "здравствуйте",
+                    },
                 },
-            },
-            format="json",
-            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
-        )
+                format="json",
+                HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+            )
     assert response.status_code == 200
     mocked.assert_not_called()
+    conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="777")
+    assert conv.display_name == "Ivan Petrov"
+    assert Message.objects.filter(conversation=conv, body="здравствуйте").count() == 1
+
+    # Idempotent duplicate update
+    with patch("social.publishers.urlopen") as mocked2:
+        with patch("supportchat.services.is_open_now", return_value=True):
+            client.post(
+                reverse("telegram-webhook"),
+                data={
+                    "update_id": 12,
+                    "message": {
+                        "message_id": 2,
+                        "chat": {"id": 777, "type": "private"},
+                        "text": "здравствуйте",
+                    },
+                },
+                format="json",
+                HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+            )
+    mocked2.assert_not_called()
+    assert Message.objects.filter(conversation=conv).count() == 1
+
+
+@pytest.mark.django_db
+def test_staff_reply_delivers_to_telegram(settings) -> None:
+    """Outbound Celery task calls publish_telegram for TG conversations."""
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from django.contrib.auth import get_user_model
+
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import add_staff_reply
+    from supportchat.tasks import deliver_outbound_message
+
+    user = get_user_model().objects.create_user(
+        username="mgr@hoocon.ru",
+        email="mgr@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="999",
+        display_name="Client",
+    )
+    msg = add_staff_reply(conv, "Ответ менеджера", author=user)
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":55}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        result = deliver_outbound_message(msg.pk)
+    assert result == "telegram_ok"
+    req = mocked.call_args.args[0]
+    assert "sendMessage" in req.full_url
+    body = json.loads(req.data.decode("utf-8"))
+    assert body["chat_id"] == "999"
+    assert "Ответ менеджера" in body["text"]
 
 
 @pytest.mark.django_db
