@@ -146,7 +146,20 @@ def add_inbound_message(
                 outside_hours=True,
             )
             touch_conversation_message(conversation, inbound=False)
+    _schedule_staff_support_push(conversation.pk)
     return inbound, auto
+
+
+def _schedule_staff_support_push(conversation_id: int) -> None:
+    """Enqueue staff Web Push after commit."""
+    from django.db import transaction
+
+    def _enqueue() -> None:
+        from webpush.tasks import notify_staff_support_inbound
+
+        notify_staff_support_inbound.delay(conversation_id)
+
+    transaction.on_commit(_enqueue)
 
 
 @transaction.atomic
@@ -172,7 +185,20 @@ def add_staff_reply(
     conversation.save(
         update_fields=["staff_unread_count", "last_message_at", "status", "updated_at"],
     )
+    _schedule_visitor_support_push(conversation.pk)
     return msg
+
+
+def _schedule_visitor_support_push(conversation_id: int) -> None:
+    """Enqueue visitor Web Push after commit (web channel only)."""
+    from django.db import transaction
+
+    def _enqueue() -> None:
+        from webpush.tasks import notify_visitor_support_reply
+
+        notify_visitor_support_reply.delay(conversation_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def count_staff_unread() -> int:

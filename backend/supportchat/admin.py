@@ -68,6 +68,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     inlines = (MessageInline,)
     ordering = ("-last_message_at", "-id")
     change_form_template = "admin/supportchat/conversation/change_form.html"
+    change_list_template = "admin/supportchat/conversation/change_list.html"
     actions = ("action_mark_read", "action_close")
 
     fieldsets = (

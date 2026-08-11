@@ -41,6 +41,14 @@ def perm_view_conversation(request: HttpRequest) -> bool:
     return _can_view_conversations(request)
 
 
+def perm_view_webpush(request: HttpRequest) -> bool:
+    """Whether the user may see Web Push subscriptions in the sidebar."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and user.has_perm("webpush.view_pushsubscription"),
+    )
+
+
 def dashboard_callback(request: HttpRequest, context: dict[str, Any]) -> dict[str, Any]:
     """Inject Hoocon dashboard data into Unfold Admin index.
 
