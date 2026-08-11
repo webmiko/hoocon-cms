@@ -136,6 +136,7 @@ INSTALLED_APPS = [
     "search",
     "social",
     "supportchat.apps.SupportchatConfig",
+    "webpush.apps.WebpushConfig",
 ]
 
 MIDDLEWARE = [
@@ -314,6 +315,14 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_conversation",
                     },
                     {
+                        "title": _("Web Push"),
+                        "icon": "notifications",
+                        "link": reverse_lazy(
+                            "admin:webpush_pushsubscription_changelist",
+                        ),
+                        "permission": "config.unfold_callbacks.perm_view_webpush",
+                    },
+                    {
                         "title": _("Клиенты"),
                         "icon": "groups",
                         "link": reverse_lazy("admin:crm_client_changelist"),
@@ -365,6 +374,14 @@ TELEGRAM_WELCOME_PHOTO_URL = os.getenv(
     "https://hoocon.ru/og-image.jpg",
 ).strip()
 
+# Web Push (VAPID). Generate: poetry run vapid --gen && set env on VPS.
+WEBPUSH_VAPID_PUBLIC_KEY = os.getenv("WEBPUSH_VAPID_PUBLIC_KEY", "").strip()
+WEBPUSH_VAPID_PRIVATE_KEY = os.getenv("WEBPUSH_VAPID_PRIVATE_KEY", "").strip()
+WEBPUSH_VAPID_SUBJECT = os.getenv(
+    "WEBPUSH_VAPID_SUBJECT",
+    "mailto:noreply@hoocon.ru",
+).strip()
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
@@ -382,6 +399,7 @@ REST_FRAMEWORK = {
         "user": "240/min",
         "lead_create": "10/hour",
         "support_message": "30/hour",
+        "webpush_subscribe": "30/hour",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
     },
