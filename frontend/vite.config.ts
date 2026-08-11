@@ -14,6 +14,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "autoUpdate",
       includeAssets: [
         "favicon.svg",
@@ -59,22 +62,9 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Do not precache HTML / navigateFallback to index.html — that bypasses
-        // Django spa_index (SSR SEO head + LCP boot hero) for SW-controlled tabs.
+      injectManifest: {
+        // Do not precache HTML — Django spa_index SSR + LCP boot.
         globPatterns: ["**/*.{js,css,svg,png,ico,woff2,jpg,jpeg,webp}"],
-        navigateFallback: null,
-        // Keep Django SEO/LLM text endpoints out of any future SPA fallback.
-        navigateFallbackDenylist: [
-          /^\/api\//,
-          /^\/admin\//,
-          /^\/media\//,
-          /^\/robots\.txt$/,
-          /^\/sitemap\.xml$/,
-          /^\/llms\.txt$/,
-          /^\/llm\.txt$/,
-          /^\/llms-full\.txt$/,
-        ],
       },
       // Dev SW intercepts ``/src/*.tsx`` and yields a blank #root — keep PWA prod-only.
       devOptions: {
