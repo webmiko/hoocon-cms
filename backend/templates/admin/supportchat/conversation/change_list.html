@@ -18,9 +18,9 @@
     (function () {
       var unreadUrl = "{% url 'admin:supportchat_conversation_unread_count' %}";
       var baseline = null;
-      var shown = false;
+      var reloading = false;
       async function tick() {
-        if (document.hidden || shown) return;
+        if (document.hidden || reloading) return;
         try {
           var resp = await fetch(unreadUrl, {
             credentials: "same-origin",
@@ -35,20 +35,24 @@
             return;
           }
           if (count <= baseline) return;
-          shown = true;
-          var banner = document.createElement("div");
-          banner.className = "hoocon-messenger__live-banner";
-          banner.setAttribute("role", "status");
-          banner.appendChild(document.createTextNode("Есть новые сообщения в чатах. "));
-          var link = document.createElement("a");
-          link.href = location.pathname + location.search;
-          link.textContent = "Обновить список";
-          banner.appendChild(link);
-          var host =
-            document.querySelector("#content-main") ||
-            document.querySelector("#content") ||
-            document.body;
-          host.insertBefore(banner, host.firstChild);
+          baseline = count;
+          // Soft-reload list so new threads appear without a manual F5.
+          reloading = true;
+          var banner = document.querySelector(".hoocon-messenger__live-banner");
+          if (!banner) {
+            banner = document.createElement("div");
+            banner.className = "hoocon-messenger__live-banner";
+            banner.setAttribute("role", "status");
+            banner.textContent = "Обновляем список…";
+            var host =
+              document.querySelector("#content-main") ||
+              document.querySelector("#content") ||
+              document.body;
+            host.insertBefore(banner, host.firstChild);
+          }
+          window.setTimeout(function () {
+            location.reload();
+          }, 400);
         } catch (e) {
           /* ignore */
         }

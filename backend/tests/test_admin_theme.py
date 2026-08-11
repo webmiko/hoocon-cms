@@ -177,3 +177,41 @@ def test_admin_sidebar_keeps_icon_rail_when_collapsed() -> None:
     assert "hoocon-sidebar-shortcut" in html
     assert "Закрыть меню" in html
     assert 'title="Панель"' in html or 'title="Панель"' in html
+
+
+@pytest.mark.django_db
+def test_admin_pwa_manifest_and_icons() -> None:
+    """Admin ships a distinct PWA manifest (gray ADMIN icons, /admin/ scope)."""
+    admin_user = User.objects.create_superuser(
+        username="admin-pwa",
+        email="admin-pwa@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/").content.decode()
+    assert "admin/img/pwa-admin-192.png" in html
+    assert "apple-touch-admin.png" in html
+    assert "/admin/manifest.webmanifest" in html
+    assert "hoocon-admin-live-badges.js" in html
+    assert 'name="theme-color" content="#5a626c"' in html
+
+    manifest = client.get("/admin/manifest.webmanifest")
+    assert manifest.status_code == 200
+    assert "application/manifest+json" in manifest["Content-Type"]
+    data = manifest.json()
+    assert data["name"] == "Hoocon Admin"
+    assert data["start_url"] == "/admin/"
+    assert data["scope"] == "/admin/"
+    assert data["theme_color"] == "#5a626c"
+    assert any("pwa-admin-192" in icon["src"] for icon in data["icons"])
+
+
+@pytest.mark.django_db
+def test_admin_login_css_prevents_ios_input_zoom() -> None:
+    """Login/OTP inputs must be ≥16px so iOS Safari does not zoom on focus."""
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text()
+    assert "body.login input" in css
+    assert "font-size: 16px !important" in css

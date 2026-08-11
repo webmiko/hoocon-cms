@@ -205,7 +205,9 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     def unread_count_view(self, request: HttpRequest) -> JsonResponse:
         if not request.user.has_perm("supportchat.view_conversation"):
             return JsonResponse({"count": 0})
-        return JsonResponse({"count": count_staff_unread()})
+        response = JsonResponse({"count": count_staff_unread()})
+        response["Cache-Control"] = "no-store"
+        return response
 
     def messages_poll_view(self, request: HttpRequest, object_id: str) -> JsonResponse:
         """GET JSON messages newer than ?after= for live Admin messenger."""

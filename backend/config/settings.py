@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
@@ -273,13 +274,41 @@ UNFOLD = {
     "SITE_URL": "/",
     # Release badge next to branding (e.g. «v0.0.3 beta»).
     "ENVIRONMENT": release_label(),
+    # Distinct Admin PWA / home-screen icons (gray + ADMIN; not the public site).
+    "SITE_FAVICONS": [
+        {
+            "href": lambda _r: static("admin/img/pwa-admin-192.png"),
+            "rel": "icon",
+            "sizes": "192x192",
+            "type": "image/png",
+        },
+        {
+            "href": lambda _r: static("admin/img/pwa-admin-512.png"),
+            "rel": "icon",
+            "sizes": "512x512",
+            "type": "image/png",
+        },
+        {
+            "href": lambda _r: static("admin/img/apple-touch-admin.png"),
+            "rel": "apple-touch-icon",
+            "sizes": "180x180",
+            "type": "image/png",
+        },
+        {
+            "href": reverse_lazy("admin-pwa-manifest"),
+            "rel": "manifest",
+            "type": "application/manifest+json",
+        },
+    ],
     "COLORS": {
         "primary": _UNFOLD_PRIMARY,
     },
     "STYLES": [
         "config.unfold_callbacks.unfold_extras_css",
     ],
-    "SCRIPTS": [],
+    "SCRIPTS": [
+        "config.unfold_callbacks.admin_live_badges_js",
+    ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,
@@ -365,9 +394,10 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 # Telegram inbound webhook (setWebhook secret_token). Empty = webhook rejects all.
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
-# Public deep-link username for support widget (t.me/<name>); empty = hide TG bot link.
-TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "").strip()
-# Public channel for widget / bot menu (t.me/<name>); default official Hoocon channel.
+# Public deep-link username for 1:1 bot chat in the support widget.
+# Default matches production bot; set empty to hide the chip.
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "HooconMsk_bot").strip()
+# Public channel for footer / bot menu (t.me/<name>); default official Hoocon channel.
 TELEGRAM_CHANNEL_USERNAME = (
     os.getenv(
         "TELEGRAM_CHANNEL_USERNAME",

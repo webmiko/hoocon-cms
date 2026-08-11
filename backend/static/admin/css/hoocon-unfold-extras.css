@@ -1230,3 +1230,19 @@ kbd.hoocon-sidebar-shortcut > span {
   outline: none !important;
   box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
 }
+
+/* Login / OTP: iOS Safari zooms inputs with font-size < 16px — keep ≥16px. */
+body.login input[type="text"],
+body.login input[type="email"],
+body.login input[type="password"],
+body.login input[type="tel"],
+body.login input[type="number"],
+body.login input[type="search"],
+body.login input:not([type]),
+body.login textarea,
+body.login select,
+#login-form input,
+#id_otp_code {
+  font-size: 16px !important;
+  max-height: none;
+}

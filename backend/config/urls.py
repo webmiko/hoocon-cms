@@ -14,6 +14,7 @@ from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 import config.admin_branding  # noqa: F401 — site_header / site_title
+from config.admin_pwa import AdminPwaManifestView
 from config.csrf_views import CsrfTokenView
 from config.health_views import HealthView
 from config.seo.spa_index import spa_index_view
@@ -43,6 +44,12 @@ def _openapi_access(view: Callable[..., HttpResponse]) -> Callable[..., HttpResp
 
 
 urlpatterns = [
+    # Before admin.site.urls so /admin/manifest.webmanifest is not swallowed.
+    path(
+        "admin/manifest.webmanifest",
+        AdminPwaManifestView.as_view(),
+        name="admin-pwa-manifest",
+    ),
     path("admin/", admin.site.urls),
     path("api/catalog/", include("catalog.urls")),
     path("api/content/", include("content.urls")),

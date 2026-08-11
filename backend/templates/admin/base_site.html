@@ -11,12 +11,20 @@
 
 {% block extrahead %}
   {{ block.super }}
+  <meta name="theme-color" content="#5a626c">
+  <meta name="apple-mobile-web-app-title" content="Admin">
+  {% if user.is_authenticated and user.is_staff %}
+  <div hidden
+    {% if HOOCON_NEW_LEADS_COUNT_URL %}data-hoocon-leads-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"{% endif %}
+    data-hoocon-support-unread-url="{% url 'admin:supportchat_conversation_unread_count' %}"
+  ></div>
+  {% endif %}
   {% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_COUNT_URL %}
   <script
     src="{% static 'admin/js/hoocon-admin-leads-sticker.js' %}?v={{ STATIC_VERSION }}"
     defer
     data-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"
-    data-poll-ms="60000"
+    data-poll-ms="12000"
   ></script>
   {% endif %}
 {% endblock %}
