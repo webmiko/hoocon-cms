@@ -1,10 +1,14 @@
 .banner,
 .panel {
   position: fixed;
-  left: 12px;
-  right: 12px;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
   bottom: calc(var(--bottom-chrome) + var(--cookie-chrome, 0px) + 4px);
   z-index: 450;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: var(--glass-bg-strong);
   backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
   -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
@@ -14,6 +18,7 @@
   padding: var(--space-md) var(--space-lg);
   animation: cookie-in 0.5s var(--ease-out) both;
   max-height: min(80vh, 560px);
+  overflow-x: clip;
   overflow-y: auto;
 }
 

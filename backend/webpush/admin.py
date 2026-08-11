@@ -135,7 +135,9 @@ class PushSubscriptionAdmin(ModelAdmin):
         if request.method == "POST":
             title = (request.POST.get("title") or "").strip()
             body = (request.POST.get("body") or "").strip()
-            url = (request.POST.get("url") or "/").strip() or "/"
+            from webpush.services import sanitize_push_url
+
+            url = sanitize_push_url((request.POST.get("url") or "/").strip() or "/")
             if not title or not body:
                 messages.error(request, "Заголовок и текст обязательны.")
             else:

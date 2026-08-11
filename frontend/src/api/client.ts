@@ -394,10 +394,17 @@ export const api = {
     topic_support?: boolean;
     topic_marketing?: boolean;
   }): Promise<{ id: number; topic_support: boolean; topic_marketing: boolean }> {
+    const headers: Record<string, string> = {
+      "X-CSRFToken": getCsrfToken() ?? "",
+    };
+    if (data.topic_marketing) {
+      // Echo cookie marketing opt-in; server rejects marketing without this.
+      headers["X-Hoocon-Marketing-Consent"] = "1";
+    }
     return apiFetch("/api/webpush/subscribe/", {
       method: "POST",
       body: JSON.stringify(data),
-      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+      headers,
     });
   },
 
@@ -405,6 +412,24 @@ export const api = {
     return apiFetch("/api/webpush/unsubscribe/", {
       method: "POST",
       body: JSON.stringify({ endpoint }),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
+
+  webpushTopics(data: {
+    endpoint?: string;
+    clear_support?: boolean;
+    clear_marketing?: boolean;
+    marketing_consent?: boolean;
+  }): Promise<{
+    deleted?: boolean;
+    topic_support?: boolean;
+    topic_marketing?: boolean;
+    marketing_consent?: boolean;
+  }> {
+    return apiFetch("/api/webpush/topics/", {
+      method: "POST",
+      body: JSON.stringify(data),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },

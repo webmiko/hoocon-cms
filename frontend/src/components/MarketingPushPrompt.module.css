@@ -1,21 +1,22 @@
 .banner {
   position: fixed;
+  /* Inset both sides — never width:100% together with left+right (overflow). */
   left: max(12px, env(safe-area-inset-left, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
   bottom: calc(
     12px + env(safe-area-inset-bottom, 0px) + var(--bottom-chrome, 0px) +
-      var(--cookie-chrome, 0px)
+      var(--cookie-chrome, 0px) + var(--support-chrome, 0px)
   );
   z-index: 430;
   display: flex;
   align-items: flex-start;
   gap: 0.85rem;
-  width: min(420px, 100%);
+  width: auto;
   max-width: 100%;
-  margin: 0 auto;
+  min-width: 0;
+  margin: 0;
   padding: 0.95rem 1rem;
   box-sizing: border-box;
-  min-width: 0;
   background: var(--glass-bg-strong, var(--color-surface));
   backdrop-filter: saturate(var(--glass-saturate, 1.2)) blur(var(--glass-blur, 12px));
   -webkit-backdrop-filter: saturate(var(--glass-saturate, 1.2))
@@ -24,6 +25,7 @@
   border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow);
   animation: mkt-in 320ms var(--ease-out);
+  overflow-x: clip;
 }
 
 @keyframes mkt-in {
@@ -141,6 +143,7 @@
   .banner {
     left: auto;
     right: max(16px, env(safe-area-inset-right, 0px));
-    margin: 0;
+    width: min(420px, calc(100% - 32px));
+    max-width: min(420px, 100%);
   }
 }

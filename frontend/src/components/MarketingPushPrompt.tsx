@@ -1,9 +1,12 @@
 /**
  * Soft marketing push prompt after cookie marketing consent.
  * Deferred (not on critical LCP path); dismissible for 14 days.
+ *
+ * Do not treat a support-chat PushSubscription as «already on news» —
+ * marketing is a separate topic flag on the same endpoint.
  */
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   COOKIE_CONSENT_CHANGE_EVENT,
@@ -11,6 +14,10 @@ import {
   readCookieConsent,
   type CookieConsentState,
 } from "../utils/cookieConsent";
+import {
+  getSupportChatState,
+  subscribeSupportChat,
+} from "../utils/supportChatControl";
 import {
   hasBrowserPushSubscription,
   pushSupported,
@@ -20,7 +27,33 @@ import {
 import styles from "./MarketingPushPrompt.module.css";
 
 const DISMISS_KEY = "hoocon-marketing-push-dismissed-until";
+const DONE_KEY = "hoocon-marketing-push-subscribed";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+
+function isMarketingPushDone(): boolean {
+  try {
+    return localStorage.getItem(DONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markMarketingPushDone() {
+  try {
+    localStorage.setItem(DONE_KEY, "1");
+    localStorage.removeItem(DISMISS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearMarketingPushDone() {
+  try {
+    localStorage.removeItem(DONE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function isDismissed(): boolean {
   try {
@@ -38,6 +71,32 @@ function dismiss() {
   } catch {
     /* ignore */
   }
+}
+
+function clearDismiss() {
+  try {
+    localStorage.removeItem(DISMISS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Done flag is stale if permission/sub/consent was revoked. */
+async function refreshMarketingDoneFlag(): Promise<boolean> {
+  if (!isMarketingPushDone()) return false;
+  if (!isMarketingAllowed(readCookieConsent())) {
+    clearMarketingPushDone();
+    return false;
+  }
+  if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+    clearMarketingPushDone();
+    return false;
+  }
+  if (!(await hasBrowserPushSubscription())) {
+    clearMarketingPushDone();
+    return false;
+  }
+  return true;
 }
 
 function BellIcon({ className }: { className?: string }) {
@@ -65,42 +124,73 @@ export function MarketingPushPrompt() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const hideTimerRef = useRef<number | null>(null);
+  const marketingWasOnRef = useRef(isMarketingAllowed(readCookieConsent()));
 
   useEffect(() => {
     let cancelled = false;
+
+    async function canOffer(): Promise<boolean> {
+      if (!pushSupported()) return false;
+      if (!isMarketingAllowed(readCookieConsent())) return false;
+      if (typeof Notification !== "undefined" && Notification.permission === "denied") {
+        return false;
+      }
+      if (await refreshMarketingDoneFlag()) return false;
+      if (getSupportChatState().open) return false;
+      return true;
+    }
+
     const timer = window.setTimeout(() => {
       void (async () => {
-        if (!pushSupported() || isDismissed()) return;
-        if (!isMarketingAllowed(readCookieConsent())) return;
-        // Already subscribed in this browser — do not nag after reload.
-        if (await hasBrowserPushSubscription()) {
-          dismiss();
-          return;
-        }
+        if (cancelled) return;
+        if (!(await canOffer()) || isDismissed()) return;
         if (!cancelled) setVisible(true);
       })();
     }, 4000);
 
     function onConsent(event: Event) {
       const detail = (event as CustomEvent<CookieConsentState>).detail;
+      const marketingOn = isMarketingAllowed(detail);
+      const wasOn = marketingWasOnRef.current;
+      marketingWasOnRef.current = marketingOn;
+
+      if (!marketingOn) {
+        clearMarketingPushDone();
+        setVisible(false);
+        void import("../utils/webPush").then(({ syncMarketingPushConsent }) =>
+          syncMarketingPushConsent(false),
+        );
+        return;
+      }
+      if (!pushSupported()) {
+        setVisible(false);
+        return;
+      }
       void (async () => {
-        if (!isMarketingAllowed(detail) || !pushSupported() || isDismissed()) {
-          setVisible(false);
+        if (await refreshMarketingDoneFlag()) {
+          if (!cancelled) setVisible(false);
           return;
         }
-        if (await hasBrowserPushSubscription()) {
-          dismiss();
-          setVisible(false);
-          return;
+        // Only re-offer on fresh marketing opt-in (false → true).
+        if (!wasOn && marketingOn) {
+          clearDismiss();
+          if (!cancelled && !getSupportChatState().open) setVisible(true);
         }
-        setVisible(true);
       })();
     }
+
+    const unsubChat = subscribeSupportChat((next) => {
+      if (next.open) setVisible(false);
+    });
+
     window.addEventListener(COOKIE_CONSENT_CHANGE_EVENT, onConsent);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
       window.removeEventListener(COOKIE_CONSENT_CHANGE_EVENT, onConsent);
+      unsubChat();
     };
   }, []);
 
@@ -110,11 +200,15 @@ export function MarketingPushPrompt() {
     setStatus("");
     setBusy(true);
     try {
+      if (!isMarketingAllowed(readCookieConsent())) {
+        setStatus("Включите «Новости и акции» в настройках cookie");
+        return;
+      }
       const result = await subscribeWebPush({ topic_marketing: true });
       if (result.ok) {
         setStatus("Готово — будем присылать новости");
-        dismiss();
-        window.setTimeout(() => setVisible(false), 2000);
+        markMarketingPushDone();
+        hideTimerRef.current = window.setTimeout(() => setVisible(false), 2000);
       } else {
         setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
       }

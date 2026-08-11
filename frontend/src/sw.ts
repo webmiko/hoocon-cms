@@ -57,7 +57,7 @@ self.addEventListener("push", (event: PushEvent) => {
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const raw = (event.notification.data as { url?: string } | undefined)?.url;
-  const target = typeof raw === "string" && raw.startsWith("/") ? raw : "/";
+  const target = safeSameOriginPath(raw);
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({
@@ -77,3 +77,13 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
     })(),
   );
 });
+
+/** Same-origin path only; reject protocol-relative ``//evil`` open redirects. */
+function safeSameOriginPath(raw: unknown): string {
+  if (typeof raw !== "string") return "/";
+  const url = raw.trim() || "/";
+  if (!url.startsWith("/") || url.startsWith("//") || url.includes("://")) {
+    return "/";
+  }
+  return url.slice(0, 500);
+}

@@ -45,7 +45,7 @@ def notify_visitor_support_reply(conversation_id: int) -> int:
     session_key = conv.external_user_id
     title = "Ответ поддержки Hoocon"
     body = "Менеджер ответил в чате на сайте"
-    url = "/"
+    url = "/?chat=1"
     sent = 0
     for sub in queryset_session_support(session_key).iterator():
         if send_push_to_subscription(sub, title=title, body=body, url=url, tag=f"support-reply-{conv.pk}"):

@@ -55,6 +55,15 @@ VAPID на сервере при этом может быть `configured: true`
 | `topic_support` | Посетитель: виджет → «Уведомлять об ответе» | Ответ менеджера (web) |
 | `topic_marketing` | После cookie «Новости» + баннер «Включить» | Admin → Web Push → рассылка |
 
+API: `POST /api/webpush/subscribe/` с `topic_marketing: true` требует
+маркетинговый consent в Django session (ставит заголовок
+`X-Hoocon-Marketing-Consent: 1` или `POST /api/webpush/topics/` с
+`marketing_consent`). Opt-out cookie «Новости» вызывает `/topics/` с
+`clear_marketing: true` (support-topic сохраняется).
+
+Push click URL: только same-origin path (`/?chat=1` для ответа поддержки);
+`//…` и абсолютные URL отклоняются.
+
 iOS: push в Safari обычно только после «На экран „Домой“» (PWA). Основной
 target v1 — Chrome / Edge / Android (где FCM доступен).
 
@@ -62,8 +71,9 @@ target v1 — Chrome / Edge / Android (где FCM доступен).
 
 `PushSubscription` хранится в браузере (не в React state). После F5:
 
-1. виджет чата вызывает `syncExistingWebPush` и снова POSTit endpoint →
-   Django (перепривязка `session_key` / topics);
+1. виджет чата вызывает `syncExistingWebPush` **только** если пользователь
+   уже нажимал «Уведомлять об ответе» (`localStorage`); иначе `topic_support`
+   не поднимается молча;
 2. UI показывает «Уведомления включены», без повторного запроса permission;
 3. `unsubscribe()` вызывается только при явной смене VAPID-ключа, не при
    обычной ошибке сети.

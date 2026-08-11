@@ -16,6 +16,7 @@ import {
   writeCookieConsent,
   type CookieConsentState,
 } from "../utils/cookieConsent";
+import { syncMarketingPushConsent } from "../utils/webPush";
 import styles from "./CookieConsent.module.css";
 
 const COOKIE_OPEN_CLASS = "cookie-banner-open";
@@ -86,6 +87,7 @@ export function CookieConsent() {
     setAnalyticsDraft(analytics);
     setMarketingDraft(marketing);
     setMode("hidden");
+    void syncMarketingPushConsent(marketing);
   }
 
   if (mode === "hidden") {
@@ -149,7 +151,8 @@ export function CookieConsent() {
               </div>
               <p className={styles.categoryDesc}>
                 Push-уведомления о новостях и предложениях Hoocon в браузере
-                (PWA). Можно отключить в любой момент.
+                (PWA). После согласия сайт предложит включить уведомления.
+                Можно отключить в любой момент.
               </p>
               <label className={styles.switchRow}>
                 <input

@@ -124,13 +124,22 @@ async function postSubscriptionToApi(
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
     return { ok: false, reason: "subscribe_failed" };
   }
+  const topicMarketing = Boolean(topics.topic_marketing);
+  if (topicMarketing) {
+    const { isMarketingAllowed, readCookieConsent } = await import(
+      "./cookieConsent"
+    );
+    if (!isMarketingAllowed(readCookieConsent())) {
+      return { ok: false, reason: "api_error", detail: "marketing consent required" };
+    }
+  }
   try {
     await api.fetchCsrfToken();
     await api.webpushSubscribe({
       endpoint: json.endpoint,
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
       topic_support: Boolean(topics.topic_support),
-      topic_marketing: Boolean(topics.topic_marketing),
+      topic_marketing: topicMarketing,
     });
   } catch (err) {
     return {
@@ -221,6 +230,36 @@ export async function subscribeWebPush(topics: {
   }
 
   return postSubscriptionToApi(subscription, topics);
+}
+
+/**
+ * Sync cookie marketing opt-in to Django session and clear server topic
+ * when the visitor turns marketing off.
+ */
+export async function syncMarketingPushConsent(
+  marketingAllowed: boolean,
+): Promise<void> {
+  try {
+    await api.fetchCsrfToken();
+    const payload: {
+      marketing_consent: boolean;
+      endpoint?: string;
+      clear_marketing?: boolean;
+    } = { marketing_consent: marketingAllowed };
+    if (!marketingAllowed && pushSupported()) {
+      const registration = await getRegistration();
+      const existing = registration
+        ? await registration.pushManager.getSubscription()
+        : null;
+      if (existing?.endpoint) {
+        payload.endpoint = existing.endpoint;
+        payload.clear_marketing = true;
+      }
+    }
+    await api.webpushTopics(payload);
+  } catch {
+    /* best-effort — local cookie state remains source of UI truth */
+  }
 }
 
 /** Short RU status for SupportWidget / marketing prompt. */

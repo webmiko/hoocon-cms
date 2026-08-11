@@ -116,14 +116,18 @@ Admin, файлы, SPA, VPS.
 - Нет open redirect с `?next=` без allowlist.
 - Зависимости npm: lockfile; не подключать произвольный third-party JS без SRI/нужды.
 - Метрика/аналитика — после cookie consent (CSP учёт).
-- **Support chat** (`supportchat`): виджет — session + CSRF + throttle
-  (`support_message`); IDOR только своя session; honeypot на start/message;
-  публичные `/api/support/channels|schedule/` без bot tokens; Telegram
-  webhook secret как у `/api/integrations/telegram/webhook/`; текст only.
+- **Support chat** (`supportchat`): виджет — Django session + throttle
+  (`support_message` / `support_poll`); IDOR только своя session; honeypot на
+  start/message; публичные `/api/support/channels|schedule/` без bot tokens;
+  Telegram webhook secret как у `/api/integrations/telegram/webhook/`; текст
+  only. CSRF-токен SPA шлёт на POST (defense-in-depth); для анонимных DRF
+  SessionAuthentication CSRF не enforced — основной контроль cookie
+  `SameSite=Lax` + CORS allowlist.
 - **Web Push** (`webpush`): VAPID keys только в `.env`; публичный API отдаёт
   только public key; marketing-topic только после cookie `marketing` +
-  Notification permission; payload без PII (без email/телефона); 410 →
-  удаление подписки. Ops: [webpush-ops.md](webpush-ops.md).
+  session consent (`X-Hoocon-Marketing-Consent` / `/topics/`); payload без
+  PII; push URL — только same-origin path (блок `//`); 410 → удаление
+  подписки. Ops: [webpush-ops.md](webpush-ops.md).
 
 ### 3.5 Infra (итерация 5, заложить в конфиги заранее)
 

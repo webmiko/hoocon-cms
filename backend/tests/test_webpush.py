@@ -82,6 +82,7 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
         data={**payload, "topic_marketing": True},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
+        HTTP_X_HOOCON_MARKETING_CONSENT="1",
     )
     assert second.status_code == 201
     assert PushSubscription.objects.filter(endpoint=payload["endpoint"]).count() == 1
@@ -89,6 +90,39 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
     assert sub.topic_support is True
     assert sub.topic_marketing is True
     assert sub.session_key == session_a
+
+
+@pytest.mark.django_db
+@override_settings(
+    WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
+    WEBPUSH_VAPID_PRIVATE_KEY="test-private",
+)
+def test_subscribe_marketing_requires_consent_header() -> None:
+    client = _csrf_client()
+    token = client.cookies["csrftoken"].value
+    payload = {
+        "endpoint": "https://push.example/sub/mkt-gate",
+        "keys": {"p256dh": "p256", "auth": "authkey"},
+        "topic_marketing": True,
+    }
+    denied = client.post(
+        "/api/webpush/subscribe/",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert denied.status_code == 400
+    assert PushSubscription.objects.count() == 0
+
+    ok = client.post(
+        "/api/webpush/subscribe/",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+        HTTP_X_HOOCON_MARKETING_CONSENT="1",
+    )
+    assert ok.status_code == 201
+    assert PushSubscription.objects.get().topic_marketing is True
 
 
 @pytest.mark.django_db
@@ -220,3 +254,49 @@ def test_admin_broadcast_form_renders_card() -> None:
     assert 'name="title"' in html
     assert "Отправить рассылку" in html
     assert "получателей" in html
+
+
+@pytest.mark.django_db
+@override_settings(
+    WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
+    WEBPUSH_VAPID_PRIVATE_KEY="test-private",
+)
+def test_clear_marketing_topic_keeps_support() -> None:
+    client = _csrf_client()
+    token = client.cookies["csrftoken"].value
+    endpoint = "https://push.example/sub/topics"
+    upsert_subscription(
+        endpoint=endpoint,
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        topic_marketing=True,
+    )
+    resp = client.post(
+        "/api/webpush/topics/",
+        data={
+            "endpoint": endpoint,
+            "clear_marketing": True,
+            "marketing_consent": False,
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["deleted"] is False
+    assert body["topic_support"] is True
+    assert body["topic_marketing"] is False
+    assert body["marketing_consent"] is False
+    sub = PushSubscription.objects.get(endpoint=endpoint)
+    assert sub.topic_support is True
+    assert sub.topic_marketing is False
+
+
+def test_sanitize_push_url_blocks_protocol_relative() -> None:
+    from webpush.services import sanitize_push_url
+
+    assert sanitize_push_url("/?chat=1") == "/?chat=1"
+    assert sanitize_push_url("//evil.example/phish") == "/"
+    assert sanitize_push_url("https://evil.example/") == "/"
+    assert sanitize_push_url("") == "/"

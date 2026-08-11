@@ -93,9 +93,49 @@ def upsert_subscription(
     return existing
 
 
+def clear_subscription_topics(
+    endpoint: str,
+    *,
+    clear_support: bool = False,
+    clear_marketing: bool = False,
+) -> PushSubscription | None:
+    """Turn off topic flags; delete the row if both topics become false.
+
+    Returns the updated subscription, or None when deleted / missing.
+    """
+    endpoint = (endpoint or "").strip()
+    if not endpoint:
+        raise ValueError("endpoint required")
+    if not clear_support and not clear_marketing:
+        raise ValueError("at least one topic to clear")
+    existing = PushSubscription.objects.filter(endpoint=endpoint).first()
+    if existing is None:
+        return None
+    if clear_support:
+        existing.topic_support = False
+    if clear_marketing:
+        existing.topic_marketing = False
+    if not existing.topic_support and not existing.topic_marketing:
+        existing.delete()
+        return None
+    existing.save(update_fields=["topic_support", "topic_marketing", "last_seen_at"])
+    return existing
+
+
 def remove_subscription(endpoint: str) -> int:
     """Delete by endpoint; return number deleted."""
     return PushSubscription.objects.filter(endpoint=(endpoint or "").strip()).delete()[0]
+
+
+def sanitize_push_url(url: str) -> str:
+    """Allow only same-origin path URLs (reject protocol-relative ``//``)."""
+    raw = (url or "").strip() or "/"
+    if not raw.startswith("/") or raw.startswith("//"):
+        return "/"
+    # Keep path + query + hash; block schemes smuggled after slash.
+    if "://" in raw:
+        return "/"
+    return raw[:500]
 
 
 def send_push_to_subscription(
@@ -117,7 +157,7 @@ def send_push_to_subscription(
         {
             "title": title[:120],
             "body": body[:240],
-            "url": url or "/",
+            "url": sanitize_push_url(url),
             "tag": tag or "hoocon",
         },
         ensure_ascii=False,
