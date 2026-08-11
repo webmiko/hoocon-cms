@@ -522,7 +522,8 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "Электропривод 230 В или 24 В: как выбрать номинал по щиту и АСУ, класс защиты III/II и IP — разные оси."
     ),
     "mu-mqu-hv-kogda-nuzhen-uskorennyy": (
-        "MU, MQU и HV: когда нужна скорость хода; ориентиры секунд и почему ускоренный привод не заменяет fail-safe."
+        "MU, MQU и HV: когда скорость хода нужна по ТЗ — и почему ускоренный "
+        "привод не заменяет возврат при отключении питания."
     ),
     "analog-belimo-hoocon": (
         "Как подобрать замену Belimo на Hoocon: сверить момент, пружину, "
@@ -536,7 +537,7 @@ ARTICLE_TITLES: dict[str, str] = {
     "podbor-privoda-po-momentu-i-ploshchadi": ("Подбор привода по площади и давлению: как выбрать момент"),
     "tipy-upravleniya-privodom": ("Типы управления приводом: Открыто/закрыто, 2-/3 и 0–10 В"),
     "pitanie-24-ili-230-v": "24 В или 230 В: что выбрать для электропривода",
-    "mu-mqu-hv-kogda-nuzhen-uskorennyy": ("MU, MQU и HV: когда нужна ускоренная перекладка"),
+    "mu-mqu-hv-kogda-nuzhen-uskorennyy": ("MU, MQU и HV: когда скорость хода действительно нужна"),
     "analog-belimo-hoocon": "Замена Belimo на Hoocon: как подбирать аналог",
 }
 
