@@ -19,7 +19,7 @@ from pathlib import Path
 from django.db.models import Prefetch
 
 from catalog.etl.normalize import PRODUCT_SLUG_REMAP
-from catalog.models import Product, SKU
+from catalog.models import SKU, Product
 from catalog.series_categories import legacy_slug_aliases
 from catalog.urls_paths import catalog_path_for_sku
 from redirects.models import Redirect
@@ -92,22 +92,22 @@ def resolve_legacy_slug_to_sku(slug: str) -> SKU | None:
         return None
     raw = PRODUCT_SLUG_REMAP.get(raw, raw)
 
-    sku = (
-        SKU.objects.filter(slug=raw, is_published=True)
-        .select_related("product__category")
-        .first()
-    )
+    sku = SKU.objects.filter(slug=raw, is_published=True).select_related("product__category").first()
     if sku is not None:
         return sku
 
-    product = Product.objects.filter(slug=raw).prefetch_related(
-        Prefetch(
-            "skus",
-            queryset=SKU.objects.filter(is_published=True).select_related(
-                "product__category",
+    product = (
+        Product.objects.filter(slug=raw)
+        .prefetch_related(
+            Prefetch(
+                "skus",
+                queryset=SKU.objects.filter(is_published=True).select_related(
+                    "product__category",
+                ),
             ),
-        ),
-    ).first()
+        )
+        .first()
+    )
     if product is not None:
         return preferred_sku_for_product(product)
 
@@ -209,11 +209,7 @@ def _rewrite_stale_redirect_targets(*, dry_run: bool) -> int:
         if row.from_path.startswith(("/statyi", "/novosti", "/news")):
             continue
         from_leaf = row.from_path.rstrip("/").rsplit("/", 1)[-1]
-        sku = (
-            SKU.objects.filter(slug=from_leaf, is_published=True)
-            .select_related("product__category")
-            .first()
-        )
+        sku = SKU.objects.filter(slug=from_leaf, is_published=True).select_related("product__category").first()
         if sku is not None:
             target = _target_path_for_sku(sku)
             if _upsert_redirect(row.from_path, target, dry_run=dry_run):

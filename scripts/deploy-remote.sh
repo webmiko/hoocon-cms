@@ -71,6 +71,9 @@ if [[ -d deploy/nginx ]]; then
       "cp -a /etc/nginx/sites-available/hoocon \
          /etc/nginx/sites-available/hoocon.bak.\$(date +%Y%m%d%H%M%S) 2>/dev/null || true; \
        cp '${DEPLOY_PATH}/deploy/nginx/hoocon.conf' /etc/nginx/sites-available/hoocon; \
+       if [[ -f '${DEPLOY_PATH}/deploy/nginx/hoocon-site.inc' ]]; then \
+         cp '${DEPLOY_PATH}/deploy/nginx/hoocon-site.inc' /etc/nginx/hoocon-site.inc; \
+       fi; \
        if [[ -f '${DEPLOY_PATH}/deploy/nginx/redirects.map' ]]; then \
          cp '${DEPLOY_PATH}/deploy/nginx/redirects.map' /etc/nginx/redirects.map; \
        fi; \

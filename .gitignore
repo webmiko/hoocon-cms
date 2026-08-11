@@ -39,6 +39,10 @@ AGENTS.md
 # Локальные "_" пути (симлинки или каталоги): БЗ, PDF-инструкции и пр.
 # Без завершающего «/» — иначе symlink не матчится как directory.
 _*
+# Не глотать Python-пакеты: иначе accounts/migrations/__init__.py не в git →
+# Django считает app unmigrated и CI падает на FK к auth_user.
+!**/__init__.py
+!**/__init__.pyi
 _инструкции-pdf
 _Универсальная-база-знаний
 

@@ -93,7 +93,11 @@ def otp_request_window_seconds() -> int:
 
 
 def otp_allowed_emails() -> frozenset[str]:
-    """Lowercased allowlist; empty means any active staff email is OK."""
+    """Lowercased allowlist entries; empty means any active staff email is OK.
+
+    Entries may be full addresses (``user@host``) or domains (``@host`` /
+    ``*@host``) so every staff mailbox on that domain is allowed.
+    """
     raw = str(getattr(settings, "ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "") or "")
     return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
 
@@ -103,7 +107,17 @@ def staff_email_allowed_for_otp(email: str) -> bool:
     allowed = otp_allowed_emails()
     if not allowed:
         return True
-    return (email or "").strip().lower() in allowed
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized in allowed:
+        return True
+    if "@" not in normalized:
+        return False
+    _, _, domain = normalized.partition("@")
+    if not domain:
+        return False
+    return f"@{domain}" in allowed or f"*@{domain}" in allowed
 
 
 def otp_ttl_human() -> str:

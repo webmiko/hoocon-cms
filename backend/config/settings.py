@@ -433,6 +433,7 @@ LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
 
 # Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
 # Prod: ADMIN_EMAIL_OTP_ENABLED=true + ALLOWED_EMAILS (SMTP required).
+# ALLOWED_EMAILS: comma list of addresses and/or domains (@hoocon.ru / *@hoocon.ru).
 ADMIN_EMAIL_OTP_ENABLED = _env_bool("ADMIN_EMAIL_OTP_ENABLED", default=False)
 ADMIN_EMAIL_OTP_TTL_SECONDS = int(os.getenv("ADMIN_EMAIL_OTP_TTL_SECONDS", "300"))
 ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"))

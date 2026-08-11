@@ -60,9 +60,21 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,jpg,jpeg,webp}"],
-        navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/media\//],
+        // Do not precache HTML / navigateFallback to index.html — that bypasses
+        // Django spa_index (SSR SEO head + LCP boot hero) for SW-controlled tabs.
+        globPatterns: ["**/*.{js,css,svg,png,ico,woff2,jpg,jpeg,webp}"],
+        navigateFallback: null,
+        // Keep Django SEO/LLM text endpoints out of any future SPA fallback.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/admin\//,
+          /^\/media\//,
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/,
+          /^\/llms\.txt$/,
+          /^\/llm\.txt$/,
+          /^\/llms-full\.txt$/,
+        ],
       },
       // Dev SW intercepts ``/src/*.tsx`` and yields a blank #root — keep PWA prod-only.
       devOptions: {

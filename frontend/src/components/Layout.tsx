@@ -13,6 +13,7 @@ import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
+import { dismissHomeSsrHero } from "../utils/adoptHomeSsrLcpImage";
 import { releaseLabel } from "../release";
 import styles from "./Layout.module.css";
 
@@ -52,6 +53,13 @@ export function Layout() {
   /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
   const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
   const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
+
+  // Boot hero is only for the initial ``/`` document; drop it on client navigations.
+  useEffect(() => {
+    if (!isHome) {
+      dismissHomeSsrHero();
+    }
+  }, [isHome]);
 
   // Reset visibility when entering home or /zavod.
   if ((isHome || isZavod) !== inlineTrack) {

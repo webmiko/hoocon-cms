@@ -10,7 +10,7 @@ from catalog.etl.seo_legacy_redirects import (
     preferred_sku_for_product,
     resolve_legacy_slug_to_sku,
 )
-from catalog.models import Category, Product, SKU
+from catalog.models import SKU, Category, Product
 from content.article_slug_renames import ARTICLE_SLUG_RENAMES, apply_article_slug_renames
 from content.models import Article, News
 from content.news_slug_renames import NEWS_SLUG_RENAMES, apply_news_slug_renames

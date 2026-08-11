@@ -32,11 +32,14 @@ def _analytics_counter_ids() -> tuple[str, str]:
     return ym.strip(), ga.strip()
 
 
-def build_csp(*, nonce: str | None = None) -> str:
+def build_csp(*, nonce: str | None = None, allow_unsafe_eval: bool = False) -> str:
     """Build CSP directive string.
 
     Args:
         nonce: Per-request nonce for SPA HTML (JSON-LD / inline).
+        allow_unsafe_eval: Allow ``script-src 'unsafe-eval'`` (Unfold Admin /
+            Alpine ``x-data`` uses ``new Function``; without this the login
+            modal overlay stays up and blocks clicks).
 
     Returns:
         Full Content-Security-Policy value.
@@ -44,6 +47,8 @@ def build_csp(*, nonce: str | None = None) -> str:
     script_parts = ["'self'"]
     if nonce:
         script_parts.insert(0, f"'nonce-{nonce}'")
+    if allow_unsafe_eval:
+        script_parts.append("'unsafe-eval'")
     connect_parts = ["'self'"]
     # data: placeholders; blob: product photos (ProtectedProductImage object URLs).
     img_parts = ["'self'", "data:", "blob:"]
@@ -116,7 +121,9 @@ class CspMiddleware:
         # Nonce only for HTML SPA shells — API JSON does not need it.
         content_type = response.get("Content-Type", "")
         use_nonce = nonce if "text/html" in content_type else None
-        value = build_csp(nonce=use_nonce)
+        # Unfold Admin (Alpine) needs eval; keep the public SPA strict.
+        allow_unsafe_eval = request.path.startswith("/admin/")
+        value = build_csp(nonce=use_nonce, allow_unsafe_eval=allow_unsafe_eval)
         if getattr(settings, "DEBUG", False):
             response.headers["Content-Security-Policy-Report-Only"] = value
         else:
