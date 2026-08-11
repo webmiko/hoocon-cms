@@ -14,4 +14,54 @@
   <link rel="stylesheet"
     href="{% static 'admin/css/hoocon-support-messenger.css' %}?v={{ STATIC_VERSION }}">
   <script src="{% static 'admin/js/hoocon-admin-webpush.js' %}?v={{ STATIC_VERSION }}" defer></script>
+  <script>
+    (function () {
+      var unreadUrl = "{% url 'admin:supportchat_conversation_unread_count' %}";
+      var baseline = null;
+      var shown = false;
+      async function tick() {
+        if (document.hidden || shown) return;
+        try {
+          var resp = await fetch(unreadUrl, {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          });
+          if (!resp.ok) return;
+          var data = await resp.json();
+          var count = Number(data.count) || 0;
+          if (baseline === null) {
+            baseline = count;
+            return;
+          }
+          if (count <= baseline) return;
+          shown = true;
+          var banner = document.createElement("div");
+          banner.className = "hoocon-messenger__live-banner";
+          banner.setAttribute("role", "status");
+          banner.appendChild(document.createTextNode("Есть новые сообщения в чатах. "));
+          var link = document.createElement("a");
+          link.href = location.pathname + location.search;
+          link.textContent = "Обновить список";
+          banner.appendChild(link);
+          var host =
+            document.querySelector("#content-main") ||
+            document.querySelector("#content") ||
+            document.body;
+          host.insertBefore(banner, host.firstChild);
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      document.addEventListener("DOMContentLoaded", function () {
+        void tick();
+        window.setInterval(function () {
+          void tick();
+        }, 5000);
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) void tick();
+        });
+      });
+    })();
+  </script>
 {% endblock %}

@@ -354,7 +354,9 @@ export const api = {
     }>;
   }> {
     const qs = after != null ? `?after=${after}` : "";
-    return apiFetch(`/api/support/conversations/current/messages/${qs}`);
+    return apiFetch(`/api/support/conversations/current/messages/${qs}`, {
+      cache: "no-store",
+    });
   },
 
   supportSendMessage(body: string): Promise<{

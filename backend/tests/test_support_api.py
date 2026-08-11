@@ -240,3 +240,50 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert "hoocon-messenger__send" in html
     assert f"/admin/supportchat/conversation/{conv.pk}/reply/" in html
     assert "hoocon-support-messenger.js" in html
+    assert "data-poll-url" in html
+    assert f"/admin/supportchat/conversation/{conv.pk}/messages/" in html
+
+
+@pytest.mark.django_db
+def test_admin_messages_poll_returns_new_inbound() -> None:
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel, Message, MessageDirection
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-poll",
+        email="support-poll@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-poll",
+        display_name="Poll test",
+        status="open",
+        staff_unread_count=1,
+    )
+    first = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Первое",
+    )
+    second = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Второе без F5",
+    )
+    client = Client()
+    client.force_login(staff)
+    url = reverse("admin:supportchat_conversation_messages_poll", args=[conv.pk])
+    resp = client.get(url, {"after": first.pk})
+    assert resp.status_code == 200
+    assert "no-store" in resp["Cache-Control"]
+    payload = resp.json()["messages"]
+    assert len(payload) == 1
+    assert payload[0]["id"] == second.pk
+    assert payload[0]["body"] == "Второе без F5"
+    assert payload[0]["direction"] == MessageDirection.INBOUND
+    conv.refresh_from_db()
+    assert conv.staff_unread_count == 0

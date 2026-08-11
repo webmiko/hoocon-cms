@@ -126,7 +126,10 @@ class CurrentMessagesView(APIView):
         )
         if after and str(after).isdigit():
             qs = qs.filter(id__gt=int(after))
-        return Response({"messages": MessageSerializer(qs, many=True).data})
+        response = Response({"messages": MessageSerializer(qs, many=True).data})
+        # Polling must never be served stale from browser/proxy caches.
+        response["Cache-Control"] = "no-store"
+        return response
 
     def post(self, request: Request) -> Response:
         serializer = MessageCreateSerializer(data=request.data)

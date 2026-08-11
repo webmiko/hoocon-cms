@@ -31,18 +31,14 @@ from supportchat.services import (
 )
 
 
-def _chat_messages_for_admin(conversation: Conversation) -> list[dict[str, Any]]:
-    """Serialize messages for the messenger template (admin-only)."""
-    qs = conversation.messages.select_related(
-        "author",
-        "conversation",
-        "conversation__assignee",
-    ).order_by("created_at", "id")
+def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
+    """Serialize message rows for Admin messenger template / poll JSON."""
     rows: list[dict[str, Any]] = []
     for msg in qs:
         local = timezone.localtime(msg.created_at)
         rows.append(
             {
+                "id": msg.pk,
                 "direction": msg.direction,
                 "body": msg.body,
                 "sender_name": message_sender_name(msg),
@@ -52,6 +48,22 @@ def _chat_messages_for_admin(conversation: Conversation) -> list[dict[str, Any]]
             },
         )
     return rows
+
+
+def _chat_messages_for_admin(
+    conversation: Conversation,
+    *,
+    after_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """Serialize messages for the messenger template (admin-only)."""
+    qs = conversation.messages.select_related(
+        "author",
+        "conversation",
+        "conversation__assignee",
+    ).order_by("created_at", "id")
+    if after_id is not None:
+        qs = qs.filter(id__gt=after_id)
+    return _serialize_admin_messages(qs)
 
 
 @admin.register(Conversation)
@@ -164,6 +176,11 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
                 name="supportchat_conversation_unread_count",
             ),
             path(
+                "<path:object_id>/messages/",
+                self.admin_site.admin_view(self.messages_poll_view),
+                name="supportchat_conversation_messages_poll",
+            ),
+            path(
                 "<path:object_id>/reply/",
                 self.admin_site.admin_view(self.reply_view),
                 name="supportchat_conversation_reply",
@@ -175,6 +192,26 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         if not request.user.has_perm("supportchat.view_conversation"):
             return JsonResponse({"count": 0})
         return JsonResponse({"count": count_staff_unread()})
+
+    def messages_poll_view(self, request: HttpRequest, object_id: str) -> JsonResponse:
+        """GET JSON messages newer than ?after= for live Admin messenger."""
+        if not request.user.has_perm("supportchat.view_conversation"):
+            return JsonResponse({"messages": []}, status=403)
+        conversation = get_object_or_404(
+            Conversation.objects.select_related("assignee"),
+            pk=object_id,
+        )
+        after_raw = (request.GET.get("after") or "").strip()
+        after_id = int(after_raw) if after_raw.isdigit() else 0
+        payload = _chat_messages_for_admin(conversation, after_id=after_id)
+        if conversation.staff_unread_count and request.user.has_perm(
+            "supportchat.change_conversation",
+        ):
+            conversation.staff_unread_count = 0
+            conversation.save(update_fields=["staff_unread_count", "updated_at"])
+        response = JsonResponse({"messages": payload})
+        response["Cache-Control"] = "no-store"
+        return response
 
     def reply_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
         change_url = reverse("admin:supportchat_conversation_change", args=[object_id])
@@ -222,7 +259,13 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             "admin:supportchat_conversation_reply",
             args=[object_id],
         )
-        extra["chat_messages"] = _chat_messages_for_admin(conversation)
+        extra["messages_poll_url"] = reverse(
+            "admin:supportchat_conversation_messages_poll",
+            args=[object_id],
+        )
+        chat_messages = _chat_messages_for_admin(conversation)
+        extra["chat_messages"] = chat_messages
+        extra["chat_last_message_id"] = chat_messages[-1]["id"] if chat_messages else 0
         label = (conversation.display_name or "").strip()
         extra["chat_client_initial"] = (label[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)

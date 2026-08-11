@@ -200,6 +200,23 @@
   white-space: nowrap;
 }
 
+.hoocon-messenger__live-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #dc1313 28%, transparent);
+  background: color-mix(in srgb, #dc1313 10%, transparent);
+  color: #b01010;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.hoocon-messenger__live-banner a {
+  color: #b01010;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
 .hoocon-channel-badge--web {
   color: #b01010;
   background: color-mix(in srgb, #dc1313 10%, transparent);
