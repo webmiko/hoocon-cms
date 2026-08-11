@@ -169,7 +169,7 @@ def add_staff_reply(
     *,
     author: AbstractBaseUser | None,
 ) -> Message:
-    """Staff outbound message; clears staff unread."""
+    """Staff outbound message; clears staff unread; claims assignee if empty."""
     text = _sanitize_body(body)
     author_user = author if author is not None and getattr(author, "pk", None) else None
     msg = Message.objects.create(
@@ -182,11 +182,42 @@ def add_staff_reply(
     conversation.staff_unread_count = 0
     conversation.last_message_at = timezone.now()
     conversation.status = ConversationStatus.OPEN
-    conversation.save(
-        update_fields=["staff_unread_count", "last_message_at", "status", "updated_at"],
-    )
+    update_fields = ["staff_unread_count", "last_message_at", "status", "updated_at"]
+    if author_user is not None and conversation.assignee_id is None:
+        conversation.assignee = author_user  # type: ignore[assignment]
+        update_fields.append("assignee")
+    conversation.save(update_fields=update_fields)
     _schedule_visitor_support_push(conversation.pk)
     return msg
+
+
+def staff_public_name(user: AbstractBaseUser | None) -> str:
+    """Public label for a staff user (first_name; never email/username)."""
+    if user is None:
+        return "Поддержка"
+    first = (getattr(user, "first_name", "") or "").strip()
+    if first:
+        return first[:80]
+    full = ""
+    getter = getattr(user, "get_full_name", None)
+    if callable(getter):
+        full = (getter() or "").strip()
+    if full:
+        return full[:80]
+    return "Поддержка"
+
+
+def message_sender_name(message: Message) -> str:
+    """Visitor-facing name next to a chat bubble."""
+    if message.direction == MessageDirection.INBOUND:
+        label = (message.conversation.display_name or "").strip()
+        return label[:80] if label else "Вы"
+    if message.direction == MessageDirection.SYSTEM:
+        return "Hoocon"
+    author_name = staff_public_name(message.author)
+    if author_name != "Поддержка":
+        return author_name
+    return staff_public_name(message.conversation.assignee)
 
 
 def _schedule_visitor_support_push(conversation_id: int) -> None:

@@ -13,6 +13,7 @@ import {
   clearChunkReloadFlag,
   recoverFromStaleChunk,
 } from "./utils/chunkLoadRecovery";
+import { installSupportChatControl } from "./utils/supportChatControl";
 
 /**
  * Entry CSS ships as ``media="print"`` (non-blocking). Flip to screen once
@@ -26,6 +27,7 @@ function promoteMainStylesheet(): void {
 }
 
 promoteMainStylesheet();
+installSupportChatControl();
 
 // Home is eager — clear the one-shot guard once the shell stays healthy.
 window.setTimeout(() => {

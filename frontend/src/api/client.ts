@@ -330,7 +330,12 @@ export const api = {
   supportStartConversation(data: {
     display_name?: string;
     contact_email?: string;
-  }): Promise<{ id: number | null; channel: string }> {
+  }): Promise<{
+    id: number | null;
+    channel: string;
+    display_name?: string;
+    contact_email?: string;
+  }> {
     return apiFetch("/api/support/conversations/", {
       method: "POST",
       body: JSON.stringify(data),
@@ -345,6 +350,7 @@ export const api = {
       body: string;
       outside_hours: boolean;
       created_at: string;
+      sender_name: string;
     }>;
   }> {
     const qs = after != null ? `?after=${after}` : "";
@@ -358,6 +364,7 @@ export const api = {
       body: string;
       outside_hours: boolean;
       created_at: string;
+      sender_name: string;
     };
     auto_reply?: {
       id: number;
@@ -365,6 +372,7 @@ export const api = {
       body: string;
       outside_hours: boolean;
       created_at: string;
+      sender_name: string;
     };
   }> {
     return apiFetch("/api/support/conversations/current/messages/", {

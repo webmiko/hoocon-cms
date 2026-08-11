@@ -63,6 +63,7 @@ def test_web_message_roundtrip_and_idor() -> None:
         )
         assert start.status_code == 201
         assert start.json()["id"] is not None
+        assert start.json()["display_name"] == "Ivan"
 
         send = c1.post(
             "/api/support/conversations/current/messages/",
@@ -72,10 +73,12 @@ def test_web_message_roundtrip_and_idor() -> None:
         )
         assert send.status_code == 201
         assert send.json()["message"]["body"] == "Нужен КП"
+        assert send.json()["message"]["sender_name"] == "Ivan"
 
         listing = c1.get("/api/support/conversations/current/messages/")
         assert listing.status_code == 200
         assert len(listing.json()["messages"]) >= 1
+        assert listing.json()["messages"][0]["sender_name"] == "Ivan"
 
     # Other session cannot see messages (empty own thread).
     c2 = Client()
@@ -116,7 +119,11 @@ def test_staff_outbound_visible_on_poll_after() -> None:
     from supportchat.models import Message, MessageDirection
     from supportchat.services import add_staff_reply
 
-    staff = get_user_model().objects.create_user(username="agent", password="x")
+    staff = get_user_model().objects.create_user(
+        username="agent",
+        password="x",
+        first_name="Анна",
+    )
 
     with patch("supportchat.services.is_open_now", return_value=True):
         client = _csrf_client()
@@ -140,6 +147,8 @@ def test_staff_outbound_visible_on_poll_after() -> None:
         with patch("webpush.tasks.notify_visitor_support_reply.delay"):
             outbound = add_staff_reply(conv, "Ответ менеджера", author=staff)
         assert outbound.direction == MessageDirection.OUTBOUND
+        conv.refresh_from_db()
+        assert conv.assignee_id == staff.pk
 
         polled = client.get(
             f"/api/support/conversations/current/messages/?after={inbound_id}",
@@ -147,6 +156,7 @@ def test_staff_outbound_visible_on_poll_after() -> None:
         assert polled.status_code == 200
         bodies = [m["body"] for m in polled.json()["messages"]]
         assert "Ответ менеджера" in bodies
+        assert polled.json()["messages"][0]["sender_name"] == "Анна"
         assert Message.objects.filter(direction=MessageDirection.OUTBOUND).count() == 1
 
 

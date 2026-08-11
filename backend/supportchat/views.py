@@ -119,7 +119,11 @@ class CurrentMessagesView(APIView):
         if conv is None:
             return Response({"messages": []})
         after = request.query_params.get("after")
-        qs = conv.messages.all().order_by("created_at", "id")
+        qs = (
+            conv.messages.select_related("author", "conversation", "conversation__assignee")
+            .all()
+            .order_by("created_at", "id")
+        )
         if after and str(after).isdigit():
             qs = qs.filter(id__gt=int(after))
         return Response({"messages": MessageSerializer(qs, many=True).data})
