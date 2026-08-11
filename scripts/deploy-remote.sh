@@ -117,7 +117,7 @@ fi
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.hub.yml)
 
 if [[ "${IMAGE_TRANSFER}" == "pull" ]]; then
-  "\${COMPOSE[@]}" pull web celery_worker
+  "\${COMPOSE[@]}" pull web celery_worker celery_beat
 elif [[ "${IMAGE_TRANSFER}" == "load" ]]; then
   docker image inspect "${DOCKER_IMAGE}" >/dev/null \
     || { echo "ERROR: image ${DOCKER_IMAGE} not on host (docker load first)" >&2; exit 1; }
@@ -127,7 +127,7 @@ else
   exit 1
 fi
 
-"\${COMPOSE[@]}" up -d --no-build --remove-orphans db redis web celery_worker
+"\${COMPOSE[@]}" up -d --no-build --remove-orphans db redis web celery_worker celery_beat
 
 echo "Waiting for health..."
 HEALTHY=0
