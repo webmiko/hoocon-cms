@@ -170,3 +170,53 @@ def test_inbound_triggers_staff_push_task(django_capture_on_commit_callbacks) ->
             with django_capture_on_commit_callbacks(execute=True):
                 add_inbound_message(conv, "hello")
     assert send.called
+
+
+@pytest.mark.django_db
+def test_admin_pushsubscription_changelist_shows_topics() -> None:
+    staff = get_user_model().objects.create_superuser(
+        username="admin",
+        email="admin@hoocon.ru",
+        password="x",
+    )
+    PushSubscription.objects.create(
+        endpoint="https://push.example/admin-list",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        topic_marketing=True,
+        session_key="sess-admin-list",
+    )
+    client = Client()
+    client.force_login(staff)
+    resp = client.get("/admin/webpush/pushsubscription/")
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "hoocon-push-topic--support" in html
+    assert "hoocon-push-topic--marketing" in html
+    assert "hoocon-webpush.css" in html
+    assert "Push-рассылка" in html
+
+
+@pytest.mark.django_db
+def test_admin_broadcast_form_renders_card() -> None:
+    staff = get_user_model().objects.create_superuser(
+        username="admin2",
+        email="admin2@hoocon.ru",
+        password="x",
+    )
+    PushSubscription.objects.create(
+        endpoint="https://push.example/mkt",
+        p256dh="p",
+        auth="a",
+        topic_marketing=True,
+    )
+    client = Client()
+    client.force_login(staff)
+    page = client.get("/admin/webpush/pushsubscription/broadcast/")
+    assert page.status_code == 200
+    html = page.content.decode()
+    assert "hoocon-push-broadcast" in html
+    assert 'name="title"' in html
+    assert "Отправить рассылку" in html
+    assert "получателей" in html

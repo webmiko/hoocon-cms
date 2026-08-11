@@ -1,28 +1,74 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet"
+    href="{% static 'admin/css/hoocon-webpush.css' %}?v={{ STATIC_VERSION }}">
+{% endblock %}
 
 {% block content %}
-<h1>Push-рассылка (маркетинг / новости)</h1>
-<p>Уйдёт всем подписчикам с темой «маркетинг». Без PII в тексте.</p>
-<form method="post">
-  {% csrf_token %}
-  <fieldset class="module aligned">
-    <div class="form-row">
+<section class="hoocon-push-broadcast" aria-labelledby="hoocon-push-broadcast-title">
+  <header class="hoocon-push-broadcast__header">
+    <h1 id="hoocon-push-broadcast-title" class="hoocon-push-broadcast__title">
+      Push-рассылка
+    </h1>
+    <p class="hoocon-push-broadcast__lead">
+      Уйдёт подписчикам с темой «Новости». Без PII в тексте — только публичный
+      анонс.
+    </p>
+    <div class="hoocon-push-broadcast__stats">
+      <span class="hoocon-push-broadcast__stat">
+        <span class="hoocon-push-topic hoocon-push-topic--marketing">Новости</span>
+        получателей <strong>{{ marketing_count }}</strong>
+      </span>
+    </div>
+  </header>
+
+  <form method="post" class="hoocon-push-broadcast__body">
+    {% csrf_token %}
+    <div class="hoocon-push-broadcast__field">
       <label for="id_title">Заголовок</label>
-      <input id="id_title" name="title" type="text" maxlength="120" required style="width:100%;max-width:40rem;">
+      <input
+        id="id_title"
+        name="title"
+        type="text"
+        maxlength="120"
+        required
+        autocomplete="off"
+        placeholder="Новинка в каталоге Hoocon"
+      >
     </div>
-    <div class="form-row">
+    <div class="hoocon-push-broadcast__field">
       <label for="id_body">Текст</label>
-      <textarea id="id_body" name="body" rows="4" maxlength="240" required style="width:100%;max-width:40rem;"></textarea>
+      <textarea
+        id="id_body"
+        name="body"
+        rows="4"
+        maxlength="240"
+        required
+        placeholder="Кратко, до 240 символов"
+      ></textarea>
+      <p class="hoocon-push-broadcast__hint">Enter в заголовке / URL отправит форму.</p>
     </div>
-    <div class="form-row">
+    <div class="hoocon-push-broadcast__field">
       <label for="id_url">URL при клике</label>
-      <input id="id_url" name="url" type="text" value="/" maxlength="500" style="width:100%;max-width:40rem;">
+      <input
+        id="id_url"
+        name="url"
+        type="text"
+        value="/"
+        maxlength="500"
+        autocomplete="off"
+        placeholder="/news/…"
+      >
     </div>
-  </fieldset>
-  <div class="submit-row">
-    <input type="submit" class="default" value="Отправить">
-    <a href="{% url 'admin:webpush_pushsubscription_changelist' %}">Отмена</a>
-  </div>
-</form>
+    <div class="hoocon-push-broadcast__actions">
+      <button type="submit" class="hoocon-push-broadcast__send">
+        Отправить рассылку
+      </button>
+      <a class="hoocon-push-broadcast__cancel" href="{{ changelist_url }}">Отмена</a>
+    </div>
+  </form>
+</section>
 {% endblock %}

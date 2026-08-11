@@ -1,0 +1,259 @@
+/**
+ * Admin Web Push — subscription list badges + marketing broadcast card.
+ * Brand aligned with hoocon-unfold-extras / support messenger.
+ */
+
+.hoocon-push-topic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-weight: 700;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(30, 30, 40, 0.12);
+  white-space: nowrap;
+}
+
+.hoocon-push-topic--support {
+  color: #1d4ed8;
+  background: color-mix(in srgb, #2563eb 12%, transparent);
+  border-color: color-mix(in srgb, #2563eb 28%, transparent);
+}
+
+.hoocon-push-topic--marketing {
+  color: #b01010;
+  background: color-mix(in srgb, #dc1313 12%, transparent);
+  border-color: color-mix(in srgb, #dc1313 28%, transparent);
+}
+
+.hoocon-push-topic--none {
+  color: #6f6f6f;
+  background: #f4f5f7;
+}
+
+.hoocon-push-topics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: 14rem;
+}
+
+.hoocon-push-subscriber {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  max-width: 16rem;
+}
+
+.hoocon-push-subscriber__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-push-subscriber__meta {
+  font-size: 0.75rem;
+  color: #6f6f6f;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-push-endpoint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  color: #6f6f6f;
+  overflow-wrap: anywhere;
+  max-width: 18rem;
+}
+
+.hoocon-push-broadcast {
+  --hp-brand: var(--hoocon-primary, #dc1313);
+  --hp-brand-hover: var(--hoocon-primary-hover, #b01010);
+  --hp-surface: var(--hoocon-surface, #fff);
+  --hp-muted: var(--hoocon-surface-muted, #f4f5f7);
+  --hp-border: var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
+  --hp-quiet: var(--hoocon-quiet, #6f6f6f);
+  --hp-radius: 16px;
+  --hp-shadow: var(--hoocon-shadow-soft, 0 4px 20px rgba(20, 20, 30, 0.04));
+
+  max-width: 36rem;
+  margin: 0 0 1.5rem;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  box-shadow: var(--hp-shadow);
+  overflow: hidden;
+}
+
+.hoocon-push-broadcast__header {
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--hp-border);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hp-brand) 10%, transparent),
+    transparent 55%
+  );
+}
+
+.hoocon-push-broadcast__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.hoocon-push-broadcast__lead {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--hp-quiet);
+  line-height: 1.45;
+}
+
+.hoocon-push-broadcast__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.hoocon-push-broadcast__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--hp-muted);
+  border: 1px solid var(--hp-border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--hp-quiet);
+}
+
+.hoocon-push-broadcast__stat strong {
+  color: inherit;
+  font-weight: 800;
+}
+
+.hoocon-push-broadcast__body {
+  padding: 1rem 1.15rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.hoocon-push-broadcast__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.hoocon-push-broadcast__field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--hp-quiet);
+}
+
+.hoocon-push-broadcast__field input,
+.hoocon-push-broadcast__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 12px;
+  background: var(--hp-muted);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.hoocon-push-broadcast__field input:focus,
+.hoocon-push-broadcast__field textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--hp-brand) 55%, var(--hp-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hp-brand) 14%, transparent);
+  background: #fff;
+}
+
+.hoocon-push-broadcast__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--hp-quiet);
+}
+
+.hoocon-push-broadcast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.hoocon-push-broadcast__send {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  border-radius: 999px;
+  background: var(--hp-brand);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--hp-brand) 25%, transparent);
+  transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.hoocon-push-broadcast__send:hover {
+  background: var(--hp-brand-hover);
+  transform: translateY(-1px);
+}
+
+.hoocon-push-broadcast__cancel {
+  color: var(--hp-quiet);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  padding: 0.4rem 0.2rem;
+}
+
+.hoocon-push-broadcast__cancel:hover {
+  color: var(--hp-brand);
+  text-decoration: underline;
+}
+
+.hoocon-push-tool {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700 !important;
+}
+
+.dark .hoocon-push-topic--support {
+  color: #93c5fd;
+  background: color-mix(in srgb, #2563eb 22%, transparent);
+}
+
+.dark .hoocon-push-topic--marketing {
+  color: #fca5a5;
+  background: color-mix(in srgb, #dc1313 22%, transparent);
+}
+
+.dark .hoocon-push-broadcast {
+  --hp-brand: var(--hoocon-primary-on-dark, #f87171);
+  --hp-brand-hover: #fb7185;
+  --hp-surface: color-mix(in srgb, #111 92%, #fff);
+  --hp-muted: color-mix(in srgb, #111 86%, #fff);
+}
+
+.dark .hoocon-push-broadcast__field input:focus,
+.dark .hoocon-push-broadcast__field textarea:focus {
+  background: color-mix(in srgb, #111 80%, #fff);
+}

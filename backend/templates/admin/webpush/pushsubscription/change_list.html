@@ -1,10 +1,38 @@
 {% extends "admin/change_list.html" %}
+{% load static %}
 
 {% block object-tools-items %}
   {% if broadcast_url %}
   <li>
-    <a href="{{ broadcast_url }}" class="addlink">Push-рассылка</a>
+    <a href="{{ broadcast_url }}" class="addlink hoocon-push-tool">
+      Push-рассылка
+    </a>
   </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet"
+    href="{% static 'admin/css/hoocon-webpush.css' %}?v={{ STATIC_VERSION }}">
+{% endblock %}
+
+{% block content %}
+  {% if push_stats %}
+  <div class="hoocon-push-broadcast__stats" style="margin:0 0 1rem;">
+    <span class="hoocon-push-broadcast__stat">
+      Всего <strong>{{ push_stats.total }}</strong>
+    </span>
+    <span class="hoocon-push-broadcast__stat">
+      <span class="hoocon-push-topic hoocon-push-topic--support">Чат</span>
+      <strong>{{ push_stats.support }}</strong>
+    </span>
+    <span class="hoocon-push-broadcast__stat">
+      <span class="hoocon-push-topic hoocon-push-topic--marketing">Новости</span>
+      <strong>{{ push_stats.marketing }}</strong>
+    </span>
+  </div>
   {% endif %}
   {{ block.super }}
 {% endblock %}
