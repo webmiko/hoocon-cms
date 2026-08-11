@@ -266,7 +266,10 @@ P1-5 скорость ──► спецификация MU/MQU, компани�
 | `analog-belimo-hoocon` | 2026-08-19 09:00 |
 
 Локальный превью отложенных: `CONTENT_SHOW_SCHEDULED=True` в `.env`.
-Новость: `articles-podbor-i-sertifikaty`.
+Новость: `articles-podbor-i-sertifikaty` (уже live).
+
+Go-live остальных (tipy / pitanie / MU-HV / analog): beat каждые 15 мин →
+новость `article-<slug>` + анонс в соцсети (`social_announce_on_publish`).
 
 Дальше: Iter C (P2 суффиксы / fail-safe / S); опц. унификация формулы момента
 в FAQ (риск §4.1). Продвижение в выдаче:

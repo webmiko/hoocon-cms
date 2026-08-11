@@ -12,3 +12,8 @@ services:
     build: !reset null
     image: ${DOCKER_IMAGE}
     pull_policy: missing
+
+  celery_beat:
+    build: !reset null
+    image: ${DOCKER_IMAGE}
+    pull_policy: missing

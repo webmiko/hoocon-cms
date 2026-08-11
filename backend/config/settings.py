@@ -464,6 +464,7 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Shared cache for DRF throttles (LocMem is per-worker — weak under Gunicorn).
 # Set DJANGO_CACHE_URL=locmem:// in CI (no Redis). Prod: redis://…/2 or omit for default.
