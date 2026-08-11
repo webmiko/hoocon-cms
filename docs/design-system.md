@@ -53,7 +53,9 @@ Body-ссылки — `#b01010` (контраст AA на белом). CTA — �
 1. Новый `font-size` в компонентах — `var(--font-size-*)` или `rem`/`clamp`,
    не «голые» `px` (кроме исключения ниже).
 2. **Исключение iOS:** `font-size: 16px` только на `<input>` / `<textarea>` /
-   search fields — иначе Safari зумит страницу при фокусе.
+   search fields — иначе Safari зумит страницу при фокусе. Глобальный
+   guard в `global.css` (`!important` на coarse pointer); CSS modules
+   **не** должны ставить на эти контролы кегль &lt; 16px / 1rem.
 3. Семейства: `--font-sans` (UI), `--font-display` (бренд / заголовки);
    preload + `font-display: swap`.
 4. Длинные RU-заголовки в узких карточках: `text-wrap: pretty` (или обычный
@@ -63,6 +65,10 @@ Body-ссылки — `#b01010` (контраст AA на белом). CTA — �
    `word-break: break-word` «на всякий случай».
 6. На узких каруселях / колонках: чуть мельче кегль + меньше горизонтальный
    padding текста, чтобы длинное имя уложилось в 2–3 строки, а не в «столбик».
+7. **Fixed / sticky оверлеи:** не `width: …100vw…`. Корень — `left`+`right`
+   (inset), панель — `min(…px, 100%)` + `min-width: 0`. Иначе на mobile
+   появляется горизонтальный скролл (чат, баннеры). Правило агента:
+   `.cursor/rules/mobile-no-horizontal-scroll.mdc`.
 
 ## Компоненты
 
@@ -71,7 +77,8 @@ Body-ссылки — `#b01010` (контраст AA на белом). CTA — �
 - **Home:** brand-first hero с мягкими градиентами; glass trust tiles;
   направления и шаги с воздухом; лёгкий `rise` на появление.
 - **Catalog / PDP:** glass-карточки; ТТХ — `dl`-карточки; hover lift 2–3px.
-- **Адаптив:** `overflow-x: clip`; больше вертикальных отступов (`--space-2xl/3xl`).
+- **Адаптив:** `overflow-x: clip`; больше вертикальных отступов (`--space-2xl/3xl`);
+  fixed-оверлеи без `100vw` (inset `left`/`right` + `width: min(…, 100%)`).
 - **A11y:** skip-link, `focus-visible`, `prefers-reduced-motion`.
 
 ## Антипаттерны (не использовать)

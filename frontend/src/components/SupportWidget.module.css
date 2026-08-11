@@ -1,5 +1,7 @@
 .root {
   position: fixed;
+  /* Inset both sides — avoid 100vw + right-only (mobile horizontal scroll). */
+  left: 16px;
   right: 16px;
   bottom: calc(16px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
   z-index: 440;
@@ -7,6 +9,8 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  max-width: 100%;
+  box-sizing: border-box;
   pointer-events: none;
 }
 
@@ -38,7 +42,9 @@
 }
 
 .panel {
-  width: min(360px, calc(100vw - 32px));
+  width: min(360px, 100%);
+  max-width: 100%;
+  min-width: 0;
   max-height: min(70vh, 520px);
   display: flex;
   flex-direction: column;
@@ -47,6 +53,7 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  box-sizing: border-box;
   animation: support-in 280ms var(--ease-out);
 }
 
@@ -68,6 +75,7 @@
   padding: 0.85rem 1rem;
   background: var(--color-subtle);
   border-bottom: 1px solid var(--color-border);
+  min-width: 0;
 }
 
 .title {
@@ -93,6 +101,7 @@
   line-height: 1;
   cursor: pointer;
   padding: 0 0.25rem;
+  flex-shrink: 0;
 }
 
 .banner {
@@ -110,6 +119,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
   padding: 0.65rem 1rem 0;
+  min-width: 0;
 }
 
 .field {
@@ -118,26 +128,33 @@
   gap: 0.2rem;
   font-size: 0.7rem;
   color: var(--color-text-muted);
+  min-width: 0;
 }
 
 .field input {
   font: inherit;
-  font-size: 0.85rem;
+  /* ≥16px — do not undercut global iOS anti-zoom rule (forms → page scroll). */
+  font-size: var(--font-size-base);
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 0.35rem 0.45rem;
   background: var(--color-surface);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   min-height: 140px;
+  min-width: 0;
 }
 
 .empty {
@@ -155,6 +172,7 @@
   font-size: 0.875rem;
   line-height: 1.4;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -179,6 +197,7 @@
   padding: 0 1rem 0.5rem;
   font-size: 0.75rem;
   color: var(--color-text-muted);
+  min-width: 0;
 }
 
 .channels a {
@@ -191,6 +210,7 @@
   flex-direction: column;
   gap: 0.35rem;
   padding: 0 1rem 0.5rem;
+  min-width: 0;
 }
 
 .pushBtn {
@@ -204,30 +224,36 @@
   border-radius: 8px;
   cursor: pointer;
   align-self: flex-start;
+  max-width: 100%;
 }
 
 .pushStatus {
   font-size: 0.7rem;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .composer {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem;
   padding: 0.75rem 1rem 1rem;
   border-top: 1px solid var(--color-border);
+  min-width: 0;
 }
 
 .composer textarea {
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--font-size-base);
   resize: none;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
   color: var(--color-text);
   background: var(--color-surface);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .composer button {
@@ -240,6 +266,7 @@
   font-weight: 600;
   font-size: 0.8rem;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .composer button:disabled {
@@ -251,6 +278,7 @@
   margin: 0 1rem 0.75rem;
   font-size: 0.75rem;
   color: var(--color-brand);
+  overflow-wrap: anywhere;
 }
 
 .srOnly {
@@ -267,6 +295,7 @@
 
 @media (max-width: 720px) {
   .root {
+    left: 12px;
     right: 12px;
     bottom: calc(12px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
   }
