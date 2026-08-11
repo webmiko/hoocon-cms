@@ -165,6 +165,8 @@
   --header-height: 68px;
   --masthead-height: 32px;
   --bottom-chrome: 0px;
+  /* Reserve space above chat FAB for other fixed banners (marketing push). */
+  --support-chrome: 0px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --transition: 280ms var(--ease-out);
   --transition-fast: 180ms var(--ease-out);

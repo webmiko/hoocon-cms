@@ -17,6 +17,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { dismissHomeSsrHero } from "../utils/adoptHomeSsrLcpImage";
 import { releaseLabel } from "../release";
+import { api } from "../api/client";
 import styles from "./Layout.module.css";
 
 /** Hero «Запросить КП» on the home page — sticky CTA waits until it leaves the viewport. */
@@ -55,6 +56,9 @@ export function Layout() {
   /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
   const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
   const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
+  const [telegramLinks, setTelegramLinks] = useState<
+    Array<{ channel: string; label: string; deep_link: string }>
+  >([]);
 
   // Boot hero is only for the initial ``/`` document; drop it on client navigations.
   useEffect(() => {
@@ -62,6 +66,21 @@ export function Layout() {
       dismissHomeSsrHero();
     }
   }, [isHome]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.supportChannels();
+        if (!cancelled) setTelegramLinks(data.channels);
+      } catch {
+        /* footer stays without TG links */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reset visibility when entering home or /zavod.
   if ((isHome || isZavod) !== inlineTrack) {
@@ -448,6 +467,17 @@ export function Layout() {
               <li>
                 <Link to="/kontakty">Все контакты</Link>
               </li>
+              {telegramLinks.map((ch) => (
+                <li key={ch.channel}>
+                  <a
+                    href={ch.deep_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {ch.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

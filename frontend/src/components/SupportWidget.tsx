@@ -9,7 +9,6 @@ import {
   subscribeSupportChat,
 } from "../utils/supportChatControl";
 import {
-  hasBrowserPushSubscription,
   pushSupported,
   subscribeWebPush,
   subscribeWebPushStatusRu,
@@ -120,6 +119,7 @@ export function SupportWidget() {
   const [error, setError] = useState("");
   const [pushStatus, setPushStatus] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef(0);
   const resumeOnceRef = useRef(false);
@@ -132,6 +132,20 @@ export function SupportWidget() {
       }),
     [],
   );
+
+  // Lift other fixed banners (marketing push) above the chat FAB.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!visible || open) {
+      root.style.setProperty("--support-chrome", "0px");
+    } else {
+      // FAB 3.25rem + gap under the banner.
+      root.style.setProperty("--support-chrome", "4.25rem");
+    }
+    return () => {
+      root.style.setProperty("--support-chrome", "0px");
+    };
+  }, [visible, open]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,35 +228,70 @@ export function SupportWidget() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
 
-  // Mobile fullscreen chat: lock page scroll under the sheet.
+  // Mobile fullscreen chat: lock page scroll; track viewport changes.
   useEffect(() => {
     if (!open) return;
     const mq = window.matchMedia("(max-width: 720px)");
-    if (!mq.matches) return;
     const root = document.documentElement;
-    const prevOverflow = root.style.overflow;
-    root.style.overflow = "hidden";
+    let prevOverflow = root.style.overflow;
+
+    function apply() {
+      if (mq.matches) {
+        prevOverflow = root.style.overflow;
+        root.style.overflow = "hidden";
+      } else {
+        root.style.overflow = prevOverflow;
+      }
+    }
+    apply();
+    mq.addEventListener("change", apply);
     return () => {
+      mq.removeEventListener("change", apply);
       root.style.overflow = prevOverflow;
     };
   }, [open]);
 
-  // Re-bind existing browser push after reload (subscription must not «fly off»).
+  // Escape closes the panel (fullscreen sheet / desktop card).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") closeSupportChat();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Re-bind support push only after explicit opt-in (never auto-OR topic_support).
   useEffect(() => {
     if (!open || !pushSupported()) return;
     let cancelled = false;
     void (async () => {
+      let optedIn = false;
+      try {
+        optedIn = localStorage.getItem("hoocon-support-push-subscribed") === "1";
+      } catch {
+        /* private mode / blocked storage — treat as not opted in */
+      }
+      if (!optedIn) return;
+      if (Notification.permission !== "granted") {
+        try {
+          localStorage.removeItem("hoocon-support-push-subscribed");
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       const synced = await syncExistingWebPush({ topic_support: true });
       if (cancelled) return;
       if (synced?.ok) {
         setPushEnabled(true);
         setPushStatus("Уведомления об ответах включены");
-        return;
-      }
-      if (await hasBrowserPushSubscription()) {
-        if (cancelled) return;
-        setPushEnabled(true);
-        setPushStatus("Уведомления включены в браузере");
+      } else {
+        try {
+          localStorage.removeItem("hoocon-support-push-subscribed");
+        } catch {
+          /* ignore */
+        }
       }
     })();
     return () => {
@@ -252,9 +301,15 @@ export function SupportWidget() {
 
   async function enablePush() {
     setPushStatus("");
+    setPushBusy(true);
     try {
       const result = await subscribeWebPush({ topic_support: true });
       if (result.ok) {
+        try {
+          localStorage.setItem("hoocon-support-push-subscribed", "1");
+        } catch {
+          /* ignore */
+        }
         setPushEnabled(true);
         setPushStatus("Уведомления об ответах включены");
       } else {
@@ -262,6 +317,8 @@ export function SupportWidget() {
       }
     } catch {
       setPushStatus("Не удалось включить уведомления");
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -422,8 +479,8 @@ export function SupportWidget() {
               <div className={styles.empty}>
                 <p className={styles.emptyTitle}>Чем помочь?</p>
                 <p className={styles.emptyText}>
-                  Вопрос по приводам, арматуре или КП — ответим здесь. Можно
-                  параллельно написать в Telegram.
+                  Вопрос по приводам, арматуре или КП — ответим здесь. Или
+                  откройте чат с ботом / канал в Telegram ниже.
                 </p>
               </div>
             ) : (
@@ -479,9 +536,10 @@ export function SupportWidget() {
                     <button
                       type="button"
                       className={styles.pushBtn}
+                      disabled={pushBusy}
                       onClick={() => void enablePush()}
                     >
-                      Уведомлять об ответе
+                      {pushBusy ? "Подключаем…" : "Уведомлять об ответе"}
                     </button>
                     {pushStatus ? (
                       <span className={styles.pushStatus}>{pushStatus}</span>
