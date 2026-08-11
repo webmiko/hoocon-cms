@@ -603,16 +603,61 @@
     );
   }
 
-  .panel {
+  /* Open chat = full-screen sheet (no floating card / FAB chrome). */
+  .rootOpen {
+    inset: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    gap: 0;
+    align-items: stretch;
+    z-index: 460;
+  }
+
+  .rootOpen .panel {
     width: 100%;
-    max-height: min(
-      70dvh,
-      calc(
-        100dvh - 5.25rem - env(safe-area-inset-bottom, 0px) - var(--bottom-chrome, 0px) -
-          var(--cookie-chrome, 0px)
-      )
-    );
-    border-radius: var(--radius-lg, 18px);
+    max-width: 100%;
+    min-width: 0;
+    height: 100%;
+    max-height: none;
+    flex: 1 1 auto;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    box-shadow: none;
+    animation: support-in-full 280ms var(--ease-out);
+  }
+
+  .rootOpen .header {
+    padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+  }
+
+  .rootOpen .composer {
+    padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .rootOpen .messages,
+  .rootOpen .footerBar,
+  .rootOpen .banner,
+  .rootOpen .metaDetails,
+  .rootOpen .error {
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  /* Header close is enough — hide the floating FAB while fullscreen. */
+  .rootOpen .fabOpen {
+    display: none;
   }
 
   .meta {
@@ -622,6 +667,17 @@
   .bubbleIn,
   .bubbleOut {
     max-width: min(92%, 100%);
+  }
+}
+
+@keyframes support-in-full {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -655,5 +711,9 @@
   .close {
     animation: none;
     transition: none;
+  }
+
+  .rootOpen .panel {
+    animation: none;
   }
 }

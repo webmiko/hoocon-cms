@@ -89,7 +89,10 @@ function SendIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
       <path
         fill="currentColor"
-        d="M3.4 11.2 19.1 3.7a1 1 0 0 1 1.4 1.1l-2.9 14.6a1 1 0 0 1-1.6.6l-4.7-3.5-2.4 2.3a.75.75 0 0 1-1.3-.5v-3.7l11-8.4-13.2 5.9Z"
+        d={
+          "M3.4 11.2 19.1 3.7a1 1 0 0 1 1.4 1.1l-2.9 14.6a1 1 0 0 1-1.6.6l-4.7-3.5-2.4 " +
+          "2.3a.75.75 0 0 1-1.3-.5v-3.7l11-8.4-13.2 5.9Z"
+        }
       />
     </svg>
   );
@@ -202,7 +205,7 @@ export function SupportWidget() {
       }
     };
     void tick();
-    const id = window.setInterval(() => void tick(), 4000);
+    const id = window.setInterval(() => void tick(), 2500);
     return () => window.clearInterval(id);
   }, [open, started]);
 
@@ -210,6 +213,19 @@ export function SupportWidget() {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
+
+  // Mobile fullscreen chat: lock page scroll under the sheet.
+  useEffect(() => {
+    if (!open) return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    if (!mq.matches) return;
+    const root = document.documentElement;
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = prevOverflow;
+    };
+  }, [open]);
 
   // Re-bind existing browser push after reload (subscription must not «fly off»).
   useEffect(() => {
@@ -325,13 +341,13 @@ export function SupportWidget() {
   if (!visible) return null;
 
   return (
-    <div className={styles.root}>
+    <div className={open ? `${styles.root} ${styles.rootOpen}` : styles.root}>
       {open ? (
         <section
           className={styles.panel}
           aria-labelledby={titleId}
           role="dialog"
-          aria-modal="false"
+          aria-modal="true"
         >
           <header className={styles.header}>
             <div className={styles.brandMark} aria-hidden="true">
