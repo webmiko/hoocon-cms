@@ -79,14 +79,18 @@
   );
 }
 
+/* No display on *Cover — ThemeAwareCover owns light/dark visibility. */
 .featuredCover,
 .itemCover,
 .coverPlaceholder {
-  display: block;
   width: 100%;
   height: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
+}
+
+.coverPlaceholder {
+  display: block;
 }
 
 .featuredBody {

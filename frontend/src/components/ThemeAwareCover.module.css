@@ -6,11 +6,15 @@
   line-height: 0;
 }
 
-.light {
+/*
+ * Nested selectors beat imgClassName ``display: block`` (0,2,0 vs 0,1,0).
+ * Same trap as BrandLogo: a single-class display on the img overrides .dark.
+ */
+.root .light {
   display: block;
 }
 
-.dark {
+.root .dark {
   display: none;
 }
 
