@@ -26,6 +26,21 @@ def badge_new_leads(request: HttpRequest) -> int | str:
     return count if count > 0 else ""
 
 
+def badge_support_unread(request: HttpRequest) -> int | str:
+    """Unread support conversations for the Unfold sidebar badge."""
+    if not _can_view_conversations(request):
+        return ""
+    from supportchat.services import count_staff_unread
+
+    count = count_staff_unread()
+    return count if count > 0 else ""
+
+
+def perm_view_conversation(request: HttpRequest) -> bool:
+    """Whether the user may see support conversations in the sidebar."""
+    return _can_view_conversations(request)
+
+
 def dashboard_callback(request: HttpRequest, context: dict[str, Any]) -> dict[str, Any]:
     """Inject Hoocon dashboard data into Unfold Admin index.
 
@@ -88,3 +103,11 @@ def _can_view_leads(request: HttpRequest) -> bool:
     """Staff with leads.view_lead (superuser included via has_perm)."""
     user = getattr(request, "user", None)
     return bool(user and user.is_authenticated and user.has_perm("leads.view_lead"))
+
+
+def _can_view_conversations(request: HttpRequest) -> bool:
+    """Staff with supportchat.view_conversation."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and user.has_perm("supportchat.view_conversation"),
+    )
