@@ -53,7 +53,85 @@ def test_mentioned_skus_one_per_product() -> None:
 
 
 @pytest.mark.django_db
-def test_article_related_sku_serializer_image() -> None:
+def test_hva5q_does_not_match_hva5qx() -> None:
+    """``HVA-5Q`` must not resolve to capacitor ``HVA-5QX`` (or UQ↔Q)."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="HV", slug="hv-rel-q")
+    p_qx = Product.objects.create(
+        name="HVA-5QX",
+        slug="privod-vozdushniy-kondensator-hva-5qx",
+        category=cat,
+    )
+    p_q = Product.objects.create(
+        name="HVA-5Q",
+        slug="privod-vozdushniy-hva-5q",
+        category=cat,
+    )
+    p_uq = Product.objects.create(
+        name="HVA-5UQ",
+        slug="privod-vozdushniy-hva-5uq",
+        category=cat,
+    )
+    SKU.objects.create(
+        product=p_qx,
+        name="HVA230-5QX",
+        slug="hva230-5qx-rel",
+        sku_code="HVA230-5QX",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=p_q,
+        name="HVA230-5Q",
+        slug="hva230-5q-rel",
+        sku_code="HVA230-5Q",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=p_uq,
+        name="HVA24-5UQ",
+        slug="hva24-5uq-rel",
+        sku_code="HVA24-5UQ",
+        is_published=True,
+    )
+    found_q = mentioned_skus_for_article("Ориентир HVA-5Q — меньше 20 с", limit=8)
+    codes_q = {s.sku_code.upper() for s in found_q}
+    assert "HVA230-5Q" in codes_q
+    assert "HVA230-5QX" not in codes_q
+
+    found_uq = mentioned_skus_for_article("Сверхбыстрый HVA-5UQ около 2,5 с", limit=8)
+    codes_uq = {s.sku_code.upper() for s in found_uq}
+    assert "HVA24-5UQ" in codes_uq
+    assert "HVA230-5QX" not in codes_uq
+
+
+@pytest.mark.django_db
+def test_da8mu_does_not_match_da8mqu() -> None:
+    """``DA8MU`` must not resolve to accelerated ``DA8MQU``."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="DA", slug="da-rel-mu")
+    p_mu = Product.objects.create(name="DA8MU", slug="damu-8", category=cat)
+    p_mqu = Product.objects.create(name="DA8MQU", slug="damqu-8", category=cat)
+    SKU.objects.create(
+        product=p_mu,
+        name="DA8MU230-A",
+        slug="da8mu230-a-rel",
+        sku_code="DA8MU230-A",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=p_mqu,
+        name="DA8MQU230-A",
+        slug="da8mqu230-a-rel",
+        sku_code="DA8MQU230-A",
+        is_published=True,
+    )
+    found = mentioned_skus_for_article("Пример DA8MU — меньше 55 с", limit=8)
+    codes = {s.sku_code.upper() for s in found}
+    assert "DA8MU230-A" in codes
+    assert "DA8MQU230-A" not in codes
+
     """Serializer returns root-relative ``/media/...`` image path."""
     from io import BytesIO
 

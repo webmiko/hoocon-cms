@@ -27,6 +27,12 @@ _MODEL_TOKEN = re.compile(
     re.I | re.X,
 )
 
+# Compact HV: HVA230S-5QX / HVA-5Q / HVA24-5UQ → family, Nm, speed suffix.
+_HV_COMPACT = re.compile(
+    r"^(hv[ad])(?:24|230)?s?(\d+)(uq|qx|qa|q|p|f)?$",
+    re.I,
+)
+
 _TAG = re.compile(r"<[^>]+>")
 
 
@@ -45,6 +51,61 @@ def extract_model_tokens(text: str) -> list[str]:
         seen.add(token)
         out.append(token)
     return out
+
+
+def _compact_has_token(haystack: str, token: str) -> bool:
+    """True if ``token`` is in ``haystack`` without extending into another suffix.
+
+    Prevents ``HVA-5Q`` matching ``HVA-5QX`` and ``DA8MU`` matching ``DA8MQU``.
+    Digits after the token are allowed (voltage / edition: ``DA8MU24``).
+    """
+    if not token or not haystack:
+        return False
+    start = 0
+    while True:
+        idx = haystack.find(token, start)
+        if idx < 0:
+            return False
+        end = idx + len(token)
+        if end >= len(haystack):
+            return True
+        nxt = haystack[end]
+        if nxt.isdigit():
+            return True
+        if nxt.isalpha():
+            start = idx + 1
+            continue
+        return True
+
+
+def _hv_parts(compact: str) -> tuple[str, str, str] | None:
+    """Parse compact HV code/token into ``(family, nm, speed)``.
+
+    Speed is ``q`` / ``uq`` / ``qx`` / …; empty string for standard.
+    """
+    match = _HV_COMPACT.match(compact)
+    if match is None:
+        return None
+    family, nm, speed = match.group(1), match.group(2), match.group(3) or ""
+    return family.casefold(), nm, speed.casefold()
+
+
+def _token_hits_sku(*, needle: str, code: str, slug_compact: str) -> bool:
+    """Whether article token ``needle`` matches SKU code or product slug."""
+    needle_hv = _hv_parts(needle)
+    if needle_hv is not None:
+        code_hv = _hv_parts(code)
+        if code_hv is not None and code_hv == needle_hv:
+            return True
+        # Slug often embeds ``hva-5q`` / ``hva-5qx`` without voltage.
+        family, nm, speed = needle_hv
+        slug_needle = f"{family}{nm}{speed}"
+        return _compact_has_token(slug_compact, slug_needle)
+
+    series_core = re.sub(r"(?:24|230)$", "", needle)
+    return _compact_has_token(code, needle) or (
+        len(series_core) >= 5 and _compact_has_token(slug_compact, series_core)
+    )
 
 
 def mentioned_skus_for_article(
@@ -67,7 +128,7 @@ def mentioned_skus_for_article(
     if not tokens:
         return []
 
-    # Longer tokens first so DA3FU230-DS beats DA3FU.
+    # Longer tokens first so DA3FU230-DS beats DA3FU; MQU before MU; UQ before Q.
     tokens_sorted = sorted(tokens, key=len, reverse=True)
     qs = (
         SKU.objects.filter(is_published=True)
@@ -87,15 +148,12 @@ def mentioned_skus_for_article(
                 continue
             code = sku.sku_code.casefold().replace("-", "").replace(" ", "")
             product_slug = (getattr(sku.product, "slug", None) or "").casefold()
-            # Exact / prefix match on sku_code, or series in product slug.
-            series_core = re.sub(r"(?:24|230)$", "", needle)
-            hit = (
-                code.startswith(needle)
-                or needle.startswith(code)
-                or (len(series_core) >= 5 and series_core in code)
-                or (len(series_core) >= 5 and series_core in product_slug.replace("-", ""))
-            )
-            if not hit:
+            slug_compact = product_slug.replace("-", "")
+            if not _token_hits_sku(
+                needle=needle,
+                code=code,
+                slug_compact=slug_compact,
+            ):
                 continue
             used_products.add(sku.product_id)
             picked.append(sku)
