@@ -11,42 +11,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List categories with a product preview image per row. */
+        /** @description GET /api/catalog/categories/ — public category list. */
         get: operations["catalog_categories_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/compare/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Return SKU columns and highlight matrix rows. */
-        get: operations["catalog_compare_retrieve"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/catalog/facets/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Return canonical facets for the catalog filter UI. */
-        get: operations["catalog_facets_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -209,48 +175,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/csrf/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * @description Return JSON {csrfToken} and set the csrftoken cookie.
-         *
-         *     Args:
-         *         request: DRF request.
-         *
-         *     Returns:
-         *         200 with {"csrfToken": "<token>"}.
-         */
-        get: operations["csrf_retrieve"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/integrations/telegram/webhook/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Accept a Telegram Update and optionally reply to a command. */
-        post: operations["integrations_telegram_webhook_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/leads/": {
         parameters: {
             query?: never;
@@ -308,41 +232,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Handle GET: parse `q`, run FTS on all content models, paginate.
+         * @description Handle GET: parse `q`, run FTS on all three models, return paginated.
          *
          *     Args:
          *         request: DRF request with optional `q` query parameter.
          *
          *     Returns:
          *         200 with paginated results: {count, next, previous, results}.
-         *         Each result: {type, slug, title, url, snippet}.
+         *         Each result: {type, slug, title, url}.
          */
         get: operations["search_retrieve"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/public/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * @description Return Yandex Metrika / GA4 IDs from SiteSettings with env defaults.
-         *
-         *     Args:
-         *         request: unused DRF request.
-         *
-         *     Returns:
-         *         JSON with yandex_metrika_id and ga4_measurement_id (may be empty).
-         */
-        get: operations["settings_public_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -355,119 +254,59 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Article detail: list fields + SKUs mentioned in the text. */
+        /** @description Expert article (/statyi/<slug>) with cover + excerpt. */
         Article: {
             readonly id: number;
-            /** Заголовок */
             readonly title: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /**
-             * Анонс
-             * @description Краткий анонс для списка статей (без HTML).
-             */
+            /** @description Краткий анонс для списка /statyi (без HTML). */
             readonly excerpt: string;
-            /** Format: uri */
-            readonly cover: string | null;
-            /** Format: uri */
-            readonly cover_dark: string | null;
-            /** Текст */
-            readonly body: string;
             /**
-             * Опубликовано
-             * @description Видимость в публичном API.
+             * Format: uri
+             * @description Обложка статьи (локальный MEDIA URL).
              */
+            readonly cover: string | null;
+            readonly body: string;
+            /** @description Видимость в публичном API. */
             readonly is_published: boolean;
             /**
-             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
              */
             readonly published_at: string | null;
-            /**
-             * Создано
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly created_at: string;
-            /**
-             * Обновлено
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly updated_at: string;
-            /** @description Return catalog cards for models referenced in the article. */
-            readonly related_skus: {
-                [key: string]: unknown;
-            }[];
         };
-        /** @description Article card for /statyi list (no related SKUs). */
-        ArticleList: {
-            readonly id: number;
-            /** Заголовок */
-            readonly title: string;
-            /** Сегмент URL */
+        /** @description ТТХ row for SKU detail: slug of Attribute + value + unit. */
+        AttributeValue: {
+            readonly name: string;
             readonly slug: string;
-            /**
-             * Анонс
-             * @description Краткий анонс для списка статей (без HTML).
-             */
-            readonly excerpt: string;
-            /** Format: uri */
-            readonly cover: string | null;
-            /** Format: uri */
-            readonly cover_dark: string | null;
-            /** Текст */
-            readonly body: string;
-            /**
-             * Опубликовано
-             * @description Видимость в публичном API.
-             */
-            readonly is_published: boolean;
-            /**
-             * Дата публикации
-             * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
-             */
-            readonly published_at: string | null;
-            /**
-             * Создано
-             * Format: date-time
-             */
-            readonly created_at: string;
-            /**
-             * Обновлено
-             * Format: date-time
-             */
-            readonly updated_at: string;
+            readonly unit: string;
+            readonly value: string;
         };
         /** @description Public category list/detail fields (series overview + install). */
         Category: {
             readonly id: number;
-            /** Название */
             readonly name: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /**
-             * Родитель
-             * @description Родительская категория (пусто = корень дерева).
-             */
+            /** @description Родительская категория (None для корня дерева). */
             readonly parent: number | null;
-            /**
-             * Описание
-             * @description Общее описание линейки продукции (для страницы категории).
-             */
             readonly description: string;
-            /**
-             * Инструкция
-             * @description Общая инструкция по монтажу/управлению для линейки продукции.
-             */
+            /** @description Общая инструкция по монтажу/управлению для линейки продукции. */
             readonly instructions: string;
-            /** @description First published product photo in this category (homepage tiles). */
+            /** @description First published product photo in this category, if any. */
             readonly image: {
-                [key: string]: unknown;
+                readonly id: number;
+                readonly image: string;
+                /** @description Lightweight card/mobile WebP when available. */
+                readonly image_card?: string | null;
+                readonly alt?: string;
             } | null;
         };
         /**
-         * @description * `datasheet` - Паспорт
+         * @description * `datasheet` - Паспорт / datasheet
          *     * `certificate` - Сертификат
          *     * `catalog` - Каталог
          *     * `other` - Прочее
@@ -483,44 +322,23 @@ export interface components {
          */
         Lead: {
             readonly id: number;
-            /** Тип заявки */
             lead_type?: components["schemas"]["LeadTypeEnum"];
-            /** Имя */
             name: string;
-            /**
-             * Эл. почта
-             * Format: email
-             */
+            /** Format: email */
             email: string;
-            /** Телефон */
             phone?: string;
-            /** Компания */
             company?: string;
-            /** Сообщение */
             message: string;
-            /** Сегмент URL */
-            sku?: string | null;
-            /**
-             * Количество
-             * @description Количество позиций в запросе КП (RFQ).
-             */
+            /** @description SKU, по которому пришла заявка (опц.; SET_NULL при удалении SKU). */
+            sku?: number | null;
+            /** @description Количество (для RFQ). */
             quantity?: number | null;
-            /**
-             * Код аналога Belimo
-             * @description Код аналога Belimo (для заявок на замену).
-             */
+            /** @description Код аналога Belimo (для replacement). */
             analog_belimo_code?: string;
-            /** Статус */
             readonly status: components["schemas"]["StatusEnum"];
-            /**
-             * Создано
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly created_at: string;
-            /**
-             * Обновлено
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly updated_at: string;
             /**
              * @description Honeypot — leave empty (hidden from real users).
@@ -538,68 +356,42 @@ export interface components {
         /** @description Company news item (/novosti/<slug>). */
         News: {
             readonly id: number;
-            /** Заголовок */
             readonly title: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /** Текст */
             readonly body: string;
-            /** Format: uri */
+            /** @description Обложка новости (JPEG/PNG/WebP). */
             readonly cover: string | null;
-            /**
-             * Опубликовано
-             * @description Видимость в публичном API.
-             */
+            /** @description Видимость в публичном API. */
             readonly is_published: boolean;
             /**
-             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
              */
             readonly published_at: string | null;
-            /**
-             * Создано
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly created_at: string;
-            /**
-             * Обновлено
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly updated_at: string;
         };
         /** @description Public CMS page (/<slug>). */
         Page: {
             readonly id: number;
-            /** Заголовок */
             readonly title: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /** Текст */
             readonly body: string;
-            /**
-             * Опубликовано
-             * @description Видимость в публичном API.
-             */
+            /** @description Видимость в публичном API. */
             readonly is_published: boolean;
             /**
-             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
+             * @description Дата публикации (для сортировки/SEO); null = черновик.
              */
             readonly published_at: string | null;
-            /**
-             * Создано
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly created_at: string;
-            /**
-             * Обновлено
-             * Format: date-time
-             */
+            /** Format: date-time */
             readonly updated_at: string;
         };
-        PaginatedArticleListList: {
+        PaginatedArticleList: {
             /** @example 123 */
             count: number;
             /**
@@ -612,7 +404,7 @@ export interface components {
              * @example http://api.example.org/accounts/?page=2
              */
             previous?: string | null;
-            results: components["schemas"]["ArticleList"][];
+            results: components["schemas"]["Article"][];
         };
         PaginatedCategoryList: {
             /** @example 123 */
@@ -692,178 +484,70 @@ export interface components {
         /** @description Serializer for staff upload (POST) and public read (GET). */
         ProductFileUpload: {
             readonly id: number;
-            /** Название */
             title: string;
             /**
-             * Файл
              * Format: uri
-             * @description Только PDF; размер и тип файла проверяются при загрузке.
+             * @description Только PDF; лимит и magic bytes — catalog.validators.
              */
             file: string;
-            /** Тип файла */
             file_type?: components["schemas"]["FileTypeEnum"];
-            /**
-             * Опубликован
-             * @description Видимость файла в публичном каталоге и на карточке товара.
-             */
+            /** @description Видимость файла в публичном каталоге / PDP. */
             is_published?: boolean;
-            /**
-             * Порядок
-             * @description Порядок в блоке «Документы» (меньше = выше).
-             */
+            /** @description Порядок в блоке «Документы» (меньше = выше). */
             sort_order?: number;
         };
-        /** @description SKU PDP payload: list fields + sectioned copy + attributes + files. */
+        /** @description SKU PDP payload: list fields + attributes + files. */
         SKUDetail: {
             readonly id: number;
-            /** @description H1/card title: series Product name on family list cards, else edition. */
             readonly name: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /**
-             * Артикул
-             * @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215.
-             */
+            /** @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215. */
             readonly sku_code: string;
-            /**
-             * Код аналога Belimo
-             * @description Код аналога Belimo (для будущей карты аналогов).
-             */
+            /** @description Код аналога Belimo (задел для AnalogMap P1). */
             readonly analog_belimo_code: string | null;
             readonly category_slug: string;
             readonly product_slug: string;
             /**
-             * Цена
              * Format: decimal
-             * @description Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»).
+             * @description Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site).
              */
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
-            /** @description True when warehouse quantity is positive (no raw qty in public API). */
+            /** @description True when warehouse quantity is positive. */
             readonly in_stock: boolean;
-            /** @description True when first_published_at is within the Новинки window (30 days). */
-            readonly is_new: boolean;
-            /**
-             * Впервые на сайте
-             * Format: date-time
-             * @description Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL.
-             */
-            readonly first_published_at: string | null;
-            /** @description Published SKU count on the same Product (family card signal). */
-            readonly edition_count: number;
-            /** @description Primary published image for catalog cards (sort_order ASC). */
-            readonly image: {
-                [key: string]: unknown;
-            } | null;
-            /** @description Hero ТТХ on PDP: fuller set than catalog cards. */
-            readonly highlights: {
-                [key: string]: string;
-            }[];
-            /**
-             * @description Return description for this SKU edition only (no H1/lead/EAV echo).
-             *
-             *     Drops bullets that only restate AttributeValue rows already shown in
-             *     ТТХ cards / highlights (e.g. «Управление: …», «Вспомогательный…»).
-             *     When nothing remains but a hero lead exists, return a light paraphrase
-             *     of that lead for the Описание tab (SEO-safe, not an exact duplicate).
-             */
             readonly description: string;
-            /** @description Short prose blurb for PDP hero (application sentence). */
-            readonly lead: string;
-            /**
-             * @description Характеристики prose — only when there are no structured attrs.
-             *
-             *     When EAV / category cards cover the ТТХ, return empty to avoid a
-             *     duplicate StructuredText block under the cards.
-             */
             readonly specs_text: string;
-            /** @description Return Аналоги for this SKU edition. */
             readonly analogs_text: string;
             readonly category_name: string;
             readonly category_description: string;
-            /** @description Install guide scoped to this SKU edition (all series). */
             readonly category_instructions: string;
-            /** @description Optional actuator + bracket picker for ball-valve RFQ. */
-            readonly ball_valve_kit: {
-                [key: string]: unknown;
-            } | null;
-            /** @description Adapter ↔ brass 8100 cross-links for PDP («Совместимые позиции»). */
-            readonly compatible_positions: {
-                [key: string]: unknown;
-            }[];
-            /** @description Same-product editions for the PDP variant picker (empty if alone). */
-            readonly siblings: {
-                [key: string]: unknown;
-            }[];
-            /** @description Unique DN / Kvs / voltage / control values among siblings. */
-            readonly variant_axes: {
-                [key: string]: string[];
-            };
-            /** @description ТТХ rows deduped and scoped to the SKU voltage/control variant. */
-            readonly attributes: {
-                [key: string]: unknown;
-            }[];
-            /** @description ТТХ grouped for category cards on the Характеристики tab. */
-            readonly attribute_groups: {
-                [key: string]: unknown;
-            }[];
+            readonly attributes: components["schemas"]["AttributeValue"][];
             /** @description Return only published ProductFile rows, ordered. */
             readonly files: {
                 [key: string]: unknown;
             }[];
-            /** @description Return published gallery images for this edition only. */
-            readonly images: {
-                [key: string]: unknown;
-            }[];
         };
-        /** @description SKU card for list: key ТТХ highlights; price gated by SiteSettings. */
+        /** @description SKU card for list: no nested ТТХ; price gated by SiteSettings. */
         SKUList: {
             readonly id: number;
-            /** @description H1/card title: series Product name on family list cards, else edition. */
             readonly name: string;
-            /** Сегмент URL */
             readonly slug: string;
-            /**
-             * Артикул
-             * @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215.
-             */
+            /** @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215. */
             readonly sku_code: string;
-            /**
-             * Код аналога Belimo
-             * @description Код аналога Belimo (для будущей карты аналогов).
-             */
+            /** @description Код аналога Belimo (задел для AnalogMap P1). */
             readonly analog_belimo_code: string | null;
             readonly category_slug: string;
             readonly product_slug: string;
             /**
-             * Цена
              * Format: decimal
-             * @description Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»).
+             * @description Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site).
              */
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
-            /** @description True when warehouse quantity is positive (no raw qty in public API). */
+            /** @description True when warehouse quantity is positive. */
             readonly in_stock: boolean;
-            /** @description True when first_published_at is within the Новинки window (30 days). */
-            readonly is_new: boolean;
-            /**
-             * Впервые на сайте
-             * Format: date-time
-             * @description Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL.
-             */
-            readonly first_published_at: string | null;
-            /** @description Published SKU count on the same Product (family card signal). */
-            readonly edition_count: number;
-            /** @description Primary published image for catalog cards (sort_order ASC). */
-            readonly image: {
-                [key: string]: unknown;
-            } | null;
-            /** @description Compact ТТХ for catalog cards (moment / voltage / control / …). */
-            readonly highlights: {
-                [key: string]: string;
-            }[];
         };
         /** @description Paginated search response (DRF PageNumberPagination shape). */
         SearchResponse: {
@@ -876,7 +560,7 @@ export interface components {
         };
         /** @description One item in the unified search results list. */
         SearchResultItem: {
-            /** @description Тип результата: sku | article | news | page. */
+            /** @description Тип результата: sku | article | news. */
             type: string;
             /** @description Slug (path-сегмент) найденной записи. */
             slug: string;
@@ -884,7 +568,9 @@ export interface components {
             title: string;
             /** @description Канонический path (напр. /<slug>/, /statyi/<slug>/). */
             url: string;
-            /** @description Краткое описание (для SKU — lead с PDP; для CMS — начало body). */
+            /**
+             * @description Краткое описание (для SKU — lead с PDP; для CMS — начало body).
+             */
             snippet: string;
         };
         /**
@@ -925,77 +611,13 @@ export interface operations {
             };
         };
     };
-    catalog_compare_retrieve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    catalog_facets_retrieve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     catalog_skus_list: {
         parameters: {
             query?: {
-                /** @description ТТХ facet: Аналоги */
-                analog?: string;
-                /** @description ТТХ facet: Площадь заслонки */
-                area?: string;
-                /** @description ТТХ facet: Вспомогательный переключатель */
-                aux_switch?: string;
                 category?: string;
-                /** @description ТТХ facet: Совместимый привод */
-                compatible_actuators?: string;
-                /** @description ТТХ facet: Управление */
-                control?: string;
-                /** @description ТТХ facet: DN */
-                dn?: string;
-                /** @description Только товары в наличии (stock_qty > 0). Значения: 1 / true / yes. */
-                in_stock?: "1" | "true" | "yes";
-                /** @description ТТХ facet: Kvs (м³/ч) */
-                kvs?: string;
-                /** @description ТТХ facet: Материал корпуса */
-                material?: string;
-                /** @description ТТХ facet: Крутящий момент */
-                moment?: string;
-                /** @description Только новинки (first_published_at за последние 30 суток). Порядок: в наличии, затем newer first. Значения: 1 / true / yes. */
-                new?: "1" | "true" | "yes";
                 /** @description A page number within the paginated result set. */
                 page?: number;
                 q?: string;
-                /** @description ТТХ facet: Термодатчик */
-                temp_sensor?: string;
-                /** @description ТТХ facet: Напряжение */
-                voltage?: string;
-                /** @description ТТХ facet: Тип крана */
-                ways?: string;
             };
             header?: never;
             path?: never;
@@ -1102,7 +724,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedArticleListList"];
+                    "application/json": components["schemas"]["PaginatedArticleList"];
                 };
             };
         };
@@ -1214,42 +836,6 @@ export interface operations {
             };
         };
     };
-    csrf_retrieve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    integrations_telegram_webhook_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     leads_create: {
         parameters: {
             query?: never;
@@ -1324,24 +910,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
                 };
-            };
-        };
-    };
-    settings_public_retrieve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No response body */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
