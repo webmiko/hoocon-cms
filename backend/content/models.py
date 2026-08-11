@@ -170,6 +170,37 @@ class Article(_ContentBase):
         super().save(*args, **kwargs)  # type: ignore[arg-type]
 
 
+class NewsCategory(models.Model):
+    """Rubric for company news (/novosti filter chips)."""
+
+    name: models.CharField = models.CharField("название", max_length=120)
+    slug: models.SlugField = models.SlugField(
+        "сегмент URL",
+        max_length=120,
+        unique=True,
+        db_index=True,
+    )
+    sort_order: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "порядок",
+        default=100,
+        db_index=True,
+    )
+    is_published: models.BooleanField = models.BooleanField(
+        "опубликовано",
+        default=True,
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "категория новостей"
+        verbose_name_plural = "категории новостей"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        """Return category name for Admin."""
+        return self.name
+
+
 class News(_ContentBase):
     """Company news item (/novosti/<slug>).
 
@@ -177,6 +208,14 @@ class News(_ContentBase):
     поддерживается Postgres-триггером (см. миграцию 0002).
     """
 
+    category = models.ForeignKey(
+        NewsCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="news",
+        verbose_name="категория",
+    )
     cover: models.ImageField = models.ImageField(
         "обложка",
         upload_to=news_cover_upload_to,

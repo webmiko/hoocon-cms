@@ -12,7 +12,7 @@ from typing import Any
 from rest_framework import serializers
 
 from catalog.media_urls import RelativeImageField, to_media_path
-from content.models import Article, News, Page
+from content.models import Article, News, NewsCategory, Page
 from content.related_skus import mentioned_skus_for_article
 
 
@@ -111,10 +111,27 @@ class ArticleSerializer(ArticleListSerializer):
         ).data
 
 
+class NewsCategoryBriefSerializer(serializers.Serializer):
+    """Nested category payload on a news card ({slug, name})."""
+
+    slug = serializers.CharField()
+    name = serializers.CharField()
+
+
+class NewsCategorySerializer(serializers.ModelSerializer):
+    """Published news rubric for /novosti filter chips."""
+
+    class Meta:
+        model = NewsCategory
+        fields = ("id", "name", "slug", "sort_order")
+        read_only_fields = fields
+
+
 class NewsSerializer(_ContentSerializer):
     """Company news item (/novosti/<slug>)."""
 
     cover = RelativeImageField(read_only=True, allow_null=True)
+    category = NewsCategoryBriefSerializer(read_only=True, allow_null=True)
 
     class Meta(_ContentSerializer.Meta):
         model = News
@@ -124,6 +141,7 @@ class NewsSerializer(_ContentSerializer):
             "slug",
             "body",
             "cover",
+            "category",
             "is_published",
             "published_at",
             "created_at",

@@ -16,6 +16,7 @@ from django.utils.text import Truncator
 
 from config.logging_utils import setup_logger
 from content.models import Article, News
+from content.news_categories import CATEGORY_STATI, ensure_categories
 
 logger = setup_logger("hoocon.content.go_live")
 
@@ -95,12 +96,14 @@ def ensure_go_live_news(article: Article) -> tuple[News, bool]:
         return existing, False
 
     now = timezone.now()
+    cats = ensure_categories()
     news = News(
         slug=slug,
         title=_news_title(article),
         body=_news_body(article),
         is_published=True,
         published_at=now,
+        category=cats.get(CATEGORY_STATI),
     )
     news.save()
     _copy_cover(news, article)

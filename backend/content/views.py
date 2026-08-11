@@ -12,10 +12,11 @@ from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import AllowAny
 
-from content.models import Article, News, Page
+from content.models import Article, News, NewsCategory, Page
 from content.serializers import (
     ArticleListSerializer,
     ArticleSerializer,
+    NewsCategorySerializer,
     NewsSerializer,
     PageSerializer,
 )
@@ -78,7 +79,46 @@ class ArticleViewSet(_ContentViewSet):
 
 
 class NewsViewSet(_ContentViewSet):
-    """GET /api/content/news/ and /api/content/news/{slug}/."""
+    """GET /api/content/news/ and /api/content/news/{slug}/.
+
+    Query params (list):
+      category — NewsCategory.slug
+      ordering — ``newest`` (default) | ``oldest``
+    """
 
     serializer_class = NewsSerializer
     queryset = News.objects.none()
+
+    def get_queryset(self) -> QuerySet:
+        """Published news with optional category filter and date ordering."""
+        qs = publicly_visible(News).select_related("category")
+        category = (self.request.query_params.get("category") or "").strip()
+        if category:
+            qs = qs.filter(
+                category__slug=category,
+                category__is_published=True,
+            )
+        ordering = (self.request.query_params.get("ordering") or "newest").strip()
+        if ordering == "oldest":
+            return qs.order_by("published_at", "created_at")
+        return qs.order_by("-published_at", "-created_at")
+
+
+class NewsCategoryViewSet(
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
+    """GET /api/content/news-categories/ — published rubrics for chips."""
+
+    permission_classes = (AllowAny,)
+    http_method_names = ["get", "head", "options"]
+    serializer_class = NewsCategorySerializer
+    pagination_class = None
+    queryset = NewsCategory.objects.none()
+
+    def get_queryset(self) -> QuerySet:
+        """Published categories ordered for the filter bar."""
+        return NewsCategory.objects.filter(is_published=True).order_by(
+            "sort_order",
+            "name",
+        )

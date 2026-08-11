@@ -901,6 +901,12 @@ class Command(BaseCommand):
         elif guides.cover:
             self.stdout.write(f"news {_NEWS_GUIDES_SLUG}: cover already set")
 
+        from content.news_categories import assign_news_categories, ensure_categories
+
+        ensure_categories()
+        assigned = assign_news_categories()
+        self.stdout.write(f"news categories: assigned={assigned}")
+
         self.stdout.write(
             self.style.SUCCESS(
                 f"Done: pages={pages_done}, article_bodies={bodies_done}, "

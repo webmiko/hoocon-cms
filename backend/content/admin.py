@@ -9,7 +9,7 @@ from django.http import HttpRequest
 from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin
-from content.models import Article, News, Page
+from content.models import Article, News, NewsCategory, Page
 from social.admin import SocialAnnounceAdminMixin, maybe_auto_announce
 
 
@@ -23,6 +23,18 @@ class _ContentBaseAdmin(OpenChangeLinkMixin, ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ("created_at", "updated_at")
     ordering = ("-published_at", "-created_at")
+
+
+@admin.register(NewsCategory)
+class NewsCategoryAdmin(OpenChangeLinkMixin, ModelAdmin):
+    """Rubrics for /novosti filter chips."""
+
+    list_display = ("name", "slug", "sort_order", "is_published")
+    list_display_links = ("name",)
+    list_filter = ("is_published",)
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
+    ordering = ("sort_order", "name")
 
 
 @admin.register(Page)
@@ -81,9 +93,19 @@ class NewsAdmin(SocialAnnounceAdminMixin, _ContentBaseAdmin):
 
     change_form_template = "admin/content/change_form_social.html"
     verbose_name = "Новость"
+    list_display = (
+        "title",
+        "slug",
+        "category",
+        "is_published",
+        "published_at",
+        "updated_at",
+    )
+    list_filter = ("is_published", "category")
     fields = (
         "title",
         "slug",
+        "category",
         "cover",
         "body",
         "is_published",

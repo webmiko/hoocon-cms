@@ -8,12 +8,22 @@ from __future__ import annotations
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from content.views import ArticleViewSet, NewsViewSet, PageViewSet
+from content.views import (
+    ArticleViewSet,
+    NewsCategoryViewSet,
+    NewsViewSet,
+    PageViewSet,
+)
 
 router = DefaultRouter()
 router.register(r"pages", PageViewSet, basename="page")
 router.register(r"articles", ArticleViewSet, basename="article")
 router.register(r"news", NewsViewSet, basename="news")
+router.register(
+    r"news-categories",
+    NewsCategoryViewSet,
+    basename="news-category",
+)
 
 urlpatterns = [
     path("", include(router.urls)),
