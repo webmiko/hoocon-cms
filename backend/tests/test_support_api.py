@@ -212,7 +212,7 @@ def test_admin_reply_view_creates_outbound_and_enqueues_deliver() -> None:
 
 @pytest.mark.django_db
 def test_admin_reply_form_is_outside_main_change_form() -> None:
-    """Reply form must render in Unfold form_after (not nested in change form)."""
+    """Reply form must render in Unfold form_before (not nested in change form)."""
     from django.contrib.auth import get_user_model
     from django.test import Client
     from django.urls import reverse
@@ -236,6 +236,7 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert page.status_code == 200
     html = page.content.decode()
     assert 'name="reply_body"' in html
-    assert "/reply/" in html
-    # Nested <form> inside conversation_form would break submit; reply action must exist.
+    assert 'id="hoocon-messenger"' in html
+    assert "hoocon-messenger__send" in html
     assert f"/admin/supportchat/conversation/{conv.pk}/reply/" in html
+    assert "hoocon-support-messenger.js" in html

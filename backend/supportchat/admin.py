@@ -9,6 +9,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
@@ -21,37 +22,51 @@ from supportchat.models import (
     SupportScheduleDay,
     SupportScheduleInterval,
 )
-from supportchat.services import SupportChatError, add_staff_reply, count_staff_unread
+from supportchat.services import (
+    SupportChatError,
+    add_staff_reply,
+    count_staff_unread,
+    message_sender_name,
+    staff_public_name,
+)
 
 
-class MessageInline(TabularInline):
-    """Read-only message history on the conversation card."""
-
-    model = Message
-    extra = 0
-    can_delete = False
-    fields = ("created_at", "direction", "outside_hours", "body", "author")
-    readonly_fields = fields
-    ordering = ("created_at",)
-    show_change_link = False
-
-    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        return False
+def _chat_messages_for_admin(conversation: Conversation) -> list[dict[str, Any]]:
+    """Serialize messages for the messenger template (admin-only)."""
+    qs = conversation.messages.select_related(
+        "author",
+        "conversation",
+        "conversation__assignee",
+    ).order_by("created_at", "id")
+    rows: list[dict[str, Any]] = []
+    for msg in qs:
+        local = timezone.localtime(msg.created_at)
+        rows.append(
+            {
+                "direction": msg.direction,
+                "body": msg.body,
+                "sender_name": message_sender_name(msg),
+                "outside_hours": msg.outside_hours,
+                "created_at_iso": msg.created_at.isoformat(),
+                "created_at_label": local.strftime("%d.%m.%Y %H:%M"),
+            },
+        )
+    return rows
 
 
 @admin.register(Conversation)
 class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
-    """Unified support inbox."""
+    """Unified support inbox with messenger change view."""
 
     list_display = (
         "unread_badge",
-        "channel",
+        "channel_badge",
         "display_name",
         "contact_email",
         "status",
-        "staff_unread_count",
         "assignee",
         "last_message_at",
+        "last_preview",
     )
     list_display_links = ("display_name", "contact_email")
     list_filter = ("channel", "status", "assignee")
@@ -65,7 +80,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "updated_at",
     )
     autocomplete_fields = ("assignee", "client", "lead")
-    inlines = (MessageInline,)
+    # Messages render in the messenger template (not a tabular inline).
+    inlines = ()
     ordering = ("-last_message_at", "-id")
     change_form_template = "admin/supportchat/conversation/change_form.html"
     change_list_template = "admin/supportchat/conversation/change_list.html"
@@ -73,7 +89,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
 
     fieldsets = (
         (
-            "Диалог",
+            "Карточка диалога",
             {
                 "fields": (
                     "channel",
@@ -106,6 +122,9 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         ),
     )
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Conversation]:
+        return super().get_queryset(request).select_related("assignee").prefetch_related("messages")
+
     @admin.display(description="Inbox", ordering="staff_unread_count")
     def unread_badge(self, obj: Conversation) -> str:
         if obj.staff_unread_count <= 0:
@@ -114,6 +133,27 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             '<span style="color:#b01010;font-weight:700;">● {}</span>',
             obj.staff_unread_count,
         )
+
+    @admin.display(description="Канал", ordering="channel")
+    def channel_badge(self, obj: Conversation) -> str:
+        label = obj.get_channel_display()
+        return format_html(
+            '<span class="hoocon-channel-badge hoocon-channel-badge--{}">{}</span>',
+            obj.channel,
+            label,
+        )
+
+    @admin.display(description="Последнее")
+    def last_preview(self, obj: Conversation) -> str:
+        msgs = list(obj.messages.all())
+        if not msgs:
+            return "—"
+        last = msgs[-1]
+        prefix = "← " if last.direction == "inbound" else "→ "
+        text = (last.body or "").replace("\n", " ").strip()
+        if len(text) > 56:
+            text = text[:55].rstrip() + "…"
+        return f"{prefix}{text}"
 
     def get_urls(self) -> list[Any]:
         urls = super().get_urls()
@@ -137,37 +177,29 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         return JsonResponse({"count": count_staff_unread()})
 
     def reply_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        change_url = reverse("admin:supportchat_conversation_change", args=[object_id])
+        change_url = f"{change_url}#hoocon-messenger"
         if request.method != "POST":
-            return HttpResponseRedirect(
-                reverse("admin:supportchat_conversation_change", args=[object_id]),
-            )
+            return HttpResponseRedirect(change_url)
         if not request.user.has_perm("supportchat.change_conversation"):
             messages.error(request, "Недостаточно прав для ответа.")
-            return HttpResponseRedirect(
-                reverse("admin:supportchat_conversation_change", args=[object_id]),
-            )
+            return HttpResponseRedirect(change_url)
         conversation = get_object_or_404(Conversation, pk=object_id)
         body = (request.POST.get("reply_body") or "").strip()
         user = request.user
         if not user.is_authenticated:
             messages.error(request, "Недостаточно прав для ответа.")
-            return HttpResponseRedirect(
-                reverse("admin:supportchat_conversation_change", args=[object_id]),
-            )
+            return HttpResponseRedirect(change_url)
         try:
             msg = add_staff_reply(conversation, body, author=user)
         except SupportChatError as exc:
             messages.error(request, str(exc))
-            return HttpResponseRedirect(
-                reverse("admin:supportchat_conversation_change", args=[object_id]),
-            )
+            return HttpResponseRedirect(change_url)
         from supportchat.tasks import deliver_outbound_message
 
         deliver_outbound_message.delay(msg.pk)
         messages.success(request, "Ответ отправлен.")
-        return HttpResponseRedirect(
-            reverse("admin:supportchat_conversation_change", args=[object_id]),
-        )
+        return HttpResponseRedirect(change_url)
 
     def change_view(
         self,
@@ -177,7 +209,10 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
         extra = dict(extra_context or {})
-        conversation = get_object_or_404(Conversation, pk=object_id)
+        conversation = get_object_or_404(
+            Conversation.objects.select_related("assignee"),
+            pk=object_id,
+        )
         if conversation.staff_unread_count and request.user.has_perm(
             "supportchat.change_conversation",
         ):
@@ -187,6 +222,10 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             "admin:supportchat_conversation_reply",
             args=[object_id],
         )
+        extra["chat_messages"] = _chat_messages_for_admin(conversation)
+        label = (conversation.display_name or "").strip()
+        extra["chat_client_initial"] = (label[:1] or "?").upper()
+        extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
         return super().change_view(request, object_id, form_url, extra)
 
     @admin.action(description="Отметить прочитанными")
