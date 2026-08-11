@@ -383,6 +383,34 @@ def test_find_staff_and_pending_edge_cases() -> None:
 @override_settings(
     **{
         **OTP_SETTINGS,
+        "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "mikolamus@ya.ru,@hoocon.ru",
+    },
+)
+def test_domain_allowlist_allows_hoocon_staff() -> None:
+    blocked = _staff(username="blocked", email="blocked@example.com")
+    allowed = _staff(username="assistant", email="assistant@hoocon.ru")
+    client = Client()
+    blocked_resp = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": blocked.username, "next": "/admin/"},
+    )
+    assert blocked_resp.status_code == 200
+    assert len(mail.outbox) == 0
+
+    ok_resp = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": allowed.username, "next": "/admin/"},
+    )
+    assert ok_resp.status_code == 302
+    assert len(mail.outbox) == 1
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **OTP_SETTINGS,
         "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "allowed@example.com",
     },
 )
@@ -483,6 +511,14 @@ def test_otp_ttl_human_and_allowlist_helpers() -> None:
     with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="A@X.ru, b@y.ru"):
         assert staff_email_allowed_for_otp("a@x.ru") is True
         assert staff_email_allowed_for_otp("other@x.ru") is False
+    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="mikolamus@ya.ru,@hoocon.ru"):
+        assert staff_email_allowed_for_otp("assistant@hoocon.ru") is True
+        assert staff_email_allowed_for_otp("sales@HOOCON.ru") is True
+        assert staff_email_allowed_for_otp("other@example.com") is False
+        assert staff_email_allowed_for_otp("mikolamus@ya.ru") is True
+    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="*@hoocon.ru"):
+        assert staff_email_allowed_for_otp("a@hoocon.ru") is True
+        assert staff_email_allowed_for_otp("a@other.ru") is False
 
 
 @pytest.fixture(autouse=True)
