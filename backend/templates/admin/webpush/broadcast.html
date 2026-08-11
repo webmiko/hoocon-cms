@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<h1>Push-рассылка (маркетинг / новости)</h1>
+<p>Уйдёт всем подписчикам с темой «маркетинг». Без PII в тексте.</p>
+<form method="post">
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    <div class="form-row">
+      <label for="id_title">Заголовок</label>
+      <input id="id_title" name="title" type="text" maxlength="120" required style="width:100%;max-width:40rem;">
+    </div>
+    <div class="form-row">
+      <label for="id_body">Текст</label>
+      <textarea id="id_body" name="body" rows="4" maxlength="240" required style="width:100%;max-width:40rem;"></textarea>
+    </div>
+    <div class="form-row">
+      <label for="id_url">URL при клике</label>
+      <input id="id_url" name="url" type="text" value="/" maxlength="500" style="width:100%;max-width:40rem;">
+    </div>
+  </fieldset>
+  <div class="submit-row">
+    <input type="submit" class="default" value="Отправить">
+    <a href="{% url 'admin:webpush_pushsubscription_changelist' %}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if broadcast_url %}
+  <li>
+    <a href="{{ broadcast_url }}" class="addlink">Push-рассылка</a>
+  </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

@@ -26,6 +26,7 @@
 - [Готовность, бэкенд и UX/дизайн B2B (перед итерацией 1)](readiness-backend-ux.md)
 - [Версии релизов Hoocon CMS (админка + фронт)](releases.md)
 - [Security baseline: Hoocon CMS (secure by default)](security-baseline.md)
+- [Web Push (PWA) — VAPID ops](webpush-ops.md)
 - [SEO: title, description и сниппеты (Google + Яндекс)](seo-meta-yandex-google.md)
 - [SEO: сохранение URL и редиректы (Tilda → Hoocon CMS)](seo-url-migration.md)
 - [Шаблоны карточек по сериям](series-card-templates.md)

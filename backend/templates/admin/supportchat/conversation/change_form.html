@@ -1,0 +1,20 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_related_objects %}
+{{ block.super }}
+{% if reply_url and original %}
+<section class="hoocon-support-reply" style="margin:1.5rem 0;padding:1rem;border:1px solid #e5e7eb;border-radius:8px;">
+  <h2 style="margin-top:0;">Ответ клиенту</h2>
+  <form method="post" action="{{ reply_url }}">
+    {% csrf_token %}
+    <textarea name="reply_body" rows="4" required maxlength="4000"
+      style="width:100%;font:inherit;padding:0.5rem;"
+      placeholder="Текст ответа…"></textarea>
+    <p style="margin:0.75rem 0 0;">
+      <button type="submit" class="default">Отправить</button>
+    </p>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

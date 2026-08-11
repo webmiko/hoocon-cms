@@ -90,6 +90,16 @@ _VIEW_USER: Final[frozenset[tuple[str, str]]] = frozenset(
     {("auth", "view_user")},
 )
 
+_SUPPORTCHAT_MODELS: Final[tuple[str, ...]] = (
+    "conversation",
+    "message",
+    "supportschedule",
+    "supportscheduleday",
+    "supportscheduleinterval",
+)
+
+_WEBPUSH_MODELS: Final[tuple[str, ...]] = ("pushsubscription",)
+
 _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
     _crud("catalog", _CATALOG_MODELS)
     | _crud("content", _CONTENT_MODELS)
@@ -98,14 +108,17 @@ _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
     | _crud("redirects", ("redirect",))
     | _crud("sitesettings", ("sitesettings",))
     | _crud("social", ("socialpost",))
+    | _crud("supportchat", _SUPPORTCHAT_MODELS)
+    | _crud("webpush", _WEBPUSH_MODELS)
     | _VIEW_USER
 )
 
-# Manager: leads + CRM write (no delete), catalog view, view_user.
-# Content/social intentionally omitted. supportchat — when app exists.
+# Manager: leads + CRM write (no delete), catalog view, supportchat write (no delete).
 _MANAGER_PERMS: Final[frozenset[tuple[str, str]]] = (
     _write_no_delete("leads", ("lead",))
     | _write_no_delete("crm", _CRM_MODELS)
+    | _write_no_delete("supportchat", _SUPPORTCHAT_MODELS)
+    | _write_no_delete("webpush", _WEBPUSH_MODELS)
     | _view_only("catalog", _CATALOG_MODELS)
     | _VIEW_USER
 )
@@ -115,6 +128,8 @@ _ANALYST_PERMS: Final[frozenset[tuple[str, str]]] = (
     _view_only("leads", ("lead",))
     | _view_only("crm", _CRM_MODELS)
     | _view_only("catalog", _CATALOG_MODELS)
+    | _view_only("supportchat", _SUPPORTCHAT_MODELS)
+    | _view_only("webpush", _WEBPUSH_MODELS)
     | _VIEW_USER
 )
 

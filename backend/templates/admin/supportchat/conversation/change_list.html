@@ -1,0 +1,15 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block object-tools-items %}
+  <li>
+    <a href="#" id="hoocon-webpush-enable" class="viewlink">Push в браузер</a>
+  </li>
+  <li><span id="hoocon-webpush-status" style="margin-left:0.5rem;opacity:0.8;"></span></li>
+  {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="{% static 'admin/js/hoocon-admin-webpush.js' %}?v={{ STATIC_VERSION }}" defer></script>
+{% endblock %}

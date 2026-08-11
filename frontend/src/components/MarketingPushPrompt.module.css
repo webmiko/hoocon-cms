@@ -1,0 +1,75 @@
+.banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(72px + var(--bottom-chrome, 0px) + var(--cookie-chrome, 0px));
+  z-index: 430;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: mkt-in 320ms var(--ease-out);
+}
+
+@keyframes mkt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.text {
+  margin: 0 0 0.65rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.primary,
+.secondary {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
+}
+
+.status {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 721px) {
+  .banner {
+    left: auto;
+    right: 16px;
+    margin: 0;
+  }
+}
