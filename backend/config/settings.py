@@ -135,6 +135,7 @@ INSTALLED_APPS = [
     "crm.apps.CrmConfig",
     "search",
     "social",
+    "supportchat.apps.SupportchatConfig",
 ]
 
 MIDDLEWARE = [
@@ -302,6 +303,17 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_lead",
                     },
                     {
+                        "title": _("Поддержка"),
+                        "icon": "forum",
+                        "link": reverse_lazy(
+                            "admin:supportchat_conversation_changelist",
+                        ),
+                        "badge": "config.unfold_callbacks.badge_support_unread",
+                        "badge_variant": "danger",
+                        "badge_style": "solid",
+                        "permission": "config.unfold_callbacks.perm_view_conversation",
+                    },
+                    {
                         "title": _("Клиенты"),
                         "icon": "groups",
                         "link": reverse_lazy("admin:crm_client_changelist"),
@@ -344,6 +356,8 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 # Telegram inbound webhook (setWebhook secret_token). Empty = webhook rejects all.
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+# Public deep-link username for support widget (t.me/<name>); empty = hide TG link.
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "").strip()
 # /start cover: local file path preferred; else public HTTPS URL for Telegram.
 TELEGRAM_WELCOME_PHOTO_PATH = os.getenv("TELEGRAM_WELCOME_PHOTO_PATH", "").strip()
 TELEGRAM_WELCOME_PHOTO_URL = os.getenv(
@@ -367,6 +381,7 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "240/min",
         "lead_create": "10/hour",
+        "support_message": "30/hour",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
     },
