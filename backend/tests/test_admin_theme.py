@@ -63,6 +63,8 @@ def test_lead_sticker_visible_on_changelist_not_only_index() -> None:
     html = client.get("/admin/leads/lead/").content.decode()
     assert "hoocon-admin-lead-sticker" in html
     assert "data-hoocon-new-leads-count" in html
+    assert "hoocon-admin-support-sticker" in html
+    assert "data-hoocon-support-unread-count" in html
     assert "hoocon-admin-leads-sticker.js" in html
 
 
@@ -124,6 +126,7 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert ".dark .hoocon-dash__panel-head a" in css
     assert ".hoocon-admin-lead-sticker" in css
     assert "hoocon-admin-lead-sticker__count" in css
+    assert ".hoocon-admin-support-sticker--active" in css
     assert ".hoocon-lead-status--new" in css
     assert "a.hoocon-admin-lead-open" in css
     assert ".hoocon-lead-stats" in css

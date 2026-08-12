@@ -4,7 +4,16 @@
   right: 0;
   bottom: var(--bottom-chrome, 0px);
   z-index: 40;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  /* Shared dock CTA box — Chat / 4 из 4 / КП. */
+  --dock-btn-h: 2.75rem;
+  --dock-btn-pad-x: 16px;
+  --dock-btn-gap: 8px;
+  padding: 8px max(10px, env(safe-area-inset-left, 0px))
+    calc(8px + env(safe-area-inset-bottom, 0px))
+    max(10px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+  max-width: 100vw;
+  overflow: hidden;
   background: var(--glass-bg-strong, rgba(255, 255, 255, 0.94));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -18,98 +27,334 @@
   box-shadow: 0 -10px 28px color-mix(in srgb, var(--color-brand) 18%, transparent);
 }
 
-.inner {
+.panel {
   max-width: var(--container-max, 1120px);
-  margin: 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-}
-
-.metaBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  margin: 0 auto 8px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--color-border);
   min-width: 0;
 }
 
-.meta {
+.panelToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.panelTitle {
   margin: 0;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-muted);
-  white-space: nowrap;
 }
 
-.hint {
-  margin: 0;
-  font-size: 0.6875rem;
-  color: var(--color-text-soft);
+.panelClear {
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.list {
+.panelClear:hover {
+  color: var(--color-text);
+}
+
+.panelList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(40vh, 220px);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.item {
+.panelItem {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 160px;
-  padding: 4px 6px 4px 4px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm, 6px);
-  background: var(--color-surface);
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 2px;
 }
 
-.thumb,
-.thumbPlaceholder {
-  width: 36px;
-  height: 36px;
+.panelThumb,
+.panelThumbPlaceholder {
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   border-radius: 4px;
   overflow: hidden;
   background: var(--color-subtle);
 }
 
-.thumb :global(img) {
+.panelThumb :global(img) {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.thumbPlaceholder {
+.panelThumbPlaceholder {
   display: block;
 }
 
-.code {
-  font-size: 0.6875rem;
-  font-weight: 600;
+.panelCode {
+  flex: 1;
   min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: uppercase;
 }
 
+.panelLinks {
+  display: none;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.panelCompare {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inner {
+  max-width: var(--container-max, 1120px);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.innerEmpty {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.innerEmpty .chat,
+.innerEmpty .actions {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  flex: none;
+}
+
+.innerEmpty .actions {
+  display: flex;
+}
+
+.innerEmpty .compare {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Text-only in empty dock — icon made Chat feel wider than КП. */
+.trayEmpty .chatIcon {
+  display: none;
+}
+
+/* Empty dock is mobile-only (replaces sticky KP). */
+@media (min-width: 769px) {
+  .trayEmpty {
+    display: none;
+  }
+}
+
+/* Desktop: chat stays as floating FAB. Mobile dock embeds it (left thumb). */
+.chat {
+  display: none;
+  appearance: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dock-btn-gap);
+  box-sizing: border-box;
+  min-width: var(--dock-btn-h);
+  min-height: var(--dock-btn-h);
+  height: var(--dock-btn-h);
+  margin: 0;
+  padding: 0 var(--dock-btn-pad-x);
+  border: none;
+  border-radius: var(--radius, 10px);
+  background: var(--color-brand-control);
+  color: var(--color-on-brand-control);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft, 0 4px 16px rgba(0, 0, 0, 0.12));
+  transition:
+    background 180ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.chat:hover,
+.chat:focus-visible {
+  background: var(--color-brand-control-hover);
+  transform: translateY(-1px);
+}
+
+.chat:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.chatIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
+.chatLabel {
+  line-height: 1;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dock-btn-gap);
+  flex: 0 1 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--dock-btn-h);
+  height: var(--dock-btn-h);
+  margin: 0;
+  padding: 0 var(--dock-btn-pad-x);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius, 10px);
+  background: var(--color-subtle, var(--color-surface));
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 180ms var(--ease-out), background 180ms var(--ease-out);
+}
+
+.summary:hover {
+  border-color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+  background: var(--color-surface);
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.stack {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: -4px;
+  padding-right: 2px;
+}
+
+.stackSlot {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  margin-right: -10px;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px var(--color-surface);
+}
+
+.stackSlot:last-child {
+  margin-right: 0;
+}
+
+.stackThumb,
+.stackPlaceholder {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--color-subtle);
+}
+
+.stackThumb :global(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.summaryText {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--dock-btn-gap);
+  flex: 0 0 auto;
+  min-width: max-content;
+  line-height: 1;
+}
+
+.summaryCount {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.chevron {
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0 0 1px;
+  border-right: 1.5px solid var(--color-text-muted);
+  border-bottom: 1.5px solid var(--color-text-muted);
+  transform: rotate(-135deg);
+  opacity: 0.75;
+  transition: transform 180ms var(--ease-out);
+}
+
+.chevronOpen {
+  margin-bottom: 0;
+  margin-top: 1px;
+  transform: rotate(45deg);
+}
+
 .remove {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 1rem;
+  font-size: 1.125rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -122,12 +367,14 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .clear {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
@@ -140,25 +387,83 @@
   color: var(--color-text);
 }
 
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dock-btn-gap);
+  box-sizing: border-box;
+  min-width: var(--dock-btn-h);
+  min-height: var(--dock-btn-h);
+  height: var(--dock-btn-h);
+  padding: 0 var(--dock-btn-pad-x);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius, 10px);
+  background: var(--color-subtle, var(--color-surface));
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.secondary:hover {
+  border-color: var(--color-text-muted);
+  text-decoration: none;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.secondaryIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
+.secondaryLabel {
+  line-height: 1;
+}
+
 .compare {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: 8px 18px;
-  border-radius: var(--radius-sm, 6px);
+  gap: var(--dock-btn-gap);
+  box-sizing: border-box;
+  min-width: var(--dock-btn-h);
+  min-height: var(--dock-btn-h);
+  height: var(--dock-btn-h);
+  padding: 0 var(--dock-btn-pad-x);
+  border: none;
+  border-radius: var(--radius, 10px);
   background: var(--color-brand-control);
   color: var(--color-on-brand-control);
-  font-size: 0.8125rem;
+  font-family: var(--font-display);
   font-weight: 700;
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.01em;
   text-decoration: none;
   white-space: nowrap;
+  box-shadow: var(--shadow-soft, 0 4px 16px rgba(0, 0, 0, 0.12));
+  transition:
+    background 180ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
 }
 
 .compare:hover {
   background: var(--color-brand-control-hover);
   text-decoration: none;
   color: var(--color-on-brand-control);
+  transform: translateY(-1px);
+}
+
+.compareFull {
+  display: inline;
+}
+
+.compareShort {
+  display: none;
 }
 
 .comparePulse {
@@ -190,18 +495,136 @@
   }
 }
 
+/* Tablet / narrow desktop: drop long hint + clear from dock. */
 @media (max-width: 640px) {
-  .inner {
-    flex-direction: column;
-    align-items: stretch;
+  .clear {
+    display: none;
+  }
+
+  .summaryLabel {
+    display: none;
+  }
+}
+
+/*
+ * Phone dock (ambidextrous):
+ * [Чат left] [N из 4 center] [КП right]
+ * Sticky page KP is hidden while this tray is mounted.
+ */
+@media (max-width: 768px) {
+  .chat {
+    display: inline-flex;
+  }
+
+  .trayEmpty .chat {
+    display: inline-flex;
+  }
+
+  .summary {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 
   .actions {
     margin-left: 0;
+  }
+
+  .innerEmpty .actions {
+    margin-left: 0;
+    display: flex;
     width: 100%;
   }
 
+  /* Equal halves: labeled Chat (no icon) + КП. */
+  .trayEmpty .chatLabel {
+    display: inline;
+  }
+
+  .trayEmpty .chat {
+    display: inline-flex;
+    width: 100%;
+    max-width: 100%;
+    padding: 0 var(--dock-btn-pad-x);
+    box-sizing: border-box;
+  }
+
+  .trayEmpty .compare {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .panelLinks {
+    display: block;
+  }
+}
+
+/* Phone: icon-only Chat + Compare in selection tray; hide thumb stack. */
+@media (max-width: 480px) {
+  .stack {
+    display: none;
+  }
+
+  .chatLabel,
+  .secondaryLabel {
+    display: none;
+  }
+
+  .chat,
+  .secondary {
+    width: var(--dock-btn-h);
+    padding: 0;
+  }
+
+  /* Empty dock: two equal grid columns, both labeled. */
+  .trayEmpty .chatLabel {
+    display: inline;
+  }
+
+  .trayEmpty .chat {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 var(--dock-btn-pad-x);
+    box-sizing: border-box;
+  }
+
+  .trayEmpty .compare {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 var(--dock-btn-pad-x);
+    box-sizing: border-box;
+  }
+}
+
+/* Very narrow: short КП in selection tray only. */
+@media (max-width: 380px) {
+  .compareFull {
+    display: none;
+  }
+
+  .compareShort {
+    display: inline;
+  }
+
   .compare {
-    flex: 1;
+    width: var(--dock-btn-h);
+    padding: 0;
+  }
+
+  .actions {
+    gap: var(--dock-btn-gap);
+  }
+
+  .trayEmpty .compare {
+    width: 100%;
+    padding: 0 var(--dock-btn-pad-x);
+  }
+
+  .trayEmpty .compareFull {
+    display: inline;
+  }
+
+  .trayEmpty .compareShort {
+    display: none;
   }
 }

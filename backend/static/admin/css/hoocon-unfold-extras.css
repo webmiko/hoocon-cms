@@ -100,6 +100,31 @@
   color: #fdba74 !important;
 }
 
+.hoocon-admin-support-sticker--active {
+  color: #1e40af !important;
+  border-color: color-mix(in srgb, #2563eb 40%, var(--hoocon-glass-border));
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+}
+
+.hoocon-admin-support-sticker--active:hover {
+  color: #1e40af !important;
+  background: color-mix(in srgb, #2563eb 18%, var(--hoocon-surface));
+}
+
+.hoocon-admin-support-sticker--active .hoocon-admin-lead-sticker__count {
+  background: #2563eb;
+  color: #fff;
+}
+
+.dark .hoocon-admin-support-sticker--active {
+  color: #93c5fd !important;
+  background: color-mix(in srgb, #2563eb 22%, var(--hoocon-surface));
+}
+
+.dark .hoocon-admin-support-sticker--active:hover {
+  color: #93c5fd !important;
+}
+
 .hoocon-lead-status {
   display: inline-flex;
   align-items: center;
@@ -207,7 +232,8 @@ a.hoocon-leads-stats-link {
 }
 
 .hoocon-lead-view-actions__edit,
-.hoocon-lead-view-actions__back {
+.hoocon-lead-view-actions__back,
+.hoocon-lead-view-actions__mail {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -221,6 +247,64 @@ a.hoocon-leads-stats-link {
   line-height: 1.2;
   text-decoration: none !important;
   white-space: nowrap;
+}
+
+.hoocon-lead-view-actions__mail {
+  border: 1px solid color-mix(in srgb, var(--hoocon-primary) 40%, var(--hoocon-glass-border));
+  background: color-mix(in srgb, var(--hoocon-primary) 10%, var(--hoocon-surface));
+  color: var(--hoocon-primary) !important;
+}
+
+.hoocon-lead-view-actions__mail:hover {
+  background: color-mix(in srgb, var(--hoocon-primary) 18%, var(--hoocon-surface));
+}
+
+.hoocon-lead-desk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 40rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.1));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hoocon-surface, #fff) 94%, transparent);
+}
+
+.hoocon-lead-desk__contact {
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--hoocon-ink, #2a2a2a);
+}
+
+.hoocon-lead-desk__type {
+  font-size: 0.8125rem;
+  color: var(--hoocon-quiet, #6f6f6f);
+}
+
+.hoocon-lead-desk__items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.hoocon-lead-desk__items th,
+.hoocon-lead-desk__items td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.08));
+  text-align: left;
+  vertical-align: top;
+}
+
+.hoocon-lead-desk__items th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--hoocon-quiet, #6f6f6f);
+}
+
+.hoocon-lead-desk__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--hoocon-quiet, #6f6f6f);
 }
 
 .hoocon-lead-view-actions__back {

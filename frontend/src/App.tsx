@@ -128,6 +128,7 @@ export default function App() {
               path="consultation"
               element={<LeadPage leadType="consultation" />}
             />
+            <Route path="rfq" element={<LeadPage leadType="rfq" />} />
             <Route
               path="replacement"
               element={<LeadPage leadType="replacement" />}

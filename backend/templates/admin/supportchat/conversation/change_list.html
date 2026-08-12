@@ -2,10 +2,25 @@
 {% load static %}
 
 {% block object-tools-items %}
-  <li>
-    <a href="#" id="hoocon-webpush-enable" class="viewlink">Push в браузер</a>
+  <li class="hoocon-admin-push-tool">
+    <button
+      type="button"
+      id="hoocon-webpush-enable"
+      class="hoocon-admin-push-toggle"
+      role="switch"
+      aria-checked="false"
+      aria-label="Push-уведомления о чате поддержки"
+      title="Push выключен"
+      data-state="off"
+    >
+      <span class="material-symbols-outlined hoocon-admin-push-toggle__icon" aria-hidden="true"
+        >notifications</span
+      >
+      <span class="hoocon-admin-push-toggle__track" aria-hidden="true">
+        <span class="hoocon-admin-push-toggle__knob"></span>
+      </span>
+    </button>
   </li>
-  <li><span id="hoocon-webpush-status" style="margin-left:0.5rem;opacity:0.8;"></span></li>
   {{ block.super }}
 {% endblock %}
 
@@ -13,6 +28,8 @@
   {{ block.super }}
   <link rel="stylesheet"
     href="{% static 'admin/css/hoocon-support-messenger.css' %}?v={{ STATIC_VERSION }}">
+  <link rel="stylesheet"
+    href="{% static 'admin/css/hoocon-webpush.css' %}?v={{ STATIC_VERSION }}">
   <script src="{% static 'admin/js/hoocon-admin-webpush.js' %}?v={{ STATIC_VERSION }}" defer></script>
   <script>
     (function () {

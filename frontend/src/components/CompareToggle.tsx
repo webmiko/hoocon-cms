@@ -17,7 +17,7 @@ interface CompareToggleProps {
 }
 
 /**
- * Add/remove SKU from compare set (max 4).
+ * Add/remove SKU from the RFQ selection set (also used for compare, max 4).
  */
 export function CompareToggle({
   item,
@@ -27,11 +27,11 @@ export function CompareToggle({
   const { items, isInCompare, toggle } = useCompare();
   const [limitMsg, setLimitMsg] = useState(false);
   const checked = isInCompare(item.slug);
-  const compareHref = `/compare${buildCompareSearch(
-    checked
-      ? items.map((row) => row.slug)
-      : [...items.map((row) => row.slug), item.slug].slice(0, COMPARE_MAX_SKUS),
-  )}`;
+  const selectedSlugs = checked
+    ? items.map((row) => row.slug)
+    : [...items.map((row) => row.slug), item.slug].slice(0, COMPARE_MAX_SKUS);
+  const rfqHref = `/rfq?skus=${encodeURIComponent(selectedSlugs.join(","))}`;
+  const compareHref = `/compare${buildCompareSearch(selectedSlugs)}`;
 
   function handleChange() {
     const result = toggle(item);
@@ -52,12 +52,17 @@ export function CompareToggle({
           onClick={handleChange}
           aria-pressed={checked}
         >
-          {checked ? "В сравнении" : "Сравнить"}
+          {checked ? "В списке КП" : "В список КП"}
         </button>
         {checked ? (
-          <Link to={compareHref} className={styles.goLink}>
-            Перейти к сравнению
-          </Link>
+          <>
+            <Link to={rfqHref} className={styles.goLink}>
+              Запросить КП
+            </Link>
+            <Link to={compareHref} className={styles.goLink}>
+              Сравнить
+            </Link>
+          </>
         ) : null}
         {limitMsg ? (
           <p className={styles.limit} role="status">
@@ -73,8 +78,8 @@ export function CompareToggle({
       className={`${styles.checkboxWrap} ${className ?? ""}`.trim()}
       title={
         checked
-          ? "Убрать из сравнения"
-          : `Добавить к сравнению (до ${COMPARE_MAX_SKUS})`
+          ? "Убрать из списка КП"
+          : `Добавить в список КП (до ${COMPARE_MAX_SKUS})`
       }
     >
       <input
@@ -84,8 +89,8 @@ export function CompareToggle({
         onChange={handleChange}
         aria-label={
           checked
-            ? `Убрать ${item.sku_code} из сравнения`
-            : `Добавить ${item.sku_code} к сравнению`
+            ? `Убрать ${item.sku_code} из списка КП`
+            : `Добавить ${item.sku_code} в список КП`
         }
       />
       <span className={styles.checkboxUi} aria-hidden="true" />

@@ -5,7 +5,8 @@
   right: max(12px, env(safe-area-inset-right, 0px));
   bottom: calc(
     12px + env(safe-area-inset-bottom, 0px) + var(--bottom-chrome, 0px) +
-      var(--cookie-chrome, 0px) + var(--support-chrome, 0px)
+      var(--cookie-chrome, 0px) + var(--support-chrome, 0px) +
+      var(--compare-tray-chrome, 0px)
   );
   z-index: 430;
   display: flex;

@@ -1,13 +1,16 @@
-Поступила новая заявка с сайта Hoocon.
-
+{% if is_continuation %}Продолжение КП{% if bundle_root %} #{{ bundle_root.pk }}{% endif %} — новая заявка с сайта Hoocon.
+{% else %}Поступила новая заявка с сайта Hoocon.
+{% endif %}
 Тип: {{ lead_type_display }}
 Имя: {{ lead.name }}
 Компания: {{ lead.company|default:"—" }}
 Email: {{ lead.email }}
 Телефон: {{ lead.phone|default:"—" }}
-{% if lead.sku %}SKU: {{ lead.sku.sku_code }} ({{ lead.sku.name }})
-{% endif %}{% if lead.quantity %}Количество: {{ lead.quantity }}
-{% endif %}{% if lead.analog_belimo_code %}Аналог Belimo: {{ lead.analog_belimo_code }}
+{% if lead_items %}Позиции:
+{% for item in lead_items %}- {{ item.sku_code|default:"?" }} × {{ item.quantity }}
+{% endfor %}{% elif lead.sku %}SKU: {{ lead.sku.sku_code }} ({{ lead.sku.name }})
+{% if lead.quantity %}Количество: {{ lead.quantity }}
+{% endif %}{% endif %}{% if lead.analog_belimo_code %}Аналог Belimo: {{ lead.analog_belimo_code }}
 {% endif %}
 Сообщение:
 {{ lead.message }}

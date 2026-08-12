@@ -41,9 +41,15 @@
               </div>
               <h1 style="margin:14px 0 8px;font-family:Montserrat,Helvetica,Arial,sans-serif;
                          font-size:22px;font-weight:700;line-height:1.25;color:#2a2a2a;">
-                Новая заявка #{{ lead.pk }}
+                {% if is_continuation %}Продолжение КП → заявка #{{ lead.pk }}{% else %}Новая заявка #{{ lead.pk }}{% endif %}
               </h1>
               <p style="margin:0;font-size:15px;color:#5a5a5a;">
+                {% if is_continuation and bundle_root %}
+                Нить КП от заявки
+                <a href="{{ site_url }}/admin/leads/lead/{{ bundle_root.pk }}/change/"
+                   style="color:#b80c24;text-decoration:none;font-weight:600;">#{{ bundle_root.pk }}</a>
+                ·
+                {% endif %}
                 Поступила с сайта
                 <a href="{{ site_url }}" style="color:#b80c24;text-decoration:none;font-weight:600;">hoocon.ru</a>
               </p>
@@ -98,7 +104,20 @@
                     {% else %}—{% endif %}
                   </td>
                 </tr>
-                {% if lead.sku %}
+                {% if lead_items %}
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    Позиции
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;color:#2a2a2a;
+                             border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
+                    {% for item in lead_items %}
+                    <div>{{ item.sku_code|default:"?" }} × {{ item.quantity }}</div>
+                    {% endfor %}
+                  </td>
+                </tr>
+                {% elif lead.sku %}
                 <tr>
                   <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
                              border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">
@@ -111,7 +130,7 @@
                   </td>
                 </tr>
                 {% endif %}
-                {% if lead.quantity %}
+                {% if lead.quantity and not lead_items %}
                 <tr>
                   <td style="padding:10px 0;font-size:13px;color:#6f6f6f;
                              border-bottom:1px solid rgba(30,30,40,0.08);vertical-align:top;">

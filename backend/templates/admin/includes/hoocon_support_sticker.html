@@ -1,0 +1,16 @@
+{% if user.is_authenticated and user.is_staff and HOOCON_SUPPORT_UNREAD_URL %}
+<a
+  href="{{ HOOCON_SUPPORT_UNREAD_URL }}"
+  class="hoocon-admin-lead-sticker hoocon-admin-support-sticker{% if HOOCON_SUPPORT_UNREAD_COUNT %} hoocon-admin-lead-sticker--active hoocon-admin-support-sticker--active{% endif %}"
+  id="hoocon-admin-support-sticker"
+  title="Новые сообщения поддержки"
+  aria-label="Новые сообщения поддержки: {{ HOOCON_SUPPORT_UNREAD_COUNT }}"
+  {% if not HOOCON_SUPPORT_UNREAD_COUNT %}hidden{% endif %}
+>
+  <span class="hoocon-admin-lead-sticker__label">Чат</span>
+  <span
+    class="hoocon-admin-lead-sticker__count"
+    data-hoocon-support-unread-count
+  >{{ HOOCON_SUPPORT_UNREAD_COUNT }}</span>
+</a>
+{% endif %}

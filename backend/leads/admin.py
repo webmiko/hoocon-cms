@@ -15,6 +15,7 @@ or the «Редактировать» button.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import cast
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
@@ -24,10 +25,12 @@ from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 
+from catalog.models import SKU
 from config.admin_mixins import OpenChangeLinkMixin
-from leads.models import Lead
+from leads.models import Lead, LeadItem
+from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
     apply_lead_manager_on_save,
     build_lead_processing_stats,
@@ -39,6 +42,16 @@ from leads.services import (
 )
 
 _LEAD_EDIT_QUERY = "edit"
+
+
+class LeadItemInline(TabularInline):
+    """SKU lines on a lead (multi-RFQ)."""
+
+    model = LeadItem
+    extra = 0
+    autocomplete_fields = ("sku",)
+    fields = ("sku", "sku_code", "quantity", "sort_order")
+    ordering = ("sort_order", "id")
 
 
 @admin.register(Lead)
@@ -58,6 +71,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "name",
         "company",
         "lead_type",
+        "rfq_thread_badge",
         "assignee",
         "processed_by",
         "created_at",
@@ -69,20 +83,77 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "assignee",
         "processed_by",
         "company",
+        ("rfq_bundle_root", admin.EmptyFieldListFilter),
         ("seen_at", admin.EmptyFieldListFilter),
         "created_at",
     )
-    search_fields = ("email", "name", "company", "message", "analog_belimo_code", "phone")
-    autocomplete_fields = ("sku", "client", "assignee", "processed_by")
-    readonly_fields = ("created_at", "updated_at", "seen_at", "processed_at")
+    search_fields = (
+        "email",
+        "name",
+        "company",
+        "message",
+        "analog_belimo_code",
+        "phone",
+        "rfq_bundle_key",
+        "items__sku_code",
+    )
+    autocomplete_fields = ("sku", "client", "assignee", "processed_by", "rfq_bundle_root")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "seen_at",
+        "processed_at",
+        "rfq_bundle_key",
+        "rfq_desk_summary",
+        "rfq_thread_links",
+    )
     ordering = ()
-    actions = ("action_take_in_work", "action_mark_done")
+    actions = ("action_take_in_work", "action_mark_done", "action_mark_thread_done")
+    inlines = (LeadItemInline,)
     change_form_template = "admin/leads/lead/change_form.html"
     fieldsets = (
         (
+            "Сводка для менеджера",
+            {
+                "fields": ("rfq_desk_summary",),
+                "description": ("Кто запросил и что нужно в КП — без прокрутки к инлайну."),
+            },
+        ),
+        (
+            "Контакт",
+            {
+                "fields": ("company", "name", "phone", "email", "client"),
+                "description": (
+                    "Эл. почта = ID клиента в CRM. Нить КП = компания + имя (для RFQ компания обязательна)."
+                ),
+            },
+        ),
+        (
+            "Нить КП",
+            {
+                "fields": ("rfq_bundle_key", "rfq_bundle_root", "rfq_thread_links"),
+                "description": (
+                    "Заявки с одной компанией и именем мягко связываются в нить. Разные компании — разные КП."
+                ),
+            },
+        ),
+        (
+            "Сообщение",
+            {
+                "fields": ("message",),
+            },
+        ),
+        (
             "Тип заявки",
             {
-                "fields": ("lead_type", "status", "sku", "quantity", "analog_belimo_code"),
+                "fields": (
+                    "lead_type",
+                    "status",
+                    "sku",
+                    "quantity",
+                    "analog_belimo_code",
+                ),
+                "classes": ("collapse",),
             },
         ),
         (
@@ -92,21 +163,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 "description": (
                     "«В работе у» — кто ведёт заявку сейчас. «Обработал» заполняется при статусе «Завершена»."
                 ),
-            },
-        ),
-        (
-            "Контакт",
-            {
-                "fields": ("email", "name", "phone", "company", "client"),
-                "description": (
-                    "Эл. почта = ID клиента в CRM. Несколько заявок с одним адресом попадают в одну карточку клиента."
-                ),
-            },
-        ),
-        (
-            "Сообщение",
-            {
-                "fields": ("message",),
+                "classes": ("collapse",),
             },
         ),
         (
@@ -139,6 +196,159 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             obj.get_status_display(),
         )
 
+    @admin.display(description="Нить")
+    def rfq_thread_badge(self, obj: Lead) -> str:
+        """Sibling count for RFQ soft-bundle (empty if alone)."""
+        if not obj.rfq_bundle_key:
+            return "—"
+        n = rfq_bundle_queryset(obj).count()
+        if n <= 1:
+            return "1"
+        root_id = obj.rfq_bundle_root_id or obj.pk
+        url = reverse("admin:leads_lead_change", args=[root_id])
+        return format_html('<a href="{}">{} заявки</a>', url, n)
+
+    @admin.display(description="Кто и что")
+    def rfq_desk_summary(self, obj: Lead) -> str:
+        """One-screen contact + positions for sales managers."""
+        if not obj.pk:
+            return "—"
+        from urllib.parse import quote
+
+        from django.conf import settings
+        from django.utils.safestring import mark_safe
+
+        from catalog.urls_paths import catalog_path_for_sku
+
+        site = (getattr(settings, "SITE_URL", "") or "").rstrip("/")
+        phone = (obj.phone or "").strip()
+        email = (obj.email or "").strip()
+        company = (obj.company or "").strip() or "—"
+        contact_bits: list[str] = [
+            format_html("<strong>{}</strong>", company),
+            format_html("{}", obj.name),
+        ]
+        if phone:
+            contact_bits.append(
+                format_html('<a href="tel:{}">{}</a>', phone, phone),
+            )
+        if email:
+            subject = quote(f"КП #{obj.pk} — {company}")
+            contact_bits.append(
+                format_html(
+                    '<a href="mailto:{}?subject={}">{}</a>',
+                    email,
+                    subject,
+                    email,
+                ),
+            )
+
+        item_rows: list[str] = []
+        items = list(obj.items.select_related("sku").order_by("sort_order", "id"))
+        legacy_sku = cast(SKU | None, obj.sku)
+        if not items and obj.sku_id and legacy_sku is not None:
+            code = legacy_sku.sku_code
+            qty = obj.quantity or 1
+            path = catalog_path_for_sku(legacy_sku)
+            href = f"{site}{path}" if site else path
+            item_rows.append(
+                format_html(
+                    '<tr><td><a href="{}" target="_blank" rel="noopener">{}</a></td><td>×&nbsp;{}</td></tr>',
+                    href,
+                    code,
+                    qty,
+                ),
+            )
+        else:
+            for item in items:
+                code = (item.sku_code or "?").strip() or "?"
+                qty = item.quantity or 1
+                item_sku = cast(SKU | None, item.sku)
+                if item.sku_id and item_sku is not None:
+                    path = catalog_path_for_sku(item_sku)
+                    href = f"{site}{path}" if site else path
+                    item_rows.append(
+                        format_html(
+                            '<tr><td><a href="{}" target="_blank" rel="noopener">{}</a></td><td>×&nbsp;{}</td></tr>',
+                            href,
+                            code,
+                            qty,
+                        ),
+                    )
+                else:
+                    item_rows.append(
+                        format_html(
+                            "<tr><td>{}</td><td>×&nbsp;{}</td></tr>",
+                            code,
+                            qty,
+                        ),
+                    )
+
+        if item_rows:
+            table = format_html(
+                '<table class="hoocon-lead-desk__items"><thead>'
+                "<tr><th>Артикул</th><th>Кол-во</th></tr></thead>"
+                "<tbody>{}</tbody></table>",
+                mark_safe("".join(item_rows)),
+            )
+        else:
+            table = format_html(
+                "{}",
+                mark_safe(
+                    '<p class="hoocon-lead-desk__empty">Позиции не указаны</p>',
+                ),
+            )
+        return format_html(
+            '<div class="hoocon-lead-desk">'
+            '<div class="hoocon-lead-desk__contact">{}</div>'
+            '<div class="hoocon-lead-desk__type">{} · {}</div>'
+            "{}"
+            "</div>",
+            mark_safe(" · ".join(contact_bits)),
+            obj.get_lead_type_display(),
+            obj.get_status_display(),
+            table,
+        )
+
+    @admin.display(description="Связанные заявки нити")
+    def rfq_thread_links(self, obj: Lead) -> str:
+        """HTML list of siblings with SKU snapshot for the change form."""
+        if not obj.pk or not obj.rfq_bundle_key:
+            return "—"
+        from django.utils.safestring import mark_safe
+
+        rows: list[str] = []
+        qs = rfq_bundle_queryset(obj).prefetch_related("items").select_related("sku")
+        for sibling in qs:
+            url = reverse("admin:leads_lead_change", args=[sibling.pk])
+            mark = " (корень)" if sibling.rfq_bundle_root_id is None else ""
+            codes = [
+                c
+                for c in sibling.items.order_by("sort_order", "id").values_list(
+                    "sku_code",
+                    flat=True,
+                )
+                if c
+            ]
+            sibling_sku = cast(SKU | None, sibling.sku)
+            if not codes and sibling.sku_id and sibling_sku is not None:
+                codes = [sibling_sku.sku_code]
+            codes_label = ", ".join(codes) or "без позиций"
+            rows.append(
+                format_html(
+                    '<a href="{}">#{}</a> {} · {} · {}{}',
+                    url,
+                    sibling.pk,
+                    sibling.get_status_display(),
+                    sibling.created_at.strftime("%Y-%m-%d %H:%M"),
+                    codes_label,
+                    mark,
+                ),
+            )
+        if not rows:
+            return "—"
+        return mark_safe("<br>".join(rows))
+
     def is_lead_edit_mode(self, request: HttpRequest, obj: Lead | None) -> bool:
         """Whether the change form allows editing (new or ``?edit=1``)."""
         if obj is None:
@@ -153,10 +363,12 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         obj: Lead | None = None,
     ) -> tuple[str, ...]:
         """All fields read-only in view mode; timestamps always locked."""
+        computed = tuple(self.readonly_fields)
         if obj is not None and not self.is_lead_edit_mode(request, obj):
             names = [f.name for f in self.model._meta.fields]
-            return tuple(names)
-        return tuple(self.readonly_fields)
+            # Keep admin-only displays (e.g. rfq_thread_links) in the form.
+            return tuple(dict.fromkeys([*names, *computed]))
+        return computed
 
     def changeform_view(
         self,
@@ -189,6 +401,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             extra["lead_view_mode"] = not edit_mode
             if obj is not None:
                 change_url = reverse("admin:leads_lead_change", args=[obj.pk])
+                if obj.email:
+                    from urllib.parse import quote
+
+                    company = (obj.company or "").strip() or "клиент"
+                    extra["lead_mailto"] = f"mailto:{obj.email}?subject={quote(f'КП #{obj.pk} — {company}')}"
                 if edit_mode:
                     extra["lead_view_url"] = change_url
                     # Keep edit=1 on the form action URL for POST.
@@ -244,7 +461,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         """
         qs = (
             self.model._default_manager.get_queryset()
-            .select_related("client", "sku", "assignee", "processed_by")
+            .select_related("client", "sku", "assignee", "processed_by", "rfq_bundle_root")
+            .prefetch_related("items")
             .annotate(
                 _status_rank=Case(
                     When(status=Lead.LeadStatus.NEW, then=0),
@@ -356,6 +574,27 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         self.message_user(
             request,
             f"Завершено: {count}",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Отметить нить КП завершённой")
+    def action_mark_thread_done(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[Lead],
+    ) -> None:
+        """Mark each selected lead's RFQ soft-bundle as done."""
+        total = 0
+        seen_roots: set[int] = set()
+        for lead in queryset:
+            root_id = lead.rfq_bundle_root_id or lead.pk
+            if root_id in seen_roots:
+                continue
+            seen_roots.add(root_id)
+            total += mark_rfq_bundle_done(lead, actor=request.user)
+        self.message_user(
+            request,
+            f"Завершено в нитях: {total}",
             messages.SUCCESS,
         )
 

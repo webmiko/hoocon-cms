@@ -57,3 +57,36 @@ def test_new_leads_sticker_empty_for_anon() -> None:
     ctx = new_leads_sticker(request)
     assert ctx["HOOCON_NEW_LEADS_COUNT"] == 0
     assert ctx["HOOCON_NEW_LEADS_URL"] == ""
+    assert ctx["HOOCON_SUPPORT_UNREAD_COUNT"] == 0
+    assert ctx["HOOCON_SUPPORT_UNREAD_URL"] == ""
+
+
+@pytest.mark.django_db
+def test_new_leads_sticker_staff_with_perms() -> None:
+    """Staff with view perms gets leads + support sticker URLs."""
+    from django.contrib.auth import get_user_model
+    from django.contrib.auth.models import Permission
+
+    user = get_user_model().objects.create_user(
+        username="sticker-staff",
+        password="x",
+        is_staff=True,
+    )
+    user.user_permissions.add(
+        Permission.objects.get(
+            codename="view_lead",
+            content_type__app_label="leads",
+        ),
+        Permission.objects.get(
+            codename="view_conversation",
+            content_type__app_label="supportchat",
+        ),
+    )
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    ctx = new_leads_sticker(request)
+    assert ctx["HOOCON_NEW_LEADS_URL"]
+    assert ctx["HOOCON_NEW_LEADS_COUNT_URL"]
+    assert ctx["HOOCON_SUPPORT_UNREAD_URL"]
+    assert ctx["HOOCON_SUPPORT_UNREAD_COUNT_URL"]
+    assert "supportchat" in ctx["HOOCON_SUPPORT_UNREAD_URL"]

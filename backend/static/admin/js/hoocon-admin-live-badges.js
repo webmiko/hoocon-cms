@@ -79,6 +79,15 @@
   function applySupport(count) {
     var safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
     setSidebarBadge("/admin/supportchat/conversation/", safe);
+    var sticker = document.getElementById("hoocon-admin-support-sticker");
+    var countEl = document.querySelector("[data-hoocon-support-unread-count]");
+    if (countEl) countEl.textContent = String(safe);
+    if (sticker) {
+      sticker.classList.toggle("hoocon-admin-lead-sticker--active", safe > 0);
+      sticker.classList.toggle("hoocon-admin-support-sticker--active", safe > 0);
+      sticker.setAttribute("aria-label", "Новые сообщения поддержки: " + safe);
+      sticker.hidden = safe === 0;
+    }
     document.dispatchEvent(
       new CustomEvent("hoocon:support-unread", { detail: { count: safe } }),
     );

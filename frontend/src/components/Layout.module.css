@@ -380,8 +380,15 @@
   padding: var(--space-2xl) 0 var(--space-3xl);
 }
 
-:global(body:has([data-compare-tray])) .main {
-  padding-bottom: calc(var(--space-3xl) + 96px);
+:global(body:has([data-mobile-dock])) .main {
+  padding-bottom: calc(var(--space-3xl) + 72px);
+}
+
+@media (min-width: 769px) {
+  /* Empty dock is mobile-only — don't reserve main padding on desktop. */
+  :global(body:has([data-dock-mode="empty"])) .main {
+    padding-bottom: var(--space-3xl);
+  }
 }
 
 .footer {
