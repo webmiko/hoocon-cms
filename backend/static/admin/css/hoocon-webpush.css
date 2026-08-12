@@ -257,3 +257,123 @@
 .dark .hoocon-push-broadcast__field textarea:focus {
   background: color-mix(in srgb, #111 80%, #fff);
 }
+
+/* Compact Push toggle in Unfold object-tools / sticky header */
+.hoocon-admin-push-tool {
+  list-style: none;
+  display: inline-flex !important;
+  align-items: center;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.hoocon-admin-push-toggle {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.85rem;
+  margin: 0 !important;
+  padding: 0.2rem 0.45rem 0.2rem 0.35rem !important;
+  border: 1px solid rgba(30, 30, 40, 0.14) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, #fff 88%, #e8e9ec) !important;
+  color: #5a5a5a !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  line-height: 1 !important;
+  text-decoration: none !important;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.hoocon-admin-push-toggle:hover {
+  border-color: color-mix(in srgb, #dc1313 35%, rgba(30, 30, 40, 0.14)) !important;
+  color: #2a2a2a !important;
+}
+
+.hoocon-admin-push-toggle:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.hoocon-admin-push-toggle__icon {
+  font-size: 1.05rem !important;
+  line-height: 1 !important;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
+}
+
+.hoocon-admin-push-toggle__track {
+  position: relative;
+  display: inline-block;
+  width: 2rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: #c8cad0;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.hoocon-admin-push-toggle__knob {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 20, 30, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.hoocon-admin-push-toggle[data-state="on"],
+.hoocon-admin-push-toggle[aria-checked="true"] {
+  border-color: color-mix(in srgb, #dc1313 45%, transparent) !important;
+  background: color-mix(in srgb, #dc1313 10%, #fff) !important;
+  color: #b01010 !important;
+}
+
+.hoocon-admin-push-toggle[data-state="on"] .hoocon-admin-push-toggle__icon,
+.hoocon-admin-push-toggle[aria-checked="true"] .hoocon-admin-push-toggle__icon {
+  font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 20;
+}
+
+.hoocon-admin-push-toggle[data-state="on"] .hoocon-admin-push-toggle__track,
+.hoocon-admin-push-toggle[aria-checked="true"] .hoocon-admin-push-toggle__track {
+  background: #dc1313;
+}
+
+.hoocon-admin-push-toggle[data-state="on"] .hoocon-admin-push-toggle__knob,
+.hoocon-admin-push-toggle[aria-checked="true"] .hoocon-admin-push-toggle__knob {
+  transform: translateX(0.85rem);
+}
+
+.hoocon-admin-push-toggle[data-state="pending"] .hoocon-admin-push-toggle__track {
+  background: #a3a3a3;
+}
+
+.hoocon-admin-push-toggle[data-state="error"] {
+  border-color: color-mix(in srgb, #b45309 50%, transparent) !important;
+  color: #b45309 !important;
+}
+
+.dark .hoocon-admin-push-toggle {
+  background: color-mix(in srgb, #111 88%, #fff) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #c4c4c4 !important;
+}
+
+.dark .hoocon-admin-push-toggle[data-state="on"],
+.dark .hoocon-admin-push-toggle[aria-checked="true"] {
+  background: color-mix(in srgb, #dc1313 18%, #111) !important;
+  border-color: color-mix(in srgb, #f87171 40%, transparent) !important;
+  color: #fca5a5 !important;
+}
+
+.dark .hoocon-admin-push-toggle__track {
+  background: #4b4b4b;
+}
+
