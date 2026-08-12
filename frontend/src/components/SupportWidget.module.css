@@ -5,7 +5,7 @@
   right: max(12px, env(safe-area-inset-right, 0px));
   bottom: calc(
     12px + env(safe-area-inset-bottom, 0px) + var(--bottom-chrome, 0px) +
-      var(--cookie-chrome, 0px)
+      var(--cookie-chrome, 0px) + var(--compare-tray-chrome, 0px)
   );
   z-index: 440;
   display: flex;
@@ -50,7 +50,20 @@
   transition:
     background 180ms var(--ease-out),
     transform 180ms var(--ease-out),
-    box-shadow 180ms var(--ease-out);
+    box-shadow 180ms var(--ease-out),
+    opacity 180ms var(--ease-out);
+}
+
+/* Idle FAB: quieter chrome until hover / open. */
+.fab {
+  opacity: 0.55;
+}
+
+.fab:hover,
+.fab:focus-visible,
+.fabOpen,
+.fabOpen:hover {
+  opacity: 1;
 }
 
 .fab:hover,
@@ -92,7 +105,7 @@
     78dvh,
     calc(
       100dvh - 5.5rem - env(safe-area-inset-bottom, 0px) - var(--bottom-chrome, 0px) -
-        var(--cookie-chrome, 0px)
+        var(--cookie-chrome, 0px) - var(--compare-tray-chrome, 0px)
     )
   );
   display: flex;
@@ -593,13 +606,13 @@
   border: 0;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .root {
     left: max(10px, env(safe-area-inset-left, 0px));
     right: max(10px, env(safe-area-inset-right, 0px));
     bottom: calc(
       10px + env(safe-area-inset-bottom, 0px) + var(--bottom-chrome, 0px) +
-        var(--cookie-chrome, 0px)
+        var(--cookie-chrome, 0px) + var(--compare-tray-chrome, 0px)
     );
   }
 
@@ -657,6 +670,11 @@
 
   /* Header close is enough — hide the floating FAB while fullscreen. */
   .rootOpen .fabOpen {
+    display: none;
+  }
+
+  /* Tray dock has Chat on the left — hide floating FAB (panel still opens). */
+  :global(body:has([data-mobile-dock])) .root:not(.rootOpen) .fab {
     display: none;
   }
 

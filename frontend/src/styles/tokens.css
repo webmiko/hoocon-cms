@@ -165,6 +165,8 @@
   --header-height: 68px;
   --masthead-height: 32px;
   --bottom-chrome: 0px;
+  /* Height of CompareTray when visible; lifts chat FAB / push banner. */
+  --compare-tray-chrome: 0px;
   /* Reserve space above chat FAB for other fixed banners (marketing push). */
   --support-chrome: 0px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -263,6 +265,16 @@ html[data-theme="dark"] {
   html[data-sticky-cta="off"] {
     --bottom-chrome: 0px;
   }
+
+  /* Mobile dock (empty or RFQ) replaces sticky KP reserve. */
+  body:has([data-mobile-dock]) {
+    --bottom-chrome: 0px;
+  }
+
+  /* Empty dock chrome (hidden on desktop via .trayEmpty). */
+  body:has([data-dock-mode="empty"]) {
+    --compare-tray-chrome: 64px;
+  }
 }
 
 html.cookie-banner-open {
@@ -273,4 +285,13 @@ html.cookie-banner-open {
   html.cookie-banner-open {
     --cookie-chrome: 160px;
   }
+}
+
+/* RFQ selection tray — all viewports. */
+body:has([data-dock-mode="tray"]) {
+  --compare-tray-chrome: 64px;
+}
+
+body:has([data-mobile-dock="open"]) {
+  --compare-tray-chrome: calc(72px + min(40vh, 220px));
 }

@@ -502,27 +502,22 @@ export function Layout() {
         </div>
       </footer>
 
-      <CompareTray />
-
-      {showMobileStickyCta ? (
-        isZavod ? (
-          <a
-            href={ZAVOD_FACTORY_MAILTO}
-            className={styles.mobileStickyCta}
-            data-brand-cta
-          >
-            Связаться с заводом
-          </a>
-        ) : (
-          <Link
-            to="/consultation"
-            className={styles.mobileStickyCta}
-            data-brand-cta
-          >
-            Запросить КП
-          </Link>
-        )
-      ) : null}
+      <CompareTray
+        showWhenEmpty={showMobileStickyCta}
+        emptyCta={
+          isZavod
+            ? {
+                kind: "href",
+                href: ZAVOD_FACTORY_MAILTO,
+                label: "Связаться с заводом",
+              }
+            : {
+                kind: "to",
+                to: "/consultation",
+                label: "Запросить КП",
+              }
+        }
+      />
 
       <CookieConsent />
       <MarketingPushPrompt />
