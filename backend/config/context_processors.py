@@ -48,36 +48,47 @@ def release_info(_request: HttpRequest) -> dict[str, str]:
 
 
 def new_leads_sticker(request: HttpRequest) -> dict[str, object]:
-    """Admin sticker: count of leads with status=new + inbox URL.
+    """Admin stickers: new leads + support unread counts and inbox URLs.
 
     Args:
         request: current HTTP request (needs authenticated staff).
 
     Returns:
-        HOOCON_NEW_LEADS_COUNT (int), HOOCON_NEW_LEADS_URL (str),
-        HOOCON_NEW_LEADS_COUNT_URL (str for JSON poll). Empty for anon.
+        HOOCON_NEW_LEADS_* and HOOCON_SUPPORT_UNREAD_* for header stickers.
+        Empty counts/URLs for anon or missing permissions.
     """
+    empty = {
+        "HOOCON_NEW_LEADS_COUNT": 0,
+        "HOOCON_NEW_LEADS_URL": "",
+        "HOOCON_NEW_LEADS_COUNT_URL": "",
+        "HOOCON_SUPPORT_UNREAD_COUNT": 0,
+        "HOOCON_SUPPORT_UNREAD_URL": "",
+        "HOOCON_SUPPORT_UNREAD_COUNT_URL": "",
+    }
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated or not user.is_staff:
-        return {
-            "HOOCON_NEW_LEADS_COUNT": 0,
-            "HOOCON_NEW_LEADS_URL": "",
-            "HOOCON_NEW_LEADS_COUNT_URL": "",
-        }
-
-    if not user.has_perm("leads.view_lead"):
-        return {
-            "HOOCON_NEW_LEADS_COUNT": 0,
-            "HOOCON_NEW_LEADS_URL": "",
-            "HOOCON_NEW_LEADS_COUNT_URL": "",
-        }
+        return empty
 
     from django.urls import reverse
 
-    from leads.services import count_new_leads, new_leads_changelist_url
+    out = dict(empty)
 
-    return {
-        "HOOCON_NEW_LEADS_COUNT": count_new_leads(user=user),
-        "HOOCON_NEW_LEADS_URL": new_leads_changelist_url(),
-        "HOOCON_NEW_LEADS_COUNT_URL": reverse("admin:leads_lead_new_count"),
-    }
+    if user.has_perm("leads.view_lead"):
+        from leads.services import count_new_leads, new_leads_changelist_url
+
+        out["HOOCON_NEW_LEADS_COUNT"] = count_new_leads(user=user)
+        out["HOOCON_NEW_LEADS_URL"] = new_leads_changelist_url()
+        out["HOOCON_NEW_LEADS_COUNT_URL"] = reverse("admin:leads_lead_new_count")
+
+    if user.has_perm("supportchat.view_conversation"):
+        from supportchat.services import count_staff_unread
+
+        out["HOOCON_SUPPORT_UNREAD_COUNT"] = count_staff_unread()
+        out["HOOCON_SUPPORT_UNREAD_URL"] = reverse(
+            "admin:supportchat_conversation_changelist",
+        )
+        out["HOOCON_SUPPORT_UNREAD_COUNT_URL"] = reverse(
+            "admin:supportchat_conversation_unread_count",
+        )
+
+    return out

@@ -100,6 +100,31 @@
   color: #fdba74 !important;
 }
 
+.hoocon-admin-support-sticker--active {
+  color: #1e40af !important;
+  border-color: color-mix(in srgb, #2563eb 40%, var(--hoocon-glass-border));
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+}
+
+.hoocon-admin-support-sticker--active:hover {
+  color: #1e40af !important;
+  background: color-mix(in srgb, #2563eb 18%, var(--hoocon-surface));
+}
+
+.hoocon-admin-support-sticker--active .hoocon-admin-lead-sticker__count {
+  background: #2563eb;
+  color: #fff;
+}
+
+.dark .hoocon-admin-support-sticker--active {
+  color: #93c5fd !important;
+  background: color-mix(in srgb, #2563eb 22%, var(--hoocon-surface));
+}
+
+.dark .hoocon-admin-support-sticker--active:hover {
+  color: #93c5fd !important;
+}
+
 .hoocon-lead-status {
   display: inline-flex;
   align-items: center;
@@ -223,7 +248,6 @@ a.hoocon-leads-stats-link {
   text-decoration: none !important;
   white-space: nowrap;
 }
-
 
 .hoocon-lead-view-actions__mail {
   border: 1px solid color-mix(in srgb, var(--hoocon-primary) 40%, var(--hoocon-glass-border));
