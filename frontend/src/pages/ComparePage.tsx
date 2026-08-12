@@ -188,8 +188,8 @@ export function ComparePage() {
   const skus = data?.skus ?? [];
   const tooFew = slugs.length > 0 && slugs.length < COMPARE_MIN_FOR_PAGE;
   const canAddMore = slugs.length < COMPARE_MAX_SKUS;
-  const rfqHref = `/consultation?skus=${encodeURIComponent(
-    skus.map((s) => s.sku_code).join(","),
+  const rfqHref = `/rfq?skus=${encodeURIComponent(
+    skus.map((s) => s.slug).join(","),
   )}`;
 
   const candidates = (searchData?.results ?? []).filter(

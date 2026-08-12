@@ -29,6 +29,69 @@
   flex: 1;
 }
 
+.bundleHint {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lineRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lineCode {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.lineMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.lineName {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.lineQty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lineQtyLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.lineQty .input {
+  width: 5.5rem;
+}
+
 .label {
   font-size: var(--font-size-sm);
   font-weight: 500;
