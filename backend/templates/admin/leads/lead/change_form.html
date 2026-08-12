@@ -18,6 +18,14 @@
       >
         Вернуться к списку
       </a>
+      {% if lead_mailto %}
+        <a
+          href="{{ lead_mailto }}"
+          class="hoocon-admin-open hoocon-lead-view-actions__mail"
+        >
+          Ответить по email
+        </a>
+      {% endif %}
       {% if lead_edit_url %}
         <a
           href="{{ lead_edit_url }}"
