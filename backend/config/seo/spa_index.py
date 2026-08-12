@@ -130,7 +130,7 @@ def _home_ssr_hero_markup() -> str:
     return (
         f'<section id="hoocon-ssr-hero" aria-labelledby="hoocon-ssr-brand">'
         f'<img class="hoocon-ssr-hero__img" id="hoocon-lcp-boot" src="{img}" alt="" '
-        f'width="960" height="640" decoding="sync" fetchpriority="high">'
+        f'width="960" height="640" decoding="async" fetchpriority="high">'
         f'<div class="hoocon-ssr-hero__shade" aria-hidden="true"></div>'
         f'<div class="hoocon-ssr-hero__brand">'
         f'<p id="hoocon-ssr-brand" class="hoocon-ssr-hero__eyebrow">{brand}</p>'
