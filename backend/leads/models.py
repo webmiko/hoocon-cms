@@ -5,9 +5,12 @@ docs/readiness-backend-ux.md §2.2 (leads | Lead (RFQ / consult / replace));
 docs/security-baseline.md §3 (PII-safe; validate; honeypot в Slice 19).
 
 Заявка вместо корзины (B2B без онлайн-оплаты в v1). Три типа:
-- RFQ: запрос КП (опц. sku + quantity для контекста).
+- RFQ: запрос КП (позиции LeadItem; legacy sku + quantity — сводка).
 - consultation: консультация (общий вопрос).
 - replacement: подбор замены (опц. analog_belimo_code — Belimo артикул).
+
+RFQ soft-bundle: заявки с одной нормализованной парой компания+имя
+связываются через ``rfq_bundle_key`` / ``rfq_bundle_root`` (без hard-merge).
 
 PII: name/email/phone — контактные данные; не логируем целиком (Slice 19).
 `sku` — опц. FK с on_delete=SET_NULL (удаление SKU не удаляет заявку).
@@ -57,6 +60,7 @@ class Lead(models.Model):
         max_length=200,
         blank=True,
         default="",
+        help_text="Для запроса КП обязательна: ключ нити КП = компания + имя.",
     )
     message: models.TextField = models.TextField("сообщение")
     sku: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
@@ -66,15 +70,13 @@ class Lead(models.Model):
         blank=True,
         related_name="leads",
         verbose_name="артикул (SKU)",
-        help_text=(
-            "Артикул (SKU), по которому пришла заявка (необязательно; при удалении артикула связь обнуляется)."
-        ),
+        help_text=("Сводка: первый артикул из позиций (необязательно; при удалении артикула связь обнуляется)."),
     )
     quantity: models.PositiveIntegerField | None = models.PositiveIntegerField(
         "количество",
         null=True,
         blank=True,
-        help_text="Количество позиций в запросе КП (RFQ).",
+        help_text="Сводка: количество по первому артикулу (RFQ).",
     )
     analog_belimo_code: models.CharField = models.CharField(
         "код аналога Belimo",
@@ -82,6 +84,23 @@ class Lead(models.Model):
         blank=True,
         default="",
         help_text="Код аналога Belimo (для заявок на замену).",
+    )
+    rfq_bundle_key: models.CharField = models.CharField(
+        "ключ нити КП",
+        max_length=400,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Нормализованные компания|имя для мягкой группировки RFQ.",
+    )
+    rfq_bundle_root = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rfq_bundle_children",
+        verbose_name="корень нити КП",
+        help_text="Первая открытая заявка нити; у корня пусто.",
     )
     status: models.CharField = models.CharField(
         "статус",
@@ -144,3 +163,52 @@ class Lead(models.Model):
     def __str__(self) -> str:
         """Return Заявка #pk and type — no contact PII (safe for logs)."""
         return f"Заявка #{self.pk} ({self.get_lead_type_display()})"
+
+
+class LeadItem(models.Model):
+    """One SKU line on a lead (multi-SKU RFQ)."""
+
+    lead = models.ForeignKey(
+        Lead,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="заявка",
+    )
+    sku = models.ForeignKey(
+        "catalog.SKU",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lead_items",
+        verbose_name="артикул (SKU)",
+    )
+    sku_code: models.CharField = models.CharField(
+        "код артикула",
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Снимок кода на момент заявки (если SKU сняли с публикации).",
+    )
+    quantity: models.PositiveIntegerField = models.PositiveIntegerField(
+        "количество",
+        default=1,
+    )
+    sort_order: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "порядок",
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = "позиция заявки"
+        verbose_name_plural = "позиции заявки"
+        ordering = ("sort_order", "id")
+
+    def __str__(self) -> str:
+        """Short line for Admin."""
+        if self.sku_code:
+            code = self.sku_code
+        elif self.sku is not None:
+            code = self.sku.sku_code
+        else:
+            code = "?"
+        return f"{code} × {self.quantity}"

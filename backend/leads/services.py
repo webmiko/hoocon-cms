@@ -493,7 +493,7 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     """Build subject, plain text, and HTML bodies for a new-lead email.
 
     Args:
-        lead: saved Lead instance (with optional sku / assignee).
+        lead: saved Lead instance (with optional sku / assignee / items).
 
     Returns:
         Tuple of (subject, text_body, html_body).
@@ -503,6 +503,9 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     inbox_url = site_url + new_leads_changelist_url()
     assignee = getattr(lead, "assignee", None)
     assignee_display = manager_display_name(assignee) if assignee is not None else ""
+    items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
+    is_continuation = lead.rfq_bundle_root_id is not None
+    root = lead.rfq_bundle_root
     context = {
         "lead": lead,
         "site_url": site_url,
@@ -510,8 +513,14 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         "inbox_url": inbox_url,
         "lead_type_display": lead.get_lead_type_display(),
         "assignee_display": assignee_display,
+        "lead_items": items,
+        "is_continuation": is_continuation,
+        "bundle_root": root,
     }
-    subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
+    if is_continuation and root is not None:
+        subject = f"Продолжение КП #{root.pk} → заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
+    else:
+        subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
     text_body = render_to_string("leads/email/new_lead.txt", context).strip()
     html_body = render_to_string("leads/email/new_lead.html", context).strip()
     return subject, text_body, html_body

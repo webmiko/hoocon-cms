@@ -277,6 +277,7 @@ def test_api_assign_sales_sets_assignee(client) -> None:
     payload = {
         "name": "API RR",
         "email": "api-rr-client@example.com",
+        "company": "ООО RoundRobin",
         "message": "Заявка через API с автоназначением.",
     }
     with patch("leads.views.send_lead_notification") as mock_task:

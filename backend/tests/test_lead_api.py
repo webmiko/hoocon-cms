@@ -58,6 +58,7 @@ def test_post_lead_sends_notification_email_on_commit(client) -> None:
     payload = {
         "name": "Anna",
         "email": "anna@example.com",
+        "company": "ООО ВентСервис",
         "message": "Помогите подобрать привод для вентиляции.",
     }
     with patch("leads.views.send_lead_notification") as mock_task:
@@ -180,6 +181,7 @@ def test_post_lead_honeypot_empty_creates_lead(client) -> None:
     payload = {
         "name": "Real User",
         "email": "real@example.com",
+        "company": "ООО Реал",
         "message": "a real message that is long enough",
         "website": "",  # honeypot empty
     }
@@ -200,6 +202,7 @@ def test_post_lead_response_does_not_expose_email_or_phone(client) -> None:
         "name": "X",
         "email": "secret@example.com",
         "phone": "+7-999-000-00-00",
+        "company": "ООО Секрет",
         "message": "a message that is long enough",
     }
     response = client.post("/api/leads/", data=payload, content_type="application/json")
@@ -221,6 +224,7 @@ def test_post_lead_throttle_after_limit(client) -> None:
     payload = {
         "name": "X",
         "email": "x@example.com",
+        "company": "ООО Throttle",
         "message": "a message that is long enough",
     }
     # First 10 should succeed (or 400 if validation fails, but throttle counts).
@@ -286,6 +290,7 @@ def test_post_lead_rejects_unpublished_sku(client) -> None:
     payload = {
         "name": "Buyer",
         "email": "buyer-sku@example.com",
+        "company": "ООО Байер",
         "message": "Нужен КП на скрытый артикул из каталога.",
         "sku": sku.slug,
     }

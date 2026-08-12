@@ -64,15 +64,17 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
             or 201 silent drop if honeypot is filled (no lead created),
             or 400 on validation errors.
         """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Honeypot: if filled, silently pretend success (no lead, no email).
-        # PII-safe log: only that a honeypot hit occurred (no user data).
-        if serializer.validated_data.get("website"):
+        # Honeypot before validation: bots skip required RFQ fields; do not
+        # teach them about company/items rules via 400 responses.
+        raw_website = request.data.get("website") or ""
+        if isinstance(raw_website, (list, tuple)):
+            raw_website = raw_website[0] if raw_website else ""
+        if str(raw_website).strip():
             logger.info("Honeypot hit — silent drop (no lead created)")
             return Response({"id": None, "status": "new"}, status=status.HTTP_201_CREATED)
 
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         lead = serializer.save()
 
         site = SiteSettings.load()

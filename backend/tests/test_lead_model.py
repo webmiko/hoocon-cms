@@ -221,6 +221,7 @@ def test_lead_serializer_valid_data() -> None:
     data = {
         "name": "Иван Иванов",
         "email": "ivan@example.com",
+        "company": "ООО Ромашка",
         "message": "Нужен КП на 10 приводов.",
         "lead_type": "rfq",
     }
