@@ -135,22 +135,35 @@ def process_due_article(article: Article, *, announce: bool = True) -> GoLiveRes
     )
 
 
+def _pending_go_live_slugs() -> frozenset[str]:
+    """AUTO_GO_LIVE slugs that do not yet have ``article-<slug>`` news."""
+    news_to_article = {go_live_news_slug(slug): slug for slug in AUTO_GO_LIVE_NEWS_SLUGS}
+    taken = set(
+        News.objects.filter(slug__in=news_to_article).values_list("slug", flat=True),
+    )
+    return frozenset(slug for news_slug, slug in news_to_article.items() if news_slug not in taken)
+
+
 def publish_due_articles(*, announce: bool = True) -> list[GoLiveResult]:
     """Process AUTO_GO_LIVE articles whose ``published_at`` is due.
+
+    Skips slugs that already have go-live news so a later beat can pick the
+    next scheduled guide. At most one article per run (social rate-limit).
+    Oldest due ``published_at`` first.
 
     Returns:
         One result per processed article (created and/or announced).
     """
     now = timezone.now()
-    # Beat task: process at most one due AUTO_GO_LIVE article per run.
-    # This prevents repeated social announcements when multiple go-live
-    # items become due at the same time.
+    pending = _pending_go_live_slugs()
+    if not pending:
+        return []
     due = Article.objects.filter(
-        slug__in=AUTO_GO_LIVE_NEWS_SLUGS,
+        slug__in=pending,
         is_published=True,
         published_at__isnull=False,
         published_at__lte=now,
-    ).order_by("-published_at", "-id")[:1]
+    ).order_by("published_at", "id")[:1]
     results: list[GoLiveResult] = []
     for article in due:
         with transaction.atomic():

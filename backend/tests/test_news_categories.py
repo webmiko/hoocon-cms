@@ -8,7 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.utils import timezone
 
-from content.article_go_live import go_live_news_slug, publish_due_articles
+from content.article_go_live import (
+    AUTO_GO_LIVE_NEWS_SLUGS,
+    go_live_news_slug,
+    publish_due_articles,
+)
 from content.models import Article, News, NewsCategory
 from content.news_categories import (
     CATEGORY_KOMPANIYA,
@@ -139,6 +143,9 @@ def test_go_live_assigns_stati_category() -> None:
         },
     )
     News.objects.filter(slug=go_live_news_slug(slug)).delete()
+    Article.objects.filter(slug__in=AUTO_GO_LIVE_NEWS_SLUGS).exclude(slug=slug).update(
+        published_at=when + timedelta(days=365),
+    )
     with (
         patch(
             "sitesettings.models.SiteSettings.load",
