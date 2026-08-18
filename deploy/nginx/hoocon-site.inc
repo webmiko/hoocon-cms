@@ -98,6 +98,15 @@ location /assets/ {
     try_files $uri =404;
 }
 
+# Service worker: never cache. A stale sw.js keeps the previous app shell.
+location = /sw.js {
+    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    try_files $uri =404;
+}
+
 # Public SPA images / logos (no content-hash in filename).
 location ~* ^/(?:home|brand|hero)/ {
     expires 30d;

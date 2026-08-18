@@ -26,6 +26,7 @@ def test_spa_home_has_unique_title_and_canonical(client) -> None:
     assert 'rel="canonical" href="https://hoocon.ru/"' in body
     assert "application/ld+json" in body
     assert "Organization" in body
+    assert "no-cache" in response["Cache-Control"]
 
 
 @pytest.mark.django_db
