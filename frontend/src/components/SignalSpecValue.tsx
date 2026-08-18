@@ -11,6 +11,8 @@ interface SignalSpecValueProps {
   value: string;
   /** When true, «спецзаказ» is a link (PDP / card footnote — not nested in <a>). */
   linkNote?: boolean;
+  /** Warehouse has 4–20 mA (special-order) units for this SKU. */
+  maInStock?: boolean;
   className?: string;
 }
 
@@ -20,6 +22,7 @@ interface SignalSpecValueProps {
 export function SignalSpecValue({
   value,
   linkNote = true,
+  maInStock = false,
   className,
 }: SignalSpecValueProps) {
   const idx = value.indexOf(SPECIAL_ORDER_MARK);
@@ -33,21 +36,25 @@ export function SignalSpecValue({
 
   const before = value.slice(0, idx);
   const after = value.slice(idx + SPECIAL_ORDER_MARK.length);
+  const pillClass = maInStock
+    ? "signalSpecNotePill signalSpecNotePillInStock"
+    : "signalSpecNotePill";
+  const noteLabel = maInStock ? "спецзаказ · на складе" : "спецзаказ";
 
   return (
     <span className={className}>
       {before ? <SoftBreakText text={before} /> : null}
-      (
-      <Link
-        to={SIGNAL_MA_SPECIAL_ORDER_HREF}
-        className="signalSpecNoteLink"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
-        спецзаказ
-      </Link>
-      )
+      <span className={pillClass}>
+        <Link
+          to={SIGNAL_MA_SPECIAL_ORDER_HREF}
+          className="signalSpecNoteLink"
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          {noteLabel}
+        </Link>
+      </span>
       {after ? <SoftBreakText text={after} /> : null}
     </span>
   );
