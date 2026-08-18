@@ -545,44 +545,30 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
   }
 }
 
-/* Narrow viewports: series rows → dl-like cards (no horizontal scroll). */
+/* Narrow viewports: CMS table rows → cards (labels from thead via data-label). */
 @media (max-width: 720px) {
-  .cms-rich-body .table-scroll:has(.series-table--map),
-  .cms-rich-body .table-scroll:has(.series-table--spec),
-  .cms-rich-body .table-scroll:has(.series-table--mass) {
+  .cms-rich-body .table-scroll:has(td[data-label]) {
     overflow-x: visible;
     -webkit-overflow-scrolling: auto;
   }
 
-  .cms-rich-body .table-scroll:has(.series-table--map) table,
-  .cms-rich-body .table-scroll:has(.series-table--spec) table,
-  .cms-rich-body .table-scroll:has(.series-table--mass) table {
+  .cms-rich-body .table-scroll:has(td[data-label]) table {
     width: 100%;
     min-width: 0;
   }
 
-  .cms-rich-body .series-table--map thead,
-  .cms-rich-body .series-table--spec thead,
-  .cms-rich-body .series-table--mass thead {
+  .cms-rich-body .table-scroll table:has(td[data-label]) thead {
     display: none;
   }
 
-  .cms-rich-body .series-table--map tbody,
-  .cms-rich-body .series-table--spec tbody,
-  .cms-rich-body .series-table--mass tbody,
-  .cms-rich-body .series-table--map tr,
-  .cms-rich-body .series-table--spec tr,
-  .cms-rich-body .series-table--mass tr,
-  .cms-rich-body .series-table--map td,
-  .cms-rich-body .series-table--spec td,
-  .cms-rich-body .series-table--mass td {
+  .cms-rich-body .table-scroll table:has(td[data-label]) tbody,
+  .cms-rich-body .table-scroll table:has(td[data-label]) tr,
+  .cms-rich-body .table-scroll table:has(td[data-label]) td {
     display: block;
     width: 100%;
   }
 
-  .cms-rich-body .series-table--map tr,
-  .cms-rich-body .series-table--spec tr,
-  .cms-rich-body .series-table--mass tr {
+  .cms-rich-body .table-scroll table:has(td[data-label]) tr {
     margin: 0 0 0.65rem;
     padding: 0.7rem 0.85rem 0.75rem;
     border: 1px solid var(--color-border);
@@ -590,138 +576,35 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
     background: var(--color-surface);
   }
 
-  .cms-rich-body .series-table--map tr:last-child,
-  .cms-rich-body .series-table--spec tr:last-child,
-  .cms-rich-body .series-table--mass tr:last-child {
+  .cms-rich-body .table-scroll table:has(td[data-label]) tr:last-child {
     margin-bottom: 0;
   }
 
-  .cms-rich-body .series-table--map td,
-  .cms-rich-body .series-table--spec td,
-  .cms-rich-body .series-table--mass td {
+  .cms-rich-body .table-scroll table:has(td[data-label]) td {
     display: grid;
-    grid-template-columns: 6.75rem minmax(0, 1fr);
+    grid-template-columns: minmax(6.75rem, 8.5rem) minmax(0, 1fr);
     gap: 0.25rem 0.65rem;
     align-items: baseline;
     border: none;
     padding: 0.28rem 0;
     background: transparent;
     white-space: normal;
+    overflow-wrap: anywhere;
   }
 
-  .cms-rich-body .series-table--map tr:nth-child(even) td,
-  .cms-rich-body .series-table--spec tr:nth-child(even) td,
-  .cms-rich-body .series-table--mass tr:nth-child(even) td {
+  .cms-rich-body .table-scroll table:has(td[data-label]) tr:nth-child(even) td {
     background: transparent;
   }
 
-  .cms-rich-body .series-table--map td::before,
-  .cms-rich-body .series-table--spec td::before,
-  .cms-rich-body .series-table--mass td::before {
+  .cms-rich-body .table-scroll table:has(td[data-label]) td::before {
+    content: attr(data-label);
     font-size: 0.75rem;
     font-weight: 600;
     line-height: 1.35;
     color: var(--color-text-muted);
   }
 
-  .cms-rich-body .series-table--map td:nth-child(1)::before {
-    content: "Семейство";
-  }
-
-  .cms-rich-body .series-table--map td:nth-child(2)::before {
-    content: "Задача";
-  }
-
-  .cms-rich-body .series-table--map td:nth-child(3)::before {
-    content: "Момент";
-  }
-
-  .cms-rich-body .series-table--map td:nth-child(4)::before {
-    content: "Особенность";
-  }
-
-  .cms-rich-body .series-table--spec td:nth-child(1)::before {
-    content: "Момент";
-  }
-
-  .cms-rich-body .series-table--spec td:nth-child(2)::before {
-    content: "Ход";
-  }
-
-  .cms-rich-body .series-table--spec td:nth-child(3)::before {
-    content: "Модель";
-  }
-
-  .cms-rich-body .series-table--mass td:nth-child(1)::before {
-    content: "Семейство";
-  }
-
-  .cms-rich-body .series-table--mass td:nth-child(2)::before {
-    content: "Момент";
-  }
-
-  .cms-rich-body .series-table--mass td:nth-child(3)::before {
-    content: "Масса";
-  }
-
-  .cms-rich-body .series-table--spec td:nth-child(3),
-  .cms-rich-body .series-table--map td:nth-child(4) {
-    overflow-wrap: anywhere;
-  }
-}
-
-/* Application / matrix compare tables → cards on narrow screens. */
-@media (max-width: 720px) {
-  .cms-rich-body .table-scroll:has(.series-table--compare) {
-    overflow-x: visible;
-    -webkit-overflow-scrolling: auto;
-  }
-
-  .cms-rich-body .table-scroll:has(.series-table--compare) table {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .cms-rich-body .series-table--compare thead {
-    display: none;
-  }
-
-  .cms-rich-body .series-table--compare tbody,
-  .cms-rich-body .series-table--compare tr,
-  .cms-rich-body .series-table--compare td {
-    display: block;
-    width: 100%;
-  }
-
-  .cms-rich-body .series-table--compare tr {
-    margin: 0 0 0.65rem;
-    padding: 0.7rem 0.85rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 8px);
-    background: var(--color-surface);
-  }
-
-  .cms-rich-body .series-table--compare tr:last-child {
-    margin-bottom: 0;
-  }
-
-  .cms-rich-body .series-table--compare td {
-    display: grid;
-    grid-template-columns: 7.5rem minmax(0, 1fr);
-    gap: 0.25rem 0.65rem;
-    align-items: baseline;
-    border: none;
-    padding: 0.28rem 0;
-    background: transparent;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .cms-rich-body .series-table--compare tr:nth-child(even) td {
-    background: transparent;
-  }
-
-  .cms-rich-body .series-table--compare td:nth-child(1) {
+  .cms-rich-body .table-scroll table:has(td[data-label]) td:first-child {
     display: block;
     margin: 0 0 0.35rem;
     padding-bottom: 0.45rem;
@@ -729,102 +612,12 @@ html[data-theme="dark"] .cms-rich-body .figure--theme .img-theme--dark {
     font-weight: 600;
   }
 
-  .cms-rich-body .series-table--compare td::before {
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1.35;
-    color: var(--color-text-muted);
-  }
-
-  .cms-rich-body .series-table--compare td:nth-child(1)::before {
+  .cms-rich-body .table-scroll table:has(td[data-label]) td:first-child::before {
     content: none;
     display: none;
   }
 
-  .cms-rich-body .series-table--compare td:nth-child(2)::before {
-    content: "Стандартные";
-  }
-
-  .cms-rich-body .series-table--compare td:nth-child(3)::before {
-    content: "Противопожарные";
-  }
-
-  .cms-rich-body .series-table--compare td:nth-child(4)::before {
-    content: "Промышленные";
-  }
-}
-
-/* Company platforms matrix → cards on narrow screens. */
-@media (max-width: 720px) {
-  .cms-rich-body .table-scroll:has(.series-table--platforms) {
-    overflow-x: visible;
-    -webkit-overflow-scrolling: auto;
-  }
-
-  .cms-rich-body .table-scroll:has(.series-table--platforms) table {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .cms-rich-body .series-table--platforms thead {
+  .cms-rich-body .table-scroll table:has(td[data-label]) td:empty {
     display: none;
-  }
-
-  .cms-rich-body .series-table--platforms tbody,
-  .cms-rich-body .series-table--platforms tr,
-  .cms-rich-body .series-table--platforms td {
-    display: block;
-    width: 100%;
-  }
-
-  .cms-rich-body .series-table--platforms tr {
-    margin: 0 0 0.65rem;
-    padding: 0.7rem 0.85rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 8px);
-    background: var(--color-surface);
-  }
-
-  .cms-rich-body .series-table--platforms tr:last-child {
-    margin-bottom: 0;
-  }
-
-  .cms-rich-body .series-table--platforms td {
-    display: grid;
-    grid-template-columns: 7rem minmax(0, 1fr);
-    gap: 0.25rem 0.65rem;
-    align-items: baseline;
-    border: none;
-    padding: 0.28rem 0;
-    background: transparent;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .cms-rich-body .series-table--platforms tr:nth-child(even) td {
-    background: transparent;
-  }
-
-  .cms-rich-body .series-table--platforms td::before {
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1.35;
-    color: var(--color-text-muted);
-  }
-
-  .cms-rich-body .series-table--platforms td:nth-child(1)::before {
-    content: "Серия";
-  }
-
-  .cms-rich-body .series-table--platforms td:nth-child(2)::before {
-    content: "Задача";
-  }
-
-  .cms-rich-body .series-table--platforms td:nth-child(3)::before {
-    content: "Конструктив";
-  }
-
-  .cms-rich-body .series-table--platforms td:nth-child(4)::before {
-    content: "Коды";
   }
 }

@@ -25,6 +25,7 @@ const ALLOWED_ATTR = [
   "decoding",
   "width",
   "height",
+  "data-label",
 ];
 
 /**
