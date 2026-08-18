@@ -17,4 +17,15 @@ describe("sanitizeHtml", () => {
     expect(out.toLowerCase()).toContain("<h2");
     expect(out).toContain("From CMS");
   });
+
+  it("keeps table header labels on cells after purify", () => {
+    const html = [
+      "<table><thead><tr><th>Знак / оценка</th><th>Где требуют</th></tr></thead>",
+      "<tbody><tr><td>CE</td><td>ЕС</td></tr></tbody></table>",
+    ].join("");
+    const out = sanitizeHtml(html);
+    expect(out).toContain('data-label="Знак / оценка"');
+    expect(out).toContain('data-label="Где требуют"');
+    expect(out).toContain('class="table-scroll"');
+  });
 });
