@@ -116,5 +116,7 @@ PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
 NOINDEX_PREFIXES: tuple[str, ...] = (
     "/search",
     "/consultation",
+    "/rfq",
     "/replacement",
+    "/compare",
 )

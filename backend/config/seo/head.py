@@ -340,7 +340,9 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
         titles = {
             "/search": "Поиск по сайту",
             "/consultation": "Запрос консультации и КП",
+            "/rfq": "Запрос коммерческого предложения",
             "/replacement": "Подбор аналога Belimo",
+            "/compare": "Сравнение моделей",
         }
         return SeoHeadContext(
             canonical_path=path,

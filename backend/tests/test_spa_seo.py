@@ -77,6 +77,28 @@ def test_spa_search_is_noindex(client) -> None:
 
 
 @pytest.mark.django_db
+def test_spa_rfq_is_noindex_not_404_title(client) -> None:
+    """GET /rfq is a real SPA page (noindex), not a server 404 title."""
+    response = client.get("/rfq")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" not in body
+    assert "коммерческого предложения" in body
+
+
+@pytest.mark.django_db
+def test_spa_compare_is_noindex_not_404_title(client) -> None:
+    """GET /compare is a real SPA page (noindex), not a server 404 title."""
+    response = client.get("/compare")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" not in body
+    assert "Сравнение моделей" in body
+
+
+@pytest.mark.django_db
 def test_spa_sku_injects_product_json_ld(client) -> None:
     """Published SKU URL gets Product JSON-LD without leaking price."""
     from catalog.models import SKU, Category, Product
