@@ -40,6 +40,7 @@ def test_sku_list_exposes_in_stock_not_qty(client) -> None:
         slug="stock-api-in",
         sku_code="STK-IN",
         stock_qty=2,
+        stock_qty_ma=7,
         is_published=True,
     )
     SKU.objects.create(
@@ -58,6 +59,10 @@ def test_sku_list_exposes_in_stock_not_qty(client) -> None:
     assert by_code["STK-OUT"]["in_stock"] is False
     assert "stock_qty" not in by_code["STK-IN"]
     assert "stock_qty" not in by_code["STK-OUT"]
+    assert by_code["STK-IN"]["in_stock_ma"] is True
+    assert by_code["STK-OUT"]["in_stock_ma"] is False
+    assert "stock_qty_ma" not in by_code["STK-IN"]
+    assert "stock_qty_ma" not in by_code["STK-OUT"]
 
 
 @pytest.mark.django_db

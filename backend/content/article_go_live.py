@@ -142,12 +142,15 @@ def publish_due_articles(*, announce: bool = True) -> list[GoLiveResult]:
         One result per processed article (created and/or announced).
     """
     now = timezone.now()
+    # Beat task: process at most one due AUTO_GO_LIVE article per run.
+    # This prevents repeated social announcements when multiple go-live
+    # items become due at the same time.
     due = Article.objects.filter(
         slug__in=AUTO_GO_LIVE_NEWS_SLUGS,
         is_published=True,
         published_at__isnull=False,
         published_at__lte=now,
-    ).order_by("published_at", "id")
+    ).order_by("-published_at", "-id")[:1]
     results: list[GoLiveResult] = []
     for article in due:
         with transaction.atomic():

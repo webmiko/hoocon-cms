@@ -5,6 +5,7 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import type { News, NewsCategory } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { stripHtmlToText } from "../utils/stripHtml";
 import styles from "./NewsListPage.module.css";
@@ -36,6 +37,7 @@ export function NewsListPage() {
   const items: News[] = data?.results ?? [];
   const [featured, ...rest] = items;
   const featuredExcerpt = featured ? excerptOf(featured) : "";
+  const featuredCoverCaption = featured ? generatedCoverCaption("news", featured.slug) : null;
   const rubrics: NewsCategory[] = categories ?? [];
 
   function patchParams(next: { category?: string; ordering?: Ordering }) {
@@ -140,7 +142,11 @@ export function NewsListPage() {
             <div className={styles.featuredMedia}>
               {featured.cover ? (
                 <img
-                  className={styles.featuredCover}
+                  className={
+                    featuredCoverCaption
+                      ? `${styles.featuredCover} ${styles.coverGenerated}`
+                      : styles.featuredCover
+                  }
                   src={featured.cover}
                   alt=""
                   loading="eager"
@@ -148,6 +154,9 @@ export function NewsListPage() {
               ) : (
                 <div className={styles.coverPlaceholder} aria-hidden />
               )}
+              {featuredCoverCaption ? (
+                <span className={styles.coverNote}>{featuredCoverCaption}</span>
+              ) : null}
             </div>
             <div className={styles.featuredBody}>
               <Meta item={featured} />
@@ -165,13 +174,18 @@ export function NewsListPage() {
         <ul className={styles.list}>
           {rest.map((item) => {
             const excerpt = excerptOf(item);
+            const coverNote = generatedCoverCaption("news", item.slug);
             return (
               <li key={item.id} className={styles.item}>
                 <Link to={`/novosti/${item.slug}`} className={styles.itemLink}>
                   <div className={styles.itemMedia}>
                     {item.cover ? (
                       <img
-                        className={styles.itemCover}
+                        className={
+                          coverNote
+                            ? `${styles.itemCover} ${styles.coverGenerated}`
+                            : styles.itemCover
+                        }
                         src={item.cover}
                         alt=""
                         loading="lazy"
@@ -179,6 +193,7 @@ export function NewsListPage() {
                     ) : (
                       <div className={styles.coverPlaceholder} aria-hidden />
                     )}
+                    {coverNote ? <span className={styles.coverNote}>{coverNote}</span> : null}
                   </div>
                   <div className={styles.itemBody}>
                     <Meta item={item} />

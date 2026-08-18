@@ -95,6 +95,25 @@
   gap: var(--space-sm);
 }
 
+.zoomBtn {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.zoomBtn[aria-pressed="true"] {
+  cursor: zoom-out;
+}
+
+.zoomBtn:hover,
+.zoomBtn:active {
+  transform: none;
+}
+
 .image,
 .imageZoomed {
   display: block;

@@ -35,6 +35,8 @@ export type SKUList = components["schemas"]["SKUList"] & {
     alt?: string;
   } | null;
   in_stock?: boolean;
+  /** 4–20 mA special-order units on hand (no raw qty). */
+  in_stock_ma?: boolean;
   /** Within the 30-day «Новинки» window (first_published_at). */
   is_new?: boolean;
   first_published_at?: string | null;
@@ -98,6 +100,7 @@ export type SKUDetail = components["schemas"]["SKUDetail"] & {
     aux_switch: boolean;
     fault_alarm?: boolean;
     in_stock: boolean;
+    in_stock_ma?: boolean;
   }>;
   variant_axes?: Record<string, string[]>;
 };

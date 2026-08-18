@@ -69,7 +69,7 @@
 .fab:hover,
 .fabOpen:hover {
   background: var(--color-brand-control-hover);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .fab:focus-visible,
@@ -573,7 +573,7 @@
 
 .send:hover:not(:disabled) {
   background: var(--color-brand-hover);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .send:disabled {

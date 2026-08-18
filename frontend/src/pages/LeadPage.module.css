@@ -14,8 +14,8 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-h1);
   margin: 0 0 var(--space-md);
   color: var(--color-text);
 }

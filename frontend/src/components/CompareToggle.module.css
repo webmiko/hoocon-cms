@@ -3,10 +3,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 8px 4px 6px;
   margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background: rgba(17, 20, 27, 0.54);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition),
+    box-shadow var(--transition), transform var(--transition-fast);
 }
 
 .checkbox {
@@ -22,12 +31,27 @@
 
 .checkboxUi {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(255, 255, 255, 0.95);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.35);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.checkboxText {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.checkboxWrap:hover {
+  transform: scale(0.98);
+  border-color: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 
 .checkbox:checked + .checkboxUi {
@@ -37,6 +61,20 @@
   background-size: 14px 14px;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+.checkboxWrap:has(.checkbox:checked) {
+  border-color: color-mix(in srgb, var(--color-brand) 78%, white);
+  background: color-mix(in srgb, var(--color-brand) 84%, transparent);
+}
+
+.checkbox:checked + .checkboxUi {
+  box-shadow: none;
+}
+
+:global(html[data-theme="dark"]) .checkboxWrap {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(18, 18, 20, 0.74);
 }
 
 :global(html[data-theme="dark"]) .checkbox:checked + .checkboxUi {

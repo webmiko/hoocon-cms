@@ -77,7 +77,7 @@ VPS (в контейнере):
    `scale = target_long / max(cw, ch)`; clamp в inner; paste по центру.
 5. Save WebP (`DEFAULT_WEBP_QUALITY`, `WEBP_METHOD`).
 6. Превью в `/tmp/*-canvas-preview` по желанию.
-7. **Только локально** проверить каталог (hard-refresh / сброс blob).
+7. **Только локально** проверить каталог (hard-refresh).
 8. На VPS — **только после «финал»**: rsync pack → attach.
 
 DN50 brass: предпочтительно свежий **JPG** (punch), не уже сжатый webp из bak.

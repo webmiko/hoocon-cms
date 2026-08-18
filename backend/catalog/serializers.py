@@ -315,6 +315,7 @@ class SKUListSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     price_on_request = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
+    in_stock_ma = serializers.SerializerMethodField()
     is_new = serializers.SerializerMethodField()
     category_slug = serializers.CharField(
         source="product.category.slug",
@@ -338,6 +339,7 @@ class SKUListSerializer(serializers.ModelSerializer):
             "price",
             "price_on_request",
             "in_stock",
+            "in_stock_ma",
             "is_new",
             "first_published_at",
             "edition_count",
@@ -362,6 +364,10 @@ class SKUListSerializer(serializers.ModelSerializer):
     def get_in_stock(self, obj: SKU) -> bool:
         """True when warehouse quantity is positive (no raw qty in public API)."""
         return obj.in_stock
+
+    def get_in_stock_ma(self, obj: SKU) -> bool:
+        """True when 4–20 mA (special-order) units are on hand (no raw qty)."""
+        return obj.in_stock_ma
 
     def get_is_new(self, obj: SKU) -> bool:
         """True when first_published_at is within the Новинки window (30 days)."""

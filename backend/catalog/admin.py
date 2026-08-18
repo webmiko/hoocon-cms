@@ -144,7 +144,9 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
         "slug",
         "product",
         "stock_qty",
+        "stock_qty_ma",
         "in_stock_label",
+        "in_stock_ma_label",
         "is_published",
         "first_published_at",
         "price",
@@ -183,7 +185,17 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Склад и цена",
             {
-                "fields": ("stock_qty", "stock_updated_at", "price"),
+                "fields": (
+                    "stock_qty",
+                    "stock_qty_ma",
+                    "stock_updated_at",
+                    "price",
+                ),
+                "description": (
+                    "Выгрузка 1С: обычная строка артикула → «остаток»; "
+                    "строка артикула с пометкой 4–20 мА → «остаток 4–20 мА» "
+                    "(спецзаказ). На сайте только «есть / нет»."
+                ),
             },
         ),
         (
@@ -199,6 +211,11 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
     def in_stock_label(self, obj: SKU) -> bool:
         """Admin column: True when stock_qty > 0."""
         return obj.in_stock
+
+    @admin.display(description="4–20 мА", boolean=True)
+    def in_stock_ma_label(self, obj: SKU) -> bool:
+        """Admin column: True when 4–20 mA special-order units are on hand."""
+        return obj.in_stock_ma
 
     def get_urls(self) -> list:
         """Add stock upload + template download endpoints."""

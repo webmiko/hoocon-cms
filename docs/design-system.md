@@ -38,15 +38,22 @@ Body-ссылки — `#b01010` (контраст AA на белом). CTA — �
 Корень: `html { font-size: 100% }` (браузерный default ≈16px). **Не** ставить
 `62.5%` / `10px` на `html` — ломает user font-size и a11y.
 
-Шкала только через токены `rem` + `clamp()` в `tokens.css`:
+Шкала только через токены `rem` + `clamp()` в `tokens.css`. Body floor —
+`1rem`; chrome `--font-size-sm` ≈ 0.875rem. Заголовки — отдельная иерархия
+(`--font-size-h1`…`h5`), не те же токены, что UI large.
 
 | Токен | Назначение |
 |-------|------------|
-| `--font-size-sm` | подписи, chips, meta |
-| `--font-size-base` | body / UI |
+| `--font-size-sm` | chrome: chips, meta, catalog card titles (~0.875) |
+| `--font-size-base` | body / UI (≥ 1rem) |
 | `--font-size-lg` | лиды, акценты в карточках |
-| `--font-size-xl` / `--font-size-2xl` | секции, H2–H3 |
-| `--font-size-hero` | hero / крупные H1 |
+| `--font-size-xl` / `--font-size-2xl` | UI large (цена, empty), не page H1 |
+| `--font-size-h1`…`--font-size-h5` | иерархия заголовков (H1 700/1.25, H2–H3 600) |
+| `--font-size-hero` | wordmark / landing hero |
+
+**H1 страницы ≠ заголовок карточки.** Семантический `h3.cardTitle` в каталоге
+остаётся `--font-size-sm`; глобальный H3 его не раздувает. Длинные имена SKU
+на PDP — `--font-size-h2`, не page H1.
 
 ### Правила агента
 

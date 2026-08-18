@@ -25,7 +25,7 @@
   border-color: var(--color-border-strong);
   background: var(--color-subtle);
   color: var(--color-link-hover);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .icon {

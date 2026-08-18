@@ -43,7 +43,9 @@ class RobotsTxtView(View):
             "Disallow: /api/",
             "Disallow: /search",
             "Disallow: /consultation",
+            "Disallow: /rfq",
             "Disallow: /replacement",
+            "Disallow: /compare",
             "",
             f"Sitemap: {_site_base_url(request)}/sitemap.xml",
         ]

@@ -5,6 +5,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { sanitizeHtml } from "../utils/sanitize";
 import { stripHtmlToText } from "../utils/stripHtml";
 import {
@@ -48,6 +49,8 @@ export function NewsPage() {
   const related = (listData?.results ?? [])
     .filter((item) => item.slug !== news.slug)
     .slice(0, 8);
+  const coverCaption = generatedCoverCaption("news", news.slug);
+  const coverClassName = coverCaption ? `${styles.cover} ${styles.coverGenerated}` : styles.cover;
 
   return (
     <div className={styles.page}>
@@ -111,10 +114,13 @@ export function NewsPage() {
         {news.cover ? (
           <figure className={styles.coverFigure}>
             <img
-              className={styles.cover}
+              className={coverClassName}
               src={news.cover}
               alt={news.title}
             />
+            {coverCaption ? (
+              <figcaption className={styles.coverCaption}>{coverCaption}</figcaption>
+            ) : null}
           </figure>
         ) : null}
 

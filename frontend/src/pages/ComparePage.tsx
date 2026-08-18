@@ -394,7 +394,10 @@ export function ComparePage() {
                                 </dt>
                                 <dd>
                                   {isModulatingSignalKey(row.key) ? (
-                                    <SignalSpecValue value={value} />
+                                    <SignalSpecValue
+                                      value={value}
+                                      maInStock={Boolean(sku.in_stock_ma)}
+                                    />
                                   ) : (
                                     softBreak(value)
                                   )}
@@ -557,7 +560,10 @@ function CompareGroupFragment({
           {row.values.map((value, index) => (
             <td key={`${row.key}-${skus[index]?.slug ?? index}`}>
               {isModulatingSignalKey(row.key) ? (
-                <SignalSpecValue value={value} />
+                <SignalSpecValue
+                  value={value}
+                  maInStock={Boolean(skus[index]?.in_stock_ma)}
+                />
               ) : (
                 softBreak(value)
               )}

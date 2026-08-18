@@ -12,6 +12,7 @@ export type SiblingEdition = {
   aux_switch: boolean;
   fault_alarm?: boolean;
   in_stock: boolean;
+  in_stock_ma?: boolean;
 };
 
 export type VariantSelection = {

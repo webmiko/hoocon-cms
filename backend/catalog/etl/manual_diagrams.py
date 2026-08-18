@@ -221,15 +221,11 @@ def crop_on_off_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
 def crop_modulating_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
     """Crop wiring + dimensions from the right column of a landscape sheet-2 raster.
 
-    Black section titles sit near y≈0.10, 0.31, 0.58. Crop diagram bodies between
-    them and inset past the ТТХ table so grey table edges do not bleed in.
-    Also used for new 2-page D/DS landscape manuals (same sheet layout as A/AS).
+    Same layout as SA..FU manuals: left = ТТХ, right = Wiring → Dimensions.
+    Title bars are detected (see :func:`crop_safu_diagrams`); leftover paper is
+    trimmed. Also used for new 2-page D/DS landscape manuals.
     """
-    width, height = page.size
-    left = int(width * 0.505)
-    right = width - 25
-    wiring = page.crop((left, int(0.122 * height), right, int(0.300 * height)))
-    dimensions = page.crop((left, int(0.338 * height), right, int(0.575 * height)))
+    wiring, dimensions = crop_safu_diagrams(page)
     return _trim_near_white(wiring), _trim_near_white(dimensions)
 
 
@@ -454,6 +450,23 @@ def relabel_diagram_crops(
     return out
 
 
+def _pdf_first_page_is_landscape(path: Path) -> bool:
+    """True when page 1 is wider than tall (factory A4 landscape manuals)."""
+    try:
+        document = pdfium.PdfDocument(str(path))
+    except (OSError, pdfium.PdfiumError) as exc:
+        logger.debug("pdf_open_failed path=%s err=%s", path, type(exc).__name__)
+        return False
+    try:
+        width, height = document[0].get_size()
+        return bool(width > height)
+    except (OSError, ValueError, IndexError, pdfium.PdfiumError) as exc:
+        logger.debug("pdf_size_failed path=%s err=%s", path, type(exc).__name__)
+        return False
+    finally:
+        document.close()
+
+
 def find_manual_pdf(
     *,
     series_nm: int,
@@ -462,10 +475,23 @@ def find_manual_pdf(
 ) -> Path | None:
     """Locate a DAFU manual PDF for the series edition.
 
-    Prefers an already-attached ``ProductFile``, then ``_инструкции-pdf``.
+    Prefers ``_инструкции-pdf`` (RU first) over an attached ``ProductFile``.
+    HTML-print SKU PDFs are portrait A5 and do not match landscape crop
+    geometry — using them put ТТХ table snippets into the gallery.
     Resolves ``_PDF_FALLBACK_NM`` (DA3 → DA5) when the series has no PDF yet.
     """
     pdf_nm = pdf_source_series_nm(series_nm)
+    wanted_kind = "modulating_24" if edition == "modulating_24" else "on_off"
+    root = manuals_dir or default_manuals_dir()
+    if root.is_dir():
+        for path in iter_manual_pdfs(root):
+            parsed = parse_manual_stem(normalize_manual_stem(path.name))
+            if parsed is None:
+                continue
+            nm, kind = parsed
+            if nm == pdf_nm and kind == wanted_kind:
+                return path.resolve()
+
     if edition == "modulating_24":
         file_qs = ProductFile.objects.filter(
             is_published=True,
@@ -479,22 +505,8 @@ def find_manual_pdf(
 
     for product_file in file_qs.select_related("sku")[:8]:
         path = Path(product_file.file.path)
-        if path.is_file():
+        if path.is_file() and _pdf_first_page_is_landscape(path):
             return path
-
-    root = manuals_dir or default_manuals_dir()
-    if not root.is_dir():
-        return None
-    wanted_kind = "modulating_24" if edition == "modulating_24" else "on_off"
-    for path in sorted(root.iterdir()):
-        if path.suffix.casefold() != ".pdf":
-            continue
-        parsed = parse_manual_stem(normalize_manual_stem(path.name))
-        if parsed is None:
-            continue
-        nm, kind = parsed
-        if nm == pdf_nm and kind == wanted_kind:
-            return path.resolve()
     return None
 
 
@@ -1151,6 +1163,15 @@ def find_damu_manual_pdf(
     manuals_dir = manuals_dir or default_manuals_dir()
     wanted_kind = "a_as" if edition == "modulating_24" else "d_ds"
 
+    if manuals_dir.is_dir():
+        for path in iter_manual_pdfs(manuals_dir):
+            parsed = parse_damu_manual_stem(path.name)
+            if parsed is None:
+                continue
+            nms, kind, _volt = parsed
+            if series_nm in nms and kind == wanted_kind:
+                return path.resolve()
+
     if edition == "modulating_24":
         file_qs = ProductFile.objects.filter(
             is_published=True,
@@ -1165,17 +1186,9 @@ def find_damu_manual_pdf(
         ).exclude(file="")
     for pf in file_qs.select_related("sku")[:3]:
         if pf.file and Path(pf.file.path).is_file():
-            return Path(pf.file.path)
-
-    if not manuals_dir.is_dir():
-        return None
-    for path in iter_manual_pdfs(manuals_dir):
-        parsed = parse_damu_manual_stem(path.name)
-        if parsed is None:
-            continue
-        nms, kind, _volt = parsed
-        if series_nm in nms and kind == wanted_kind:
-            return path
+            path = Path(pf.file.path)
+            if _pdf_first_page_is_landscape(path):
+                return path
     return None
 
 

@@ -18,12 +18,12 @@
 .title {
   margin: 0 0 var(--space-md);
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 3vw, 1.85rem);
-  font-weight: 700;
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-h1);
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: var(--line-height-h1);
   color: var(--color-text);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .lead {

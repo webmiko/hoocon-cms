@@ -113,7 +113,7 @@
 
 .primary:hover:not(:disabled) {
   background: var(--color-brand-control-hover, var(--color-brand));
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .secondary {

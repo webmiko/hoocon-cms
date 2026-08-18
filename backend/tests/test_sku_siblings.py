@@ -41,13 +41,22 @@ def test_sku_detail_exposes_siblings() -> None:
             slug=f"h8103-{code.lower()}",
             sku_code=code,
             is_published=True,
+            stock_qty=4 if code.endswith("-24A") else 0,
+            stock_qty_ma=2 if code.endswith("-24A") else 0,
         )
     client = APIClient()
     resp = client.get("/api/catalog/skus/h8103-h8103-bv265-24a/")
     assert resp.status_code == 200
     data = resp.json()
+    assert data["in_stock_ma"] is True
     assert len(data["siblings"]) == 2
     assert data["variant_axes"]["control"]
+    by_code = {row["sku_code"]: row for row in data["siblings"]}
+    assert by_code["H8103-BV265-24A"]["in_stock"] is True
+    assert by_code["H8103-BV265-24A"]["in_stock_ma"] is True
+    assert by_code["H8103-BV265-24AS"]["in_stock_ma"] is False
+    assert "stock_qty_ma" not in data
+    assert "stock_qty_ma" not in data["siblings"][0]
 
 
 @pytest.mark.django_db

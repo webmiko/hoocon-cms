@@ -182,7 +182,7 @@
 
 .acceptButton:hover {
   background: var(--color-brand-control-hover);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .declineButton,

@@ -544,6 +544,10 @@ export interface components {
             readonly price_on_request: boolean;
             /** @description True when warehouse quantity is positive. */
             readonly in_stock: boolean;
+            /**
+             * @description True when 4–20 mA (special-order) units are on hand.
+             */
+            readonly in_stock_ma: boolean;
             readonly description: string;
             readonly specs_text: string;
             readonly analogs_text: string;
@@ -576,6 +580,10 @@ export interface components {
             readonly price_on_request: boolean;
             /** @description True when warehouse quantity is positive. */
             readonly in_stock: boolean;
+            /**
+             * @description True when 4–20 mA (special-order) units are on hand.
+             */
+            readonly in_stock_ma: boolean;
         };
         /** @description Paginated search response (DRF PageNumberPagination shape). */
         SearchResponse: {

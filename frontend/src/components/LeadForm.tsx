@@ -24,6 +24,8 @@ interface LeadFormProps {
   /** Prefill RFQ line items (compare / ?skus= — prefer slugs). */
   skuCodes?: string[];
   ballValveKit?: BallValveKitOptions | null;
+  /** Denser PDP embed: tighter gaps, no multi-КП hint. */
+  compact?: boolean;
 }
 
 interface FormState {
@@ -112,6 +114,7 @@ export function LeadForm({
   skuName,
   skuCodes,
   ballValveKit,
+  compact = false,
 }: LeadFormProps) {
   const { items: compareItems } = useCompare();
   const defaultMessage = useMemo(
@@ -322,7 +325,10 @@ export function LeadForm({
   const showLines = leadType === "rfq" && lines.length > 0;
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
+    <form
+      className={compact ? `${styles.form} ${styles.formCompact}` : styles.form}
+      onSubmit={handleSubmit}
+    >
       <div className={styles.honeypot} aria-hidden="true">
         <label htmlFor="website">Website (leave empty)</label>
         <input
@@ -336,7 +342,7 @@ export function LeadForm({
         />
       </div>
 
-      {leadType === "rfq" ? (
+      {leadType === "rfq" && !compact ? (
         <p className={styles.bundleHint}>{BUNDLE_HINT}</p>
       ) : null}
 
@@ -371,39 +377,41 @@ export function LeadForm({
         </div>
       ) : null}
 
-      <div className={styles.field}>
-        <label htmlFor="name" className={styles.label}>
-          Имя *
-        </label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          required
-          value={form.name}
-          onChange={(e) => update("name", e.target.value)}
-          className={styles.input}
-        />
-        {errors.name && <span className={styles.error}>{errors.name}</span>}
-      </div>
+      <div className={styles.fieldsGrid}>
+        <div className={styles.field}>
+          <label htmlFor="name" className={styles.label}>
+            Имя *
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            autoComplete="name"
+            required
+            value={form.name}
+            onChange={(e) => update("name", e.target.value)}
+            className={styles.input}
+          />
+          {errors.name && <span className={styles.error}>{errors.name}</span>}
+        </div>
 
-      <div className={styles.field}>
-        <label htmlFor="email" className={styles.label}>
-          Email *
-        </label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          required
-          value={form.email}
-          onChange={(e) => update("email", e.target.value)}
-          className={styles.input}
-        />
-        {errors.email && <span className={styles.error}>{errors.email}</span>}
-      </div>
+        <div className={styles.field}>
+          <label htmlFor="email" className={styles.label}>
+            Email *
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={form.email}
+            onChange={(e) => update("email", e.target.value)}
+            className={styles.input}
+          />
+          {errors.email && <span className={styles.error}>{errors.email}</span>}
+        </div>
 
-      <div className={styles.fieldRow}>
         <div className={styles.field}>
           <label htmlFor="phone" className={styles.label}>
             Телефон
@@ -412,6 +420,7 @@ export function LeadForm({
             type="tel"
             id="phone"
             name="phone"
+            autoComplete="tel"
             value={form.phone}
             onChange={(e) => update("phone", e.target.value)}
             className={styles.input}
@@ -427,6 +436,7 @@ export function LeadForm({
             id="company"
             name="company"
             required={leadType === "rfq"}
+            autoComplete="organization"
             value={form.company}
             onChange={(e) => update("company", e.target.value)}
             className={styles.input}
@@ -487,7 +497,7 @@ export function LeadForm({
           id="message"
           name="message"
           required
-          rows={4}
+          rows={compact ? 3 : 4}
           value={messageValue}
           onChange={(e) => update("message", e.target.value)}
           className={styles.textarea}

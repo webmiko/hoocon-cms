@@ -91,6 +91,44 @@ def test_crop_modulating_uses_right_column() -> None:
     assert dims.size[1] < page.size[1] * 0.30
 
 
+@pytest.mark.django_db
+def test_find_manual_pdf_prefers_pack_over_product_file(tmp_path) -> None:
+    """HTML-print SKU PDFs must not win over the factory RU landscape pack."""
+    from django.core.files.base import ContentFile
+
+    from catalog.etl.manual_diagrams import find_manual_pdf
+    from catalog.models import SKU, Category, Product, ProductFile
+
+    pack = tmp_path / "RU" / "DA10FU24-A_AS.pdf"
+    pack.parent.mkdir()
+    pack.write_bytes(b"%PDF-pack")
+
+    cat = Category.objects.create(name="C", slug="dafu-pdf-c")
+    product = Product.objects.create(name="P", slug="dafu-pdf-p", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA10FU24-AS",
+        name="DA10FU24-AS",
+        slug="da10fu24-as-pdf",
+        is_published=True,
+    )
+    attached = ProductFile.objects.create(
+        sku=sku,
+        title="Инструкция DA10FU (A/AS (24 В))",
+        file_type=ProductFile.FileType.DATASHEET,
+        is_published=True,
+        sort_order=0,
+    )
+    attached.file.save("da10fu24-a-as.pdf", ContentFile(b"%PDF-attached"), save=True)
+
+    found = find_manual_pdf(
+        series_nm=10,
+        edition="modulating_24",
+        manuals_dir=tmp_path,
+    )
+    assert found == pack.resolve()
+
+
 def test_parse_safu_series_and_fallback() -> None:
     assert parse_safu_series_nm("sa10fu24-dst") == 10
     assert safu_pdf_source_series_nm(20) == 15

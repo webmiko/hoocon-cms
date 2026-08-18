@@ -75,6 +75,7 @@ def sibling_edition_row(sku: SKU) -> dict[str, Any]:
         "aux_switch": bool(variant.aux_switch),
         "fault_alarm": bool(variant.fault_alarm),
         "in_stock": bool(sku.in_stock),
+        "in_stock_ma": bool(sku.in_stock_ma),
     }
 
 
@@ -92,7 +93,7 @@ def siblings_for_sku(sku: SKU, *, limit: int = 400) -> list[dict[str, Any]]:
         return []
     qs = (
         SKU.objects.filter(product_id=sku.product_id, is_published=True)
-        .only("slug", "sku_code", "stock_qty")
+        .only("slug", "sku_code", "stock_qty", "stock_qty_ma")
         .order_by("sku_code")[:limit]
     )
     return [sibling_edition_row(row) for row in qs]

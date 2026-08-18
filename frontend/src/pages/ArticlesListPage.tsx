@@ -6,6 +6,7 @@ import { ThemeAwareCover } from "../components/ThemeAwareCover";
 import { api } from "../api/client";
 import type { Article } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import styles from "./ArticlesListPage.module.css";
 
@@ -17,6 +18,9 @@ export function ArticlesListPage() {
   const { data, loading, error } = useAsync(() => api.articles());
   const articles: Article[] = data?.results ?? [];
   const [featured, ...rest] = articles;
+  const featuredCoverCaption = featured
+    ? generatedCoverCaption("article", featured.slug)
+    : null;
 
   return (
     <div className={styles.page}>
@@ -74,12 +78,19 @@ export function ArticlesListPage() {
                 <ThemeAwareCover
                   light={featured.cover}
                   dark={featured.cover_dark}
-                  imgClassName={styles.featuredCover}
+                  imgClassName={
+                    featuredCoverCaption
+                      ? `${styles.featuredCover} ${styles.coverGenerated}`
+                      : styles.featuredCover
+                  }
                   loading="eager"
                 />
               ) : (
                 <div className={styles.coverPlaceholder} aria-hidden />
               )}
+              {featuredCoverCaption ? (
+                <span className={styles.coverNote}>{featuredCoverCaption}</span>
+              ) : null}
             </div>
             <div className={styles.featuredBody}>
               <Meta article={featured} />
@@ -95,31 +106,41 @@ export function ArticlesListPage() {
 
       {rest.length > 0 ? (
         <ul className={styles.list}>
-          {rest.map((article) => (
-            <li key={article.id} className={styles.item}>
-              <Link to={`/statyi/${article.slug}`} className={styles.itemLink}>
-                <div className={styles.itemMedia}>
-                  {article.cover ? (
-                    <ThemeAwareCover
-                      light={article.cover}
-                      dark={article.cover_dark}
-                      imgClassName={styles.itemCover}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className={styles.coverPlaceholder} aria-hidden />
-                  )}
-                </div>
-                <div className={styles.itemBody}>
-                  <Meta article={article} />
-                  <h2 className={styles.itemTitle}>{article.title}</h2>
-                  {article.excerpt ? (
-                    <p className={styles.itemExcerpt}>{article.excerpt}</p>
-                  ) : null}
-                </div>
-              </Link>
-            </li>
-          ))}
+          {rest.map((article) => {
+            const coverNote = generatedCoverCaption("article", article.slug);
+            return (
+              <li key={article.id} className={styles.item}>
+                <Link to={`/statyi/${article.slug}`} className={styles.itemLink}>
+                  <div className={styles.itemMedia}>
+                    {article.cover ? (
+                      <ThemeAwareCover
+                        light={article.cover}
+                        dark={article.cover_dark}
+                      imgClassName={
+                        coverNote
+                          ? `${styles.itemCover} ${styles.coverGenerated}`
+                          : styles.itemCover
+                      }
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className={styles.coverPlaceholder} aria-hidden />
+                    )}
+                    {coverNote ? (
+                      <span className={styles.coverNote}>{coverNote}</span>
+                    ) : null}
+                  </div>
+                  <div className={styles.itemBody}>
+                    <Meta article={article} />
+                    <h2 className={styles.itemTitle}>{article.title}</h2>
+                    {article.excerpt ? (
+                      <p className={styles.itemExcerpt}>{article.excerpt}</p>
+                    ) : null}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

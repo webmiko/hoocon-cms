@@ -15,6 +15,7 @@ from catalog.etl.stock_import import (
     normalize_stock_article_key,
     parse_stock_qty,
     parse_stock_rows,
+    stock_article_is_ma_option,
 )
 
 
@@ -52,6 +53,17 @@ def test_normalize_stock_article_key_bv_aliases() -> None:
     assert normalize_stock_article_key("H8101-BV215A-24A") == "H8101-BV215A-24A"
     assert normalize_stock_article_key("DA5FU24-DS") == "DA5FU24-DS"
     assert normalize_stock_article_key("DA10FU24-AS 4-20 mA") == "DA10FU24-AS"
+    assert normalize_stock_article_key("DA15FU24-AS 4-20mA") == "DA15FU24-AS"
+
+
+def test_stock_article_is_ma_option() -> None:
+    """4–20 mA warehouse note is an option on the same SKU, not HVA24-20."""
+    assert stock_article_is_ma_option("DA10FU24-AS 4-20 mA") is True
+    assert stock_article_is_ma_option("DA15FU24-AS 4-20mA") is True
+    assert stock_article_is_ma_option("DA10FU24-AS 4–20 мА") is True
+    assert stock_article_is_ma_option("DA10FU24-AS") is False
+    assert stock_article_is_ma_option("HVA24-20") is False
+    assert stock_article_is_ma_option("BV265 DN65") is False
 
 
 def test_parse_stock_rows_requires_headers() -> None:
@@ -243,6 +255,73 @@ def test_apply_stock_updates_known_ignores_unknown_keeps_missing() -> None:
     assert report.ignored_unknown == 1
     assert report.bad_rows == 1
     assert "UNKNOWN-X" in report.unknown_codes
+
+
+@pytest.mark.django_db
+def test_apply_stock_splits_ma_option_from_base_qty() -> None:
+    """``DA10FU24-AS 4-20 mA`` updates stock_qty_ma; base row keeps stock_qty."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C", slug="stock-ma-c")
+    product = Product.objects.create(name="P", slug="stock-ma-p", category=cat)
+    both = SKU.objects.create(
+        product=product,
+        name="AS",
+        slug="stock-da10-as",
+        sku_code="DA10FU24-AS",
+        stock_qty=0,
+        stock_qty_ma=0,
+    )
+    only_ma = SKU.objects.create(
+        product=product,
+        name="AS15",
+        slug="stock-da15-as",
+        sku_code="DA15FU24-AS",
+        stock_qty=9,
+        stock_qty_ma=0,
+    )
+    only_base = SKU.objects.create(
+        product=product,
+        name="D",
+        slug="stock-da5-d",
+        sku_code="DA5FU24-D",
+        stock_qty=4,
+        stock_qty_ma=11,
+    )
+    missing = SKU.objects.create(
+        product=product,
+        name="Keep",
+        slug="stock-keep",
+        sku_code="DA08MU24-AS",
+        stock_qty=2,
+        stock_qty_ma=3,
+    )
+
+    report = apply_stock_rows(
+        [
+            ("DA10FU24-AS 4-20 mA", 58),
+            ("DA10FU24-AS", 251),
+            ("DA15FU24-AS 4-20mA", 60),
+            ("DA5FU24-D", 4),
+        ],
+    )
+    both.refresh_from_db()
+    only_ma.refresh_from_db()
+    only_base.refresh_from_db()
+    missing.refresh_from_db()
+
+    assert both.stock_qty == 251
+    assert both.stock_qty_ma == 58
+    assert both.in_stock is True
+    assert both.in_stock_ma is True
+    assert only_ma.stock_qty == 9
+    assert only_ma.stock_qty_ma == 60
+    assert only_base.stock_qty == 4
+    assert only_base.stock_qty_ma == 0
+    assert missing.stock_qty == 2
+    assert missing.stock_qty_ma == 3
+    assert report.updated == 3
+    assert report.ignored_unknown == 0
 
 
 @pytest.mark.django_db

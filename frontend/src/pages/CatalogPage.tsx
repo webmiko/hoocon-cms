@@ -382,14 +382,11 @@ export function CatalogPage() {
     updateFilter("q", value);
   }
 
-  function goToPage(p: number) {
-    updateFilter("page", p > 1 ? String(p) : "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  const totalCount = skusData?.count ?? displayedSkus.length;
 
   const filterHead = (
     <div className={styles.filterPanelHead}>
-      <h2 className={styles.filterPanelTitle}>Фильтры</h2>
+      <p className={styles.filterPanelTitle}>Фильтры</p>
       {activeCount > 0 ? (
         <button
           type="button"
@@ -599,7 +596,7 @@ export function CatalogPage() {
         </div>
 
         {activeCount > 0 ? (
-          <div className={styles.activeTags} aria-label="Активные фильтры">
+          <div className={styles.activeTags} role="group" aria-label="Активные фильтры">
             {category && activeCategory ? (
               <button
                 type="button"
@@ -721,6 +718,7 @@ export function CatalogPage() {
 
         {displayedSkus.length > 0 && (
           <>
+            <h2 className="sr-only">Товары</h2>
             <div
               className={styles.grid}
               aria-busy={loading || undefined}
@@ -748,27 +746,10 @@ export function CatalogPage() {
                   {loadMoreError}
                 </p>
               ) : null}
-              {skusData && (skusData.next || skusData.previous) ? (
-                <nav className={styles.pagination} aria-label="Пагинация">
-                  <button
-                    type="button"
-                    className={styles.pageButton}
-                    disabled={!skusData.previous || page <= 1}
-                    onClick={() => goToPage(page - 1)}
-                  >
-                    ← Назад
-                  </button>
-                  <span className={styles.pageInfo}>Страница {page}</span>
-                  <button
-                    type="button"
-                    className={styles.pageButton}
-                    disabled={!skusData.next}
-                    onClick={() => goToPage(page + 1)}
-                  >
-                    Вперёд →
-                  </button>
-                </nav>
-              ) : null}
+              <p className={styles.resultsMeta}>
+                {`Показано ${displayedSkus.length} из ${totalCount}`}
+                {appendHasNext ? " · ещё загружаются по кнопке" : ""}
+              </p>
             </div>
           </>
         )}
