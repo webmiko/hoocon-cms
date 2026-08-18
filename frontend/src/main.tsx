@@ -13,6 +13,7 @@ import {
   clearChunkReloadFlag,
   recoverFromStaleChunk,
 } from "./utils/chunkLoadRecovery";
+import { reloadIfReleaseStale } from "./utils/reloadIfReleaseStale";
 import { installSupportChatControl } from "./utils/supportChatControl";
 
 /**
@@ -41,14 +42,24 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 if (import.meta.env.PROD) {
+  let swRegistration: ServiceWorkerRegistration | undefined;
+  const checkRelease = () => {
+    void reloadIfReleaseStale();
+  };
+  const poke = () => {
+    void swRegistration?.update();
+    checkRelease();
+  };
+  checkRelease();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") poke();
+  });
   registerSW({
     immediate: true,
     onRegisteredSW(_swUrl, registration) {
+      swRegistration = registration;
       if (!registration) return;
-      // Pick up new builds while a tab stays open (deploy race).
-      window.setInterval(() => {
-        void registration.update();
-      }, 60 * 60 * 1000);
+      window.setInterval(poke, 5 * 60 * 1000);
     },
   });
 }

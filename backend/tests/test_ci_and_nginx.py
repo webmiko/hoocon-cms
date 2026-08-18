@@ -108,6 +108,15 @@ def test_nginx_conf_has_spa_fallback() -> None:
     assert "proxy_pass" in content
 
 
+def test_nginx_sw_js_is_not_cached() -> None:
+    """``/sw.js`` must revalidate so deploys activate without a hard refresh."""
+    content = _nginx_site_text()
+    assert "location = /sw.js" in content
+    block = content.split("location = /sw.js", 1)[1].split("location ", 1)[0]
+    assert "no-cache" in block
+    assert "no-store" in block
+
+
 def test_nginx_conf_strips_trailing_slash() -> None:
     """nginx 301-rewrites trailing slash (БЗ canonical without /)."""
     content = _nginx_site_text()
