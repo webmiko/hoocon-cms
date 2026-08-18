@@ -50,8 +50,8 @@ def build_csp(*, nonce: str | None = None, allow_unsafe_eval: bool = False) -> s
     if allow_unsafe_eval:
         script_parts.append("'unsafe-eval'")
     connect_parts = ["'self'"]
-    # data: placeholders; blob: product photos (ProtectedProductImage object URLs).
-    img_parts = ["'self'", "data:", "blob:"]
+    # data: placeholders / analytics pixels. Product photos are same-origin /media.
+    img_parts = ["'self'", "data:"]
 
     ym_id, ga_id = _analytics_counter_ids()
     if ym_id:

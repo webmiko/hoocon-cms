@@ -1,4 +1,4 @@
-/* Soft reveal + shimmer while blob/session bytes resolve. */
+/* Soft reveal + shimmer until the native image paints. */
 
 .frame {
   position: relative;
@@ -11,7 +11,7 @@
   background: transparent;
 }
 
-/* Reserve space without letting the 1×1 GIF force a square aspect jump.
+/* Reserve space while the file is still in flight (catalog grid cells).
    Compact thumbs (lists/trays) skip this — size comes from frameClassName. */
 .frame[data-ready="false"]:not(.frameCompact) {
   min-height: 10rem;
@@ -57,15 +57,6 @@
   transition: opacity 280ms var(--ease-out, ease-out);
 }
 
-.frame[data-ready="false"] .media {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-}
-
 .mediaReady {
   opacity: 1;
 }
@@ -88,13 +79,6 @@
   .media {
     opacity: 1;
     transition: none;
-  }
-
-  .frame[data-ready="false"] .media {
-    clip: auto;
-    width: 100%;
-    height: 100%;
-    position: relative;
   }
 }
 

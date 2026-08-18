@@ -8,8 +8,9 @@ import type {
 /**
  * Client-side deterrents against casual photo save / text scrape on product UI.
  *
- * Not DRM: DevTools Network, screenshots, and API JSON still expose paths.
- * Goal: block casual save/copy and hide ``/media/...`` from ``img.src`` via blob URLs.
+ * Not DRM: DevTools Network, screenshots, and ``img.src`` still expose paths.
+ * Goal: deter casual save/copy (context menu / drag). Photos use native
+ * ``/media/...`` URLs so the catalog can cache and lazy-load in the browser.
  */
 
 /** Cancel browser default for copy / cut / context menu / drag. */
