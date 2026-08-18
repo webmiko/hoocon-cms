@@ -133,7 +133,12 @@ ip-rating, габариты/вес/вал — как у референса по�
 ```bash
 poetry run python manage.py enrich_damu
 poetry run python manage.py attach_manual_pdfs --series damu
+poetry run python manage.py attach_manual_pdfs --series passport
 ```
+
+Паспорта изделия (`_инструкции-pdf/паспорт изделия/{SKU} — паспорт (RU).pdf`)
+вешаются отдельной строкой «Паспорт …» в Документы и **не** заменяют
+инструкцию. `--series all` тоже подхватывает эту папку.
 
 Код: `backend/catalog/etl/series_copy_damu.py`.
 

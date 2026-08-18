@@ -1,4 +1,4 @@
-"""Attach instruction PDFs from ``_инструкции-pdf`` to matching SKUs.
+"""Attach instruction and product-passport PDFs from ``_инструкции-pdf``.
 
 Usage::
 
@@ -22,6 +22,7 @@ from catalog.etl.manual_pdfs import (
     attach_damu_manuals,
     attach_hva_manuals,
     attach_hvd_manuals,
+    attach_product_passports,
     attach_safu_manuals,
     attach_samu_manuals,
     default_manuals_dir,
@@ -30,9 +31,9 @@ from catalog.etl.manual_pdfs import (
 
 
 class Command(BaseCommand):
-    """Link local DAFU/SAFU/DAMU manuals to catalog SKUs; fix spring-return category."""
+    """Attach instruction + product-passport PDFs; align DAFU category."""
 
-    help = "Attach DAFU/SAFU/DAMU/DAMQU instruction PDFs; place DAFU under spring-return."
+    help = "Attach instruction PDFs and GOST product passports; place DAFU under spring-return."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
@@ -65,9 +66,10 @@ class Command(BaseCommand):
                 "hva",
                 "h81",
                 "br",
+                "passport",
             ),
             default="all",
-            help="Which series manuals to attach (default: all).",
+            help="Which PDFs to attach (default: all, including passports).",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -116,6 +118,10 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"  ! {warn}"))
         if series in {"all", "br"}:
             summaries.append(("BR", attach_br_adapter_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "passport"}:
+            summaries.append(
+                ("PASSPORT", attach_product_passports(manuals_dir, dry_run=dry_run)),
+            )
 
         for label, summary in summaries:
             self.stdout.write(
