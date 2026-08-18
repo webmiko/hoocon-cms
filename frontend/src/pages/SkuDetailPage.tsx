@@ -75,17 +75,25 @@ function SpecAttrValue({
   unit,
   valueClassName,
   unitClassName,
+  maInStock = false,
 }: {
   slug: string;
   value: string;
   unit?: string | null;
   valueClassName: string;
   unitClassName: string;
+  maInStock?: boolean;
 }) {
   const displayUnit = specDisplayUnit(value, unit ?? undefined);
   const display = `${value}${displayUnit ? ` ${displayUnit}` : ""}`;
   if (isModulatingSignalKey(slug) || value.includes("(спецзаказ)")) {
-    return <SignalSpecValue value={display} className={valueClassName} />;
+    return (
+      <SignalSpecValue
+        value={display}
+        maInStock={maInStock}
+        className={valueClassName}
+      />
+    );
   }
   return (
     <span className={valueClassName}>
@@ -232,6 +240,7 @@ export function SkuDetailPage() {
     return overlayCopyForSibling(sku.lead, sku.sku_code, activeSibling);
   }, [sku, activeSibling]);
   const displayInStock = activeSibling?.in_stock ?? sku?.in_stock;
+  const displayInStockMa = activeSibling?.in_stock_ma ?? sku?.in_stock_ma;
 
   const files: SkuFile[] = useMemo(
     () => ((sku?.files ?? []) as unknown[] as SkuFile[]),
@@ -443,6 +452,7 @@ export function SkuDetailPage() {
                         unit={attr.unit}
                         valueClassName={styles.specValue}
                         unitClassName={styles.specUnit}
+                        maInStock={Boolean(displayInStockMa)}
                       />
                     </li>
                   ))}
@@ -477,6 +487,7 @@ export function SkuDetailPage() {
                       unit={attr.unit}
                       valueClassName={styles.specValue}
                       unitClassName={styles.specUnit}
+                      maInStock={Boolean(displayInStockMa)}
                     />
                   </li>
                 ))}
@@ -579,11 +590,11 @@ export function SkuDetailPage() {
               className={styles.heroZoomTrigger}
               onClick={() => setLightboxIndex(0)}
               onContextMenu={protectedMediaImgProps.onContextMenu}
-              aria-label="Увеличить фото"
+              aria-label={`Увеличить фото: ${galleryImages[0].alt}`}
             >
               <ProtectedProductImage
                 src={galleryImages[0].src}
-                alt={galleryImages[0].alt}
+                alt=""
                 className={styles.heroImage}
                 loading="eager"
               />
@@ -616,6 +627,11 @@ export function SkuDetailPage() {
           >
             {stockAvailabilityLabel(Boolean(displayInStock))}
           </p>
+          {displayInStockMa ? (
+            <p className={`${styles.stockLabel} ${styles.stockMa}`}>
+              4–20 мА (спецзаказ) — есть на складе
+            </p>
+          ) : null}
           {sku.analog_belimo_code ? (
             <p className={`${styles.analog} text-tech`}>
               Аналог Belimo: <strong>{softBreak(sku.analog_belimo_code)}</strong>
@@ -634,7 +650,10 @@ export function SkuDetailPage() {
                     </span>{" "}
                     <strong>
                       {isModulatingSignalKey(h.key) ? (
-                        <SignalSpecValue value={display} />
+                        <SignalSpecValue
+                          value={display}
+                          maInStock={Boolean(displayInStockMa)}
+                        />
                       ) : (
                         <>
                           <SoftBreakText text={h.value} />
@@ -673,50 +692,52 @@ export function SkuDetailPage() {
       </div>
 
       {galleryImages.length > 1 ? (
-        <div
+        <ul
           className={`${styles.gallery} u-protect-media`}
+          role="list"
           aria-label="Дополнительные фотографии"
           onContextMenu={protectedMediaImgProps.onContextMenu}
         >
           {galleryImages.slice(1).map((item, offset) => {
             const fullIndex = offset + 1;
             return (
-              <PhotoWash
-                key={`${item.src}-${fullIndex}`}
-                className={styles.galleryItem}
-                data-purpose={mediaPurpose}
-                src={item.src}
-                style={
-                  isTechnicalDiagram(item.src, item.alt)
-                    ? undefined
-                    : productWashStyle
-                }
-                backdrop={
-                  isTechnicalDiagram(item.src, item.alt) ? "white" : "auto"
-                }
-              >
-                <button
-                  type="button"
-                  className={styles.galleryZoomTrigger}
-                  onClick={() => setLightboxIndex(fullIndex)}
-                  onContextMenu={protectedMediaImgProps.onContextMenu}
-                  aria-label={`Увеличить фото ${fullIndex + 1}`}
+              <li key={`${item.src}-${fullIndex}`} className={styles.gallerySlot}>
+                <PhotoWash
+                  className={styles.galleryItem}
+                  data-purpose={mediaPurpose}
+                  src={item.src}
+                  style={
+                    isTechnicalDiagram(item.src, item.alt)
+                      ? undefined
+                      : productWashStyle
+                  }
+                  backdrop={
+                    isTechnicalDiagram(item.src, item.alt) ? "white" : "auto"
+                  }
                 >
-                  <ProtectedProductImage
-                    src={item.src}
-                    alt={item.alt}
-                    className={
-                      isTechnicalDiagram(item.src, item.alt)
-                        ? `${styles.galleryImage} ${styles.galleryImageDiagram}`
-                        : styles.galleryImage
-                    }
-                    loading="lazy"
-                  />
-                </button>
-              </PhotoWash>
+                  <button
+                    type="button"
+                    className={styles.galleryZoomTrigger}
+                    onClick={() => setLightboxIndex(fullIndex)}
+                    onContextMenu={protectedMediaImgProps.onContextMenu}
+                    aria-label={`Увеличить фото ${fullIndex + 1}: ${item.alt}`}
+                  >
+                    <ProtectedProductImage
+                      src={item.src}
+                      alt=""
+                      className={
+                        isTechnicalDiagram(item.src, item.alt)
+                          ? `${styles.galleryImage} ${styles.galleryImageDiagram}`
+                          : styles.galleryImage
+                      }
+                      loading="lazy"
+                    />
+                  </button>
+                </PhotoWash>
+              </li>
             );
           })}
-        </div>
+        </ul>
       ) : null}
 
       {lightboxIndex !== null && galleryImages.length > 0 ? (
@@ -745,9 +766,12 @@ export function SkuDetailPage() {
                   {visibleTabs.map((item) => (
                     <button
                       key={item.id}
+                      id={`sku-tab-${item.id}`}
                       type="button"
                       role="tab"
                       aria-selected={activeTab === item.id}
+                      aria-controls="sku-tab-panel"
+                      tabIndex={activeTab === item.id ? 0 : -1}
                       className={
                         activeTab === item.id ? styles.tabActive : styles.tab
                       }
@@ -757,7 +781,12 @@ export function SkuDetailPage() {
                     </button>
                   ))}
                 </div>
-                <div className={styles.tabPanel} role="tabpanel">
+                <div
+                  id="sku-tab-panel"
+                  className={styles.tabPanel}
+                  role="tabpanel"
+                  aria-labelledby={`sku-tab-${activeTab}`}
+                >
                   {renderTabBody(activeTab)}
                 </div>
               </div>
@@ -837,18 +866,15 @@ export function SkuDetailPage() {
           )}
 
           <section id="rfq" className={styles.ctaSection}>
-            <h2 className={styles.ctaTitle}>Запросить коммерческое предложение</h2>
-            <p className={styles.ctaText}>
-              Отправьте заявку — подготовим КП на {displayName || sku.name}
-              {" "}
-              (арт. {displaySkuCode || sku.sku_code}). Ответим до 2 рабочих часов
-              с ценой и сроком или уточняющими вопросами по характеристикам.
-            </p>
-            <p className={styles.ctaSla}>
-              Заявка уходит на sales@hoocon.ru. Публичного прайса нет — цена
-              зависит от объёма.
-            </p>
+            <div className={styles.ctaIntro}>
+              <h2 className={styles.ctaTitle}>Запросить КП</h2>
+              <p className={styles.ctaText}>
+                Подготовим предложение на {displaySkuCode || sku.sku_code}.
+                Ответ до 2 рабочих часов — цена зависит от объёма.
+              </p>
+            </div>
             <LeadForm
+              compact
               leadType="rfq"
               skuSlug={displaySlug}
               skuName={displayName || sku.name}

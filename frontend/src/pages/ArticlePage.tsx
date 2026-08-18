@@ -9,6 +9,7 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
 import { extractArticleToc } from "../utils/articleToc";
+import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { stripHtmlToText } from "../utils/stripHtml";
 import {
   buildArticleJsonLd,
@@ -57,6 +58,8 @@ export function ArticlePage() {
     .filter((item) => item.slug !== article.slug)
     .slice(0, 8);
   const showToc = bodyWithToc.items.length >= TOC_MIN_SECTIONS;
+  const coverCaption = generatedCoverCaption("article", article.slug);
+  const coverClassName = coverCaption ? `${styles.cover} ${styles.coverGenerated}` : styles.cover;
 
   return (
     <div className={styles.page}>
@@ -123,9 +126,12 @@ export function ArticlePage() {
               light={article.cover}
               dark={article.cover_dark}
               alt={article.title}
-              imgClassName={styles.cover}
+              imgClassName={coverClassName}
               loading="eager"
             />
+            {coverCaption ? (
+              <figcaption className={styles.coverCaption}>{coverCaption}</figcaption>
+            ) : null}
           </figure>
         ) : null}
 

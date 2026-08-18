@@ -214,7 +214,7 @@
 .chat:hover,
 .chat:focus-visible {
   background: var(--color-brand-control-hover);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .chat:focus-visible {
@@ -455,7 +455,7 @@
   background: var(--color-brand-control-hover);
   text-decoration: none;
   color: var(--color-on-brand-control);
-  transform: translateY(-1px);
+  transform: scale(0.98);
 }
 
 .compareFull {

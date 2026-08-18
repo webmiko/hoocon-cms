@@ -34,7 +34,8 @@ html::-webkit-scrollbar {
 body {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
-  line-height: 1.6;
+  font-weight: var(--font-weight-body);
+  line-height: var(--line-height-body);
   color: var(--color-text);
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
@@ -69,7 +70,7 @@ body::before {
 a {
   color: var(--color-link);
   text-decoration: none;
-  transition: color var(--transition-fast);
+  transition: color var(--transition-fast), transform var(--transition-fast);
 }
 
 a:visited {
@@ -189,12 +190,31 @@ a[data-brand-cta]:hover {
   }
 }
 
-button:active,
-a:active {
-  transform: scale(0.98);
+/*
+ * Press affordance: hover (fine pointer) + stronger press on click.
+ * Inline CMS links / chrome CTAs stay unscaled — scale blurs glyphs there.
+ */
+@media (hover: hover) and (pointer: fine) {
+  a:hover,
+  button:hover:not(:disabled),
+  summary:hover,
+  [role="button"]:hover {
+    transform: scale(0.98);
+  }
 }
 
-/* Chrome brand CTAs keep a sharp layer — global a:active scale blurs glyphs. */
+button:active:not(:disabled),
+a:active,
+summary:active,
+[role="button"]:active {
+  transform: scale(0.96);
+}
+
+.cms-rich-body a:hover,
+.cms-rich-body a:active,
+.skip-link:hover,
+.skip-link:active,
+a[data-brand-cta]:hover,
 a[data-brand-cta]:active {
   transform: none;
 }
@@ -206,8 +226,6 @@ h4,
 h5,
 h6 {
   font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.25;
   /* inherit — dark panels set color on the surface; forced --color-text
      made titles invisible on #111 / hero (direct rule beats inheritance). */
   color: inherit;
@@ -227,15 +245,34 @@ h6 {
 }
 
 h1 {
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-h1);
+  line-height: var(--line-height-h1);
 }
 
 h2 {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-h2);
+  line-height: var(--line-height-h2);
 }
 
 h3 {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-h3);
+  line-height: var(--line-height-h3);
+}
+
+h4 {
+  font-size: var(--font-size-h4);
+  font-weight: var(--font-weight-h4);
+  line-height: var(--line-height-h4);
+}
+
+h5,
+h6 {
+  font-size: var(--font-size-h5);
+  font-weight: var(--font-weight-h5);
+  line-height: var(--line-height-h5);
 }
 
 .container {
@@ -286,6 +323,17 @@ h3 {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  a:hover,
+  a:active,
+  button:hover,
+  button:active,
+  summary:hover,
+  summary:active,
+  [role="button"]:hover,
+  [role="button"]:active {
+    transform: none;
   }
 }
 
@@ -370,13 +418,56 @@ select:focus-visible {
 }
 
 /* FAQ note inside Y/U signal ТТХ (SignalSpecValue). */
+.signalSpecNotePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0.25rem;
+  padding: 0.08rem 0.42rem;
+  border: 1px solid color-mix(in srgb, #b96712 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #b96712 12%, transparent);
+  color: #b96712;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.signalSpecNotePill::before {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M8 1.5A6.5 6.5 0 1 0 14.5 8 6.5 6.5 0 0 0 8 1.5m0 1.2A5.3 5.3 0 1 1 2.7 8 5.3 5.3 0 0 1 8 2.7m-.6 1.9v4.1L10.9 11l.7-1-3-2V4.6z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M8 1.5A6.5 6.5 0 1 0 14.5 8 6.5 6.5 0 0 0 8 1.5m0 1.2A5.3 5.3 0 1 1 2.7 8 5.3 5.3 0 0 1 8 2.7m-.6 1.9v4.1L10.9 11l.7-1-3-2V4.6z'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
 .signalSpecNoteLink {
-  color: var(--color-link);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
 }
 
 .signalSpecNoteLink:hover {
-  color: var(--color-link-hover, var(--color-link));
+  color: color-mix(in srgb, currentColor 84%, black);
+  text-decoration: none;
+}
+
+.signalSpecNotePillInStock {
+  color: var(--color-success, #1a7f4e);
+  border-color: color-mix(in srgb, var(--color-success, #1a7f4e) 28%, transparent);
+  background: color-mix(in srgb, var(--color-success, #1a7f4e) 10%, transparent);
+}
+
+.signalSpecNotePillInStock::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M6.7 11.4 3.6 8.3l-.9.9 4 4 6.7-6.7-.9-.9z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M6.7 11.4 3.6 8.3l-.9.9 4 4 6.7-6.7-.9-.9z'/%3E%3C/svg%3E");
 }

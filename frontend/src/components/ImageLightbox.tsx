@@ -22,12 +22,13 @@ function ZoomablePhoto({ src, alt }: { src: string; alt: string }) {
   const [zoomed, setZoomed] = useState(false);
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
 
-  const toggleZoom = (event: MouseEvent<HTMLImageElement>) => {
+  const toggleZoom = (event: MouseEvent<HTMLButtonElement>) => {
     if (zoomed) {
       setZoomed(false);
       return;
     }
-    const rect = event.currentTarget.getBoundingClientRect();
+    const target = event.currentTarget.querySelector("img") ?? event.currentTarget;
+    const rect = target.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 100;
     const y = ((event.clientY - rect.top) / rect.height) * 100;
     setOrigin({
@@ -39,22 +40,29 @@ function ZoomablePhoto({ src, alt }: { src: string; alt: string }) {
 
   return (
     <>
-      <ProtectedProductImage
-        src={src}
-        alt={alt}
-        className={`${zoomed ? styles.imageZoomed : styles.image} u-protect-media`}
-        style={
-          zoomed
-            ? {
-                transformOrigin: `${origin.x}% ${origin.y}%`,
-                transform: `scale(${ZOOM_SCALE})`,
-              }
-            : undefined
-        }
+      <button
+        type="button"
+        className={styles.zoomBtn}
+        aria-pressed={zoomed}
+        aria-label={zoomed ? "Уменьшить фото" : "Увеличить фото"}
         onClick={toggleZoom}
-        loading="eager"
-      />
-      <p className={styles.hint}>
+      >
+        <ProtectedProductImage
+          src={src}
+          alt={alt}
+          className={`${zoomed ? styles.imageZoomed : styles.image} u-protect-media`}
+          style={
+            zoomed
+              ? {
+                  transformOrigin: `${origin.x}% ${origin.y}%`,
+                  transform: `scale(${ZOOM_SCALE})`,
+                }
+              : undefined
+          }
+          loading="eager"
+        />
+      </button>
+      <p className={styles.hint} aria-hidden="true">
         {zoomed
           ? "Нажмите, чтобы уменьшить"
           : "Нажмите на фото, чтобы увеличить"}

@@ -44,22 +44,17 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
   }
   return (
     <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true">
-      <rect
-        x="3.5"
-        y="4.5"
-        width="17"
-        height="12"
-        rx="2"
+      <circle
+        cx="12"
+        cy="12"
+        r="8"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
       />
       <path
-        d="M8 20.5h8M12 16.5v4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
+        d="M12 4a8 8 0 0 0 0 16Z"
+        fill="currentColor"
       />
     </svg>
   );

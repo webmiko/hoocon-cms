@@ -59,6 +59,7 @@ export function CatalogSkuCard({
   );
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
+  const skuHref = catalogPathForSku(sku);
   const cardClass =
     variant === "vertical"
       ? `${styles.card} ${styles.cardVertical} u-protect-content`
@@ -79,13 +80,6 @@ export function CatalogSkuCard({
       data-purpose={purpose}
       {...protectedContentHandlers}
     >
-      <Link
-        to={catalogPathForSku(sku)}
-        className={styles.cardHit}
-        aria-label={sku.name}
-        onPointerDown={rememberFocus}
-        onClick={rememberFocus}
-      />
       {imageSrc ? (
         <div
           className={`${styles.cardMedia} u-protect-media`}
@@ -104,7 +98,7 @@ export function CatalogSkuCard({
           />
           <ProtectedProductImage
             src={imageSrc}
-            alt={sku.image?.alt || sku.name}
+            alt=""
             className={styles.cardImage}
             loading="lazy"
           />
@@ -136,7 +130,17 @@ export function CatalogSkuCard({
         <p className={`${styles.cardCode} text-tech`}>
           {softBreak(sku.sku_code)}
         </p>
-        <h3 className={styles.cardTitle}>{softBreak(sku.name)}</h3>
+        <h3 className={styles.cardTitle}>
+          <Link
+            to={skuHref}
+            className={styles.cardTitleLink}
+            onPointerDown={rememberFocus}
+            onClick={rememberFocus}
+          >
+            {softBreak(sku.name)}
+            <span className="sr-only">. {ctaLabel}</span>
+          </Link>
+        </h3>
         {editionsLabel ? (
           <p className={styles.cardEditions}>{editionsLabel}</p>
         ) : null}
@@ -151,6 +155,7 @@ export function CatalogSkuCard({
                   {isModulatingSignalKey(h.key) ? (
                     <SignalSpecValue
                       value={`${h.value}${unit ? ` ${unit}` : ""}`}
+                      maInStock={Boolean(sku.in_stock_ma)}
                       className={`${styles.cardSpecValue} ${styles.cardInteractive}`}
                     />
                   ) : (
@@ -172,7 +177,9 @@ export function CatalogSkuCard({
           ) : (
             <span className={styles.cardPriceOnRequest}>Цена по запросу</span>
           )}
-          <span className={styles.cardCta}>{ctaLabel}</span>
+          <span className={styles.cardCta} aria-hidden="true">
+            {ctaLabel}
+          </span>
         </div>
       </div>
     </article>

@@ -140,9 +140,9 @@ export function DirectionsCategoryGrid({
               />
             </span>
             <span className={styles.directionBody}>
-              <span className={styles.directionName}>
+              <h3 className={styles.directionName}>
                 {softBreak(cat.name)}
-              </span>
+              </h3>
               {lead ? (
                 <span className={styles.directionDesc}>{lead}</span>
               ) : null}

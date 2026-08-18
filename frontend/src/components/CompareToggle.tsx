@@ -94,6 +94,9 @@ export function CompareToggle({
         }
       />
       <span className={styles.checkboxUi} aria-hidden="true" />
+      <span className={styles.checkboxText} aria-hidden="true">
+        {checked ? "В КП" : "КП"}
+      </span>
       {limitMsg ? (
         <span className={styles.limitFloat} role="status">
           Макс. {COMPARE_MAX_SKUS}

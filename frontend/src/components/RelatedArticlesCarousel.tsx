@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import styles from "./RelatedArticlesCarousel.module.css";
 
 const LOOP_COPIES = 3;
@@ -186,6 +187,7 @@ export function RelatedArticlesCarousel({
     suppressTransition || reduceMotion
       ? "none"
       : `transform ${TRANSITION_MS}ms var(--ease-out, ease)`;
+  const contentLabel = pathPrefix === "/novosti" ? "Новость" : "Статья";
 
   return (
     <div
@@ -241,6 +243,10 @@ export function RelatedArticlesCarousel({
             const inWindow = i >= opaqueStart && i < opaqueEnd;
             const isPeek = i === opaqueStart - 1 || i === opaqueEnd;
             const dimmed = !inWindow;
+            const coverNote = generatedCoverCaption(
+              pathPrefix === "/novosti" ? "news" : "article",
+              article.slug,
+            );
             return (
               <li
                 key={`${article.slug}-${i}`}
@@ -258,17 +264,28 @@ export function RelatedArticlesCarousel({
                   className={styles.card}
                   tabIndex={inWindow ? 0 : -1}
                 >
-                  {article.cover ? (
-                    <img
-                      className={styles.cover}
-                      src={article.cover}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className={styles.coverPh} aria-hidden />
-                  )}
-                  <span className={styles.cardTitle}>{article.title}</span>
+                  <span className={styles.coverWrap}>
+                    {article.cover ? (
+                      <img
+                        className={
+                          coverNote
+                            ? `${styles.cover} ${styles.coverGenerated}`
+                            : styles.cover
+                        }
+                        src={article.cover}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className={styles.coverPh} aria-hidden />
+                    )}
+                    {coverNote ? <span className={styles.coverNote}>{coverNote}</span> : null}
+                  </span>
+                  <span className={styles.cardBody}>
+                    <span className={styles.cardKicker}>{contentLabel}</span>
+                    <h3 className={styles.cardTitle}>{article.title}</h3>
+                    <span className={styles.cardMore}>Читать материал →</span>
+                  </span>
                 </Link>
               </li>
             );
