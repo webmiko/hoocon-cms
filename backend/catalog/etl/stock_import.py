@@ -50,7 +50,12 @@ _H8205_BARE_RE = re.compile(
     r"(?i)^h8205-lav[23](?:32|40|50|65|80|100|125|150|200|250|300)(?:st|s|t)?$",
 )
 _TRAILING_NOTE_RE = re.compile(
-    r"(?i)\s+(?:DN\s*\d+|\d+\s*[.…\-−–—]+\s*\d+\s*mA.*)$",
+    r"(?i)\s+(?:DN\s*\d+|\d+\s*[.…\-−–—]+\s*\d+\s*[mм][aа].*)$",
+)
+# 1C warehouse line for the 4–20 mA factory option on the same sku_code.
+# Latin/Cyrillic ``mA`` / ``мА`` is the discriminator (not ``HVA24-20``).
+_MA_OPTION_RE = re.compile(
+    r"(?i)(?:0\s*\(?\s*)?4\s*[-–—.]*\s*20\s*[mм][aа]\b",
 )
 
 
@@ -107,7 +112,8 @@ def normalize_stock_article_key(raw: str) -> str:
     Bare ``H8205-LAV280`` / ``H8205-LAV280ST`` fan out to matching editions.
 
     Other articles: casefold, strip ``8100-``, drop trailing notes
-    (``4-20 mA``, ``DN65``).
+    (``4-20 mA``, ``DN65``). The 4–20 mA note is *not* a different SKU —
+    see :func:`stock_article_is_ma_option`.
 
     Args:
         raw: Article from Excel or ``SKU.sku_code``.
@@ -131,6 +137,24 @@ def normalize_stock_article_key(raw: str) -> str:
     if key.startswith("8100-"):
         key = key[5:]
     return re.sub(r"[\s_]+", "-", key).upper()
+
+
+def stock_article_is_ma_option(raw: str) -> bool:
+    """True when the 1C article is the 4–20 mA (special-order) warehouse line.
+
+    The modulating SKU keeps one ``sku_code``; 1C adds a second row
+    ``DA10FU24-AS 4-20 mA`` for units already switched to current mode.
+
+    Args:
+        raw: Article cell from the stock workbook.
+
+    Returns:
+        True when the cell names the 4–20 mA option, not the base article.
+    """
+    text = " ".join(str(raw or "").strip().split())
+    if not text:
+        return False
+    return _MA_OPTION_RE.search(text) is not None
 
 
 def h81_kit_bare_stock_key(normalized_key: str) -> str | None:
@@ -270,10 +294,15 @@ def parse_stock_rows(file_obj: BinaryIO | BytesIO) -> list[tuple[str, int | None
 
 
 def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
-    """Update ``SKU.stock_qty`` for known codes; ignore unknown.
+    """Update ``SKU.stock_qty`` / ``stock_qty_ma`` for known codes; ignore unknown.
 
-    Catalog SKUs absent from ``rows`` keep their previous quantity.
-    Duplicate артикул in the file: last row wins.
+    Catalog SKUs absent from ``rows`` keep their previous quantities.
+    Duplicate артикул in the file: last row wins (per bucket).
+
+    A row whose article contains ``4-20 mA`` / ``4-20mA`` updates
+    ``stock_qty_ma`` and does **not** overwrite ``stock_qty``. A base row
+    for the same key sets ``stock_qty`` and zeros ``stock_qty_ma`` unless a
+    mA row is also present.
 
     Matching: exact / casefold, plus BV body aliases
     (``BV232-A`` → ``8100-bv232a``). H81xx-BV* kit codes do not alias to
@@ -291,7 +320,8 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
     if not rows:
         return report
 
-    by_key: dict[str, tuple[str, int | None]] = {}
+    base_by_key: dict[str, tuple[str, int | None]] = {}
+    ma_by_key: dict[str, tuple[str, int | None]] = {}
     for code, qty in rows:
         raw = code.strip()
         if not raw:
@@ -301,9 +331,20 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
         if not key:
             report.skipped_blank += 1
             continue
-        by_key[key] = (raw, qty)
+        if stock_article_is_ma_option(raw):
+            ma_by_key[key] = (raw, qty)
+        else:
+            base_by_key[key] = (raw, qty)
 
-    skus = list(SKU.objects.only("id", "sku_code", "stock_qty", "stock_updated_at"))
+    skus = list(
+        SKU.objects.only(
+            "id",
+            "sku_code",
+            "stock_qty",
+            "stock_qty_ma",
+            "stock_updated_at",
+        ),
+    )
     sku_by_key: dict[str, SKU] = {}
     skus_by_bare: dict[str, list[SKU]] = {}
     for sku in skus:
@@ -321,27 +362,49 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
     to_update: list[SKU] = []
     seen_ids: set[int] = set()
 
-    for key, (raw_code, qty) in by_key.items():
+    def _touch(sku: SKU) -> None:
+        sku.stock_updated_at = now
+        if sku.pk in seen_ids:
+            return
+        to_update.append(sku)
+        seen_ids.add(sku.pk)
+
+    for key in set(base_by_key) | set(ma_by_key):
+        raw_code = (base_by_key.get(key) or ma_by_key[key])[0]
         targets = _resolve_stock_target_skus(key, sku_by_key, skus_by_bare)
         if not targets:
             report.ignored_unknown += 1
             if len(report.unknown_codes) < 20:
                 report.unknown_codes.append(raw_code)
             continue
-        if qty is None:
+        base_entry = base_by_key.get(key)
+        ma_entry = ma_by_key.get(key)
+        if base_entry is not None and base_entry[1] is None:
             report.bad_rows += 1
+        if ma_entry is not None and ma_entry[1] is None:
+            report.bad_rows += 1
+        applied = False
+        if base_entry is not None and base_entry[1] is not None:
+            for sku in targets:
+                sku.stock_qty = base_entry[1]
+                if ma_entry is None:
+                    sku.stock_qty_ma = 0
+                _touch(sku)
+            applied = True
+        if ma_entry is not None and ma_entry[1] is not None:
+            for sku in targets:
+                sku.stock_qty_ma = ma_entry[1]
+                _touch(sku)
+            applied = True
+        if not applied:
             continue
-        for sku in targets:
-            sku.stock_qty = qty
-            sku.stock_updated_at = now
-            if sku.pk in seen_ids:
-                continue
-            to_update.append(sku)
-            seen_ids.add(sku.pk)
 
     if to_update:
         with transaction.atomic():
-            SKU.objects.bulk_update(to_update, ["stock_qty", "stock_updated_at"])
+            SKU.objects.bulk_update(
+                to_update,
+                ["stock_qty", "stock_qty_ma", "stock_updated_at"],
+            )
         report.updated = len(to_update)
         logger.info(
             "stock_import updated=%s ignored_unknown=%s bad_rows=%s",

@@ -19,7 +19,11 @@ class StockUploadForm(forms.Form):
 
     file = forms.FileField(
         label="Файл остатков (.xlsx)",
-        help_text="Колонки: «Артикул» и «Свободно» (или «Остатки» / «Остаток»).",
+        help_text=(
+            "Колонки: «Артикул» и «Свободно» (или «Остатки» / «Остаток»). "
+            "Строка артикула с пометкой 4–20 мА — остаток исполнений "
+            "4–20 мА (спецзаказ)."
+        ),
         allow_empty_file=False,
         widget=StockFileWidget,
     )
