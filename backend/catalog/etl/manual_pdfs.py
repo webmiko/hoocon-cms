@@ -40,6 +40,11 @@ BR adapters (RU tech sheets; Cyrillic basenames, NFC-normalized)::
     Техничка на кронштейн.pdf      → BR-M + BR-ML
     Техничка штока BR-M.pdf        → BR-M
     Техничка штока BR-ML.pdf       → BR-ML
+
+Product passports (GOST, one PDF per SKU) live in ``паспорт изделия/``
+and attach as extra ProductFile rows — they do not replace instructions::
+
+    DA2MU24-D — паспорт (RU).pdf   → title «Паспорт DA2MU24-D»
 """
 
 from __future__ import annotations
@@ -53,6 +58,7 @@ from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models.functions import Lower
 
 from catalog.models import SKU, ProductFile
 
@@ -81,6 +87,12 @@ _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
 _RU_MANUAL_SUFFIX = re.compile(
     r"(?i)\s*[—–\-]\s*руководство(?:\s*\(\s*ru\s*\))?\s*$",
 )
+# Disk export: «DA2MU24-D — паспорт (RU).pdf» under ``паспорт изделия/``.
+_RU_PASSPORT_SUFFIX = re.compile(
+    r"(?i)\s*[—–\-]\s*паспорт(?:\s*\(\s*ru\s*\))?\s*$",
+)
+_PASSPORT_SKU_RE = re.compile(r"(?i)^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+$")
+PASSPORT_SUBDIR: Final[str] = "паспорт изделия"
 _HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
 _HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
 # hva-5 | hva-5q | hva-5uq | «HVA-5 instruction» (not hva-*p — RF-excluded)
@@ -1703,6 +1715,149 @@ def attach_br_adapter_manuals(
                     if dirty:
                         existing.save()
                 summary["by_sku"].setdefault(code, []).append(match.title)
+        if dry_run:
+            transaction.set_rollback(True)
+
+    summary["warnings"] = warnings
+    return summary
+
+
+@dataclass(frozen=True, slots=True)
+class PassportMatch:
+    """One GOST product passport PDF mapped onto a single SKU code."""
+
+    path: Path
+    sku_code: str
+
+
+def passport_dir(manuals_dir: Path) -> Path:
+    """``_инструкции-pdf/паспорт изделия`` (or the same subdir under a pack)."""
+    return manuals_dir / PASSPORT_SUBDIR
+
+
+def normalize_passport_stem(filename: str) -> str:
+    """Strip ``.pdf`` and «— паспорт (RU)» from a passport basename."""
+    stem = Path(filename).name
+    if stem.casefold().endswith(".pdf"):
+        stem = stem[:-4]
+    stem = unicodedata.normalize("NFC", stem.replace("\xa0", " ")).strip()
+    return _RU_PASSPORT_SUFFIX.sub("", stem).strip()
+
+
+def parse_passport_sku_code(filename: str) -> str | None:
+    """Read the catalog SKU code from a passport filename, or None."""
+    stem = normalize_passport_stem(filename).replace(" ", "")
+    if not stem or _PASSPORT_SKU_RE.fullmatch(stem) is None:
+        return None
+    return stem
+
+
+def _passport_title(sku_code: str) -> str:
+    """Public ProductFile title; distinct from «Инструкция …» rows."""
+    return f"Паспорт {sku_code}"
+
+
+def _passport_storage_basename(sku_code: str) -> str:
+    """ASCII FileField name so Disk punctuation does not leak into storage."""
+    compact = sku_code.strip().replace(" ", "").casefold()
+    return f"{compact}-passport.pdf"
+
+
+def discover_product_passports(
+    manuals_dir: Path,
+) -> tuple[list[PassportMatch], list[str]]:
+    """Scan ``паспорт изделия/`` for per-SKU PDFs (not RU/EN manuals)."""
+    matches: list[PassportMatch] = []
+    warnings: list[str] = []
+    folder = passport_dir(manuals_dir)
+    if not folder.is_dir():
+        return matches, warnings
+
+    seen_codes: set[str] = set()
+    for path in sorted(folder.glob("*.pdf")):
+        if not path.is_file() or path.name.startswith("."):
+            continue
+        code = parse_passport_sku_code(path.name)
+        if code is None:
+            warnings.append(f"unrecognized passport filename: {path.name!r}")
+            continue
+        key = code.casefold()
+        if key in seen_codes:
+            warnings.append(f"duplicate passport SKU {code!r}: {path.name!r}")
+            continue
+        seen_codes.add(key)
+        matches.append(PassportMatch(path=path, sku_code=code))
+    return matches, warnings
+
+
+def attach_product_passports(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update per-SKU passport ProductFiles without touching manuals.
+
+    Idempotent by ``(sku, title='Паспорт {sku_code}')``. Instruction rows
+    (titles «Инструкция …») are never updated or deleted.
+    """
+    matches, warnings = discover_product_passports(manuals_dir)
+    summary: dict[str, Any] = {
+        "manuals": len(matches),
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "warnings": warnings,
+        "dry_run": dry_run,
+        "by_sku": {},
+    }
+    if not matches:
+        return summary
+
+    wanted = {m.sku_code.casefold() for m in matches}
+    code_to_sku = {
+        s.sku_code.casefold(): s
+        for s in SKU.objects.annotate(_code_l=Lower("sku_code")).filter(
+            _code_l__in=list(wanted),
+        )
+    }
+
+    with transaction.atomic():
+        for match in matches:
+            sku = code_to_sku.get(match.sku_code.casefold())
+            if sku is None:
+                warnings.append(f"SKU missing in DB: {match.sku_code}")
+                continue
+            title = _passport_title(sku.sku_code)
+            basename = _passport_storage_basename(sku.sku_code)
+            payload = match.path.read_bytes()
+            existing = ProductFile.objects.filter(sku=sku, title=title).first()
+            if dry_run:
+                summary["by_sku"].setdefault(sku.sku_code, []).append(title)
+                summary["created" if existing is None else "updated"] += 1
+                continue
+            if existing is None:
+                pf = ProductFile(
+                    sku=sku,
+                    title=title,
+                    file_type=ProductFile.FileType.DATASHEET,
+                    is_published=True,
+                    sort_order=1,
+                )
+                pf.file.save(basename, ContentFile(payload), save=True)
+                summary["created"] += 1
+                logger.info(
+                    "passport_pdf_attached sku=%s title=%s",
+                    sku.sku_code,
+                    title,
+                )
+            else:
+                current_size = existing.file.size if existing.file else 0
+                if current_size != len(payload):
+                    existing.file.save(basename, ContentFile(payload), save=True)
+                    summary["updated"] += 1
+                else:
+                    summary["skipped"] += 1
+            summary["by_sku"].setdefault(sku.sku_code, []).append(title)
         if dry_run:
             transaction.set_rollback(True)
 
