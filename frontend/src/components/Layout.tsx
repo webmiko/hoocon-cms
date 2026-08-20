@@ -427,6 +427,9 @@ export function Layout() {
               <li>
                 <Link to="/search">Поиск</Link>
               </li>
+              <li>
+                <Link to="/dokumentaciya">Документация</Link>
+              </li>
             </ul>
           </div>
           <div>

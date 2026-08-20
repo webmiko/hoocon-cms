@@ -862,6 +862,17 @@ export function SkuDetailPage() {
                   </li>
                 ))}
               </ul>
+              <p className={styles.docsHubHint}>
+                <Link
+                  to={
+                    displaySkuCode
+                      ? `/dokumentaciya?q=${encodeURIComponent(displaySkuCode)}`
+                      : "/dokumentaciya"
+                  }
+                >
+                  Все документы
+                </Link>
+              </p>
             </section>
           )}
 

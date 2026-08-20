@@ -41,6 +41,9 @@ const WhereToBuyPage = lazyWithChunkReload(() =>
     default: m.WhereToBuyPage,
   })),
 );
+const DocsPage = lazyWithChunkReload(() =>
+  import("./pages/DocsPage").then((m) => ({ default: m.DocsPage })),
+);
 const SearchPage = lazyWithChunkReload(() =>
   import("./pages/SearchPage").then((m) => ({ default: m.SearchPage })),
 );
@@ -142,6 +145,7 @@ export default function App() {
             <Route path="company" element={<PageView slug="company" />} />
             <Route path="zavod" element={<PageView slug="zavod" />} />
             <Route path="gde-kupit" element={<WhereToBuyPage />} />
+            <Route path="dokumentaciya" element={<DocsPage />} />
             <Route path="faq" element={<PageView slug="faq" />} />
             <Route path="kontakty" element={<PageView slug="kontakty" />} />
             <Route path="oferta" element={<PageView slug="oferta" />} />

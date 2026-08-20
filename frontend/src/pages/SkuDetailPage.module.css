@@ -865,6 +865,21 @@
   text-transform: uppercase;
 }
 
+.docsHubHint {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+}
+
+.docsHubHint a {
+  color: var(--color-text-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.docsHubHint a:hover {
+  color: var(--color-brand);
+}
+
 .ctaSection {
   display: grid;
   gap: var(--space-md);

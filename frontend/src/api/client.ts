@@ -131,6 +131,43 @@ export interface CatalogFacetsResponse {
   results: CatalogFacet[];
 }
 
+/** Documentation hub (``GET /api/catalog/docs/``). */
+export type DocsHubKind =
+  | "passport"
+  | "manual"
+  | "certificate"
+  | "catalog"
+  | "datasheet"
+  | "other";
+
+export interface DocsHubFamily {
+  key: string;
+  label: string;
+  series: string;
+  file_count: number;
+  zip_path: string;
+}
+
+export interface DocsHubFile {
+  id: number;
+  title: string;
+  file: string;
+  kind: DocsHubKind | string;
+  family: string;
+  series: string;
+  sku_code: string;
+  sku_slug: string;
+  product_slug: string;
+  category_slug: string;
+  size_bytes: number;
+  updated_at: string;
+}
+
+export interface DocsHubResponse {
+  families: DocsHubFamily[];
+  files: DocsHubFile[];
+}
+
 export interface CompareRow {
   key: string;
   name: string;
@@ -261,6 +298,22 @@ export const api = {
         ? `?${new URLSearchParams({ skus: slugs.join(",") }).toString()}`
         : "";
     return apiFetch<CompareResponse>(`/api/catalog/compare/${qs}`);
+  },
+
+  /** Deduped manuals / passports hub (``/dokumentaciya``). */
+  docs(params?: {
+    q?: string;
+    series?: string;
+    kind?: string;
+    family?: string;
+  }): Promise<DocsHubResponse> {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set("q", params.q);
+    if (params?.series) qs.set("series", params.series);
+    if (params?.kind) qs.set("kind", params.kind);
+    if (params?.family) qs.set("family", params.family);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch<DocsHubResponse>(`/api/catalog/docs/${suffix}`);
   },
 
   // ── Content ───────────────────────────────────────────────────────
