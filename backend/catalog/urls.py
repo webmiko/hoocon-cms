@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from catalog.docs_views import DocsFamilyZipView, DocsHubListView
 from catalog.views import (
     CategoryViewSet,
     CompareViewSet,
@@ -23,6 +24,12 @@ router.register("skus", SKUViewSet, basename="catalog-sku")
 sku_files = ProductFileViewSet.as_view({"get": "list", "post": "create"})
 
 urlpatterns = [
+    path("docs/", DocsHubListView.as_view(), name="catalog-docs"),
+    path(
+        "docs/families/<str:key>/zip/",
+        DocsFamilyZipView.as_view(),
+        name="catalog-docs-family-zip",
+    ),
     path(
         "skus/<str:sku_slug>/files/",
         sku_files,
