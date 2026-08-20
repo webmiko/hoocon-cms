@@ -152,6 +152,7 @@ def test_llms_txt(client) -> None:
     body = response.content.decode()
     assert "Hoocon" in body
     assert "/catalog" in body
+    assert "/dokumentaciya" in body
     assert "/llms-full.txt" in body
 
 
