@@ -186,6 +186,7 @@ def test_sitemap_includes_home_and_static_pages(client) -> None:
     assert "/company" in body
     assert "/zavod" in body
     assert "/faq" in body
+    assert "/dokumentaciya" in body
     assert "/novosti</loc>" in body or 'novosti"' in body or "/novosti\n" in body
 
 
