@@ -92,7 +92,8 @@ def test_attach_pdf_only_no_gallery_crops(tmp_path: Path) -> None:
     summary = apply_8100_catalog_media(dry_run=False, pdf_path=pdf)
 
     assert summary["pdf_created"] == 1
-    assert ProductFile.objects.filter(sku=sku, title__contains="8100").exists()
+    pf = ProductFile.objects.get(sku=sku, title__contains="8100")
+    assert pf.title == "Инструкция серии 8100 (шаровые краны)"
     assert ProductImage.objects.filter(source_url__contains="8100-series").count() == 0
     hero.refresh_from_db()
     assert hero.is_published is True
@@ -208,3 +209,37 @@ def test_attach_pdf_skip_when_too_large(tmp_path: Path) -> None:
     ):
         assert attach_8100_series_pdf(sku, pdf_path=pdf) == "too_large"
     assert ProductFile.objects.filter(sku=sku).count() == 0
+
+
+@pytest.mark.django_db
+def test_attach_renames_legacy_passport_series_title(tmp_path: Path) -> None:
+    """Old «Паспорт серии…» rows become «Инструкция серии…» on re-attach."""
+    from django.core.files.base import ContentFile
+
+    from catalog.etl.ball_valve_8100_catalog_media import PDF_TITLE, PDF_TITLE_LEGACY
+
+    pdf = tmp_path / "series.pdf"
+    pdf.write_bytes(b"%PDF-renamed")
+    cat = Category.objects.create(name="Ball", slug="sharovye-8100-rename")
+    product = Product.objects.create(name="BV215", slug="8100-bv215-rename", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="8100-bv215a",
+        name="BV215A",
+        slug="8100-bv215-rename-a",
+        is_published=True,
+    )
+    legacy = ProductFile(
+        sku=sku,
+        title=PDF_TITLE_LEGACY,
+        file_type=ProductFile.FileType.DATASHEET,
+        is_published=True,
+        sort_order=40,
+    )
+    legacy.file.save("old.pdf", ContentFile(b"%PDF-old"), save=True)
+
+    assert attach_8100_series_pdf(sku, pdf_path=pdf) == "update"
+    assert ProductFile.objects.filter(sku=sku).count() == 1
+    row = ProductFile.objects.get(sku=sku)
+    assert row.title == PDF_TITLE
+    assert not ProductFile.objects.filter(sku=sku, title=PDF_TITLE_LEGACY).exists()

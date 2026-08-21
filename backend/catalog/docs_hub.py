@@ -154,11 +154,13 @@ def doc_series(family_key: str) -> str:
 def doc_kind(title: str, file_type: str) -> str:
     """Hub filter kind from ProductFile title + file_type (no migration)."""
     text = (title or "").strip()
-    if text.casefold().startswith("паспорт"):
+    folded = text.casefold()
+    # Series datasheets historically mislabeled «Паспорт серии …» — not GOST.
+    if folded.startswith("паспорт серии"):
+        return KIND_MANUAL
+    if folded.startswith("паспорт"):
         return KIND_PASSPORT
-    if text.casefold().startswith("инструкция") or text.casefold().startswith(
-        "техничка",
-    ):
+    if folded.startswith("инструкция") or folded.startswith("техничка"):
         return KIND_MANUAL
     ft = (file_type or "").strip().casefold()
     if ft == ProductFile.FileType.CERTIFICATE:

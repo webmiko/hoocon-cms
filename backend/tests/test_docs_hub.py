@@ -70,7 +70,9 @@ def test_doc_series(family: str, series: str) -> None:
     ("title", "file_type", "expected"),
     [
         ("Паспорт DA2MU24-D", "datasheet", "passport"),
+        ("Паспорт серии 8100 (шаровые краны)", "datasheet", "manual"),
         ("Инструкция DA2MU (D/DS)", "datasheet", "manual"),
+        ("Инструкция серии 8100 (шаровые краны)", "datasheet", "manual"),
         ("Техничка на кронштейн", "datasheet", "manual"),
         ("CE certificate", "certificate", "certificate"),
         ("Каталог 2026", "catalog", "catalog"),

@@ -28,7 +28,9 @@ from catalog.validators import MAX_PRODUCT_FILE_SIZE_BYTES
 logger = logging.getLogger(__name__)
 
 PDF_FILENAME: Final[str] = "шаровые краны серии 8100.pdf"
-PDF_TITLE: Final[str] = "Паспорт серии 8100 (шаровые краны)"
+# Series technical PDF (not a per-SKU GOST passport — those are «Паспорт {sku}»).
+PDF_TITLE: Final[str] = "Инструкция серии 8100 (шаровые краны)"
+PDF_TITLE_LEGACY: Final[str] = "Паспорт серии 8100 (шаровые краны)"
 PDF_SORT: Final[int] = 40
 # Legacy diagram tiles from an earlier pass — unpublished on apply.
 _LEGACY_DIAGRAM_SOURCE_PREFIX: Final[str] = "https://hoocon.ru/.local-assets/8100-series/"
@@ -91,12 +93,11 @@ def attach_8100_series_pdf(
     pdf_path: Path,
     dry_run: bool = False,
 ) -> str:
-    """Attach series PDF as datasheet. Returns create / update / skip / too_large."""
-    existing = ProductFile.objects.filter(
-        sku=sku,
-        title=PDF_TITLE,
-        file_type=ProductFile.FileType.DATASHEET,
-    ).first()
+    """Attach series instruction PDF. Returns create / update / skip / too_large."""
+    existing = (
+        ProductFile.objects.filter(sku=sku, title=PDF_TITLE).first()
+        or ProductFile.objects.filter(sku=sku, title=PDF_TITLE_LEGACY).first()
+    )
     size = pdf_path.stat().st_size
     if size > MAX_PRODUCT_FILE_SIZE_BYTES:
         logger.warning(
@@ -124,8 +125,10 @@ def attach_8100_series_pdf(
             doc.full_clean()
             doc.save()
             return "create"
+        existing.title = PDF_TITLE
         existing.is_published = True
         existing.sort_order = PDF_SORT
+        existing.file_type = ProductFile.FileType.DATASHEET
         existing.file.save(filename, ContentFile(data), save=False)
         existing.full_clean()
         existing.save()

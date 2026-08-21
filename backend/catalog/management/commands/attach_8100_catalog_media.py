@@ -23,9 +23,9 @@ from catalog.etl.ball_valve_8100_catalog_media import apply_8100_catalog_media
 
 
 class Command(BaseCommand):
-    """Attach 8100 series passport PDF to brass body SKUs."""
+    """Attach 8100 series instruction PDF to brass body SKUs."""
 
-    help = "Attach series-8100 PDF datasheet to brass SKUs (no gallery crops)."
+    help = "Attach series-8100 PDF instruction to brass SKUs (no gallery crops)."
 
     def add_arguments(self, parser: Any) -> None:
         """Register CLI flags."""
