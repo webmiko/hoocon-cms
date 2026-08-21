@@ -384,11 +384,15 @@
   flex-wrap: wrap;
 }
 
+/* Full row — long category names must not squeeze beside the search. */
 .title {
-  font-size: var(--font-size-h1);
-  flex: 1 1 12rem;
+  flex: 1 1 100%;
   min-width: 0;
+  max-width: 100%;
+  font-size: var(--font-size-h1);
   text-wrap: pretty;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .searchForm {
@@ -397,6 +401,7 @@
   gap: 0;
   width: min(100%, 22rem);
   max-width: 100%;
+  margin-left: auto;
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
