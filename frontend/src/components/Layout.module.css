@@ -382,7 +382,9 @@
 }
 
 :global(body:has([data-mobile-dock])) .main {
-  padding-bottom: calc(var(--space-3xl) + 72px);
+  padding-bottom: calc(
+    var(--space-3xl) + var(--compare-tray-chrome, 72px)
+  );
 }
 
 @media (min-width: 769px) {
@@ -398,7 +400,10 @@
     var(--color-footer);
   color: #b0b0b0;
   padding: var(--space-3xl) 0
-    calc(var(--space-xl) + var(--bottom-chrome) + var(--cookie-chrome, 0px));
+    calc(
+      var(--space-xl) + var(--bottom-chrome) + var(--compare-tray-chrome, 0px) +
+        var(--cookie-chrome, 0px)
+    );
   margin-top: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }

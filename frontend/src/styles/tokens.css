@@ -301,7 +301,7 @@ html[data-theme="dark"] {
 
   /* Empty dock chrome (hidden on desktop via .trayEmpty). */
   body:has([data-dock-mode="empty"]) {
-    --compare-tray-chrome: 64px;
+    --compare-tray-chrome: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -317,9 +317,11 @@ html.cookie-banner-open {
 
 /* RFQ selection tray — all viewports. */
 body:has([data-dock-mode="tray"]) {
-  --compare-tray-chrome: 64px;
+  --compare-tray-chrome: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
 body:has([data-mobile-dock="open"]) {
-  --compare-tray-chrome: calc(72px + min(40vh, 220px));
+  --compare-tray-chrome: calc(
+    72px + min(40vh, 220px) + env(safe-area-inset-bottom, 0px)
+  );
 }

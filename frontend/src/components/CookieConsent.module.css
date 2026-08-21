@@ -3,7 +3,10 @@
   position: fixed;
   left: max(12px, env(safe-area-inset-left, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
-  bottom: calc(var(--bottom-chrome) + var(--cookie-chrome, 0px) + 4px);
+  bottom: calc(
+    var(--bottom-chrome) + var(--compare-tray-chrome, 0px) +
+      var(--cookie-chrome, 0px) + 4px
+  );
   z-index: 450;
   width: auto;
   max-width: 100%;
@@ -232,7 +235,8 @@
   .banner,
   .panel {
     bottom: calc(
-      var(--bottom-chrome) + var(--cookie-chrome, 68px) + 4px
+      var(--bottom-chrome) + var(--compare-tray-chrome, 0px) +
+        var(--cookie-chrome, 68px) + 4px
     );
   }
 }
