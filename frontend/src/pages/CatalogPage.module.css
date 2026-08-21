@@ -137,12 +137,13 @@
   min-width: 0;
 }
 
-.filterSection:first-of-type {
-  border-top: none;
+/* Quick toggles only — do not use :first-of-type (matches first <details> too). */
+.filterQuick {
   display: grid;
   gap: 0.5rem;
   padding-bottom: var(--space-sm);
   margin-bottom: var(--space-xs);
+  min-width: 0;
 }
 
 .filterSummary {
@@ -237,20 +238,20 @@
     color var(--transition-fast);
 }
 
-.filterSection:first-of-type .optionRow,
-.filterSection:first-of-type .optionRowActive {
+.filterQuick .optionRow,
+.filterQuick .optionRowActive {
   min-height: 2.5rem;
   padding-inline: 0.875rem;
   border-radius: 999px;
   font-weight: 700;
 }
 
-.filterSection:first-of-type .optionRow {
+.filterQuick .optionRow {
   border-color: var(--color-control-border);
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
 }
 
-.filterSection:first-of-type .optionRowActive {
+.filterQuick .optionRowActive {
   border-color: color-mix(in srgb, var(--color-brand) 64%, white);
   background: color-mix(in srgb, var(--color-brand) 12%, transparent);
 }

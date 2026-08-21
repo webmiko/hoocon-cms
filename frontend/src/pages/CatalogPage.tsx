@@ -401,7 +401,7 @@ export function CatalogPage() {
 
   const filterSections = (
     <>
-      <div className={styles.filterSection}>
+      <div className={styles.filterQuick}>
         <button
           type="button"
           className={
