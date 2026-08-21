@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from catalog.docs_hub import (
@@ -11,10 +13,14 @@ from catalog.docs_hub import (
     SERIES_H81,
     SERIES_HV,
     SERIES_SA,
+    DocsFileRow,
+    build_family_metas,
     dedupe_files_by_family_title,
     doc_family_key,
+    doc_family_sort_key,
     doc_kind,
     doc_series,
+    natural_doc_sort_parts,
     normalize_doc_title,
 )
 
@@ -64,6 +70,66 @@ def test_doc_family_key(sku_code: str, expected: str) -> None:
 )
 def test_doc_series(family: str, series: str) -> None:
     assert doc_series(family) == series
+
+
+def test_doc_family_sort_key_orders_model_then_nm() -> None:
+    """DA10… must not precede DA2…; MU / MQU / FU stay contiguous."""
+    keys = [
+        "DA10FU",
+        "DA2MU",
+        "DA5MQU",
+        "DA5FU",
+        "DA16MU",
+        "SA10FU",
+        "SA3FU",
+        "SA7MU",
+        "HVA-5",
+        "HVD-5F",
+        "OTHER",
+    ]
+    assert sorted(keys, key=doc_family_sort_key) == [
+        "DA2MU",
+        "DA16MU",
+        "DA5MQU",
+        "HVA-5",
+        "HVD-5F",
+        "DA5FU",
+        "DA10FU",
+        "SA3FU",
+        "SA10FU",
+        "SA7MU",
+        "OTHER",
+    ]
+
+
+def test_natural_doc_sort_parts_digits() -> None:
+    assert natural_doc_sort_parts("DA2MU") < natural_doc_sort_parts("DA10MU")
+    assert natural_doc_sort_parts("Паспорт DA2MU24-D") < natural_doc_sort_parts(
+        "Паспорт DA2MU230-D",
+    )
+
+
+def test_build_family_metas_uses_model_sort() -> None:
+    now = datetime(2026, 8, 21, tzinfo=UTC)
+
+    def row(family: str) -> DocsFileRow:
+        return DocsFileRow(
+            id=1,
+            title=f"Паспорт {family}",
+            file_url="/x.pdf",
+            kind="passport",
+            family=family,
+            series=doc_series(family),
+            sku_code=family,
+            sku_slug=family.lower(),
+            product_slug="p",
+            category_slug="c",
+            size_bytes=1,
+            updated_at=now,
+        )
+
+    metas = build_family_metas([row("DA10FU"), row("DA2MU"), row("DA5FU")])
+    assert [m.key for m in metas] == ["DA2MU", "DA5FU", "DA10FU"]
 
 
 @pytest.mark.parametrize(

@@ -25,6 +25,8 @@ from catalog.validators import sanitize_upload_filename
 _DA_SA_FAMILY = re.compile(
     r"(?i)^(da|sa)(\d+)(mqu|mu|fu)(?=\d|-|$)",
 )
+# Family keys themselves: DA2MU / DA5MQU / SA10FU (no voltage/edition).
+_DA_SA_FAMILY_KEY = re.compile(r"(?i)^(da|sa)(\d+)(mqu|mu|fu)$")
 # HVD24S-5F / HVD230ST-3F → HVD-5F
 _HVD_F_FAMILY = re.compile(
     r"(?i)^hvd(?:24|230)s?t?-(\d+)f\b",
@@ -37,10 +39,19 @@ _HVD_AIR_FAMILY = re.compile(
 _HVA_FAMILY = re.compile(
     r"(?i)^hva(?:24|230)s?-(\d+(?:uq|qx|q)?)\b",
 )
+_HV_FAMILY_KEY = re.compile(r"(?i)^(hva|hvd)-(\d+)([a-z]*)$")
 _H81_FAMILY = re.compile(r"(?i)^(h81\d{2})\b")
+_H81_FAMILY_KEY = re.compile(r"(?i)^h81(\d{2})$")
 _BRASS_FAMILY = re.compile(r"(?i)^(8100-bv\d+)")
+_BRASS_FAMILY_KEY = re.compile(r"(?i)^8100-bv(\d+)$")
 _H8205_FAMILY = re.compile(r"(?i)^(h8205-lav\d+)")
+_H8205_FAMILY_KEY = re.compile(r"(?i)^h8205-lav(\d+)$")
 _BR_FAMILY = re.compile(r"(?i)^(br-ml?)\b")
+# Natural alphanumeric chunks for titles / leftover keys (DA2 before DA10).
+_NATURAL_CHUNK = re.compile(r"(\d+)|(\D+)")
+# Mirror catalog.ordering.series_ord_case for hub chips / file groups.
+_DA_BODY_ORD: dict[str, int] = {"MU": 10, "MQU": 20, "FU": 50}
+_SA_BODY_ORD: dict[str, int] = {"FU": 60, "MU": 70, "MQU": 65}
 
 OTHER_FAMILY = "OTHER"
 
@@ -151,6 +162,72 @@ def doc_series(family_key: str) -> str:
     return SERIES_OTHER
 
 
+def natural_doc_sort_parts(text: str) -> tuple[int | str, ...]:
+    """Split ``DA10FU`` / titles so digits compare as ints (2 before 10)."""
+    parts: list[int | str] = []
+    for match in _NATURAL_CHUNK.finditer((text or "").casefold()):
+        digits, rest = match.group(1), match.group(2)
+        if digits is not None:
+            parts.append(int(digits))
+        elif rest:
+            parts.append(rest)
+    return tuple(parts)
+
+
+def doc_family_sort_key(family_key: str) -> tuple[Any, ...]:
+    """Hub order: DA MU→MQU→FU by Нм, then SA FU→MU, HV, valves, OTHER.
+
+    Lexicographic ``DA10FU`` before ``DA2MU`` is wrong; body letters (MU/FU/…)
+    stay contiguous like catalog ``series_ord_case``.
+    """
+    key = (family_key or "").strip().upper()
+    if not key or key == OTHER_FAMILY:
+        return (9999, 0, "", key)
+
+    m = _DA_SA_FAMILY_KEY.fullmatch(key)
+    if m is not None:
+        brand = m.group(1).upper()
+        nm = int(m.group(2))
+        body = m.group(3).upper()
+        if brand == "DA":
+            body_ord = _DA_BODY_ORD.get(body, 40)
+        else:
+            body_ord = _SA_BODY_ORD.get(body, 75)
+        return (body_ord, nm, body, key)
+
+    m = _HV_FAMILY_KEY.fullmatch(key)
+    if m is not None:
+        brand = m.group(1).upper()
+        nm = int(m.group(2))
+        suffix = m.group(3).upper()
+        brand_ord = 30 if brand == "HVA" else 40
+        return (brand_ord, nm, suffix, key)
+
+    m = _BRASS_FAMILY_KEY.fullmatch(key)
+    if m is not None:
+        return (80, int(m.group(1)), "", key)
+
+    m = _H81_FAMILY_KEY.fullmatch(key)
+    if m is not None:
+        return (90, int(m.group(1)), "", key)
+
+    m = _H8205_FAMILY_KEY.fullmatch(key)
+    if m is not None:
+        return (100, int(m.group(1)), "", key)
+
+    if key == "BR-M":
+        return (110, 0, "", key)
+    if key == "BR-ML":
+        return (110, 1, "", key)
+
+    return (500, 0, "", key)
+
+
+def doc_file_sort_key(family: str, title: str, file_id: int = 0) -> tuple[Any, ...]:
+    """Sort hub rows by family model, then natural title, then id."""
+    return (*doc_family_sort_key(family), *natural_doc_sort_parts(title), file_id)
+
+
 def doc_kind(title: str, file_type: str) -> str:
     """Hub filter kind from ProductFile title + file_type (no migration)."""
     text = (title or "").strip()
@@ -226,8 +303,13 @@ def dedupe_files_by_family_title(
         if prev is None or pf.id < prev.id:
             best[key] = pf
 
-    def sort_key(row: ProductFile) -> tuple[str, str, int]:
-        return (doc_family_key(cast(SKU, row.sku).sku_code), row.title, row.id)
+    def sort_key(row: ProductFile) -> tuple[Any, ...]:
+        sku = cast(SKU, row.sku)
+        return doc_file_sort_key(
+            doc_family_key(sku.sku_code),
+            row.title,
+            row.id,
+        )
 
     return sorted(best.values(), key=sort_key)
 
@@ -289,14 +371,14 @@ def filter_doc_rows(
 
 
 def build_family_metas(rows: list[DocsFileRow]) -> list[DocsFamilyMeta]:
-    """Aggregate unique file counts per family (stable key order)."""
+    """Aggregate unique file counts per family (model + Nm order)."""
     counts: dict[str, int] = {}
     series_by: dict[str, str] = {}
     for row in rows:
         counts[row.family] = counts.get(row.family, 0) + 1
         series_by[row.family] = row.series
     metas: list[DocsFamilyMeta] = []
-    for key in sorted(counts.keys(), key=lambda k: (k == OTHER_FAMILY, k)):
+    for key in sorted(counts.keys(), key=doc_family_sort_key):
         metas.append(
             DocsFamilyMeta(
                 key=key,
@@ -325,6 +407,10 @@ def collect_hub_payload(
         series=series,
         kind=kind,
         family=family,
+    )
+    filtered = sorted(
+        filtered,
+        key=lambda r: doc_file_sort_key(r.family, r.title, r.id),
     )
     # Family chips always reflect the filtered file set.
     families = build_family_metas(filtered)
