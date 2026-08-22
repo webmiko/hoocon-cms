@@ -10,8 +10,8 @@
 ## Оглавление
 
 - [Django Admin vs Wagtail — для Hoocon CMS](admin-vs-wagtail.md)
-- [Счётчик минут GitHub Actions (2000/мес → 500/нед)](actions-minutes.md)
-- [Ручной деплой (без GitHub Actions)](manual-deploy.md)
+- [GitHub Actions: минуты и CI (public repo)](actions-minutes.md)
+- [Ручной деплой (когда Actions недоступен)](manual-deploy.md)
 - [Аудит Hoocon CMS — баги, БЗ, безопасность](audit-2026-07-20.md)
 - [Security policy (ответственное раскрытие)](../SECURITY.md)
 - [Лицензия — исключительные права](../LICENSE)

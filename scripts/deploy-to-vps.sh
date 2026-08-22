@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ручной деплой на VPS — запасной путь, когда GitHub Actions исчерпан.
+# Ручной деплой на VPS — запасной путь, когда GitHub Actions недоступен.
 # Зеркалит CI: checkup → image linux/amd64 → frontend → SSH
 # (scripts/deploy-remote.sh). Канон: docs/manual-deploy.md
 #
@@ -31,7 +31,7 @@ SKIP_FRONTEND=0
 
 usage() {
   cat <<'USAGE'
-Ручной деплой на VPS (когда GitHub Actions исчерпан).
+Ручной деплой на VPS (когда GitHub Actions недоступен).
 Канон: docs/manual-deploy.md
 
 Usage:

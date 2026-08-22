@@ -1,13 +1,22 @@
-# Счётчик минут GitHub Actions (бесплатный деплой)
+# GitHub Actions: минуты и CI
 
-Private Free: **2000 мин/мес** на GitHub-hosted runners.
-Скрипт делит бюджет на **4 недели по 500 мин**, чтобы не сжечь квоту
-в начале месяца.
+Репозиторий **public** (`webmiko/hoocon-cms`). На GitHub-hosted runners
+для public-репо **минуты Actions не списываются** с личного бюджета
+(в отличие от private Free: **2000 мин/мес**).
+
+Квота перестала быть блокером деплоя. Оптимизированный pipeline и
+`paths-ignore` всё равно экономят время CI и очередь на runner'ах.
+
+## Счётчик (опционально)
+
+Скрипт остался для **статистики** и на случай возврата к private или
+self-hosted runner со своим лимитом. Делит условный бюджет **2000 мин/мес**
+на 4 недели по **500 мин** — это темп CI, а не биллинг GitHub для public.
 
 ```bash
 ./scripts/actions-minutes.py            # отчёт
 ./scripts/actions-minutes.py --refresh  # пересчитать по runs
-./scripts/actions-minutes.py --set-used 420   # факт из UI Billing
+./scripts/actions-minutes.py --set-used 420   # факт из UI Billing (private)
 ./scripts/actions-minutes.py --json
 ```
 
@@ -15,10 +24,10 @@ Private Free: **2000 мин/мес** на GitHub-hosted runners.
 
 | Поле | Смысл |
 |------|--------|
-| Месяц | 2000 мин, сброс 1-го числа (календарный месяц UTC) |
+| Месяц | условно 2000 мин, сброс 1-го числа (календарный месяц UTC) |
 | Неделя 1…4 | дни 1–7 / 8–14 / 15–21 / 22–конец месяца; лимит **500** |
 | Оценка | сумма длительностей job'ов CI (каждая job ↑ до целой минуты) |
-| Ручной факт | `--set-used` из **Settings → Billing → Actions** (точнее API) |
+| Ручной факт | `--set-used` из **Settings → Billing → Actions** (для private) |
 
 Кэш: `.local/actions-minutes.json` (в git не попадает).
 
@@ -52,8 +61,8 @@ Private Free: **2000 мин/мес** на GitHub-hosted runners.
 
 Подробности инфра: [infra-reg-ru.md](infra-reg-ru.md).
 
-Чтобы экономить минуты: копить коммиты, не пушить docs-only как code;
-при нулевом бюджете Actions — ручной деплой:
+Чтобы не гонять лишний CI: копить коммиты, не пушить docs-only как code.
+Если Actions недоступен (сбой GitHub, красный CI, нет сети) — ручной деплой:
 
 ```bash
 ./scripts/deploy-to-vps.sh

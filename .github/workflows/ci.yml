@@ -1,6 +1,6 @@
 # CI/CD: check (pytest + lint) → build (GHCR + frontend) → deploy SSH.
 #
-# Minutes budget (private Free 2000/mo): see docs/actions-minutes.md
+# Public repo: GH-hosted minutes free; CI pacing: docs/actions-minutes.md
 #
 # Optimizations vs linear test→lint→build→deploy:
 #   - one Python install (merged check job)

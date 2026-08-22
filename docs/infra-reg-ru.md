@@ -63,9 +63,9 @@ A/AAAA сайта указывали на VPS, а MX/TXT почты — на Я�
    `ghcr.io/…/hoocon-cms` на VPS: оставляем **3** новейших ID
    (`IMAGE_KEEP`, по умолчанию 3). Запасной путь:
    `./scripts/deploy-to-vps.sh` ([manual-deploy.md](manual-deploy.md)).
-   Одноразовый перенос БД: `scripts/sync-db-to-vps.sh`. Квота Free
-   private: **2000 мин/мес** → `./scripts/actions-minutes.py`
-   ([actions-minutes.md](actions-minutes.md)).
+   Одноразовый перенос БД: `scripts/sync-db-to-vps.sh`. Репо **public** —
+   минуты GH-hosted Actions не списываются; статистика CI:
+   `./scripts/actions-minutes.py` ([actions-minutes.md](actions-minutes.md)).
 
 ---
 

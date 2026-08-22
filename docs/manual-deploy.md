@@ -1,13 +1,14 @@
-# Ручной деплой (когда Actions исчерпан)
+# Ручной деплой (когда Actions недоступен)
 
-Запасной путь без минут GitHub Actions. Тот же смысл, что CI
-(test/lint → build → SSH), но с ноутбука.
+Запасной путь без GitHub Actions. Тот же смысл, что CI
+(check → build → SSH), но с ноутбука.
 
 **Основной путь:** push в `main` → Actions (check → build → deploy) → VPS
 ([infra-reg-ru.md](infra-reg-ru.md)). Push в `develop` собирает образ,
-но **не** выкладывает — merge в `main` или этот скрипт. Ручной deploy
-также если квота 2000 мин/мес кончилась или CI заблокирован биллингом
-([actions-minutes.md](actions-minutes.md)).
+но **не** выкладывает — merge в `main` или этот скрипт. Ручной deploy —
+если CI красный, GitHub недоступен или нужна выкладка без push в `main`
+([actions-minutes.md](actions-minutes.md)). Репо public: квота 2000 мин/мес
+не блокирует Actions.
 
 ## Команда
 
@@ -69,7 +70,7 @@ CI по-прежнему пушит в GHCR и вызывает `deploy-remote.s
 
 ## Чеклист перед ручным деплоем
 
-- [ ] `./scripts/actions-minutes.py` — минут действительно нет / CI красный
+- [ ] CI красный или Actions недоступен (не из‑за квоты — репо public)
 - [ ] Ветка с нужным кодом (обычно `develop`), dirty tree осознан
 - [ ] SSH: `ssh hoocon-prod 'echo ok'`
 - [ ] На сервере есть `/opt/hoocon/.env` (скрипт его **не** перезаписывает)
