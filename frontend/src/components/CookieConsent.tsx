@@ -17,7 +17,6 @@ import {
   type CookieConsentState,
 } from "../utils/cookieConsent";
 import { syncMarketingPushConsent } from "../utils/webPush";
-import { waitForHomeLcpPaint } from "../utils/waitForHomeLcpPaint";
 import styles from "./CookieConsent.module.css";
 
 const COOKIE_OPEN_CLASS = "cookie-banner-open";
@@ -25,7 +24,7 @@ const COOKIE_OPEN_CLASS = "cookie-banner-open";
 type PanelMode = "banner" | "settings" | "hidden";
 
 function initialMode(): PanelMode {
-  return "hidden";
+  return readCookieConsent() === null ? "banner" : "hidden";
 }
 
 /**
@@ -40,21 +39,6 @@ export function CookieConsent() {
     isMarketingAllowed(readCookieConsent()),
   );
   const settingsTitleId = useId();
-
-  useEffect(() => {
-    if (readCookieConsent() !== null) {
-      return;
-    }
-    let cancelled = false;
-    void waitForHomeLcpPaint().then(() => {
-      if (!cancelled && readCookieConsent() === null) {
-        setMode("banner");
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     function onOpen() {

@@ -8,10 +8,9 @@ import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import {
-  adoptHomeSsrLcpImage,
+  fadeOutHomeSsrHero,
   homeSsrLcpBootPresent,
 } from "../utils/adoptHomeSsrLcpImage";
-import { waitForHomeLcpPaint } from "../utils/waitForHomeLcpPaint";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./HomePage.module.css";
 
@@ -537,9 +536,8 @@ export function HomePage() {
   const [loadedHeroSlides, setLoadedHeroSlides] = useState<ReadonlySet<number>>(
     () => new Set([0]),
   );
-  /** Full-page boot: adopt the same ``<img>`` node so mobile LCP is not reset. */
-  const [useSsrBoot] = useState(() => homeSsrLcpBootPresent());
-  const lcpHostRef = useRef<HTMLLIElement>(null);
+  /** Full-page boot: SSR hero overlay stays until interaction (no DOM move). */
+  const [useSsrBoot, setUseSsrBoot] = useState(() => homeSsrLcpBootPresent());
 
   // Adjust loaded set during render (same pattern as Layout menuRoute).
   if (!loadedHeroSlides.has(heroSlide)) {
@@ -549,18 +547,23 @@ export function HomePage() {
   }
 
   useEffect(() => {
-    const host = lcpHostRef.current;
-    if (!host || !useSsrBoot) {
+    if (!useSsrBoot) {
       return;
     }
-    let cancelled = false;
-    void waitForHomeLcpPaint().then(() => {
-      if (!cancelled) {
-        adoptHomeSsrLcpImage(host, styles.heroSlideImg);
+    const dismiss = () => {
+      if (!useSsrBoot) {
+        return;
       }
-    });
+      fadeOutHomeSsrHero();
+      setUseSsrBoot(false);
+    };
+    window.addEventListener("pointerdown", dismiss, { once: true, passive: true });
+    window.addEventListener("keydown", dismiss, { once: true });
+    window.addEventListener("scroll", dismiss, { once: true, passive: true });
     return () => {
-      cancelled = true;
+      window.removeEventListener("pointerdown", dismiss);
+      window.removeEventListener("keydown", dismiss);
+      window.removeEventListener("scroll", dismiss);
     };
   }, [useSsrBoot]);
 
@@ -613,7 +616,6 @@ export function HomePage() {
             {HOME_PROJECTS.map((project, index) => (
               <li
                 key={project.name}
-                ref={index === 0 ? lcpHostRef : undefined}
                 className={
                   index === heroSlide
                     ? `${styles.heroSlide} ${styles.heroSlideActive}`
