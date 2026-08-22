@@ -146,6 +146,56 @@ export const QUIZ_STEPS: Record<QuizStepId, QuizStepCopy> = {
     ],
     skippable: true,
   },
+  aux_switch: {
+    id: "aux_switch",
+    question: "Нужны сухие контакты положения в щит?",
+    lead:
+      "Вспомогательные переключатели не управляют заслонкой — " +
+      "они сообщают BMS, что клапан открыт или закрыт.",
+    choices: [
+      {
+        id: "yes",
+        title: "Да, для сигнализации в BMS",
+        hint: "Издания с суффиксом S — DS/AS или HVA…S",
+      },
+      {
+        id: "no",
+        title: "Нет, достаточно управления",
+        hint: "Базовые издания без вспомогательных переключателей",
+      },
+      {
+        id: "skip",
+        title: "Пока не знаю",
+        hint: "Покажем все издания категории",
+      },
+    ],
+    skippable: true,
+  },
+  temp_sensor: {
+    id: "temp_sensor",
+    question: "Нужен термодатчик по паспорту клапана?",
+    lead:
+      "SAF72 — размыкатель при ~72 °C (среда TS1 и канал TS2). " +
+      "Уточните по паспорту ОЗК или дымового клапана.",
+    choices: [
+      {
+        id: "yes",
+        title: "Да, по паспорту / BAT 72 °C",
+        hint: "Исполнения DST (SA..FU) или ST (HVD-F)",
+      },
+      {
+        id: "no",
+        title: "Нет, без термодатчика",
+        hint: "Издания DS / S без терморазмыкателя",
+      },
+      {
+        id: "skip",
+        title: "Пока не знаю",
+        hint: "Покажем оба варианта — уточните с проектировщиком",
+      },
+    ],
+    skippable: true,
+  },
   damper_area: {
     id: "damper_area",
     question: "Какая площадь прохода заслонки?",
@@ -371,6 +421,10 @@ export function buildQuizSummaryChips(answers: QuizAnswers): string[] {
   if (answers.voltage === "230") chips.push("230 В");
   if (answers.control === "onoff") chips.push("Открыть / закрыть");
   if (answers.control === "modulating") chips.push("Плавное регулирование");
+  if (answers.auxSwitch === "yes") chips.push("Сухие контакты");
+  if (answers.auxSwitch === "no") chips.push("Без всп. переключателей");
+  if (answers.tempSensor === "yes") chips.push("Термодатчик SAF72");
+  if (answers.tempSensor === "no") chips.push("Без термодатчика");
   if (answers.damperArea && answers.damperArea !== "skip") {
     const step = QUIZ_STEPS.damper_area.choices.find(
       (c) => c.id === answers.damperArea,

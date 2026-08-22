@@ -46,12 +46,20 @@ export type QuizWays = "2" | "3" | "skip";
 /** Hoocon ball-valve bracket: BR-M (MU/MQU) or BR-ML (FU). */
 export type QuizAdapterType = "br_m" | "br_ml" | "skip";
 
+/** Auxiliary SPDT switches for position feedback in BMS (DS/AS/S editions). */
+export type QuizAuxSwitch = "yes" | "no" | "skip";
+
+/** SAF72 thermal cut-out (~72 °C) — fire/smoke valve editions only. */
+export type QuizTempSensor = "yes" | "no" | "skip";
+
 export type QuizStepId =
   | "need"
   | "application"
   | "failsafe_type"
   | "voltage"
   | "control"
+  | "aux_switch"
+  | "temp_sensor"
   | "damper_area"
   | "damper_type"
   | "damper_pressure"
@@ -73,6 +81,8 @@ export type QuizAnswers = {
   kvs?: QuizKvs;
   ways?: QuizWays;
   adapterType?: QuizAdapterType;
+  auxSwitch?: QuizAuxSwitch;
+  tempSensor?: QuizTempSensor;
 };
 
 export type QuizPhase = "questions" | "results";
@@ -92,6 +102,38 @@ export function createInitialQuizState(): QuizState {
   };
 }
 
+/** Fire/smoke editions already include aux in DS/S — ask temp sensor instead. */
+export function quizNeedsTempSensorStep(answers: QuizAnswers): boolean {
+  return (
+    answers.need === "actuator" &&
+    (answers.application === "fire" || answers.application === "smoke")
+  );
+}
+
+/** Optional aux on ventilation / fast / fail-safe actuators and H81 kits. */
+export function quizNeedsAuxStep(answers: QuizAnswers): boolean {
+  if (answers.need === "kit") {
+    return true;
+  }
+  if (answers.need !== "actuator") {
+    return false;
+  }
+  if (answers.application === "fire" || answers.application === "smoke") {
+    return false;
+  }
+  return true;
+}
+
+function functionalStepsAfterControl(answers: QuizAnswers): QuizStepId[] {
+  const steps: QuizStepId[] = [];
+  if (quizNeedsTempSensorStep(answers)) {
+    steps.push("temp_sensor");
+  } else if (quizNeedsAuxStep(answers)) {
+    steps.push("aux_switch");
+  }
+  return steps;
+}
+
 export function getCurrentStepId(state: QuizState): QuizStepId {
   return state.stepStack[state.stepStack.length - 1] ?? "need";
 }
@@ -105,7 +147,9 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
     return ["need", "dn", "kvs", "ways"];
   }
   if (answers.need === "kit") {
-    return ["need", "voltage"];
+    return quizNeedsAuxStep(answers)
+      ? ["need", "voltage", "aux_switch"]
+      : ["need", "voltage"];
   }
   if (answers.need === "adapter") {
     return ["need", "adapter_type"];
@@ -114,7 +158,8 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
   if (answers.application === "failsafe") {
     steps.push("failsafe_type");
   }
-  steps.push("voltage", "control", "damper_area", "damper_type", "damper_pressure");
+  steps.push("voltage", "control", ...functionalStepsAfterControl(answers));
+  steps.push("damper_area", "damper_type", "damper_pressure");
   return steps;
 }
 
@@ -174,6 +219,12 @@ function setAnswerForStep(
     case "adapter_type":
       next.adapterType = choiceId as QuizAdapterType;
       break;
+    case "aux_switch":
+      next.auxSwitch = choiceId as QuizAuxSwitch;
+      break;
+    case "temp_sensor":
+      next.tempSensor = choiceId as QuizTempSensor;
+      break;
     default:
       break;
   }
@@ -197,10 +248,19 @@ function nextStepAfter(
     case "failsafe_type":
       return "voltage";
     case "voltage":
-      if (answers.need === "kit") return "results";
+      if (answers.need === "kit") {
+        return quizNeedsAuxStep(answers) ? "aux_switch" : "results";
+      }
       if (answers.need === "actuator") return "control";
       return "results";
     case "control":
+      if (quizNeedsTempSensorStep(answers)) return "temp_sensor";
+      if (quizNeedsAuxStep(answers)) return "aux_switch";
+      return "damper_area";
+    case "temp_sensor":
+      return "damper_area";
+    case "aux_switch":
+      if (answers.need === "kit") return "results";
       return "damper_area";
     case "damper_area":
       return "damper_type";
@@ -269,6 +329,8 @@ export function skipQuizStep(state: QuizState): QuizState {
 const QUIZ_SKIP_FIELD: Partial<Record<QuizStepId, keyof QuizAnswers>> = {
   voltage: "voltage",
   control: "control",
+  aux_switch: "auxSwitch",
+  temp_sensor: "tempSensor",
   damper_area: "damperArea",
   damper_type: "damperType",
   damper_pressure: "damperPressure",
@@ -291,6 +353,8 @@ const STEP_ANSWER_KEY: Partial<Record<QuizStepId, keyof QuizAnswers>> = {
   kvs: "kvs",
   ways: "ways",
   adapter_type: "adapterType",
+  aux_switch: "auxSwitch",
+  temp_sensor: "tempSensor",
 };
 
 export function goBackQuizStep(state: QuizState): QuizState {
@@ -309,6 +373,8 @@ export function goBackQuizStep(state: QuizState): QuizState {
   }
   if (dropped === "application") {
     delete answers.failsafeType;
+    delete answers.auxSwitch;
+    delete answers.tempSensor;
   }
   return { answers, stepStack, phase: "questions" };
 }

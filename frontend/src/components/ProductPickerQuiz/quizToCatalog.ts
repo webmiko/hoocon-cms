@@ -5,10 +5,12 @@ import type { QuizAnswers } from "./quizEngine";
 import {
   facetValuesForKey,
   matchAreaForMomentNmFacet,
+  matchAuxSwitchFacet,
   matchControlFacet,
   matchDnFacet,
   matchKvsFacet,
   matchMomentNmFacet,
+  matchTempSensorFacet,
   matchVoltageFacet,
   matchWaysFacet,
 } from "./quizFacetMatch";
@@ -99,6 +101,38 @@ export function buildCatalogParams(
         params.area = areaValue;
       }
     }
+
+    if (answers.auxSwitch && answers.auxSwitch !== "skip") {
+      const value = matchAuxSwitchFacet(
+        facetValuesForKey(facets, "aux_switch"),
+        answers.auxSwitch,
+      );
+      if (value) {
+        params.aux_switch = value;
+      }
+    }
+
+    if (answers.tempSensor && answers.tempSensor !== "skip") {
+      const value = matchTempSensorFacet(
+        facetValuesForKey(facets, "temp_sensor"),
+        answers.tempSensor,
+      );
+      if (value) {
+        params.temp_sensor = value;
+      }
+    }
+  }
+
+  if (answers.need === "kit") {
+    if (answers.auxSwitch && answers.auxSwitch !== "skip") {
+      const value = matchAuxSwitchFacet(
+        facetValuesForKey(facets, "aux_switch"),
+        answers.auxSwitch,
+      );
+      if (value) {
+        params.aux_switch = value;
+      }
+    }
   }
 
   if (answers.need === "ball_valve") {
@@ -143,6 +177,8 @@ export function buildCatalogParams(
 const RELAX_ORDER = [
   "area",
   "moment",
+  "temp_sensor",
+  "aux_switch",
   "control",
   "voltage",
   "ways",

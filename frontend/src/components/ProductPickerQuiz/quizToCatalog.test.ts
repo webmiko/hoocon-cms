@@ -24,6 +24,23 @@ const ACTUATOR_FACETS: CatalogFacet[] = [
     ],
   },
   {
+    key: "aux_switch",
+    label: "Вспомогательный переключатель",
+    values: [
+      { value: "Нет", count: 8 },
+      { value: "SPDT-1", count: 2 },
+      { value: "SPDT-2", count: 6 },
+    ],
+  },
+  {
+    key: "temp_sensor",
+    label: "Термодатчик",
+    values: [
+      { value: "Нет", count: 5 },
+      { value: "SAF72", count: 3 },
+    ],
+  },
+  {
     key: "moment",
     label: "Крутящий момент",
     values: [
@@ -89,6 +106,40 @@ describe("quizToCatalog", () => {
     expect(params.moment).toBe("10 Нм");
     expect(params.area).toBe("до 1,0 м²");
     expect(params.page_size).toBe("6");
+  });
+
+  it("maps aux and temp sensor facets for actuator answers", () => {
+    const ventilation = buildCatalogParams(
+      {
+        need: "actuator",
+        application: "general",
+        voltage: "24",
+        control: "modulating",
+        auxSwitch: "yes",
+        damperArea: "skip",
+        damperType: "skip",
+        damperPressure: "skip",
+      },
+      ACTUATOR_FACETS,
+    );
+    expect(ventilation.aux_switch).toBe("SPDT-2");
+
+    const fire = buildCatalogParams(
+      {
+        need: "actuator",
+        application: "fire",
+        voltage: "24",
+        control: "onoff",
+        tempSensor: "yes",
+        damperArea: "skip",
+        damperType: "skip",
+        damperPressure: "skip",
+      },
+      ACTUATOR_FACETS,
+    );
+    expect(fire.category).toBe(QUIZ_CATEGORY.fire);
+    expect(fire.temp_sensor).toBe("SAF72");
+    expect(fire.aux_switch).toBeUndefined();
   });
 
   it("maps fire application to SA category", () => {
@@ -164,21 +215,25 @@ describe("quizToCatalog", () => {
     expect(variants[3]).not.toHaveProperty("dn");
   });
 
-  it("relaxes filters in area → moment → control → voltage order", () => {
+  it("relaxes filters in area → moment → temp → aux → control → voltage order", () => {
     const strict = {
       category: QUIZ_CATEGORY.general,
       page: "1",
       page_size: "6",
       area: "до 1,0 м²",
       moment: "10 Нм",
+      temp_sensor: "SAF72",
+      aux_switch: "SPDT-2",
       control: "Открыто/закрыто",
       voltage: "230 В",
     };
     const variants = relaxCatalogParams(strict);
-    expect(variants).toHaveLength(5);
+    expect(variants).toHaveLength(7);
     expect(variants[1]).not.toHaveProperty("area");
     expect(variants[2]).not.toHaveProperty("moment");
-    expect(variants[3]).not.toHaveProperty("control");
-    expect(variants[4]).not.toHaveProperty("voltage");
+    expect(variants[3]).not.toHaveProperty("temp_sensor");
+    expect(variants[4]).not.toHaveProperty("aux_switch");
+    expect(variants[5]).not.toHaveProperty("control");
+    expect(variants[6]).not.toHaveProperty("voltage");
   });
 });

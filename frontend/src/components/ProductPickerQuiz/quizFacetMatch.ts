@@ -1,8 +1,10 @@
 import type { CatalogFacet } from "../../api/client";
 import type {
+  QuizAuxSwitch,
   QuizControl,
   QuizDn,
   QuizKvs,
+  QuizTempSensor,
   QuizVoltage,
   QuizWays,
 } from "./quizEngine";
@@ -112,6 +114,48 @@ function momentForAreaCapM2(capM2: number): number | null {
     }
   }
   return 40;
+}
+
+export function matchAuxSwitchFacet(
+  values: readonly string[],
+  choice: Exclude<QuizAuxSwitch, "skip">,
+): string | null {
+  if (choice === "no") {
+    for (const value of values) {
+      if (/^нет$/i.test(value.trim())) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  for (const value of values) {
+    if (/SPDT-2/i.test(value.trim())) {
+      return value;
+    }
+  }
+  for (const value of values) {
+    if (/SPDT-1/i.test(value.trim())) {
+      return value;
+    }
+  }
+  return null;
+}
+
+export function matchTempSensorFacet(
+  values: readonly string[],
+  choice: Exclude<QuizTempSensor, "skip">,
+): string | null {
+  for (const value of values) {
+    const raw = value.trim();
+    if (choice === "yes" && /SAF72/i.test(raw)) {
+      return value;
+    }
+    if (choice === "no" && /^нет$/i.test(raw)) {
+      return value;
+    }
+  }
+  return null;
 }
 
 export function matchDnFacet(

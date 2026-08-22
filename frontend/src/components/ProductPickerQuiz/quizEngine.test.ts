@@ -22,6 +22,9 @@ describe("quizEngine", () => {
     expect(getCurrentStepId(state)).toBe("control");
 
     state = applyQuizChoice(state, "onoff");
+    expect(getCurrentStepId(state)).toBe("aux_switch");
+
+    state = applyQuizChoice(state, "no");
     expect(getCurrentStepId(state)).toBe("damper_area");
 
     state = applyQuizChoice(state, "0_6_1_0");
@@ -37,6 +40,7 @@ describe("quizEngine", () => {
       application: "general",
       voltage: "230",
       control: "onoff",
+      auxSwitch: "no",
       damperArea: "0_6_1_0",
       damperType: "rectangular",
       damperPressure: "medium",
@@ -53,6 +57,7 @@ describe("quizEngine", () => {
       "failsafe_type",
       "voltage",
       "control",
+      "aux_switch",
       "damper_area",
       "damper_type",
       "damper_pressure",
@@ -88,6 +93,34 @@ describe("quizEngine", () => {
     });
   });
 
+  it("inserts temp sensor step for fire application", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "actuator");
+    state = applyQuizChoice(state, "fire");
+    state = applyQuizChoice(state, "24");
+    state = applyQuizChoice(state, "onoff");
+    expect(getCurrentStepId(state)).toBe("temp_sensor");
+    expect(plannedQuizSteps(state.answers)).toContain("temp_sensor");
+    expect(plannedQuizSteps(state.answers)).not.toContain("aux_switch");
+
+    state = applyQuizChoice(state, "yes");
+    expect(getCurrentStepId(state)).toBe("damper_area");
+    expect(state.answers.tempSensor).toBe("yes");
+  });
+
+  it("kit branch asks aux after voltage", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "kit");
+    expect(plannedQuizSteps(state.answers)).toEqual([
+      "need",
+      "voltage",
+      "aux_switch",
+    ]);
+    state = applyQuizChoice(state, "24");
+    expect(getCurrentStepId(state)).toBe("aux_switch");
+    state = applyQuizChoice(state, "yes");
+    expect(state.phase).toBe("results");
+    expect(state.answers.auxSwitch).toBe("yes");
+  });
+
   it("resets branch answers when need changes", () => {
     let state = applyQuizChoice(createInitialQuizState(), "actuator");
     state = applyQuizChoice(state, "general");
@@ -100,9 +133,10 @@ describe("quizEngine", () => {
 
   it("skip sets optional facet to skip and advances", () => {
     let state = applyQuizChoice(createInitialQuizState(), "kit");
+    state = applyQuizChoice(state, "24");
     state = skipQuizStep(state);
     expect(state.phase).toBe("results");
-    expect(state.answers.voltage).toBe("skip");
+    expect(state.answers.auxSwitch).toBe("skip");
   });
 
   it("walks adapter branch to BR-M or BR-ML", () => {
