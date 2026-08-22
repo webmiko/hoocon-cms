@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DeferredMount } from "../components/DeferredMount";
@@ -11,6 +11,7 @@ import {
   adoptHomeSsrLcpImage,
   homeSsrLcpBootPresent,
 } from "../utils/adoptHomeSsrLcpImage";
+import { waitForHomeLcpPaint } from "../utils/waitForHomeLcpPaint";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./HomePage.module.css";
 
@@ -547,12 +548,20 @@ export function HomePage() {
     setLoadedHeroSlides(next);
   }
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const host = lcpHostRef.current;
     if (!host || !useSsrBoot) {
       return;
     }
-    adoptHomeSsrLcpImage(host, styles.heroSlideImg);
+    let cancelled = false;
+    void waitForHomeLcpPaint().then(() => {
+      if (!cancelled) {
+        adoptHomeSsrLcpImage(host, styles.heroSlideImg);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [useSsrBoot]);
 
   useEffect(() => {
