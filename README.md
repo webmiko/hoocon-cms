@@ -16,6 +16,9 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 
 Python 3.12–3.13.
 
+**Лицензия:** проприетарная, все права защищены — [LICENSE](LICENSE).  
+**Безопасность:** [SECURITY.md](SECURITY.md) · [docs/security-baseline.md](docs/security-baseline.md).
+
 ## Репозиторий
 
 ```text
@@ -34,7 +37,8 @@ scripts/     Checkup, деплой-хелперы
 | Тема | Файл |
 |------|------|
 | Версии релизов | [docs/releases.md](docs/releases.md) |
-| Безопасность | [docs/security-baseline.md](docs/security-baseline.md) |
+| Безопасность | [docs/security-baseline.md](docs/security-baseline.md) · [SECURITY.md](SECURITY.md) |
+| Лицензия | [LICENSE](LICENSE) (проприетарная) |
 | SEO / URL | [docs/seo-url-migration.md](docs/seo-url-migration.md) |
 | Инфраструктура | [docs/infra-reg-ru.md](docs/infra-reg-ru.md) |
 | ETL / качество данных | [docs/data-quality-etl.md](docs/data-quality-etl.md) |
