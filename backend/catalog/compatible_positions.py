@@ -38,6 +38,21 @@ def _normalize_code(code: str) -> str:
     return (code or "").casefold().replace(" ", "").replace("-", "")
 
 
+def exact_adapter_sku_code(value: str) -> str | None:
+    """Canonical BR-M / BR-ML code when ``q`` is an exact adapter article lookup.
+
+    ``sku_code__icontains='BR-M'`` also matches ``BR-ML``; catalog search and
+    quiz adapter branch must not mix the two brackets.
+    """
+    needle = (value or "").strip()
+    if not needle:
+        return None
+    for code in ADAPTER_CODES:
+        if needle.casefold() == code.casefold():
+            return code
+    return None
+
+
 def _bracket_text(sku: SKU) -> str:
     for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)

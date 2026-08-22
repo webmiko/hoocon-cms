@@ -8,6 +8,7 @@ from django.urls import reverse
 from catalog.compatible_positions import (
     bracket_uses_adapter,
     compatible_positions_for_sku,
+    exact_adapter_sku_code,
 )
 from catalog.etl.attr_write import set_sku_attribute
 from catalog.models import SKU, Category, Product
@@ -19,6 +20,15 @@ def test_bracket_uses_adapter_substring_safe() -> None:
     assert bracket_uses_adapter("BR-M", "BR-M") is True
     assert bracket_uses_adapter("BR-M / BR-ML (для DA5FU)", "BR-M") is True
     assert bracket_uses_adapter("BR-M / BR-ML (для DA5FU)", "BR-ML") is True
+
+
+def test_exact_adapter_sku_code_for_catalog_q() -> None:
+    assert exact_adapter_sku_code("BR-M") == "BR-M"
+    assert exact_adapter_sku_code("br-m") == "BR-M"
+    assert exact_adapter_sku_code("BR-ML") == "BR-ML"
+    assert exact_adapter_sku_code("BR-M ") == "BR-M"
+    assert exact_adapter_sku_code("HVA-5") is None
+    assert exact_adapter_sku_code("") is None
 
 
 def _make_category(slug: str, name: str) -> Category:

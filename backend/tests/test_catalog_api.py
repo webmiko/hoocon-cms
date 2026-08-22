@@ -253,6 +253,38 @@ def test_sku_search_q_matches_sku_code(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sku_search_q_br_m_does_not_match_br_ml(client) -> None:
+    """Exact BR-M / BR-ML adapter codes must not substring-match each other."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Адаптеры", slug="adaptery")
+    for code, slug in (("BR-M", "adapter-br-m"), ("BR-ML", "adapter-br-ml")):
+        product = Product.objects.create(name=code, slug=slug, category=cat)
+        SKU.objects.create(
+            product=product,
+            name=f"{code} | Адаптер",
+            slug=slug,
+            sku_code=code,
+            is_published=True,
+            analogs_text="Не подходит — нужен BR-M" if code == "BR-ML" else "",
+        )
+
+    br_m = client.get(
+        reverse("catalog-sku-list"),
+        {"category": "adaptery", "q": "BR-M"},
+    )
+    assert br_m.status_code == 200
+    assert {row["sku_code"] for row in br_m.data["results"]} == {"BR-M"}
+
+    br_ml = client.get(
+        reverse("catalog-sku-list"),
+        {"category": "adaptery", "q": "BR-ML"},
+    )
+    assert br_ml.status_code == 200
+    assert {row["sku_code"] for row in br_ml.data["results"]} == {"BR-ML"}
+
+
+@pytest.mark.django_db
 def test_category_list(client) -> None:
     """GET /api/catalog/categories/ returns seeded categories."""
     _seed_catalog()

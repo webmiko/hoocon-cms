@@ -14,6 +14,7 @@ from rest_framework.filters import BaseFilterBackend
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from catalog.compatible_positions import exact_adapter_sku_code
 from catalog.facets import FACET_BY_KEY, FACET_KEYS, filter_skus_by_facet
 from catalog.models import SKU, Attribute
 from catalog.newness import new_since
@@ -97,6 +98,13 @@ class SKUFilterSet(django_filters.FilterSet):
         """
         if not value:
             return queryset
+        adapter_code = exact_adapter_sku_code(value)
+        if adapter_code is not None:
+            return queryset.filter(sku_code__iexact=adapter_code).order_by(
+                F("moment_nm").asc(nulls_last=True),
+                F("sku_code_nm").asc(nulls_last=True),
+                "sku_code",
+            )
         from django.contrib.postgres.search import SearchQuery, SearchRank
 
         query = SearchQuery(value, config="russian")
