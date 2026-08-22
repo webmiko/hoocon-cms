@@ -38,6 +38,11 @@ const NovinkiCarousel = lazyWithChunkReload(() =>
     default: m.NovinkiCarousel,
   })),
 );
+const ProductPickerQuiz = lazyWithChunkReload(() =>
+  import("../components/ProductPickerQuiz").then((m) => ({
+    default: m.ProductPickerQuiz,
+  })),
+);
 
 /**
  * First sentence of a category description for the directions card.
@@ -272,7 +277,10 @@ function HomeStepsSection() {
           <span className={styles.stepNum}>1</span>
           <div>
             <h3>Подбор по характеристикам</h3>
-            <p>Фильтры по моменту, напряжению, типу пружины и артикулу.</p>
+            <p>
+              Ответьте на несколько вопросов в блоке «Подбор за минуту» — или
+              укажите параметры в каталоге.
+            </p>
           </div>
         </li>
         <li>
@@ -503,6 +511,15 @@ function HomeFaqSection() {
             рабочих часов. Партнёры: <Link to="/gde-kupit">где купить</Link>.
           </p>
         </details>
+        <details className={styles.faqItem}>
+          <summary>Как подобрать модель на сайте?</summary>
+          <p>
+            На главной — блок{" "}
+            <a href="#podbor">«Подбор за минуту»</a>: укажите тип продукции и
+            параметры из проекта. Сервис покажет подходящие модели в каталоге
+            или поможет оставить заявку инженеру.
+          </p>
+        </details>
       </div>
     </section>
   );
@@ -573,9 +590,8 @@ export function HomePage() {
       <Seo
         title="Электроприводы для вентиляции и кондиционирования Hoocon — каталог, подбор, аналоги Belimo"
         description={
-          "Электроприводы для вентиляции, кондиционирования и "
-          + "противопожарных систем. Каталог, фильтры по характеристикам, паспорта, аналоги "
-          + "Belimo, запрос КП."
+          "Электроприводы для вентиляции и ОВК. Подбор модели за минуту на главной, "
+          + "каталог по параметрам, паспорта PDF, аналоги Belimo, запрос КП."
         }
         path="/"
         preloadImage={HOME_PROJECTS[0].image}
@@ -626,13 +642,16 @@ export function HomePage() {
             Электроприводы для вентиляции и кондиционирования
           </h1>
           <p className={styles.heroLead}>
-            Подбор по техническим характеристикам, паспорта, аналоги Belimo.
+            Подбор за минуту на главной, каталог по параметрам, паспорта, аналоги Belimo.
             Склад в Москве — отгрузка по РФ. КП по запросу.
           </p>
           <div className={styles.heroActions}>
             <Link to="/catalog" className={styles.ctaPrimary} data-brand-cta>
               Смотреть каталог
             </Link>
+            <a href="#podbor" className={styles.ctaSecondary} data-on-dark-cta>
+              Подобрать модель
+            </a>
             <Link
               to="/consultation"
               className={styles.ctaSecondary}
@@ -667,6 +686,10 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <Suspense fallback={null}>
+        <ProductPickerQuiz />
+      </Suspense>
 
       <section className={styles.trust} aria-label="Преимущества">
         <div className={styles.trustItem}>

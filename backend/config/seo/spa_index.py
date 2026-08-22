@@ -20,7 +20,8 @@ HOME_LCP_IMAGE = "/home/projects/beijing-metro.webp"
 HOME_SSR_BRAND = "HOOCON"
 HOME_SSR_H1 = "Электроприводы для вентиляции и кондиционирования"
 HOME_SSR_LEAD = (
-    "Подбор по техническим характеристикам, паспорта, аналоги Belimo. Склад в Москве — отгрузка по РФ. КП по запросу."
+    "Подбор за минуту на главной, каталог по параметрам, паспорта, аналоги Belimo. "
+    "Склад в Москве — отгрузка по РФ. КП по запросу."
 )
 
 _index_cache_lock = threading.Lock()
@@ -139,9 +140,28 @@ def _home_ssr_hero_markup() -> str:
         f'<div class="hoocon-ssr-hero__actions">'
         f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--primary" href="/catalog">'
         f"Смотреть каталог</a>"
+        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--secondary" href="/#podbor">'
+        f"Подобрать модель</a>"
         f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--secondary" href="/consultation">'
         f"Запросить КП</a>"
         f"</div></div></section>"
+    )
+
+
+def _home_ssr_podbor_noscript() -> str:
+    """Crawler/no-JS fallback for the home product picker (React mounts inside #root)."""
+    heading = escape("Подбор модели за минуту")
+    body = escape(
+        "Укажите тип продукции и параметры из проекта: привод на заслонку, "
+        "шаровой кран, комплект кран+привод или кронштейн BR-M/BR-ML под привод Hoocon. "
+        "Сервис покажет подходящие позиции в каталоге.",
+    )
+    return (
+        f'<noscript><section id="podbor-noscript" aria-labelledby="podbor-noscript-h">'
+        f'<h2 id="podbor-noscript-h">{heading}</h2>'
+        f"<p>{body}</p>"
+        f'<p><a href="/catalog">Каталог электроприводов</a></p>'
+        f"</section></noscript>"
     )
 
 
@@ -241,7 +261,7 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
         # Outside ``#root``: LCP img survives createRoot; React adopts it.
         html = html.replace(
             '<div id="root"></div>',
-            f'{boot}<div id="root"></div>',
+            f'{boot}<div id="root"></div>{_home_ssr_podbor_noscript()}',
             1,
         )
 

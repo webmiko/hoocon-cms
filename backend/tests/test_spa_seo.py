@@ -45,6 +45,10 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert f'<h1 class="hoocon-ssr-hero__title">{HOME_SSR_H1}</h1>' in body
     assert "hoocon-ssr-hero-css" in body
     assert "Смотреть каталог" in body
+    assert 'href="/#podbor"' in body
+    assert "Подобрать модель" in body
+    assert 'id="podbor-noscript"' in body
+    assert "Подбор модели за минуту" in body
     # Outside ``#root`` so createRoot does not wipe the LCP img.
     assert body.index('id="hoocon-ssr-hero"') < body.index('id="root"')
     assert '<div id="root"></div>' in body

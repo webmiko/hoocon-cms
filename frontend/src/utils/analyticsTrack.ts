@@ -9,6 +9,11 @@ export type LeadTrackType = "rfq" | "consultation" | "replacement";
 /** YM goal name — create the same goal in Metrika UI. */
 export const LEAD_SUBMIT_GOAL = "lead_submit";
 
+export const QUIZ_START_GOAL = "quiz_start";
+export const QUIZ_COMPLETE_GOAL = "quiz_complete";
+export const QUIZ_TO_CATALOG_GOAL = "quiz_to_catalog";
+export const QUIZ_TO_CONSULTATION_GOAL = "quiz_to_consultation";
+
 let lastSpaHitPath: string | null = null;
 let ymCounterId: number | null = null;
 let ga4Id: string | null = null;
@@ -87,4 +92,43 @@ export function trackLeadSubmit(leadType: LeadTrackType): void {
       ...(ga4Id ? { send_to: ga4Id } : {}),
     });
   }
+}
+
+function trackQuizGoal(
+  goal: string,
+  params?: Record<string, string | number | boolean>,
+): void {
+  if (ymCounterId !== null && typeof window !== "undefined" && window.ym) {
+    window.ym(ymCounterId, "reachGoal", goal, params);
+  }
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("event", goal, {
+      ...(params ?? {}),
+      ...(ga4Id ? { send_to: ga4Id } : {}),
+    });
+  }
+}
+
+/** First answer beyond the opening step. */
+export function trackQuizStart(): void {
+  trackQuizGoal(QUIZ_START_GOAL);
+}
+
+/** Quiz finished and preview loaded (or empty). */
+export function trackQuizComplete(params: {
+  category: string;
+  count: number;
+  relaxed: boolean;
+}): void {
+  trackQuizGoal(QUIZ_COMPLETE_GOAL, params);
+}
+
+/** User opens the filtered catalog from quiz results. */
+export function trackQuizToCatalog(): void {
+  trackQuizGoal(QUIZ_TO_CATALOG_GOAL);
+}
+
+/** User opens consultation from quiz results. */
+export function trackQuizToConsultation(): void {
+  trackQuizGoal(QUIZ_TO_CONSULTATION_GOAL);
 }
