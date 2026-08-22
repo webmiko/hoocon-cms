@@ -488,7 +488,7 @@ export function Layout() {
           <p>
             © {new Date().getFullYear()} Hoocon · Системы вентиляции и
             кондиционирования
-            <span className={styles.footerRelease}> · {releaseLabel()}</span>
+            <span className={styles.footerRelease}> · {releaseLabel(false)}</span>
           </p>
           <nav className={styles.footerLegal} aria-label="Правовая информация">
             <Link to="/privacy-policy">Обработка ПДн</Link>

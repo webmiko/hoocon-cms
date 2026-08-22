@@ -1,8 +1,8 @@
 /** App release label (keep in sync with backend/config/release.py). */
 
 /** Beta: ``X.Y.Z``; after GA: ``MAJOR.MINOR`` (see docs/releases.md). */
-export const RELEASE_VERSION = "0.1.30";
-export const RELEASE_CHANNEL = "beta";
+export const RELEASE_VERSION = "1.0";
+export const RELEASE_CHANNEL = "";
 
 const VERSION_CORE = /^(\d+)\.(\d+)(?:\.(\d+))?$/;
 

@@ -19,12 +19,13 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _VERSION_CORE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
 
-def test_release_label_beta_format() -> None:
-    """Display string matches ``vX.Y.Z beta`` while channel is beta."""
-    assert RELEASE_CHANNEL == "beta"
+def test_release_label_ga_format() -> None:
+    """Display string is ``vMAJOR.MINOR`` / ``MAJOR.MINOR`` after GA."""
+    assert RELEASE_CHANNEL == ""
+    assert RELEASE_VERSION == "1.0"
     assert _VERSION_CORE.match(RELEASE_VERSION)
-    assert release_label() == f"v{display_version()} beta"
-    assert release_label(with_v=False) == f"{display_version()} beta"
+    assert release_label() == f"v{display_version()}"
+    assert release_label(with_v=False) == display_version()
 
 
 def test_package_version_pads_two_part() -> None:
