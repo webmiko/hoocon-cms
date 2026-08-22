@@ -112,7 +112,8 @@ margin:0 auto}
 #hoocon-ssr-hero .hoocon-ssr-hero__eyebrow{margin:0 0 12px;font-size:12px;font-weight:700;
 letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
 #hoocon-ssr-hero .hoocon-ssr-hero__title{margin:0 0 16px;font-size:clamp(1.75rem,4vw + .5rem,2.75rem);
-line-height:1.15;font-weight:700;max-width:18ch}
+line-height:1.15;font-weight:700;max-width:28ch;word-break:keep-all;overflow-wrap:normal;
+text-wrap:balance}
 #hoocon-ssr-hero .hoocon-ssr-hero__lead{margin:0 0 28px;font-size:1.05rem;line-height:1.45;
 max-width:36rem;color:rgba(255,255,255,.88)}
 #hoocon-ssr-hero .hoocon-ssr-hero__actions{display:flex;flex-wrap:wrap;gap:12px}

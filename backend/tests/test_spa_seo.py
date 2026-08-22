@@ -74,6 +74,11 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert main_css is not None
     assert "data-href=" in main_css.group(0)
     assert not re.search(r"(?<!data-)href=", main_css.group(0), flags=re.IGNORECASE)
+    # Hero title must not break Cyrillic words letter-by-letter on narrow
+    # viewports: keep-all + overflow-wrap:normal + wider max-width.
+    assert "max-width:28ch" in body
+    assert "word-break:keep-all" in body
+    assert "overflow-wrap:normal" in body
 
 
 @pytest.mark.django_db
