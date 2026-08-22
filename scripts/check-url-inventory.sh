@@ -4,12 +4,12 @@
 #
 # Usage:
 #   ./scripts/check-url-inventory.sh
-#   SERVER_HOST=161.104.19.49 ./scripts/check-url-inventory.sh
+#   SERVER_HOST=hoocon.ru ./scripts/check-url-inventory.sh
 #   BASE_URL=http://127.0.0.1:8000 ./scripts/check-url-inventory.sh
 set -euo pipefail
 
-SERVER_HOST="${SERVER_HOST:-161.104.19.49}"
-BASE_URL="${BASE_URL:-http://${SERVER_HOST}}"
+SERVER_HOST="${SERVER_HOST:-hoocon.ru}"
+BASE_URL="${BASE_URL:-https://${SERVER_HOST}}"
 HOST_HEADER="${HOST_HEADER:-hoocon.ru}"
 
 # path|expected_status (comma-separated OK codes)

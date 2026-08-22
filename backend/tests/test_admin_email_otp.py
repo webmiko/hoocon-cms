@@ -383,7 +383,7 @@ def test_find_staff_and_pending_edge_cases() -> None:
 @override_settings(
     **{
         **OTP_SETTINGS,
-        "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "mikolamus@ya.ru,@hoocon.ru",
+        "ADMIN_EMAIL_OTP_ALLOWED_EMAILS": "admin@example.com,@hoocon.ru",
     },
 )
 def test_domain_allowlist_allows_hoocon_staff() -> None:
@@ -511,11 +511,11 @@ def test_otp_ttl_human_and_allowlist_helpers() -> None:
     with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="A@X.ru, b@y.ru"):
         assert staff_email_allowed_for_otp("a@x.ru") is True
         assert staff_email_allowed_for_otp("other@x.ru") is False
-    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="mikolamus@ya.ru,@hoocon.ru"):
+    with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="admin@example.com,@hoocon.ru"):
         assert staff_email_allowed_for_otp("assistant@hoocon.ru") is True
         assert staff_email_allowed_for_otp("sales@HOOCON.ru") is True
         assert staff_email_allowed_for_otp("other@example.com") is False
-        assert staff_email_allowed_for_otp("mikolamus@ya.ru") is True
+        assert staff_email_allowed_for_otp("admin@example.com") is True
     with override_settings(ADMIN_EMAIL_OTP_ALLOWED_EMAILS="*@hoocon.ru"):
         assert staff_email_allowed_for_otp("a@hoocon.ru") is True
         assert staff_email_allowed_for_otp("a@other.ru") is False

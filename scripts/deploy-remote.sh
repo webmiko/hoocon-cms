@@ -83,10 +83,14 @@ if [[ -d deploy/nginx ]]; then
            /etc/nginx/admin-allow.conf.example; \
        fi; \
        ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
-       if [[ -f '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
-             && -f /etc/letsencrypt/live/161.104.19.49.sslip.io/fullchain.pem ]]; then \
-         cp '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
-           /etc/nginx/sites-available/hoocon-sslip-ssl; \
+       SSLIP_DOMAIN=\"\$(grep -E '^VPS_SSLIP_DOMAIN=' '${DEPLOY_PATH}/.env' 2>/dev/null \
+         | tail -1 | cut -d= -f2- | tr -d '\"' | tr -d \"'\" | xargs || true)\"; \
+       if [[ -n \"\${SSLIP_DOMAIN}\" \
+             && -f '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
+             && -f \"/etc/letsencrypt/live/\${SSLIP_DOMAIN}/fullchain.pem\" ]]; then \
+         sed \"s/203.0.113.10.sslip.io/\${SSLIP_DOMAIN}/g\" \
+           '${DEPLOY_PATH}/deploy/nginx/hoocon-sslip-ssl.conf' \
+           > /etc/nginx/sites-available/hoocon-sslip-ssl; \
          ln -sfn /etc/nginx/sites-available/hoocon-sslip-ssl \
            /etc/nginx/sites-enabled/hoocon-sslip-ssl; \
        fi; \

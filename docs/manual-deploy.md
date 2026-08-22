@@ -48,7 +48,7 @@
 ```bash
 SSH_HOST=hoocon-prod
 DEPLOY_PATH=/opt/hoocon
-# SMOKE_HOST=161.104.19.49   # если нужен явный IP для smoke
+# SMOKE_HOST=hoocon.ru   # или IP, если домен ещё не смотрит на VPS
 ```
 
 ## Важно: архитектура образа

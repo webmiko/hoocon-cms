@@ -521,7 +521,7 @@ ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"
 ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "60"),
 )
-# Comma-separated; empty = any active staff (local/CI). Prod: mikolamus@ya.ru
+# Comma-separated; empty = any active staff (local/CI). Prod example: @hoocon.ru
 ADMIN_EMAIL_OTP_ALLOWED_EMAILS = os.getenv("ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "")
 ADMIN_EMAIL_OTP_REQUEST_LIMIT = int(os.getenv("ADMIN_EMAIL_OTP_REQUEST_LIMIT", "5"))
 ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS = int(
