@@ -23,6 +23,10 @@ HOME_SSR_LEAD = (
     "Подбор за минуту на главной, каталог по параметрам, паспорта, аналоги Belimo. "
     "Склад в Москве — отгрузка по РФ. КП по запросу."
 )
+# Hero band offset — sync ``tokens.css`` (--masthead-height + --header-height).
+# Matches React ``.heroSlideImg`` crop (header chrome bleeds ~1–2px past box).
+_HOME_SSR_TOP_DESKTOP_PX = 32 + 68
+_HOME_SSR_TOP_MOBILE_PX = 68
 
 _index_cache_lock = threading.Lock()
 _index_cache: tuple[int, str] | None = None
@@ -95,35 +99,45 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
 
 def _home_ssr_hero_css() -> str:
     """Critical CSS for the server-rendered home hero (no React, no entry CSS)."""
-    # Fixed band outside ``#root`` (not full-viewport inset) so the LCP img
-    # matches React ``.hero`` height and is not re-measured after adopt.
-    return """
-#hoocon-ssr-hero{position:fixed;top:0;left:0;right:0;z-index:10000;display:flex;flex-direction:column;
-justify-content:flex-end;min-height:min(78vh,760px);height:min(78vh,760px);padding:72px 24px 48px;
-background:#101010;color:#fff;overflow:hidden;box-sizing:border-box;
-font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-#hoocon-ssr-hero .hoocon-ssr-hero__img{position:absolute;inset:0;width:100%;height:100%;
-object-fit:cover;pointer-events:none}
-#hoocon-ssr-hero .hoocon-ssr-hero__shade{position:absolute;inset:0;pointer-events:none;background:
-linear-gradient(105deg,rgba(12,12,12,.88) 0%,rgba(12,12,12,.55) 45%,rgba(12,12,12,.4) 100%),
-linear-gradient(180deg,rgba(12,12,12,.25) 0%,transparent 40%,rgba(12,12,12,.5) 100%)}
-#hoocon-ssr-hero .hoocon-ssr-hero__brand{position:relative;z-index:1;max-width:1120px;width:100%;
-margin:0 auto}
-#hoocon-ssr-hero .hoocon-ssr-hero__eyebrow{margin:0 0 12px;font-size:12px;font-weight:700;
-letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
-#hoocon-ssr-hero .hoocon-ssr-hero__title{margin:0 0 16px;font-size:clamp(1.75rem,4vw + .5rem,2.75rem);
+    # Fixed band below sticky header — same box as React ``.hero`` (``HomePage.module.css``)
+    # so the LCP crop/shade match when the overlay fades.
+    top_desktop = _HOME_SSR_TOP_DESKTOP_PX
+    top_mobile = _HOME_SSR_TOP_MOBILE_PX
+    return f"""
+#hoocon-ssr-hero{{position:fixed;top:{top_desktop}px;left:0;right:0;z-index:10000;display:flex;
+flex-direction:column;justify-content:flex-end;min-height:min(78vh,760px);height:min(78vh,760px);
+padding:clamp(72px,10vw,112px) 28px clamp(48px,6vw,72px);background:#101010;color:#fff;
+overflow:hidden;box-sizing:border-box;isolation:isolate;
+font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}}
+#hoocon-ssr-hero::before{{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.03) 50%,transparent 60%)}}
+#hoocon-ssr-hero::after{{content:"";position:absolute;left:0;right:0;bottom:0;z-index:1;height:1px;
+pointer-events:none;background:linear-gradient(90deg,transparent 0%,rgba(218,14,43,.55) 30%,
+rgba(218,14,43,.85) 50%,rgba(218,14,43,.55) 70%,transparent 100%)}}
+#hoocon-ssr-hero .hoocon-ssr-hero__img{{position:absolute;inset:0;z-index:0;width:100%;height:100%;
+object-fit:cover;object-position:center;pointer-events:none}}
+#hoocon-ssr-hero .hoocon-ssr-hero__shade{{position:absolute;inset:0;z-index:2;pointer-events:none;
+background:linear-gradient(105deg,rgba(12,12,12,.88) 0%,rgba(12,12,12,.62) 34%,
+rgba(12,12,12,.35) 62%,rgba(12,12,12,.48) 100%),linear-gradient(180deg,rgba(12,12,12,.28) 0%,
+transparent 38%,rgba(12,12,12,.55) 100%),radial-gradient(70% 55% at 80% 20%,rgba(218,14,43,.14) 0%,
+transparent 55%)}}
+#hoocon-ssr-hero .hoocon-ssr-hero__brand{{position:relative;z-index:3;max-width:1120px;width:100%;
+margin:0 auto}}
+#hoocon-ssr-hero .hoocon-ssr-hero__eyebrow{{margin:0 0 12px;font-size:12px;font-weight:700;
+letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}}
+#hoocon-ssr-hero .hoocon-ssr-hero__title{{margin:0 0 16px;font-size:clamp(1.75rem,4vw + .5rem,2.75rem);
 line-height:1.15;font-weight:700;max-width:28ch;word-break:keep-all;overflow-wrap:normal;
-text-wrap:balance}
-#hoocon-ssr-hero .hoocon-ssr-hero__lead{margin:0 0 28px;font-size:1.05rem;line-height:1.45;
-max-width:36rem;color:rgba(255,255,255,.88)}
-#hoocon-ssr-hero .hoocon-ssr-hero__actions{display:flex;flex-wrap:wrap;gap:12px}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta{display:inline-flex;align-items:center;justify-content:center;
-min-height:44px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta--primary{background:#da0e2b;color:#fff}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta--secondary{background:transparent;color:#fff;
-border:1px solid rgba(255,255,255,.55)}
-@media (max-width:768px){#hoocon-ssr-hero{min-height:min(70vh,640px);height:min(70vh,640px);
-padding:64px 16px 56px}}
+text-wrap:balance}}
+#hoocon-ssr-hero .hoocon-ssr-hero__lead{{margin:0 0 28px;font-size:1.05rem;line-height:1.45;
+max-width:36rem;color:rgba(255,255,255,.88)}}
+#hoocon-ssr-hero .hoocon-ssr-hero__actions{{display:flex;flex-wrap:wrap;gap:12px}}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta{{display:inline-flex;align-items:center;justify-content:center;
+min-height:44px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none}}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta--primary{{background:#da0e2b;color:#fff}}
+#hoocon-ssr-hero .hoocon-ssr-hero__cta--secondary{{background:transparent;color:#fff;
+border:1px solid rgba(255,255,255,.55)}}
+@media (max-width:768px){{#hoocon-ssr-hero{{top:{top_mobile}px;min-height:min(70vh,640px);
+height:min(70vh,640px);padding:64px 16px 56px}}}}
 """.replace("\n", "")
 
 

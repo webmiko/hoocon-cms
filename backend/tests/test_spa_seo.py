@@ -79,6 +79,10 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert "max-width:28ch" in body
     assert "word-break:keep-all" in body
     assert "overflow-wrap:normal" in body
+    # SSR hero band must sit below sticky header (same crop as React ``.hero``).
+    assert "top:100px" in body
+    assert "object-position:center" in body
+    assert "rgba(218,14,43,.14)" in body
 
 
 @pytest.mark.django_db
