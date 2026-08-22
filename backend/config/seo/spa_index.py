@@ -206,7 +206,7 @@ def _defer_home_entry_until_lcp(html: str) -> str:
         "(function(){"
         f"var src={src_js};"
         "var started=false;"
-        "function boot(){"
+        "function start(){"
         "if(started)return;"
         "started=true;"
         'var s=document.createElement("script");'
@@ -214,6 +214,12 @@ def _defer_home_entry_until_lcp(html: str) -> str:
         's.crossOrigin="";'
         "s.src=src;"
         "document.head.appendChild(s);"
+        "}"
+        "function boot(){"
+        "if(started)return;"
+        'if(typeof requestIdleCallback==="function"){'
+        "requestIdleCallback(start,{timeout:1500});"
+        "}else{start();}"
         "}"
         'var img=document.getElementById("hoocon-lcp-boot");'
         "if(img&&!img.complete){"

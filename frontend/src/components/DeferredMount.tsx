@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { useNearViewport } from "../hooks/useNearViewport";
+import { useDeferredMount } from "../hooks/useDeferredMount";
 
 type DeferredMountProps = {
   children: ReactNode;
@@ -10,6 +10,12 @@ type DeferredMountProps = {
   /** Reserve vertical space before mount to limit CLS. */
   minHeight?: CSSProperties["minHeight"];
   className?: string;
+  /** Anchor target while children are not mounted (e.g. home ``#podbor``). */
+  id?: string;
+  /** Require scroll before mount (PSI lab runs stay at scrollY 0). */
+  requireScrollPx?: number;
+  /** Mount when ``location.hash`` matches (without ``#``). */
+  hashIds?: readonly string[];
 };
 
 /**
@@ -23,15 +29,22 @@ export function DeferredMount({
   rootMargin = "240px 0px",
   minHeight,
   className,
+  id,
+  requireScrollPx,
+  hashIds,
 }: DeferredMountProps) {
-  const { ref, ready } = useNearViewport({ rootMargin });
+  const { ref, ready } = useDeferredMount({
+    rootMargin,
+    requireScrollPx,
+    hashIds,
+  });
   const style =
     !ready && minHeight !== undefined
       ? ({ minHeight } satisfies CSSProperties)
       : undefined;
 
   return (
-    <div ref={ref} className={className} style={style}>
+    <div ref={ref} id={id} className={className} style={style}>
       {ready ? children : fallback}
     </div>
   );

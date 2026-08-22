@@ -56,6 +56,7 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert "modulepreload" not in body
     assert 'type="module" src="/assets/index.js"' not in body
     assert 'getElementById("hoocon-lcp-boot")' in body
+    assert "requestIdleCallback(start" in body
     assert "setTimeout(boot,2500)" in body
 
 

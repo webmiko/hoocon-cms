@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 
-import { CatalogSkuCard } from "../CatalogSkuCard";
+import { lazyWithChunkReload } from "../../utils/lazyWithChunkReload";
 import {
   trackQuizComplete,
   trackQuizStart,
@@ -26,10 +26,19 @@ import { quizMomentEstimateNote } from "./quizMomentEstimate";
 import { catalogUrlFromParams } from "./quizToCatalog";
 import { useQuizResults } from "./useQuizResults";
 
+const CatalogSkuCard = lazyWithChunkReload(() =>
+  import("../CatalogSkuCard").then((m) => ({ default: m.CatalogSkuCard })),
+);
+
+type ProductPickerQuizProps = {
+  /** Omit when the home ``DeferredMount`` wrapper owns ``#podbor``. */
+  sectionId?: string | null;
+};
+
 /**
  * Home-page product picker quiz — answers → catalog parameters.
  */
-export function ProductPickerQuiz() {
+export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizProps) {
   const questionRef = useRef<HTMLHeadingElement>(null);
   const focusedStepRef = useRef<string | null>(null);
   const startedTrackedRef = useRef(false);
@@ -114,7 +123,7 @@ export function ProductPickerQuiz() {
 
   return (
     <section
-      id="podbor"
+      {...(sectionId ? { id: sectionId } : {})}
       className={styles.section}
       aria-labelledby="podbor-heading"
       data-section="product-picker-quiz"
@@ -259,7 +268,9 @@ export function ProductPickerQuiz() {
               <div className={styles.resultsCarousel}>
                 {results.items.map((sku) => (
                   <div key={sku.slug} className={styles.resultsSlide}>
-                    <CatalogSkuCard sku={sku} omitDomId variant="carousel" />
+                    <Suspense fallback={<p className={styles.status}>Загрузка карточки…</p>}>
+                      <CatalogSkuCard sku={sku} omitDomId variant="carousel" />
+                    </Suspense>
                   </div>
                 ))}
               </div>

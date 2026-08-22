@@ -687,9 +687,15 @@ export function HomePage() {
         </div>
       </section>
 
-      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={480}>
+      <DeferredMount
+        id="podbor"
+        rootMargin="0px"
+        requireScrollPx={1}
+        hashIds={["podbor"]}
+        minHeight={480}
+      >
         <Suspense fallback={<div style={{ minHeight: 480 }} aria-hidden="true" />}>
-          <ProductPickerQuiz />
+          <ProductPickerQuiz sectionId={null} />
         </Suspense>
       </DeferredMount>
 
