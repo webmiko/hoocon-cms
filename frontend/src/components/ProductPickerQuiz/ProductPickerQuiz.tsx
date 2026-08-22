@@ -31,6 +31,7 @@ import { useQuizResults } from "./useQuizResults";
  */
 export function ProductPickerQuiz() {
   const questionRef = useRef<HTMLHeadingElement>(null);
+  const focusedStepRef = useRef<string | null>(null);
   const startedTrackedRef = useRef(false);
   const completedTrackedRef = useRef(false);
   const [state, setState] = useState<QuizState>(() => createInitialQuizState());
@@ -73,9 +74,19 @@ export function ProductPickerQuiz() {
   ]);
 
   useEffect(() => {
-    if (state.phase === "questions" && questionRef.current) {
-      questionRef.current.focus();
+    if (state.phase !== "questions" || !stepId || !questionRef.current) {
+      return;
     }
+    // Lazy mount must not scroll the hero away; focus only after a step change.
+    if (focusedStepRef.current === null) {
+      focusedStepRef.current = stepId;
+      return;
+    }
+    if (focusedStepRef.current === stepId) {
+      return;
+    }
+    focusedStepRef.current = stepId;
+    questionRef.current.focus({ preventScroll: true });
   }, [stepId, state.phase]);
 
   function handleChoice(choiceId: string) {
