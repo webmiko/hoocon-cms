@@ -123,6 +123,7 @@ export function SupportWidget() {
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef(0);
   const resumeOnceRef = useRef(false);
+  const [fabNudge, setFabNudge] = useState(false);
 
   useEffect(
     () =>
@@ -260,6 +261,42 @@ export function SupportWidget() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Working hours: subtle FAB nudge — first after 5s, then every 10s (5 hops each).
+  const canRunFabNudge = visible && !open && isOpenNow;
+
+  useEffect(() => {
+    if (!canRunFabNudge) {
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    let intervalId: number | undefined;
+    let nudgeOffId: number | undefined;
+
+    const runNudge = () => {
+      setFabNudge(true);
+      nudgeOffId = window.setTimeout(() => setFabNudge(false), 1500);
+    };
+
+    const initialId = window.setTimeout(() => {
+      runNudge();
+      intervalId = window.setInterval(runNudge, 10_000);
+    }, 5_000);
+
+    return () => {
+      window.clearTimeout(initialId);
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+      if (nudgeOffId !== undefined) {
+        window.clearTimeout(nudgeOffId);
+      }
+      setFabNudge(false);
+    };
+  }, [canRunFabNudge]);
 
   // Re-bind support push only after explicit opt-in (never auto-OR topic_support).
   useEffect(() => {
@@ -588,7 +625,17 @@ export function SupportWidget() {
 
       <button
         type="button"
-        className={open ? styles.fabOpen : styles.fab}
+        className={
+          open
+            ? styles.fabOpen
+            : [
+                styles.fab,
+                isOpenNow ? styles.fabLive : styles.fabAway,
+                fabNudge && canRunFabNudge ? styles.fabNudge : "",
+              ]
+                .filter(Boolean)
+                .join(" ")
+        }
         aria-expanded={open}
         aria-label={open ? "Закрыть чат" : "Открыть чат поддержки"}
         onClick={() => setSupportChatOpen(!open)}

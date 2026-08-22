@@ -54,22 +54,86 @@
     opacity 180ms var(--ease-out);
 }
 
-/* Idle FAB: quieter chrome until hover / open. */
-.fab {
+/* Idle FAB: full chrome in working hours; quieter when outside schedule. */
+.fabAway {
   opacity: 0.55;
 }
 
-.fab:hover,
-.fab:focus-visible,
+.fabLive {
+  opacity: 1;
+  background: var(--color-brand-fill);
+}
+
+.fabAway:hover,
+.fabAway:focus-visible,
 .fabOpen,
 .fabOpen:hover {
   opacity: 1;
 }
 
+.fabLive:hover {
+  background: var(--color-brand-fill-hover);
+}
+
+.fabAway:hover {
+  background: var(--color-brand-control-hover);
+}
+
 .fab:hover,
 .fabOpen:hover {
-  background: var(--color-brand-control-hover);
   transform: scale(0.98);
+}
+
+.fabNudge {
+  animation: fab-nudge-burst 1.4s var(--ease-out);
+}
+
+@keyframes fab-nudge-burst {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  6% {
+    transform: translateY(-5px);
+  }
+
+  12% {
+    transform: translateY(0);
+  }
+
+  18% {
+    transform: translateY(-4px);
+  }
+
+  24% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-3px);
+  }
+
+  36% {
+    transform: translateY(0);
+  }
+
+  42% {
+    transform: translateY(-2px);
+  }
+
+  48% {
+    transform: translateY(0);
+  }
+
+  54% {
+    transform: translateY(-2px);
+  }
+
+  60%,
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .fab:focus-visible,
@@ -80,6 +144,11 @@
 .channelChip:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
+}
+
+.fabNudge:hover,
+.fabNudge:focus-visible {
+  animation: none;
 }
 
 .fabOpen {
@@ -725,6 +794,7 @@
   .panel,
   .fab,
   .fabOpen,
+  .fabNudge,
   .send,
   .close {
     animation: none;
