@@ -261,20 +261,73 @@
   box-shadow: 0 12px 32px color-mix(in srgb, var(--color-brand-fill) 32%, transparent);
 }
 
-.ctaSecondary {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+/* Beat global a[data-brand-cta] { transform: none } — same press as .ctaSecondary. */
+.heroActions a.ctaPrimary[data-brand-cta]:hover {
+  transform: scale(0.98);
 }
 
-.ctaSecondary:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: #fff;
+.heroActions a.ctaPrimary[data-brand-cta]:active {
+  transform: scale(0.96);
+}
+
+/* Hero secondary only (Подобрать модель / Запросить КП). */
+.heroActions a.ctaSecondary[data-on-dark-cta] {
+  background-color: var(--on-dark-cta-fill);
+  border: 1px solid var(--on-dark-cta-border);
+  color: var(--on-dark-cta-text);
+  -webkit-backdrop-filter: saturate(var(--on-dark-cta-saturate)) blur(var(--on-dark-cta-blur));
+  backdrop-filter: saturate(var(--on-dark-cta-saturate)) blur(var(--on-dark-cta-blur));
   text-decoration: none;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    transform var(--transition-fast),
+    -webkit-backdrop-filter var(--transition),
+    backdrop-filter var(--transition);
+}
+
+/* Light: idle — матовая заливка без blur; hover/active — стекло с градиентом слайдов hero. */
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta],
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta]:link,
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta]:visited {
+  color: #121214;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta]:hover,
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta]:visited:hover,
+:global(html:not([data-theme="dark"])) .heroActions a.ctaSecondary[data-on-dark-cta]:active {
+  background-color: var(--glass-bg-strong);
+  border-color: rgba(255, 255, 255, 0.42);
+  color: #121214;
+  -webkit-backdrop-filter: saturate(1.35) blur(var(--glass-blur));
+  backdrop-filter: saturate(1.35) blur(var(--glass-blur));
   transform: scale(0.98);
+}
+
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta],
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta]:link,
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta]:visited,
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta]:active {
+  background-color: #1c1c21;
+  color: #ffffff;
+}
+
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta]:hover,
+:global(html[data-theme="dark"]) .heroActions a.ctaSecondary[data-on-dark-cta]:visited:hover {
+  background-color: var(--on-dark-cta-fill-hover);
+  border-color: var(--on-dark-cta-border-hover);
+  color: #ffffff;
+  -webkit-backdrop-filter: saturate(var(--on-dark-cta-saturate-hover))
+    blur(var(--on-dark-cta-blur-hover));
+  backdrop-filter: saturate(var(--on-dark-cta-saturate-hover)) blur(var(--on-dark-cta-blur-hover));
+  transform: scale(0.98);
+}
+
+.heroActions a.ctaSecondary[data-on-dark-cta]:active {
+  transform: scale(0.96);
 }
 
 /* Trust — glass tiles, air between */
@@ -1014,7 +1067,9 @@
   .directionBlock:hover,
   .directionBlock:hover .directionMore,
   .ctaPrimary:hover,
-  .ctaSecondary:hover,
+  .heroActions a.ctaSecondary[data-on-dark-cta]:hover,
+  .heroActions a.ctaPrimary[data-brand-cta]:active,
+  .heroActions a.ctaSecondary[data-on-dark-cta]:active,
   .heroDotActive::before {
     transform: none;
   }
