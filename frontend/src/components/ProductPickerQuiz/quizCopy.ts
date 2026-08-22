@@ -74,17 +74,17 @@ export const QUIZ_STEPS: Record<QuizStepId, QuizStepCopy> = {
       {
         id: "fire",
         title: "Огнезадерживающий клапан (ОЗК)",
-        hint: "Пожарная безопасность, работа при нагреве",
+        hint: "Серия SA…FU — пружинный возврат, термодатчик DST",
       },
       {
         id: "smoke",
         title: "Дымоудаление",
-        hint: "Клапаны дымоудаления и подпора",
+        hint: "SA…MU без пружины и HVD-…F с пружинным возвратом",
       },
       {
         id: "failsafe",
         title: "Возврат при отключении питания",
-        hint: "Пружинный или электронный fail-safe",
+        hint: "Обычные воздушные заслонки: пружина FU или электронный QX",
       },
       {
         id: "fast",
@@ -101,14 +101,38 @@ export const QUIZ_STEPS: Record<QuizStepId, QuizStepCopy> = {
       {
         id: "spring",
         title: "Пружинный возврат (FU)",
-        hint: "Механическая пружина — типично для ОЗК",
+        hint: "Механическая пружина — серия DA…FU на воздух",
       },
       {
         id: "electronic",
-        title: "Электронный fail-safe (EU)",
-        hint: "Электронный привод с контролем положения",
+        title: "Электронный fail-safe (QX)",
+        hint: "Конденсаторный возврат — серии HVA/HVD …QX",
       },
     ],
+  },
+  smoke_return: {
+    id: "smoke_return",
+    question: "Нужен пружинный возврат на дымовом клапане?",
+    lead:
+      "В каталоге дымоудаления две семьи: без пружины (SA…MU) и с пружиной (HVD-…F).",
+    choices: [
+      {
+        id: "no_spring",
+        title: "Без пружины",
+        hint: "Серия SA…MU — 2-/3-позиционное, без возвратной пружины",
+      },
+      {
+        id: "spring",
+        title: "С пружинным возвратом",
+        hint: "Серия HVD-…F — компактный пружинный привод",
+      },
+      {
+        id: "skip",
+        title: "Пока не знаю",
+        hint: "Покажем обе семьи дымоудаления",
+      },
+    ],
+    skippable: true,
   },
   voltage: {
     id: "voltage",
@@ -175,19 +199,20 @@ export const QUIZ_STEPS: Record<QuizStepId, QuizStepCopy> = {
     id: "temp_sensor",
     question: "Нужен термодатчик SAF72 по паспорту клапана?",
     lead:
-      "Термодатчик отключает привод при нагреве выше 72 °C: " +
-      "TS1 — датчик окружающей среды, TS2 — датчик в канале. " +
-      "В паспорте: у SA — исполнение «DST», у HVD — исполнение «ST».",
+      "Термодатчик отключает привод при нагреве выше 72 °C. " +
+      "ОЗК (SA…FU): «DST» со датчиком, «DS» без. " +
+      "Дымоудаление HVD-…F: «ST» со датчиком, «S» без. " +
+      "SA…MU в каталоге — только «DS» (без термодатчика).",
     choices: [
       {
         id: "yes",
         title: "Да, нужен термодатчик SAF72",
-        hint: "Исполнение «DST» (SA..FU) или «ST» (HVD-…F)",
+        hint: "ОЗК «DST» или дымоудаление HVD «ST»",
       },
       {
         id: "no",
         title: "Нет, без термодатчика",
-        hint: "Исполнение «DS» (SA) или «S» (HVD) — без SAF72",
+        hint: "ОЗК «DS», HVD «S» или все SA…MU",
       },
       {
         id: "skip",
@@ -408,7 +433,15 @@ export function buildQuizSummaryChips(answers: QuizAnswers): string[] {
 
   if (answers.application === "general") chips.push("Вентиляция");
   if (answers.application === "fire") chips.push("ОЗК");
-  if (answers.application === "smoke") chips.push("Дымоудаление");
+  if (answers.application === "smoke") {
+    if (answers.smokeReturn === "spring") {
+      chips.push("Дымоудаление · HVD-…F");
+    } else if (answers.smokeReturn === "no_spring") {
+      chips.push("Дымоудаление · SA…MU");
+    } else {
+      chips.push("Дымоудаление");
+    }
+  }
   if (answers.application === "fast") chips.push("Быстрый ход");
   if (answers.application === "failsafe") {
     chips.push(

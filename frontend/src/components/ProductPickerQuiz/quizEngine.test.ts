@@ -93,32 +93,69 @@ describe("quizEngine", () => {
     });
   });
 
-  it("inserts temp sensor step for fire application", () => {
+  it("skips control and inserts temp sensor for fire application", () => {
     let state = applyQuizChoice(createInitialQuizState(), "actuator");
     state = applyQuizChoice(state, "fire");
-    state = applyQuizChoice(state, "24");
-    state = applyQuizChoice(state, "onoff");
-    expect(getCurrentStepId(state)).toBe("temp_sensor");
+    expect(state.answers.control).toBe("onoff");
+    expect(plannedQuizSteps(state.answers)).not.toContain("control");
     expect(plannedQuizSteps(state.answers)).toContain("temp_sensor");
     expect(plannedQuizSteps(state.answers)).not.toContain("aux_switch");
+
+    state = applyQuizChoice(state, "24");
+    expect(getCurrentStepId(state)).toBe("temp_sensor");
 
     state = applyQuizChoice(state, "yes");
     expect(getCurrentStepId(state)).toBe("damper_area");
     expect(state.answers.tempSensor).toBe("yes");
   });
 
-  it("kit branch asks aux after voltage", () => {
+  it("skips modulating control for smoke extraction", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "actuator");
+    state = applyQuizChoice(state, "smoke");
+    expect(state.answers.control).toBe("onoff");
+    expect(getCurrentStepId(state)).toBe("smoke_return");
+    expect(plannedQuizSteps(state.answers)).toContain("smoke_return");
+    expect(plannedQuizSteps(state.answers)).not.toContain("control");
+
+    state = applyQuizChoice(state, "spring");
+    expect(getCurrentStepId(state)).toBe("voltage");
+    expect(state.answers.smokeReturn).toBe("spring");
+
+    state = applyQuizChoice(state, "230");
+    expect(getCurrentStepId(state)).toBe("temp_sensor");
+  });
+
+  it("skips temp sensor for smoke without spring (SA…MU)", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "actuator");
+    state = applyQuizChoice(state, "smoke");
+    state = applyQuizChoice(state, "no_spring");
+    expect(state.answers.tempSensor).toBe("no");
+    expect(plannedQuizSteps(state.answers)).not.toContain("temp_sensor");
+
+    state = applyQuizChoice(state, "24");
+    expect(getCurrentStepId(state)).toBe("damper_area");
+  });
+
+  it("kit branch asks control then aux after voltage", () => {
     let state = applyQuizChoice(createInitialQuizState(), "kit");
     expect(plannedQuizSteps(state.answers)).toEqual([
       "need",
       "voltage",
+      "control",
       "aux_switch",
     ]);
     state = applyQuizChoice(state, "24");
+    expect(getCurrentStepId(state)).toBe("control");
+    state = applyQuizChoice(state, "onoff");
     expect(getCurrentStepId(state)).toBe("aux_switch");
     state = applyQuizChoice(state, "yes");
     expect(state.phase).toBe("results");
-    expect(state.answers.auxSwitch).toBe("yes");
+    expect(state.answers).toMatchObject({
+      need: "kit",
+      voltage: "24",
+      control: "onoff",
+      auxSwitch: "yes",
+    });
   });
 
   it("resets branch answers when need changes", () => {
@@ -134,6 +171,7 @@ describe("quizEngine", () => {
   it("skip sets optional facet to skip and advances", () => {
     let state = applyQuizChoice(createInitialQuizState(), "kit");
     state = applyQuizChoice(state, "24");
+    state = applyQuizChoice(state, "onoff");
     state = skipQuizStep(state);
     expect(state.phase).toBe("results");
     expect(state.answers.auxSwitch).toBe("skip");

@@ -29,9 +29,30 @@ def filter_skus_by_facet(
     *,
     attr_ids: Iterable[int] | None = None,
 ) -> QuerySet[SKU]:
-    """Filter SKUs whose EAV value matches the facet (loose)."""
+    """Filter SKUs whose EAV value matches the facet (loose).
+
+    Comma-separated ``value`` means OR (any part matches) — used by the
+    product picker when discrete on/off spans several canon labels
+    (``Открыто/закрыто`` and ``2-/3-позиционное``).
+    """
     if facet.key == "analog":
         return _filter_skus_by_belimo_analog(queryset, value)
+
+    parts = [part.strip() for part in str(value).split(",") if part.strip()]
+    if len(parts) > 1:
+        matching: set[int] = set()
+        for part in parts:
+            matching.update(
+                filter_skus_by_facet(
+                    queryset,
+                    facet,
+                    part,
+                    attr_ids=attr_ids,
+                ).values_list("pk", flat=True),
+            )
+        if not matching:
+            return queryset.none()
+        return queryset.filter(pk__in=matching)
 
     ids = list(attr_ids) if attr_ids is not None else attribute_ids_for_facet(facet)
     if not ids:

@@ -74,8 +74,17 @@ export function buildCatalogParams(
     }
   }
 
-  if (answers.need === "actuator") {
-    if (answers.control && answers.control !== "skip") {
+  if (answers.need === "actuator" || answers.need === "kit") {
+    // Fire/smoke: only discrete control in category — do not pin one facet chip
+    // («Открыто/закрыто» vs «2-/3») or SAMU / HVD-F drop out of each other.
+    const skipControlFilter =
+      answers.need === "actuator" &&
+      (answers.application === "fire" || answers.application === "smoke");
+    if (
+      !skipControlFilter &&
+      answers.control &&
+      answers.control !== "skip"
+    ) {
       const value = matchControlFacet(
         facetValuesForKey(facets, "control"),
         answers.control,
@@ -84,6 +93,9 @@ export function buildCatalogParams(
         params.control = value;
       }
     }
+  }
+
+  if (answers.need === "actuator") {
     const estimatedNm = estimateRequiredMomentNm(answers);
     if (estimatedNm !== null) {
       const momentValue = matchMomentNmFacet(
@@ -171,23 +183,38 @@ export function buildCatalogParams(
     }
   }
 
+  // Smoke family split inside the shared category (SAMU vs HVD-…F).
+  if (
+    answers.need === "actuator" &&
+    answers.application === "smoke" &&
+    answers.smokeReturn &&
+    answers.smokeReturn !== "skip"
+  ) {
+    if (answers.smokeReturn === "spring") {
+      params.q = "HVD";
+    }
+    if (answers.smokeReturn === "no_spring") {
+      params.q = "SA";
+    }
+  }
+
   return params;
 }
 
 const RELAX_ORDER = [
   "area",
   "moment",
-  "temp_sensor",
   "aux_switch",
-  "control",
-  "voltage",
   "ways",
   "kvs",
   "dn",
-  "q",
 ] as const;
 
-/** Progressive relax variants when the strict filter set returns zero SKUs. */
+/**
+ * Progressive relax when the strict set returns zero SKUs.
+ * Never drops intent filters (control / temp_sensor / voltage / q) — those
+ * would surface products outside the user's branch.
+ */
 export function relaxCatalogParams(
   params: CatalogQueryParams,
 ): CatalogQueryParams[] {

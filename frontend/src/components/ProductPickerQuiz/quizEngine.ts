@@ -9,6 +9,9 @@ export type QuizApplication =
 
 export type QuizFailsafeType = "spring" | "electronic";
 
+/** Smoke dampers: HVD-…F (spring) vs SA…MU (no spring). */
+export type QuizSmokeReturn = "spring" | "no_spring" | "skip";
+
 export type QuizVoltage = "24" | "230" | "skip";
 
 export type QuizControl = "onoff" | "modulating" | "skip";
@@ -56,6 +59,7 @@ export type QuizStepId =
   | "need"
   | "application"
   | "failsafe_type"
+  | "smoke_return"
   | "voltage"
   | "control"
   | "aux_switch"
@@ -72,6 +76,7 @@ export type QuizAnswers = {
   need?: QuizNeed;
   application?: QuizApplication;
   failsafeType?: QuizFailsafeType;
+  smokeReturn?: QuizSmokeReturn;
   voltage?: QuizVoltage;
   control?: QuizControl;
   damperArea?: QuizDamperArea;
@@ -102,12 +107,32 @@ export function createInitialQuizState(): QuizState {
   };
 }
 
-/** Fire/smoke editions already include aux in DS/S — ask temp sensor instead. */
+/** Fire always; smoke only when HVD-F (or unknown) — SA…MU has no SAF72 in catalog. */
 export function quizNeedsTempSensorStep(answers: QuizAnswers): boolean {
-  return (
-    answers.need === "actuator" &&
-    (answers.application === "fire" || answers.application === "smoke")
-  );
+  if (answers.need !== "actuator") {
+    return false;
+  }
+  if (answers.application === "fire") {
+    return true;
+  }
+  if (answers.application === "smoke") {
+    return answers.smokeReturn !== "no_spring";
+  }
+  return false;
+}
+
+/**
+ * Control type (on/off vs modulating) — skip for fire/smoke valves.
+ * SAFU / SAMU are 2-/3-position only; no 0…10 V editions in catalog.
+ */
+export function quizNeedsControlStep(answers: QuizAnswers): boolean {
+  if (answers.need !== "actuator") {
+    return false;
+  }
+  if (answers.application === "fire" || answers.application === "smoke") {
+    return false;
+  }
+  return true;
 }
 
 /** Optional aux on ventilation / fast / fail-safe actuators and H81 kits. */
@@ -122,6 +147,17 @@ export function quizNeedsAuxStep(answers: QuizAnswers): boolean {
     return false;
   }
   return true;
+}
+
+/** After voltage (or control): temp sensor, aux, or damper sizing. */
+function stepAfterVoltageOrControl(answers: QuizAnswers): QuizStepId {
+  if (quizNeedsTempSensorStep(answers)) {
+    return "temp_sensor";
+  }
+  if (quizNeedsAuxStep(answers)) {
+    return "aux_switch";
+  }
+  return "damper_area";
 }
 
 function functionalStepsAfterControl(answers: QuizAnswers): QuizStepId[] {
@@ -148,8 +184,8 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
   }
   if (answers.need === "kit") {
     return quizNeedsAuxStep(answers)
-      ? ["need", "voltage", "aux_switch"]
-      : ["need", "voltage"];
+      ? ["need", "voltage", "control", "aux_switch"]
+      : ["need", "voltage", "control"];
   }
   if (answers.need === "adapter") {
     return ["need", "adapter_type"];
@@ -158,7 +194,14 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
   if (answers.application === "failsafe") {
     steps.push("failsafe_type");
   }
-  steps.push("voltage", "control", ...functionalStepsAfterControl(answers));
+  if (answers.application === "smoke") {
+    steps.push("smoke_return");
+  }
+  steps.push("voltage");
+  if (quizNeedsControlStep(answers)) {
+    steps.push("control");
+  }
+  steps.push(...functionalStepsAfterControl(answers));
   steps.push("damper_area", "damper_type", "damper_pressure");
   return steps;
 }
@@ -191,6 +234,9 @@ function setAnswerForStep(
       break;
     case "failsafe_type":
       next.failsafeType = choiceId as QuizFailsafeType;
+      break;
+    case "smoke_return":
+      next.smokeReturn = choiceId as QuizSmokeReturn;
       break;
     case "voltage":
       next.voltage = choiceId as QuizVoltage;
@@ -244,19 +290,27 @@ function nextStepAfter(
       return "results";
     case "application":
       if (answers.application === "failsafe") return "failsafe_type";
+      if (answers.application === "smoke") return "smoke_return";
       return "voltage";
     case "failsafe_type":
       return "voltage";
+    case "smoke_return":
+      return "voltage";
     case "voltage":
+      if (answers.need === "kit") {
+        return "control";
+      }
+      if (answers.need === "actuator") {
+        return quizNeedsControlStep(answers)
+          ? "control"
+          : stepAfterVoltageOrControl(answers);
+      }
+      return "results";
+    case "control":
       if (answers.need === "kit") {
         return quizNeedsAuxStep(answers) ? "aux_switch" : "results";
       }
-      if (answers.need === "actuator") return "control";
-      return "results";
-    case "control":
-      if (quizNeedsTempSensorStep(answers)) return "temp_sensor";
-      if (quizNeedsAuxStep(answers)) return "aux_switch";
-      return "damper_area";
+      return stepAfterVoltageOrControl(answers);
     case "temp_sensor":
       return "damper_area";
     case "aux_switch":
@@ -292,6 +346,17 @@ export function applyQuizChoice(
       need: answers.need,
       application: answers.application,
     };
+  }
+  // Fire/smoke: only on/off in catalog — lock control without asking.
+  if (
+    stepId === "application" &&
+    (answers.application === "fire" || answers.application === "smoke")
+  ) {
+    answers = { ...answers, control: "onoff" };
+  }
+  // SA…MU: no published DST — skip temp filter entirely.
+  if (stepId === "smoke_return" && answers.smokeReturn === "no_spring") {
+    answers = { ...answers, tempSensor: "no" };
   }
   const next = nextStepAfter(answers, stepId);
   if (next === "results") {
@@ -331,6 +396,7 @@ const QUIZ_SKIP_FIELD: Partial<Record<QuizStepId, keyof QuizAnswers>> = {
   control: "control",
   aux_switch: "auxSwitch",
   temp_sensor: "tempSensor",
+  smoke_return: "smokeReturn",
   damper_area: "damperArea",
   damper_type: "damperType",
   damper_pressure: "damperPressure",
@@ -344,6 +410,7 @@ const STEP_ANSWER_KEY: Partial<Record<QuizStepId, keyof QuizAnswers>> = {
   need: "need",
   application: "application",
   failsafe_type: "failsafeType",
+  smoke_return: "smokeReturn",
   voltage: "voltage",
   control: "control",
   damper_area: "damperArea",
@@ -373,8 +440,10 @@ export function goBackQuizStep(state: QuizState): QuizState {
   }
   if (dropped === "application") {
     delete answers.failsafeType;
+    delete answers.smokeReturn;
     delete answers.auxSwitch;
     delete answers.tempSensor;
+    delete answers.control;
   }
   return { answers, stepStack, phase: "questions" };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CatalogFacet } from "../../api/client";
 import { QUIZ_CATEGORY } from "./quizCategories";
+import { matchControlFacet } from "./quizFacetMatch";
 import {
   buildCatalogParams,
   catalogUrlFromParams,
@@ -140,6 +141,59 @@ describe("quizToCatalog", () => {
     expect(fire.category).toBe(QUIZ_CATEGORY.fire);
     expect(fire.temp_sensor).toBe("SAF72");
     expect(fire.aux_switch).toBeUndefined();
+    // Fire/smoke: no control facet pin (discrete-only category).
+    expect(fire.control).toBeUndefined();
+  });
+
+  it("maps kit control facet alongside voltage and aux", () => {
+    const params = buildCatalogParams(
+      {
+        need: "kit",
+        voltage: "24",
+        control: "modulating",
+        auxSwitch: "yes",
+      },
+      ACTUATOR_FACETS,
+    );
+    expect(params.category).toBe(QUIZ_CATEGORY.kit);
+    expect(params.voltage).toBe("24 В AC/DC");
+    expect(params.control).toBe("Пропорциональное 0…10 В");
+    expect(params.aux_switch).toBe("SPDT-2");
+  });
+
+  it("maps smoke spring/no-spring to HVD vs SA search", () => {
+    const spring = buildCatalogParams(
+      {
+        need: "actuator",
+        application: "smoke",
+        smokeReturn: "spring",
+        control: "onoff",
+        voltage: "skip",
+        damperArea: "skip",
+        damperType: "skip",
+        damperPressure: "skip",
+      },
+      ACTUATOR_FACETS,
+    );
+    expect(spring.category).toBe(QUIZ_CATEGORY.smoke);
+    expect(spring.q).toBe("HVD");
+    expect(spring.control).toBeUndefined();
+
+    const noSpring = buildCatalogParams(
+      {
+        need: "actuator",
+        application: "smoke",
+        smokeReturn: "no_spring",
+        control: "onoff",
+        tempSensor: "no",
+        voltage: "skip",
+        damperArea: "skip",
+        damperType: "skip",
+        damperPressure: "skip",
+      },
+      ACTUATOR_FACETS,
+    );
+    expect(noSpring.q).toBe("SA");
   });
 
   it("maps fire application to SA category", () => {
@@ -215,7 +269,7 @@ describe("quizToCatalog", () => {
     expect(variants[3]).not.toHaveProperty("dn");
   });
 
-  it("relaxes filters in area → moment → temp → aux → control → voltage order", () => {
+  it("relaxes only soft sizing/aux filters — keeps control and voltage", () => {
     const strict = {
       category: QUIZ_CATEGORY.general,
       page: "1",
@@ -228,12 +282,39 @@ describe("quizToCatalog", () => {
       voltage: "230 В",
     };
     const variants = relaxCatalogParams(strict);
-    expect(variants).toHaveLength(7);
+    expect(variants).toHaveLength(4);
     expect(variants[1]).not.toHaveProperty("area");
     expect(variants[2]).not.toHaveProperty("moment");
-    expect(variants[3]).not.toHaveProperty("temp_sensor");
-    expect(variants[4]).not.toHaveProperty("aux_switch");
-    expect(variants[5]).not.toHaveProperty("control");
-    expect(variants[6]).not.toHaveProperty("voltage");
+    expect(variants[3]).not.toHaveProperty("aux_switch");
+    const last = variants[variants.length - 1]!;
+    expect(last.control).toBe("Открыто/закрыто");
+    expect(last.voltage).toBe("230 В");
+    expect(last.temp_sensor).toBe("SAF72");
+  });
+});
+
+describe("matchControlFacet", () => {
+  it("treats 2-/3-position as discrete on/off intent", () => {
+    expect(
+      matchControlFacet(["2-/3-позиционное", "Пропорциональное"], "onoff"),
+    ).toBe("2-/3-позиционное");
+  });
+
+  it("ORs both discrete chips so DA and HVD stay in on/off results", () => {
+    expect(
+      matchControlFacet(
+        ["Открыто/закрыто", "2-/3-позиционное", "Пропорциональное"],
+        "onoff",
+      ),
+    ).toBe("2-/3-позиционное,Открыто/закрыто");
+  });
+
+  it("maps modulating to proportional chip", () => {
+    expect(
+      matchControlFacet(
+        ["Открыто/закрыто", "Пропорциональное 0…10 В"],
+        "modulating",
+      ),
+    ).toBe("Пропорциональное 0…10 В");
   });
 });

@@ -37,23 +37,37 @@ export function matchControlFacet(
   values: readonly string[],
   choice: Exclude<QuizControl, "skip">,
 ): string | null {
+  let onOffLabel: string | null = null;
+  let floatingLabel: string | null = null;
+  let modulatingLabel: string | null = null;
+
   for (const value of values) {
     const raw = value.trim();
     if (!raw) continue;
-    if (
-      choice === "onoff" &&
-      /открыто\s*\/\s*закрыто|вкл|on\/off/i.test(raw)
-    ) {
-      return value;
+    if (/открыто\s*\/\s*закрыто|вкл|on\/off/i.test(raw)) {
+      onOffLabel ??= value;
     }
-    if (
-      choice === "modulating" &&
-      /пропорциональн|модулир|плавн|0\s*[(.…\-−–—]?\s*10/i.test(raw)
-    ) {
-      return value;
+    if (/2\s*[-–—]?\s*\/\s*3|позицион/i.test(raw)) {
+      floatingLabel ??= value;
+    }
+    if (/пропорциональн|модулир|плавн|0\s*[(.…\-−–—]?\s*10/i.test(raw)) {
+      modulatingLabel ??= value;
     }
   }
-  return null;
+
+  if (choice === "modulating") {
+    return modulatingLabel;
+  }
+
+  // Discrete on/off may be stored as two canon chips — OR them so DA…D and
+  // HVD air are not dropped when the user asks for «открыть / закрыть».
+  const discrete = [floatingLabel, onOffLabel].filter(
+    (label): label is string => Boolean(label),
+  );
+  if (discrete.length === 0) {
+    return null;
+  }
+  return [...new Set(discrete)].join(",");
 }
 
 export function matchMomentNmFacet(

@@ -579,3 +579,48 @@ export function IconTempSensorOff(props: IconProps) {
     </Svg>
   );
 }
+
+/**
+ * IEC-style SPDT auxiliary contact (dry switch): common + NO/NC poles.
+ * Same glyph family as wiring diagrams in actuator manuals.
+ */
+function auxSpdtContact(stroke = SW) {
+  return (
+    <>
+      {/* Common terminal */}
+      <path d="M4 12h5.2" {...ink(stroke)} />
+      <circle cx={4} cy={12} r={1.05} {...fillInk()} />
+      {/* Movable arm toward NO (closed path) */}
+      <path d="M9.2 12L16.2 7.2" {...ink(stroke)} />
+      {/* NO pole (top) */}
+      <path d="M16.2 7.2H20" {...ink(stroke)} />
+      <circle cx={20} cy={7.2} r={1.05} {...fillInk()} />
+      {/* NC pole (bottom, open) */}
+      <path d="M16.2 16.8H20" {...ink(stroke)} />
+      <circle cx={20} cy={16.8} r={1.05} {...fillInk()} />
+    </>
+  );
+}
+
+/** Auxiliary SPDT present (DS/AS/S editions). */
+export function IconAuxSwitch(props: IconProps) {
+  return <Svg {...props}>{auxSpdtContact()}</Svg>;
+}
+
+/** No auxiliary switches — SPDT glyph in prohibition circle. */
+export function IconAuxSwitchOff(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx={12} cy={12} r={8.25} {...ink()} />
+      {/* Compact SPDT inside the circle */}
+      <path d="M6.2 12h3.4" {...ink(SW_FINE)} />
+      <circle cx={6.2} cy={12} r={0.75} {...fillInk()} />
+      <path d="M9.6 12L14.4 8.4" {...ink(SW_FINE)} />
+      <path d="M14.4 8.4H17.6" {...ink(SW_FINE)} />
+      <circle cx={17.6} cy={8.4} r={0.75} {...fillInk()} />
+      <path d="M14.4 15.6H17.6" {...ink(SW_FINE)} />
+      <circle cx={17.6} cy={15.6} r={0.75} {...fillInk()} />
+      <path d="M6.4 6.4l11.2 11.2" {...ink()} />
+    </Svg>
+  );
+}
