@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from django.test import override_settings
 
@@ -56,8 +58,22 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert "modulepreload" not in body
     assert 'type="module" src="/assets/index.js"' not in body
     assert 'getElementById("hoocon-lcp-boot")' in body
-    assert "requestIdleCallback(start" in body
-    assert "setTimeout(boot,2500)" in body
+    assert "setTimeout(start,2500)" in body
+    assert "requestIdleCallback" not in body
+    # CSS must not fight the hero WebP on Slow 4G (no style preload).
+    assert not re.search(
+        r'<link\b(?=[^>]*\brel=["\']preload["\'])(?=[^>]*\bas=["\']style["\'])',
+        body,
+        flags=re.IGNORECASE,
+    )
+    main_css = re.search(
+        r'<link\b[^>]*\bid=["\']hoocon-main-css["\'][^>]*>',
+        body,
+        flags=re.IGNORECASE,
+    )
+    assert main_css is not None
+    assert "data-href=" in main_css.group(0)
+    assert not re.search(r"(?<!data-)href=", main_css.group(0), flags=re.IGNORECASE)
 
 
 @pytest.mark.django_db

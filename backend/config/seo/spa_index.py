@@ -177,21 +177,70 @@ _MODULEPRELOAD_RE = re.compile(
     r'<link\b[^>]*\brel=["\']modulepreload["\'][^>]*>\s*',
     re.IGNORECASE,
 )
+# Match either attribute order: rel=preload as=style | as=style rel=preload.
+_STYLE_PRELOAD_RE = re.compile(
+    r'<link\b(?=[^>]*\brel=["\']preload["\'])(?=[^>]*\bas=["\']style["\'])[^>]*>\s*',
+    re.IGNORECASE,
+)
+_MAIN_CSS_LINK_RE = re.compile(
+    r'<link\b[^>]*\bid=["\']hoocon-main-css["\'][^>]*>',
+    re.IGNORECASE,
+)
+
+
+def _park_home_css_until_lcp(html: str) -> str:
+    """Drop CSS preload and park entry stylesheet href until after LCP.
+
+    On Slow 4G a ~90 KiB ``preload as=style`` contends with the hero WebP and
+    stretches LCP resource delay. Keep the ``media=print`` link in the DOM
+    (``main.tsx`` still flips it to ``all``) but set ``href`` only after the
+    boot image has loaded.
+    """
+    html = _STYLE_PRELOAD_RE.sub("", html)
+
+    def _park(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        href_match = re.search(
+            r'(?<![\w-])href=(["\'])([^"\']+)\1',
+            tag,
+            flags=re.IGNORECASE,
+        )
+        if not href_match:
+            return tag
+        href = href_match.group(2)
+        safe = escape(href, quote=True)
+        without_href = re.sub(
+            r'\s*(?<![\w-])href=(["\'])[^"\']+\1',
+            "",
+            tag,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        # Support both ``>`` and ``/>``; inject data-href before the closer.
+        closer = "/>" if without_href.rstrip().endswith("/>") else ">"
+        body = without_href.rstrip()
+        if body.endswith("/>"):
+            body = body[:-2].rstrip()
+        elif body.endswith(">"):
+            body = body[:-1].rstrip()
+        return f'{body} data-href="{safe}"{closer}'
+
+    return _MAIN_CSS_LINK_RE.sub(_park, html, count=1)
 
 
 def _defer_home_entry_until_lcp(html: str) -> str:
-    """Start the SPA entry module only after the LCP boot image has loaded.
+    """Start SPA JS/CSS only after the LCP boot image has loaded.
 
-    On Slow 4G, ``modulepreload`` + large ``vendor-react`` contend with the hero
-    WebP and block the main thread before the image can paint — LCP stays ~3–4s.
-    Waiting for ``#hoocon-lcp-boot`` ``load`` (with a safety timeout) lets the
-    SSR hero become LCP before JS download/parse.
+    On Slow 4G, ``modulepreload`` + CSS preload + ``vendor-react`` contend with
+    the hero WebP. Waiting for ``#hoocon-lcp-boot`` ``load`` (with a safety
+    timeout) lets the SSR hero paint first; then attach CSS href and entry JS
+    immediately (no idle delay — React adopt must not stretch LCP render delay).
 
     Args:
         html: Home HTML that already contains the SSR LCP boot image.
 
     Returns:
-        HTML with modulepreloads removed and entry script deferred.
+        HTML with module/style preloads removed and entry assets deferred.
     """
     match = _ENTRY_MODULE_RE.search(html)
     if not match:
@@ -200,6 +249,7 @@ def _defer_home_entry_until_lcp(html: str) -> str:
     src = match.group(1)
     src_js = json.dumps(src)
     html = _MODULEPRELOAD_RE.sub("", html)
+    html = _park_home_css_until_lcp(html)
     # Inline loader gets a CSP nonce via ``inject_csp_nonce`` (runs after this).
     loader = (
         '<script type="module">'
@@ -209,24 +259,26 @@ def _defer_home_entry_until_lcp(html: str) -> str:
         "function start(){"
         "if(started)return;"
         "started=true;"
+        'var css=document.getElementById("hoocon-main-css");'
+        "if(css){"
+        'var href=css.getAttribute("data-href");'
+        "if(href){"
+        'css.setAttribute("href",href);'
+        'css.removeAttribute("data-href");'
+        "}"
+        "}"
         'var s=document.createElement("script");'
         's.type="module";'
         's.crossOrigin="";'
         "s.src=src;"
         "document.head.appendChild(s);"
         "}"
-        "function boot(){"
-        "if(started)return;"
-        'if(typeof requestIdleCallback==="function"){'
-        "requestIdleCallback(start,{timeout:1500});"
-        "}else{start();}"
-        "}"
         'var img=document.getElementById("hoocon-lcp-boot");'
         "if(img&&!img.complete){"
-        'img.addEventListener("load",boot,{once:true});'
-        'img.addEventListener("error",boot,{once:true});'
-        "}else{boot();}"
-        "setTimeout(boot,2500);"
+        'img.addEventListener("load",start,{once:true});'
+        'img.addEventListener("error",start,{once:true});'
+        "}else{start();}"
+        "setTimeout(start,2500);"
         "})();"
         "</script>"
     )
@@ -240,7 +292,7 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     HTML+critical CSS while ``vendor-react`` downloads. The shell is a
     **sibling before** ``#root`` so ``createRoot`` does not destroy the LCP
     ``<img>``; HomePage adopts that node into the React hero on mount.
-    Entry JS is deferred until the boot image loads (mobile LCP).
+    Entry JS and main CSS start only after the boot image loads (mobile LCP).
 
     Args:
         html: SPA shell HTML.
