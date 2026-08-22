@@ -17,32 +17,33 @@ B2B-сайт и CMS для HVAC (электроприводы ОВК): ката�
 Python 3.12–3.13.
 
 **Лицензия:** проприетарная, все права защищены — [LICENSE](LICENSE).  
-**Безопасность:** [SECURITY.md](SECURITY.md) · [docs/security-baseline.md](docs/security-baseline.md).
+**Безопасность:** [SECURITY.md](SECURITY.md) · локально `_docs/security-baseline.md`.
 
 ## Репозиторий
 
 ```text
 backend/     Django apps (catalog, leads, search, …), API, ETL
 frontend/    Публичный SPA
-docs/        Проектная документация (wiki-индекс: docs/README.md)
+_docs/       Проектная документация (локально, не в git; индекс: _docs/README.md)
 scripts/     Checkup, деплой-хелперы
 ```
 
 ## Документация
 
-Полный индекс (wiki в репозитории): [`docs/README.md`](docs/README.md).
+Полный индекс (локально): `_docs/README.md` (каталог `_docs/` в git не
+попадает — см. `.gitignore`).
 
 Ключевые темы:
 
-| Тема | Файл |
-|------|------|
-| Версии релизов | [docs/releases.md](docs/releases.md) |
-| Безопасность | [docs/security-baseline.md](docs/security-baseline.md) · [SECURITY.md](SECURITY.md) |
+| Тема | Файл (локально) |
+|------|-----------------|
+| Версии релизов | `_docs/releases.md` |
+| Безопасность | `_docs/security-baseline.md` · [SECURITY.md](SECURITY.md) |
 | Лицензия | [LICENSE](LICENSE) (проприетарная) |
-| SEO / URL | [docs/seo-url-migration.md](docs/seo-url-migration.md) |
-| Инфраструктура | [docs/infra-reg-ru.md](docs/infra-reg-ru.md) |
-| ETL / качество данных | [docs/data-quality-etl.md](docs/data-quality-etl.md) |
-| Карточки серий | [docs/series-card-templates.md](docs/series-card-templates.md) |
+| SEO / URL | `_docs/seo-url-migration.md` |
+| Инфраструктура | `_docs/infra-reg-ru.md` |
+| ETL / качество данных | `_docs/data-quality-etl.md` |
+| Карточки серий | `_docs/series-card-templates.md` |
 
 ## Локальный запуск (кратко)
 
@@ -64,4 +65,4 @@ Docker: `docker-compose.yml` (dev) / `docker-compose.prod.yml` (prod).
 ## Статус
 
 Публичный каталог, поиск, RFQ, Admin/ETL и деплой на reg.ru в работе
-на ветке `develop`. Версия продукта — см. [docs/releases.md](docs/releases.md).
+на ветке `develop`. Версия продукта — см. `_docs/releases.md` (локально).

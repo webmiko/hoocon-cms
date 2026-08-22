@@ -13,8 +13,8 @@ from redirects.pathutils import normalize_path, validate_internal_path
 from redirects.services import load_redirects_from_csv, render_nginx_map
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TYPO_SEED = REPO_ROOT / "docs" / "redirects-slug-typo-seed.csv"
-TPRODUCT_SEED = REPO_ROOT / "docs" / "redirects-tproduct-seed.csv"
+TYPO_SEED = REPO_ROOT / "backend/redirects/seeds/redirects-slug-typo-seed.csv"
+TPRODUCT_SEED = REPO_ROOT / "backend/redirects/seeds/redirects-tproduct-seed.csv"
 
 
 def test_normalize_path_strips_trailing_slash() -> None:

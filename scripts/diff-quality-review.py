@@ -132,7 +132,7 @@ _SKIP_PATH_PARTS = (
     "__pycache__",
 )
 
-_ALLOW_TODO_IN = ("/docs/", "/ПЛАН", ".md")
+_ALLOW_TODO_IN = ("/_docs/", "/docs/", "/ПЛАН", ".md")
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 Политика ответственного раскрытия уязвимостей для [Hoocon CMS](https://hoocon.ru).
 
-Технический baseline проекта: [docs/security-baseline.md](docs/security-baseline.md).
+Технический baseline проекта (локально): `_docs/security-baseline.md`.
 
 ## Supported versions
 

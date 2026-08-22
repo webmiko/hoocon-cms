@@ -55,7 +55,7 @@ def _repo_root() -> Path:
 
 
 def _default_seed() -> Path:
-    return _repo_root() / "docs" / "redirects-tproduct-seed.csv"
+    return _repo_root() / "backend" / "redirects" / "seeds" / "redirects-tproduct-seed.csv"
 
 
 def _fetch_text(url: str, timeout: int = 25) -> str:
