@@ -27,16 +27,32 @@ Private Free: **2000 мин/мес** на GitHub-hosted runners.
 К концу недели N равномерный потолок = `N × 500`.
 Если месяц уже выше — скрипт предупреждает «темп выше плана».
 
-Один полный CI (test → lint → build → deploy) обычно **~5–15 мин**
-в зависимости от кэша Docker/npm. При лимите 500/нед это примерно
-**30–100 деплоев в неделю** — на практике упираетесь раньше в время
-сборки, чем в число пушей.
+Один полный CI (check → build → deploy) обычно **~4–10 мин**
+после оптимизации pipeline (см. `.github/workflows/ci.yml`).
+
+| Событие | Jobs | Минут (оценка) |
+|---------|------|----------------|
+| PR | check | ~3–5 |
+| push `develop` | check + build | ~5–8 |
+| push `main` | check + build + deploy | ~6–10 |
+| push только `docs/**`, `*.md` | — (workflow не стартует) | 0 |
+
+При лимите 500/нед это заметно больше прогонов, чем при старой
+цепочке test→lint→build→deploy на каждый push.
 
 ## Связь с деплоем
 
-Канон: push в `develop` / `main` → Actions → VPS
-([infra-reg-ru.md](infra-reg-ru.md)).
-Чтобы экономить минуты: копить коммиты и пушить пачкой в конце дня;
+Канон после оптимизации CI:
+
+- **Автодеплой:** push в `main` → Actions → VPS
+- **develop:** check + build (образ в GHCR), без deploy — выкладка
+  `./scripts/deploy-to-vps.sh` или merge в `main`
+- **Ручной полный цикл:** Actions → **Run workflow** → `deploy: true`
+  (с любой ветки, если нужен аварийный deploy)
+
+Подробности инфра: [infra-reg-ru.md](infra-reg-ru.md).
+
+Чтобы экономить минуты: копить коммиты, не пушить docs-only как code;
 при нулевом бюджете Actions — ручной деплой:
 
 ```bash

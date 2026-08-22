@@ -53,9 +53,11 @@ A/AAAA сайта указывали на VPS, а MX/TXT почты — на Я�
    reg.ru (скрипт + cron на хосте). Почта бэкапится средствами 360 /
    политикой организации — не в Docker.
 7. **Секреты** — только `.env` на сервере; в git — `.env.example`.
-8. **CI/CD** — GitHub Actions на push в `develop` / `main`: test →
-   lint → build (GHCR + `frontend/dist`) → deploy SSH
-   (`scripts/deploy-remote.sh`). Секреты репо: `SSH_PRIVATE_KEY`,
+8. **CI/CD** — GitHub Actions (`.github/workflows/ci.yml`): check
+   (pytest + lint) → build (GHCR + `frontend/dist`) → deploy SSH только
+   с `main` (`scripts/deploy-remote.sh`). Push в `develop` — check +
+   build без deploy; выкладка — merge в `main`, workflow_dispatch или
+   `./scripts/deploy-to-vps.sh`. Секреты репо: `SSH_PRIVATE_KEY`,
    `SSH_USER`, `SERVER_HOST`, `DEPLOY_PATH`. `.env` на VPS не
    перезаписывается. После успешного health — prune образов
    `ghcr.io/…/hoocon-cms` на VPS: оставляем **3** новейших ID

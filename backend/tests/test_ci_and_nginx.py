@@ -37,27 +37,45 @@ def test_ci_workflow_is_valid_yaml() -> None:
     assert "jobs" in data
 
 
-def test_ci_workflow_has_test_job_with_postgres() -> None:
-    """CI has a test job with a Postgres service container."""
+def test_ci_workflow_has_check_job_with_postgres() -> None:
+    """CI has a merged check job (pytest + lint) with a Postgres service."""
     import yaml
 
     data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
-    test_job = data["jobs"].get("test")
-    assert test_job is not None
-    services = test_job.get("services", {})
+    check_job = data["jobs"].get("check")
+    assert check_job is not None
+    services = check_job.get("services", {})
     assert "postgres" in services
+    steps = check_job.get("steps", [])
+    step_runs = [s.get("run", "") for s in steps if isinstance(s, dict)]
+    joined = "\n".join(step_runs)
+    assert "pytest" in joined
+    assert "ruff check" in joined
+    assert "mypy" in joined
+    assert "pip-audit" in joined
 
 
-def test_ci_workflow_has_lint_job() -> None:
-    """CI has a lint job (ruff + mypy + pip-audit)."""
+def test_ci_workflow_build_skipped_on_pull_request() -> None:
+    """Build (image + frontend) runs only on push / workflow_dispatch."""
     import yaml
 
     data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
-    lint_job = data["jobs"].get("lint")
-    assert lint_job is not None
-    # Lint job depends on test (gated pipeline).
-    assert "needs" in lint_job
-    assert "test" in lint_job["needs"]
+    build_job = data["jobs"].get("build")
+    assert build_job is not None
+    assert build_job.get("needs") == "check"
+    assert "pull_request" not in build_job.get("if", "")
+
+
+def test_ci_workflow_deploy_only_on_main() -> None:
+    """Deploy SSH runs on push to main (or manual workflow_dispatch)."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    deploy_job = data["jobs"].get("deploy")
+    assert deploy_job is not None
+    deploy_if = deploy_job.get("if", "")
+    assert "refs/heads/main" in deploy_if
+    assert "refs/heads/develop" not in deploy_if
 
 
 def test_ci_workflow_triggers_on_develop_and_main() -> None:

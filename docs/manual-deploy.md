@@ -3,9 +3,10 @@
 Запасной путь без минут GitHub Actions. Тот же смысл, что CI
 (test/lint → build → SSH), но с ноутбука.
 
-**Основной путь** по-прежнему: `git push` → Actions → VPS
-([infra-reg-ru.md](infra-reg-ru.md)). Ручной — только если квота
-2000 мин/мес кончилась или CI заблокирован биллингом
+**Основной путь:** push в `main` → Actions (check → build → deploy) → VPS
+([infra-reg-ru.md](infra-reg-ru.md)). Push в `develop` собирает образ,
+но **не** выкладывает — merge в `main` или этот скрипт. Ручной deploy
+также если квота 2000 мин/мес кончилась или CI заблокирован биллингом
 ([actions-minutes.md](actions-minutes.md)).
 
 ## Команда
