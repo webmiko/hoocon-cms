@@ -107,7 +107,7 @@
 
 .primary {
   background: var(--color-brand-control, var(--color-brand));
-  color: var(--color-on-brand-control, var(--color-on-brand));
+  color: var(--color-on-brand-control);
   box-shadow: var(--shadow);
 }
 

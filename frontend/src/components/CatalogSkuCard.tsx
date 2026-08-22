@@ -32,8 +32,8 @@ type CatalogSkuCardProps = {
   sku: SKUList;
   /** Skip ``id`` when the card is cloned (e.g. infinite carousel). */
   omitDomId?: boolean;
-  /** Home carousel: photo above copy, fixed card height. */
-  variant?: "default" | "vertical";
+  /** Home / quiz carousels: photo above copy, fixed slide height. */
+  variant?: "default" | "vertical" | "carousel";
 };
 
 /**
@@ -60,10 +60,13 @@ export function CatalogSkuCard({
   const editionsLabel = formatEditionCountLabel(sku.edition_count ?? 1);
   const ctaLabel = editionsLabel ? "Выбрать вариант" : "Паспорт и характеристики";
   const skuHref = catalogPathForSku(sku);
+  const highlightMax = variant === "carousel" ? 4 : undefined;
   const cardClass =
     variant === "vertical"
       ? `${styles.card} ${styles.cardVertical} u-protect-content`
-      : `${styles.card} u-protect-content`;
+      : variant === "carousel"
+        ? `${styles.card} ${styles.cardCarousel} u-protect-content`
+        : `${styles.card} u-protect-content`;
 
   function rememberFocus() {
     saveCatalogFocus({
@@ -146,7 +149,7 @@ export function CatalogSkuCard({
         ) : null}
         {sku.highlights && sku.highlights.length > 0 ? (
           <ul className={styles.cardSpecs} role="list">
-            {cardHighlights(sku.highlights).map((h) => {
+            {cardHighlights(sku.highlights, highlightMax).map((h) => {
               const unit = specDisplayUnit(h.value, h.unit);
               const label = compactCardSpecName(h.name);
               return (

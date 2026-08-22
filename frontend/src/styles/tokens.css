@@ -19,14 +19,18 @@
   --color-brand-fill: var(--color-brand);
   --color-brand-fill-hover: var(--color-brand-hover);
   --color-on-brand-fill: var(--color-on-brand);
-  /* Label on brand-control / data-brand-cta (may differ from ink on-brand in dark). */
+  /*
+   * Label on logo-red fill (--color-brand-fill / --color-primary-control).
+   * Always white in both themes — do not use --color-on-brand on red fills
+   * (dark theme remaps on-brand to ink for coral links).
+   */
   --color-on-brand-control: var(--color-on-brand-fill);
   /* Brand as ink on surfaces (dark theme remaps brand for WCAG AA). */
   --color-brand-ink: var(--color-brand);
 
   --color-primary: var(--color-brand);
   --color-primary-hover: var(--color-brand-hover);
-  --color-on-primary: var(--color-on-brand);
+  --color-on-primary: var(--color-on-brand-fill);
 
   /* Text links — separate from brand fill so dark theme can stay AA */
   --color-link: var(--color-brand-hover);
@@ -68,6 +72,29 @@
    */
   --control-blur: 32px;
   --control-saturate: 1.35;
+  /*
+   * Hero secondary CTAs (data-on-dark-cta): frosted glass + blur, no solid fill.
+   * Light theme (:root): как панель квиза (--glass-bg-strong), без blur;
+   * idle на 10% прозрачнее hover/active (0.86 vs 0.96); hover/active — blur как панель квиза.
+   */
+  --on-dark-cta-fill: rgba(255, 255, 255, 0.86);
+  --on-dark-cta-fill-hover: var(--glass-bg-strong);
+  --on-dark-cta-fill-active: var(--glass-bg-strong);
+  --on-dark-cta-text: #121214;
+  --on-dark-cta-text-hover: #121214;
+  --on-dark-cta-border: var(--glass-border);
+  --on-dark-cta-border-hover: var(--glass-border);
+  --on-dark-cta-blur: 0px;
+  --on-dark-cta-blur-hover: var(--glass-blur);
+  --on-dark-cta-saturate: 1.25;
+  --on-dark-cta-saturate-hover: var(--glass-saturate);
+  --on-light-cta-fill: rgba(255, 255, 255, 0.52);
+  --on-light-cta-fill-hover: rgb(255, 255, 255);
+  --on-light-cta-text: #121214;
+  --on-light-cta-border: rgba(0, 0, 0, 0.16);
+  --on-light-cta-border-hover: rgba(0, 0, 0, 0.32);
+  --on-light-cta-blur: var(--on-dark-cta-blur);
+  --on-light-cta-saturate: var(--on-dark-cta-saturate);
   /*
    * ≥94% so on-brand-fill stays ≥4.5:1 even when backdrop-filter blends a
    * bright page through the fill. Mix from brand-fill (logo), not brand-ink.
@@ -228,6 +255,7 @@ html[data-theme="dark"] {
   --color-on-brand-control: var(--color-on-brand-fill);
   --color-primary-control: var(--color-brand-control);
   --color-primary-control-hover: var(--color-brand-control-hover);
+  --color-on-primary: var(--color-on-brand-fill);
   --color-link: var(--color-brand);
   --color-link-hover: var(--color-brand-hover);
 
@@ -254,6 +282,15 @@ html[data-theme="dark"] {
   --glass-bg: rgba(22, 22, 28, 0.92);
   --glass-bg-strong: rgba(28, 28, 34, 0.96);
   --glass-border: rgba(255, 255, 255, 0.1);
+
+  /* Hero secondary CTAs (dark theme): idle #1c1c21; hover #333 90%. */
+  --on-dark-cta-fill: #1c1c21;
+  --on-dark-cta-fill-hover: rgba(51, 51, 51, 0.9);
+  --on-dark-cta-text: #ffffff;
+  --on-dark-cta-text-hover: #ffffff;
+  --on-dark-cta-border: rgba(255, 255, 255, 0.24);
+  --on-dark-cta-border-hover: rgba(255, 255, 255, 0.5);
+  --on-dark-cta-blur: var(--control-blur);
 
   --gradient-page:
     radial-gradient(ellipse 80% 55% at 8% -5%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 52%),

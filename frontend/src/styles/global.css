@@ -92,18 +92,42 @@ a[data-brand-cta]:link,
 a[data-brand-cta]:visited,
 a[data-brand-cta]:hover,
 a[data-brand-cta]:active,
-a[data-brand-cta]:visited:hover {
+a[data-brand-cta]:visited:hover,
+a[data-brand-fill]:link,
+a[data-brand-fill]:visited,
+a[data-brand-fill]:hover,
+a[data-brand-fill]:active,
+a[data-brand-fill]:visited:hover,
+button[data-brand-fill],
+button[data-brand-fill]:hover,
+button[data-brand-fill]:active,
+input[type="submit"][data-brand-fill],
+input[type="submit"][data-brand-fill]:hover {
   color: var(--color-on-brand-control);
   text-decoration: none;
 }
 
-/* Hero / on-dark glass CTAs — keep white label vs a:visited. */
+/* Hero / on-dark glass CTAs — white label on dark matte (see --on-dark-cta-*). */
 a[data-on-dark-cta]:link,
 a[data-on-dark-cta]:visited,
+a[data-on-dark-cta]:active {
+  color: var(--on-dark-cta-text);
+  text-decoration: none;
+}
+
 a[data-on-dark-cta]:hover,
-a[data-on-dark-cta]:active,
 a[data-on-dark-cta]:visited:hover {
-  color: #fff;
+  color: var(--on-dark-cta-text-hover);
+  text-decoration: none;
+}
+
+/* Inverse: dark label on light matte (e.g. bright hero band). */
+a[data-on-light-cta]:link,
+a[data-on-light-cta]:visited,
+a[data-on-light-cta]:hover,
+a[data-on-light-cta]:active,
+a[data-on-light-cta]:visited:hover {
+  color: var(--on-light-cta-text);
   text-decoration: none;
 }
 
@@ -157,10 +181,51 @@ button {
 
 /*
  * Brand / on-dark CTA links (often over hero media or sticky chrome).
- * Semi-opaque fill + strong blur so underlying text/images stay quiet.
+ * Translucent frosted fill + strong backdrop blur (theme tokens in tokens.css).
  */
 a[data-brand-cta],
+a[data-on-dark-cta],
+a[data-on-light-cta] {
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    transform var(--transition-fast),
+    box-shadow var(--transition),
+    -webkit-backdrop-filter var(--transition),
+    backdrop-filter var(--transition);
+}
+
 a[data-on-dark-cta] {
+  background-color: var(--on-dark-cta-fill);
+  border: 1px solid var(--on-dark-cta-border);
+  -webkit-backdrop-filter: saturate(var(--on-dark-cta-saturate)) blur(var(--on-dark-cta-blur));
+  backdrop-filter: saturate(var(--on-dark-cta-saturate)) blur(var(--on-dark-cta-blur));
+}
+
+a[data-on-dark-cta]:hover {
+  background-color: var(--on-dark-cta-fill-hover);
+  border-color: var(--on-dark-cta-border-hover);
+  color: var(--on-dark-cta-text-hover);
+  -webkit-backdrop-filter: saturate(var(--on-dark-cta-saturate-hover))
+    blur(var(--on-dark-cta-blur-hover));
+  backdrop-filter: saturate(var(--on-dark-cta-saturate-hover)) blur(var(--on-dark-cta-blur-hover));
+}
+
+a[data-on-light-cta] {
+  background-color: var(--on-light-cta-fill);
+  border: 1px solid var(--on-light-cta-border);
+  -webkit-backdrop-filter: saturate(var(--on-light-cta-saturate)) blur(var(--on-light-cta-blur));
+  backdrop-filter: saturate(var(--on-light-cta-saturate)) blur(var(--on-light-cta-blur));
+}
+
+a[data-on-light-cta]:hover {
+  background-color: var(--on-light-cta-fill-hover);
+  border-color: var(--on-light-cta-border-hover);
+  color: var(--on-light-cta-text);
+}
+
+a[data-brand-cta] {
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
 }
@@ -176,7 +241,8 @@ a[data-brand-cta]:hover {
 @media (prefers-reduced-transparency: reduce) {
   button,
   a[data-brand-cta],
-  a[data-on-dark-cta] {
+  a[data-on-dark-cta],
+  a[data-on-light-cta] {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -187,6 +253,26 @@ a[data-brand-cta]:hover {
 
   a[data-brand-cta]:hover {
     background-color: var(--color-brand-fill-hover);
+  }
+
+  a[data-on-dark-cta] {
+    background-color: color-mix(
+      in srgb,
+      var(--on-dark-cta-fill-hover) 82%,
+      var(--on-dark-cta-fill)
+    );
+  }
+
+  a[data-on-dark-cta]:hover {
+    background-color: var(--on-dark-cta-fill-hover);
+  }
+
+  a[data-on-light-cta] {
+    background-color: rgba(255, 255, 255, 0.92);
+  }
+
+  a[data-on-light-cta]:hover {
+    background-color: rgb(255, 255, 255);
   }
 }
 

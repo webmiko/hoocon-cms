@@ -154,7 +154,7 @@ export function DocsPage() {
             placeholder="SKU, семейство или название файла…"
             aria-label="Поиск по документации"
           />
-          <button type="submit" className={styles.button}>
+          <button type="submit" className={styles.button} data-brand-fill>
             Найти
           </button>
         </form>
@@ -239,6 +239,7 @@ export function DocsPage() {
                     className={styles.zipLink}
                     href={zipPath}
                     download={`${group.family}-docs.zip`}
+                    data-brand-fill
                   >
                     Скачать ZIP
                   </a>

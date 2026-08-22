@@ -3,6 +3,7 @@
   max-width: 960px;
   margin: 0 auto;
   padding-bottom: var(--space-2xl);
+  min-width: 0;
 }
 
 .header {
@@ -58,7 +59,7 @@
   background: var(--color-primary-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
-  color: var(--color-on-primary);
+  color: var(--color-on-brand-control);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -66,6 +67,7 @@
 
 .button:hover {
   background: var(--color-primary-control-hover);
+  color: var(--color-on-brand-control);
 }
 
 .filters {
@@ -163,7 +165,7 @@
   padding: 8px 14px;
   font-size: var(--font-size-sm);
   font-weight: 600;
-  color: var(--color-on-primary);
+  color: var(--color-on-brand-control);
   background: var(--color-primary-control);
   border-radius: var(--radius-sm);
   text-decoration: none;
@@ -172,6 +174,7 @@
 
 .zipLink:hover {
   background: var(--color-primary-control-hover);
+  color: var(--color-on-brand-control);
 }
 
 .fileList {
@@ -249,6 +252,22 @@
   color: var(--color-brand);
 }
 
+/*
+ * Dark theme: default hairline borders are below WCAG 1.4.11 on surface;
+ * interactive blocks use control-border (≥3:1 vs --color-surface).
+ */
+:global(html[data-theme="dark"]) .input,
+:global(html[data-theme="dark"]) .chip,
+:global(html[data-theme="dark"]) .chipActive,
+:global(html[data-theme="dark"]) .fileItem,
+:global(html[data-theme="dark"]) .group {
+  border-color: var(--color-control-border);
+}
+
+:global(html[data-theme="dark"]) .chipActive {
+  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-control-border));
+}
+
 @media (max-width: 640px) {
   .form {
     flex-direction: column;
@@ -261,5 +280,27 @@
   .chipLabel {
     width: 100%;
     margin: 0 0 2px;
+  }
+
+  .groupHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zipLink {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .fileItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skuLink {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
