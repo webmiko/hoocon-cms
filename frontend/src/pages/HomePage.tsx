@@ -687,9 +687,11 @@ export function HomePage() {
         </div>
       </section>
 
-      <Suspense fallback={null}>
-        <ProductPickerQuiz />
-      </Suspense>
+      <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={480}>
+        <Suspense fallback={<div style={{ minHeight: 480 }} aria-hidden="true" />}>
+          <ProductPickerQuiz />
+        </Suspense>
+      </DeferredMount>
 
       <section className={styles.trust} aria-label="Преимущества">
         <div className={styles.trustItem}>

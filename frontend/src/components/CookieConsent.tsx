@@ -4,7 +4,7 @@
  * Spec: ПЛАН §6 Iter 4 — F10; docs/security-baseline.md §privacy; БЗ §8.6.
  */
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -68,7 +68,7 @@ export function CookieConsent() {
     };
   }, [mode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const open = mode !== "hidden";
     if (open) {

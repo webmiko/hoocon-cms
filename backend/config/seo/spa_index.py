@@ -95,11 +95,13 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
 
 def _home_ssr_hero_css() -> str:
     """Critical CSS for the server-rendered home hero (no React, no entry CSS)."""
-    # Fixed overlay outside ``#root`` so ``createRoot`` cannot wipe the LCP img.
+    # Fixed band outside ``#root`` (not full-viewport inset) so the LCP img
+    # matches React ``.hero`` height and is not re-measured after adopt.
     return """
-#hoocon-ssr-hero{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;
-justify-content:flex-end;min-height:100vh;padding:72px 24px 48px;background:#101010;color:#fff;
-overflow:hidden;box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#hoocon-ssr-hero{position:fixed;top:0;left:0;right:0;z-index:10000;display:flex;flex-direction:column;
+justify-content:flex-end;min-height:min(78vh,760px);height:min(78vh,760px);padding:72px 24px 48px;
+background:#101010;color:#fff;overflow:hidden;box-sizing:border-box;
+font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #hoocon-ssr-hero .hoocon-ssr-hero__img{position:absolute;inset:0;width:100%;height:100%;
 object-fit:cover;pointer-events:none}
 #hoocon-ssr-hero .hoocon-ssr-hero__shade{position:absolute;inset:0;pointer-events:none;background:
@@ -119,6 +121,8 @@ min-height:44px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:600;
 #hoocon-ssr-hero .hoocon-ssr-hero__cta--primary{background:#da0e2b;color:#fff}
 #hoocon-ssr-hero .hoocon-ssr-hero__cta--secondary{background:transparent;color:#fff;
 border:1px solid rgba(255,255,255,.55)}
+@media (max-width:768px){#hoocon-ssr-hero{min-height:min(70vh,640px);height:min(70vh,640px);
+padding:64px 16px 56px}}
 """.replace("\n", "")
 
 
@@ -131,7 +135,7 @@ def _home_ssr_hero_markup() -> str:
     return (
         f'<section id="hoocon-ssr-hero" aria-labelledby="hoocon-ssr-brand">'
         f'<img class="hoocon-ssr-hero__img" id="hoocon-lcp-boot" src="{img}" alt="" '
-        f'width="960" height="640" decoding="async" fetchpriority="high">'
+        f'width="960" height="640" decoding="sync" fetchpriority="high">'
         f'<div class="hoocon-ssr-hero__shade" aria-hidden="true"></div>'
         f'<div class="hoocon-ssr-hero__brand">'
         f'<p id="hoocon-ssr-brand" class="hoocon-ssr-hero__eyebrow">{brand}</p>'
