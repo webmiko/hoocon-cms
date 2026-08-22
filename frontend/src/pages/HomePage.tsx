@@ -9,6 +9,7 @@ import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import {
   fadeOutHomeSsrHero,
+  hideHomeSsrHeroFromA11y,
   homeSsrLcpBootPresent,
 } from "../utils/adoptHomeSsrLcpImage";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
@@ -550,6 +551,7 @@ export function HomePage() {
     if (!useSsrBoot) {
       return;
     }
+    hideHomeSsrHeroFromA11y();
     const dismiss = () => {
       if (!useSsrBoot) {
         return;

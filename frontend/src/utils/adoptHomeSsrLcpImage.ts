@@ -6,6 +6,22 @@ export const HOME_SSR_HERO_CSS_ID = "hoocon-ssr-hero-css";
 const FADE_MS = 320;
 
 /**
+ * Hide the SSR hero overlay from the accessibility tree once React mounts.
+ *
+ * The SSR hero stays visually on top (``position:fixed``) for LCP stability
+ * until the user interacts, but its duplicate H1/brand/CTAs must not appear
+ * in the a11y tree or be read by screen readers alongside the React hero.
+ */
+export function hideHomeSsrHeroFromA11y(): void {
+  const hero = document.getElementById(HOME_SSR_HERO_ID);
+  if (!hero) {
+    return;
+  }
+  hero.setAttribute("aria-hidden", "true");
+  hero.setAttribute("inert", "");
+}
+
+/**
  * Fade out the SSR hero overlay, then remove it after the transition.
  *
  * The SSR hero image stays as the LCP element — it is never moved or re-painted.
