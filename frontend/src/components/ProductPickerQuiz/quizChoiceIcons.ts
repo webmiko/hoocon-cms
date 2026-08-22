@@ -41,6 +41,8 @@ import {
   IconSkipUnknown,
   IconSmokeExtract,
   IconSpringReturn,
+  IconTempSensor,
+  IconTempSensorOff,
   IconValve2Way,
   IconValve3Way,
   IconVentGeneral,
@@ -96,9 +98,20 @@ const CHOICE_ICONS: Record<string, QuizIcon> = {
   br_m: IconAdapterBrM,
   br_ml: IconAdapterBrMl,
   skip: IconSkipUnknown,
+  "temp_sensor:yes": IconTempSensor,
+  "temp_sensor:no": IconTempSensorOff,
 };
 
-/** SVG pictogram for a quiz choice card. */
-export function iconForChoice(choiceId: string): QuizIcon | null {
+/** SVG pictogram for a quiz choice card (step-scoped keys beat bare ids). */
+export function iconForChoice(
+  choiceId: string,
+  stepId?: string,
+): QuizIcon | null {
+  if (stepId) {
+    const scoped = CHOICE_ICONS[`${stepId}:${choiceId}`];
+    if (scoped) {
+      return scoped;
+    }
+  }
   return CHOICE_ICONS[choiceId] ?? null;
 }

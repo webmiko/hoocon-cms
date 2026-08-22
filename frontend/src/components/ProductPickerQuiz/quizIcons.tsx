@@ -549,3 +549,33 @@ export function IconSkipUnknown(props: IconProps) {
     </Svg>
   );
 }
+
+/** Thermometer — SAF72 / thermal edition present. */
+export function IconTempSensor(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M10 14.2V6.2a2 2 0 0 1 4 0v8a3.2 3.2 0 1 1-4 0Z"
+        {...ink()}
+      />
+      <circle cx={12} cy={17.2} r={1.35} {...fillInk()} />
+      <path d="M12 15.6V9.2" {...ink(SW_FINE)} />
+      <path d="M15.2 7.2h1.6M15.2 9.4h1.6M15.2 11.6h1.6" {...ink(SW_FINE)} />
+    </Svg>
+  );
+}
+
+/** Thermometer in prohibition circle — no thermal sensor. */
+export function IconTempSensorOff(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx={12} cy={12} r={8.25} {...ink()} />
+      <path
+        d="M10.4 13.4V7.3a1.6 1.6 0 0 1 3.2 0v6.1a2.55 2.55 0 1 1-3.2 0Z"
+        {...ink(SW_FINE)}
+      />
+      <circle cx={12} cy={15.85} r={0.95} {...fillInk()} />
+      <path d="M6.4 6.4l11.2 11.2" {...ink()} />
+    </Svg>
+  );
+}

@@ -182,7 +182,7 @@ export function ProductPickerQuiz() {
 
               <div className={styles.choiceGrid} role="group" aria-label={stepCopy.question}>
                 {stepCopy.choices.map((choice) => {
-                  const Icon = iconForChoice(choice.id);
+                  const Icon = iconForChoice(choice.id, stepId ?? undefined);
                   return (
                     <button
                       key={choice.id}
