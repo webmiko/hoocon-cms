@@ -3,7 +3,7 @@
   left: 0;
   right: 0;
   bottom: var(--bottom-chrome, 0px);
-  z-index: 40;
+  z-index: 200;
   /* Shared dock CTA box — Chat / 4 из 4 / КП. */
   --dock-btn-h: 2.75rem;
   --dock-btn-pad-x: 16px;
