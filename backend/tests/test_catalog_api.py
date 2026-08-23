@@ -205,6 +205,43 @@ def test_sku_list_shows_price_when_flag_enabled(client) -> None:
 
 
 @pytest.mark.django_db
+def test_sku_list_site_settings_reads_do_not_scale_with_rows(client) -> None:
+    """Price flag is resolved per request, not twice per card.
+
+    ``price_on_request`` and ``to_representation`` both consult
+    SiteSettings, so a 20-row page used to load the singleton 40 times.
+    Asserting the count is row-independent keeps that from creeping back
+    without pinning a brittle absolute number.
+    """
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.models import SKU
+
+    def site_settings_reads() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            response = client.get(reverse("catalog-sku-list"))
+        assert response.status_code == 200
+        return sum("sitesettings" in q["sql"].lower() for q in ctx.captured_queries)
+
+    seed = _seed_catalog()
+    reads_with_one_row = site_settings_reads()
+
+    for index in range(6):
+        SKU.objects.create(
+            product=seed["product"],
+            name=f"Привод HVA {index}NM",
+            slug=f"privod-hva-{index}nm-extra",
+            sku_code=f"HVA-{index}NM-X",
+            is_published=True,
+        )
+    response = client.get(reverse("catalog-sku-list"))
+    assert len(response.data["results"]) == 7
+
+    assert site_settings_reads() == reads_with_one_row
+
+
+@pytest.mark.django_db
 def test_sku_filter_by_attribute_slug(client) -> None:
     """?moment=5 filters SKUs via EAV AttributeValue exact match."""
     seed = _seed_catalog()
