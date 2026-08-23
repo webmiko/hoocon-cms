@@ -231,6 +231,24 @@ location / {
 }
 
 location @spa {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 256;
+    gzip_types text/html;
+    gzip_proxied any;
+
+    proxy_cache hoocon_spa;
+    proxy_cache_key "$scheme$host$request_uri";
+    proxy_cache_valid 200 5m;
+    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+    proxy_cache_lock on;
+    proxy_ignore_headers Cache-Control;
+    add_header X-Proxy-Cache $upstream_cache_status always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
