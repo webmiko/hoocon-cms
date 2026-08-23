@@ -89,6 +89,9 @@ def load_redirects_from_csv(path: Path, *, dry_run: bool = False) -> dict[str, i
             else:
                 updated += 1
 
+    from redirects.lookup import clear_redirect_index
+
+    clear_redirect_index()
     return {"created": created, "updated": updated, "skipped": skipped, "total": total}
 
 
