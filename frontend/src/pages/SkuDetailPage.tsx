@@ -29,7 +29,11 @@ import {
 import { compactCardSpecName } from "../utils/cardHighlights";
 import { specDisplayUnit } from "../utils/specDisplay";
 import { stockAvailabilityLabel } from "../utils/stockAvailability";
-import { skuSeoDescription, skuSeoTitlePartial } from "../utils/seoMeta";
+import {
+  skuNotFoundSeoTitle,
+  skuSeoDescription,
+  skuSeoTitlePartial,
+} from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
 import { photoScalePlanFromHighlights } from "../utils/productPhotoScale";
 import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
@@ -304,7 +308,7 @@ export function SkuDetailPage() {
     return (
       <div className={styles.notFound}>
         <Seo
-          title="Товар не найден"
+          title={skuNotFoundSeoTitle(routeSlug)}
           path={
             categorySlug && slug
               ? catalogSkuPath(categorySlug, slug)
