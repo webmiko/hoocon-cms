@@ -44,7 +44,7 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert "hoocon-ssr-hero" not in body
     assert "hoocon-lcp-boot" not in body
     assert 'type="module" src="/assets/index.js"' in body
-    assert "getElementById(\"hoocon-lcp-boot\")" not in body
+    assert 'getElementById("hoocon-lcp-boot")' not in body
 
 
 @pytest.mark.django_db
