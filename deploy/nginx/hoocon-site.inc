@@ -30,6 +30,49 @@ location /api/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
+# Public read-only JSON — the only /api/ subtrees we compress. Opt-in, not
+# opt-out: /api/csrf/ hands out a CSRF token and /api/support/ carries chat
+# bodies, so a blanket `gzip on` under /api/ would put a secret and reflected
+# input in the same compressed response. Catalog and content are anonymous GETs
+# with no secret, and they are the big payloads (skus ~32 KiB, pages ~46 KiB).
+# These blocks duplicate the /api/ proxy setup because a longer prefix wins
+# outright in nginx — keep limit_req and the proxy headers in sync with it.
+location /api/catalog/ {
+    limit_req zone=api_limit burst=20 nodelay;
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json;
+    # B2B clients often sit behind corporate proxies, which send Via; the
+    # default (off) would ship these responses raw to exactly those users.
+    gzip_proxied any;
+
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /api/content/ {
+    limit_req zone=api_limit burst=20 nodelay;
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json;
+    gzip_proxied any;
+
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 # Lead submission — stricter rate limit (Iter 3 throttle + nginx backstop).
 location /api/leads/ {
     limit_req zone=lead_limit burst=3 nodelay;
