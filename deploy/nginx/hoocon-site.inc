@@ -80,8 +80,22 @@ location /media/ {
     add_header Content-Disposition "inline";
 }
 
+# gzip_types stays inside the static locations on purpose. nginx.conf enables
+# gzip globally but its default gzip_types is text/html, so proxied HTML was
+# compressed while /assets/*.css|js shipped raw (~454 KiB) and starved the hero
+# WebP of bandwidth (mobile LCP load delay 870 ms). Declaring the types here
+# leaves HTML/API encoding exactly as before — no new BREACH surface on
+# CSRF-bearing responses. woff2 is already compressed; keep it out of the list.
+
 # Django collectstatic — long cache (hashed filenames when ManifestStaticFiles).
 location /static/ {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/css text/javascript text/plain application/javascript
+               application/json image/svg+xml;
+
     alias /var/www/hoocon/staticfiles/;
     expires 30d;
     add_header Cache-Control "public, max-age=2592000, immutable" always;
@@ -90,6 +104,13 @@ location /static/ {
 
 # Vite hashed bundles (JS/CSS/fonts under /assets/*-[hash].*) — immutable.
 location /assets/ {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/css text/javascript text/plain application/javascript
+               application/json image/svg+xml;
+
     expires 1y;
     add_header Cache-Control "public, max-age=31536000, immutable" always;
     add_header X-Content-Type-Options "nosniff" always;
