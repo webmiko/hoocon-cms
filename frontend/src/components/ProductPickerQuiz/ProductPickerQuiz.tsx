@@ -242,11 +242,20 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
           <div className={styles.stepBody} aria-live="polite">
             <div className={styles.resultsHead}>
               <h3 className={styles.resultsTitle}>
-                {results.loading
-                  ? "Подбираем модели…"
-                  : results.totalCount > 0
-                    ? formatQuizResultsCount(results.totalCount)
-                    : "По этим параметрам точных моделей нет"}
+                {results.loading ? (
+                  <span className={styles.loadingPhrase}>
+                    Подбираем модели
+                    <span className={styles.loadingDots} aria-hidden="true">
+                      <span className={styles.loadingDot} />
+                      <span className={styles.loadingDot} />
+                      <span className={styles.loadingDot} />
+                    </span>
+                  </span>
+                ) : results.totalCount > 0 ? (
+                  formatQuizResultsCount(results.totalCount)
+                ) : (
+                  "По этим параметрам точных моделей нет"
+                )}
               </h3>
               {results.relaxed && !results.loading ? (
                 <p className={styles.resultsNote}>
@@ -263,7 +272,18 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
             ) : null}
 
             {results.loading ? (
-              <p className={styles.status}>Загружаем подборку из каталога…</p>
+              <div
+                className={styles.resultsCarousel}
+                aria-busy="true"
+                aria-label="Подбираем модели по вашим ответам"
+              >
+                <div className={styles.resultsSlide}>
+                  <div className={styles.resultsSkeletonCard} />
+                </div>
+                <div className={styles.resultsSlide}>
+                  <div className={styles.resultsSkeletonCard} />
+                </div>
+              </div>
             ) : results.items.length > 0 ? (
               <div className={styles.resultsCarousel}>
                 {results.items.map((sku) => (
