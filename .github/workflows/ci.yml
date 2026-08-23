@@ -119,9 +119,15 @@ jobs:
       - name: npm ci
         working-directory: frontend
         run: npm ci
-      - name: npm audit (high+)
+      # Split so severity maps to actual exposure. Advisories in build tooling
+      # (eslint, openapi-typescript, vite-plugin-pwa) never reach a visitor, so
+      # they must not gate CD; anything in the shipped bundle must. One blanket
+      # continue-on-error step hid a high glob DoS behind a green job for months.
+      - name: npm audit (runtime deps, blocking)
         working-directory: frontend
-        # Known upstream peers (TS6 / openapi-typescript); do not block CD.
+        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit (build tooling, advisory only)
+        working-directory: frontend
         continue-on-error: true
         run: npm audit --audit-level=high
 
