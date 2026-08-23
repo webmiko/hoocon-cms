@@ -24,10 +24,9 @@ export function hideHomeSsrHeroFromA11y(): void {
 /**
  * Fade out the SSR hero overlay, then remove it after the transition.
  *
- * The SSR hero image stays as the LCP element — it is never moved or re-painted.
  * On interaction (scroll/click/keydown) we fade the overlay so the React hero
  * underneath becomes visible. Removing the element after fade does not create
- * a new LCP candidate.
+ * a new LCP candidate when ``.heroMedia`` matches the SSR band height.
  */
 export function fadeOutHomeSsrHero(): void {
   const hero = document.getElementById(HOME_SSR_HERO_ID);
