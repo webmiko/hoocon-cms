@@ -161,6 +161,26 @@ describe("quizToCatalog", () => {
     expect(params.aux_switch).toBe("SPDT-2");
   });
 
+  it("maps kit answers to dn, kvs and ways facets", () => {
+    const params = buildCatalogParams(
+      {
+        need: "kit",
+        voltage: "24",
+        control: "onoff",
+        auxSwitch: "no",
+        dn: "25",
+        kvs: "6_to_16",
+        ways: "3",
+      },
+      [...ACTUATOR_FACETS, ...BALL_VALVE_FACETS],
+    );
+    expect(params.category).toBe(QUIZ_CATEGORY.kit);
+    expect(params.dn).toBe("DN 25");
+    expect(params.kvs).toBe("10");
+    expect(params.ways).toBe("3-ходовой");
+    expect(params.aux_switch).toBe("Нет");
+  });
+
   it("maps smoke spring/no-spring to HVD vs SA search", () => {
     const spring = buildCatalogParams(
       {

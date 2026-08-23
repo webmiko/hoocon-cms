@@ -136,25 +136,37 @@ describe("quizEngine", () => {
     expect(getCurrentStepId(state)).toBe("damper_area");
   });
 
-  it("kit branch asks control then aux after voltage", () => {
+  it("kit branch asks control, aux, then dn/kvs/ways after voltage", () => {
     let state = applyQuizChoice(createInitialQuizState(), "kit");
     expect(plannedQuizSteps(state.answers)).toEqual([
       "need",
       "voltage",
       "control",
       "aux_switch",
+      "dn",
+      "kvs",
+      "ways",
     ]);
     state = applyQuizChoice(state, "24");
     expect(getCurrentStepId(state)).toBe("control");
     state = applyQuizChoice(state, "onoff");
     expect(getCurrentStepId(state)).toBe("aux_switch");
     state = applyQuizChoice(state, "yes");
+    expect(getCurrentStepId(state)).toBe("dn");
+    state = applyQuizChoice(state, "25");
+    expect(getCurrentStepId(state)).toBe("kvs");
+    state = applyQuizChoice(state, "6_to_16");
+    expect(getCurrentStepId(state)).toBe("ways");
+    state = applyQuizChoice(state, "2");
     expect(state.phase).toBe("results");
     expect(state.answers).toMatchObject({
       need: "kit",
       voltage: "24",
       control: "onoff",
       auxSwitch: "yes",
+      dn: "25",
+      kvs: "6_to_16",
+      ways: "2",
     });
   });
 
@@ -173,8 +185,17 @@ describe("quizEngine", () => {
     state = applyQuizChoice(state, "24");
     state = applyQuizChoice(state, "onoff");
     state = skipQuizStep(state);
-    expect(state.phase).toBe("results");
+    expect(getCurrentStepId(state)).toBe("dn");
     expect(state.answers.auxSwitch).toBe("skip");
+    state = skipQuizStep(state);
+    state = skipQuizStep(state);
+    state = skipQuizStep(state);
+    expect(state.phase).toBe("results");
+    expect(state.answers).toMatchObject({
+      dn: "skip",
+      kvs: "skip",
+      ways: "skip",
+    });
   });
 
   it("walks adapter branch to BR-M or BR-ML", () => {

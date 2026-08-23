@@ -183,9 +183,16 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
     return ["need", "dn", "kvs", "ways"];
   }
   if (answers.need === "kit") {
-    return quizNeedsAuxStep(answers)
-      ? ["need", "voltage", "control", "aux_switch"]
-      : ["need", "voltage", "control"];
+    const steps: QuizStepId[] = [
+      "need",
+      "voltage",
+      "control",
+    ];
+    if (quizNeedsAuxStep(answers)) {
+      steps.push("aux_switch");
+    }
+    steps.push("dn", "kvs", "ways");
+    return steps;
   }
   if (answers.need === "adapter") {
     return ["need", "adapter_type"];
@@ -308,13 +315,18 @@ function nextStepAfter(
       return "results";
     case "control":
       if (answers.need === "kit") {
-        return quizNeedsAuxStep(answers) ? "aux_switch" : "results";
+        if (quizNeedsAuxStep(answers)) {
+          return "aux_switch";
+        }
+        return "dn";
       }
       return stepAfterVoltageOrControl(answers);
     case "temp_sensor":
       return "damper_area";
     case "aux_switch":
-      if (answers.need === "kit") return "results";
+      if (answers.need === "kit") {
+        return "dn";
+      }
       return "damper_area";
     case "damper_area":
       return "damper_type";
