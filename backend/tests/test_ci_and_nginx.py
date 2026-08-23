@@ -189,6 +189,13 @@ def test_redirects_map_file_exists() -> None:
     assert REDIRECTS_MAP.exists(), f"Missing redirects map: {REDIRECTS_MAP}"
 
 
+def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
+    """proxy_cache_path needs the on-disk dir before ``nginx -t`` on VPS."""
+    deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+    assert "mkdir -p /var/cache/nginx/hoocon_spa" in deploy
+    assert deploy.index("mkdir -p /var/cache/nginx/hoocon_spa") < deploy.index("nginx -t")
+
+
 def test_redirects_map_has_documentation() -> None:
     """redirects.map has usage documentation (not just empty)."""
     content = REDIRECTS_MAP.read_text(encoding="utf-8")

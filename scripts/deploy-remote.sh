@@ -82,6 +82,8 @@ if [[ -d deploy/nginx ]]; then
          cp '${DEPLOY_PATH}/deploy/nginx/admin-allow.conf.example' \
            /etc/nginx/admin-allow.conf.example; \
        fi; \
+       mkdir -p /var/cache/nginx/hoocon_spa; \
+       chown www-data:www-data /var/cache/nginx/hoocon_spa 2>/dev/null || true; \
        ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
        SSLIP_DOMAIN=\"\$(grep -E '^VPS_SSLIP_DOMAIN=' '${DEPLOY_PATH}/.env' 2>/dev/null \
          | tail -1 | cut -d= -f2- | tr -d '\"' | tr -d \"'\" | xargs || true)\"; \
