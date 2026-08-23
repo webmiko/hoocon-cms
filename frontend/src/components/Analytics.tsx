@@ -13,6 +13,7 @@ import {
   setAnalyticsCounters,
   trackSpaHit,
 } from "../utils/analyticsTrack";
+import { yandexMetrikaInitOptions } from "../utils/yandexMetrikaInit";
 import {
   COOKIE_CONSENT_CHANGE_EVENT,
   COOKIE_CONSENT_STORAGE_KEY,
@@ -100,11 +101,8 @@ function loadYandexMetrika(counterId: string): void {
   script.async = true;
   script.src = "https://mc.yandex.ru/metrika/tag.js";
   script.onload = () => {
-    window.ym?.(id, "init", {
-      clickmap: true,
-      trackLinks: true,
-      accurateTrackBounce: true,
-    });
+    window.dataLayer = window.dataLayer ?? [];
+    window.ym?.(id, "init", yandexMetrikaInitOptions());
   };
   document.head.appendChild(script);
 }
