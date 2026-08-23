@@ -28,9 +28,7 @@ HOME_SSR_LEAD = (
 _HOME_SSR_TOP_DESKTOP_PX = 32 + 68
 _HOME_SSR_TOP_MOBILE_PX = 68
 # Typography sync ``HomePage.module.css`` + ``tokens.css`` (no entry CSS on first paint).
-_HOME_SSR_FONT_DISPLAY = (
-    "Montserrat,IBM Plex Sans,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
-)
+_HOME_SSR_FONT_DISPLAY = "Montserrat,IBM Plex Sans,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"
 _HOME_SSR_BRAND_MAX_PX = 1200
 
 _index_cache_lock = threading.Lock()
