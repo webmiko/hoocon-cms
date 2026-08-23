@@ -5,6 +5,7 @@ Part of ``catalog.facets`` package (audit P3-3).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from catalog.models import Attribute, AttributeValue
@@ -203,10 +204,25 @@ def attribute_matches_facet(attr: Attribute, facet: FacetDef) -> bool:
     return any(token in name for token in facet.name_substrings)
 
 
-def attribute_ids_for_facet(facet: FacetDef) -> list[int]:
-    """Resolve Attribute PKs that feed a facet (cached per request via caller)."""
+def attribute_ids_for_facet(
+    facet: FacetDef,
+    *,
+    attributes: Iterable[Attribute] | None = None,
+) -> list[int]:
+    """Resolve Attribute PKs that feed a facet.
+
+    Args:
+        facet: Facet definition to match Attributes against.
+        attributes: Pre-fetched Attribute rows. Callers that resolve several
+            facets should read the table once and pass it here — the facets
+            endpoint otherwise re-scanned Attribute for every facet.
+
+    Returns:
+        Attribute PKs belonging to the facet.
+    """
+    rows = attributes if attributes is not None else Attribute.objects.all().only("id", "name", "slug")
     ids: list[int] = []
-    for attr in Attribute.objects.all().only("id", "name", "slug"):
+    for attr in rows:
         if attribute_matches_facet(attr, facet):
             # For mislabeled «Мощность»: only if some values look like torque.
             if facet.include_power_as_moment and "мощность" in (attr.name or "").casefold():

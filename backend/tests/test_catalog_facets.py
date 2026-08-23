@@ -65,6 +65,34 @@ def test_facets_endpoint_lists_moment_and_voltage(client) -> None:
 
 
 @pytest.mark.django_db
+def test_facets_endpoint_reads_attribute_table_once(client) -> None:
+    """Attribute is scanned once per payload, not once per facet.
+
+    ``collect_facet_options`` resolves ids for ~15 facets; each one used to
+    run its own ``Attribute.objects.all()``, so the endpoint issued about a
+    dozen identical scans.
+    """
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _seed_with_attrs()
+    with CaptureQueriesContext(connection) as ctx:
+        response = client.get(reverse("catalog-facet-list"))
+    assert response.status_code == 200
+    assert response.data["results"], "facets payload must not be empty"
+
+    # Only unfiltered reads count. The «Аналоги» facet prefetches
+    # attribute_values__attribute for small scopes, which is a bounded
+    # WHERE id IN (…) lookup rather than another scan of the table.
+    full_scans = [
+        query["sql"]
+        for query in ctx.captured_queries
+        if 'from "catalog_attribute"' in query["sql"].lower() and "where" not in query["sql"].lower()
+    ]
+    assert len(full_scans) == 1, full_scans
+
+
+@pytest.mark.django_db
 def test_sku_filter_by_canonical_moment_alias(client) -> None:
     """?moment=5 Нм filters via name-based facet (not Attribute.slug)."""
     _seed_with_attrs()
