@@ -7,11 +7,6 @@ import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
 import { buildHomeJsonLd } from "../utils/jsonLd";
-import {
-  fadeOutHomeSsrHero,
-  hideHomeSsrHeroFromA11y,
-  homeSsrLcpBootPresent,
-} from "../utils/adoptHomeSsrLcpImage";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./HomePage.module.css";
 
@@ -537,8 +532,6 @@ export function HomePage() {
   const [loadedHeroSlides, setLoadedHeroSlides] = useState<ReadonlySet<number>>(
     () => new Set([0]),
   );
-  /** Full-page boot: SSR hero overlay stays until interaction (no DOM move). */
-  const [useSsrBoot, setUseSsrBoot] = useState(() => homeSsrLcpBootPresent());
 
   // Adjust loaded set during render (same pattern as Layout menuRoute).
   if (!loadedHeroSlides.has(heroSlide)) {
@@ -546,28 +539,6 @@ export function HomePage() {
     next.add(heroSlide);
     setLoadedHeroSlides(next);
   }
-
-  useEffect(() => {
-    if (!useSsrBoot) {
-      return;
-    }
-    hideHomeSsrHeroFromA11y();
-    const dismiss = () => {
-      if (!useSsrBoot) {
-        return;
-      }
-      fadeOutHomeSsrHero();
-      setUseSsrBoot(false);
-    };
-    window.addEventListener("pointerdown", dismiss, { once: true, passive: true });
-    window.addEventListener("keydown", dismiss, { once: true });
-    window.addEventListener("scroll", dismiss, { once: true, passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", dismiss);
-      window.removeEventListener("keydown", dismiss);
-      window.removeEventListener("scroll", dismiss);
-    };
-  }, [useSsrBoot]);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -624,11 +595,9 @@ export function HomePage() {
                     : styles.heroSlide
                 }
               >
-                {index === 0 && useSsrBoot
-                  ? null
-                  : loadedHeroSlides.has(index)
-                    ? (
-                      <img
+                {loadedHeroSlides.has(index)
+                  ? (
+                    <img
                         className={styles.heroSlideImg}
                         src={project.image}
                         alt=""
@@ -651,7 +620,6 @@ export function HomePage() {
             HOOCON
           </p>
           <h1 className={styles.heroTitle}>
-            {/* Keep copy in sync with backend spa_index HOME_SSR_* (SSR shell). */}
             Электроприводы для вентиляции и кондиционирования
           </h1>
           <p className={styles.heroLead}>

@@ -24,13 +24,9 @@
   isolation: isolate;
 }
 
-/* Image band height — keep in sync with spa_index ``_home_ssr_hero_css`` (LCP crop). */
 .heroMedia {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: min(78vh, 760px);
+  inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
@@ -941,10 +937,6 @@
   .hero {
     padding: 64px var(--space-md) 56px;
     min-height: min(70vh, 640px);
-  }
-
-  .heroMedia {
-    height: min(70vh, 640px);
   }
 
   .trust {
