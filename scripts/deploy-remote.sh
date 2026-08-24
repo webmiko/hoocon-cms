@@ -12,6 +12,7 @@
 #   IMAGE_TRANSFER=pull|load (default pull)
 #   GHCR_USER + GHCR_TOKEN — login before pull
 #   DEPLOY_APPLY_NGINX=1 (default)
+#   DEPLOY_EXPORT_REDIRECTS=1 (default) — after health, rebuild /etc/nginx/redirects.map from DB
 #   IMAGE_KEEP=3 — max ghcr app image tags/IDs kept on VPS after deploy
 #   WWW_FRONTEND / WWW_STATIC / WWW_MEDIA
 set -euo pipefail
@@ -151,6 +152,17 @@ if [[ "\${HEALTHY}" -ne 1 ]]; then
   echo "ERROR: /api/health/ did not become ready" >&2
   "\${COMPOSE[@]}" logs --tail=80 web >&2 || true
   exit 1
+fi
+
+# Refresh nginx redirects.map from live DB (repo stub can lag after Admin/ETL).
+# Opt out: DEPLOY_EXPORT_REDIRECTS=0
+if [[ "${DEPLOY_EXPORT_REDIRECTS:-1}" == "1" ]]; then
+  echo "Export redirects.map from DB → /etc/nginx/redirects.map"
+  "\${COMPOSE[@]}" exec -T web \\
+    python manage.py export_nginx_redirects --output /tmp/hoocon-redirects.map
+  WEB_CID="\$("\${COMPOSE[@]}" ps -q web)"
+  docker cp "\${WEB_CID}:/tmp/hoocon-redirects.map" /etc/nginx/redirects.map
+  nginx -t && systemctl reload nginx && echo "nginx redirects.map reloaded"
 fi
 
 # Keep newest IMAGE_KEEP unique image IDs for this repo; drop older tags.
