@@ -2092,39 +2092,29 @@ def merge_h81_kits_onto_family_products(
 
 
 def retire_legacy_flanged_body_skus() -> dict[str, int]:
-    """Unpublish mistaken ``8100-bv265…2150`` bodies; 301 to canonical ``8100Q-BV*``.
+    """Delete mistaken ``8100-bv265…2150`` bodies; keep 301 to ``8100Q-BV*``.
+
+    Redirects are written from the legacy catalog path (and known flat aliases)
+    before the SKU row is removed. Orphan Products (no remaining SKUs) are
+    deleted too. When the legacy SKU is already gone, alias redirects are still
+    upserted so re-runs stay idempotent.
 
     Returns:
-        Counters ``skus_unpublished`` / ``redirects``.
+        Counters ``skus_deleted`` / ``products_deleted`` / ``redirects``.
     """
     from catalog.etl.h81_kits import Q8100_BODY_ROWS
     from redirects.models import Redirect
     from redirects.pathutils import normalize_path
 
-    skus_unpublished = 0
+    skus_deleted = 0
+    products_deleted = 0
     redirects = 0
 
-    for body, *_rest in Q8100_BODY_ROWS:
-        legacy_code = f"8100-{body.lower()}"
-        legacy_sku = (
-            SKU.objects.filter(sku_code__iexact=legacy_code).select_related("product", "product__category").first()
-        )
-        target = (
-            SKU.objects.filter(sku_code__iexact=q8100_sku_code(body))
-            .select_related("product", "product__category")
-            .first()
-        )
-        if legacy_sku is not None and legacy_sku.is_published:
-            legacy_sku.is_published = False
-            legacy_sku.save(update_fields=["is_published"])
-            skus_unpublished += 1
-
-        if legacy_sku is None or target is None:
-            continue
-        from_path = normalize_path(catalog_path_for_sku(legacy_sku))
-        to_path = normalize_path(catalog_path_for_sku(target))
+    def _upsert_redirect(from_raw: str, to_path: str) -> None:
+        nonlocal redirects
+        from_path = normalize_path(from_raw)
         if not from_path or not to_path or from_path == to_path:
-            continue
+            return
         _, created = Redirect.objects.update_or_create(
             from_path=from_path,
             defaults={
@@ -2135,20 +2125,56 @@ def retire_legacy_flanged_body_skus() -> dict[str, int]:
         )
         if created:
             redirects += 1
-        flat_norm = normalize_path(f"/{product_slug_for_series(body)}")
-        if flat_norm and flat_norm != to_path:
-            _, flat_created = Redirect.objects.update_or_create(
-                from_path=flat_norm,
-                defaults={
-                    "to_path": to_path,
-                    "status_code": 301,
-                    "is_active": True,
-                },
-            )
-            if flat_created:
-                redirects += 1
 
-    return {"skus_unpublished": skus_unpublished, "redirects": redirects}
+    for body, *_rest in Q8100_BODY_ROWS:
+        legacy_code = f"8100-{body.lower()}"
+        body_dn = body[2:].lower()  # BV265 → 265
+        legacy_sku = (
+            SKU.objects.filter(sku_code__iexact=legacy_code).select_related("product", "product__category").first()
+        )
+        target = (
+            SKU.objects.filter(sku_code__iexact=q8100_sku_code(body))
+            .select_related("product", "product__category")
+            .first()
+        )
+        if target is None:
+            continue
+
+        to_path = normalize_path(catalog_path_for_sku(target))
+        # Known aliases even after the mistaken SKU was already deleted.
+        _upsert_redirect(f"/{product_slug_for_series(body)}", to_path)
+        _upsert_redirect(f"/sharovoy-kran-bv{body_dn}", to_path)
+        _upsert_redirect(f"/catalog/sharovye-krany/sharovoy-kran-bv{body_dn}", to_path)
+        _upsert_redirect(
+            f"/catalog/sharovye-krany/sharovoy-kran-bv{body_dn}-{legacy_code}",
+            to_path,
+        )
+
+        if legacy_sku is None:
+            continue
+
+        _upsert_redirect(catalog_path_for_sku(legacy_sku), to_path)
+        legacy_product_slug = (legacy_sku.product.slug or "").strip()
+        if legacy_product_slug:
+            cat = (legacy_sku.product.category.slug or "").strip()
+            if cat:
+                _upsert_redirect(f"/catalog/{cat}/{legacy_product_slug}", to_path)
+            _upsert_redirect(f"/{legacy_product_slug}", to_path)
+
+        product = legacy_sku.product
+        legacy_sku.delete()
+        skus_deleted += 1
+        if product is not None and not SKU.objects.filter(product_id=product.pk).exists():
+            product.delete()
+            products_deleted += 1
+
+    return {
+        "skus_deleted": skus_deleted,
+        "products_deleted": products_deleted,
+        "redirects": redirects,
+        # Back-compat for callers that still read the old key.
+        "skus_unpublished": skus_deleted,
+    }
 
 
 _Q8100_DRIVES = ("DA16MU24", "DA16MU230", "DA24MU24", "DA24MU230")
@@ -2415,8 +2441,8 @@ def apply_all_ball_valve_enrichment(
     """Enrich brass bodies, H8101…H8122 kits, and H8205 LAV cards.
 
     Creates missing Product/SKU rows, rewrites copy / ТТХ / media, seeds
-    ``8100Q-BV*`` DN65–150 bodies, then retires mistaken ``8100-bv265…2150``
-    cards onto the 8100Q URLs (not brass ``8100-bv215*``).
+    ``8100Q-BV*`` DN65–150 bodies, then deletes mistaken ``8100-bv265…2150``
+    cards (with 301 redirects onto the 8100Q URLs, not brass ``8100-bv215*``).
 
     Args:
         import_images: Download Tilda galleries / attach local catalog photos.
@@ -2565,6 +2591,8 @@ def apply_all_ball_valve_enrichment(
     )
     if run_retire:
         retired = retire_legacy_flanged_body_skus()
-        totals["legacy_unpublished"] = totals.get("legacy_unpublished", 0) + retired["skus_unpublished"]
+        totals["legacy_deleted"] = totals.get("legacy_deleted", 0) + retired["skus_deleted"]
+        # Back-compat for enrich_ball_valves log line.
+        totals["legacy_unpublished"] = totals["legacy_deleted"]
         totals["redirects"] = totals.get("redirects", 0) + retired["redirects"]
     return totals

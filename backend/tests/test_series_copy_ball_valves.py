@@ -482,7 +482,7 @@ def test_merge_brass_bv_onto_8100_dn_products() -> None:
 
 @pytest.mark.django_db
 def test_retire_legacy_8100_flanged_redirects_to_8100q() -> None:
-    """Legacy 8100-bv265 is unpublished and 301'd to 8100Q-BV265."""
+    """Legacy 8100-bv265 is deleted and 301'd to 8100Q-BV265."""
     from catalog.etl.series_copy_ball_valves import (
         apply_8100q_enrichment,
         retire_legacy_flanged_body_skus,
@@ -502,16 +502,18 @@ def test_retire_legacy_8100_flanged_redirects_to_8100q() -> None:
         sku_code="8100-bv265",
         is_published=True,
     )
+    legacy_slug = legacy.slug
     apply_8100q_enrichment(attach_pdf=False)
     retired = retire_legacy_flanged_body_skus()
-    legacy.refresh_from_db()
-    assert legacy.is_published is False
-    assert retired["skus_unpublished"] >= 1
+    assert not SKU.objects.filter(pk=legacy.pk).exists()
+    assert not Product.objects.filter(pk=product.pk).exists()
+    assert retired["skus_deleted"] >= 1
+    assert retired["skus_unpublished"] >= 1  # back-compat alias
     target = SKU.objects.get(sku_code="8100Q-BV265")
     assert target.is_published is True
     assert target.slug == "8100q-bv265"
     assert Redirect.objects.filter(
-        from_path__contains=legacy.slug,
+        from_path__contains=legacy_slug,
         to_path__contains=target.slug,
         is_active=True,
     ).exists()
