@@ -205,18 +205,23 @@ def test_sku_list_shows_price_when_flag_enabled(client) -> None:
 
 
 @pytest.mark.django_db
-def test_sku_list_site_settings_reads_do_not_scale_with_rows(client) -> None:
+def test_sku_list_site_settings_reads_do_not_scale_with_rows(client, settings) -> None:
     """Price flag is resolved per request, not twice per card.
 
     ``price_on_request`` and ``to_representation`` both consult
     SiteSettings, so a 20-row page used to load the singleton 40 times.
     Asserting the count is row-independent keeps that from creeping back
     without pinning a brittle absolute number.
+
+    Catalog HTTP cache is off here: a HIT would skip the view and make
+    SiteSettings query counts look artificially low / stale.
     """
     from django.db import connection
     from django.test.utils import CaptureQueriesContext
 
     from catalog.models import SKU
+
+    settings.CATALOG_HTTP_CACHE_SECONDS = 0
 
     def site_settings_reads() -> int:
         with CaptureQueriesContext(connection) as ctx:
