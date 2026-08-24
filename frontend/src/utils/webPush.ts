@@ -294,6 +294,28 @@ export async function syncMarketingPushConsent(
   }
 }
 
+/** Safari / iOS WebKit (not Chrome/Firefox on iOS). */
+function isAppleWebKitBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // CriOS/FxiOS/EdgiOS are Chromium/Gecko shells on iOS — not APNs Web Push path.
+  if (/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Edg|Firefox/i.test(ua)) return false;
+  return /Safari/i.test(ua) || (/iPhone|iPad|iPod/i.test(ua) && /WebKit/i.test(ua));
+}
+
+function pushServiceUnavailableRu(): string {
+  if (isAppleWebKitBrowser()) {
+    return (
+      "Safari не смог подключить push (нужен доступ к Apple Push). " +
+      "На iPhone обычно помогает «На экран „Домой“», затем снова «Включить»"
+    );
+  }
+  return (
+    "Браузер не смог подключить push (часто блокировка Google FCM). " +
+    "Уведомления могли разрешиться, но доставка недоступна"
+  );
+}
+
 /** Short RU status for SupportWidget / marketing prompt. */
 export function subscribeWebPushStatusRu(
   result: SubscribeWebPushResult,
@@ -309,10 +331,7 @@ export function subscribeWebPushStatusRu(
     case "no_service_worker":
       return "Сервис-воркер ещё не готов — обновите страницу";
     case "push_service":
-      return (
-        "Браузер не смог подключить push (часто блокировка Google FCM). " +
-        "Уведомления могли разрешиться, но доставка недоступна"
-      );
+      return pushServiceUnavailableRu();
     case "api_error":
       return "Ошибка сервера при сохранении подписки";
     default:
