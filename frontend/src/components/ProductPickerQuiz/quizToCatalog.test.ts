@@ -65,7 +65,11 @@ const BALL_VALVE_FACETS: CatalogFacet[] = [
   {
     key: "dn",
     label: "DN",
-    values: [{ value: "DN 25", count: 4 }],
+    values: [
+      { value: "25", count: 4 },
+      { value: "65", count: 1 },
+      { value: "150", count: 1 },
+    ],
   },
   {
     key: "kvs",
@@ -75,14 +79,17 @@ const BALL_VALVE_FACETS: CatalogFacet[] = [
       { value: "10", count: 3 },
       { value: "16", count: 2 },
       { value: "40", count: 1 },
+      { value: "63", count: 1 },
+      { value: "100", count: 1 },
+      { value: "400", count: 1 },
     ],
   },
   {
     key: "ways",
     label: "Тип крана",
     values: [
-      { value: "2-ходовой", count: 5 },
-      { value: "3-ходовой", count: 2 },
+      { value: "2-ходовый", count: 5 },
+      { value: "3-ходовый", count: 2 },
     ],
   },
 ];
@@ -175,9 +182,9 @@ describe("quizToCatalog", () => {
       [...ACTUATOR_FACETS, ...BALL_VALVE_FACETS],
     );
     expect(params.category).toBe(QUIZ_CATEGORY.kit);
-    expect(params.dn).toBe("DN 25");
-    expect(params.kvs).toBe("10");
-    expect(params.ways).toBe("3-ходовой");
+    expect(params.dn).toBe("25");
+    expect(params.kvs).toBe("10,16");
+    expect(params.ways).toBe("3-ходовый");
     expect(params.aux_switch).toBe("Нет");
   });
 
@@ -246,9 +253,25 @@ describe("quizToCatalog", () => {
       BALL_VALVE_FACETS,
     );
     expect(params.category).toBe(QUIZ_CATEGORY.ballValve);
-    expect(params.dn).toBe("DN 25");
-    expect(params.kvs).toBe("10");
-    expect(params.ways).toBe("2-ходовой");
+    expect(params.dn).toBe("25");
+    expect(params.kvs).toBe("10,16");
+    expect(params.ways).toBe("2-ходовый");
+  });
+
+  it("maps 8100Q DN65 and over-40 Kvs to flanged body facets", () => {
+    const params = buildCatalogParams(
+      {
+        need: "ball_valve",
+        dn: "65",
+        kvs: "over_40",
+        ways: "2",
+      },
+      BALL_VALVE_FACETS,
+    );
+    expect(params.category).toBe(QUIZ_CATEGORY.ballValve);
+    expect(params.dn).toBe("65");
+    expect(params.kvs).toBe("63,100,400");
+    expect(params.ways).toBe("2-ходовый");
   });
 
   it("maps adapter type to exact catalog search by SKU code", () => {

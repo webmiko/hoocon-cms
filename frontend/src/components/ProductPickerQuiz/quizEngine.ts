@@ -33,7 +33,19 @@ export type QuizDamperPressure = "low" | "medium" | "high" | "very_high" | "skip
 /** Blade / frame type — Kтип in M = S × P × Kтип × Kзapас. */
 export type QuizDamperType = "round" | "rectangular" | "gate" | "skip";
 
-export type QuizDn = "15" | "20" | "25" | "32" | "40" | "50" | "skip";
+export type QuizDn =
+  | "15"
+  | "20"
+  | "25"
+  | "32"
+  | "40"
+  | "50"
+  | "65"
+  | "80"
+  | "100"
+  | "125"
+  | "150"
+  | "skip";
 
 /** Flow coefficient band (m³/h) — maps to catalog Kvs facet. */
 export type QuizKvs =
