@@ -30,6 +30,16 @@ def _clear_throttle_cache() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _clear_redirect_index() -> None:
+    """Drop in-memory redirect index so DB rollbacks cannot leak stale rows."""
+    from redirects.lookup import clear_redirect_index
+
+    clear_redirect_index()
+    yield
+    clear_redirect_index()
+
+
+@pytest.fixture(autouse=True)
 def _spa_index_html(settings) -> None:
     """Serve the SPA SEO fixture for catch-all spa_index_view in tests."""
     settings.SPA_INDEX_HTML = str(_SPA_FIXTURE)

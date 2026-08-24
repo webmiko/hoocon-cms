@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import secrets
 import threading
@@ -15,14 +14,8 @@ from django.http import Http404, HttpRequest, HttpResponse
 from config.seo.head import apply_seo_head, inject_json_ld, resolve_seo_context
 from config.seo.json_ld import build_json_ld
 
-# Keep in sync with ``frontend/.../HomePage.tsx`` hero (LCP / first paint).
+# Keep in sync with ``frontend/.../HomePage.tsx`` hero (LCP preload).
 HOME_LCP_IMAGE = "/home/projects/beijing-metro.webp"
-HOME_SSR_BRAND = "HOOCON"
-HOME_SSR_H1 = "Электроприводы для вентиляции и кондиционирования"
-HOME_SSR_LEAD = (
-    "Подбор за минуту на главной, каталог по параметрам, паспорта, аналоги Belimo. "
-    "Склад в Москве — отгрузка по РФ. КП по запросу."
-)
 
 _index_cache_lock = threading.Lock()
 _index_cache: tuple[int, str] | None = None
@@ -93,66 +86,7 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
     return html
 
 
-def _home_ssr_hero_css() -> str:
-    """Critical CSS for the server-rendered home hero (no React, no entry CSS)."""
-    # Fixed band outside ``#root`` (not full-viewport inset) so the LCP img
-    # matches React ``.hero`` height and is not re-measured after adopt.
-    return """
-#hoocon-ssr-hero{position:fixed;top:0;left:0;right:0;z-index:10000;display:flex;flex-direction:column;
-justify-content:flex-end;min-height:min(78vh,760px);height:min(78vh,760px);padding:72px 24px 48px;
-background:#101010;color:#fff;overflow:hidden;box-sizing:border-box;
-font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-#hoocon-ssr-hero .hoocon-ssr-hero__img{position:absolute;inset:0;width:100%;height:100%;
-object-fit:cover;pointer-events:none}
-#hoocon-ssr-hero .hoocon-ssr-hero__shade{position:absolute;inset:0;pointer-events:none;background:
-linear-gradient(105deg,rgba(12,12,12,.88) 0%,rgba(12,12,12,.55) 45%,rgba(12,12,12,.4) 100%),
-linear-gradient(180deg,rgba(12,12,12,.25) 0%,transparent 40%,rgba(12,12,12,.5) 100%)}
-#hoocon-ssr-hero .hoocon-ssr-hero__brand{position:relative;z-index:1;max-width:1120px;width:100%;
-margin:0 auto}
-#hoocon-ssr-hero .hoocon-ssr-hero__eyebrow{margin:0 0 12px;font-size:12px;font-weight:700;
-letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
-#hoocon-ssr-hero .hoocon-ssr-hero__title{margin:0 0 16px;font-size:clamp(1.75rem,4vw + .5rem,2.75rem);
-line-height:1.15;font-weight:700;max-width:18ch}
-#hoocon-ssr-hero .hoocon-ssr-hero__lead{margin:0 0 28px;font-size:1.05rem;line-height:1.45;
-max-width:36rem;color:rgba(255,255,255,.88)}
-#hoocon-ssr-hero .hoocon-ssr-hero__actions{display:flex;flex-wrap:wrap;gap:12px}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta{display:inline-flex;align-items:center;justify-content:center;
-min-height:44px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:600;text-decoration:none}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta--primary{background:#da0e2b;color:#fff}
-#hoocon-ssr-hero .hoocon-ssr-hero__cta--secondary{background:transparent;color:#fff;
-border:1px solid rgba(255,255,255,.55)}
-@media (max-width:768px){#hoocon-ssr-hero{min-height:min(70vh,640px);height:min(70vh,640px);
-padding:64px 16px 56px}}
-""".replace("\n", "")
-
-
-def _home_ssr_hero_markup() -> str:
-    """Semantic home hero HTML painted before the SPA JS runs."""
-    brand = escape(HOME_SSR_BRAND)
-    title = escape(HOME_SSR_H1)
-    lead = escape(HOME_SSR_LEAD)
-    img = escape(HOME_LCP_IMAGE, quote=True)
-    return (
-        f'<section id="hoocon-ssr-hero" aria-labelledby="hoocon-ssr-brand">'
-        f'<img class="hoocon-ssr-hero__img" id="hoocon-lcp-boot" src="{img}" alt="" '
-        f'width="960" height="640" decoding="sync" fetchpriority="high">'
-        f'<div class="hoocon-ssr-hero__shade" aria-hidden="true"></div>'
-        f'<div class="hoocon-ssr-hero__brand">'
-        f'<p id="hoocon-ssr-brand" class="hoocon-ssr-hero__eyebrow">{brand}</p>'
-        f'<h1 class="hoocon-ssr-hero__title">{title}</h1>'
-        f'<p class="hoocon-ssr-hero__lead">{lead}</p>'
-        f'<div class="hoocon-ssr-hero__actions">'
-        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--primary" href="/catalog">'
-        f"Смотреть каталог</a>"
-        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--secondary" href="/#podbor">'
-        f"Подобрать модель</a>"
-        f'<a class="hoocon-ssr-hero__cta hoocon-ssr-hero__cta--secondary" href="/consultation">'
-        f"Запросить КП</a>"
-        f"</div></div></section>"
-    )
-
-
-def _home_ssr_podbor_noscript() -> str:
+def _home_podbor_noscript() -> str:
     """Crawler/no-JS fallback for the home product picker (React mounts inside #root)."""
     heading = escape("Подбор модели за минуту")
     body = escape(
@@ -169,137 +103,17 @@ def _home_ssr_podbor_noscript() -> str:
     )
 
 
-_ENTRY_MODULE_RE = re.compile(
-    r'<script\b[^>]*\btype=["\']module["\'][^>]*\bsrc=["\']([^"\']+)["\'][^>]*>\s*</script>',
-    re.IGNORECASE,
-)
-_MODULEPRELOAD_RE = re.compile(
-    r'<link\b[^>]*\brel=["\']modulepreload["\'][^>]*>\s*',
-    re.IGNORECASE,
-)
-# Match either attribute order: rel=preload as=style | as=style rel=preload.
-_STYLE_PRELOAD_RE = re.compile(
-    r'<link\b(?=[^>]*\brel=["\']preload["\'])(?=[^>]*\bas=["\']style["\'])[^>]*>\s*',
-    re.IGNORECASE,
-)
-_MAIN_CSS_LINK_RE = re.compile(
-    r'<link\b[^>]*\bid=["\']hoocon-main-css["\'][^>]*>',
-    re.IGNORECASE,
-)
-
-
-def _park_home_css_until_lcp(html: str) -> str:
-    """Drop CSS preload and park entry stylesheet href until after LCP.
-
-    On Slow 4G a ~90 KiB ``preload as=style`` contends with the hero WebP and
-    stretches LCP resource delay. Keep the ``media=print`` link in the DOM
-    (``main.tsx`` still flips it to ``all``) but set ``href`` only after the
-    boot image has loaded.
-    """
-    html = _STYLE_PRELOAD_RE.sub("", html)
-
-    def _park(match: re.Match[str]) -> str:
-        tag = match.group(0)
-        href_match = re.search(
-            r'(?<![\w-])href=(["\'])([^"\']+)\1',
-            tag,
-            flags=re.IGNORECASE,
-        )
-        if not href_match:
-            return tag
-        href = href_match.group(2)
-        safe = escape(href, quote=True)
-        without_href = re.sub(
-            r'\s*(?<![\w-])href=(["\'])[^"\']+\1',
-            "",
-            tag,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-        # Support both ``>`` and ``/>``; inject data-href before the closer.
-        closer = "/>" if without_href.rstrip().endswith("/>") else ">"
-        body = without_href.rstrip()
-        if body.endswith("/>"):
-            body = body[:-2].rstrip()
-        elif body.endswith(">"):
-            body = body[:-1].rstrip()
-        return f'{body} data-href="{safe}"{closer}'
-
-    return _MAIN_CSS_LINK_RE.sub(_park, html, count=1)
-
-
-def _defer_home_entry_until_lcp(html: str) -> str:
-    """Start SPA JS/CSS only after the LCP boot image has loaded.
-
-    On Slow 4G, ``modulepreload`` + CSS preload + ``vendor-react`` contend with
-    the hero WebP. Waiting for ``#hoocon-lcp-boot`` ``load`` (with a safety
-    timeout) lets the SSR hero paint first; then attach CSS href and entry JS
-    immediately (no idle delay — React adopt must not stretch LCP render delay).
-
-    Args:
-        html: Home HTML that already contains the SSR LCP boot image.
-
-    Returns:
-        HTML with module/style preloads removed and entry assets deferred.
-    """
-    match = _ENTRY_MODULE_RE.search(html)
-    if not match:
-        return html
-
-    src = match.group(1)
-    src_js = json.dumps(src)
-    html = _MODULEPRELOAD_RE.sub("", html)
-    html = _park_home_css_until_lcp(html)
-    # Inline loader gets a CSP nonce via ``inject_csp_nonce`` (runs after this).
-    loader = (
-        '<script type="module">'
-        "(function(){"
-        f"var src={src_js};"
-        "var started=false;"
-        "function start(){"
-        "if(started)return;"
-        "started=true;"
-        'var css=document.getElementById("hoocon-main-css");'
-        "if(css){"
-        'var href=css.getAttribute("data-href");'
-        "if(href){"
-        'css.setAttribute("href",href);'
-        'css.removeAttribute("data-href");'
-        "}"
-        "}"
-        'var s=document.createElement("script");'
-        's.type="module";'
-        's.crossOrigin="";'
-        "s.src=src;"
-        "document.head.appendChild(s);"
-        "}"
-        'var img=document.getElementById("hoocon-lcp-boot");'
-        "if(img&&!img.complete){"
-        'img.addEventListener("load",start,{once:true});'
-        'img.addEventListener("error",start,{once:true});'
-        "}else{start();}"
-        "setTimeout(start,2500);"
-        "})();"
-        "</script>"
-    )
-    return _ENTRY_MODULE_RE.sub(loader, html, count=1)
-
-
 def inject_home_lcp_hints(html: str, raw_path: str) -> str:
-    """Server-render home hero (image + copy) before React mounts.
+    """Preload home hero LCP image and inject noscript podbor fallback.
 
-    Not full React SSR — a static shell for ``/`` so FCP/LCP can fire from
-    HTML+critical CSS while ``vendor-react`` downloads. The shell is a
-    **sibling before** ``#root`` so ``createRoot`` does not destroy the LCP
-    ``<img>``; HomePage adopts that node into the React hero on mount.
-    Entry JS and main CSS start only after the boot image loads (mobile LCP).
+    React paints the hero after entry JS — no SSR overlay (UX over lab LCP tricks).
 
     Args:
         html: SPA shell HTML.
         raw_path: Request path.
 
     Returns:
-        HTML with home LCP preload + SSR hero, or unchanged for other routes.
+        HTML with home LCP preload + noscript, or unchanged for other routes.
     """
     path = (raw_path or "/").split("?", 1)[0]
     if path not in ("/", ""):
@@ -316,18 +130,14 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
         else:
             html = html.replace("</head>", f"    {preload}\n  </head>", 1)
 
-    if 'id="hoocon-ssr-hero"' not in html:
-        style = f'<style id="hoocon-ssr-hero-css">{_home_ssr_hero_css()}</style>'
-        html = html.replace("</head>", f"    {style}\n  </head>", 1)
-        boot = _home_ssr_hero_markup()
-        # Outside ``#root``: LCP img survives createRoot; React adopts it.
+    if 'id="podbor-noscript"' not in html:
         html = html.replace(
             '<div id="root"></div>',
-            f'{boot}<div id="root"></div>{_home_ssr_podbor_noscript()}',
+            f'<div id="root"></div>{_home_podbor_noscript()}',
             1,
         )
 
-    return _defer_home_entry_until_lcp(html)
+    return html
 
 
 def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpResponse:

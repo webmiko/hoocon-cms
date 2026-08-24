@@ -19,7 +19,7 @@ from catalog.facets.defs import (
     attribute_ids_for_facet,
 )
 from catalog.facets.normalize import normalize_facet_value, values_match
-from catalog.models import SKU, AttributeValue
+from catalog.models import SKU, Attribute, AttributeValue
 
 
 def filter_skus_by_facet(
@@ -150,6 +150,9 @@ def collect_facet_options(
         base_queryset = SKU.objects.filter(is_published=True)
     sku_ids = list(base_queryset.values_list("id", flat=True))
     result: list[dict[str, object]] = []
+    # Read Attribute once for the whole payload: one scan per facet meant ~11
+    # identical queries on this endpoint.
+    attributes = list(Attribute.objects.all().only("id", "name", "slug"))
 
     for facet in facet_defs_for_category(category_slug):
         if facet.key == "analog":
@@ -157,7 +160,7 @@ def collect_facet_options(
             if analog_facet is not None:
                 result.append(analog_facet)
             continue
-        attr_ids = attribute_ids_for_facet(facet)
+        attr_ids = attribute_ids_for_facet(facet, attributes=attributes)
         if not attr_ids:
             continue
         counts: dict[str, set[int]] = {}

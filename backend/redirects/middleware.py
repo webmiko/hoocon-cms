@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.http import HttpRequest, HttpResponse, HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.utils.deprecation import MiddlewareMixin
 
+from redirects.lookup import lookup_redirect
 from redirects.models import Redirect
 from redirects.pathutils import normalize_path
 
@@ -45,14 +46,14 @@ class RedirectMiddleware(MiddlewareMixin):
             return None
 
         try:
-            match = Redirect.objects.filter(from_path=path, is_active=True).only("to_path", "status_code").first()
+            hit = lookup_redirect(path)
         except RuntimeError:
             # pytest-django blocks DB outside django_db tests; skip redirects.
             return None
 
-        if match is None:
+        if hit is None:
             return None
 
-        if match.status_code == Redirect.HTTP_MOVED_PERMANENTLY:
-            return HttpResponsePermanentRedirect(match.to_path)
-        return HttpResponseRedirect(match.to_path)
+        if hit.status_code == Redirect.HTTP_MOVED_PERMANENTLY:
+            return HttpResponsePermanentRedirect(hit.to_path)
+        return HttpResponseRedirect(hit.to_path)

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Счётчик бесплатных минут GitHub Actions (private Free: 2000 мин/мес).
+"""Статистика минут GitHub Actions (условный бюджет 2000/мес → 500/нед).
 
-Бюджет делится на 4 недели по 500 мин. Оценка расхода — сумма длительностей
-job'ов CI за календарный месяц (Linux = 1×). Канон биллинга в UI GitHub точнее;
-при расхождении: ``--set-used N`` из Settings → Billing → Actions.
+Репо public — GH-hosted минуты не списываются с личного бюджета; скрипт
+для темпа CI и сценария private/self-hosted. Оценка — сумма длительностей
+job'ов за календарный месяц (Linux = 1×). Для private: ``--set-used N``
+из Settings → Billing → Actions.
 
 Usage:
   ./scripts/actions-minutes.py
@@ -332,7 +333,7 @@ def print_human(report: dict[str, Any]) -> None:
     """Человекочитаемый вывод счётчика."""
     p = report["period"]
     print("══════════════════════════════════════════════════")
-    print("  GitHub Actions — бесплатные минуты (private Free)")
+    print("  GitHub Actions — минуты CI (public: биллинг не списывается)")
     print("══════════════════════════════════════════════════")
     print(
         f"  Репо:     {report.get('repo') or '—'}",
@@ -383,8 +384,9 @@ def print_human(report: dict[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Счётчик бесплатных минут GitHub Actions "
-            f"({MONTHLY_FREE_MINUTES}/мес → {WEEKLY_BUDGET_MINUTES}/нед × 4)."
+            "Статистика минут GitHub Actions "
+            f"({MONTHLY_FREE_MINUTES}/мес → {WEEKLY_BUDGET_MINUTES}/нед × 4; "
+            "public repo — без списания с биллинга)."
         ),
     )
     parser.add_argument(

@@ -132,7 +132,7 @@ INSTALLED_APPS = [
     "axes",
     # Project apps (с итерации 1)
     "accounts.apps.AccountsConfig",
-    "redirects",
+    "redirects.apps.RedirectsConfig",
     "sitesettings",
     "catalog",
     "content",
@@ -146,22 +146,28 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-    # Block foreign-site <img>/<embed> of /media/ (DEBUG media + any proxied path).
-    "config.media_hotlink_middleware.MediaHotlinkMiddleware",
-    # SEO redirects before CommonMiddleware so typo/legacy paths never hit views.
-    "redirects.middleware.RedirectMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.locale.LocaleMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "axes.middleware.AxesMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "config.csp_middleware.CspMiddleware",
 ]
+if DEBUG:
+    MIDDLEWARE.append("django.middleware.gzip.GZipMiddleware")
+MIDDLEWARE.extend(
+    [
+        "corsheaders.middleware.CorsMiddleware",
+        "whitenoise.middleware.WhiteNoiseMiddleware",
+        # Block foreign-site <img>/<embed> of /media/ (DEBUG media + any proxied path).
+        "config.media_hotlink_middleware.MediaHotlinkMiddleware",
+        # SEO redirects before CommonMiddleware so typo/legacy paths never hit views.
+        "redirects.middleware.RedirectMiddleware",
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.middleware.locale.LocaleMiddleware",
+        "django.middleware.common.CommonMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "axes.middleware.AxesMiddleware",
+        "django.contrib.messages.middleware.MessageMiddleware",
+        "django.middleware.clickjacking.XFrameOptionsMiddleware",
+        "config.csp_middleware.CspMiddleware",
+    ],
+)
 
 # django-axes: brute-force protection for admin login.
 # Spec: docs/security-baseline.md §3.2; ПЛАН §6 Iter 1.
@@ -521,7 +527,7 @@ ADMIN_EMAIL_OTP_MAX_ATTEMPTS = int(os.getenv("ADMIN_EMAIL_OTP_MAX_ATTEMPTS", "5"
 ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "60"),
 )
-# Comma-separated; empty = any active staff (local/CI). Prod: mikolamus@ya.ru
+# Comma-separated; empty = any active staff (local/CI). Prod example: @hoocon.ru
 ADMIN_EMAIL_OTP_ALLOWED_EMAILS = os.getenv("ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "")
 ADMIN_EMAIL_OTP_REQUEST_LIMIT = int(os.getenv("ADMIN_EMAIL_OTP_REQUEST_LIMIT", "5"))
 ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS = int(

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Пересобирает wiki-индекс docs/README.md из docs/*.md.
-# GitHub Wiki на private Free недоступен — канон wiki = docs/ в репозитории.
+# Пересобирает wiki-индекс _docs/README.md из _docs/*.md.
+# GitHub Wiki на private Free недоступен — канон wiki = _docs/ локально.
 # При Pro/Team: ./scripts/sync-github-wiki.sh --push (отдельный remote *.wiki.git).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOCS="${ROOT}/docs"
+DOCS="${ROOT}/_docs"
 INDEX="${DOCS}/README.md"
 
 EXCLUDE=(
@@ -36,8 +36,8 @@ tmp="$(mktemp)"
   cat <<'EOF'
 # Документация Hoocon CMS
 
-Индекс проектной документации (wiki в репозитории).
-Исходники — этот каталог `docs/`.
+Индекс проектной документации (wiki локально).
+Исходники — этот каталог `_docs/`.
 
 **Без онлайн-корзины и оплаты в v1** — RFQ вместо checkout.
 

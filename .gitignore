@@ -1,6 +1,6 @@
 # Hoocon CMS .gitignore
 # Опора: каноничный шаблон БЗ/LMS, адаптированный под проект.
-# docs/ в git; локальные агент/план — не на GitHub.
+# _docs/ локально (gitignore через _*); docs/ — legacy, не в git.
 
 # Виртуальное окружение
 .venv/
@@ -71,8 +71,11 @@ frontend/dist/
 frontend/dev-dist/
 node_modules/
 
-# Demo slide raster exports (PNG/PDF)
-docs/demo/export/
+# Demo slide raster exports (PNG/PDF) — локально в _docs/demo/export/
+_docs/demo/export/
+
+# Legacy docs/ (канон локально: _docs/, см. README)
+docs/
 
 # RU manual HTML / constructor — local only (also matched by ``_*`` above).
 # Not for prod site; not tracked on develop after untrack.

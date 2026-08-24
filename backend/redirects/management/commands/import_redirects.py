@@ -9,8 +9,8 @@ from django.core.management.base import BaseCommand, CommandError
 from redirects.services import load_redirects_from_csv
 
 DEFAULT_SEEDS = (
-    "docs/redirects-slug-typo-seed.csv",
-    "docs/redirects-tproduct-seed.csv",
+    "backend/redirects/seeds/redirects-slug-typo-seed.csv",
+    "backend/redirects/seeds/redirects-tproduct-seed.csv",
 )
 
 
@@ -25,7 +25,7 @@ class Command(BaseCommand):
             "paths",
             nargs="*",
             type=str,
-            help="Optional CSV paths (default: docs typo + tproduct seeds).",
+            help="Optional CSV paths (default: backend/redirects/seeds typo + tproduct).",
         )
         parser.add_argument(  # type: ignore[attr-defined]
             "--dry-run",

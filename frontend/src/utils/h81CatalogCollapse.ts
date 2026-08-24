@@ -2,6 +2,7 @@
 
 const H81_PRODUCT_SLUG_RE = /^h81(?:01|02|03|04|05|06|07|08|21|22)$/i;
 const BRASS_DN_PRODUCT_SLUG_RE = /^8100-bv\d+$/i;
+const Q8100_DN_PRODUCT_SLUG_RE = /^8100q-bv\d+$/i;
 const H8205_LAV_PRODUCT_SLUG_RE = /^h8205-lav\d+[st]*$/i;
 const DAMU_PRODUCT_SLUG_RE = /^privod-vozdushniy-bez-pruzhini-damu-\d+nm$/i;
 const DAMQU_PRODUCT_SLUG_RE = /^privod-vozdushniy-da\d+mqu-\d+nm$/i;
@@ -21,6 +22,10 @@ export function isH81FamilyProductSlug(productSlug: string | undefined | null): 
 
 export function isBrassDnProductSlug(productSlug: string | undefined | null): boolean {
   return BRASS_DN_PRODUCT_SLUG_RE.test((productSlug || "").trim());
+}
+
+export function isQ8100DnProductSlug(productSlug: string | undefined | null): boolean {
+  return Q8100_DN_PRODUCT_SLUG_RE.test((productSlug || "").trim());
 }
 
 export function isH8205LavProductSlug(productSlug: string | undefined | null): boolean {
@@ -62,6 +67,7 @@ function isCollapsibleFamilyProductSlug(
   return (
     isH81FamilyProductSlug(productSlug) ||
     isBrassDnProductSlug(productSlug) ||
+    isQ8100DnProductSlug(productSlug) ||
     isH8205LavProductSlug(productSlug) ||
     isDamuFamilyProductSlug(productSlug) ||
     isDamquFamilyProductSlug(productSlug) ||

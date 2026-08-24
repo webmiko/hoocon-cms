@@ -31,6 +31,16 @@ describe("collapseH81CatalogSkus", () => {
     expect(out.map((r) => r.slug)).toEqual(["a", "c", "d"]);
   });
 
+  it("keeps one row per 8100Q DN product_slug", () => {
+    const rows = [
+      { slug: "q1", product_slug: "8100q-bv265" },
+      { slug: "q2", product_slug: "8100q-bv265" },
+      { slug: "q3", product_slug: "8100q-bv280" },
+    ];
+    const out = collapseH81CatalogSkus(rows);
+    expect(out.map((r) => r.slug)).toEqual(["q1", "q3"]);
+  });
+
   it("keeps one row per DAMU / DAMQU / DAFU / SAMU product_slug", () => {
     const rows = [
       { slug: "da-a", product_slug: "privod-vozdushniy-bez-pruzhini-damu-8nm" },

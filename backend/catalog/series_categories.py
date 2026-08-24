@@ -172,7 +172,7 @@ def classify_series_category(product_slug: str, sku_codes: list[str] | None = No
     # Adapters before BV / «без пружины» tokens in titles.
     if _ADAPTER_CODES.search(codes) or "adapter" in slug or "adaptery" in slug or slug.startswith("adapter-br"):
         return _ADAPTERS[0]
-    if "sharov" in blob or re.search(r"\bbv\d", blob) or "8100-bv" in blob:
+    if "sharov" in blob or re.search(r"\bbv\d", blob) or "8100-bv" in blob or "8100q" in blob:
         return _BALL_VALVES[0]
     if "dimoudal" in blob or re.search(r"\bsa\d*mu", blob):
         return "elektroprivody-dlya-klapanov-dymoudaleniya"

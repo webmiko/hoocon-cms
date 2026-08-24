@@ -205,12 +205,44 @@ export async function subscribeWebPush(topics: {
   let subscription: PushSubscription;
   try {
     const existing = await registration.pushManager.getSubscription();
-    subscription =
-      existing ??
-      (await registration.pushManager.subscribe({
+    if (existing) {
+      subscription = existing;
+    } else {
+      const subscribePromise = registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKeyBytes(meta.public_key),
-      }));
+      });
+      let timeoutId = 0;
+      const raced = await Promise.race([
+        subscribePromise.then((sub) => ({ kind: "ok" as const, sub })),
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          timeoutId = window.setTimeout(() => resolve({ kind: "timeout" }), 15_000);
+        }),
+      ]);
+      window.clearTimeout(timeoutId);
+
+      if (raced.kind === "timeout") {
+        // Timeout must not abandon a late PushManager success — otherwise the
+        // browser keeps a subscription that never reaches Django until retry.
+        void subscribePromise
+          .then((sub) => postSubscriptionToApi(sub, topics))
+          .catch(() => undefined);
+        try {
+          const late = await registration.pushManager.getSubscription();
+          if (late) {
+            return postSubscriptionToApi(late, topics);
+          }
+        } catch {
+          /* fall through to timeout error */
+        }
+        return {
+          ok: false,
+          reason: "push_service",
+          detail: "PushManager.subscribe timed out",
+        };
+      }
+      subscription = raced.sub;
+    }
   } catch (err) {
     // Only drop the browser sub when the key clearly mismatches — never on
     // transient errors (that would make push «fly off» after a refresh).
@@ -277,7 +309,10 @@ export function subscribeWebPushStatusRu(
     case "no_service_worker":
       return "Сервис-воркер ещё не готов — обновите страницу";
     case "push_service":
-      return "Push-сервис браузера недоступен (Chrome/FCM или поставьте PWA)";
+      return (
+        "Браузер не смог подключить push (часто блокировка Google FCM). " +
+        "Уведомления могли разрешиться, но доставка недоступна"
+      );
     case "api_error":
       return "Ошибка сервера при сохранении подписки";
     default:

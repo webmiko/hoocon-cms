@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   absoluteOgImageUrl,
+  catalogListingSeoTitle,
   categorySeoDescription,
   metaDescription,
+  skuNotFoundSeoTitle,
 } from "./seoMeta";
 
 describe("metaDescription", () => {
@@ -30,6 +32,32 @@ describe("categorySeoDescription", () => {
 
   it("falls back to catalog blurb when empty", () => {
     expect(categorySeoDescription("", "")).toContain("Каталог электроприводов");
+  });
+});
+
+describe("catalogListingSeoTitle", () => {
+  it("uses category name when available", () => {
+    expect(catalogListingSeoTitle("sharovye-krany", "Шаровые краны")).toBe(
+      "Шаровые краны",
+    );
+  });
+
+  it("falls back to slug-specific title instead of root catalog", () => {
+    expect(catalogListingSeoTitle("sharovye-krany")).toBe(
+      "Каталог — sharovye-krany",
+    );
+  });
+
+  it("uses root title only for /catalog", () => {
+    expect(catalogListingSeoTitle()).toContain("Каталог электроприводов");
+  });
+});
+
+describe("skuNotFoundSeoTitle", () => {
+  it("includes slug for unique 404 titles", () => {
+    expect(skuNotFoundSeoTitle("h8102-h8102-bv215c-24ds")).toContain(
+      "h8102-h8102-bv215c-24ds",
+    );
   });
 });
 

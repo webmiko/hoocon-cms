@@ -30,6 +30,49 @@ location /api/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
+# Public read-only JSON — the only /api/ subtrees we compress. Opt-in, not
+# opt-out: /api/csrf/ hands out a CSRF token and /api/support/ carries chat
+# bodies, so a blanket `gzip on` under /api/ would put a secret and reflected
+# input in the same compressed response. Catalog and content are anonymous GETs
+# with no secret, and they are the big payloads (skus ~32 KiB, pages ~46 KiB).
+# These blocks duplicate the /api/ proxy setup because a longer prefix wins
+# outright in nginx — keep limit_req and the proxy headers in sync with it.
+location /api/catalog/ {
+    limit_req zone=api_limit burst=20 nodelay;
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json;
+    # B2B clients often sit behind corporate proxies, which send Via; the
+    # default (off) would ship these responses raw to exactly those users.
+    gzip_proxied any;
+
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /api/content/ {
+    limit_req zone=api_limit burst=20 nodelay;
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json;
+    gzip_proxied any;
+
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 # Lead submission — stricter rate limit (Iter 3 throttle + nginx backstop).
 location /api/leads/ {
     limit_req zone=lead_limit burst=3 nodelay;
@@ -80,8 +123,22 @@ location /media/ {
     add_header Content-Disposition "inline";
 }
 
+# gzip_types stays inside the static locations on purpose. nginx.conf enables
+# gzip globally but its default gzip_types is text/html, so proxied HTML was
+# compressed while /assets/*.css|js shipped raw (~454 KiB) and starved the hero
+# WebP of bandwidth (mobile LCP load delay 870 ms). Declaring the types here
+# leaves HTML/API encoding exactly as before — no new BREACH surface on
+# CSRF-bearing responses. woff2 is already compressed; keep it out of the list.
+
 # Django collectstatic — long cache (hashed filenames when ManifestStaticFiles).
 location /static/ {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/css text/javascript text/plain application/javascript
+               application/json image/svg+xml;
+
     alias /var/www/hoocon/staticfiles/;
     expires 30d;
     add_header Cache-Control "public, max-age=2592000, immutable" always;
@@ -90,6 +147,13 @@ location /static/ {
 
 # Vite hashed bundles (JS/CSS/fonts under /assets/*-[hash].*) — immutable.
 location /assets/ {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types text/css text/javascript text/plain application/javascript
+               application/json image/svg+xml;
+
     expires 1y;
     add_header Cache-Control "public, max-age=31536000, immutable" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -167,6 +231,24 @@ location / {
 }
 
 location @spa {
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 256;
+    gzip_types text/html;
+    gzip_proxied any;
+
+    proxy_cache hoocon_spa;
+    proxy_cache_key "$scheme$host$request_uri";
+    proxy_cache_valid 200 5m;
+    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+    proxy_cache_lock on;
+    proxy_ignore_headers Cache-Control;
+    add_header X-Proxy-Cache $upstream_cache_status always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;

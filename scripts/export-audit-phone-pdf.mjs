@@ -15,8 +15,8 @@ import { readFileSync, existsSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const htmlPath = path.join(root, "docs/demo/yandex-competitors-audit.html");
-const outDir = path.join(root, "docs/demo/export/phone");
+const htmlPath = path.join(root, "_docs/demo/yandex-competitors-audit.html");
+const outDir = path.join(root, "_docs/demo/export/phone");
 const pdfPath = path.join(outDir, "hoocon-competitors-audit-phone.pdf");
 
 function loadPlaywright() {

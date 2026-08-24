@@ -77,7 +77,7 @@ def test_attach_pdf_only_no_gallery_crops(tmp_path: Path) -> None:
         product=product,
         sku_code="8100-bv215a",
         name="BV215A",
-        slug="8100-bv215-8100-bv215a",
+        slug="8100-bv215a",
         is_published=True,
     )
     hero = ProductImage.objects.create(
@@ -134,7 +134,7 @@ def test_sync_brass_dims_fills_empty_only() -> None:
         product=product,
         sku_code="8100-bv220a",
         name="BV220A",
-        slug="8100-bv220-8100-bv220a",
+        slug="8100-bv220a",
         is_published=True,
     )
     from catalog.etl.attr_write import set_sku_attribute
@@ -171,7 +171,7 @@ def test_dry_run_writes_nothing(tmp_path: Path) -> None:
         product=product,
         sku_code="8100-bv225a",
         name="BV225A",
-        slug="8100-bv225-8100-bv225a",
+        slug="8100-bv225a",
         is_published=True,
     )
     summary = apply_8100_catalog_media(dry_run=True, pdf_path=pdf)
@@ -200,7 +200,7 @@ def test_attach_pdf_skip_when_too_large(tmp_path: Path) -> None:
         product=product,
         sku_code="8100-bv232a",
         name="BV232A",
-        slug="8100-bv232-8100-bv232a",
+        slug="8100-bv232a",
         is_published=True,
     )
     with patch(

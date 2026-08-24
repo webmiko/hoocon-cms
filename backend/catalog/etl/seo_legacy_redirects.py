@@ -28,7 +28,7 @@ from redirects.pathutils import normalize_path
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_TPRODUCT_SEED = _REPO_ROOT / "docs" / "redirects-tproduct-seed.csv"
+_TPRODUCT_SEED = _REPO_ROOT / "backend" / "redirects" / "seeds" / "redirects-tproduct-seed.csv"
 
 # Inventory paths that must not 404 after DNS cutover (docs/seo-url-migration.md).
 _STATIC_INVENTORY: tuple[tuple[str, str], ...] = (

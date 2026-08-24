@@ -1,16 +1,16 @@
 # CI/CD: check (pytest + lint) → build (GHCR + frontend) → deploy SSH.
 #
-# Minutes budget (private Free 2000/mo): see docs/actions-minutes.md
+# Public repo: GH-hosted minutes free; CI pacing: _docs/actions-minutes.md
 #
 # Optimizations vs linear test→lint→build→deploy:
 #   - one Python install (merged check job)
-#   - skip workflow when only docs/rules change (paths-ignore)
+#   - skip workflow when only _docs/rules change (paths-ignore)
 #   - PR: check only — no image build / deploy
 #   - push develop: check + build (verify) — deploy via main or manual
 #   - push main: check + build + deploy
 #   - GHCR buildcache for Docker layers
 #
-# Spec: docs/infra-reg-ru.md; ПЛАН §6 Iter 5 CI+deploy.
+# Spec: _docs/infra-reg-ru.md; ПЛАН §6 Iter 5 CI+deploy.
 name: Hoocon CI/CD
 
 on:
@@ -19,6 +19,7 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - "_docs/**"
       - ".cursor/**"
       - "_manuals-ru/**"
       - "_инструкции-pdf/**"
@@ -26,6 +27,15 @@ on:
       - "agent-transcripts/**"
   pull_request:
     branches: [develop, main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "_docs/**"
+      - ".cursor/**"
+      - "_manuals-ru/**"
+      - "_инструкции-pdf/**"
+      - "_Универсальная-база-знаний/**"
+      - "agent-transcripts/**"
   workflow_dispatch:
     inputs:
       deploy:
@@ -109,9 +119,15 @@ jobs:
       - name: npm ci
         working-directory: frontend
         run: npm ci
-      - name: npm audit (high+)
+      # Split so severity maps to actual exposure. Advisories in build tooling
+      # (eslint, openapi-typescript, vite-plugin-pwa) never reach a visitor, so
+      # they must not gate CD; anything in the shipped bundle must. One blanket
+      # continue-on-error step hid a high glob DoS behind a green job for months.
+      - name: npm audit (runtime deps, blocking)
         working-directory: frontend
-        # Known upstream peers (TS6 / openapi-typescript); do not block CD.
+        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit (build tooling, advisory only)
+        working-directory: frontend
         continue-on-error: true
         run: npm audit --audit-level=high
 

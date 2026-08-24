@@ -2,8 +2,8 @@
 
 SKU ``sku_code`` is lexicographic (``da10…`` before ``da2…``; ``…230…``
 before ``…24…``). Cards sort by series family, then numeric moment / DN
-digits (incl. H8205 LAV body DN), then voltage (24 before 230), then
-``sku_code`` (control suffix).
+(BV/H8205: DN after the ways digit, not the full body code), then voltage
+(24 before 230), then ``sku_code`` (control suffix).
 """
 
 from __future__ import annotations
@@ -46,20 +46,29 @@ def _parse_moment_nm_expr(field_name: str = "value") -> Cast:
 
 
 def _parse_sku_code_nm_expr() -> Cast:
-    """Numeric key from ``sku_code`` (DA/SA/BV torque or DN, else trailing -N).
+    """Numeric key from ``sku_code`` (DA/SA torque, BV/LAV DN, else trail).
 
-    Examples:
-        ``DA10FU24-D`` → 10, ``8100-bv215a`` → 215, ``HVA230-5Q`` → 5,
-        ``H8205-LAV232-24A`` → 32 (not voltage 24 from the trail).
+    Ball-valve / kit bodies encode ``BV{ways}{dn}`` (``215`` → DN15,
+    ``2100`` → DN100) — sort by DN, not the full body integer. Same for
+    H8205 ``LAV{ways}{dn}``. Examples: ``DA10FU24-D`` → 10,
+    ``8100-bv215a`` → 15, ``8100q-bv2100`` → 100, ``H8102-BV265-24A`` → 65,
+    ``H8205-LAV232-24A`` → 32 (not voltage 24 from the trail).
 
     Postgres ``REGEXP_REPLACE`` returns the whole string when the pattern does
     not match; ``NullIf(..., sku_code)`` drops those misses. Use flag ``i``
     (ARE); do not embed ``(?i)`` — that breaks POSIX mode.
     """
-    family_or_raw = _RegexpReplace(
+    da_sa_or_raw = _RegexpReplace(
         F("sku_code"),
-        Value(r"^(8100-)?(da|sa|bv)([0-9]+).*$"),
-        Value(r"\3"),
+        Value(r"^(da|sa)([0-9]+).*$"),
+        Value(r"\2"),
+        Value("i"),
+    )
+    # Brass 8100 / 8100Q / H81: DN after ways digit (2|3).
+    bv_dn_or_raw = _RegexpReplace(
+        F("sku_code"),
+        Value(r"^.*?bv[23]([0-9]+).*$"),
+        Value(r"\1"),
         Value("i"),
     )
     # H8205-LAV{2|3}{dn}{opts}-{V}{ctrl} — DN after ways digit, before opts.
@@ -76,7 +85,8 @@ def _parse_sku_code_nm_expr() -> Cast:
         Value("i"),
     )
     picked = Coalesce(
-        NullIf(family_or_raw, F("sku_code")),
+        NullIf(da_sa_or_raw, F("sku_code")),
+        NullIf(bv_dn_or_raw, F("sku_code")),
         NullIf(h8205_dn_or_raw, F("sku_code")),
         NullIf(trail_or_raw, F("sku_code")),
         Value(""),
@@ -106,12 +116,29 @@ def moment_nm_subquery() -> Subquery:
     )
 
 
+def dn_nm_subquery() -> Subquery:
+    """Numeric DN from AttributeValue (NULL if missing)."""
+    from catalog.models import AttributeValue
+
+    return Subquery(
+        AttributeValue.objects.filter(sku_id=OuterRef("pk"))
+        .filter(
+            Q(attribute__slug="dn") | Q(attribute__name__iexact="dn") | Q(attribute__name__iexact="DN"),
+        )
+        .annotate(parsed=_parse_moment_nm_expr("value"))
+        .order_by("id")
+        .values("parsed")[:1],
+        output_field=FloatField(),
+    )
+
+
 def series_ord_case() -> Case:
     """Stable series family rank (DAMU before HVA before HVD, …).
 
     ``da*mqu`` must be matched before ``da*mu``. H81 / H8205 / brass after
     actuators so «Все категории» keeps drives then valves/kits by category,
-    and within a mixed category series stay contiguous.
+    and within a mixed category series stay contiguous. ``8100q`` before
+    bare ``8100`` in the Case so flanged stays its own family after brass.
     """
     return Case(
         When(sku_code__iregex=r"(?i)^da\d+mqu", then=Value(20)),
@@ -121,6 +148,7 @@ def series_ord_case() -> Case:
         When(sku_code__iregex=r"(?i)^da\d+fu", then=Value(50)),
         When(sku_code__iregex=r"(?i)^sa\d+fu", then=Value(60)),
         When(sku_code__iregex=r"(?i)^sa\d+mu", then=Value(70)),
+        When(sku_code__iregex=r"(?i)^8100q-bv", then=Value(85)),
         When(sku_code__iregex=r"(?i)^8100-bv", then=Value(80)),
         When(sku_code__iregex=r"(?i)^h81", then=Value(90)),
         When(sku_code__iregex=r"(?i)^h8205", then=Value(100)),
@@ -140,20 +168,23 @@ def voltage_ord_case() -> Case:
 
 
 def ways_ord_case() -> Case:
-    """H8205 2-way before 3-way at the same DN; other series → 0."""
+    """2-way before 3-way at the same DN (H8205 LAV / brass BV / H81)."""
     return Case(
         When(sku_code__iregex=r"(?i)^h8205-lav2", then=Value(2)),
         When(sku_code__iregex=r"(?i)^h8205-lav3", then=Value(3)),
+        When(sku_code__iregex=r"(?i)(?:^|-)bv2[0-9]", then=Value(2)),
+        When(sku_code__iregex=r"(?i)(?:^|-)bv3[0-9]", then=Value(3)),
         default=Value(0),
         output_field=IntegerField(),
     )
 
 
 def annotate_moment_nm(queryset: QuerySet[Any]) -> QuerySet[Any]:
-    """Annotate sort keys: series, moment, sku digits, ways, voltage."""
+    """Annotate sort keys: series, moment, DN, sku digits, ways, voltage."""
     return queryset.annotate(
         series_ord=series_ord_case(),
         moment_nm=moment_nm_subquery(),
+        dn_nm=dn_nm_subquery(),
         sku_code_nm=_parse_sku_code_nm_expr(),
         ways_ord=ways_ord_case(),
         voltage_ord=voltage_ord_case(),
@@ -163,15 +194,17 @@ def annotate_moment_nm(queryset: QuerySet[Any]) -> QuerySet[Any]:
 def catalog_list_order_by() -> tuple[Any, ...]:
     """Catalog card order: category → series → Nm/DN → ways → V → sku_code.
 
-    Within one category, series families stay contiguous (DAMU then HVA…),
-    each by torque / DN, then H8205 ways (2 before 3), then 24 V before
-    230 V; ``sku_code`` orders control suffixes (A/AS/D/DS/DST/M) and ties.
+    Within one category, series families stay contiguous (DAMU then HVA…,
+    then 8100 / 8100Q / H81 / H8205), each by torque or DN (numeric, not
+    text), then ways (2 before 3), then 24 V before 230 V; ``sku_code``
+    orders control suffixes (A/AS/D/DS/DST/M) and ties.
     """
     return (
         "category_spec_order",
         "product__category__name",
         "series_ord",
         F("moment_nm").asc(nulls_last=True),
+        F("dn_nm").asc(nulls_last=True),
         F("sku_code_nm").asc(nulls_last=True),
         "ways_ord",
         "voltage_ord",

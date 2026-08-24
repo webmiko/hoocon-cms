@@ -15,7 +15,6 @@ import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
-import { dismissHomeSsrHero } from "../utils/adoptHomeSsrLcpImage";
 import { releaseLabel } from "../release";
 import { api } from "../api/client";
 import styles from "./Layout.module.css";
@@ -59,13 +58,6 @@ export function Layout() {
   const [telegramLinks, setTelegramLinks] = useState<
     Array<{ channel: string; label: string; deep_link: string }>
   >([]);
-
-  // Boot hero is only for the initial ``/`` document; drop it on client navigations.
-  useEffect(() => {
-    if (!isHome) {
-      dismissHomeSsrHero();
-    }
-  }, [isHome]);
 
   useEffect(() => {
     let cancelled = false;

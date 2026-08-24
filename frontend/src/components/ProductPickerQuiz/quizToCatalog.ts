@@ -147,7 +147,7 @@ export function buildCatalogParams(
     }
   }
 
-  if (answers.need === "ball_valve") {
+  if (answers.need === "ball_valve" || answers.need === "kit") {
     if (answers.dn && answers.dn !== "skip") {
       const value = matchDnFacet(facetValuesForKey(facets, "dn"), answers.dn);
       if (value) {

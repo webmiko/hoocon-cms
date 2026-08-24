@@ -72,6 +72,34 @@ export function categorySeoDescription(
   return truncateAtWord(source, DESC_MAX);
 }
 
+const CATALOG_ROOT_TITLE =
+  "Каталог электроприводов вентиляции и кондиционирования";
+
+/** Listing page <title>: unique per category; never reuse the root /catalog title. */
+export function catalogListingSeoTitle(
+  categorySlug?: string,
+  categoryName?: string | null,
+): string {
+  const name = (categoryName ?? "").trim();
+  if (name) {
+    return name;
+  }
+  const slug = (categorySlug ?? "").trim();
+  if (slug) {
+    return `Каталог — ${slug}`;
+  }
+  return CATALOG_ROOT_TITLE;
+}
+
+/** PDP 404: include slug so broken legacy URLs do not share one SERP title. */
+export function skuNotFoundSeoTitle(slug: string): string {
+  const code = (slug ?? "").trim();
+  if (!code) {
+    return "Товар не найден";
+  }
+  return truncateAtWord(`Товар не найден — ${code}`, TITLE_PARTIAL_MAX);
+}
+
 export function brandedTitle(partial: string): string {
   if (partial.includes(SITE_NAME)) {
     return truncateAtWord(partial, TITLE_MAX);

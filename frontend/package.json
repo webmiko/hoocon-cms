@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,11 +17,11 @@
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/montserrat": "^5.3.0",
     "@types/dompurify": "^3.0.5",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.13",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-helmet-async": "^3.0.0",
-    "react-router-dom": "^7.18.1",
+    "react-router-dom": "^7.18.2",
     "workbox-core": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1"

@@ -1,6 +1,7 @@
 """Collapse multi-edition Product cards to one SKU row in catalog lists.
 
-H81 kits (``h8101``…``h8122``), brass ``8100-bv*``, H8205 LAV, DAMU,
+H81 kits (``h8101``…``h8122``), brass ``8100-bv*``, flanged ``8100q-bv*``,
+H8205 LAV, DAMU,
 DAMQU (``privod-vozdushniy-da{n}mqu-*``),
 DAFU (``…-pruzhina-dafu-*nm``), SAMU, SAFU (``privod-protivopozharniy-*nm``),
 HVA, HVD (air + smoke ``…-hvd-*f``) keep many published SKUs under one Product.
@@ -35,6 +36,7 @@ H81_FAMILY_PRODUCT_SLUGS: frozenset[str] = frozenset(
 # Shared slug bodies (no anchors) — used by both fullmatch and ORM iregex.
 _H81_SLUG = "|".join(re.escape(s) for s in sorted(H81_FAMILY_PRODUCT_SLUGS))
 _BRASS_DN_SLUG = r"8100-bv\d+"
+_Q8100_DN_SLUG = r"8100q-bv\d+"
 _H8205_LAV_SLUG = r"h8205-lav\d+[st]*"
 _DAMU_SLUG = r"privod-vozdushniy-bez-pruzhini-damu-\d+nm"
 _DAMQU_SLUG = r"privod-vozdushniy-da\d+mqu-\d+nm"
@@ -57,6 +59,7 @@ _HVD_SMOKE_SLUG = r"privod-dimoudaleniya-hvd-\d+f"
 _FAMILY_PRODUCT_SLUG_RE = re.compile(
     rf"(?i)^(?:{_H81_SLUG}"
     rf"|{_BRASS_DN_SLUG}"
+    rf"|{_Q8100_DN_SLUG}"
     rf"|{_H8205_LAV_SLUG}"
     rf"|{_DAMU_SLUG}"
     rf"|{_DAMQU_SLUG}"

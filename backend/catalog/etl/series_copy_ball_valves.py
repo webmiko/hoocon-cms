@@ -1,11 +1,16 @@
 """Canonical copy + ТТХ for Hoocon ball valves.
 
-* Brass bodies (``8100-bv*``): valve only + RFQ kit picker.
+* Brass bodies (``8100-bv*``): valve only + RFQ kit picker (DN15–50).
+* Flanged bodies (``8100Q-bv*``): valve only DN65–150, 2-way ВЧШГ.
 * H81 factory kits (**H8101…H8122**): complete valve+actuator editions
   ``H8101-BV215A-24AS`` … ``H8122-BV2150-230DS``.
 * H8205 LAV regulating valves: ``H8205-LAV232-24A`` … ``H8205-LAV3300ST-230M``.
 
-Source: sibling Tilda store CSV, catalog 2026 шаровые, PDP pages.
+SKU URL slugs use the article only (``8100-bv215a``, ``h8102-bv215a-24a``,
+``8100q-bv265``) — no ``product-sku`` echo like ``h8102-h8102-…``.
+
+Source: sibling Tilda store CSV, catalog 2026 шаровые, PDF серии 8100/8100Q,
+PDP pages.
 Style: docs/tech-copy-belimo-ru.md.
 """
 
@@ -152,7 +157,8 @@ DEFAULT_STORE_CSV = (
 _FU_SERIES_RE = re.compile(r"(?i)da5fu")
 _SERIES_RE = re.compile(r"\b(BV\d{3,4})\b", re.I)
 # Brass editions: bv215a (optional bare body for legacy lookups).
-_SKU_BODY_RE = re.compile(r"(?i)^(?:8100-)?bv(?P<num>\d{3,4})(?P<ed>[a-e])?$")
+# Also matches ``8100Q-bv265`` (no edition letter).
+_SKU_BODY_RE = re.compile(r"(?i)^(?:8100q-|8100-)?bv(?P<num>\d{3,4})(?P<ed>[a-e])?$")
 _SKU_EDITION_RE = re.compile(r"(?i)bv(\d{3})([a-e])\s*$")
 _DN_RE = re.compile(r"DN\s*(\d+)", re.I)
 
@@ -190,9 +196,28 @@ def product_slug_for_series(series: str) -> str:
     return f"8100-bv{code}"
 
 
+def product_slug_for_8100q(body: str) -> str:
+    """Return CMS product slug for an 8100Q body (``BV265`` → ``8100q-bv265``)."""
+    code = (body or "").strip().casefold()
+    if code.startswith("bv"):
+        return f"8100q-{code}"
+    return f"8100q-bv{code}"
+
+
+def q8100_sku_code(body: str) -> str:
+    """Canonical article for an 8100Q body (``BV265`` → ``8100Q-BV265``)."""
+    code = (body or "").strip().upper()
+    if not code.startswith("BV"):
+        code = f"BV{code}"
+    return f"8100Q-{code}"
+
+
 def brass_sku_slug(product_slug: str, sku_code: str) -> str:
-    """Stable SKU.slug under a brass DN Product (``8100-bv215-8100-bv215a``)."""
-    return f"{product_slug}-{(sku_code or '').strip().lower()}"
+    """Stable SKU.slug = article only (``8100-bv215a``, not ``8100-bv215-8100-bv215a``)."""
+    code = (sku_code or "").strip().lower().replace(" ", "")
+    if code:
+        return code
+    return (product_slug or "").strip().lower()
 
 
 def legacy_brass_product_slug(series: str) -> str:
@@ -213,13 +238,16 @@ def brass_body_code_from_sku(sku_code: str) -> str | None:
 
 
 def body_meta_for_brass(body: str) -> tuple[str, str, str] | None:
-    """Return ``(dn, kvs, ways)`` for a brass body code like ``BV215A``."""
-    from catalog.etl.h81_kits import BRASS_KIT_BODIES
+    """Return ``(dn, kvs, ways)`` for a brass/8100Q body code like ``BV215A``."""
+    from catalog.etl.h81_kits import BRASS_KIT_BODIES, Q8100_BODY_ROWS
 
     body_u = (body or "").strip().upper()
     for row_body, dn, kvs, ways in BRASS_KIT_BODIES:
         if row_body == body_u:
             return dn, kvs, ways
+    for row_body, dn, kvs, *_rest in Q8100_BODY_ROWS:
+        if row_body == body_u:
+            return dn, kvs, "2-ходовый"
     return None
 
 
@@ -232,8 +260,12 @@ def product_slug_for_flanged_kit(kit: str, body: str) -> str:
 
 
 def ball_valve_product_slugs() -> frozenset[str]:
-    """All known ball-valve product slugs (brass bodies + H81 family cards)."""
-    from catalog.etl.h81_kits import h81_family_prefixes, h81_family_product_slug
+    """All known ball-valve product slugs (brass + 8100Q + H81 family cards)."""
+    from catalog.etl.h81_kits import (
+        Q8100_BODY_ROWS,
+        h81_family_prefixes,
+        h81_family_product_slug,
+    )
 
     brass = (
         215,
@@ -250,8 +282,13 @@ def ball_valve_product_slugs() -> frozenset[str]:
         350,
     )
     kit_slugs = (h81_family_product_slug(p) for p in h81_family_prefixes())
+    q_slugs = (product_slug_for_8100q(row[0]) for row in Q8100_BODY_ROWS)
     return frozenset(
-        (*(product_slug_for_series(f"BV{n}") for n in brass), *kit_slugs),
+        (
+            *(product_slug_for_series(f"BV{n}") for n in brass),
+            *q_slugs,
+            *kit_slugs,
+        ),
     )
 
 
@@ -1782,7 +1819,7 @@ def merge_brass_bv_onto_dn_products(
     """Move brass SKUs onto ``8100-bv*`` DN Products; 301 from legacy slugs.
 
     Legacy cards used ``sharovoy-kran-bv215``; target is ``8100-bv215`` with
-    SKU slug ``8100-bv215-8100-bv215a`` (Kvs editions as siblings).
+    SKU slug ``8100-bv215a`` (article only — no product-prefix echo).
 
     Args:
         series_codes: Optional filter like ``("BV215", "BV220")``.
@@ -1915,7 +1952,7 @@ def merge_h81_kits_onto_family_products(
     """Move H81 SKUs onto one Product per series; rename slugs; 301 old URLs.
 
     Legacy body cards used ``sharovoy-kran-h8101-bv215a``; target is ``h8101``
-    with SKU slug ``h8101-h8101-bv215a-24as``.
+    with SKU slug ``h8101-bv215a-24as`` (article only).
 
     Args:
         prefixes: Optional filter like ``("H8101", "H8121")``.
@@ -2055,24 +2092,25 @@ def merge_h81_kits_onto_family_products(
 
 
 def retire_legacy_flanged_body_skus() -> dict[str, int]:
-    """Unpublish mistaken ``8100-bv265…2150`` bodies and add 301 to H8103-*-24A.
+    """Unpublish mistaken ``8100-bv265…2150`` bodies; 301 to canonical ``8100Q-BV*``.
 
     Returns:
         Counters ``skus_unpublished`` / ``redirects``.
     """
+    from catalog.etl.h81_kits import Q8100_BODY_ROWS
     from redirects.models import Redirect
     from redirects.pathutils import normalize_path
 
     skus_unpublished = 0
     redirects = 0
 
-    for body in LEGACY_FLANGED_BODY_CODES:
+    for body, *_rest in Q8100_BODY_ROWS:
         legacy_code = f"8100-{body.lower()}"
         legacy_sku = (
             SKU.objects.filter(sku_code__iexact=legacy_code).select_related("product", "product__category").first()
         )
         target = (
-            SKU.objects.filter(sku_code__iexact=f"H8103-{body}-24A")
+            SKU.objects.filter(sku_code__iexact=q8100_sku_code(body))
             .select_related("product", "product__category")
             .first()
         )
@@ -2113,6 +2151,260 @@ def retire_legacy_flanged_body_skus() -> dict[str, int]:
     return {"skus_unpublished": skus_unpublished, "redirects": redirects}
 
 
+_Q8100_DRIVES = ("DA16MU24", "DA16MU230", "DA24MU24", "DA24MU230")
+
+
+def _q8100_product_name(body: str, dn: str) -> str:
+    return f"{body} | Шаровой кран 2-ходовый DN {dn} (серия 8100Q)"
+
+
+def _q8100_description(*, body: str, dn: str, kvs: str) -> str:
+    return normalize_tech_copy(
+        f"""
+Шаровой кран 2-ходовый DN {dn} серии 8100Q ({body}) для систем отопления,
+вентиляции и кондиционирования (HVAC). Корпус из высокопрочного чугуна
+с шаровидным графитом (ВЧШГ), фланцевое соединение.
+
+Назначение и особенности:
+{WORKING_MEDIUM_BULLET}
+– Рабочая температура среды: –9…+95 °C.
+– Соединение: фланцевое PN16.
+– Материал корпуса: ВЧШГ.
+– Вид: 2-ходовый.
+– Пропускная способность: Kvs {kvs} м³/ч.
+– Уплотнение корпуса: фторопласт (PTFE); двойное уплотнение штока EPDM.
+– Встроенный цельный выпрямительный диск.
+{WARRANTY_BULLET}
+
+Область применения:
+– Системы обработки воздуха.
+– VAV-системы вентиляции и осушения (фанкойлы).
+– Вентиляционные установки.
+– Воздухоподогреватели.
+– Крышные кондиционеры.
+– Бойлерные системы (чиллеры).
+""".strip(),
+    )
+
+
+def _q8100_shared_attrs(
+    *,
+    dn: str,
+    kvs: str,
+    length: str,
+    od: str,
+    height_act: str,
+    height_stem: str,
+    pcd: str,
+    bolts: str,
+) -> tuple[AttrRow, ...]:
+    drives = format_compatible_actuators(_Q8100_DRIVES)
+    return (
+        ("DN", "dn", "", dn, ATTR_GROUP_VALVE),
+        ("Вид крана", "ways", "", "2-ходовый", ATTR_GROUP_VALVE),
+        ("Соединение", "connection", "", "фланцевое PN16", ATTR_GROUP_VALVE),
+        ("Kvs", "kvs", "м³/ч", kvs, ATTR_GROUP_HYDRAULIC),
+        (
+            "Максимальный рабочий перепад давления",
+            "diff-pressure",
+            "МПа",
+            "0,35",
+            ATTR_GROUP_HYDRAULIC,
+        ),
+        ("Рабочая среда", "medium", "", WORKING_MEDIUM_ATTR, ATTR_GROUP_OPERATING),
+        (
+            "Рабочая температура среды",
+            "media-temp",
+            "°C",
+            "–9…+95",
+            ATTR_GROUP_OPERATING,
+        ),
+        ("Угол поворота", "rotation-angle", "°", "0…90", ATTR_GROUP_FUNCTIONAL),
+        ("Материал корпуса", "material", "", "ВЧШГ", ATTR_GROUP_MATERIALS),
+        (
+            "Золотниковый шток и шар",
+            "ball-stem-material",
+            "",
+            "Нержавеющая сталь 304",
+            ATTR_GROUP_MATERIALS,
+        ),
+        (
+            "Двойное уплотнение штока",
+            "stem-seal",
+            "",
+            "Прокладка из каучука (EPDM)",
+            ATTR_GROUP_MATERIALS,
+        ),
+        (
+            "Уплотнение корпуса крана",
+            "seat-seal",
+            "",
+            "Фторопласт (PTFE)",
+            ATTR_GROUP_MATERIALS,
+        ),
+        (
+            "Выпрямительный диск",
+            "flow-disk",
+            "",
+            "Встроенный цельный",
+            ATTR_GROUP_MATERIALS,
+        ),
+        (
+            "Высота до верхнего края привода",
+            "height-actuator",
+            "мм",
+            height_act,
+            ATTR_GROUP_SIZE,
+        ),
+        (
+            "Высота до верхнего края штока",
+            "height-stem",
+            "мм",
+            height_stem,
+            ATTR_GROUP_SIZE,
+        ),
+        ("Длина крана", "valve-length", "мм", length, ATTR_GROUP_SIZE),
+        ("Внешний диаметр крана", "valve-od", "мм", od, ATTR_GROUP_SIZE),
+        (
+            "Делительная окружность фланца",
+            "flange-pcd-pn16",
+            "мм",
+            pcd,
+            ATTR_GROUP_SIZE,
+        ),
+        ("Болты фланца", "flange-bolts-pn16", "", bolts, ATTR_GROUP_SIZE),
+        (
+            "Совместимый привод",
+            "compatible-actuators",
+            "",
+            drives,
+            ATTR_GROUP_FUNCTIONAL,
+        ),
+        ("Кронштейн", "bracket", "", "BR-H", ATTR_GROUP_FUNCTIONAL),
+    )
+
+
+def ensure_8100q_bodies() -> dict[str, int]:
+    """Create published ``8100Q-BV*`` DN65–150 body cards in ``sharovye-krany``."""
+    from catalog.etl.h81_kits import Q8100_BODY_ROWS
+
+    category = Category.objects.filter(slug="sharovye-krany").first()
+    if category is None:
+        logger.error("Category sharovye-krany missing — cannot seed 8100Q")
+        return {"products_created": 0, "skus_created": 0}
+
+    products_created = 0
+    skus_created = 0
+    for body, dn, kvs, length, od, height_act, height_stem, _pcd, _bolts in Q8100_BODY_ROWS:
+        product_slug = product_slug_for_8100q(body)
+        name = _q8100_product_name(body, dn)[:200]
+        product = Product.objects.filter(slug=product_slug).first()
+        if product is None:
+            product = Product.objects.create(
+                category=category,
+                name=name,
+                slug=product_slug,
+                description=_q8100_description(body=body, dn=dn, kvs=kvs),
+            )
+            products_created += 1
+        else:
+            product.category = category
+            product.name = name
+            product.description = _q8100_description(body=body, dn=dn, kvs=kvs)
+            product.save(update_fields=["category", "name", "description"])
+
+        sku_code = q8100_sku_code(body)
+        slug = brass_sku_slug(product_slug, sku_code)
+        existing = SKU.objects.filter(sku_code__iexact=sku_code).first()
+        if existing is None:
+            if SKU.objects.filter(slug=slug).exists():
+                slug = f"{slug}-{SKU.objects.count()}"
+            SKU.objects.create(
+                product=product,
+                name=name[:300],
+                slug=slug[:300],
+                sku_code=sku_code,
+                description=_q8100_description(body=body, dn=dn, kvs=kvs),
+                is_published=True,
+            )
+            skus_created += 1
+        else:
+            changed: list[str] = []
+            if existing.product_id != product.pk:
+                existing.product = product
+                changed.append("product")
+            if (existing.slug or "") != slug and not SKU.objects.filter(slug=slug).exclude(
+                pk=existing.pk,
+            ).exists():
+                existing.slug = slug[:300]
+                changed.append("slug")
+            if not existing.is_published:
+                existing.is_published = True
+                changed.append("is_published")
+            existing.name = name[:300]
+            existing.description = _q8100_description(body=body, dn=dn, kvs=kvs)
+            changed.extend(["name", "description"])
+            existing.save(update_fields=list(dict.fromkeys(changed)))
+        _ = (length, od, height_act, height_stem)  # used in enrich
+    return {"products_created": products_created, "skus_created": skus_created}
+
+
+def apply_8100q_enrichment(*, attach_pdf: bool = True) -> dict[str, int]:
+    """Write ТТХ / copy for all 8100Q bodies; optionally attach series PDF."""
+    from catalog.etl.h81_kits import Q8100_BODY_ROWS
+
+    ensure_stats = ensure_8100q_bodies()
+    attributes = 0
+    pdf_attached = 0
+    for body, dn, kvs, length, od, height_act, height_stem, pcd, bolts in Q8100_BODY_ROWS:
+        sku = SKU.objects.filter(sku_code__iexact=q8100_sku_code(body)).first()
+        if sku is None:
+            continue
+        name = _q8100_product_name(body, dn)
+        sku.name = name[:300]
+        sku.description = _q8100_description(body=body, dn=dn, kvs=kvs)
+        sku.is_published = True
+        sku.save(update_fields=["name", "description", "is_published"])
+        for label, slug, unit, value, _group in _q8100_shared_attrs(
+            dn=dn,
+            kvs=kvs,
+            length=length,
+            od=od,
+            height_act=height_act,
+            height_stem=height_stem,
+            pcd=pcd,
+            bolts=bolts,
+        ):
+            if not value:
+                continue
+            set_sku_attribute(
+                sku,
+                slug=slug,
+                value=value,
+                name=label,
+                unit=unit,
+            )
+            attributes += 1
+        if attach_pdf:
+            from catalog.etl.ball_valve_8100_catalog_media import (
+                attach_8100_series_pdf,
+                find_8100_series_pdf,
+            )
+
+            pdf_path = find_8100_series_pdf()
+            if pdf_path is not None:
+                action = attach_8100_series_pdf(sku, pdf_path=pdf_path)
+                if action in {"create", "update"}:
+                    pdf_attached += 1
+    return {
+        "products": ensure_stats["products_created"],
+        "skus": ensure_stats["skus_created"],
+        "attributes": attributes,
+        "pdf_attached": pdf_attached,
+        "series": len(Q8100_BODY_ROWS),
+    }
+
+
 def apply_all_ball_valve_enrichment(
     *,
     import_images: bool = True,
@@ -2122,12 +2414,13 @@ def apply_all_ball_valve_enrichment(
 ) -> dict[str, int]:
     """Enrich brass bodies, H8101…H8122 kits, and H8205 LAV cards.
 
-    Creates missing Product/SKU rows, rewrites copy / ТТХ / media, then retires
-    mistaken ``8100-bv265…2150`` body cards (not brass ``8100-bv215*``).
+    Creates missing Product/SKU rows, rewrites copy / ТТХ / media, seeds
+    ``8100Q-BV*`` DN65–150 bodies, then retires mistaken ``8100-bv265…2150``
+    cards onto the 8100Q URLs (not brass ``8100-bv215*``).
 
     Args:
         import_images: Download Tilda galleries / attach local catalog photos.
-        series_codes: Optional filter like ``("BV220", "H8101", "H8205")``.
+        series_codes: Optional filter like ``("BV220", "H8101", "H8205", "8100Q")``.
         csv_path: Optional CSV override for brass series.
         attach_pdf: Attach 2026 catalog PDF to each SKU once.
 
@@ -2184,6 +2477,15 @@ def apply_all_ball_valve_enrichment(
         )
         totals["redirects"] += int(brass_merge.get("redirects", 0))
         totals["legacy_unpublished"] += int(brass_merge.get("products_retired", 0))
+
+    run_8100q = wanted is None or any(
+        c in {"8100Q", "Q8100"} or c.startswith("8100Q") or c in LEGACY_FLANGED_BODY_CODES for c in (wanted or set())
+    )
+    if run_8100q:
+        q_stats = apply_8100q_enrichment(attach_pdf=True)
+        totals["series"] += int(q_stats.get("series", 0))
+        for key in ("products", "skus", "attributes", "pdf_attached"):
+            totals[key] += int(q_stats.get(key, 0))
 
     kit_prefixes: set[str] = set()
     for kit in flanged_kit_series():
@@ -2254,7 +2556,12 @@ def apply_all_ball_valve_enrichment(
         totals["redirects"] = totals.get("redirects", 0) + ensure_h81_kit_category_redirects()
 
     run_retire = wanted is None or any(
-        c.startswith("H810") or c.startswith("H812") or c in LEGACY_FLANGED_BODY_CODES for c in (wanted or set())
+        c.startswith("H810")
+        or c.startswith("H812")
+        or c in LEGACY_FLANGED_BODY_CODES
+        or c in {"8100Q", "Q8100"}
+        or c.startswith("8100Q")
+        for c in (wanted or set())
     )
     if run_retire:
         retired = retire_legacy_flanged_body_skus()

@@ -2,7 +2,10 @@ import { Link, useLocation, useNavigate, useNavigationType, useParams, useSearch
 import { useEffect, useMemo, useState } from "react";
 
 import { Seo } from "../components/Seo";
-import { categorySeoDescription } from "../utils/seoMeta";
+import {
+  catalogListingSeoTitle,
+  categorySeoDescription,
+} from "../utils/seoMeta";
 import { CatalogSkeleton } from "../components/CatalogSkeleton";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
@@ -150,6 +153,12 @@ export function CatalogPage() {
     (inStockOnly ? 1 : 0) +
     (newOnly ? 1 : 0);
   const activeCategory = categories.find((c) => c.slug === category);
+  const categoriesReady = categoriesData !== undefined;
+  const catalogTitle = catalogListingSeoTitle(
+    category,
+    activeCategory?.name,
+  );
+  const catalogSeoReady = !category || categoriesReady;
 
   // «Показать ещё»: append next DRF pages (PAGE_SIZE=20) without replacing.
   const [append, setAppend] = useState<AppendState>({
@@ -506,36 +515,34 @@ export function CatalogPage() {
 
   return (
     <div className={styles.page}>
-      <Seo
-        title={
-          activeCategory
-            ? activeCategory.name
-            : "Каталог электроприводов вентиляции и кондиционирования"
-        }
-        description={
-          activeCategory
-            ? categorySeoDescription(
-                activeCategory.name,
-                activeCategory.description,
-              )
-            : categorySeoDescription()
-        }
-        path={category ? catalogCategoryPath(category) : "/catalog"}
-        jsonLd={[
-          buildBreadcrumbJsonLd([
-            { name: "Главная", path: "/" },
-            { name: "Каталог", path: "/catalog" },
-            ...(activeCategory
-              ? [
-                  {
-                    name: activeCategory.name,
-                    path: catalogCategoryPath(activeCategory.slug),
-                  },
-                ]
-              : []),
-          ]),
-        ]}
-      />
+      {catalogSeoReady ? (
+        <Seo
+          title={catalogTitle}
+          description={
+            activeCategory
+              ? categorySeoDescription(
+                  activeCategory.name,
+                  activeCategory.description,
+                )
+              : categorySeoDescription(catalogTitle)
+          }
+          path={category ? catalogCategoryPath(category) : "/catalog"}
+          jsonLd={[
+            buildBreadcrumbJsonLd([
+              { name: "Главная", path: "/" },
+              { name: "Каталог", path: "/catalog" },
+              ...(activeCategory
+                ? [
+                    {
+                      name: activeCategory.name,
+                      path: catalogCategoryPath(activeCategory.slug),
+                    },
+                  ]
+                : []),
+            ]),
+          ]}
+        />
+      ) : null}
 
       <Breadcrumbs
         items={[

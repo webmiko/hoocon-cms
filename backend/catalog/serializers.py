@@ -49,9 +49,25 @@ from catalog.sku_access import (
 from sitesettings.models import SiteSettings
 
 
-def _prices_visible() -> bool:
-    """Return True if public API may expose SKU.price."""
-    return bool(SiteSettings.load().show_prices_on_site)
+def _prices_visible(context: dict[str, Any] | None = None) -> bool:
+    """Return True if public API may expose SKU.price.
+
+    Reads the singleton once per serializer context. Without that a 20-row list
+    page hit SiteSettings 40 times — ``price_on_request`` plus
+    ``to_representation`` for every card. Context is rebuilt per request, so the
+    Admin toggle still takes effect on the next call.
+
+    Args:
+        context: Serializer context to memoize into; None re-reads the row.
+
+    Returns:
+        True when SiteSettings.show_prices_on_site is enabled.
+    """
+    if context is None:
+        return bool(SiteSettings.load().show_prices_on_site)
+    if "_prices_visible" not in context:
+        context["_prices_visible"] = bool(SiteSettings.load().show_prices_on_site)
+    return bool(context["_prices_visible"])
 
 
 def _sku_own_images(obj: SKU) -> list[ProductImage]:
@@ -359,7 +375,7 @@ class SKUListSerializer(serializers.ModelSerializer):
 
     def get_price_on_request(self, _obj: SKU) -> bool:
         """True when prices are hidden (RFQ policy)."""
-        return not _prices_visible()
+        return not _prices_visible(self.context)
 
     def get_in_stock(self, obj: SKU) -> bool:
         """True when warehouse quantity is positive (no raw qty in public API)."""
@@ -413,7 +429,7 @@ class SKUListSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: SKU) -> dict[str, Any]:
         """Drop `price` key entirely when show_prices_on_site is False."""
         data = super().to_representation(instance)
-        if not _prices_visible():
+        if not _prices_visible(self.context):
             data.pop("price", None)
         return data
 

@@ -447,43 +447,6 @@ def test_ensure_and_enrich_flanged_h8103_bv265() -> None:
 
 
 @pytest.mark.django_db
-def test_retire_legacy_8100_flanged_redirects_to_h8103() -> None:
-    """Legacy 8100-bv265 is unpublished and 301'd to H8103-BV265-24A."""
-    from catalog.etl.series_copy_ball_valves import (
-        apply_flanged_kit_enrichment,
-        flanged_kit_series,
-        retire_legacy_flanged_body_skus,
-    )
-    from redirects.models import Redirect
-
-    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
-    product = Product.objects.create(
-        name="BV265",
-        slug="sharovoy-kran-bv265",
-        category=cat,
-    )
-    legacy = SKU.objects.create(
-        product=product,
-        name="BV265",
-        slug="sharovoy-kran-bv265-8100-bv265",
-        sku_code="8100-bv265",
-        is_published=True,
-    )
-    kit = next(k for k in flanged_kit_series() if k.code == "H8103-BV265")
-    apply_flanged_kit_enrichment(kit, import_images=False, attach_pdf=False)
-    retired = retire_legacy_flanged_body_skus()
-    legacy.refresh_from_db()
-    assert legacy.is_published is False
-    assert retired["skus_unpublished"] >= 1
-    target = SKU.objects.get(sku_code="H8103-BV265-24A")
-    assert Redirect.objects.filter(
-        from_path__contains=legacy.slug,
-        to_path__contains=target.slug,
-        is_active=True,
-    ).exists()
-
-
-@pytest.mark.django_db
 @requires_store_csv
 def test_merge_brass_bv_onto_8100_dn_products() -> None:
     """Legacy ``sharovoy-kran-bv215`` SKUs move to ``8100-bv215`` + 301."""
@@ -506,12 +469,73 @@ def test_merge_brass_bv_onto_8100_dn_products() -> None:
     stats = merge_brass_bv_onto_dn_products(series_codes=("BV215",))
     sku.refresh_from_db()
     assert sku.product.slug == "8100-bv215"
-    assert sku.slug == "8100-bv215-8100-bv215a"
+    assert sku.slug == "8100-bv215a"
     assert stats["skus_moved"] >= 1
     assert stats["slugs_renamed"] >= 1
     assert not Product.objects.filter(slug="sharovoy-kran-bv215").exists()
     assert Redirect.objects.filter(
         from_path="/catalog/sharovye-krany/sharovoy-kran-bv215-8100-bv215a",
-        to_path="/catalog/sharovye-krany/8100-bv215-8100-bv215a",
+        to_path="/catalog/sharovye-krany/8100-bv215a",
         is_active=True,
     ).exists()
+
+
+@pytest.mark.django_db
+def test_retire_legacy_8100_flanged_redirects_to_8100q() -> None:
+    """Legacy 8100-bv265 is unpublished and 301'd to 8100Q-BV265."""
+    from catalog.etl.series_copy_ball_valves import (
+        apply_8100q_enrichment,
+        retire_legacy_flanged_body_skus,
+    )
+    from redirects.models import Redirect
+
+    cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    product = Product.objects.create(
+        name="BV265",
+        slug="sharovoy-kran-bv265",
+        category=cat,
+    )
+    legacy = SKU.objects.create(
+        product=product,
+        name="BV265",
+        slug="sharovoy-kran-bv265-8100-bv265",
+        sku_code="8100-bv265",
+        is_published=True,
+    )
+    apply_8100q_enrichment(attach_pdf=False)
+    retired = retire_legacy_flanged_body_skus()
+    legacy.refresh_from_db()
+    assert legacy.is_published is False
+    assert retired["skus_unpublished"] >= 1
+    target = SKU.objects.get(sku_code="8100Q-BV265")
+    assert target.is_published is True
+    assert target.slug == "8100q-bv265"
+    assert Redirect.objects.filter(
+        from_path__contains=legacy.slug,
+        to_path__contains=target.slug,
+        is_active=True,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_8100q_body_attrs_match_pdf_table() -> None:
+    """8100Q DN65 card gets PDF Kvs / flanged ВЧШГ / BR-H."""
+    from catalog.etl.series_copy_ball_valves import apply_8100q_enrichment
+    from catalog.models import AttributeValue
+
+    Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    apply_8100q_enrichment(attach_pdf=False)
+    sku = SKU.objects.get(sku_code="8100Q-BV265")
+    by_slug = {
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")
+    }
+    assert by_slug["dn"] == "65"
+    assert by_slug["kvs"] == "63"
+    assert by_slug["ways"] == "2-ходовый"
+    assert by_slug["material"] == "ВЧШГ"
+    assert "фланц" in by_slug["connection"].casefold()
+    assert by_slug["valve-length"] == "93"
+    assert by_slug["height-actuator"] == "236"
+    assert by_slug["bracket"] == "BR-H"
+    assert sku.product.slug == "8100q-bv265"
+    assert sku.slug == "8100q-bv265"

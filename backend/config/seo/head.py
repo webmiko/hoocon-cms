@@ -266,6 +266,39 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
     )
 
 
+def _resolve_missing_catalog_sku(path: str) -> SeoHeadContext | None:
+    """Unique noindex title for ``/catalog/{category}/{sku}`` when SKU is absent."""
+    if not path.startswith("/catalog/"):
+        return None
+    parts = [p for p in path.removeprefix("/catalog/").split("/") if p]
+    if len(parts) != 2:
+        return None
+    cat_slug = validate_slug(parts[0])
+    sku_slug = validate_slug(parts[1])
+    from catalog.models import SKU
+
+    if SKU.objects.filter(slug=sku_slug, is_published=True).exists():
+        return None
+    title_partial = plain_text_for_meta(
+        f"Товар не найден — {sku_slug}",
+        max_len=TITLE_PARTIAL_MAX,
+    )
+    canonical = f"/catalog/{cat_slug}/{sku_slug}"
+    return SeoHeadContext(
+        canonical_path=canonical,
+        page_title=_format_page_title(title_partial),
+        description=format_meta_description(
+            f"Позиция {sku_slug} не найдена в каталоге Hoocon.",
+        ),
+        noindex=True,
+        breadcrumb=(
+            ("/", "Главная"),
+            ("/catalog", "Каталог"),
+            (canonical, sku_slug),
+        ),
+    )
+
+
 def _resolve_catalog_category(path: str) -> SeoHeadContext | None:
     """Resolve ``/catalog/{category_slug}`` listing pages."""
     if not path.startswith("/catalog/") or path == "/catalog":
@@ -354,6 +387,10 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
     sku_ctx = _resolve_sku(path)
     if sku_ctx is not None:
         return sku_ctx
+
+    missing_sku_ctx = _resolve_missing_catalog_sku(path)
+    if missing_sku_ctx is not None:
+        return missing_sku_ctx
 
     return SeoHeadContext(
         canonical_path=path,

@@ -788,9 +788,9 @@
 }
 
 .cardStockIn {
-  color: var(--color-success, #1a7f4e);
-  border-color: color-mix(in srgb, var(--color-success, #1a7f4e) 28%, transparent);
-  background: color-mix(in srgb, var(--color-success, #1a7f4e) 10%, transparent);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
 }
 
 .cardStockIn::before {
@@ -828,14 +828,14 @@
   min-height: 1.5rem;
   margin: 0;
   padding: 0.2rem 0.55rem;
-  border: 1px solid color-mix(in srgb, var(--color-brand, #0b3d5c) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-badge-brand-ink) 28%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-brand, #0b3d5c) 10%, transparent);
+  background: var(--color-brand-soft);
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   line-height: 1.2;
-  color: var(--color-brand, #0b3d5c);
+  color: var(--color-badge-brand-ink);
   white-space: nowrap;
 }
 

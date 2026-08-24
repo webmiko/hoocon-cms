@@ -135,9 +135,19 @@
 
 .status {
   margin: 0.55rem 0 0;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--color-text-soft);
   overflow-wrap: anywhere;
+}
+
+.statusOk {
+  color: var(--color-success);
+}
+
+.statusError {
+  color: var(--color-danger);
 }
 
 @media (min-width: 721px) {

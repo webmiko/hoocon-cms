@@ -19,6 +19,7 @@ from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 
 from catalog.etl.attr_write import set_sku_attribute
 from catalog.etl.manual_pdfs import default_manuals_dir, find_manual_file
@@ -210,7 +211,7 @@ def apply_8100_catalog_media(
     pdf_path: Path | None = None,
     force_attrs: bool = False,
 ) -> dict[str, Any]:
-    """Attach series PDF to published ``8100-bv*`` SKUs; drop legacy gallery crops."""
+    """Attach series PDF to published ``8100-bv*`` / ``8100Q-bv*`` SKUs."""
     summary: dict[str, Any] = {
         "pdf_created": 0,
         "pdf_updated": 0,
@@ -231,7 +232,7 @@ def apply_8100_catalog_media(
 
     skus = list(
         SKU.objects.filter(
-            sku_code__istartswith="8100-bv",
+            Q(sku_code__istartswith="8100-bv") | Q(sku_code__istartswith="8100Q-bv"),
             is_published=True,
         ).order_by("sku_code"),
     )

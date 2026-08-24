@@ -340,8 +340,22 @@ def h81_family_product_name(family: KitFamily) -> str:
 
 
 def h81_sku_slug(product_slug: str, sku_code: str) -> str:
-    """Stable SKU.slug under a family Product (``h8101-h8101-bv215a-24as``)."""
-    return f"{product_slug}-{(sku_code or '').strip().lower()}"
+    """Stable SKU.slug = article only (``h8102-bv215a-24as``, not ``h8102-h8102-…``)."""
+    code = (sku_code or "").strip().lower().replace(" ", "")
+    if code:
+        return code
+    return (product_slug or "").strip().lower()
+
+
+# PDF «шаровые краны серии 8100» стр.4 — корпусы 8100Q (DN65–150, только 2-ходовые).
+# body, dn, kvs, L, D, H, H1, flange PCD, bolt pattern
+Q8100_BODY_ROWS: tuple[tuple[str, str, str, str, str, str, str, str, str], ...] = (
+    ("BV265", "65", "63", "93", "105", "236", "67", "146", "4-Φ18"),
+    ("BV280", "80", "100", "108", "125", "244", "90", "160", "8-Φ18"),
+    ("BV2100", "100", "160", "120", "148", "233", "99", "180", "8-Φ18"),
+    ("BV2125", "125", "250", "144,5", "179", "247", "114", "210", "8-Φ18"),
+    ("BV2150", "150", "400", "168", "205", "261", "138", "240", "8-Φ22"),
+)
 
 
 _H81_PARTS_RE = re.compile(

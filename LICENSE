@@ -1,0 +1,54 @@
+Hoocon CMS — Proprietary License
+Copyright (c) 2026 Hoocon. All rights reserved.
+
+================================================================================
+RU — Исключительные права
+================================================================================
+
+Правообладатель: Hoocon (сайт https://hoocon.ru).
+
+Исключительные права на исходный код, документацию, дизайн, базы данных,
+медиа и иные материалы данного репозитория принадлежат правообладателю,
+если прямо не указано иное.
+
+Без предварительного письменного согласия правообладателя запрещается:
+
+- копирование, воспроизведение, распространение или публикация материалов;
+- создание производных работ на основе материалов репозитория;
+- коммерческое использование, сублицензирование, передача третьим лицам;
+- обратная разработка (reverse engineering), декомпиляция или дизассемблирование,
+  за исключением случаев, прямо разрешённых применимым законодательством.
+
+Доступ к репозиторию не означает передачу прав собственности или
+лицензии любого рода, кроме ограниченного права просмотра в рамках
+согласованного с правообладателем доступа (например, сотрудничество,
+аудит, сопровождение).
+
+ПО ПРЕДОСТАВЛЯЕТСЯ «КАК ЕСТЬ», БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ.
+
+Вопросы по лицензированию: sales@hoocon.ru
+
+================================================================================
+EN — All rights reserved
+================================================================================
+
+Copyright holder: Hoocon (https://hoocon.ru).
+
+All rights in this repository — including source code, documentation, design,
+databases, media, and other materials — are reserved by the copyright holder
+unless otherwise stated.
+
+Without prior written permission you may not:
+
+- copy, reproduce, distribute, or publish the materials;
+- create derivative works based on the repository;
+- use the materials commercially, sublicense, or transfer them to third parties;
+- reverse engineer, decompile, or disassemble, except where mandatory law
+  allows.
+
+Repository access does not grant ownership or any license except a limited
+right to view content as agreed with the copyright holder.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+Licensing inquiries: sales@hoocon.ru

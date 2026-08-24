@@ -149,6 +149,8 @@
   --color-badge-sku: var(--color-brand);
   --color-badge-article: #555555;
   --color-badge-news: #2d6a4f;
+  /* Soft brand chips (catalog «Новое»): deep ink on --color-brand-soft ≥4.5:1 */
+  --color-badge-brand-ink: var(--color-brand-deep);
   --color-on-badge: #ffffff;
 
   /* Elevation — soft, single layer */
@@ -312,6 +314,7 @@ html[data-theme="dark"] {
   --color-badge-default: #2a2a32;
   /* Keep dark fill + white label (light #a8a8b0 + white failed AA) */
   --color-badge-article: #55555e;
+  --color-badge-brand-ink: var(--color-brand);
 
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.28);

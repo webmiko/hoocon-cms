@@ -265,7 +265,13 @@ class Command(BaseCommand):
 
         seed = options["seed_csv"].strip()
         if not seed:
-            seed = str(Path(settings.BASE_DIR).resolve().parent / "docs" / "redirects-tproduct-seed.csv")
+            seed = str(
+                Path(settings.BASE_DIR).resolve().parent
+                / "backend"
+                / "redirects"
+                / "seeds"
+                / "redirects-tproduct-seed.csv"
+            )
         seed_csv = Path(seed).expanduser().resolve()
         store_csv = Path(options["store_csv"]).expanduser().resolve()
         dry_run = bool(options["dry_run"])

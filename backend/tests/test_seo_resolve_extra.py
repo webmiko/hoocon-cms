@@ -142,6 +142,20 @@ def test_resolve_seo_sku_og_image_uses_family_gallery_fallback() -> None:
 
 
 @pytest.mark.django_db
+def test_resolve_seo_missing_catalog_sku_has_unique_title() -> None:
+    """Broken /catalog/{cat}/{sku} URLs get per-slug noindex titles."""
+    from catalog.models import Category
+
+    Category.objects.create(name="Комплекты", slug="komplekty-seo-miss")
+    ctx = resolve_seo_context(
+        "/catalog/komplekty-seo-miss/h8102-bv215c-24ds",
+    )
+    assert ctx.noindex is True
+    assert "h8102-bv215c-24ds" in ctx.page_title
+    assert "Товар не найден" in ctx.page_title
+
+
+@pytest.mark.django_db
 def test_resolve_seo_deep_catalog_path_is_fallback() -> None:
     """Three-segment catalog path is not treated as a category page."""
     ctx = resolve_seo_context("/catalog/a/b/c")
