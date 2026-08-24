@@ -252,13 +252,15 @@ export function parseKvsM3h(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** Pick catalog Kvs closest to the band midpoint among available values. */
+/**
+ * Pick catalog Kvs values in the quiz band (comma OR for the API).
+ * All chips in-band are kept so DN65–150 / 8100Q are not dropped when the
+ * band also contains other Kvs (e.g. «больше 40» → 63,100,160…).
+ */
 export function matchKvsFacet(
   values: readonly string[],
   choice: Exclude<QuizKvs, "skip">,
 ): string | null {
-  const band = KVS_BAND_LIMITS[choice];
-  const mid = (band.min + band.max) / 2;
   const inBand = values
     .map((value) => ({ value, kvs: parseKvsM3h(value) }))
     .filter((row): row is { value: string; kvs: number } => row.kvs !== null)
@@ -269,9 +271,7 @@ export function matchKvsFacet(
     return null;
   }
 
-  return inBand.reduce((best, row) =>
-    Math.abs(row.kvs - mid) < Math.abs(best.kvs - mid) ? row : best,
-  ).value;
+  return [...new Set(inBand.map((row) => row.value))].join(",");
 }
 
 export function facetValuesForKey(

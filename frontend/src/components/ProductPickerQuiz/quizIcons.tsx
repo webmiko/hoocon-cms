@@ -110,6 +110,7 @@ function pressureGauge(level: number, extra?: ReactNode) {
 }
 
 function dnPipe(bore: number, label: string) {
+  const fontSize = label.length > 2 ? "4.5" : "5.5";
   return (
     <>
       <path d="M5 10.5h14" {...ink(SW)} />
@@ -119,7 +120,7 @@ function dnPipe(bore: number, label: string) {
         x={12}
         y={19.5}
         textAnchor="middle"
-        fontSize="5.5"
+        fontSize={fontSize}
         fontWeight="700"
         fill="currentColor"
         stroke="none"
@@ -466,6 +467,26 @@ export function IconDn40(props: IconProps) {
 
 export function IconDn50(props: IconProps) {
   return <Svg {...props}>{dnPipe(2.9, "50")}</Svg>;
+}
+
+export function IconDn65(props: IconProps) {
+  return <Svg {...props}>{dnPipe(3.1, "65")}</Svg>;
+}
+
+export function IconDn80(props: IconProps) {
+  return <Svg {...props}>{dnPipe(3.2, "80")}</Svg>;
+}
+
+export function IconDn100(props: IconProps) {
+  return <Svg {...props}>{dnPipe(3.2, "100")}</Svg>;
+}
+
+export function IconDn125(props: IconProps) {
+  return <Svg {...props}>{dnPipe(3.2, "125")}</Svg>;
+}
+
+export function IconDn150(props: IconProps) {
+  return <Svg {...props}>{dnPipe(3.2, "150")}</Svg>;
 }
 
 export function IconKvsUpTo25(props: IconProps) {

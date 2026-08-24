@@ -61,7 +61,7 @@ class Command(BaseCommand):
                 f"images_created={stats['images_created']}, "
                 f"images_failed={stats['images_failed']}, "
                 f"pdf_attached={stats.get('pdf_attached', 0)}, "
-                f"legacy_unpublished={stats.get('legacy_unpublished', 0)}, "
+                f"legacy_deleted={stats.get('legacy_deleted', stats.get('legacy_unpublished', 0))}, "
                 f"redirects={stats.get('redirects', 0)}",
             ),
         )
