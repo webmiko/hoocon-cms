@@ -77,11 +77,15 @@ def _norm_heading_phrase(text: str) -> str:
 def _heading_article(sku_code: str, fallback: str) -> str:
     """Unique left-side article for H1 / cards.
 
-    Ball valves: ``8100-bv215a`` → ``BV215A``. Actuators: keep ``sku_code``.
+    Ball valves: ``8100-bv215a`` → ``BV215A``, ``8100Q-bv265`` → ``BV265``.
+    Actuators: keep ``sku_code``.
     """
     code = (sku_code or "").strip()
     if not code:
         return fallback
+    m_q = re.match(r"(?i)^8100q-(.+)$", code)
+    if m_q:
+        return m_q.group(1).upper()
     m = re.match(r"(?i)^8100-(.+)$", code)
     if m:
         return m.group(1).upper()

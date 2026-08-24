@@ -47,14 +47,14 @@ def test_apply_flow_scheme_only_three_way(
     sku2 = SKU.objects.create(
         product=two,
         name="BV215A",
-        slug="8100-bv215-8100-bv215a",
+        slug="8100-bv215a",
         sku_code="8100-bv215a",
         is_published=True,
     )
     sku3 = SKU.objects.create(
         product=three,
         name="BV315A",
-        slug="8100-bv315-8100-bv315a",
+        slug="8100-bv315a",
         sku_code="8100-bv315a",
         is_published=True,
     )

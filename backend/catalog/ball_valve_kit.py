@@ -68,10 +68,16 @@ def is_ball_valve_sku(sku: SKU) -> bool:
     slug = (product.slug or "").casefold()
     if slug in {s.casefold() for s in ball_valve_product_slugs()}:
         return True
-    if slug.startswith("8100-bv") or slug.startswith("sharovoy-kran-bv"):
+    if (
+        slug.startswith("8100-bv")
+        or slug.startswith("8100q-bv")
+        or slug.startswith(
+            "sharovoy-kran-bv",
+        )
+    ):
         return True
     code = (sku.sku_code or "").casefold().replace(" ", "")
-    return code.startswith("8100-bv")
+    return code.startswith("8100-bv") or code.startswith("8100q-bv")
 
 
 def _compatible_actuators_text(sku: SKU) -> str:

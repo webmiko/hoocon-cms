@@ -148,10 +148,10 @@ def test_resolve_seo_missing_catalog_sku_has_unique_title() -> None:
 
     Category.objects.create(name="Комплекты", slug="komplekty-seo-miss")
     ctx = resolve_seo_context(
-        "/catalog/komplekty-seo-miss/h8102-h8102-bv215c-24ds",
+        "/catalog/komplekty-seo-miss/h8102-bv215c-24ds",
     )
     assert ctx.noindex is True
-    assert "h8102-h8102-bv215c-24ds" in ctx.page_title
+    assert "h8102-bv215c-24ds" in ctx.page_title
     assert "Товар не найден" in ctx.page_title
 
 

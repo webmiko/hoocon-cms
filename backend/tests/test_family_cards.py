@@ -19,6 +19,7 @@ def test_is_collapsible_family_product_slug() -> None:
     assert is_collapsible_family_product_slug("h8101")
     assert is_collapsible_family_product_slug("h8122")
     assert is_collapsible_family_product_slug("8100-bv215")
+    assert is_collapsible_family_product_slug("8100q-bv265")
     assert is_collapsible_family_product_slug("h8205-lav232")
     assert is_collapsible_family_product_slug(
         "privod-vozdushniy-bez-pruzhini-damu-8nm",
@@ -142,7 +143,7 @@ def test_komplekty_list_shows_all_h81_series_cards(client: APIClient) -> None:
             SKU.objects.create(
                 product=product,
                 name=f"{code} | edition",
-                slug=f"{prefix.casefold()}-{code.lower()}",
+                slug=code.lower(),
                 sku_code=code,
                 is_published=True,
             )

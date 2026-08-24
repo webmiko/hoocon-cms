@@ -17,7 +17,7 @@ def test_siblings_for_h8101_family_product() -> None:
         SKU.objects.create(
             product=product,
             name=code,
-            slug=f"h8101-{code.lower()}",
+            slug=code.lower(),
             sku_code=code,
             is_published=True,
         )
@@ -38,14 +38,14 @@ def test_sku_detail_exposes_siblings() -> None:
         SKU.objects.create(
             product=product,
             name=code,
-            slug=f"h8103-{code.lower()}",
+            slug=code.lower(),
             sku_code=code,
             is_published=True,
             stock_qty=4 if code.endswith("-24A") else 0,
             stock_qty_ma=2 if code.endswith("-24A") else 0,
         )
     client = APIClient()
-    resp = client.get("/api/catalog/skus/h8103-h8103-bv265-24a/")
+    resp = client.get("/api/catalog/skus/h8103-bv265-24a/")
     assert resp.status_code == 200
     data = resp.json()
     assert data["in_stock_ma"] is True
@@ -69,9 +69,9 @@ def test_siblings_for_brass_8100_bv_dn_card() -> None:
         category=cat,
     )
     for code, slug in (
-        ("8100-bv215a", "8100-bv215-8100-bv215a"),
-        ("8100-bv215b", "8100-bv215-8100-bv215b"),
-        ("8100-bv215c", "8100-bv215-8100-bv215c"),
+        ("8100-bv215a", "8100-bv215a"),
+        ("8100-bv215b", "8100-bv215b"),
+        ("8100-bv215c", "8100-bv215c"),
     ):
         SKU.objects.create(
             product=product,

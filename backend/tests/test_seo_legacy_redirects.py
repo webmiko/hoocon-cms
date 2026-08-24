@@ -90,7 +90,7 @@ def test_resolve_brass_legacy_slug(db: None) -> None:
     sku = SKU.objects.create(
         product=product,
         sku_code="8100-BV215A",
-        slug="8100-bv215-8100-bv215a",
+        slug="8100-bv215a",
         name="A",
         is_published=True,
     )

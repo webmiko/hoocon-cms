@@ -1142,7 +1142,7 @@ def test_ball_valve_8100_facet_order_and_labels(client) -> None:
     sku = SKU.objects.create(
         product=product,
         name="8100-bv215a",
-        slug="8100-bv215-8100-bv215a",
+        slug="8100-bv215a",
         sku_code="8100-bv215a",
         is_published=True,
     )

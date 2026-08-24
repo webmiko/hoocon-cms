@@ -134,6 +134,13 @@ DEFAULT_ATTR_GROUP_BY_SLUG: dict[str, str] = {
     "valve-length": ATTR_GROUP_SIZE,
     "valve-od": ATTR_GROUP_SIZE,
     "center-to-edge": ATTR_GROUP_SIZE,
+    "flange-pcd-pn16": ATTR_GROUP_SIZE,
+    "flange-bolts-pn16": ATTR_GROUP_SIZE,
+    "flange-od-pn16": ATTR_GROUP_SIZE,
+    "flange-pcd-pn25": ATTR_GROUP_SIZE,
+    "flange-bolts-pn25": ATTR_GROUP_SIZE,
+    "flange-od-pn25": ATTR_GROUP_SIZE,
+    "flange-face": ATTR_GROUP_SIZE,
 }
 
 

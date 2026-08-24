@@ -62,7 +62,7 @@ def test_apply_ball_valve_kvs_discs_attaches_gallery_tile(
     sku = SKU.objects.create(
         product=product,
         name="BV215A",
-        slug="8100-bv215-8100-bv215a",
+        slug="8100-bv215a",
         sku_code="8100-bv215a",
         is_published=True,
     )
