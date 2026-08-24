@@ -173,6 +173,11 @@ def _apply_cache_headers(response: HttpResponse, *, hit: bool) -> None:
     response["X-Catalog-Cache"] = "HIT" if hit else "MISS"
 
 
+def invalidate_catalog_http_cache_on_site_settings(**_kwargs: object) -> None:
+    """``post_save`` handler for SiteSettings — must be module-level (strong ref)."""
+    invalidate_catalog_http_cache()
+
+
 def catalog_http_cache_debug_info(request: HttpRequest) -> dict[str, Any]:
     """Small dict for tests / management commands."""
     return {
