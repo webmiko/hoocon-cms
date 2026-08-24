@@ -31,4 +31,4 @@ class Command(BaseCommand):
         output.parent.mkdir(parents=True, exist_ok=True)
         qs = list(Redirect.objects.filter(is_active=True).order_by("from_path"))
         output.write_text(render_nginx_map(qs), encoding="utf-8")
-        self.stderr.write(self.style.SUCCESS(f"Wrote {len(qs)} rules → {output}"))
+        self.stdout.write(self.style.SUCCESS(f"Wrote {len(qs)} rules → {output}"))
