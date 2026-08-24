@@ -169,3 +169,69 @@ def test_cache_key_stable_across_query_order(settings) -> None:
     k1 = build_catalog_http_cache_key("/api/catalog/skus/", "b=1&a=2")
     k2 = build_catalog_http_cache_key("/api/catalog/skus/", "a=2&b=1")
     assert k1 == k2
+
+
+@pytest.mark.django_db
+def test_head_uses_get_cache_without_storing_empty_body(client, settings) -> None:
+    """HEAD is served from the GET entry; empty HEAD bodies are not stored."""
+    settings.CATALOG_HTTP_CACHE_SECONDS = 30
+    _seed_sku()
+    url = reverse("catalog-sku-list")
+    assert client.get(url)["X-Catalog-Cache"] == "MISS"
+    head = client.head(url)
+    assert head.status_code == 200
+    assert head["X-Catalog-Cache"] == "HIT"
+    assert head.content == b""
+
+
+def test_load_skips_corrupt_payload_and_store_guards(settings, rf) -> None:
+    """Defensive branches: bad payload, Set-Cookie, non-JSON, oversize, POST."""
+    from django.http import HttpResponse
+
+    from catalog.http_cache import (
+        build_catalog_http_cache_key,
+        load_cached_catalog_response,
+        store_catalog_http_response,
+    )
+
+    settings.CATALOG_HTTP_CACHE_SECONDS = 30
+    settings.CATALOG_HTTP_CACHE_MAX_BYTES = 64
+    cache.clear()
+
+    get_req = rf.get("/api/catalog/skus/")
+    key = build_catalog_http_cache_key("/api/catalog/skus/", "")
+    cache.set(key, {"body": "not-bytes", "status": 200, "content_type": "application/json"}, 30)
+    assert load_cached_catalog_response(get_req) is None
+
+    post_req = rf.post("/api/catalog/skus/")
+    assert load_cached_catalog_response(post_req) is None
+
+    ok = HttpResponse(b'{"ok":true}', content_type="application/json", status=200)
+    store_catalog_http_response(get_req, ok)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is not None
+
+    cache.clear()
+    cookie = HttpResponse(b'{"ok":true}', content_type="application/json", status=200)
+    cookie["Set-Cookie"] = "a=1"
+    store_catalog_http_response(get_req, cookie)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is None
+
+    html = HttpResponse(b"<html/>", content_type="text/html", status=200)
+    store_catalog_http_response(get_req, html)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is None
+
+    empty = HttpResponse(b"", content_type="application/json", status=200)
+    store_catalog_http_response(get_req, empty)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is None
+
+    huge = HttpResponse(b"x" * 128, content_type="application/json", status=200)
+    store_catalog_http_response(get_req, huge)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is None
+
+    err = HttpResponse(b'{"e":1}', content_type="application/json", status=500)
+    store_catalog_http_response(get_req, err)
+    assert cache.get(build_catalog_http_cache_key("/api/catalog/skus/", "")) is None
+
+    head_req = rf.head("/api/catalog/skus/")
+    store_catalog_http_response(head_req, ok)
+    assert head_req.method == "HEAD"
