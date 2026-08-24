@@ -134,7 +134,7 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "redirects.apps.RedirectsConfig",
     "sitesettings",
-    "catalog",
+    "catalog.apps.CatalogConfig",
     "content",
     "leads",
     "crm.apps.CrmConfig",
@@ -165,6 +165,9 @@ MIDDLEWARE.extend(
         "axes.middleware.AxesMiddleware",
         "django.contrib.messages.middleware.MessageMiddleware",
         "django.middleware.clickjacking.XFrameOptionsMiddleware",
+        # Phase 0 bot-load: short Redis/LocMem cache for catalog GET JSON
+        # (before CSP so cached responses still get CSP headers).
+        "catalog.middleware.CatalogHttpCacheMiddleware",
         "config.csp_middleware.CspMiddleware",
     ],
 )
@@ -503,6 +506,13 @@ elif _cache_url:
             "LOCATION": _cache_url,
         },
     }
+
+# Phase 0 bot-load: short GET cache for /api/catalog/{categories,facets,skus}.
+# 0 disables. Invalidate on SiteSettings save (prices); else TTL staleness OK.
+CATALOG_HTTP_CACHE_SECONDS = int(os.getenv("CATALOG_HTTP_CACHE_SECONDS", "30"))
+CATALOG_HTTP_CACHE_MAX_BYTES = int(
+    os.getenv("CATALOG_HTTP_CACHE_MAX_BYTES", str(1_048_576)),
+)
 
 # ── Email (SMTP Яндекс 360 on prod; see docs/infra-reg-ru.md) ────────
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")

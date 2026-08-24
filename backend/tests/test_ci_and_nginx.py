@@ -118,6 +118,39 @@ def test_nginx_conf_has_lead_rate_limit() -> None:
     assert "location /api/leads/" in content
 
 
+def test_nginx_catalog_has_tighter_limit_and_bad_bot_ua() -> None:
+    """Phase 1: catalog zone + scraper UA block; SEO allowlist in map."""
+    conf = NGINX_CONF.read_text(encoding="utf-8")
+    site = NGINX_SITE_INC.read_text(encoding="utf-8")
+    assert "zone=catalog_api" in conf
+    assert "rate=8r/s" in conf
+    assert "limit_conn_zone" in conf
+    assert "zone=api_conn" in conf
+    assert "$hoocon_bad_bot" in conf
+    assert "headlesschrome" in conf.lower()
+    assert "research-scan" in conf.lower()
+    assert "googlebot" in conf.lower()
+    assert "yandex" in conf.lower()
+
+    block = site.split("location /api/catalog/", 1)[1].split("\nlocation ", 1)[0]
+    assert "zone=catalog_api" in block
+    assert "limit_conn api_conn" in block
+    assert "hoocon_bad_bot" in block
+    assert "return 429" in block
+    # Must not ban HeadlessChrome on HTML (PageSpeed / Lighthouse).
+    spa = site.split("location @spa", 1)[1]
+    assert "hoocon_bad_bot" not in spa
+
+
+def test_deploy_remote_exports_redirects_map_after_health() -> None:
+    """Post-deploy: regenerate redirects.map from DB so nginx matches Admin."""
+    deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+    assert "export_nginx_redirects" in deploy
+    assert "DEPLOY_EXPORT_REDIRECTS" in deploy
+    assert deploy.index("/api/health/") < deploy.index("export_nginx_redirects")
+    assert deploy.index("export_nginx_redirects") < deploy.index("Prune")
+
+
 def test_nginx_conf_has_spa_fallback() -> None:
     """nginx config proxies HTML SPA routes to Django (@spa)."""
     content = _nginx_site_text()

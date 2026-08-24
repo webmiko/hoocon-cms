@@ -23,6 +23,7 @@ if ($hoocon_redirect != "") {
 # API proxy → Django (gunicorn).
 location /api/ {
     limit_req zone=api_limit burst=20 nodelay;
+    limit_conn api_conn 12;
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -38,7 +39,14 @@ location /api/ {
 # These blocks duplicate the /api/ proxy setup because a longer prefix wins
 # outright in nginx — keep limit_req and the proxy headers in sync with it.
 location /api/catalog/ {
-    limit_req zone=api_limit burst=20 nodelay;
+    # Phase 1 bot-load: scrapers (empty UA / HeadlessChrome / research-scan).
+    # SEO allowlist is in $hoocon_bad_bot map (hoocon.conf). Not applied to @spa.
+    if ($hoocon_bad_bot) {
+        return 429;
+    }
+
+    limit_req zone=catalog_api burst=12 nodelay;
+    limit_conn api_conn 12;
 
     gzip on;
     gzip_vary on;
@@ -58,6 +66,7 @@ location /api/catalog/ {
 
 location /api/content/ {
     limit_req zone=api_limit burst=20 nodelay;
+    limit_conn api_conn 12;
 
     gzip on;
     gzip_vary on;
@@ -76,6 +85,7 @@ location /api/content/ {
 # Lead submission — stricter rate limit (Iter 3 throttle + nginx backstop).
 location /api/leads/ {
     limit_req zone=lead_limit burst=3 nodelay;
+    limit_conn api_conn 8;
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
