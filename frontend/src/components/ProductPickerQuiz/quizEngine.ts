@@ -119,6 +119,30 @@ export function createInitialQuizState(): QuizState {
   };
 }
 
+/** DN65–150 flanged 8100Q / H8103… bodies — 2-way only, one Kvs per DN. */
+const FLANGED_8100Q_DNS = new Set<Exclude<QuizDn, "skip">>([
+  "65",
+  "80",
+  "100",
+  "125",
+  "150",
+]);
+
+export function quizDnIsFlanged8100Q(dn: QuizDn | undefined): boolean {
+  return dn != null && dn !== "skip" && FLANGED_8100Q_DNS.has(dn);
+}
+
+/**
+ * Kvs / ways after DN — skipped for flanged 8100Q (fixed 2-way + Kvs > 40).
+ * Brass DN15–50 and «не знаю» still ask both.
+ */
+export function quizNeedsBallValveSizingSteps(answers: QuizAnswers): boolean {
+  if (answers.need !== "ball_valve" && answers.need !== "kit") {
+    return false;
+  }
+  return !quizDnIsFlanged8100Q(answers.dn);
+}
+
 /** Fire always; smoke only when HVD-F (or unknown) — SA…MU has no SAF72 in catalog. */
 export function quizNeedsTempSensorStep(answers: QuizAnswers): boolean {
   if (answers.need !== "actuator") {
@@ -192,7 +216,10 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
     return ["need"];
   }
   if (answers.need === "ball_valve") {
-    return ["need", "dn", "kvs", "ways"];
+    if (quizNeedsBallValveSizingSteps(answers)) {
+      return ["need", "dn", "kvs", "ways"];
+    }
+    return ["need", "dn"];
   }
   if (answers.need === "kit") {
     const steps: QuizStepId[] = [
@@ -203,7 +230,10 @@ export function plannedQuizSteps(answers: QuizAnswers): QuizStepId[] {
     if (quizNeedsAuxStep(answers)) {
       steps.push("aux_switch");
     }
-    steps.push("dn", "kvs", "ways");
+    steps.push("dn");
+    if (quizNeedsBallValveSizingSteps(answers)) {
+      steps.push("kvs", "ways");
+    }
     return steps;
   }
   if (answers.need === "adapter") {
@@ -349,6 +379,9 @@ function nextStepAfter(
     case "adapter_type":
       return "results";
     case "dn":
+      if (quizDnIsFlanged8100Q(answers.dn)) {
+        return "results";
+      }
       return "kvs";
     case "kvs":
       return "ways";
@@ -382,6 +415,17 @@ export function applyQuizChoice(
   if (stepId === "smoke_return" && answers.smokeReturn === "no_spring") {
     answers = { ...answers, tempSensor: "no" };
   }
+  // 8100Q / flanged kits: only 2-way, Kvs always > 40 — lock and skip steps.
+  if (stepId === "dn") {
+    if (quizDnIsFlanged8100Q(answers.dn)) {
+      answers = { ...answers, ways: "2", kvs: "over_40" };
+    } else {
+      const cleared = { ...answers };
+      delete cleared.ways;
+      delete cleared.kvs;
+      answers = cleared;
+    }
+  }
   const next = nextStepAfter(answers, stepId);
   if (next === "results") {
     return {
@@ -399,6 +443,10 @@ export function applyQuizChoice(
 
 export function skipQuizStep(state: QuizState): QuizState {
   const stepId = getCurrentStepId(state);
+  // DN skip must clear flanged auto-locks the same way as applyQuizChoice.
+  if (stepId === "dn") {
+    return applyQuizChoice(state, "skip");
+  }
   const copy = QUIZ_SKIP_FIELD[stepId];
   if (!copy) {
     return applyQuizChoice(state, "skip");
@@ -468,6 +516,11 @@ export function goBackQuizStep(state: QuizState): QuizState {
     delete answers.auxSwitch;
     delete answers.tempSensor;
     delete answers.control;
+  }
+  // Flanged DN auto-locks ways/kvs without putting them on the stack.
+  if (dropped === "dn") {
+    delete answers.kvs;
+    delete answers.ways;
   }
   return { answers, stepStack, phase: "questions" };
 }

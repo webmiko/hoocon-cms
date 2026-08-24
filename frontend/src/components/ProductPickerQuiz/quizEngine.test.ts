@@ -93,6 +93,75 @@ describe("quizEngine", () => {
     });
   });
 
+  it("locks 8100Q DN65–150 to 2-way and over-40 Kvs, skips sizing steps", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "ball_valve");
+    state = applyQuizChoice(state, "65");
+    expect(state.phase).toBe("results");
+    expect(plannedQuizSteps(state.answers)).toEqual(["need", "dn"]);
+    expect(state.answers).toMatchObject({
+      need: "ball_valve",
+      dn: "65",
+      kvs: "over_40",
+      ways: "2",
+    });
+
+    state = goBackQuizStep(state);
+    expect(state.phase).toBe("questions");
+    expect(getCurrentStepId(state)).toBe("dn");
+
+    state = applyQuizChoice(state, "150");
+    expect(state.phase).toBe("results");
+    expect(state.answers.dn).toBe("150");
+    expect(state.answers.ways).toBe("2");
+    expect(state.answers.kvs).toBe("over_40");
+  });
+
+  it("clears flanged locks when DN goes back to brass path", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "ball_valve");
+    state = applyQuizChoice(state, "80");
+    expect(state.answers.ways).toBe("2");
+    state = goBackQuizStep(state);
+    state = goBackQuizStep(state);
+    expect(state.answers.dn).toBeUndefined();
+    expect(state.answers.kvs).toBeUndefined();
+    expect(state.answers.ways).toBeUndefined();
+
+    state = applyQuizChoice(state, "ball_valve");
+    state = applyQuizChoice(state, "32");
+    expect(getCurrentStepId(state)).toBe("kvs");
+    expect(state.answers.ways).toBeUndefined();
+    expect(state.answers.kvs).toBeUndefined();
+    expect(plannedQuizSteps(state.answers)).toEqual([
+      "need",
+      "dn",
+      "kvs",
+      "ways",
+    ]);
+  });
+
+  it("kit branch with flanged DN skips kvs/ways after voltage/control/aux", () => {
+    let state = applyQuizChoice(createInitialQuizState(), "kit");
+    state = applyQuizChoice(state, "24");
+    state = applyQuizChoice(state, "onoff");
+    state = applyQuizChoice(state, "yes");
+    expect(getCurrentStepId(state)).toBe("dn");
+    state = applyQuizChoice(state, "100");
+    expect(state.phase).toBe("results");
+    expect(plannedQuizSteps(state.answers)).toEqual([
+      "need",
+      "voltage",
+      "control",
+      "aux_switch",
+      "dn",
+    ]);
+    expect(state.answers).toMatchObject({
+      need: "kit",
+      dn: "100",
+      kvs: "over_40",
+      ways: "2",
+    });
+  });
+
   it("skips control and inserts temp sensor for fire application", () => {
     let state = applyQuizChoice(createInitialQuizState(), "actuator");
     state = applyQuizChoice(state, "fire");
@@ -206,5 +275,124 @@ describe("quizEngine", () => {
     state = applyQuizChoice(state, "br_m");
     expect(state.phase).toBe("results");
     expect(state.answers.adapterType).toBe("br_m");
+  });
+
+  it("keeps planned steps consistent with applyQuizChoice for every branch", () => {
+    type Path = { label: string; choices: string[] };
+    const paths: Path[] = [
+      {
+        label: "actuator/general",
+        choices: [
+          "actuator",
+          "general",
+          "230",
+          "onoff",
+          "no",
+          "0_6_1_0",
+          "rectangular",
+          "medium",
+        ],
+      },
+      {
+        label: "actuator/failsafe/electronic",
+        choices: [
+          "actuator",
+          "failsafe",
+          "electronic",
+          "24",
+          "modulating",
+          "yes",
+          "1_0_1_6",
+          "round",
+          "low",
+        ],
+      },
+      {
+        label: "actuator/fire",
+        choices: [
+          "actuator",
+          "fire",
+          "230",
+          "yes",
+          "0_3_0_6",
+          "rectangular",
+          "high",
+        ],
+      },
+      {
+        label: "actuator/smoke/spring",
+        choices: [
+          "actuator",
+          "smoke",
+          "spring",
+          "24",
+          "no",
+          "up_to_0_3",
+          "gate",
+          "very_high",
+        ],
+      },
+      {
+        label: "actuator/smoke/no_spring",
+        choices: [
+          "actuator",
+          "smoke",
+          "no_spring",
+          "230",
+          "0_6_1_0",
+          "rectangular",
+          "medium",
+        ],
+      },
+      {
+        label: "actuator/fast",
+        choices: [
+          "actuator",
+          "fast",
+          "24",
+          "onoff",
+          "skip",
+          "2_5_4_0",
+          "skip",
+          "skip",
+        ],
+      },
+      {
+        label: "ball_valve/brass",
+        choices: ["ball_valve", "40", "16_to_40", "3"],
+      },
+      {
+        label: "ball_valve/8100Q",
+        choices: ["ball_valve", "100"],
+      },
+      {
+        label: "kit/brass",
+        choices: ["kit", "230", "modulating", "no", "20", "2_5_to_6", "2"],
+      },
+      {
+        label: "kit/flanged",
+        choices: ["kit", "24", "onoff", "yes", "65"],
+      },
+      {
+        label: "adapter",
+        choices: ["adapter", "br_ml"],
+      },
+    ];
+
+    for (const path of paths) {
+      let state = createInitialQuizState();
+      for (const choice of path.choices) {
+        expect(state.phase, path.label).toBe("questions");
+        const plan = plannedQuizSteps(state.answers);
+        const current = getCurrentStepId(state);
+        expect(plan, `${path.label} @ ${current}`).toContain(current);
+        state = applyQuizChoice(state, choice);
+      }
+      expect(state.phase, path.label).toBe("results");
+      const finalPlan = plannedQuizSteps(state.answers);
+      for (const step of state.stepStack) {
+        expect(finalPlan, `${path.label} stack`).toContain(step);
+      }
+    }
   });
 });

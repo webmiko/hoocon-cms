@@ -274,6 +274,24 @@ describe("quizToCatalog", () => {
     expect(params.ways).toBe("2-ходовый");
   });
 
+  it("maps kit flanged DN locks the same way as ball-valve 8100Q", () => {
+    const params = buildCatalogParams(
+      {
+        need: "kit",
+        voltage: "24",
+        control: "onoff",
+        dn: "150",
+        kvs: "over_40",
+        ways: "2",
+      },
+      [...ACTUATOR_FACETS, ...BALL_VALVE_FACETS],
+    );
+    expect(params.category).toBe(QUIZ_CATEGORY.kit);
+    expect(params.dn).toBe("150");
+    expect(params.kvs).toBe("63,100,400");
+    expect(params.ways).toBe("2-ходовый");
+  });
+
   it("maps adapter type to exact catalog search by SKU code", () => {
     const brM = buildCatalogParams(
       {
