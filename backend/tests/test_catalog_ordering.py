@@ -131,10 +131,13 @@ def test_catalog_order_voltage_24_before_230() -> None:
     reason="REGEXP_REPLACE ordering requires Postgres",
 )
 def test_catalog_order_sku_code_nm_for_ball_valves() -> None:
-    """Without moment, DN digits in sku_code sort numerically (bv32 before bv215)."""
+    """Family then DN numeric: BV215→15 before BV232→32; 8100 before 8100Q."""
     cat = Category.objects.create(slug="sharovye-krany", name="Краны")
+    _sku("8100q-bv2100", category=cat, moment=None)
+    _sku("8100-bv232a", category=cat, moment=None)
+    _sku("8100q-bv265", category=cat, moment=None)
     _sku("8100-bv215a", category=cat, moment=None)
-    _sku("8100-bv32a", category=cat, moment=None)
+    _sku("8100-bv315a", category=cat, moment=None)
 
     codes = list(
         annotate_moment_nm(
@@ -147,7 +150,13 @@ def test_catalog_order_sku_code_nm_for_ball_valves() -> None:
         .order_by(*catalog_list_order_by())
         .values_list("sku_code", flat=True),
     )
-    assert codes == ["8100-bv32a", "8100-bv215a"]
+    assert codes == [
+        "8100-bv215a",
+        "8100-bv315a",
+        "8100-bv232a",
+        "8100q-bv265",
+        "8100q-bv2100",
+    ]
 
 
 @pytest.mark.skipif(
