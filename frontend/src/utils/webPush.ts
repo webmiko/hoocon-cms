@@ -294,20 +294,36 @@ export async function syncMarketingPushConsent(
   }
 }
 
-/** Safari / iOS WebKit (not Chrome/Firefox on iOS). */
-function isAppleWebKitBrowser(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  // CriOS/FxiOS/EdgiOS are Chromium/Gecko shells on iOS — not APNs Web Push path.
-  if (/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Edg|Firefox/i.test(ua)) return false;
-  return /Safari/i.test(ua) || (/iPhone|iPad|iPod/i.test(ua) && /WebKit/i.test(ua));
+/** Chrome/Firefox shells (incl. on iOS) — not native Safari / APNs Web Push. */
+function isNonSafariShell(ua: string): boolean {
+  return /CriOS|FxiOS|EdgiOS|Chrome|Chromium|Edg|Firefox/i.test(ua);
+}
+
+/** iPhone / iPad / iPod Safari (Web Push needs Home Screen PWA on iOS). */
+function isIosSafari(ua: string): boolean {
+  if (isNonSafariShell(ua)) return false;
+  return /iPhone|iPad|iPod/i.test(ua) && /WebKit/i.test(ua);
+}
+
+/** Desktop Safari (macOS) — native Web Push via Apple, not FCM. */
+function isDesktopSafari(ua: string): boolean {
+  if (isNonSafariShell(ua)) return false;
+  if (/iPhone|iPad|iPod/i.test(ua)) return false;
+  return /Safari/i.test(ua) && /AppleWebKit/i.test(ua);
 }
 
 function pushServiceUnavailableRu(): string {
-  if (isAppleWebKitBrowser()) {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (isIosSafari(ua)) {
     return (
       "Safari не смог подключить push (нужен доступ к Apple Push). " +
       "На iPhone обычно помогает «На экран „Домой“», затем снова «Включить»"
+    );
+  }
+  if (isDesktopSafari(ua)) {
+    return (
+      "Safari не смог подключить push (нужен доступ к Apple Push). " +
+      "Уведомления могли разрешиться, но доставка недоступна"
     );
   }
   return (
