@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.test import Client
+from django.test import Client, override_settings
 from unfold.admin import ModelAdmin
 
 from catalog.admin import SKUAdmin
@@ -187,6 +187,7 @@ def test_admin_sidebar_keeps_icon_rail_when_collapsed() -> None:
 
 
 @pytest.mark.django_db
+@override_settings(BUILD_SHA="deploysha1")
 def test_admin_pwa_manifest_and_icons() -> None:
     """Admin ships a distinct PWA manifest (gray ADMIN icons, /admin/ scope)."""
     admin_user = User.objects.create_superuser(
@@ -197,8 +198,8 @@ def test_admin_pwa_manifest_and_icons() -> None:
     client = Client()
     client.force_login(admin_user)
     html = client.get("/admin/").content.decode()
-    assert "admin/img/pwa-admin-192.png" in html
-    assert "apple-touch-admin.png" in html
+    assert "admin/img/pwa-admin-192.png?v=deploysha1" in html
+    assert "apple-touch-admin.png?v=deploysha1" in html
     assert "/admin/manifest.webmanifest" in html
     assert "hoocon-admin-live-badges.js" in html
     assert "hoocon-admin-tables.js" in html
@@ -212,7 +213,7 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert data["start_url"] == "/admin/"
     assert data["scope"] == "/admin/"
     assert data["theme_color"] == "#5a626c"
-    assert any("pwa-admin-192" in icon["src"] for icon in data["icons"])
+    assert any(icon["src"].endswith("pwa-admin-192.png?v=deploysha1") for icon in data["icons"])
 
 
 @pytest.mark.django_db

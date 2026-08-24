@@ -6,13 +6,13 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
-from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
 from config.media_hotlink import build_media_hotlink_hosts
 from config.release import RELEASE_VERSION, release_label
+from config.static_urls import versioned_static
 
 # Load project-root .env; do not call load_dotenv() twice (avoid CWD-anchored
 # overrides pulling in an unexpected file).
@@ -290,19 +290,19 @@ UNFOLD = {
     # Distinct Admin PWA / home-screen icons (gray + ADMIN; not the public site).
     "SITE_FAVICONS": [
         {
-            "href": lambda _r: static("admin/img/pwa-admin-192.png"),
+            "href": lambda _r: versioned_static("admin/img/pwa-admin-192.png"),
             "rel": "icon",
             "sizes": "192x192",
             "type": "image/png",
         },
         {
-            "href": lambda _r: static("admin/img/pwa-admin-512.png"),
+            "href": lambda _r: versioned_static("admin/img/pwa-admin-512.png"),
             "rel": "icon",
             "sizes": "512x512",
             "type": "image/png",
         },
         {
-            "href": lambda _r: static("admin/img/apple-touch-admin.png"),
+            "href": lambda _r: versioned_static("admin/img/apple-touch-admin.png"),
             "rel": "apple-touch-icon",
             "sizes": "180x180",
             "type": "image/png",

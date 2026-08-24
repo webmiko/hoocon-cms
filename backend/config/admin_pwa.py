@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import HttpRequest, JsonResponse
 from django.views import View
+
+from config.static_urls import versioned_static
 
 
 class AdminPwaManifestView(View):
@@ -14,9 +15,9 @@ class AdminPwaManifestView(View):
 
     def get(self, request: HttpRequest) -> JsonResponse:
         del request
-        icon_192 = staticfiles_storage.url("admin/img/pwa-admin-192.png")
-        icon_512 = staticfiles_storage.url("admin/img/pwa-admin-512.png")
-        icon_maskable = staticfiles_storage.url("admin/img/pwa-admin-512-maskable.png")
+        icon_192 = versioned_static("admin/img/pwa-admin-192.png")
+        icon_512 = versioned_static("admin/img/pwa-admin-512.png")
+        icon_maskable = versioned_static("admin/img/pwa-admin-512-maskable.png")
         payload = {
             "name": "Hoocon Admin",
             "short_name": "Admin",
