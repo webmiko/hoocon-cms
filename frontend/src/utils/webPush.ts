@@ -212,20 +212,36 @@ export async function subscribeWebPush(topics: {
         userVisibleOnly: true,
         applicationServerKey: applicationServerKeyBytes(meta.public_key),
       });
-      const timedOut = await Promise.race([
-        subscribePromise.then((sub) => ({ ok: true as const, sub })),
-        new Promise<{ ok: false }>((resolve) => {
-          window.setTimeout(() => resolve({ ok: false }), 15_000);
+      let timeoutId = 0;
+      const raced = await Promise.race([
+        subscribePromise.then((sub) => ({ kind: "ok" as const, sub })),
+        new Promise<{ kind: "timeout" }>((resolve) => {
+          timeoutId = window.setTimeout(() => resolve({ kind: "timeout" }), 15_000);
         }),
       ]);
-      if (!timedOut.ok) {
+      window.clearTimeout(timeoutId);
+
+      if (raced.kind === "timeout") {
+        // Timeout must not abandon a late PushManager success — otherwise the
+        // browser keeps a subscription that never reaches Django until retry.
+        void subscribePromise
+          .then((sub) => postSubscriptionToApi(sub, topics))
+          .catch(() => undefined);
+        try {
+          const late = await registration.pushManager.getSubscription();
+          if (late) {
+            return postSubscriptionToApi(late, topics);
+          }
+        } catch {
+          /* fall through to timeout error */
+        }
         return {
           ok: false,
           reason: "push_service",
           detail: "PushManager.subscribe timed out",
         };
       }
-      subscription = timedOut.sub;
+      subscription = raced.sub;
     }
   } catch (err) {
     // Only drop the browser sub when the key clearly mismatches — never on
