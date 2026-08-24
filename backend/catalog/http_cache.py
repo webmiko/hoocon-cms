@@ -1,7 +1,7 @@
 """Short-lived HTTP response cache for public catalog GET JSON.
 
 Goal: bots and repeat SPA fetches hit Redis (or LocMem in CI) instead of
-re-running heavy ``/api/catalog/skus/`` queries. See docs/bot-load-defense.md
+re-running heavy ``/api/catalog/skus/`` queries. See ``_docs/bot-load-defense.md``
 phase 0.
 
 Design notes (avoid later bugs):

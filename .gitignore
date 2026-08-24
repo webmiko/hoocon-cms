@@ -74,7 +74,7 @@ node_modules/
 # Demo slide raster exports (PNG/PDF) — локально в _docs/demo/export/
 _docs/demo/export/
 
-# Legacy docs/ (канон локально: _docs/, см. README)
+# Не создавать docs/ — канон только _docs/ (см. README). Игнор на случай опечатки.
 docs/
 
 # RU manual HTML / constructor — local only (also matched by ``_*`` above).
