@@ -205,12 +205,28 @@ export async function subscribeWebPush(topics: {
   let subscription: PushSubscription;
   try {
     const existing = await registration.pushManager.getSubscription();
-    subscription =
-      existing ??
-      (await registration.pushManager.subscribe({
+    if (existing) {
+      subscription = existing;
+    } else {
+      const subscribePromise = registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: applicationServerKeyBytes(meta.public_key),
-      }));
+      });
+      const timedOut = await Promise.race([
+        subscribePromise.then((sub) => ({ ok: true as const, sub })),
+        new Promise<{ ok: false }>((resolve) => {
+          window.setTimeout(() => resolve({ ok: false }), 15_000);
+        }),
+      ]);
+      if (!timedOut.ok) {
+        return {
+          ok: false,
+          reason: "push_service",
+          detail: "PushManager.subscribe timed out",
+        };
+      }
+      subscription = timedOut.sub;
+    }
   } catch (err) {
     // Only drop the browser sub when the key clearly mismatches — never on
     // transient errors (that would make push «fly off» after a refresh).
@@ -277,7 +293,10 @@ export function subscribeWebPushStatusRu(
     case "no_service_worker":
       return "Сервис-воркер ещё не готов — обновите страницу";
     case "push_service":
-      return "Push-сервис браузера недоступен (Chrome/FCM или поставьте PWA)";
+      return (
+        "Браузер не смог подключить push (часто блокировка Google FCM). " +
+        "Уведомления могли разрешиться, но доставка недоступна"
+      );
     case "api_error":
       return "Ошибка сервера при сохранении подписки";
     default:

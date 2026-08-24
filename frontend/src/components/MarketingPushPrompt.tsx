@@ -23,12 +23,26 @@ import {
   pushSupported,
   subscribeWebPush,
   subscribeWebPushStatusRu,
+  type SubscribeWebPushResult,
 } from "../utils/webPush";
 import styles from "./MarketingPushPrompt.module.css";
 
 const DISMISS_KEY = "hoocon-marketing-push-dismissed-until";
 const DONE_KEY = "hoocon-marketing-push-subscribed";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+const SUCCESS_HIDE_MS = 2000;
+const ERROR_HIDE_MS = 4500;
+
+/** Failures that will not succeed on retry in this browser session. */
+function isTerminalPushFailure(result: SubscribeWebPushResult): boolean {
+  if (result.ok) return false;
+  return (
+    result.reason === "unsupported" ||
+    result.reason === "permission" ||
+    result.reason === "not_configured" ||
+    result.reason === "push_service"
+  );
+}
 
 function isMarketingPushDone(): boolean {
   try {
@@ -121,11 +135,18 @@ function BellIcon({ className }: { className?: string }) {
 
 export function MarketingPushPrompt() {
   const titleId = useId();
+  const statusId = useId();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [statusKind, setStatusKind] = useState<"ok" | "error" | "">("");
   const hideTimerRef = useRef<number | null>(null);
   const marketingWasOnRef = useRef(isMarketingAllowed(readCookieConsent()));
+
+  function scheduleHide(ms: number) {
+    if (hideTimerRef.current != null) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => setVisible(false), ms);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -198,27 +219,43 @@ export function MarketingPushPrompt() {
 
   async function enable() {
     setStatus("");
+    setStatusKind("");
     setBusy(true);
     try {
       if (!isMarketingAllowed(readCookieConsent())) {
         setStatus("Включите «Новости и акции» в настройках cookie");
+        setStatusKind("error");
         return;
       }
       const result = await subscribeWebPush({ topic_marketing: true });
       if (result.ok) {
         setStatus("Готово — будем присылать новости");
+        setStatusKind("ok");
         markMarketingPushDone();
-        hideTimerRef.current = window.setTimeout(() => setVisible(false), 2000);
-      } else {
-        setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
+        scheduleHide(SUCCESS_HIDE_MS);
+        return;
       }
+      setStatus(subscribeWebPushStatusRu(result) || "Не удалось включить");
+      setStatusKind("error");
+      // Permanent browser/network limits: stop nagging after a clear message.
+      if (isTerminalPushFailure(result)) {
+        dismiss();
+        scheduleHide(ERROR_HIDE_MS);
+      }
+    } catch {
+      setStatus("Не удалось включить уведомления");
+      setStatusKind("error");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <aside className={styles.banner} aria-labelledby={titleId}>
+    <aside
+      className={styles.banner}
+      aria-labelledby={titleId}
+      aria-describedby={status ? statusId : undefined}
+    >
       <div className={styles.iconWrap} aria-hidden="true">
         <BellIcon className={styles.icon} />
       </div>
@@ -235,6 +272,7 @@ export function MarketingPushPrompt() {
             type="button"
             className={styles.primary}
             disabled={busy}
+            aria-busy={busy}
             onClick={() => void enable()}
           >
             {busy ? "Подключаем…" : "Включить"}
@@ -251,7 +289,22 @@ export function MarketingPushPrompt() {
             Не сейчас
           </button>
         </div>
-        {status ? <p className={styles.status}>{status}</p> : null}
+        {status ? (
+          <p
+            id={statusId}
+            className={
+              statusKind === "ok"
+                ? `${styles.status} ${styles.statusOk}`
+                : statusKind === "error"
+                  ? `${styles.status} ${styles.statusError}`
+                  : styles.status
+            }
+            role="status"
+            aria-live={statusKind === "error" ? "assertive" : "polite"}
+          >
+            {status}
+          </p>
+        ) : null}
       </div>
     </aside>
   );
