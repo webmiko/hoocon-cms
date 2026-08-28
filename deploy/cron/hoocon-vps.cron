@@ -1,0 +1,10 @@
+# Hoocon VPS cron — installed to /etc/cron.d/hoocon by scripts/vps-install-cron.sh
+# Do not edit on the server; change repo copy and redeploy.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Health + SPA GET + disk (every 5 min)
+*/5 * * * * root __DEPLOY_PATH__/scripts/monitor-health.sh >> /var/log/hoocon-monitor.log 2>&1
+
+# Weekly safe cleanup + disk report (Sun 03:15 UTC)
+15 3 * * 0 root __DEPLOY_PATH__/scripts/vps-maintenance.sh

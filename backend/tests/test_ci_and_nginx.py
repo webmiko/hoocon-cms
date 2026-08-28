@@ -236,8 +236,7 @@ def test_vps_free_disk_script_exists() -> None:
     script = ROOT / "scripts" / "vps-free-disk.sh"
     assert script.is_file()
     text = script.read_text(encoding="utf-8")
-    assert "hoocon_spa" in text
-    assert "docker image prune" in text
+    assert "vps-disk-cleanup.sh" in text
     assert "vps-free-disk.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 

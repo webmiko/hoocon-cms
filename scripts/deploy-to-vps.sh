@@ -207,4 +207,19 @@ if [[ "${SMOKE_OK}" -ne 1 ]]; then
   exit 1
 fi
 
+echo "==> smoke http://${SMOKE_HOST}/ (SPA GET)"
+SPA_OK=0
+for _ in 1 2 3 4 5 6; do
+  if curl -fsS --http1.1 "http://${SMOKE_HOST}/" | grep -q '<div id="root">'; then
+    echo "SPA GET ok"
+    SPA_OK=1
+    break
+  fi
+  sleep 5
+done
+if [[ "${SPA_OK}" -ne 1 ]]; then
+  echo -e "${RED}Smoke failed for http://${SMOKE_HOST}/${NC}" >&2
+  exit 1
+fi
+
 echo -e "${GREEN}✓ Manual deploy OK (${GIT_SHA:0:12})${NC}"
