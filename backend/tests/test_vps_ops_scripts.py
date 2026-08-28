@@ -15,6 +15,7 @@ def test_monitor_health_checks_spa_get_and_disk_free() -> None:
     assert "DISK_WARN_PCT" in text
     assert "DISK_WARN_FREE_MB" in text
     assert 'DISK_WARN_PCT="${DISK_WARN_PCT:-80}"' in text
+    assert "SPA_MARKER" in text
 
 
 def test_vps_disk_cleanup_has_modes_and_top_dirs() -> None:
