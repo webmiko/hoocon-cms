@@ -85,6 +85,11 @@ if [[ -d deploy/nginx ]]; then
        fi; \
        mkdir -p /var/cache/nginx/hoocon_spa; \
        chown www-data:www-data /var/cache/nginx/hoocon_spa 2>/dev/null || true; \
+       if [[ \"\${DEPLOY_PURGE_SPA_CACHE:-1}\" == \"1\" ]]; then \
+         find /var/cache/nginx/hoocon_spa -mindepth 1 -delete 2>/dev/null \
+           || rm -rf /var/cache/nginx/hoocon_spa/* 2>/dev/null || true; \
+         echo 'purged hoocon_spa proxy_cache'; \
+       fi; \
        ln -sfn /etc/nginx/sites-available/hoocon /etc/nginx/sites-enabled/hoocon; \
        SSLIP_DOMAIN=\"\$(grep -E '^VPS_SSLIP_DOMAIN=' '${DEPLOY_PATH}/.env' 2>/dev/null \
          | tail -1 | cut -d= -f2- | tr -d '\"' | tr -d \"'\" | xargs || true)\"; \

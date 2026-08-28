@@ -258,6 +258,10 @@ location @spa {
 
     proxy_http_version 1.1;
     proxy_set_header Connection "";
+    # Cache one uncompressed HTML body; gzip below applies per client. Without
+    # this, proxy_cache + gzip_vary can write invalid cache entries and break
+    # GET (HEAD still returns 200 — browsers see a blank / reset page).
+    proxy_set_header Accept-Encoding "";
 
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;

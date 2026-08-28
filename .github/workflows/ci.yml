@@ -235,12 +235,25 @@ jobs:
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
+          ok=0
           for i in 1 2 3 4 5 6; do
             if curl -fsS "http://${SERVER_HOST}/api/health/"; then
               echo
+              ok=1
+              break
+            fi
+            sleep 5
+          done
+          if [[ "${ok}" -ne 1 ]]; then
+            echo "Smoke failed: /api/health/" >&2
+            exit 1
+          fi
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --http1.1 "http://${SERVER_HOST}/" | grep -q '<div id="root">'; then
+              echo "SPA GET ok"
               exit 0
             fi
             sleep 5
           done
-          echo "Smoke failed" >&2
+          echo "Smoke failed: GET / (SPA HTML body)" >&2
           exit 1
