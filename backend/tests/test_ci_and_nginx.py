@@ -183,6 +183,7 @@ def test_nginx_spa_location_compresses_and_caches_html() -> None:
     assert "gzip_types text/html" in block
     assert "gzip_proxied any" in block
     assert "proxy_cache hoocon_spa" in block
+    assert 'proxy_set_header Accept-Encoding ""' in block
     assert "proxy_http_version 1.1" in block
 
 
@@ -226,6 +227,7 @@ def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
     """proxy_cache_path needs the on-disk dir before ``nginx -t`` on VPS."""
     deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
     assert "mkdir -p /var/cache/nginx/hoocon_spa" in deploy
+    assert "purged hoocon_spa proxy_cache" in deploy
     assert deploy.index("mkdir -p /var/cache/nginx/hoocon_spa") < deploy.index("nginx -t")
 
 
