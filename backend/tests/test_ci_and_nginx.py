@@ -231,6 +231,16 @@ def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
     assert deploy.index("mkdir -p /var/cache/nginx/hoocon_spa") < deploy.index("nginx -t")
 
 
+def test_vps_free_disk_script_exists() -> None:
+    """Emergency pre-deploy cleanup when VPS disk is full."""
+    script = ROOT / "scripts" / "vps-free-disk.sh"
+    assert script.is_file()
+    text = script.read_text(encoding="utf-8")
+    assert "hoocon_spa" in text
+    assert "docker image prune" in text
+    assert "vps-free-disk.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+
+
 def test_redirects_map_has_documentation() -> None:
     """redirects.map has usage documentation (not just empty)."""
     content = REDIRECTS_MAP.read_text(encoding="utf-8")

@@ -43,6 +43,13 @@ if [[ -n "${SERVER_HOST:-}" ]]; then
   ssh-keyscan -H "${SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null || true
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x "${SCRIPT_DIR}/vps-free-disk.sh" ]]; then
+  echo "Pre-deploy disk cleanup"
+  SSH_HOST="${SSH_HOST:-}" SSH_USER="${SSH_USER:-}" SERVER_HOST="${SERVER_HOST:-}" \
+    "${SCRIPT_DIR}/vps-free-disk.sh"
+fi
+
 echo "Sync compose files to ${SSH_TARGET}:${DEPLOY_PATH}"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
   "mkdir -p '${DEPLOY_PATH}' '${WWW_FRONTEND}' '${WWW_STATIC}' '${WWW_MEDIA}'"
