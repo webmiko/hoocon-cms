@@ -241,21 +241,8 @@ location / {
 }
 
 location @spa {
-    # Gzip only — do NOT enable proxy_cache here. nginx proxy_cache + gzip on
-    # the same location repeatedly corrupted SPA GET bodies (HEAD 200 / GET
-    # reset or Django 500) even with Accept-Encoding stripped. Redis short
-    # cache covers catalog JSON; HTML TTFB is acceptable without edge cache.
-    gzip on;
-    gzip_vary on;
-    gzip_comp_level 5;
-    gzip_min_length 256;
-    gzip_types text/html;
-    gzip_proxied any;
-
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Accept-Encoding "";
-
+    # Pre-gzip stable proxy (before 1555b31 Lighthouse microcache). Do not
+    # re-enable proxy_cache or gzip here — that combo broke SPA GET in prod.
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;

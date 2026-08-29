@@ -175,16 +175,14 @@ def test_nginx_conf_strips_trailing_slash() -> None:
     assert "location = /index.html" in content
 
 
-def test_nginx_spa_location_gzips_without_proxy_cache() -> None:
-    """@spa gzips HTML but must not proxy_cache (cache+gzip broke SPA GETs)."""
+def test_nginx_spa_location_is_plain_proxy() -> None:
+    """@spa is a plain Django proxy — no gzip/proxy_cache (pre-1555b31 stable)."""
     content = _nginx_site_text()
     block = content.split("location @spa", 1)[1].split("\nlocation ", 1)[0]
-    assert "gzip on" in block
-    assert "gzip_types text/html" in block
-    assert "gzip_proxied any" in block
+    assert "proxy_pass" in block
     assert "proxy_cache" not in block
-    assert 'proxy_set_header Accept-Encoding ""' in block
-    assert "proxy_http_version 1.1" in block
+    assert "gzip on" not in block
+    assert "proxy_set_header Host" in block
 
 
 def test_nginx_upstream_uses_keepalive() -> None:
@@ -192,7 +190,7 @@ def test_nginx_upstream_uses_keepalive() -> None:
     content = NGINX_CONF.read_text(encoding="utf-8")
     assert "upstream hoocon_app" in content
     assert "keepalive" in content
-    # Zone may remain for future use / old hosts; @spa must not reference it.
+    # Zone may remain unused; @spa must not reference proxy_cache.
     assert "proxy_cache_path" in content
 
 
