@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Free disk on VPS before deploy (CI SSH or manual).
+# Free disk on VPS before any rsync (CI SSH or manual).
+#
+# Runs entirely over SSH with inline commands — does not need scripts on the
+# host first (critical when disk is 100% full and rsync cannot write).
 #
 # Required: SSH_HOST — OR — SSH_USER + SERVER_HOST
 # Optional:
@@ -31,6 +34,8 @@ ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s <<EOF
 set -euo pipefail
 MIN_MB=${DISK_MIN_FREE_MB}
 DEPLOY_PATH="${DEPLOY_PATH}"
+BACKUP_ROOT="\${DEPLOY_PATH}/backups"
+RETENTION_DAYS=3
 
 free_mb() {
   df -BM / | awk 'NR==2 { gsub(/M/, "", \$4); print \$4 }'
@@ -40,31 +45,31 @@ echo "=== df before ==="
 df -h /
 docker system df 2>/dev/null || true
 
-# Always drop SPA microcache (safe; clears corrupted entries even when disk OK).
+echo "=== always: spa cache + unused docker + journal ==="
 rm -rf /var/cache/nginx/hoocon_spa/* 2>/dev/null || true
+docker container prune -f 2>/dev/null || true
+docker image prune -af 2>/dev/null || true
+docker builder prune -af 2>/dev/null || true
+journalctl --vacuum-size=200M 2>/dev/null || true
+find /var/log -type f -name '*.gz' -mtime +14 -delete 2>/dev/null || true
+apt-get clean 2>/dev/null || true
 
-if [[ "\$(free_mb)" -ge "\${MIN_MB}" ]]; then
-  echo "Enough free space (\$(free_mb) MiB) — spa cache purged, skip aggressive"
-  exit 0
-fi
-
-echo "Low disk (\$(free_mb) MiB) — running aggressive cleanup"
-if [[ -x "\${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh" ]]; then
-  "\${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh" aggressive
-else
-  echo "WARN: \${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh missing — fallback prune"
-  docker container prune -f 2>/dev/null || true
-  docker image prune -af 2>/dev/null || true
-  journalctl --vacuum-size=200M 2>/dev/null || true
+# Old nginx site backups and local DB/media backups (safe retention).
+find /etc/nginx/sites-available -maxdepth 1 -name 'hoocon.bak.*' -mtime +7 \
+  -delete 2>/dev/null || true
+if [[ -d "\${BACKUP_ROOT}" ]]; then
+  find "\${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+\${RETENTION_DAYS}" \
+    -exec rm -rf {} + 2>/dev/null || true
 fi
 
 echo "=== df after ==="
 df -h /
+docker system df 2>/dev/null || true
 
 if [[ "\$(free_mb)" -lt "\${MIN_MB}" ]]; then
   echo "ERROR: still only \$(free_mb) MiB free on / (need \${MIN_MB})" >&2
-  du -xm /var/www/hoocon/media "\${DEPLOY_PATH}/backups" /var/log /var/lib/docker \
-    /var/cache/nginx 2>/dev/null | sort -nr | head -15 || true
+  du -xm /var/www/hoocon/media "\${BACKUP_ROOT}" /var/log /var/lib/docker \
+    /var/cache/nginx "\${DEPLOY_PATH}" 2>/dev/null | sort -nr | head -20 || true
   exit 1
 fi
 echo "Cleanup OK (\$(free_mb) MiB free)"

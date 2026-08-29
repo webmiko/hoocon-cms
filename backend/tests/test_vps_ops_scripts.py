@@ -28,20 +28,21 @@ def test_vps_disk_cleanup_has_modes_and_top_dirs() -> None:
     assert "RETENTION_DAYS" in text
 
 
-def test_vps_free_disk_uses_shared_cleanup_and_low_threshold() -> None:
-    """Pre-deploy cleanup delegates to vps-disk-cleanup.sh; 512 MiB is enough for rsync."""
+def test_vps_free_disk_uses_inline_cleanup_always() -> None:
+    """Pre-deploy cleanup is inline SSH (works at 100% full) and always prunes."""
     text = (ROOT / "scripts" / "vps-free-disk.sh").read_text(encoding="utf-8")
     assert 'DISK_MIN_FREE_MB="${DISK_MIN_FREE_MB:-512}"' in text
-    assert "vps-disk-cleanup.sh" in text
-    assert "aggressive" in text
+    assert "docker image prune" in text
+    assert "hoocon_spa" in text
+    assert "does not need scripts on the" in text or "inline" in text.lower()
 
 
-def test_deploy_remote_syncs_ops_scripts_before_cleanup() -> None:
-    """Ops scripts must land on VPS before pre-deploy disk cleanup runs."""
+def test_deploy_remote_cleans_disk_before_rsync() -> None:
+    """Ops scripts must not rsync before disk cleanup (100% full blocks write)."""
     deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+    assert "Pre-deploy disk cleanup" in deploy
     assert "Sync ops scripts" in deploy
-    assert "vps-disk-cleanup.sh" in deploy
-    assert deploy.index("Sync ops scripts") < deploy.index("Pre-deploy disk cleanup")
+    assert deploy.index("Pre-deploy disk cleanup") < deploy.index("Sync ops scripts")
     assert "vps-install-cron.sh" in deploy
 
 

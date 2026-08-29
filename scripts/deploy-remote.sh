@@ -45,6 +45,14 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Disk cleanup BEFORE any rsync — when / is 100% full, even script sync fails.
+if [[ -x "${SCRIPT_DIR}/vps-free-disk.sh" ]]; then
+  echo "Pre-deploy disk cleanup"
+  SSH_HOST="${SSH_HOST:-}" SSH_USER="${SSH_USER:-}" SERVER_HOST="${SERVER_HOST:-}" \
+    DEPLOY_PATH="${DEPLOY_PATH}" \
+    "${SCRIPT_DIR}/vps-free-disk.sh"
+fi
+
 echo "Sync ops scripts → ${DEPLOY_PATH}/scripts"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p '${DEPLOY_PATH}/scripts'"
 rsync -az -e "${RSYNC_SSH}" \
@@ -59,13 +67,6 @@ rsync -az -e "${RSYNC_SSH}" \
   scripts/ "${SSH_TARGET}:${DEPLOY_PATH}/scripts/"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
   "chmod +x '${DEPLOY_PATH}/scripts/'*.sh 2>/dev/null || true"
-
-if [[ -x "${SCRIPT_DIR}/vps-free-disk.sh" ]]; then
-  echo "Pre-deploy disk cleanup"
-  SSH_HOST="${SSH_HOST:-}" SSH_USER="${SSH_USER:-}" SERVER_HOST="${SERVER_HOST:-}" \
-    DEPLOY_PATH="${DEPLOY_PATH}" \
-    "${SCRIPT_DIR}/vps-free-disk.sh"
-fi
 
 echo "Sync compose files to ${SSH_TARGET}:${DEPLOY_PATH}"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
