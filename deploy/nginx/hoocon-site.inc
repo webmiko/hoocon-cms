@@ -241,6 +241,10 @@ location / {
 }
 
 location @spa {
+    # Gzip only — do NOT enable proxy_cache here. nginx proxy_cache + gzip on
+    # the same location repeatedly corrupted SPA GET bodies (HEAD 200 / GET
+    # reset or Django 500) even with Accept-Encoding stripped. Redis short
+    # cache covers catalog JSON; HTML TTFB is acceptable without edge cache.
     gzip on;
     gzip_vary on;
     gzip_comp_level 5;
@@ -248,19 +252,8 @@ location @spa {
     gzip_types text/html;
     gzip_proxied any;
 
-    proxy_cache hoocon_spa;
-    proxy_cache_key "$scheme$host$request_uri";
-    proxy_cache_valid 200 5m;
-    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-    proxy_cache_lock on;
-    proxy_ignore_headers Cache-Control;
-    add_header X-Proxy-Cache $upstream_cache_status always;
-
     proxy_http_version 1.1;
     proxy_set_header Connection "";
-    # Cache one uncompressed HTML body; gzip below applies per client. Without
-    # this, proxy_cache + gzip_vary can write invalid cache entries and break
-    # GET (HEAD still returns 200 — browsers see a blank / reset page).
     proxy_set_header Accept-Encoding "";
 
     proxy_pass http://hoocon_app;
