@@ -40,8 +40,11 @@ echo "=== df before ==="
 df -h /
 docker system df 2>/dev/null || true
 
+# Always drop SPA microcache (safe; clears corrupted entries even when disk OK).
+rm -rf /var/cache/nginx/hoocon_spa/* 2>/dev/null || true
+
 if [[ "\$(free_mb)" -ge "\${MIN_MB}" ]]; then
-  echo "Enough free space (\$(free_mb) MiB) — skip aggressive cleanup"
+  echo "Enough free space (\$(free_mb) MiB) — spa cache purged, skip aggressive"
   exit 0
 fi
 
@@ -50,7 +53,6 @@ if [[ -x "\${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh" ]]; then
   "\${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh" aggressive
 else
   echo "WARN: \${DEPLOY_PATH}/scripts/vps-disk-cleanup.sh missing — fallback prune"
-  rm -rf /var/cache/nginx/hoocon_spa/* 2>/dev/null || true
   docker container prune -f 2>/dev/null || true
   docker image prune -af 2>/dev/null || true
   journalctl --vacuum-size=200M 2>/dev/null || true
