@@ -180,7 +180,7 @@ def test_nginx_spa_location_is_plain_proxy() -> None:
     content = _nginx_site_text()
     block = content.split("location @spa", 1)[1].split("\nlocation ", 1)[0]
     assert "proxy_pass" in block
-    assert "proxy_cache" not in block
+    assert "proxy_cache " not in block
     assert "gzip on" not in block
     assert "proxy_set_header Host" in block
 

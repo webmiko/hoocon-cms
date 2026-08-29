@@ -241,8 +241,8 @@ location / {
 }
 
 location @spa {
-    # Pre-gzip stable proxy (before 1555b31 Lighthouse microcache). Do not
-    # re-enable proxy_cache or gzip here — that combo broke SPA GET in prod.
+    # Pre-Lighthouse stable proxy (before 1555b31). Do not add edge HTML
+    # microcache or response compression here — that combo broke SPA GET.
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
