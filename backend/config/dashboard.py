@@ -34,6 +34,7 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
 
     can_leads = user.has_perm("leads.view_lead")
     can_crm = user.has_perm("crm.view_client")
+    can_analytics = user.has_perm("analytics.view_pagedailystat")
     since = timezone.now() - timedelta(days=_STATS_DAYS)
 
     notifications = _build_notifications(
@@ -45,6 +46,7 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
         user=user,
         can_leads=can_leads,
         can_crm=can_crm,
+        can_analytics=can_analytics,
         since=since,
     )
     chart = _build_status_chart(user=user) if can_leads else []
@@ -68,6 +70,8 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
     if can_crm:
         links["clients"] = reverse("admin:crm_client_changelist")
         links["activities"] = reverse("admin:crm_activity_changelist")
+    if can_analytics:
+        links["analytics"] = reverse("admin:analytics_pagedailystat_stats")
 
     return {
         "hoocon_dashboard": {
@@ -178,6 +182,7 @@ def _build_stat_cards(
     user: Any,
     can_leads: bool,
     can_crm: bool,
+    can_analytics: bool,
     since: Any,
 ) -> list[dict[str, Any]]:
     """KPI tiles for the dashboard grid (scoped for managers)."""
@@ -224,6 +229,27 @@ def _build_stat_cards(
                     "url": reverse("admin:leads_lead_stats"),
                 },
             )
+
+    if can_analytics:
+        from analytics.models import SiteDailyStat
+
+        today_row = SiteDailyStat.objects.filter(day=timezone.localdate()).first()
+        cards.extend(
+            [
+                {
+                    "label": "Просмотры сегодня",
+                    "value": today_row.views if today_row else 0,
+                    "accent": not can_leads,
+                    "url": reverse("admin:analytics_pagedailystat_stats"),
+                },
+                {
+                    "label": "Уникальные сегодня",
+                    "value": today_row.unique_visitors if today_row else 0,
+                    "accent": False,
+                    "url": reverse("admin:analytics_pagedailystat_stats"),
+                },
+            ],
+        )
 
     if can_crm:
         from crm.models import Client, EmailMessage, EmailStatus

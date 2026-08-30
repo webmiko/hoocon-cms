@@ -510,4 +510,20 @@ export const api = {
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },
+
+  /**
+   * First-party pageview (essential cookies; no Metrika/GA consent).
+   */
+  trackSiteHit(data: {
+    path: string;
+    title?: string;
+    object_type?: string;
+    object_key?: string;
+  }): Promise<{ ok: boolean }> {
+    return apiFetch("/api/analytics/hit/", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
 };
