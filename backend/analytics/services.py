@@ -165,11 +165,7 @@ def record_page_hit(
         return False
 
     user = getattr(request, "user", None)
-    if (
-        user is not None
-        and getattr(user, "is_authenticated", False)
-        and getattr(user, "is_staff", False)
-    ):
+    if user is not None and getattr(user, "is_authenticated", False) and getattr(user, "is_staff", False):
         # Do not pollute Admin analytics with staff browsing the public SPA.
         return True
 
