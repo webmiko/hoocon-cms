@@ -14,6 +14,7 @@ from typing import Any
 PROJECT_APP_LABELS: frozenset[str] = frozenset(
     {
         "accounts",
+        "analytics",
         "catalog",
         "content",
         "crm",

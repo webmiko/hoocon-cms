@@ -1,0 +1,145 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{{ changelist_url }}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <span>Обзор</span>
+</nav>
+
+<div class="hoocon-lead-stats">
+  <div class="hoocon-lead-stats__toolbar">
+    <h1>Аналитика сайта</h1>
+    <nav class="hoocon-lead-stats__periods" aria-label="Период">
+      <a href="?days=7" class="{% if days == 7 %}is-active{% endif %}">7 дней</a>
+      <a href="?days=30" class="{% if days == 30 %}is-active{% endif %}">30 дней</a>
+      <a href="?days=90" class="{% if days == 90 %}is-active{% endif %}">90 дней</a>
+      <a href="?days=0" class="{% if days == 0 %}is-active{% endif %}">Всё время</a>
+      <a href="{{ changelist_url }}">← По дням</a>
+    </nav>
+  </div>
+
+  <p class="hoocon-dash__sub" style="margin:0 0 1rem;">
+    Собственная статистика просмотров (обязательные cookie, без Яндекс.Метрики / GA4).
+    Уникальные посетители считаются по сессии Django.
+  </p>
+
+  <section class="hoocon-lead-stats__cards" aria-label="Сводка">
+    <article class="hoocon-lead-stats__card hoocon-lead-stats__card--accent">
+      <p class="hoocon-lead-stats__label">Сегодня · просмотры</p>
+      <p class="hoocon-lead-stats__value">{{ stats.today.views }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Сегодня · уникальные</p>
+      <p class="hoocon-lead-stats__value">{{ stats.today.unique_visitors }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Период · просмотры</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.views }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Период · уникальные</p>
+      <p class="hoocon-lead-stats__value">{{ stats.totals.unique_visitors }}</p>
+    </article>
+  </section>
+
+  <section class="module hoocon-lead-stats__table-wrap">
+    <h2>Топ страниц</h2>
+    {% if stats.top_pages %}
+    <table class="hoocon-lead-stats__table">
+      <thead>
+        <tr>
+          <th scope="col">Путь</th>
+          <th scope="col">Тип</th>
+          <th scope="col">Заголовок</th>
+          <th scope="col">Просмотры</th>
+          <th scope="col">Уникальные</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.top_pages %}
+        <tr>
+          <th scope="row">
+            <a href="{{ row.path }}" target="_blank" rel="noopener noreferrer">{{ row.path }}</a>
+          </th>
+          <td>{{ row.object_type_label }}</td>
+          <td>{% if row.title %}{{ row.title }}{% else %}—{% endif %}</td>
+          <td>{{ row.views }}</td>
+          <td>{{ row.unique_visitors }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Пока нет данных за выбранный период.</p>
+    {% endif %}
+  </section>
+
+  <section class="module hoocon-lead-stats__table-wrap">
+    <h2>Топ артикулов</h2>
+    {% if stats.top_skus %}
+    <table class="hoocon-lead-stats__table">
+      <thead>
+        <tr>
+          <th scope="col">Артикул (slug)</th>
+          <th scope="col">Путь</th>
+          <th scope="col">Заголовок</th>
+          <th scope="col">Просмотры</th>
+          <th scope="col">Уникальные</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.top_skus %}
+        <tr>
+          <th scope="row">{{ row.object_key|default:"—" }}</th>
+          <td>
+            <a href="{{ row.path }}" target="_blank" rel="noopener noreferrer">{{ row.path }}</a>
+          </td>
+          <td>{% if row.title %}{{ row.title }}{% else %}—{% endif %}</td>
+          <td>{{ row.views }}</td>
+          <td>{{ row.unique_visitors }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Пока нет просмотров карточек товаров.</p>
+    {% endif %}
+  </section>
+
+  <section class="module hoocon-lead-stats__table-wrap">
+    <h2>Контент (страницы, статьи, новости)</h2>
+    {% if stats.top_content %}
+    <table class="hoocon-lead-stats__table">
+      <thead>
+        <tr>
+          <th scope="col">Путь</th>
+          <th scope="col">Тип</th>
+          <th scope="col">Заголовок</th>
+          <th scope="col">Просмотры</th>
+          <th scope="col">Уникальные</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.top_content %}
+        <tr>
+          <th scope="row">
+            <a href="{{ row.path }}" target="_blank" rel="noopener noreferrer">{{ row.path }}</a>
+          </th>
+          <td>{{ row.object_type_label }}</td>
+          <td>{% if row.title %}{{ row.title }}{% else %}—{% endif %}</td>
+          <td>{{ row.views }}</td>
+          <td>{{ row.unique_visitors }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Пока нет просмотров контентных страниц.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

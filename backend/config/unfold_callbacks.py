@@ -90,6 +90,14 @@ def perm_view_sitesettings(request: HttpRequest) -> bool:
     )
 
 
+def perm_view_analytics(request: HttpRequest) -> bool:
+    """Whether the user may see first-party site analytics in the sidebar."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and user.has_perm("analytics.view_pagedailystat"),
+    )
+
+
 def unfold_extras_css(request: HttpRequest) -> str:
     """URL of thin CSS for Unfold shell (cache-busted)."""
     del request
