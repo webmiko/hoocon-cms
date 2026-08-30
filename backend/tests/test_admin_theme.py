@@ -144,6 +144,12 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-table-stacked" in css
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
+    assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
+
+    js = (
+        Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js"
+    ).read_text(encoding="utf-8")
+    assert "table.hoocon-lead-stats__table" in js
 
 
 @pytest.mark.django_db

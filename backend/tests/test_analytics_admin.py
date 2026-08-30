@@ -38,6 +38,8 @@ def test_analytics_stats_page_for_superuser(client) -> None:
     assert "Аналитика сайта" in html
     assert "sku-1" in html
     assert "Топ артикулов" in html
+    assert "hoocon-lead-stats__table" in html
+    assert "hoocon-admin-tables.js" in html
 
 
 @pytest.mark.django_db
