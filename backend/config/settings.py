@@ -143,6 +143,7 @@ INSTALLED_APPS = [
     "social",
     "supportchat.apps.SupportchatConfig",
     "webpush.apps.WebpushConfig",
+    "analytics.apps.AnalyticsConfig",
 ]
 
 MIDDLEWARE = [
@@ -379,6 +380,14 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_sku",
                     },
                     {
+                        "title": _("Аналитика сайта"),
+                        "icon": "monitoring",
+                        "link": reverse_lazy(
+                            "admin:analytics_pagedailystat_stats",
+                        ),
+                        "permission": "config.unfold_callbacks.perm_view_analytics",
+                    },
+                    {
                         "title": _("Настройки сайта"),
                         "icon": "settings",
                         "link": reverse_lazy(
@@ -457,6 +466,8 @@ REST_FRAMEWORK = {
         # GET poll every ~4s needs headroom (15/min); separate from POST scope.
         "support_poll": "120/minute",
         "webpush_subscribe": "30/hour",
+        # First-party SPA pageviews (essential); per-IP, headroom for SPA navigations.
+        "analytics_hit": "120/min",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
     },

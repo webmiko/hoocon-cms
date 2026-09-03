@@ -13,6 +13,7 @@ import {
   setAnalyticsCounters,
   trackSpaHit,
 } from "../utils/analyticsTrack";
+import { trackSitePageView } from "../utils/siteAnalytics";
 import { yandexMetrikaInitOptions } from "../utils/yandexMetrikaInit";
 import {
   COOKIE_CONSENT_CHANGE_EVENT,
@@ -171,7 +172,8 @@ function scheduleAnalyticsLoad(): void {
 }
 
 /**
- * Mount once in Layout: loads analytics when allowed (deferred); tracks SPA navigations.
+ * Mount once in Layout: loads third-party analytics when allowed (deferred);
+ * always records first-party SPA pageviews (essential cookies).
  */
 export function Analytics() {
   const location = useLocation();
@@ -203,6 +205,9 @@ export function Analytics() {
   }, []);
 
   useEffect(() => {
+    // First-party Admin stats — always (essential session cookie).
+    trackSitePageView(routeKey);
+    // Third-party Metrika/GA4 — only after opt-in (see scheduleAnalyticsLoad).
     trackSpaHit(routeKey);
   }, [routeKey]);
 

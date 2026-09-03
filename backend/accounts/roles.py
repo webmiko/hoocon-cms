@@ -100,6 +100,8 @@ _SUPPORTCHAT_MODELS: Final[tuple[str, ...]] = (
 
 _WEBPUSH_MODELS: Final[tuple[str, ...]] = ("pushsubscription",)
 
+_ANALYTICS_MODELS: Final[tuple[str, ...]] = ("pagedailystat", "sitedailystat")
+
 _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
     _crud("catalog", _CATALOG_MODELS)
     | _crud("content", _CONTENT_MODELS)
@@ -110,6 +112,7 @@ _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
     | _crud("social", ("socialpost",))
     | _crud("supportchat", _SUPPORTCHAT_MODELS)
     | _crud("webpush", _WEBPUSH_MODELS)
+    | _view_only("analytics", _ANALYTICS_MODELS)
     | _VIEW_USER
 )
 
@@ -120,6 +123,7 @@ _MANAGER_PERMS: Final[frozenset[tuple[str, str]]] = (
     | _write_no_delete("supportchat", _SUPPORTCHAT_MODELS)
     | _write_no_delete("webpush", _WEBPUSH_MODELS)
     | _view_only("catalog", _CATALOG_MODELS)
+    | _view_only("analytics", _ANALYTICS_MODELS)
     | _VIEW_USER
 )
 
@@ -130,6 +134,7 @@ _ANALYST_PERMS: Final[frozenset[tuple[str, str]]] = (
     | _view_only("catalog", _CATALOG_MODELS)
     | _view_only("supportchat", _SUPPORTCHAT_MODELS)
     | _view_only("webpush", _WEBPUSH_MODELS)
+    | _view_only("analytics", _ANALYTICS_MODELS)
     | _VIEW_USER
 )
 

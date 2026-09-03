@@ -458,6 +458,54 @@ a.hoocon-leads-stats-link {
   color: var(--hoocon-quiet);
 }
 
+/* Analytics / lead-stats tables: card stack on mobile (JS adds stack classes). */
+table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody tr {
+  cursor: default;
+}
+
+table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody th,
+table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a {
+  color: var(--hoocon-primary);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .hoocon-lead-stats__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hoocon-lead-stats__periods {
+    width: 100%;
+  }
+
+  .hoocon-lead-stats__periods a {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .hoocon-lead-stats__table-wrap {
+    overflow-x: visible;
+  }
+
+  .hoocon-lead-stats__table-wrap h2 {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+}
+
 .hoocon-admin-breadcrumbs {
   display: flex;
   flex-wrap: wrap;
