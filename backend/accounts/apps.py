@@ -11,7 +11,9 @@ class AccountsConfig(AppConfig):
     verbose_name = "Учётные записи / роли"
 
     def ready(self) -> None:
-        """Install Admin Email OTP routes/login patch (flag-gated at runtime)."""
+        """Install Admin Email OTP + passkey routes/login patch."""
+        from accounts.passkey_views import install_admin_passkeys
         from config.admin_otp_views import install_admin_email_otp
 
         install_admin_email_otp()
+        install_admin_passkeys()

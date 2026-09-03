@@ -483,6 +483,8 @@ def _patched_login(
     if request.method == "GET" and admin_email_otp_enabled() and mode == "otp" and get_pending_admin_otp_user(request):
         return HttpResponseRedirect(reverse("admin:otp"))
 
+    from accounts.passkey_views import passkey_login_context
+
     context = {
         **self.each_context(request),
         "title": "Вход",
@@ -493,6 +495,7 @@ def _patched_login(
     if REDIRECT_FIELD_NAME not in request.GET and REDIRECT_FIELD_NAME not in request.POST:
         context[REDIRECT_FIELD_NAME] = reverse("admin:index", current_app=self.name)
     context.update(extra_context or {})
+    context.update(passkey_login_context(request))
 
     request.current_app = self.name
 

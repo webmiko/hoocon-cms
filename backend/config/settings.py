@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
@@ -542,6 +543,19 @@ ADMIN_EMAIL_OTP_ALLOWED_EMAILS = os.getenv("ADMIN_EMAIL_OTP_ALLOWED_EMAILS", "")
 ADMIN_EMAIL_OTP_REQUEST_LIMIT = int(os.getenv("ADMIN_EMAIL_OTP_REQUEST_LIMIT", "5"))
 ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS", "600"),
+)
+
+# Admin WebAuthn passkeys (Touch ID / Google Password Manager). Spec: plan passkey.
+# Prod: ADMIN_PASSKEY_ENABLED=true + RP_ID=hoocon.ru + ORIGIN=https://hoocon.ru
+# Local: RP_ID=localhost, ORIGIN=http://127.0.0.1:8000 (or Vite proxy origin).
+ADMIN_PASSKEY_ENABLED = _env_bool("ADMIN_PASSKEY_ENABLED", default=False)
+ADMIN_PASSKEY_RP_NAME = os.getenv("ADMIN_PASSKEY_RP_NAME", "HOOCON CMS").strip() or "HOOCON CMS"
+_passkey_site_host = (urlparse(SITE_URL).hostname or "").strip()
+_passkey_default_rp = _passkey_site_host or ("localhost" if DEBUG else "hoocon.ru")
+ADMIN_PASSKEY_RP_ID = os.getenv("ADMIN_PASSKEY_RP_ID", _passkey_default_rp).strip() or _passkey_default_rp
+ADMIN_PASSKEY_ORIGIN = os.getenv("ADMIN_PASSKEY_ORIGIN", SITE_URL).strip().rstrip("/") or SITE_URL
+ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS = int(
+    os.getenv("ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS", "300"),
 )
 
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─

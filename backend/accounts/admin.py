@@ -20,6 +20,8 @@ from unfold.admin import ModelAdmin
 from unfold.forms import ActionForm
 
 from accounts.forms import StaffUserChangeForm, StaffUserCreationForm
+from accounts.models import PasskeyCredential
+from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
 
 
@@ -76,6 +78,17 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 ),
             },
         ),
+        (
+            "Ключи доступа",
+            {
+                "fields": ("passkeys_summary",),
+                "description": (
+                    "Passkey (Связка ключей / Google Password Manager) — "
+                    "вход в админку без пароля. Включается флагом "
+                    "ADMIN_PASSKEY_ENABLED."
+                ),
+            },
+        ),
         ("Важные даты", {"fields": ("last_login", "date_joined")}),
         (
             "Служебное",
@@ -100,7 +113,13 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             },
         ),
     )
-    readonly_fields = ("username", "last_login", "date_joined", "recovery_codes_summary")
+    readonly_fields = (
+        "username",
+        "last_login",
+        "date_joined",
+        "recovery_codes_summary",
+        "passkeys_summary",
+    )
 
     def get_fieldsets(self, request: HttpRequest, obj: User | None = None) -> tuple:
         """On add with OTP: only email + display name (no password fields)."""
@@ -125,16 +144,22 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                     ),
                 )
             return self.add_fieldsets
+        fieldsets: tuple = self.fieldsets
         if not obj.is_superuser or not request.user.is_superuser:
             # Hide recovery fieldset for non-superuser targets/viewers.
-            return tuple(fs for fs in self.fieldsets if fs[0] != "Аварийный вход")
-        return self.fieldsets
+            fieldsets = tuple(fs for fs in fieldsets if fs[0] != "Аварийный вход")
+        if not admin_passkey_enabled():
+            fieldsets = tuple(fs for fs in fieldsets if fs[0] != "Ключи доступа")
+        return fieldsets
 
     def get_readonly_fields(self, request: HttpRequest, obj: User | None = None) -> tuple:
         base = super().get_readonly_fields(request, obj)
-        if "recovery_codes_summary" not in base:
-            return (*base, "recovery_codes_summary")
-        return base  # type: ignore[return-value]
+        extra = ("recovery_codes_summary", "passkeys_summary")
+        out = tuple(base)
+        for name in extra:
+            if name not in out:
+                out = (*out, name)
+        return out
 
     @admin.display(description="Резервные коды")
     def recovery_codes_summary(self, obj: User) -> str:
@@ -149,6 +174,22 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             '<p class="help mt-2">Старые коды будут аннулированы. '
             "Текст кодов покажется один раз.</p>",
             unused,
+            url,
+        )
+
+    @admin.display(description="Ключи доступа")
+    def passkeys_summary(self, obj: User) -> str:
+        """Count + link to manage page."""
+        if not obj.pk or not admin_passkey_enabled():
+            return "—"
+        count = PasskeyCredential.objects.filter(user=obj).count()
+        url = reverse("admin:passkey_manage")
+        if obj.pk:
+            url = f"{url}?user={obj.pk}"
+        return format_html(
+            '<p class="mb-2">Зарегистрировано ключей: <strong>{}</strong></p>'
+            '<a class="button" href="{}">Управлять ключами доступа</a>',
+            count,
             url,
         )
 
@@ -232,3 +273,34 @@ admin.site.unregister(User)
 admin.site.unregister(Group)
 admin.site.register(User, UserAdmin)
 admin.site.register(Group, GroupAdmin)
+
+
+@admin.register(PasskeyCredential)
+class PasskeyCredentialAdmin(ModelAdmin):
+    """Read-mostly list of registered Admin passkeys."""
+
+    action_form = ActionForm
+    list_display = ("device_name", "user", "created_at", "last_used_at", "sign_count")
+    list_filter = ("created_at",)
+    search_fields = ("device_name", "user__email", "user__username", "credential_id")
+    readonly_fields = (
+        "user",
+        "credential_id",
+        "sign_count",
+        "created_at",
+        "last_used_at",
+    )
+    fields = (
+        "user",
+        "device_name",
+        "credential_id",
+        "sign_count",
+        "created_at",
+        "last_used_at",
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        return admin_passkey_enabled() and super().has_module_permission(request)

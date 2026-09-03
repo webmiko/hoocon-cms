@@ -1,4 +1,4 @@
-"""Staff account extensions (recovery codes for superuser break-glass)."""
+"""Staff account extensions (recovery codes + WebAuthn passkeys)."""
 
 from __future__ import annotations
 
@@ -49,3 +49,51 @@ class SuperuserRecoveryCode(models.Model):
     def is_used(self) -> bool:
         """True after successful consume."""
         return self.used_at is not None
+
+
+class PasskeyCredential(models.Model):
+    """WebAuthn passkey for passwordless Admin login (staff only)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="passkeys",
+        verbose_name=_("Пользователь"),
+    )
+    credential_id = models.CharField(
+        max_length=512,
+        unique=True,
+        verbose_name=_("Идентификатор ключа"),
+    )
+    public_key = models.BinaryField(verbose_name=_("Публичный ключ"))
+    sign_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Счётчик подписей"),
+    )
+    device_name = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        verbose_name=_("Название устройства"),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Создан"),
+    )
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Последний вход"),
+    )
+
+    class Meta:
+        verbose_name = _("Ключ доступа")
+        verbose_name_plural = _("Ключи доступа")
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["user", "-created_at"], name="accounts_pk_user_created_idx"),
+        ]
+
+    def __str__(self) -> str:
+        label = self.device_name or self.credential_id[:12]
+        return f"Passkey({self.user_id}, {label})"

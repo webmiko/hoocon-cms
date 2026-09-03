@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block content %}
-  {% include "unfold/helpers/unauthenticated_title.html" with title="HOOCON CMS" subtitle=_("С возвращением в") %}
+  {% include "unfold/helpers/unauthenticated_title.html" with title=site_title|default:_('Django site admin') subtitle=_('Welcome back to') %}
 
   {% include "unfold/helpers/messages.html" %}
 
@@ -20,36 +20,30 @@
     <div class="flex flex-col gap-4 mb-8 *:mb-0">
       {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
       {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+      {% if user.is_authenticated %}
+        {% blocktranslate trimmed asvar message %}
+          You are authenticated as {{ username }}, but are not authorized to
+          access this page. Would you like to login to a different account?
+        {% endblocktranslate %}
+        {% include "unfold/helpers/messages/error.html" with error=message %}
+      {% endif %}
     </div>
   {% endif %}
 
-  <p class="mb-6 text-sm text-font-subtle-light dark:text-font-subtle-dark">
-    Введите логин или email — одноразовый код придёт на почту аккаунта.
-  </p>
-
   <form action="{{ app_path }}" method="post" id="login-form">
     {% csrf_token %}
-    {% if next %}
-      <input type="hidden" name="next" value="{{ next }}">
-    {% endif %}
     {% include "unfold/helpers/field.html" with field=form.username %}
+    {% include "unfold/helpers/field.html" with field=form.password %}
 
     <div class="flex flex-col gap-3 mt-6">
       {% component "unfold/components/button.html" with submit=1 variant="primary" class="submit-row w-full" %}
-        Получить код
+        {% translate 'Log in' %}
         <span class="material-symbols-outlined relative right-0 transition-all group-hover:-right-1 text-sm">
           arrow_forward
         </span>
       {% endcomponent %}
     </div>
   </form>
-
-  <p class="mt-8 text-sm text-font-subtle-light dark:text-font-subtle-dark">
-    Супер-админ, если письмо не доходит:
-    <a href="{{ password_login_url }}" class="text-primary-600 underline dark:text-primary-400">войти паролем</a>
-    или
-    <a href="{{ recovery_login_url }}" class="text-primary-600 underline dark:text-primary-400">резервным кодом</a>.
-  </p>
 
   {% include "admin/includes/passkey_login.html" %}
 {% endblock %}
