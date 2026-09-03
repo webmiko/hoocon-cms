@@ -1,8 +1,9 @@
 /**
  * Granular cookie consent (152-ФЗ / GDPR-style).
  *
- * Essential cookies are always on (site + CSRF/forms). Analytics (Metrika/GA4)
- * and marketing push require explicit opt-in. Preference JSON in localStorage.
+ * Essential cookies are always on (site + CSRF/forms + first-party pageview
+ * stats for Admin). Third-party analytics (Metrika/GA4) and marketing push
+ * require explicit opt-in. Preference JSON in localStorage.
  */
 
 export const COOKIE_CONSENT_STORAGE_KEY = "hoocon-cookie-consent";

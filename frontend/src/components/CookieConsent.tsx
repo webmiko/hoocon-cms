@@ -107,8 +107,9 @@ export function CookieConsent() {
             Настройки cookie
           </h2>
           <p className={styles.panelLead}>
-            Обязательные cookie нужны для работы сайта и защиты форм.
-            Аналитику и новости включаем только после вашего согласия.
+            Обязательные cookie нужны для работы сайта, защиты форм и внутренней
+            статистики просмотров. Стороннюю аналитику и новости включаем только
+            после вашего согласия.
           </p>
 
           <ul className={styles.categoryList}>
@@ -119,7 +120,8 @@ export function CookieConsent() {
               </div>
               <p className={styles.categoryDesc}>
                 Сессия, CSRF, согласие на cookie, базовая безопасность форм
-                заявок.
+                заявок, собственная статистика просмотров страниц и товаров
+                (без передачи сторонним счётчикам).
               </p>
               <label className={styles.switchRow}>
                 <input type="checkbox" checked disabled readOnly />
@@ -132,8 +134,8 @@ export function CookieConsent() {
                 <span className={styles.categoryBadgeOptional}>Необязательные</span>
               </div>
               <p className={styles.categoryDesc}>
-                Яндекс.Метрика и Google Analytics — статистика посещений, без
-                рекламных профилей на стороне сайта.
+                Яндекс.Метрика и Google Analytics — дополнительные счётчики
+                посещений, без рекламных профилей на стороне сайта.
               </p>
               <label className={styles.switchRow}>
                 <input
@@ -209,8 +211,9 @@ export function CookieConsent() {
     >
       <div className={styles.content}>
         <p className={styles.text}>
-          Используем обязательные cookie для работы сайта и защиты форм.
-          Аналитику и новости — только с вашего согласия. Подробности — в
+          Используем обязательные cookie для работы сайта, защиты форм и
+          внутренней статистики просмотров. Стороннюю аналитику и новости —
+          только с вашего согласия. Подробности — в
           {" "}
           <Link to="/privacy-policy" className={styles.link}>
             политике конфиденциальности

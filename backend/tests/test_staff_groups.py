@@ -67,6 +67,8 @@ def test_analyst_group_is_read_only_same_surface_as_manager() -> None:
     assert "view_sku" in codenames
     assert "view_client" in codenames
     assert "view_user" in codenames
+    assert "view_pagedailystat" in codenames
+    assert "view_sitedailystat" in codenames
     assert "add_lead" not in codenames
     assert "change_lead" not in codenames
     assert "delete_lead" not in codenames
@@ -75,6 +77,16 @@ def test_analyst_group_is_read_only_same_surface_as_manager() -> None:
     assert "view_redirect" not in codenames
     assert "view_socialpost" not in codenames
     assert "change_sitesettings" not in codenames
+
+
+def test_manager_group_can_view_site_analytics() -> None:
+    """Менеджер видит собственную аналитику просмотров (view-only)."""
+    ensure_staff_groups()
+    group = Group.objects.get(name=GROUP_MANAGER)
+    codenames = set(group.permissions.values_list("codename", flat=True))
+    assert "view_pagedailystat" in codenames
+    assert "add_pagedailystat" not in codenames
+    assert "change_pagedailystat" not in codenames
 
 
 def test_ensure_staff_groups_replaces_drifted_permissions() -> None:

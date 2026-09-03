@@ -9,6 +9,8 @@
     "#changelist table",
     ".inline-group .tabular table",
     "table#change-history",
+    /* Lead / site analytics overview pages (not changelist). */
+    "table.hoocon-lead-stats__table",
   ];
 
   const CHECKBOX_LABEL = "Выбрать";

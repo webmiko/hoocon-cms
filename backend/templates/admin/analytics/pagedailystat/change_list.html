@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if hoocon_analytics_stats_url %}
+  <li>
+    <a href="{{ hoocon_analytics_stats_url }}" class="hoocon-leads-stats-link">Обзор</a>
+  </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

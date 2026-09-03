@@ -175,15 +175,14 @@ def test_nginx_conf_strips_trailing_slash() -> None:
     assert "location = /index.html" in content
 
 
-def test_nginx_spa_location_compresses_and_caches_html() -> None:
-    """@spa enables gzip for proxied HTML and microcaches Django SEO shell."""
+def test_nginx_spa_location_is_plain_proxy() -> None:
+    """@spa is a plain Django proxy — no gzip/proxy_cache (pre-1555b31 stable)."""
     content = _nginx_site_text()
     block = content.split("location @spa", 1)[1].split("\nlocation ", 1)[0]
-    assert "gzip on" in block
-    assert "gzip_types text/html" in block
-    assert "gzip_proxied any" in block
-    assert "proxy_cache hoocon_spa" in block
-    assert "proxy_http_version 1.1" in block
+    assert "proxy_pass" in block
+    assert "proxy_cache " not in block
+    assert "gzip on" not in block
+    assert "proxy_set_header Host" in block
 
 
 def test_nginx_upstream_uses_keepalive() -> None:
@@ -191,6 +190,7 @@ def test_nginx_upstream_uses_keepalive() -> None:
     content = NGINX_CONF.read_text(encoding="utf-8")
     assert "upstream hoocon_app" in content
     assert "keepalive" in content
+    # Zone may remain unused; @spa must not reference proxy_cache.
     assert "proxy_cache_path" in content
 
 
@@ -226,7 +226,18 @@ def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
     """proxy_cache_path needs the on-disk dir before ``nginx -t`` on VPS."""
     deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
     assert "mkdir -p /var/cache/nginx/hoocon_spa" in deploy
+    assert "purged hoocon_spa proxy_cache" in deploy
     assert deploy.index("mkdir -p /var/cache/nginx/hoocon_spa") < deploy.index("nginx -t")
+
+
+def test_vps_free_disk_script_exists() -> None:
+    """Emergency pre-deploy cleanup when VPS disk is full."""
+    script = ROOT / "scripts" / "vps-free-disk.sh"
+    assert script.is_file()
+    text = script.read_text(encoding="utf-8")
+    assert "docker image prune" in text
+    assert "hoocon_spa" in text
+    assert "vps-free-disk.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 
 def test_redirects_map_has_documentation() -> None:
