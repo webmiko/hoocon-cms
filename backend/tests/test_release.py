@@ -22,7 +22,7 @@ _VERSION_CORE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 def test_release_label_ga_format() -> None:
     """Display string is ``vMAJOR.MINOR`` / ``MAJOR.MINOR`` after GA."""
     assert RELEASE_CHANNEL == ""
-    assert RELEASE_VERSION == "1.4"
+    assert RELEASE_VERSION == "1.5"
     assert _VERSION_CORE.match(RELEASE_VERSION)
     assert release_label() == f"v{display_version()}"
     assert release_label(with_v=False) == display_version()
