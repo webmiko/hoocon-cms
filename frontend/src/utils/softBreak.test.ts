@@ -51,4 +51,15 @@ describe("softBreak", () => {
     expect(joined.includes("шаровидным\u00A0графитом")).toBe(false);
     expect(joined.replaceAll("\u200B", "").replaceAll("\u2060", "")).toBe(raw);
   });
+
+  it("lets long factory-setting instruction notes wrap", () => {
+    const raw =
+      "DIP-переключатели режима сигнала (заводская установка: вход 0…10 В=, обратная связь 0…10 В=):";
+    const parts = softBreakParts(raw);
+    expect(
+      parts.some((p) => p.nowrap && p.text.includes("обратная связь")),
+    ).toBe(false);
+    const joined = softBreak(raw);
+    expect(joined.includes("вход\u00A0")).toBe(false);
+  });
 });

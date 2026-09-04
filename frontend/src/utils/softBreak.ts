@@ -44,11 +44,20 @@ export type SoftBreakPart = {
 export function parenChunkIsNowrap(chunk: string): boolean {
   const inner = chunk.replace(/^\(\s*|\s*\)$/gu, "").trim();
   if (!inner) return false;
-  if (/^Заводская\b/iu.test(inner)) return true;
-  if (/В=|мА|\.\.\.|…/u.test(inner)) return true;
+  const len = [...inner].length;
+  // Do not use ``\b``: JS word chars are ASCII-only, so Cyrillic
+  // ``Заводская\b`` never matches before a space.
+  // Short factory note only — long multi-clause notes must wrap in cards.
+  if (/^Заводская(?:\s|:|$)/iu.test(inner)) {
+    return len <= 40;
+  }
+  // Signal / current units stay atomic when short and without list commas.
+  if (/В=|мА|\.\.\.|…/u.test(inner)) {
+    return len <= 28 && !/,/.test(inner);
+  }
   // Edition suffixes: (−D/−DS/−A/−AS), not prose with a slash.
   if (/[−]/.test(inner) || /\/(?:−|[A-Z]{1,4}\d)/.test(inner)) return true;
-  return [...inner].length <= NOWRAP_PAREN_MAX_INNER;
+  return len <= NOWRAP_PAREN_MAX_INNER;
 }
 
 /**

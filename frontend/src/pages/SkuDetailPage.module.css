@@ -698,6 +698,11 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow-soft);
   text-wrap: pretty;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: none;
 }
 
 .descList li:last-child {
@@ -713,6 +718,13 @@
   height: 7px;
   border-radius: 50%;
   background: var(--color-brand);
+}
+
+/* Длинные SoftBreak nowrap-фрагменты не раздувают узкие карточки инструкций. */
+.descList li :global(.u-nowrap) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Характеристики: карточки по категориям на всех ширинах. */

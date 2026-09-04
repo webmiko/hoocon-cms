@@ -881,6 +881,13 @@
   word-break: normal;
 }
 
+/* Long SoftBreak nowrap chunks must not blow out catalog card columns. */
+.card :global(.u-nowrap) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /*
  * Narrow phone (.container ≲ 391px → viewport ~420px with --space-md):
  * value may wrap; label and value share vertical center.
@@ -1055,6 +1062,22 @@
   padding-left: var(--space-lg);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.categoryList li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.categoryList li :global(.u-nowrap) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .categoryInstToggle {
