@@ -1,0 +1,145 @@
+<p class="hero-dek">
+  В артикуле Hoocon буквы после напряжения — не «украшение», а оси спецификации:
+  <strong>D</strong> / <strong>A</strong> (управление), <strong>S</strong>
+  (вспомогательный переключатель), <strong>T</strong> (термодатчик на ОЗК).
+  Ниже — как читать код и не перепутать его с fail-safe FU/EU.
+</p>
+
+<p class="dash-note">
+  Канон суффиксов — из спецификации ряда и фасетов каталога. Точная расшифровка —
+  в паспорте SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Буквы в хвосте артикула</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">D</span><span class="kpi-tiles__lab">Открыто/закрыто</span></li>
+      <li><span class="kpi-tiles__num">A</span><span class="kpi-tiles__lab">пропорциональное</span></li>
+      <li><span class="kpi-tiles__num">S</span><span class="kpi-tiles__lab">переключатель</span></li>
+      <li><span class="kpi-tiles__num">T</span><span class="kpi-tiles__lab">термо · ОЗК</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Что смотреть в первую очередь</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">Управление</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--90"></span></span>
+        <span class="hbar__val">D · A</span>
+      </li>
+      <li>
+        <span class="hbar__label">Сигнализация</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--75"></span></span>
+        <span class="hbar__val">S · DS</span>
+      </li>
+      <li>
+        <span class="hbar__label">Термо ОЗК</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--55"></span></span>
+        <span class="hbar__val">DST</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Как устроен артикул</h2>
+<p>
+  Типовой код: семейство + момент + питание + хвост опций.
+  Пример: <strong>DA10MU230-AS</strong> — воздушный 10&nbsp;Нм, 230&nbsp;В,
+  пропорциональное (<strong>A</strong>) со вспомогательным переключателем
+  (<strong>S</strong>). Пример ОЗК: <strong>SA10FU230-DST</strong> — пружина FU,
+  Открыто/закрыто + S + термодатчик T.
+</p>
+<p>
+  Питание (24 / 230) и момент выбираются отдельно:
+  <a href="/statyi/pitanie-24-ili-230-v">24 или 230&nbsp;В</a>,
+  <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">подбор по Нм</a>.
+  Обзор семейств —
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификация</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Суффикс</th>
+  <th>Значение</th>
+  <th>Где встречается</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>D</strong></td>
+  <td>Открыто/закрыто (дискретное)</td>
+  <td>DA…D, DA…DS; SA…DS</td>
+</tr>
+<tr>
+  <td><strong>A</strong></td>
+  <td>Пропорциональное / модулирующее</td>
+  <td>DA…A, DA…AS; сигнал 0(2)…10&nbsp;В=</td>
+</tr>
+<tr>
+  <td><strong>S</strong></td>
+  <td>Вспомогательный переключатель (SPDT)</td>
+  <td>…S, …DS, …AS; на SA FU — обычно всегда</td>
+</tr>
+<tr>
+  <td><strong>T</strong></td>
+  <td>Термодатчик</td>
+  <td>ОЗК: …DST; не путать с «трёхпозиционным»</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>D и A — управление, не fail-safe</h2>
+<p>
+  Фасет «Управление» в каталоге: Открыто/закрыто, 2-/3-позиционное,
+  пропорциональное. В коде суффикс <strong>D</strong> ≈ Открыто/закрыто,
+  <strong>A</strong> ≈ пропорциональное. Подробнее —
+  <a href="/statyi/tipy-upravleniya-privodom">типы управления</a>.
+  Пружина / электронный возврат — другая ось (<strong>FU</strong> /
+  <strong>EU</strong>), см.
+  <a href="/statyi/fu-vs-eu-fail-safe">FU vs EU</a> и
+  <a href="/faq#fail-safe">FAQ</a>.
+</p>
+
+<h2>S и T — опции сигнализации</h2>
+<p>
+  <strong>S</strong> — контакты для индикации положения в АСУ (группы SPDT).
+  Разбор —
+  <a href="/statyi/vspomogatelnyy-pereklyuchatel">вспомогательный переключатель</a>.
+  <strong>T</strong> на противопожарных — термодатчик в исполнении -DST;
+  DS без T — тот же контур управления, без термо.
+</p>
+
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Частые ошибки чтения кода</p>
+    <ul class="meter-list">
+      <li>
+        <span class="meter__label">D/A = пружина</span>
+        <span class="meter__track"><span class="meter__fill meter__fill--20"></span></span>
+        <span class="meter__val">нет</span>
+      </li>
+      <li>
+        <span class="meter__label">T = «трёхпозиционное»</span>
+        <span class="meter__track"><span class="meter__fill meter__fill--15"></span></span>
+        <span class="meter__val">нет</span>
+      </li>
+      <li>
+        <span class="meter__label">S нужен для ОЗК</span>
+        <span class="meter__track"><span class="meter__fill meter__fill--85"></span></span>
+        <span class="meter__val">обычно да</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Дальше</h2>
+<p>
+  Сверьте хвост с паспортом в карточке
+  <a href="/catalog">каталога</a>. Замена Belimo — метод и форма в
+  <a href="/statyi/analog-belimo-hoocon">аналоге Belimo</a> /
+  <a href="/replacement">/replacement</a>. Вопросы —
+  <a href="/consultation">консультация</a>, <a href="/faq">FAQ</a>.
+</p>

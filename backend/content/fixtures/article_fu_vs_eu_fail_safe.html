@@ -1,0 +1,143 @@
+<p class="hero-dek">
+  <strong>Fail-safe</strong> у электропривода — отдельная ось от момента и сигнала:
+  при пропадании питания заслонка уходит в безопасное положение либо остаётся
+  как есть. В линейке Hoocon два канона: пружина <strong>FU</strong> и электронный
+  возврат <strong>EU</strong>. Не путать с ускоренным ходом MU / MQU / HV.
+</p>
+
+<p class="dash-note">
+  Направление закрытия/открытия и время возврата — только по паспорту SKU и ТЗ
+  на клапан.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Две оси fail-safe</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">FU</span><span class="kpi-tiles__lab">пружина</span></li>
+      <li><span class="kpi-tiles__num">EU</span><span class="kpi-tiles__lab">электронный</span></li>
+      <li><span class="kpi-tiles__num">нет</span><span class="kpi-tiles__lab">MU · HV</span></li>
+      <li><span class="kpi-tiles__num">ОЗК</span><span class="kpi-tiles__lab">только FU</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Типовые задачи</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">ОЗК · пожар</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">SA…FU</span>
+      </li>
+      <li>
+        <span class="hbar__label">Воздух · пружина</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--80"></span></span>
+        <span class="hbar__val">DA…FU</span>
+      </li>
+      <li>
+        <span class="hbar__label">Воздух · EU</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--70"></span></span>
+        <span class="hbar__val">DA…EU</span>
+      </li>
+      <li>
+        <span class="hbar__label">Без возврата</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--60"></span></span>
+        <span class="hbar__val">MU · HV</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>FU — механическая пружина</h2>
+<p>
+  При отключении питания пружина переводит заслонку в заданное безопасное
+  положение (закрыто или открыто — по исполнению). Типичные семейства:
+  <strong>DA…FU</strong> (воздух) и <strong>SA…FU</strong> (противопожарные /
+  дымовые). На ОЗК пружинный возврат — норма; подмена на обычный DA…MU недопустима
+  (см. <a href="/faq#fail-safe">FAQ</a>).
+</p>
+<p>
+  Ориентиры времени хода / возврата — в
+  <a href="/statyi/spetsifikatsiya-modelnogo-ryada-privodov">спецификации</a>
+  (секунды — ориентир; паспорт SKU важнее).
+</p>
+
+<h2>EU — электронный fail-safe</h2>
+<p>
+  Электронная схема возвращает заслонку без механической пружины. Семейство
+  <strong>DA…EU</strong> в каталоге — для воздушных задач, где нужен аварийный
+  уход, но конструкция пружины не требуется. Не смешивать с «быстрым» MQU:
+  скорость хода — другая статья
+  (<a href="/statyi/mu-mqu-hv-kogda-nuzhen-uskorennyy">MU / MQU / HV</a>).
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Код</th>
+  <th>Механика</th>
+  <th>Типовая задача</th>
+  <th>Заметка</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>DA…FU</td>
+  <td>Пружина</td>
+  <td>Воздух, нужен аварийный возврат</td>
+  <td>Опция S; D или A по сигналу</td>
+</tr>
+<tr>
+  <td>SA…FU</td>
+  <td>Пружина</td>
+  <td>ОЗК / дым</td>
+  <td>Обычно DS / DST; не менять на DA…MU</td>
+</tr>
+<tr>
+  <td>DA…EU</td>
+  <td>Электронный возврат</td>
+  <td>Воздух без пружины</td>
+  <td>Не замена SA на ОЗК</td>
+</tr>
+<tr>
+  <td>…MU / HV</td>
+  <td>Без fail-safe</td>
+  <td>Положение сохраняется</td>
+  <td>Скорость ≠ аварийный возврат</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Жёсткий запрет</p>
+    <p>
+      <strong>SA…FU</strong> на огнезадерживающем клапане нельзя менять на
+      «похожий по Нм» <strong>DA…MU</strong>. Fail-safe и семейство — часть
+      пожарной логики объекта.
+    </p>
+  </div>
+</div>
+
+<h2>Как выбрать</h2>
+<ol>
+  <li>Нужен ли аварийный уход при отключении питания?</li>
+  <li>ОЗК / противопожар → только пружинный контур SA…FU.</li>
+  <li>Воздух: FU (пружина) или EU (электронный) — по ТЗ и массе / габариту.</li>
+  <li>Нужна только скорость без возврата → MU / MQU / HV, не FU.</li>
+</ol>
+<p>
+  Сигнал и суффиксы D/A/S —
+  <a href="/statyi/tipy-upravleniya-privodom">типы управления</a>,
+  <a href="/statyi/suffiksy-d-a-s-t">суффиксы</a>. Момент —
+  <a href="/statyi/podbor-privoda-po-momentu-i-ploshchadi">подбор по площади</a>.
+</p>
+
+<h2>Дальше</h2>
+<p>
+  Сверьте fail-safe в карточке
+  <a href="/catalog">каталога</a>. Замена с сохранением оси —
+  <a href="/statyi/analog-belimo-hoocon">Belimo → Hoocon</a> /
+  <a href="/replacement">форма аналога</a>. Вопросы —
+  <a href="/consultation">консультация</a>.
+</p>

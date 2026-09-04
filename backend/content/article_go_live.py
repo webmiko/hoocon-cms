@@ -28,6 +28,11 @@ AUTO_GO_LIVE_NEWS_SLUGS: frozenset[str] = frozenset(
         "pitanie-24-ili-230-v",
         "mu-mqu-hv-kogda-nuzhen-uskorennyy",
         "analog-belimo-hoocon",
+        "suffiksy-d-a-s-t",
+        "fu-vs-eu-fail-safe",
+        "vspomogatelnyy-pereklyuchatel",
+        "komplekt-sharovoy-kran-privod",
+        "pasport-i-sertifikaty-v-zayavke",
     }
 )
 

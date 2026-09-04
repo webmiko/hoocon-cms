@@ -1,0 +1,129 @@
+<p class="hero-dek">
+  Буква <strong>S</strong> в артикуле — вспомогательный переключатель (обычно
+  SPDT): сухие контакты для индикации положения заслонки в АСУ и щитах.
+  На противопожарных SA…FU переключатель входит в типовое исполнение
+  (<strong>DS</strong> / <strong>DST</strong>). Ниже — зачем он нужен и чем
+  DS отличается от DST.
+</p>
+
+<p class="dash-note">
+  Число групп, углы срабатывания и клеммы — только по паспорту и схеме из
+  инструкции SKU.
+</p>
+<div class="dash">
+  <div class="dash-panel">
+    <p class="dash-panel__title">Что даёт S</p>
+    <ul class="kpi-tiles">
+      <li><span class="kpi-tiles__num">SPDT</span><span class="kpi-tiles__lab">группы контактов</span></li>
+      <li><span class="kpi-tiles__num">DS</span><span class="kpi-tiles__lab">D + переключатель</span></li>
+      <li><span class="kpi-tiles__num">AS</span><span class="kpi-tiles__lab">A + переключатель</span></li>
+      <li><span class="kpi-tiles__num">DST</span><span class="kpi-tiles__lab">+ термо ОЗК</span></li>
+    </ul>
+  </div>
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Где критичен</p>
+    <ul class="hbar">
+      <li>
+        <span class="hbar__label">ОЗК · пожар</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--95"></span></span>
+        <span class="hbar__val">DS / DST</span>
+      </li>
+      <li>
+        <span class="hbar__label">Индикация BMS</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--85"></span></span>
+        <span class="hbar__val">часто нужен</span>
+      </li>
+      <li>
+        <span class="hbar__label">Простой on/off</span>
+        <span class="hbar__track"><span class="hbar__fill hbar__fill--45"></span></span>
+        <span class="hbar__val">по ТЗ</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<h2>Зачем вспомогательный переключатель</h2>
+<p>
+  Основной сигнал управления (D / A) двигает привод. Контакты <strong>S</strong>
+  сообщают контроллеру «заслонка открыта / закрыта / в зоне» без опроса аналога
+  обратной связи. Типовые сценарии: лампа на щите, блокировка смежных
+  агрегатов, подтверждение закрытия ОЗК.
+</p>
+<p>
+  Суффиксы в целом —
+  <a href="/statyi/suffiksy-d-a-s-t">D / A / S / T</a>; типы сигнала —
+  <a href="/statyi/tipy-upravleniya-privodom">типы управления</a>.
+</p>
+
+<div class="table-scroll">
+<table class="series-table">
+<thead>
+<tr>
+  <th>Код</th>
+  <th>Управление</th>
+  <th>Переключатель</th>
+  <th>Термо</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>…D</td>
+  <td>Открыто/закрыто</td>
+  <td>—</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>…DS</td>
+  <td>Открыто/закрыто</td>
+  <td>есть</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>…AS</td>
+  <td>Пропорциональное</td>
+  <td>есть</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>…DST</td>
+  <td>Открыто/закрыто (ОЗК)</td>
+  <td>есть</td>
+  <td>есть</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>DS и DST на противопожарных</h2>
+<p>
+  В семействе <strong>SA…FU</strong> вспомогательный переключатель — штатная
+  опция для сигнализации в систему пожарной автоматики.
+  <strong>DST</strong> добавляет термодатчик: срабатывание по температуре
+  среды клапана (логика по паспорту ОЗК). Не читать T как «трёхпозиционное
+  управление» — это термо, не фасет 2-/3.
+</p>
+<p>
+  Fail-safe пружины —
+  <a href="/statyi/fu-vs-eu-fail-safe">FU vs EU</a>; нельзя менять SA…FU на
+  DA…MU «без S» ради экономии.
+</p>
+
+<div class="dash">
+  <div class="dash-panel dash-panel--wide">
+    <p class="dash-panel__title">Практика монтажа</p>
+    <ul class="funnel">
+      <li><span class="funnel__bar funnel__bar--1"></span><span class="funnel__lab">Сверить число групп в паспорте</span></li>
+      <li><span class="funnel__bar funnel__bar--2"></span><span class="funnel__lab">Развести силовые и сигнальные цепи</span></li>
+      <li><span class="funnel__bar funnel__bar--3"></span><span class="funnel__lab">Настроить углы по ТЗ / заводской уставке</span></li>
+      <li><span class="funnel__bar funnel__bar--4"></span><span class="funnel__lab">Проверить индикацию в АСУ</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>Дальше</h2>
+<p>
+  Схемы клемм — в инструкции на карточке
+  <a href="/catalog">SKU</a> и PDF. Документы к заявке —
+  <a href="/statyi/pasport-i-sertifikaty-v-zayavke">чек‑лист</a>. Вопросы —
+  <a href="/consultation">консультация</a>, <a href="/faq">FAQ</a>.
+</p>

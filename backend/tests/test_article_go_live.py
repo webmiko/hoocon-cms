@@ -176,3 +176,46 @@ def test_go_live_does_not_starve_older_due_without_news() -> None:
     assert [r.article_slug for r in results] == [older]
     assert results[0].news_created is True
     assert News.objects.filter(slug=go_live_news_slug(older)).exists()
+
+
+@pytest.mark.django_db
+def test_p2_slugs_are_in_auto_go_live() -> None:
+    """P2 Iter C+D guides must be announced by beat when due."""
+    expected = {
+        "suffiksy-d-a-s-t",
+        "fu-vs-eu-fail-safe",
+        "vspomogatelnyy-pereklyuchatel",
+        "komplekt-sharovoy-kran-privod",
+        "pasport-i-sertifikaty-v-zayavke",
+    }
+    assert expected <= AUTO_GO_LIVE_NEWS_SLUGS
+
+
+@pytest.mark.django_db
+def test_p2_first_guide_go_live_creates_news() -> None:
+    """Due P2-1 suffixes guide creates article-<slug> news once."""
+    slug = "suffiksy-d-a-s-t"
+    _due_article(slug, title="Суффиксы D A S T")
+    results = publish_due_articles(announce=False)
+    hit = [r for r in results if r.article_slug == slug]
+    assert len(hit) == 1
+    assert hit[0].news_created is True
+    assert News.objects.filter(slug=go_live_news_slug(slug)).exists()
+
+
+def test_p2_fixture_files_exist() -> None:
+    """HTML + WebP covers for P2 guides are present in fixtures/."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "content" / "fixtures"
+    stems = (
+        "suffiksy_d_a_s_t",
+        "fu_vs_eu_fail_safe",
+        "vspomogatelnyy_pereklyuchatel",
+        "komplekt_sharovoy_kran_privod",
+        "pasport_i_sertifikaty_v_zayavke",
+    )
+    for stem in stems:
+        assert (root / f"article_{stem}.html").is_file()
+        assert (root / f"article_{stem}_cover.webp").is_file()
+        assert (root / f"article_{stem}_cover_dark.webp").is_file()
