@@ -219,3 +219,30 @@ def test_p2_fixture_files_exist() -> None:
         assert (root / f"article_{stem}.html").is_file()
         assert (root / f"article_{stem}_cover.webp").is_file()
         assert (root / f"article_{stem}_cover_dark.webp").is_file()
+
+
+def test_p2_go_live_is_weekly_mondays_msk() -> None:
+    """P2 guides publish Mondays 09:00 Europe/Moscow, one week apart."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "content" / "migrations" / "0019_reschedule_p2_weekly_mondays.py"
+    spec = importlib.util.spec_from_file_location("p2_weekly_schedule", path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    go_live = mod._GO_LIVE
+
+    order = (
+        "suffiksy-d-a-s-t",
+        "fu-vs-eu-fail-safe",
+        "vspomogatelnyy-pereklyuchatel",
+        "komplekt-sharovoy-kran-privod",
+        "pasport-i-sertifikaty-v-zayavke",
+    )
+    times = [go_live[slug] for slug in order]
+    assert [t.weekday() for t in times] == [0] * 5
+    assert all(t.hour == 9 and t.minute == 0 for t in times)
+    assert all(str(t.tzinfo) == "Europe/Moscow" for t in times)
+    gaps = [(b.date() - a.date()).days for a, b in zip(times, times[1:])]
+    assert gaps == [7, 7, 7, 7]
