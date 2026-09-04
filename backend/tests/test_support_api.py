@@ -382,6 +382,67 @@ def test_conversation_party_label_name_company_and_anonymous_phone() -> None:
 
 
 @pytest.mark.django_db
+def test_chat_messages_for_admin_select_related_party_no_n_plus_one() -> None:
+    """Serializing N inbound messages must not lazy-load client/lead per row."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from crm.models import Client
+    from supportchat.admin import _chat_messages_for_admin
+    from supportchat.models import Channel, Message, MessageDirection
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-n1-admin",
+        display_name="",
+        status="open",
+    )
+    conv.client = Client.objects.create(
+        name="Оля",
+        email="olya@example.com",
+        company="ООО Север",
+        phone="+79001110000",
+    )
+    conv.save(update_fields=["client"])
+    for i in range(2):
+        Message.objects.create(
+            conversation=conv,
+            direction=MessageDirection.INBOUND,
+            body=f"msg-{i}",
+        )
+
+    def party_fk_queries() -> tuple[int, int, list]:
+        with CaptureQueriesContext(connection) as ctx:
+            rows = _chat_messages_for_admin(conv)
+        sqls = [q["sql"].lower() for q in ctx.captured_queries]
+        # Separate SELECTs on party tables (JOIN in the messages query is OK).
+        client_sel = sum(
+            1 for s in sqls if "crm_client" in s and s.lstrip().startswith("select") and "supportchat_message" not in s
+        )
+        lead_sel = sum(
+            1 for s in sqls if "leads_lead" in s and s.lstrip().startswith("select") and "supportchat_message" not in s
+        )
+        return client_sel, lead_sel, rows
+
+    client_sel, lead_sel, rows = party_fk_queries()
+    assert len(rows) == 2
+    assert rows[0]["sender_name"] == "Оля"
+    assert client_sel == 0
+    assert lead_sel == 0
+
+    for i in range(2, 8):
+        Message.objects.create(
+            conversation=conv,
+            direction=MessageDirection.INBOUND,
+            body=f"msg-{i}",
+        )
+    client_sel2, lead_sel2, rows2 = party_fk_queries()
+    assert len(rows2) == 8
+    assert client_sel2 == 0
+    assert lead_sel2 == 0
+
+
+@pytest.mark.django_db
 def test_touch_conversation_message_bumps_unread_atomically() -> None:
     """Concurrent inbound bumps must not lose counts (F() expression)."""
     from supportchat.models import Channel, touch_conversation_message

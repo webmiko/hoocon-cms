@@ -241,6 +241,66 @@ def test_delete_unlinked_conversation_only() -> None:
 
 @pytest.mark.django_db
 @override_settings(**STAFF_SETTINGS)
+def test_conversation_mutate_views_select_related_party() -> None:
+    """assign/close/read serialize party label without extra client/lead SELECTs."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from crm.models import Client
+    from supportchat.models import Channel, Conversation
+
+    user = _manager(email="chatmut@example.com")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-mutate-party",
+        display_name="",
+        status="open",
+        staff_unread_count=3,
+    )
+    conv.client = Client.objects.create(
+        name="Кира",
+        email="kira@example.com",
+        company="АО Мост",
+        phone="+79002223344",
+    )
+    conv.save(update_fields=["client"])
+
+    api = _auth_client(user)
+
+    def assert_no_lazy_party(path: str) -> dict:
+        with CaptureQueriesContext(connection) as ctx:
+            resp = api.post(path)
+        assert resp.status_code == 200
+        sqls = [q["sql"].lower() for q in ctx.captured_queries]
+        lazy_client = sum(
+            1
+            for s in sqls
+            if "crm_client" in s and s.lstrip().startswith("select") and "supportchat_conversation" not in s
+        )
+        lazy_lead = sum(
+            1
+            for s in sqls
+            if "leads_lead" in s and s.lstrip().startswith("select") and "supportchat_conversation" not in s
+        )
+        assert lazy_client == 0, sqls
+        assert lazy_lead == 0, sqls
+        return resp.json()
+
+    read = assert_no_lazy_party(f"/api/staff/conversations/{conv.pk}/read/")
+    assert read["title"] == "Кира · АО Мост"
+    assert read["staff_unread_count"] == 0
+
+    assigned = assert_no_lazy_party(f"/api/staff/conversations/{conv.pk}/assign/")
+    assert assigned["assignee_id"] == user.pk
+    assert assigned["title"] == "Кира · АО Мост"
+
+    closed = assert_no_lazy_party(f"/api/staff/conversations/{conv.pk}/close/")
+    assert closed["status"] == "closed"
+    assert closed["title"] == "Кира · АО Мост"
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
 def test_logout_deletes_token() -> None:
     user = _manager(email="out@example.com")
     token = StaffAuthToken.objects.create(user=user)

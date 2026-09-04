@@ -61,6 +61,8 @@ def _chat_messages_for_admin(
         "author",
         "conversation",
         "conversation__assignee",
+        "conversation__client",
+        "conversation__lead",
     ).order_by("created_at", "id")
     if after_id is not None:
         qs = qs.filter(id__gt=after_id)

@@ -383,12 +383,20 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
         return Response(serialize_message(msg), status=status.HTTP_201_CREATED)
 
 
+def _conversation_for_staff(*, pk: int) -> Conversation:
+    """Load conversation with party FKs for ``serialize_conversation``."""
+    return get_object_or_404(
+        Conversation.objects.select_related("client", "lead", "assignee"),
+        pk=pk,
+    )
+
+
 class ConversationAssignView(StaffAuthMixin, APIView):
     def post(self, request: Request, pk: int) -> Response:
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = get_object_or_404(Conversation, pk=pk)
+        conv = _conversation_for_staff(pk=pk)
         conv.assignee = request.user
         conv.status = ConversationStatus.OPEN
         conv.save(update_fields=["assignee", "status", "updated_at"])
@@ -400,7 +408,7 @@ class ConversationCloseView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = get_object_or_404(Conversation, pk=pk)
+        conv = _conversation_for_staff(pk=pk)
         conv.status = ConversationStatus.CLOSED
         conv.save(update_fields=["status", "updated_at"])
         return Response(serialize_conversation(conv))
@@ -411,7 +419,7 @@ class ConversationReadView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = get_object_or_404(Conversation, pk=pk)
+        conv = _conversation_for_staff(pk=pk)
         conv.staff_unread_count = 0
         conv.save(update_fields=["staff_unread_count", "updated_at"])
         return Response(serialize_conversation(conv))

@@ -57,7 +57,7 @@ def notify_staff_fcm_support(conversation_id: int) -> int:
     from supportchat.services import conversation_party_label
 
     try:
-        conv = Conversation.objects.get(pk=conversation_id)
+        conv = Conversation.objects.select_related("client", "lead").get(pk=conversation_id)
     except Conversation.DoesNotExist:
         return 0
     title = "Новое сообщение в поддержке"
