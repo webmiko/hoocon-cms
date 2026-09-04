@@ -143,6 +143,104 @@ def test_device_register_delete() -> None:
 
 @pytest.mark.django_db
 @override_settings(**STAFF_SETTINGS)
+def test_conversations_party_label_not_channel() -> None:
+    """List/detail expose name·company or Пользователь·phone — never «Сайт» as title."""
+    from crm.models import Client
+    from supportchat.models import Channel, Conversation
+
+    user = _manager(email="chatlabel@example.com")
+    named = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-named-api",
+        display_name="",
+        status="open",
+    )
+    named.client = Client.objects.create(
+        name="Пётр",
+        email="petr@example.com",
+        company="АО Ветер",
+        phone="+79001234567",
+    )
+    named.save(update_fields=["client"])
+
+    anon = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-anon-api",
+        display_name="",
+        contact_email="",
+        status="open",
+    )
+
+    client = _auth_client(user)
+    listing = client.get("/api/staff/conversations/")
+    assert listing.status_code == 200
+    by_id = {row["id"]: row for row in listing.json()["results"]}
+    assert by_id[named.pk]["title"] == "Пётр · АО Ветер"
+    assert by_id[named.pk]["display_name"] == "Пётр · АО Ветер"
+    assert by_id[named.pk]["phone"] == "+79001234567"
+    assert by_id[named.pk]["company"] == "АО Ветер"
+    assert by_id[anon.pk]["title"] == "Пользователь"
+    assert "Сайт" not in by_id[anon.pk]["title"]
+    assert by_id[anon.pk]["channel_label"] == "Сайт"
+
+    detail = client.get(f"/api/staff/conversations/{named.pk}/")
+    assert detail.status_code == 200
+    assert detail.json()["title"] == "Пётр · АО Ветер"
+    assert by_id[named.pk]["deletable"] is False
+    assert by_id[anon.pk]["deletable"] is True
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
+def test_delete_unlinked_conversation_only() -> None:
+    """DELETE removes anonymous chats; CRM-linked chats stay."""
+    from crm.models import Client
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    user = _manager(email="chatdel@example.com")
+    linked = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-linked-del",
+        status="open",
+    )
+    linked.client = Client.objects.create(
+        name="CRM",
+        email="crm-del@example.com",
+        company="Co",
+    )
+    linked.save(update_fields=["client"])
+    Message.objects.create(
+        conversation=linked,
+        direction=MessageDirection.INBOUND,
+        body="keep me",
+    )
+
+    orphan = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-orphan-del",
+        display_name="Спам",
+        status="open",
+        staff_unread_count=2,
+    )
+    Message.objects.create(
+        conversation=orphan,
+        direction=MessageDirection.INBOUND,
+        body="delete me",
+    )
+
+    api = _auth_client(user)
+    blocked = api.delete(f"/api/staff/conversations/{linked.pk}/")
+    assert blocked.status_code == 400
+    assert Conversation.objects.filter(pk=linked.pk).exists()
+
+    ok = api.delete(f"/api/staff/conversations/{orphan.pk}/")
+    assert ok.status_code == 204
+    assert not Conversation.objects.filter(pk=orphan.pk).exists()
+    assert not Message.objects.filter(conversation_id=orphan.pk).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
 def test_logout_deletes_token() -> None:
     user = _manager(email="out@example.com")
     token = StaffAuthToken.objects.create(user=user)

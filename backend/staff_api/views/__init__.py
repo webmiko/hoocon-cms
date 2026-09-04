@@ -50,7 +50,12 @@ from staff_api.serializers import (
     serialize_user,
 )
 from supportchat.models import Conversation, ConversationStatus
-from supportchat.services import add_staff_reply, count_staff_unread
+from supportchat.services import (
+    SupportChatError,
+    add_staff_reply,
+    count_staff_unread,
+    delete_unlinked_conversation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +315,9 @@ class ConversationListView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = Conversation.objects.all().order_by("-last_message_at", "-id")
+        qs = (
+            Conversation.objects.select_related("client", "lead", "assignee").all().order_by("-last_message_at", "-id")
+        )
         st = (request.query_params.get("status") or "").strip()
         if st:
             qs = qs.filter(status=st)
@@ -319,6 +326,29 @@ class ConversationListView(StaffAuthMixin, APIView):
         return paginator.get_paginated_response(
             [serialize_conversation(c) for c in page],
         )
+
+
+class ConversationDetailView(StaffAuthMixin, APIView):
+    def get(self, request: Request, pk: int) -> Response:
+        blocked = _require_enabled()
+        if blocked:
+            return blocked
+        conv = get_object_or_404(
+            Conversation.objects.select_related("client", "lead", "assignee"),
+            pk=pk,
+        )
+        return Response(serialize_conversation(conv))
+
+    def delete(self, request: Request, pk: int) -> Response:
+        blocked = _require_enabled()
+        if blocked:
+            return blocked
+        conv = get_object_or_404(Conversation, pk=pk)
+        try:
+            delete_unlinked_conversation(conv)
+        except SupportChatError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ConversationMessagesView(StaffAuthMixin, APIView):

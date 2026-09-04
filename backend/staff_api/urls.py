@@ -12,6 +12,7 @@ from staff_api.views import (
     ClientListView,
     ConversationAssignView,
     ConversationCloseView,
+    ConversationDetailView,
     ConversationListView,
     ConversationMessagesView,
     ConversationReadView,
@@ -52,6 +53,11 @@ urlpatterns = [
         name="staff-client-emails",
     ),
     path("conversations/", ConversationListView.as_view(), name="staff-conversations"),
+    path(
+        "conversations/<int:pk>/",
+        ConversationDetailView.as_view(),
+        name="staff-conversation-detail",
+    ),
     path(
         "conversations/<int:pk>/messages/",
         ConversationMessagesView.as_view(),

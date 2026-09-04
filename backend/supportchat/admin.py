@@ -25,6 +25,7 @@ from supportchat.models import (
 from supportchat.services import (
     SupportChatError,
     add_staff_reply,
+    conversation_party_label,
     count_staff_unread,
     message_sender_name,
     staff_public_name,
@@ -73,16 +74,26 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_display = (
         "unread_badge",
         "channel_badge",
-        "display_name",
+        "party_label",
         "contact_email",
         "status",
         "assignee",
         "last_message_at",
         "last_preview",
     )
-    list_display_links = ("display_name", "contact_email")
+    list_display_links = ("party_label", "contact_email")
     list_filter = ("channel", "status", "assignee")
-    search_fields = ("display_name", "contact_email", "external_user_id")
+    search_fields = (
+        "display_name",
+        "contact_email",
+        "external_user_id",
+        "client__name",
+        "client__company",
+        "client__phone",
+        "lead__name",
+        "lead__company",
+        "lead__phone",
+    )
     readonly_fields = (
         "channel",
         "external_user_id",
@@ -144,12 +155,16 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .select_related("assignee")
+            .select_related("assignee", "client", "lead")
             .annotate(
                 _last_body=Subquery(last_msg.values("body")[:1]),
                 _last_direction=Subquery(last_msg.values("direction")[:1]),
             )
         )
+
+    @admin.display(description="Собеседник")
+    def party_label(self, obj: Conversation) -> str:
+        return conversation_party_label(obj)
 
     @admin.display(description="Inbox", ordering="staff_unread_count")
     def unread_badge(self, obj: Conversation) -> str:
@@ -259,7 +274,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     ) -> HttpResponse:
         extra = dict(extra_context or {})
         conversation = get_object_or_404(
-            Conversation.objects.select_related("assignee"),
+            Conversation.objects.select_related("assignee", "client", "lead"),
             pk=object_id,
         )
         if conversation.staff_unread_count and request.user.has_perm(
@@ -278,8 +293,9 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         chat_messages = _chat_messages_for_admin(conversation)
         extra["chat_messages"] = chat_messages
         extra["chat_last_message_id"] = chat_messages[-1]["id"] if chat_messages else 0
-        label = (conversation.display_name or "").strip()
-        extra["chat_client_initial"] = (label[:1] or "?").upper()
+        party = conversation_party_label(conversation)
+        extra["chat_party_label"] = party
+        extra["chat_client_initial"] = (party[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
         return super().change_view(request, object_id, form_url, extra)
 

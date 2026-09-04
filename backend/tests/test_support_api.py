@@ -305,13 +305,13 @@ def test_admin_messages_poll_returns_new_inbound() -> None:
 
 @pytest.mark.django_db
 def test_admin_poll_sender_name_for_anonymous_inbound() -> None:
-    """Staff messenger shows «Клиент» when inbound has no display_name."""
+    """Staff messenger shows «Пользователь» when inbound has no name."""
     from django.contrib.auth import get_user_model
     from django.test import Client
     from django.urls import reverse
 
     from supportchat.models import Channel, Message, MessageDirection
-    from supportchat.services import message_sender_name
+    from supportchat.services import conversation_party_label, message_sender_name
 
     staff = get_user_model().objects.create_superuser(
         username="support-name",
@@ -330,14 +330,55 @@ def test_admin_poll_sender_name_for_anonymous_inbound() -> None:
         body="hi",
     )
     assert message_sender_name(msg) == "Вы"
-    assert message_sender_name(msg, staff_view=True) == "Клиент"
+    assert message_sender_name(msg, staff_view=True) == "Пользователь"
+    assert conversation_party_label(conv) == "Пользователь"
 
     client = Client()
     client.force_login(staff)
     url = reverse("admin:supportchat_conversation_messages_poll", args=[conv.pk])
     resp = client.get(url)
     assert resp.status_code == 200
-    assert resp.json()["messages"][0]["sender_name"] == "Клиент"
+    assert resp.json()["messages"][0]["sender_name"] == "Пользователь"
+
+
+@pytest.mark.django_db
+def test_conversation_party_label_name_company_and_anonymous_phone() -> None:
+    """Hub label prefers name·company; anonymous uses phone."""
+    from crm.models import Client
+    from leads.models import Lead
+    from supportchat.models import Channel
+    from supportchat.services import conversation_party_label
+
+    named = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-named",
+        display_name="",
+        status="open",
+    )
+    named.client = Client.objects.create(
+        name="Иван",
+        email="ivan@example.com",
+        company="ООО Ромашка",
+        phone="+79001112233",
+    )
+    named.save(update_fields=["client"])
+    assert conversation_party_label(named) == "Иван · ООО Ромашка"
+
+    anon = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-phone",
+        display_name="",
+        status="open",
+    )
+    anon.lead = Lead.objects.create(
+        name="",
+        email="anon@example.com",
+        phone="+79005556677",
+        company="",
+        message="",
+    )
+    anon.save(update_fields=["lead"])
+    assert conversation_party_label(anon) == "Пользователь · +79005556677"
 
 
 @pytest.mark.django_db

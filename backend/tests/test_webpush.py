@@ -174,18 +174,27 @@ def test_send_deletes_on_410() -> None:
 
 
 @pytest.mark.django_db
-@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-def test_inbound_triggers_staff_push_task(django_capture_on_commit_callbacks) -> None:
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    FCM_SERVER_KEY="test-fcm-key",
+    STAFF_API_ENABLED=True,
+)
+def test_inbound_bumps_support_sticker_and_triggers_push(
+    django_capture_on_commit_callbacks,
+) -> None:
+    """Inbound bumps unread sticker (admin + staff badges) and fires Web Push + FCM."""
+    from django.urls import reverse
+
+    from staff_api.models import StaffAuthToken, StaffDevice
     from supportchat.models import Channel, Conversation
     from supportchat.schedule import ensure_default_schedule
-    from supportchat.services import add_inbound_message
+    from supportchat.services import add_inbound_message, count_staff_unread
 
     ensure_default_schedule()
-    user = get_user_model().objects.create_user(
+    user = get_user_model().objects.create_superuser(
         username="staff@hoocon.ru",
         email="staff@hoocon.ru",
         password="x",
-        is_staff=True,
     )
     upsert_subscription(
         endpoint="https://push.example/staff",
@@ -194,16 +203,73 @@ def test_inbound_triggers_staff_push_task(django_capture_on_commit_callbacks) ->
         topic_support=True,
         user=user,
     )
+    StaffDevice.objects.create(
+        user=user,
+        fcm_token="fcm-token-support-1",
+        platform="android",
+    )
     conv = Conversation.objects.create(
         channel=Channel.WEB,
         external_user_id="sess-1",
-        display_name="Client",
+        display_name="Анна",
+        staff_unread_count=0,
     )
-    with patch("webpush.services.send_push_to_subscription", return_value=True) as send:
-        with patch("supportchat.services.is_open_now", return_value=True):
-            with django_capture_on_commit_callbacks(execute=True):
-                add_inbound_message(conv, "hello")
-    assert send.called
+    assert count_staff_unread() == 0
+
+    admin = Client()
+    admin.force_login(user)
+    unread_url = reverse("admin:supportchat_conversation_unread_count")
+    assert admin.get(unread_url).json()["count"] == 0
+
+    token = StaffAuthToken.objects.create(user=user)
+    staff_api = Client()
+    badges0 = staff_api.get(
+        "/api/staff/badges/",
+        HTTP_AUTHORIZATION=f"Token {token.key}",
+    )
+    assert badges0.status_code == 200
+    assert badges0.json()["support_unread"] == 0
+
+    with patch("webpush.services.send_push_to_subscription", return_value=True) as web_send:
+        with patch("staff_api.tasks._send_fcm", return_value=True) as fcm_send:
+            with patch("supportchat.services.is_open_now", return_value=True):
+                with django_capture_on_commit_callbacks(execute=True):
+                    add_inbound_message(conv, "нужна помощь")
+
+    conv.refresh_from_db()
+    assert conv.staff_unread_count == 1
+    assert count_staff_unread() == 1
+    assert admin.get(unread_url).json()["count"] == 1
+    badges1 = staff_api.get(
+        "/api/staff/badges/",
+        HTTP_AUTHORIZATION=f"Token {token.key}",
+    )
+    assert badges1.json()["support_unread"] == 1
+
+    assert web_send.called
+    web_kwargs = web_send.call_args.kwargs
+    assert "поддержк" in web_kwargs["title"].casefold()
+    assert web_kwargs["tag"] == f"support-{conv.pk}"
+    assert f"/supportchat/conversation/{conv.pk}/" in web_kwargs["url"]
+
+    assert fcm_send.called
+    fcm_kwargs = fcm_send.call_args.kwargs
+    assert fcm_kwargs["token"] == "fcm-token-support-1"
+    assert "поддержк" in fcm_kwargs["title"].casefold()
+    assert fcm_kwargs["data"]["type"] == "support"
+    assert fcm_kwargs["data"]["conversation_id"] == str(conv.pk)
+
+    change = admin.get(reverse("admin:supportchat_conversation_change", args=[conv.pk]))
+    assert change.status_code == 200
+    conv.refresh_from_db()
+    assert conv.staff_unread_count == 0
+    assert count_staff_unread() == 0
+    assert admin.get(unread_url).json()["count"] == 0
+    badges2 = staff_api.get(
+        "/api/staff/badges/",
+        HTTP_AUTHORIZATION=f"Token {token.key}",
+    )
+    assert badges2.json()["support_unread"] == 0
 
 
 @pytest.mark.django_db

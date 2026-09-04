@@ -7,6 +7,11 @@ from rest_framework import serializers
 from crm.models import ActivityType, Client
 from leads.models import Lead
 from supportchat.models import Conversation, Message
+from supportchat.services import (
+    conversation_party_company,
+    conversation_party_label,
+    conversation_party_phone,
+)
 
 
 class OtpStartSerializer(serializers.Serializer):
@@ -135,17 +140,26 @@ def serialize_client(client: Client, *, detail: bool = False) -> dict:
 
 
 def serialize_conversation(conv: Conversation) -> dict:
+    """Hub row: ``title`` / ``display_name`` = party label (name·company or phone)."""
+    title = conversation_party_label(conv)
     return {
         "id": conv.pk,
         "channel": conv.channel,
         "channel_label": conv.get_channel_display(),
         "status": conv.status,
-        "display_name": conv.display_name or "",
+        "title": title,
+        "display_name": title,
+        "visitor_name": (conv.display_name or "").strip(),
+        "contact_email": (conv.contact_email or "").strip(),
+        "company": conversation_party_company(conv),
+        "phone": conversation_party_phone(conv),
         "staff_unread_count": conv.staff_unread_count,
-        "last_message_at": conv.last_message_at.isoformat() if conv.last_message_at else None,
+        "last_message_at": (conv.last_message_at.isoformat() if conv.last_message_at else None),
         "assignee_id": conv.assignee_id,
         "client_id": conv.client_id,
         "lead_id": conv.lead_id,
+        # Mobile may delete only chats without a CRM client link.
+        "deletable": conv.client_id is None,
     }
 
 

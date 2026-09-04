@@ -28,12 +28,22 @@
       </span>
       <div class="hoocon-messenger__who-text">
         <h2 class="hoocon-messenger__title">
-          {{ original.display_name|default:original.get_channel_display }}
+          {{ chat_party_label|default:original.display_name|default:original.get_channel_display }}
         </h2>
         <p class="hoocon-messenger__meta">
           <span class="hoocon-messenger__channel hoocon-messenger__channel--{{ original.channel }}">
             {{ original.get_channel_display }}
           </span>
+          {% if original.client and original.client.phone %}
+            <span>· {{ original.client.phone }}</span>
+          {% elif original.lead and original.lead.phone %}
+            <span>· {{ original.lead.phone }}</span>
+          {% endif %}
+          {% if original.client and original.client.company %}
+            <span>· {{ original.client.company }}</span>
+          {% elif original.lead and original.lead.company %}
+            <span>· {{ original.lead.company }}</span>
+          {% endif %}
           {% if original.contact_email %}
             · <a href="mailto:{{ original.contact_email }}">{{ original.contact_email }}</a>
           {% endif %}

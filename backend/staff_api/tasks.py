@@ -54,13 +54,14 @@ def notify_staff_fcm_support(conversation_id: int) -> int:
     """FCM: new inbound support message."""
     from staff_api.models import StaffDevice
     from supportchat.models import Conversation
+    from supportchat.services import conversation_party_label
 
     try:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
         return 0
     title = "Новое сообщение в поддержке"
-    label = conv.display_name or conv.get_channel_display()
+    label = conversation_party_label(conv)
     body = f"{label}: новое обращение"
     data = {
         "type": "support",
