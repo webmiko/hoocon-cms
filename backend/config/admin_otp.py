@@ -156,19 +156,32 @@ def hash_otp_code(code: str) -> str:
 
 
 def _client_ip(request: HttpRequest) -> str:
+    """Client IP behind one reverse proxy (nginx → gunicorn)."""
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded:
+        # Leftmost entry is the original client when the edge proxy appends.
+        parts = [part.strip() for part in forwarded.split(",") if part.strip()]
+        if parts:
+            return parts[0]
     return (request.META.get("REMOTE_ADDR") or "0.0.0.0").strip() or "0.0.0.0"
 
 
-def consume_otp_request_quota(request: HttpRequest) -> None:
+def consume_otp_request_quota(
+    request: HttpRequest,
+    *,
+    cache_prefix: str = "admin_email_otp:req_v1:",
+    limit: int | None = None,
+    window: int | None = None,
+) -> None:
     """Count OTP send/resend for this IP; raise if over limit."""
-    limit = otp_request_limit()
-    window = otp_request_window_seconds()
-    key = f"admin_email_otp:req_v1:{_client_ip(request)}"
+    resolved_limit = otp_request_limit() if limit is None else limit
+    resolved_window = otp_request_window_seconds() if window is None else window
+    key = f"{cache_prefix}{_client_ip(request)}"
     try:
         count = int(cache.incr(key))
     except ValueError:
         # Key missing — seed window.
-        cache.add(key, 1, timeout=window)
+        cache.add(key, 1, timeout=resolved_window)
         count = 1
         # Race: another worker may have created it.
         if cache.get(key) != 1:
@@ -176,7 +189,7 @@ def consume_otp_request_quota(request: HttpRequest) -> None:
                 count = int(cache.incr(key))
             except ValueError:
                 count = 1
-    if count > limit:
+    if count > resolved_limit:
         raise AdminOtpDeliveryError("Слишком много запросов. Попробуйте позже.")
 
 

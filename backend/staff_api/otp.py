@@ -41,7 +41,14 @@ def _challenge_key(challenge_id: str) -> str:
 
 def start_staff_otp(request: HttpRequest, login: str) -> dict[str, str]:
     """Send OTP and return challenge_id + masked email."""
-    consume_otp_request_quota(request)
+    from django.conf import settings
+
+    consume_otp_request_quota(
+        request,
+        cache_prefix="staff_api_otp:req_v1:",
+        limit=int(getattr(settings, "STAFF_OTP_REQUEST_LIMIT", 30)),
+        window=int(getattr(settings, "STAFF_OTP_REQUEST_WINDOW_SECONDS", 3600)),
+    )
     user = find_staff_user_for_otp(login)
     if user is None:
         # Same shape as success to avoid user enumeration timing where possible.
@@ -73,7 +80,14 @@ def start_staff_otp(request: HttpRequest, login: str) -> dict[str, str]:
 
 def resend_staff_otp(request: HttpRequest, challenge_id: str) -> None:
     """Resend code for an existing challenge."""
-    consume_otp_request_quota(request)
+    from django.conf import settings
+
+    consume_otp_request_quota(
+        request,
+        cache_prefix="staff_api_otp:req_v1:",
+        limit=int(getattr(settings, "STAFF_OTP_REQUEST_LIMIT", 30)),
+        window=int(getattr(settings, "STAFF_OTP_REQUEST_WINDOW_SECONDS", 3600)),
+    )
     raw = cache.get(_challenge_key(challenge_id))
     if not isinstance(raw, dict):
         raise AdminOtpDeliveryError("Сессия входа истекла. Запросите код снова.")
