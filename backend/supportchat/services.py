@@ -163,13 +163,19 @@ def add_inbound_message(
 
 
 def _schedule_staff_support_push(conversation_id: int) -> None:
-    """Enqueue staff Web Push after commit."""
+    """Enqueue staff Web Push + FCM after commit."""
     from django.db import transaction
 
     def _enqueue() -> None:
         from webpush.tasks import notify_staff_support_inbound
 
         notify_staff_support_inbound.delay(conversation_id)
+        try:
+            from staff_api.tasks import notify_staff_fcm_support
+
+            notify_staff_fcm_support.delay(conversation_id)
+        except Exception:  # noqa: BLE001 — FCM optional / app may be absent
+            pass
 
     transaction.on_commit(_enqueue)
 

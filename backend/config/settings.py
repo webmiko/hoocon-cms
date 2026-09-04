@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "supportchat.apps.SupportchatConfig",
     "webpush.apps.WebpushConfig",
     "analytics.apps.AnalyticsConfig",
+    "staff_api.apps.StaffApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -470,6 +471,7 @@ REST_FRAMEWORK = {
         "analytics_hit": "120/min",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
+        "staff_otp": "30/hour",
     },
 }
 
@@ -568,6 +570,10 @@ ADMIN_PASSKEY_ORIGIN = os.getenv("ADMIN_PASSKEY_ORIGIN", SITE_URL).strip().rstri
 ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS = int(
     os.getenv("ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS", "300"),
 )
+
+# Staff mobile API (Flutter manager app). Internal distribution only.
+STAFF_API_ENABLED = _env_bool("STAFF_API_ENABLED", default=False)
+FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "").strip()
 
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─
 LOGGING = {
