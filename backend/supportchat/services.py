@@ -122,6 +122,11 @@ def add_inbound_message(
 
     text = _sanitize_body(body)
     open_now = is_open_now()
+    # First client message in the thread → email managers (attention ping).
+    is_first_inbound = not Message.objects.filter(
+        conversation=conversation,
+        direction=MessageDirection.INBOUND,
+    ).exists()
     # Web inbound on a closed thread must reopen (same as messenger).
     if conversation.status == ConversationStatus.CLOSED:
         conversation.status = ConversationStatus.OPEN
@@ -158,12 +163,21 @@ def add_inbound_message(
                 outside_hours=True,
             )
             touch_conversation_message(conversation, inbound=False)
-    _schedule_staff_support_push(conversation.pk)
+    _schedule_staff_support_push(
+        conversation.pk,
+        message_id=inbound.pk,
+        first_inbound=is_first_inbound,
+    )
     return inbound, auto
 
 
-def _schedule_staff_support_push(conversation_id: int) -> None:
-    """Enqueue staff Web Push + FCM after commit."""
+def _schedule_staff_support_push(
+    conversation_id: int,
+    *,
+    message_id: int | None = None,
+    first_inbound: bool = False,
+) -> None:
+    """Enqueue staff Web Push + FCM (+ first-inbound email) after commit."""
     from django.db import transaction
 
     def _enqueue() -> None:
@@ -176,6 +190,10 @@ def _schedule_staff_support_push(conversation_id: int) -> None:
             notify_staff_fcm_support.delay(conversation_id)
         except Exception:  # noqa: BLE001 — FCM optional / app may be absent
             pass
+        if first_inbound and message_id is not None:
+            from supportchat.tasks import send_support_first_inbound_notification
+
+            send_support_first_inbound_notification.delay(conversation_id, message_id)
 
     transaction.on_commit(_enqueue)
 
@@ -332,6 +350,73 @@ def count_staff_unread() -> int:
 
     total = Conversation.objects.filter(status=ConversationStatus.OPEN).aggregate(s=Sum("staff_unread_count")).get("s")
     return int(total or 0)
+
+
+def resolve_support_notify_recipients(conversation: Conversation) -> list[str]:
+    """Email recipients for a new support thread (first inbound only).
+
+    Active staff assignee with email → that address. Otherwise the same
+    sales list as leads (``LEAD_NOTIFY_EMAIL``).
+    """
+    from django.conf import settings
+
+    from leads.services import parse_notify_emails
+
+    assignee = getattr(conversation, "assignee", None)
+    if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
+        addr = (getattr(assignee, "email", "") or "").strip()
+        if addr:
+            return parse_notify_emails(addr)
+    return parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+
+
+def build_conversation_admin_url(conversation_id: int) -> str:
+    """Absolute Admin change URL for a support conversation."""
+    from django.conf import settings
+    from django.urls import reverse
+
+    site = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
+    path = reverse("admin:supportchat_conversation_change", args=[conversation_id])
+    return f"{site}{path}"
+
+
+def render_support_first_inbound_notification(
+    conversation: Conversation,
+    message: Message,
+) -> tuple[str, str, str]:
+    """Build subject + text/HTML for the first-inbound support email."""
+    from django.conf import settings
+    from django.template.loader import render_to_string
+
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
+    party = conversation_party_label(conversation)
+    preview = (message.body or "").strip()
+    if len(preview) > 400:
+        preview = preview[:397] + "…"
+    phone = conversation_party_phone(conversation)
+    company = conversation_party_company(conversation)
+    context = {
+        "conversation": conversation,
+        "message": message,
+        "party_label": party,
+        "channel_display": conversation.get_channel_display(),
+        "preview": preview,
+        "phone": phone,
+        "company": company,
+        "contact_email": (conversation.contact_email or "").strip(),
+        "site_url": site_url,
+        "admin_url": build_conversation_admin_url(conversation.pk),
+    }
+    subject = f"Новый чат поддержки #{conversation.pk}: {party}"
+    text_body = render_to_string(
+        "supportchat/email/first_inbound.txt",
+        context,
+    ).strip()
+    html_body = render_to_string(
+        "supportchat/email/first_inbound.html",
+        context,
+    ).strip()
+    return subject, text_body, html_body
 
 
 def delete_unlinked_conversation(conversation: Conversation) -> None:

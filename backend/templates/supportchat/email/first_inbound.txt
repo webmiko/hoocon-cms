@@ -1,0 +1,13 @@
+Клиент написал в чат поддержки Hoocon — первый ответ в этом диалоге.
+
+Кто: {{ party_label }}
+Канал: {{ channel_display }}
+{% if company %}Компания: {{ company }}
+{% endif %}{% if phone %}Телефон: {{ phone }}
+{% endif %}{% if contact_email %}Email: {{ contact_email }}
+{% endif %}
+Сообщение:
+{{ preview }}
+
+—
+Открыть чат в Admin: {{ admin_url }}

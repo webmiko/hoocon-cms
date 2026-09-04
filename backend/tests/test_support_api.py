@@ -6,7 +6,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 
 from supportchat.models import Conversation
 from supportchat.schedule import ensure_default_schedule
@@ -538,6 +538,120 @@ def test_outside_hours_auto_reply_once_per_day() -> None:
             conversation=conv,
             direction=MessageDirection.SYSTEM,
             outside_hours=True,
+        ).count()
+        == 1
+    )
+
+
+@pytest.mark.django_db
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    LEAD_NOTIFY_EMAIL="sales@hoocon.ru",
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    SITE_URL="https://hoocon.ru",
+)
+def test_first_inbound_sends_email_second_does_not(
+    django_capture_on_commit_callbacks,
+) -> None:
+    """Only the first client message in a thread emails sales@."""
+    from django.core import mail
+
+    from supportchat.models import Channel
+    from supportchat.services import add_inbound_message
+
+    ensure_default_schedule()
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-email-first",
+        display_name="Ирина",
+    )
+    mail.outbox.clear()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        with django_capture_on_commit_callbacks(execute=True):
+            add_inbound_message(conv, "Здравствуйте, нужен подбор привода")
+    assert len(mail.outbox) == 1
+    msg = mail.outbox[0]
+    assert msg.to == ["sales@hoocon.ru"]
+    assert f"#{conv.pk}" in msg.subject
+    assert "Ирина" in msg.subject
+    assert "нужен подбор" in msg.body
+    assert f"/admin/supportchat/conversation/{conv.pk}/change/" in msg.body
+
+    mail.outbox.clear()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        with django_capture_on_commit_callbacks(execute=True):
+            add_inbound_message(conv, "ещё одно сообщение")
+    assert mail.outbox == []
+
+
+@pytest.mark.django_db
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    LEAD_NOTIFY_EMAIL="sales@hoocon.ru",
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+def test_first_inbound_email_goes_to_assignee(
+    django_capture_on_commit_callbacks,
+) -> None:
+    """Claimed thread notifies the assignee email, not the sales list."""
+    from django.contrib.auth import get_user_model
+    from django.core import mail
+
+    from supportchat.models import Channel
+    from supportchat.services import add_inbound_message
+
+    ensure_default_schedule()
+    mgr = get_user_model().objects.create_user(
+        username="mgr-chat@hoocon.ru",
+        email="mgr-chat@hoocon.ru",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="tg-42",
+        display_name="Павел",
+        assignee=mgr,
+    )
+    mail.outbox.clear()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        with django_capture_on_commit_callbacks(execute=True):
+            add_inbound_message(conv, "привет из бота")
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["mgr-chat@hoocon.ru"]
+
+
+@pytest.mark.django_db
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    LEAD_NOTIFY_EMAIL="",
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+def test_first_inbound_skips_email_without_recipients(
+    django_capture_on_commit_callbacks,
+) -> None:
+    """No LEAD_NOTIFY_EMAIL and no assignee → no mail, chat still works."""
+    from django.core import mail
+
+    from supportchat.models import Channel, Message, MessageDirection
+    from supportchat.services import add_inbound_message
+
+    ensure_default_schedule()
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-no-mail",
+        display_name="X",
+    )
+    mail.outbox.clear()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        with django_capture_on_commit_callbacks(execute=True):
+            add_inbound_message(conv, "есть кто?")
+    assert mail.outbox == []
+    assert (
+        Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.INBOUND,
         ).count()
         == 1
     )
