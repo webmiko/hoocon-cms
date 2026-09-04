@@ -275,7 +275,9 @@ def conversation_party_phone(conversation: Conversation) -> str:
             return phone[:64]
     lead = getattr(conversation, "lead", None)
     if lead is not None:
-        return (getattr(lead, "phone", None) or "").strip()[:64]
+        phone = (getattr(lead, "phone", None) or "").strip()
+        if phone:
+            return phone[:64]
     return ""
 
 
@@ -288,7 +290,9 @@ def conversation_party_company(conversation: Conversation) -> str:
             return company[:200]
     lead = getattr(conversation, "lead", None)
     if lead is not None:
-        return (getattr(lead, "company", None) or "").strip()[:200]
+        company = (getattr(lead, "company", None) or "").strip()
+        if company:
+            return company[:200]
     return ""
 
 

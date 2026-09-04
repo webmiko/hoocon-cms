@@ -382,6 +382,43 @@ def test_conversation_party_label_name_company_and_anonymous_phone() -> None:
 
 
 @pytest.mark.django_db
+def test_conversation_party_phone_company_skip_empty_lead() -> None:
+    """Empty client/lead fields fall through; only non-empty values are returned."""
+    from crm.models import Client
+    from leads.models import Lead
+    from supportchat.models import Channel
+    from supportchat.services import conversation_party_company, conversation_party_phone
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-empty-fields",
+        status="open",
+    )
+    conv.client = Client.objects.create(
+        name="X",
+        email="empty-fields@example.com",
+        company="",
+        phone="",
+    )
+    conv.lead = Lead.objects.create(
+        name="",
+        email="empty-lead@example.com",
+        phone="",
+        company="",
+        message="",
+    )
+    conv.save(update_fields=["client", "lead"])
+    assert conversation_party_phone(conv) == ""
+    assert conversation_party_company(conv) == ""
+
+    conv.lead.phone = "+79009998877"
+    conv.lead.company = "Лид Ко"
+    conv.lead.save(update_fields=["phone", "company"])
+    assert conversation_party_phone(conv) == "+79009998877"
+    assert conversation_party_company(conv) == "Лид Ко"
+
+
+@pytest.mark.django_db
 def test_chat_messages_for_admin_select_related_party_no_n_plus_one() -> None:
     """Serializing N inbound messages must not lazy-load client/lead per row."""
     from django.db import connection
