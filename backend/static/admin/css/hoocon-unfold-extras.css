@@ -9,25 +9,38 @@
   --hoocon-primary-hover: #b01010;
   --hoocon-surface: #ffffff;
   --hoocon-surface-muted: color-mix(in srgb, #141414 4%, #ffffff);
-  --hoocon-glass-border: rgba(30, 30, 40, 0.12);
+  --hoocon-page-bg: #f3f4f7;
+  --hoocon-glass-border: rgba(30, 30, 40, 0.1);
   --hoocon-quiet: #6f6f6f;
-  --hoocon-radius: 0.5rem;
+  --hoocon-radius: 0.875rem;
   --hoocon-radius-pill: 999px;
   --hoocon-btn-height: 2.25rem;
   --hoocon-inline-padding: 1.1rem;
-  --hoocon-shadow-soft: 0 4px 20px rgba(20, 20, 30, 0.04);
-  --hoocon-hairline: rgba(30, 30, 40, 0.1);
+  --hoocon-card-pad: 1.15rem 1.2rem 1.25rem;
+  --hoocon-shadow-soft: 0 8px 28px rgba(20, 20, 30, 0.06);
+  --hoocon-hairline: rgba(30, 30, 40, 0.09);
   --hoocon-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hoocon-kpi-strip-h: 0.28rem;
 }
 
 .dark {
   --hoocon-surface: #171717;
   --hoocon-surface-muted: color-mix(in srgb, #ffffff 6%, #171717);
+  --hoocon-page-bg: #0f0f10;
   --hoocon-glass-border: rgba(255, 255, 255, 0.12);
   --hoocon-quiet: #a3a3a3;
   --hoocon-hairline: rgba(255, 255, 255, 0.1);
+  --hoocon-shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.35);
   /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1 */
   --hoocon-primary-on-dark: #f87171;
+}
+
+/* Soft canvas behind Unfold white cards (desktop + phone). */
+#main,
+#main.bg-white,
+.dark #main,
+.dark #main.bg-white {
+  background-color: var(--hoocon-page-bg) !important;
 }
 
 .hoocon-admin-lead-sticker {
@@ -385,8 +398,10 @@ a.hoocon-leads-stats-link {
 }
 
 .hoocon-lead-stats__card {
+  position: relative;
   margin: 0;
-  padding: 1rem 1.1rem;
+  padding: var(--hoocon-card-pad);
+  padding-bottom: calc(1.25rem + var(--hoocon-kpi-strip-h));
   border-radius: var(--hoocon-radius);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface);
@@ -395,13 +410,65 @@ a.hoocon-leads-stats-link {
   overflow: hidden;
 }
 
+/* Xeloro-like bottom accent strip (Hoocon red family only). */
+.hoocon-lead-stats__card::after {
+  content: "";
+  position: absolute;
+  right: 1.2rem;
+  bottom: 0.85rem;
+  left: 1.2rem;
+  height: var(--hoocon-kpi-strip-h);
+  border-radius: var(--hoocon-radius-pill);
+  background: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-hairline));
+}
+
+.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 1)::after {
+  background: linear-gradient(
+    90deg,
+    var(--hoocon-primary) 62%,
+    color-mix(in srgb, var(--hoocon-primary) 18%, transparent) 62%
+  );
+}
+
+.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 2)::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--hoocon-primary) 72%, #b01010) 48%,
+    color-mix(in srgb, var(--hoocon-primary) 14%, transparent) 48%
+  );
+}
+
+.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 3)::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--hoocon-primary) 55%, #6f6f6f) 35%,
+    color-mix(in srgb, var(--hoocon-primary) 12%, transparent) 35%
+  );
+}
+
+.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 4)::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--hoocon-primary) 40%, #8f0d0d) 78%,
+    color-mix(in srgb, var(--hoocon-primary) 16%, transparent) 78%
+  );
+}
+
 .hoocon-lead-stats__card--accent {
-  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
-  background: color-mix(in srgb, var(--hoocon-primary) 8%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-glass-border));
+  background: var(--hoocon-surface);
+}
+
+.hoocon-lead-stats__card--accent::after {
+  background: linear-gradient(
+    90deg,
+    var(--hoocon-primary) 88%,
+    color-mix(in srgb, var(--hoocon-primary) 20%, transparent) 88%
+  ) !important;
 }
 
 .hoocon-lead-stats__label {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.45rem;
   color: var(--hoocon-quiet);
   font-size: 0.75rem;
   font-weight: 600;
@@ -414,11 +481,11 @@ a.hoocon-leads-stats-link {
 
 .hoocon-lead-stats__value {
   margin: 0;
-  font-size: 1.65rem;
+  font-size: 1.85rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.1;
 }
 
 .hoocon-lead-stats__table-wrap {
@@ -618,10 +685,11 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.85rem 1rem;
+  padding: var(--hoocon-card-pad);
   border-radius: var(--hoocon-radius);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface);
+  box-shadow: var(--hoocon-shadow-soft);
 }
 
 .hoocon-dash__alert--danger {
@@ -678,7 +746,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 
 .hoocon-dash__chart {
   margin-bottom: 1.5rem;
-  padding: 1rem 1.1rem;
+  padding: var(--hoocon-card-pad);
   border-radius: var(--hoocon-radius);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface);
@@ -737,7 +805,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 }
 
 .hoocon-dash__panel {
-  padding: 1rem 1.1rem;
+  padding: var(--hoocon-card-pad);
   border-radius: var(--hoocon-radius);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface);
@@ -1419,12 +1487,12 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  margin-bottom: 0.75rem;
-  padding: 0.65rem 0.95rem 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1.05rem 0.95rem;
   border: 1px solid var(--hoocon-glass-border);
   border-radius: var(--hoocon-radius);
   background: var(--hoocon-surface);
-  box-shadow: none;
+  box-shadow: var(--hoocon-shadow-soft);
   overflow: visible;
   cursor: pointer;
 }

@@ -117,9 +117,13 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert 'id="hoocon-phone-shell"' in html
     assert 'id="hoocon-phone-shell-template"' in html
     assert "hoocon-phone-tabs" in html
+    assert 'data-hoocon-phone-tab="home"' in html
+    assert "data-match-exact" in html
     assert 'data-hoocon-phone-tab="leads"' in html
     assert 'data-hoocon-phone-tab="chat"' in html
     assert 'data-hoocon-phone-tab="clients"' in html
+    assert "hoocon-phone-home-link" in html
+    assert 'href="/admin/"' in html or 'href="/admin"' in html
     assert "data-hoocon-phone-more-open" in html
     assert 'id="hoocon-phone-more"' in html
     assert 'name="apple-mobile-web-app-capable" content="yes"' in html
@@ -131,6 +135,8 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "hoocon-phone-tabs" in phone_css
     assert "hoocon-phone-select-mode" in phone_css
     assert "safe-area-inset-bottom" in phone_css
+    assert "hoocon-page-bg" in phone_css
+    assert "hoocon-shadow-soft" in phone_css
 
     phone_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
         encoding="utf-8"
@@ -184,6 +190,11 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "--hoocon-primary: #dc1313" in css
     assert "--hoocon-primary-hover: #b01010" in css
     assert "--hoocon-primary-on-dark: #f87171" in css
+    assert "--hoocon-page-bg: #f3f4f7" in css
+    assert "--hoocon-radius: 0.875rem" in css
+    assert "--hoocon-card-pad:" in css
+    assert "--hoocon-kpi-strip-h:" in css
+    assert ".hoocon-lead-stats__card::after" in css
     assert ".dark .hoocon-dash__panel-head a" in css
     assert ".hoocon-admin-lead-sticker" in css
     assert "hoocon-admin-lead-sticker__count" in css
@@ -206,6 +217,7 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
+    assert "box-shadow: var(--hoocon-shadow-soft)" in css
 
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
     assert "table.hoocon-lead-stats__table" in js
