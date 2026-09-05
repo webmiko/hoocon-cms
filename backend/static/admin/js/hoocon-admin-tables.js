@@ -297,12 +297,22 @@
       return;
     }
 
+    filter.classList.add("hoocon-phone-filter-chips");
+
     filter.querySelectorAll("details").forEach((details) => {
       const selected = details.querySelector("li.selected a");
       const selectedText = (selected?.textContent || "").replace(/\s+/g, " ").trim();
       const isDefaultAll = !selected || selectedText === "Все" || selectedText === "All";
       const optionCount = details.querySelectorAll("li").length;
       // Keep short filters open; collapse long idle ones so the table stays visible.
+      // On phone prefer all collapsed except those with a non-default selection.
+      const phone =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(max-width: 767px)").matches;
+      if (phone) {
+        details.open = !isDefaultAll;
+        return;
+      }
       if (isDefaultAll && optionCount > 6) {
         details.open = false;
       }

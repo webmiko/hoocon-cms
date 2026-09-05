@@ -1,0 +1,504 @@
+/**
+ * Admin phone shell (≤767px): bottom tabs, cards polish, sticky CTAs.
+ * Desktop Unfold chrome unchanged.
+ */
+
+:root {
+  --hoocon-phone-tabs-h: 3.75rem;
+  --hoocon-phone-cta-h: 3.5rem;
+  --hoocon-phone-tap: 3rem;
+}
+
+/* ── Shell visibility ─────────────────────────────────────────────── */
+.hoocon-phone-shell[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+  html {
+    /* iOS notch / home indicator for fixed chrome. */
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-shell {
+    display: block !important;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-shell[hidden] {
+    display: block !important;
+  }
+
+  body.hoocon-phone-ready {
+    padding-bottom: calc(
+      var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  /* Prefer bottom tabs over hamburger sidebar on phones. */
+  body.hoocon-phone-ready .hoocon-nav-shell {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready .hoocon-admin-lead-sticker,
+  body.hoocon-phone-ready .hoocon-admin-support-sticker {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .hoocon-phone-shell {
+    display: none !important;
+  }
+}
+
+/* ── Bottom tabs ──────────────────────────────────────────────────── */
+.hoocon-phone-tabs {
+  position: fixed;
+  z-index: 70;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  min-height: var(--hoocon-phone-tabs-h);
+  padding: 0.2rem 0.15rem calc(0.2rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.12));
+  background: color-mix(in srgb, var(--hoocon-surface, #fff) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 -6px 20px rgba(20, 20, 30, 0.06);
+}
+
+.hoocon-phone-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: var(--hoocon-phone-tap);
+  padding: 0.35rem 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--hoocon-quiet, #5a626c);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hoocon-phone-tab .material-symbols-outlined {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.hoocon-phone-tab--active {
+  color: var(--hoocon-primary, #dc1313);
+}
+
+.hoocon-phone-tab__badge {
+  position: absolute;
+  top: 0.15rem;
+  right: calc(50% - 1.35rem);
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #ea580c;
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+.hoocon-phone-tab__badge[hidden] {
+  display: none !important;
+}
+
+/* ── More sheet ───────────────────────────────────────────────────── */
+.hoocon-phone-more[hidden] {
+  display: none !important;
+}
+
+.hoocon-phone-more {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.hoocon-phone-more__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(17, 20, 27, 0.45);
+  cursor: pointer;
+}
+
+.hoocon-phone-more__sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-height: min(78vh, 36rem);
+  overflow: auto;
+  padding: 0.85rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  border-radius: 1rem 1rem 0 0;
+  background: var(--hoocon-surface, #fff);
+  box-shadow: 0 -12px 40px rgba(20, 20, 30, 0.18);
+}
+
+.hoocon-phone-more__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.hoocon-phone-more__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.hoocon-phone-more__close {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
+  border-radius: 999px;
+  background: var(--hoocon-surface-muted, #f4f5f6);
+  color: var(--hoocon-quiet, #5a626c);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hoocon-phone-more__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hoocon-phone-more__list a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--hoocon-phone-tap);
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.08));
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hoocon-phone-more__list .material-symbols-outlined {
+  color: var(--hoocon-quiet, #5a626c);
+}
+
+.hoocon-phone-more__theme {
+  margin: 0.75rem 0;
+}
+
+.hoocon-phone-more__logout {
+  margin: 0;
+}
+
+.hoocon-phone-more__logout button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--hoocon-phone-tap);
+  border: 1px solid color-mix(in srgb, #b91c1c 35%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, #b91c1c 8%, var(--hoocon-surface, #fff));
+  color: #b91c1c;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── Changelist: select mode + filters ────────────────────────────── */
+@media (max-width: 767px) {
+  #changelist #changelist-filter {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 0.85rem !important;
+    padding: 0.65rem 0.75rem !important;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
+    border-radius: 0.75rem;
+    background: var(--hoocon-surface, #fff);
+  }
+
+  #changelist #changelist-filter h2,
+  #changelist #changelist-filter summary {
+    font-size: 0.8125rem;
+  }
+
+  #changelist #changelist-filter details {
+    margin: 0 0 0.45rem;
+  }
+
+  #changelist #changelist-filter ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  #changelist #changelist-filter li {
+    margin: 0;
+  }
+
+  #changelist #changelist-filter li a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+    background: var(--hoocon-surface-muted, #f4f5f6);
+    color: var(--hoocon-quiet, #5a626c);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  #changelist #changelist-filter li.selected a {
+    border-color: color-mix(in srgb, var(--hoocon-primary, #dc1313) 45%, transparent);
+    background: color-mix(in srgb, var(--hoocon-primary, #dc1313) 12%, #fff);
+    color: var(--hoocon-primary, #dc1313);
+  }
+
+  .hoocon-phone-select-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    margin: 0 0 0.65rem;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+    border-radius: 999px;
+    background: var(--hoocon-surface, #fff);
+    color: var(--hoocon-quiet, #5a626c);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  body.hoocon-phone-ready:not(.hoocon-phone-select-mode)
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.action-checkbox,
+  body.hoocon-phone-ready:not(.hoocon-phone-select-mode)
+    #changelist
+    table.hoocon-admin-table-stacked
+    thead
+    .action-checkbox-column,
+  body.hoocon-phone-ready:not(.hoocon-phone-select-mode)
+    #changelist
+    .actions {
+    display: none !important;
+  }
+
+  /* Card hierarchy: title + meta + chips */
+  #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
+    gap: 0.15rem;
+    padding: 0.85rem 1rem 0.95rem;
+    min-height: 4.5rem;
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-status_badge,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-status_badge,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-unread_badge,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-unread_badge,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-channel_badge,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-channel_badge {
+    order: -2;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0 0 0.35rem !important;
+    border-bottom: none;
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-name,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-name,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-party_label,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-party_label,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-email_id,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-email_id {
+    order: -1;
+    grid-template-columns: 1fr !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
+    border-bottom: none;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-name::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-name::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-party_label::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-party_label::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-email_id::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-email_id::before {
+    display: none;
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-company,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-company,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-contact_email,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-contact_email,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-created_at,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-created_at,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-last_message_at,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-last_message_at,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-updated_at,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-updated_at {
+    grid-template-columns: 1fr !important;
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
+    border-bottom: none;
+    font-size: 0.8125rem;
+    color: var(--hoocon-quiet, #5a626c);
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-company::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-company::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-contact_email::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-contact_email::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-created_at::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-created_at::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-last_message_at::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-last_message_at::before,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-updated_at::before,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-updated_at::before {
+    display: none;
+  }
+
+  #changelist table.hoocon-admin-table-stacked tbody td.field-open_lead,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-open_lead,
+  #changelist table.hoocon-admin-table-stacked tbody td.field-open_link,
+  #changelist table.hoocon-admin-table-stacked tbody th.field-open_link {
+    display: none !important;
+  }
+
+  /* Forms: readable inputs, sticky submit over tabs */
+  #content-main input[type="text"],
+  #content-main input[type="email"],
+  #content-main input[type="password"],
+  #content-main input[type="url"],
+  #content-main input[type="number"],
+  #content-main input[type="search"],
+  #content-main input[type="tel"],
+  #content-main input:not([type]),
+  #content-main textarea,
+  #content-main select {
+    font-size: 16px !important;
+    min-height: 2.75rem;
+  }
+
+  .hoocon-lead-view-actions {
+    bottom: calc(var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 0.75rem;
+    z-index: 65;
+  }
+
+  .hoocon-lead-view-actions-spacer {
+    height: calc(
+      5.5rem + var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
+  .hoocon-lead-view-actions__edit,
+  .hoocon-lead-view-actions__back,
+  .hoocon-lead-view-actions__mail,
+  .hoocon-lead-view-actions .submit-row input,
+  .hoocon-lead-view-actions .submit-row button,
+  .hoocon-lead-view-actions input[type="submit"],
+  .submit-row input[type="submit"],
+  .submit-row button {
+    min-height: var(--hoocon-phone-tap) !important;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  body.hoocon-phone-ready.change-form .submit-row:not(.hoocon-lead-view-actions) {
+    position: sticky;
+    bottom: calc(var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0 0;
+    padding: 0.75rem 0.25rem;
+    background: color-mix(in srgb, var(--hoocon-surface, #fff) 94%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Dashboard tiles */
+  .hoocon-dash__quick {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .hoocon-dash__quick a {
+    justify-content: center;
+    min-height: var(--hoocon-phone-tap);
+    padding: 0.75rem 0.65rem;
+    font-size: 0.875rem;
+  }
+
+  .hoocon-dash__cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .hoocon-dash__grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Messenger full-bleed on phone ────────────────────────────────── */
+@media (max-width: 767px) {
+  body.hoocon-phone-ready .hoocon-messenger {
+    height: calc(
+      100dvh - 7.5rem - var(--hoocon-phone-tabs-h) - env(safe-area-inset-bottom, 0px)
+    );
+    max-height: none;
+    max-width: none;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  body.hoocon-phone-ready .hoocon-messenger__composer {
+    padding-bottom: 0.35rem;
+  }
+
+  body.hoocon-phone-ready .hoocon-messenger__send {
+    min-width: var(--hoocon-phone-tap);
+    min-height: var(--hoocon-phone-tap);
+    width: auto;
+    padding: 0 0.85rem;
+  }
+
+  body.hoocon-phone-ready .hoocon-messenger__send-label {
+    display: inline;
+  }
+}

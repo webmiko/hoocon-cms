@@ -25,9 +25,11 @@ class AdminPwaManifestView(View):
             "start_url": "/admin/",
             "scope": "/admin/",
             "display": "standalone",
+            "display_override": ["standalone", "minimal-ui"],
             "background_color": "#5a626c",
             "theme_color": "#5a626c",
             "lang": "ru",
+            "orientation": "portrait-primary",
             "icons": [
                 {
                     "src": icon_192,

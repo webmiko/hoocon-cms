@@ -12,7 +12,14 @@
 {% block extrahead %}
   {{ block.super }}
   <meta name="theme-color" content="#5a626c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Admin">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
   {% if user.is_authenticated and user.is_staff %}
   <div hidden
     {% if HOOCON_NEW_LEADS_COUNT_URL %}data-hoocon-leads-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"{% endif %}
@@ -27,4 +34,9 @@
     data-poll-ms="12000"
   ></script>
   {% endif %}
+{% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+  {% include "admin/includes/hoocon_phone_shell.html" %}
 {% endblock %}

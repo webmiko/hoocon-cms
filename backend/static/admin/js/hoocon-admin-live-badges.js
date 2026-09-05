@@ -63,6 +63,19 @@
     badge.textContent = String(safe);
   }
 
+  function setPhoneBadge(selector, count) {
+    var el = document.querySelector(selector);
+    if (!el) return;
+    var safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    if (safe <= 0) {
+      el.hidden = true;
+      el.textContent = "0";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = safe > 99 ? "99+" : String(safe);
+  }
+
   function applyLeads(count) {
     var safe = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
     var sticker = document.getElementById("hoocon-admin-lead-sticker");
@@ -74,6 +87,7 @@
       sticker.hidden = safe === 0;
     }
     setSidebarBadge("/admin/leads/lead/", safe);
+    setPhoneBadge("[data-hoocon-phone-leads-badge]", safe);
   }
 
   function applySupport(count) {
@@ -88,6 +102,7 @@
       sticker.setAttribute("aria-label", "Новые сообщения поддержки: " + safe);
       sticker.hidden = safe === 0;
     }
+    setPhoneBadge("[data-hoocon-phone-support-badge]", safe);
     document.dispatchEvent(
       new CustomEvent("hoocon:support-unread", { detail: { count: safe } }),
     );

@@ -102,6 +102,66 @@ def test_lead_stats_page_renders_in_content_breadcrumbs() -> None:
 
 
 @pytest.mark.django_db
+def test_admin_phone_shell_assets_and_markup() -> None:
+    """Phone shell CSS/JS and bottom-nav markup ship on authenticated Admin."""
+    admin_user = User.objects.create_superuser(
+        username="admin-phone-shell",
+        email="admin-phone-shell@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/").content.decode()
+    assert "hoocon-admin-phone.css" in html
+    assert "hoocon-admin-phone-shell.js" in html
+    assert 'id="hoocon-phone-shell"' in html
+    assert "hoocon-phone-tabs" in html
+    assert 'data-hoocon-phone-tab="leads"' in html
+    assert 'data-hoocon-phone-tab="chat"' in html
+    assert 'data-hoocon-phone-tab="clients"' in html
+    assert "data-hoocon-phone-more-open" in html
+    assert 'id="hoocon-phone-more"' in html
+    assert 'name="apple-mobile-web-app-capable" content="yes"' in html
+    assert "viewport-fit=cover" in html
+
+    phone_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-phone-tabs" in phone_css
+    assert "hoocon-phone-select-mode" in phone_css
+    assert "safe-area-inset-bottom" in phone_css
+
+    phone_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-phone-ready" in phone_js
+    assert "max-width: 767px" in phone_js
+
+    badges_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-live-badges.js").read_text(
+        encoding="utf-8"
+    )
+    assert "data-hoocon-phone-leads-badge" in badges_js
+    assert "data-hoocon-phone-support-badge" in badges_js
+
+
+@pytest.mark.django_db
+def test_admin_phone_shell_hidden_without_staff_perms() -> None:
+    """Staff without lead/chat/crm perms still get «Ещё» tab only."""
+    staff = User.objects.create_user(
+        username="staff-phone-empty",
+        email="staff-phone-empty@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    client = Client()
+    client.force_login(staff)
+    html = client.get("/admin/").content.decode()
+    assert 'id="hoocon-phone-shell"' in html
+    assert 'data-hoocon-phone-tab="leads"' not in html
+    assert "data-hoocon-phone-more-open" in html
+
+
+@pytest.mark.django_db
 def test_admin_login_page_loads_unfold() -> None:
     """Login page renders Unfold without the legacy hoocon-admin shell CSS."""
     response = Client().get("/admin/login/")
@@ -148,6 +208,7 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
 
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
     assert "table.hoocon-lead-stats__table" in js
+    assert "hoocon-phone-filter-chips" in js
 
 
 @pytest.mark.django_db
@@ -207,6 +268,8 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "/admin/manifest.webmanifest" in html
     assert "hoocon-admin-live-badges.js" in html
     assert "hoocon-admin-tables.js" in html
+    assert "hoocon-admin-phone-shell.js" in html
+    assert "hoocon-admin-phone.css" in html
     assert 'name="theme-color" content="#5a626c"' in html
 
     manifest = client.get("/admin/manifest.webmanifest")
@@ -217,6 +280,7 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert data["start_url"] == "/admin/"
     assert data["scope"] == "/admin/"
     assert data["theme_color"] == "#5a626c"
+    assert data["orientation"] == "portrait-primary"
     assert any(icon["src"].endswith("pwa-admin-192.png?v=deploysha1") for icon in data["icons"])
 
 

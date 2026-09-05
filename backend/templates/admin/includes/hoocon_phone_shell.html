@@ -1,0 +1,158 @@
+{% load i18n %}
+{% if user.is_authenticated and user.is_staff %}
+{# Phone bottom tabs + «Ещё» sheet (visible ≤767px via CSS). #}
+<div
+  id="hoocon-phone-shell"
+  class="hoocon-phone-shell"
+  data-hoocon-phone-shell
+  hidden
+>
+  <nav class="hoocon-phone-tabs" aria-label="{% trans 'Основные разделы' %}">
+    {% if perms.leads.view_lead %}
+      <a
+        href="{% url 'admin:leads_lead_changelist' %}"
+        class="hoocon-phone-tab"
+        data-hoocon-phone-tab="leads"
+        data-match="/admin/leads/lead/"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
+        <span class="hoocon-phone-tab__label">{% trans "Заявки" %}</span>
+        <span
+          class="hoocon-phone-tab__badge"
+          data-hoocon-phone-leads-badge
+          hidden
+        >0</span>
+      </a>
+    {% endif %}
+    {% if perms.supportchat.view_conversation %}
+      <a
+        href="{% url 'admin:supportchat_conversation_changelist' %}"
+        class="hoocon-phone-tab"
+        data-hoocon-phone-tab="chat"
+        data-match="/admin/supportchat/conversation/"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">forum</span>
+        <span class="hoocon-phone-tab__label">{% trans "Чат" %}</span>
+        <span
+          class="hoocon-phone-tab__badge"
+          data-hoocon-phone-support-badge
+          hidden
+        >0</span>
+      </a>
+    {% endif %}
+    {% if perms.crm.view_client %}
+      <a
+        href="{% url 'admin:crm_client_changelist' %}"
+        class="hoocon-phone-tab"
+        data-hoocon-phone-tab="clients"
+        data-match="/admin/crm/client/"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+        <span class="hoocon-phone-tab__label">{% trans "Клиенты" %}</span>
+      </a>
+    {% endif %}
+    <button
+      type="button"
+      class="hoocon-phone-tab"
+      data-hoocon-phone-tab="more"
+      data-hoocon-phone-more-open
+      aria-haspopup="dialog"
+      aria-controls="hoocon-phone-more"
+      aria-expanded="false"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>
+      <span class="hoocon-phone-tab__label">{% trans "Ещё" %}</span>
+    </button>
+  </nav>
+
+  <div
+    id="hoocon-phone-more"
+    class="hoocon-phone-more"
+    hidden
+    role="dialog"
+    aria-modal="true"
+    aria-label="{% trans 'Дополнительно' %}"
+  >
+    <button
+      type="button"
+      class="hoocon-phone-more__backdrop"
+      data-hoocon-phone-more-close
+      aria-label="{% trans 'Закрыть' %}"
+    ></button>
+    <div class="hoocon-phone-more__sheet">
+      <div class="hoocon-phone-more__head">
+        <p class="hoocon-phone-more__title">{% trans "Ещё" %}</p>
+        <button
+          type="button"
+          class="hoocon-phone-more__close"
+          data-hoocon-phone-more-close
+        >
+          {% trans "Закрыть" %}
+        </button>
+      </div>
+      <ul class="hoocon-phone-more__list">
+        <li>
+          <a href="{% url 'admin:index' %}">
+            <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+            {% trans "Панель" %}
+          </a>
+        </li>
+        {% if perms.catalog.view_sku %}
+          <li>
+            <a href="{% url 'admin:catalog_sku_changelist' %}">
+              <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
+              {% trans "Артикулы" %}
+            </a>
+          </li>
+        {% endif %}
+        {% if perms.analytics.view_pagedailystat %}
+          <li>
+            <a href="{% url 'admin:analytics_pagedailystat_stats' %}">
+              <span class="material-symbols-outlined" aria-hidden="true">monitoring</span>
+              {% trans "Аналитика сайта" %}
+            </a>
+          </li>
+        {% endif %}
+        {% if perms.sitesettings.view_sitesettings %}
+          <li>
+            <a href="{% url 'admin:sitesettings_sitesettings_changelist' %}">
+              <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+              {% trans "Настройки сайта" %}
+            </a>
+          </li>
+        {% endif %}
+        {% if perms.webpush.view_pushsubscription %}
+          <li>
+            <a href="{% url 'admin:webpush_pushsubscription_changelist' %}">
+              <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+              {% trans "Web Push" %}
+            </a>
+          </li>
+        {% endif %}
+        {% if site_url %}
+          <li>
+            <a href="{{ site_url }}">
+              <span class="material-symbols-outlined" aria-hidden="true">public</span>
+              {% trans "На сайт" %}
+            </a>
+          </li>
+        {% endif %}
+      </ul>
+      <div class="hoocon-phone-more__theme">
+        {% include "unfold/helpers/theme_switch.html" %}
+      </div>
+      <form
+        method="post"
+        action="{% url 'admin:logout' %}"
+        class="hoocon-phone-more__logout"
+      >
+        {% csrf_token %}
+        <button type="submit">
+          <span class="material-symbols-outlined" aria-hidden="true">logout</span>
+          {% trans "Выйти" %}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}

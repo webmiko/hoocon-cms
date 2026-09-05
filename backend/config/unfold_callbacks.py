@@ -98,55 +98,50 @@ def perm_view_analytics(request: HttpRequest) -> bool:
     )
 
 
-def unfold_extras_css(request: HttpRequest) -> str:
-    """URL of thin CSS for Unfold shell (cache-busted)."""
-    del request
-    url = static("admin/css/hoocon-unfold-extras.css")
+def _versioned_static(relative: str) -> str:
+    """Cache-bust a static admin asset (BUILD_SHA or DEBUG mtime)."""
+    url = static(relative)
     from django.conf import settings
 
     version = getattr(settings, "BUILD_SHA", "").strip()
     if not version and settings.DEBUG:
-        path = settings.BASE_DIR / "static/admin/css/hoocon-unfold-extras.css"
+        path = settings.BASE_DIR / "static" / relative
         if path.is_file():
             version = str(int(path.stat().st_mtime))
     if version:
         sep = "&" if "?" in url else "?"
         return f"{url}{sep}v={version}"
     return url
+
+
+def unfold_extras_css(request: HttpRequest) -> str:
+    """URL of thin CSS for Unfold shell (cache-busted)."""
+    del request
+    return _versioned_static("admin/css/hoocon-unfold-extras.css")
+
+
+def admin_phone_css(request: HttpRequest) -> str:
+    """Phone shell / card polish CSS (≤767px; cache-busted)."""
+    del request
+    return _versioned_static("admin/css/hoocon-admin-phone.css")
 
 
 def admin_live_badges_js(request: HttpRequest) -> str:
     """Live lead/support badge poller for Admin chrome (cache-busted)."""
     del request
-    url = static("admin/js/hoocon-admin-live-badges.js")
-    from django.conf import settings
-
-    version = getattr(settings, "BUILD_SHA", "").strip()
-    if not version and settings.DEBUG:
-        path = settings.BASE_DIR / "static/admin/js/hoocon-admin-live-badges.js"
-        if path.is_file():
-            version = str(int(path.stat().st_mtime))
-    if version:
-        sep = "&" if "?" in url else "?"
-        return f"{url}{sep}v={version}"
-    return url
+    return _versioned_static("admin/js/hoocon-admin-live-badges.js")
 
 
 def admin_tables_js(request: HttpRequest) -> str:
     """Changelist card stack + blank-cell hide (cache-busted)."""
     del request
-    url = static("admin/js/hoocon-admin-tables.js")
-    from django.conf import settings
+    return _versioned_static("admin/js/hoocon-admin-tables.js")
 
-    version = getattr(settings, "BUILD_SHA", "").strip()
-    if not version and settings.DEBUG:
-        path = settings.BASE_DIR / "static/admin/js/hoocon-admin-tables.js"
-        if path.is_file():
-            version = str(int(path.stat().st_mtime))
-    if version:
-        sep = "&" if "?" in url else "?"
-        return f"{url}{sep}v={version}"
-    return url
+
+def admin_phone_shell_js(request: HttpRequest) -> str:
+    """Bottom tabs + more sheet for Admin phone (cache-busted)."""
+    del request
+    return _versioned_static("admin/js/hoocon-admin-phone-shell.js")
 
 
 def _can_view_leads(request: HttpRequest) -> bool:

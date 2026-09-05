@@ -321,10 +321,12 @@ UNFOLD = {
     },
     "STYLES": [
         "config.unfold_callbacks.unfold_extras_css",
+        "config.unfold_callbacks.admin_phone_css",
     ],
     "SCRIPTS": [
         "config.unfold_callbacks.admin_live_badges_js",
         "config.unfold_callbacks.admin_tables_js",
+        "config.unfold_callbacks.admin_phone_shell_js",
     ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     "SIDEBAR": {

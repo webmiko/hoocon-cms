@@ -469,3 +469,5 @@
     max-width: min(92%, 100%);
   }
 }
+
+/* Phone shell (hoocon-admin-phone.css) overrides ≤767 for full-bleed + tabs. */
