@@ -1,9 +1,0 @@
-# Built APKs / IPA for local distribute
-dist/
-**/build/
-**/.dart_tool/
-**/.flutter-plugins-dependencies
-**/ios/Pods/
-**/ios/.symlinks/
-**/android/.gradle/
-**/android/local.properties
