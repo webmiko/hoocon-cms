@@ -25,6 +25,10 @@
     {% if HOOCON_NEW_LEADS_COUNT_URL %}data-hoocon-leads-count-url="{{ HOOCON_NEW_LEADS_COUNT_URL }}"{% endif %}
     data-hoocon-support-unread-url="{% url 'admin:supportchat_conversation_unread_count' %}"
   ></div>
+  {# Unfold change_list/change_form replace {% block footer %} without super — keep shell here. #}
+  <template id="hoocon-phone-shell-template">
+    {% include "admin/includes/hoocon_phone_shell.html" %}
+  </template>
   {% endif %}
   {% if user.is_authenticated and user.is_staff and HOOCON_NEW_LEADS_COUNT_URL %}
   <script

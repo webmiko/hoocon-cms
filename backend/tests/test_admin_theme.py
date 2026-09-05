@@ -115,6 +115,7 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "hoocon-admin-phone.css" in html
     assert "hoocon-admin-phone-shell.js" in html
     assert 'id="hoocon-phone-shell"' in html
+    assert 'id="hoocon-phone-shell-template"' in html
     assert "hoocon-phone-tabs" in html
     assert 'data-hoocon-phone-tab="leads"' in html
     assert 'data-hoocon-phone-tab="chat"' in html

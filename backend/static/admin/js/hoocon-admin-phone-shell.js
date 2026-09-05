@@ -13,7 +13,28 @@
       : { matches: false, addEventListener: function () {}, addListener: function () {} };
   }
 
+  function ensureShellMounted() {
+    if (document.getElementById("hoocon-phone-shell")) {
+      return true;
+    }
+    var tpl = document.getElementById("hoocon-phone-shell-template");
+    if (!tpl || !tpl.content) {
+      return false;
+    }
+    document.body.appendChild(tpl.content.cloneNode(true));
+    var shell = document.getElementById("hoocon-phone-shell");
+    if (shell && window.Alpine && typeof window.Alpine.initTree === "function") {
+      try {
+        window.Alpine.initTree(shell);
+      } catch (_err) {
+        /* theme switch still usable from sidebar on desktop */
+      }
+    }
+    return Boolean(shell);
+  }
+
   function shellEl() {
+    ensureShellMounted();
     return document.getElementById("hoocon-phone-shell");
   }
 
@@ -167,7 +188,7 @@
   }
 
   function init() {
-    if (!shellEl()) {
+    if (!ensureShellMounted() && !document.getElementById("hoocon-phone-shell-template")) {
       return;
     }
     syncViewport();
