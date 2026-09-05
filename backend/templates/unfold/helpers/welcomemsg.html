@@ -2,6 +2,16 @@
 
 <div class="flex flex-row grow font-semibold items-center min-w-0 mr-3">
     {% if is_nav_sidebar_enabled and not is_popup %}
+        {# Phone: sidebar hidden — home instead of useless hamburger. #}
+        <a
+            href="{% url 'admin:index' %}"
+            class="hoocon-phone-home-link cursor-pointer flex flex-row items-center"
+            title="{% trans 'Панель' %}"
+            aria-label="{% trans 'Панель' %}"
+        >
+            <span class="material-symbols-outlined" aria-hidden="true">home</span>
+        </a>
+
         <span class="hoocon-mobile-nav-toggle cursor-pointer flex flex-row items-center">
             <span class="material-symbols-outlined" x-on:click="sidebarToggle()">
                 dock_to_right
@@ -9,6 +19,7 @@
         </span>
 
         <span class="hoocon-mobile-nav-toggle block bg-base-200 h-5 mx-3 w-px dark:bg-base-700"></span>
+        <span class="hoocon-phone-home-sep block bg-base-200 h-5 mx-3 w-px dark:bg-base-700"></span>
     {% endif %}
 
     {% include "unfold/helpers/header_back_button.html" %}

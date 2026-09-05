@@ -8,6 +8,16 @@
   hidden
 >
   <nav class="hoocon-phone-tabs" aria-label="{% trans 'Основные разделы' %}">
+    <a
+      href="{% url 'admin:index' %}"
+      class="hoocon-phone-tab"
+      data-hoocon-phone-tab="home"
+      data-match="/admin/"
+      data-match-exact
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+      <span class="hoocon-phone-tab__label">{% trans "Панель" %}</span>
+    </a>
     {% if perms.leads.view_lead %}
       <a
         href="{% url 'admin:leads_lead_changelist' %}"

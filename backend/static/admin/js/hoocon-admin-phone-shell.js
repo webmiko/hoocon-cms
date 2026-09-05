@@ -55,13 +55,30 @@
     }
   }
 
+  function normalizeAdminPath(path) {
+    var p = path || "";
+    if (p.length > 1 && p.charAt(p.length - 1) === "/") {
+      p = p.slice(0, -1);
+    }
+    return p || "/";
+  }
+
   function markActiveTab() {
     var path = window.location.pathname || "";
+    var pathNorm = normalizeAdminPath(path);
     var tabs = document.querySelectorAll("[data-hoocon-phone-tab]");
     tabs.forEach(function (tab) {
       var match = tab.getAttribute("data-match") || "";
       var isMore = tab.getAttribute("data-hoocon-phone-tab") === "more";
-      var active = !isMore && match && path.indexOf(match) === 0;
+      var exact = tab.hasAttribute("data-match-exact");
+      var active = false;
+      if (!isMore && match) {
+        if (exact) {
+          active = pathNorm === normalizeAdminPath(match);
+        } else {
+          active = path.indexOf(match) === 0;
+        }
+      }
       tab.classList.toggle("hoocon-phone-tab--active", Boolean(active));
       if (tab.tagName === "A") {
         if (active) {
