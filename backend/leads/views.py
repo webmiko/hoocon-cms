@@ -95,8 +95,8 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
                 notify_staff_fcm_new_lead.delay(lead_id)
                 notify_staff_new_lead.delay(lead_id)
                 notify_staff_telegram_new_lead.delay(lead_id)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception:  # noqa: BLE001 — optional broker/app may be absent
+                logger.exception("lead_staff_push_enqueue_failed lead_id=%s", lead_id)
 
         transaction.on_commit(_staff_push)
 

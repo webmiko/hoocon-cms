@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -27,6 +28,9 @@ _MAX_BODY_LEN = 4000
 
 class SupportChatError(Exception):
     """Domain error for support chat operations."""
+
+
+logger = logging.getLogger("hoocon.supportchat")
 
 
 def get_or_create_web_session_id(request: HttpRequest) -> str:
@@ -198,7 +202,7 @@ def _schedule_staff_support_push(
 
             notify_staff_fcm_support.delay(conversation_id)
         except Exception:  # noqa: BLE001 — FCM optional / app may be absent
-            pass
+            logger.exception("fcm_support_enqueue_failed conversation_id=%s", conversation_id)
         if first_inbound and message_id is not None:
             from supportchat.tasks import send_support_first_inbound_notification
 
