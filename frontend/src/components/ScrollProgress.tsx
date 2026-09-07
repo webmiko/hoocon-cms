@@ -17,12 +17,20 @@ export function ScrollProgress() {
 
   useEffect(() => {
     let frame = 0;
+    const dims = { scrollable: 0 };
 
     function measure() {
-      const doc = document.documentElement;
-      const scrollable = doc.scrollHeight - doc.clientHeight;
-      const next = scrollable <= 0 ? 0 : Math.min(1, doc.scrollTop / scrollable);
+      const next =
+        dims.scrollable <= 0
+          ? 0
+          : Math.min(1, window.scrollY / dims.scrollable);
       setProgress(next);
+    }
+
+    function updateDims() {
+      const doc = document.documentElement;
+      dims.scrollable = doc.scrollHeight - doc.clientHeight;
+      measure();
     }
 
     function onScroll() {
@@ -33,14 +41,22 @@ export function ScrollProgress() {
       });
     }
 
-    // Remeasure on route change (effect deps); starts at current scroll.
-    measure();
+    function onResize() {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        updateDims();
+      });
+    }
+
+    // Cache scrollable height once, then only read cheap window.scrollY on scroll.
+    updateDims();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [location.pathname, location.search]);
 
