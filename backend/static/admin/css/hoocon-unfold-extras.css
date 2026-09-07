@@ -1547,7 +1547,8 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     max-width: 100%;
     margin-left: 0;
     margin-right: 0;
-    padding: 0.85rem 0 1rem;
+    /* Horizontal inset so cards don't flush against the results frame. */
+    padding: 0.85rem 1.5rem 1.5rem;
     box-sizing: border-box;
   }
 

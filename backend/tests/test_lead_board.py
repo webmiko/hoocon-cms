@@ -92,6 +92,8 @@ def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
     assert "max-width: none !important" in css
     assert "padding-left: 2rem !important" in css
     assert "padding-right: 2rem !important" in css
+    # Wall table keeps cards inset from the results frame edges.
+    assert "padding: 0.85rem 1.5rem 1.5rem" in css
     open_pin = css[css.index("Pin «Открыть»") : css.index("hoocon-lead-wall-heading")]
     assert "field-open_link" in open_pin
     assert "margin-top: auto" in open_pin
