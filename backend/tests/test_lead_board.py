@@ -39,6 +39,18 @@ def _css_rule_body(css: str, selector: str) -> str:
     raise AssertionError(f"Unclosed CSS rule for {selector!r}")
 
 
+def test_lead_board_css_header_object_tools_row() -> None:
+    """Sticky header object-tools stay a horizontal row (bare <li>, no ul)."""
+    admin_css = (_BACKEND / "static/admin/css/hoocon-admin.css").read_text(encoding="utf-8")
+    row = _css_rule_body(admin_css, ".hoocon-header-object-tools")
+    assert "display: flex" in row
+    assert "flex-direction: row" in row
+    assert "align-items: center" in row
+    items = _css_rule_body(admin_css, ".hoocon-header-object-tools > li")
+    assert "display: inline-flex" in items
+    assert "list-style: none" in items
+
+
 def test_lead_board_css_phone_header_hamburger() -> None:
     """Phone CSS/JS move overflow header tools into a hamburger; Add stays out."""
     phone = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(

@@ -970,6 +970,35 @@ html body #content-main .aligned label + div.help {
   float: none !important;
 }
 
+/* Unfold sticky header: nav_global_side is bare <li>s (no ul.object-tools). */
+.hoocon-header-object-tools {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.hoocon-header-object-tools > li {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  max-width: 100%;
+  overflow: visible;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+}
+
+.hoocon-header-object-tools > li::marker {
+  content: none;
+}
+
 ul.messagelist {
   box-sizing: border-box;
 }
