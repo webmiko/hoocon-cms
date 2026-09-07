@@ -87,6 +87,128 @@
   body.hoocon-phone-ready .hoocon-admin-support-sticker {
     display: none !important;
   }
+
+  body.hoocon-phone-ready .hoocon-admin-header {
+    overflow-x: clip;
+  }
+
+  body.hoocon-phone-ready .hoocon-header-userlinks {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* Overflow tools live in the header hamburger; keep Add (+ env) outside. */
+  body.hoocon-phone-ready .hoocon-phone-header-menu:not([hidden]) {
+    display: inline-flex;
+    position: relative;
+    flex: 0 0 auto;
+    align-items: center;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+    border-radius: 999px;
+    background: var(--hoocon-surface, #fff);
+    color: var(--hoocon-quiet, #5a626c);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__btn .material-symbols-outlined {
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__btn[aria-expanded="true"] {
+    color: var(--hoocon-primary, #dc1313);
+    border-color: color-mix(in srgb, var(--hoocon-primary, #dc1313) 35%, transparent);
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__panel {
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    right: 0;
+    z-index: 60;
+    min-width: min(18rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 1.5rem);
+    padding: 0.45rem;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+    border-radius: var(--hoocon-radius, 0.875rem);
+    background: var(--hoocon-surface, #fff);
+    box-shadow: var(--hoocon-shadow-soft, 0 8px 28px rgba(20, 20, 30, 0.06));
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list > li,
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list > * {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list a,
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list .hoocon-admin-push-tool {
+    display: flex !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list a {
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.65rem;
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list a:hover {
+    background: var(--hoocon-surface-muted, #f3f4f7);
+  }
+
+  /* Стена/Канбан — desktop only; hide from phone hamburger. */
+  body.hoocon-phone-ready .hoocon-lead-view-tool {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list .hoocon-admin-push-tool {
+    padding: 0.35rem 0.5rem;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-header-menu__list .hoocon-admin-push-toggle {
+    width: 100%;
+    justify-content: flex-start;
+    min-height: 2.5rem;
+  }
+
+  /* Unfold -mx-4 on #changelist can widen past the padded shell on phones. */
+  body.hoocon-phone-ready.hoocon-lead-board #changelist.module,
+  body.hoocon-phone-ready.hoocon-lead-board #changelist {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 100%;
+  }
 }
 
 @media (min-width: 768px) {
@@ -96,6 +218,10 @@
 
   .hoocon-phone-home-link,
   .hoocon-phone-home-sep {
+    display: none !important;
+  }
+
+  .hoocon-phone-header-menu {
     display: none !important;
   }
 }

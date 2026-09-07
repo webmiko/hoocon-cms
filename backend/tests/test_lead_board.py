@@ -39,21 +39,45 @@ def _css_rule_body(css: str, selector: str) -> str:
     raise AssertionError(f"Unclosed CSS rule for {selector!r}")
 
 
+def test_lead_board_css_phone_header_hamburger() -> None:
+    """Phone CSS/JS move overflow header tools into a hamburger; Add stays out."""
+    phone = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-phone-header-menu" in phone
+    assert "hoocon-phone-header-menu__btn" in phone
+    assert "hoocon-lead-view-tool" in phone
+    assert "display: none !important" in phone
+    assert "hoocon-lead-board #changelist" in phone
+    assert "margin-left: 0 !important" in phone
+    js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
+        encoding="utf-8"
+    )
+    assert "relocateHeaderTools" in js
+    assert "data-hoocon-phone-header-menu" in js
+    assert "isDesktopOnlyTool" in js
+    assert "hoocon-lead-view-tool" in js
+    board_js = _BOARD_JS.read_text(encoding="utf-8")
+    assert 'view === "kanban" && !phone' in board_js
+
+
 def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
-    """Wall grid: 2 cols, then 3 from 1280px; centered; «Открыть» at footer."""
+    """Wall grid: lift Unfold #content.container cap; 2rem gutters; 2→3 cols."""
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
-    assert "repeat(2, minmax(0, 24rem))" in css
-    assert "repeat(3, minmax(0, 24rem))" in css
+    assert "repeat(2, minmax(0, 1fr))" in css
+    assert "repeat(3, minmax(0, 1fr))" in css
     assert "@media (min-width: 1280px)" in css
-    assert "justify-content: center" in css
+    assert "justify-content: stretch" in css
     assert "align-items: stretch" in css
     assert "display: contents" in css
     assert "margin-top: auto" in css
     assert "gap: 1.15rem 1.25rem" in css
-    # Inset from Unfold -mx-4 / white results frame.
     assert "margin-left: 0 !important" in css
-    assert "padding-left: 1.25rem" in css
-    assert "padding-right: 1.25rem" in css
+    # Unfold container mx-auto was capping the board at 768px.
+    assert "body.hoocon-lead-board #content.container" in css
+    assert "max-width: none !important" in css
+    assert "padding-left: 2rem !important" in css
+    assert "padding-right: 2rem !important" in css
     open_pin = css[css.index("Pin «Открыть»") : css.index("hoocon-lead-wall-heading")]
     assert "field-open_link" in open_pin
     assert "margin-top: auto" in open_pin
@@ -102,7 +126,26 @@ def test_lead_board_js_classifies_status_badges_and_wall_headings() -> None:
 
 
 @pytest.mark.django_db
-def test_lead_changelist_renders_status_badges_for_board_js() -> None:
+def test_lead_changelist_renders_header_hamburger_markup() -> None:
+    """Leads changelist ships phone header hamburger shell in userlinks."""
+    Lead.objects.create(
+        name="Menu Lead",
+        email="menu-lead@example.com",
+        message="Проверка гамбургера.",
+        status=Lead.LeadStatus.NEW,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-header-menu",
+        email="lead-header-menu@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/leads/lead/?view=wall").content.decode()
+    assert "data-hoocon-phone-header-menu" in html
+    assert "data-hoocon-header-object-tools" in html
+    assert "Меню действий" in html
+
     """Changelist HTML exposes badge classes so wall/kanban JS can bucket rows."""
     Lead.objects.create(
         name="Board New",

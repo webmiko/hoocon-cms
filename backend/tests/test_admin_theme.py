@@ -137,12 +137,17 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "safe-area-inset-bottom" in phone_css
     assert "hoocon-page-bg" in phone_css
     assert "hoocon-shadow-soft" in phone_css
+    assert "hoocon-phone-header-menu" in phone_css
+    assert "overflow-x: clip" in phone_css
+    assert "hoocon-lead-board #changelist" in phone_css
 
     phone_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
         encoding="utf-8"
     )
     assert "hoocon-phone-ready" in phone_js
     assert "max-width: 767px" in phone_js
+    assert "relocateHeaderTools" in phone_js
+    assert "data-hoocon-phone-header-menu" in phone_js
 
     badges_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-live-badges.js").read_text(
         encoding="utf-8"
@@ -221,10 +226,13 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-card-table" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
     assert "body.hoocon-lead-board" in css
-    assert "repeat(2, minmax(0, 24rem))" in css
-    assert "repeat(3, minmax(0, 24rem))" in css
+    assert "body.hoocon-lead-board #content.container" in css
+    assert "max-width: none !important" in css
+    assert "repeat(2, minmax(0, 1fr))" in css
+    assert "repeat(3, minmax(0, 1fr))" in css
     assert "@media (min-width: 1280px)" in css
-    assert "justify-content: center" in css
+    assert "padding-left: 2rem !important" in css
+    assert "justify-content: stretch" in css
     assert "display: contents" in css
     assert "gap: 1.15rem 1.25rem" in css
     assert "align-items: stretch" in css

@@ -198,6 +198,7 @@
     const view = leadView();
     const phone = isPhone();
 
+    // Kanban is desktop-only; phone always uses the stacked wall card list.
     if (view === "kanban" && !phone) {
       applyKanban(table);
       return;

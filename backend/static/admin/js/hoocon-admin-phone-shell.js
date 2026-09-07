@@ -1,5 +1,6 @@
 /**
- * Admin phone shell: activate ≤767px, more sheet, select-mode, tab active state.
+ * Admin phone shell: activate ≤767px, more sheet, select-mode, tab active state,
+ * header hamburger for overflowing object-tools.
  */
 (function () {
   "use strict";
@@ -42,6 +43,95 @@
     return document.getElementById("hoocon-phone-more");
   }
 
+  function headerMenuRoot() {
+    return document.querySelector("[data-hoocon-phone-header-menu]");
+  }
+
+  function headerMenuList() {
+    return document.querySelector("[data-hoocon-phone-header-menu-list]");
+  }
+
+  function headerToolsSource() {
+    return document.querySelector("[data-hoocon-header-object-tools]");
+  }
+
+  function isAddTool(node) {
+    if (!(node instanceof Element)) return false;
+    if (node.matches("a.addlink")) return true;
+    if (node.querySelector("a.addlink")) return true;
+    return false;
+  }
+
+  function isDesktopOnlyTool(node) {
+    if (!(node instanceof Element)) return false;
+    // Стена/Канбан toggle is desktop-only (kanban layout starts at 768px).
+    return node.classList.contains("hoocon-lead-view-tool");
+  }
+
+  function closeHeaderMenu() {
+    var root = headerMenuRoot();
+    var panel = document.querySelector("[data-hoocon-phone-header-menu-panel]");
+    var btn = document.querySelector("[data-hoocon-phone-header-menu-open]");
+    if (panel) panel.setAttribute("hidden", "");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (root) root.classList.remove("is-open");
+  }
+
+  function openHeaderMenu() {
+    var root = headerMenuRoot();
+    var panel = document.querySelector("[data-hoocon-phone-header-menu-panel]");
+    var btn = document.querySelector("[data-hoocon-phone-header-menu-open]");
+    if (!panel || !btn) return;
+    panel.removeAttribute("hidden");
+    btn.setAttribute("aria-expanded", "true");
+    if (root) root.classList.add("is-open");
+  }
+
+  function toggleHeaderMenu() {
+    var panel = document.querySelector("[data-hoocon-phone-header-menu-panel]");
+    if (!panel) return;
+    if (panel.hasAttribute("hidden")) {
+      openHeaderMenu();
+    } else {
+      closeHeaderMenu();
+    }
+  }
+
+  function relocateHeaderTools(toPhone) {
+    var source = headerToolsSource();
+    var list = headerMenuList();
+    var root = headerMenuRoot();
+    if (!source || !list || !root) return;
+
+    if (toPhone) {
+      Array.prototype.slice.call(source.children).forEach(function (child) {
+        if (isAddTool(child)) return;
+        if (isDesktopOnlyTool(child)) {
+          child.setAttribute("hidden", "");
+          return;
+        }
+        list.appendChild(child);
+      });
+      if (list.children.length) {
+        root.removeAttribute("hidden");
+      } else {
+        root.setAttribute("hidden", "");
+        closeHeaderMenu();
+      }
+    } else {
+      Array.prototype.slice.call(list.children).forEach(function (child) {
+        source.appendChild(child);
+      });
+      Array.prototype.slice.call(source.querySelectorAll(".hoocon-lead-view-tool[hidden]")).forEach(
+        function (child) {
+          child.removeAttribute("hidden");
+        },
+      );
+      root.setAttribute("hidden", "");
+      closeHeaderMenu();
+    }
+  }
+
   function setReady(on) {
     document.body.classList.toggle("hoocon-phone-ready", on);
     var shell = shellEl();
@@ -53,6 +143,7 @@
         closeMore();
       }
     }
+    relocateHeaderTools(on);
   }
 
   function normalizeAdminPath(path) {
@@ -94,6 +185,7 @@
     var more = moreEl();
     var btn = document.querySelector("[data-hoocon-phone-more-open]");
     if (!more) return;
+    closeHeaderMenu();
     more.removeAttribute("hidden");
     if (btn) btn.setAttribute("aria-expanded", "true");
     document.body.classList.add("hoocon-phone-more-open");
@@ -171,6 +263,12 @@
   function onDocClick(event) {
     var target = event.target;
     if (!(target instanceof Element)) return;
+    if (target.closest("[data-hoocon-phone-header-menu-open]")) {
+      event.preventDefault();
+      closeMore();
+      toggleHeaderMenu();
+      return;
+    }
     if (target.closest("[data-hoocon-phone-more-open]")) {
       event.preventDefault();
       toggleMore();
@@ -184,12 +282,20 @@
     if (target.closest("[data-hoocon-phone-select-toggle]")) {
       event.preventDefault();
       setSelectMode(!document.body.classList.contains("hoocon-phone-select-mode"));
+      return;
+    }
+    if (
+      document.querySelector(".hoocon-phone-header-menu.is-open") &&
+      !target.closest("[data-hoocon-phone-header-menu]")
+    ) {
+      closeHeaderMenu();
     }
   }
 
   function onKey(event) {
     if (event.key === "Escape") {
       closeMore();
+      closeHeaderMenu();
     }
   }
 
@@ -205,9 +311,7 @@
   }
 
   function init() {
-    if (!ensureShellMounted() && !document.getElementById("hoocon-phone-shell-template")) {
-      return;
-    }
+    ensureShellMounted();
     syncViewport();
     document.addEventListener("click", onDocClick);
     document.addEventListener("keydown", onKey);

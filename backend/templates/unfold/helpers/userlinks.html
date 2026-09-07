@@ -1,7 +1,7 @@
 {% load i18n static unfold %}
 
 {# Sticker lives here (not nav-global-side): Unfold change_list/change_form own that block. #}
-<div class="flex flex-row gap-4 items-center ml-auto">
+<div class="flex flex-row gap-4 items-center ml-auto hoocon-header-userlinks">
     {% if environment %}
         {% include "unfold/helpers/label.html" with text=environment.0 type=environment.1 %}
     {% endif %}
@@ -11,7 +11,39 @@
     {% include "admin/includes/hoocon_lead_sticker.html" %}
     {% include "admin/includes/hoocon_support_sticker.html" %}
 
+    {# Phone: overflow tools move into this hamburger (JS). Add stays outside. #}
+    <div class="hoocon-phone-header-menu" data-hoocon-phone-header-menu hidden>
+        <button
+            type="button"
+            class="hoocon-phone-header-menu__btn"
+            data-hoocon-phone-header-menu-open
+            aria-expanded="false"
+            aria-controls="hoocon-phone-header-menu-panel"
+            aria-haspopup="true"
+            aria-label="{% trans 'Меню действий' %}"
+        >
+            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+        </button>
+        <div
+            id="hoocon-phone-header-menu-panel"
+            class="hoocon-phone-header-menu__panel"
+            data-hoocon-phone-header-menu-panel
+            hidden
+            role="menu"
+        >
+            <ul
+                class="hoocon-phone-header-menu__list"
+                data-hoocon-phone-header-menu-list
+            ></ul>
+        </div>
+    </div>
+
     {% if nav_global_side %}
-        {{ nav_global_side }}
+        <div
+            class="hoocon-header-object-tools"
+            data-hoocon-header-object-tools
+        >
+            {{ nav_global_side }}
+        </div>
     {% endif %}
 </div>

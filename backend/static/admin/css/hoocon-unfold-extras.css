@@ -1475,29 +1475,61 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   cursor: pointer;
 }
 
-/* Leads board: tablet/desktop wall grid — 2 cards, then 3 when wide enough.
+/* Leads board: tablet/desktop wall — full content width, 2rem gutters.
  * Unfold puts each result row in its own <tbody>; grid the <table> and use
  * display:contents on tbodies so all <tr> participate in one grid.
- * Content ~720px (sidebar open) cannot fit 3×24rem tracks — start at 2. */
+ * Narrow content (~720–1100px): 2 equal tracks; wide: 3.
+ * Root cause of “not full width”: Unfold #content.container mx-auto caps at
+ * Tailwind container breakpoints (e.g. 768px at ~953px viewport). */
 @media (min-width: 768px) {
-  /* Unfold uses -mx-4 on #changelist — restore inset so cards don't hug edges. */
+  /* Drop Unfold shell px-4 so the only horizontal inset is 2rem below. */
+  body.hoocon-lead-board #main > div.px-4,
+  body.hoocon-lead-board #main > div.pb-4 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Unfold #content.container mx-auto — lift the container max-width cap. */
+  body.hoocon-lead-board #content.container,
+  body.hoocon-lead-board #content {
+    max-width: none !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    box-sizing: border-box;
+  }
+
+  /* Unfold -mx-4 / stacked px-4 — gutter lives on #content; zero nested. */
   body.hoocon-lead-board #changelist.module,
   body.hoocon-lead-board #changelist {
     margin-left: 0 !important;
     margin-right: 0 !important;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+    padding-left: 0;
+    padding-right: 0;
     padding-bottom: 1rem;
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
-  /* White results frame hugs the table — keep inner inset on the board. */
+  body.hoocon-lead-board #changelist .result-list-wrapper,
+  body.hoocon-lead-board #changelist .changelist-form-container {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box;
+  }
+
+  /* Drop nested results padding — gutter lives on the form wrapper. */
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
     .results,
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
     .overflow-x-auto {
-    padding-left: 1.25rem;
-    padding-right: 1.25rem;
+    padding-left: 0;
+    padding-right: 0;
     box-sizing: border-box;
   }
 
@@ -1506,16 +1538,16 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked {
     display: grid !important;
-    /* Tablet / narrow content: 2 equal tracks, centered, max 24rem each. */
-    grid-template-columns: repeat(2, minmax(0, 24rem));
+    /* Fill the row: equal tracks, no 24rem cap. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.15rem 1.25rem;
     align-items: stretch;
-    justify-content: center;
+    justify-content: stretch;
     width: 100%;
     max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 0.85rem 0.35rem 1rem;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0.85rem 0 1rem;
     box-sizing: border-box;
   }
 
@@ -1634,13 +1666,13 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   }
 }
 
-/* Wide desktop: room for a third card without crushing ~24rem tracks. */
+/* Wide desktop: third equal track across the full content width. */
 @media (min-width: 1280px) {
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked,
   body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked {
-    grid-template-columns: repeat(3, minmax(0, 24rem));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
