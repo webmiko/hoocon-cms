@@ -181,6 +181,18 @@ location = /sw.js {
     try_files $uri =404;
 }
 
+# Admin PWA service worker (Django view; never cache).
+location = /admin/sw.js {
+    add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+    add_header Service-Worker-Allowed "/admin/" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 # Public SPA images / logos (no content-hash in filename).
 location ~* ^/(?:home|brand|hero)/ {
     expires 30d;

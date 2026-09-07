@@ -192,14 +192,23 @@ def send_push_to_subscription(
         return False
 
 
-def queryset_staff_support() -> QuerySet[PushSubscription]:
-    """Staff subscribers for support-chat alerts."""
+def queryset_staff_alerts() -> QuerySet[PushSubscription]:
+    """Staff Admin PWA subscribers (заявки + чат поддержки).
+
+    ``topic_support`` is the staff opt-in flag from the Admin Push toggle —
+    it covers all operational alerts, not only support chat.
+    """
     return PushSubscription.objects.filter(
         topic_support=True,
         user__isnull=False,
         user__is_staff=True,
         user__is_active=True,
     )
+
+
+def queryset_staff_support() -> QuerySet[PushSubscription]:
+    """Alias of :func:`queryset_staff_alerts` (legacy name)."""
+    return queryset_staff_alerts()
 
 
 def queryset_session_support(session_key: str) -> QuerySet[PushSubscription]:

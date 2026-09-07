@@ -13,7 +13,7 @@ logger = setup_logger("hoocon.webpush")
 def notify_staff_support_inbound(conversation_id: int) -> int:
     """Push staff: new inbound support message."""
     from supportchat.models import Conversation
-    from webpush.services import queryset_staff_support, send_push_to_subscription
+    from webpush.services import queryset_staff_alerts, send_push_to_subscription
 
     try:
         conv = Conversation.objects.get(pk=conversation_id)
@@ -24,8 +24,40 @@ def notify_staff_support_inbound(conversation_id: int) -> int:
     body = f"{label}: новое обращение"
     url = f"/admin/supportchat/conversation/{conv.pk}/change/"
     sent = 0
-    for sub in queryset_staff_support().iterator():
-        if send_push_to_subscription(sub, title=title, body=body, url=url, tag=f"support-{conv.pk}"):
+    for sub in queryset_staff_alerts().iterator():
+        if send_push_to_subscription(
+            sub,
+            title=title,
+            body=body,
+            url=url,
+            tag=f"support-{conv.pk}",
+        ):
+            sent += 1
+    return sent
+
+
+@shared_task
+def notify_staff_new_lead(lead_id: int) -> int:
+    """Push staff Admin PWA: new RFQ / consultation / replacement lead."""
+    from leads.models import Lead
+    from webpush.services import queryset_staff_alerts, send_push_to_subscription
+
+    try:
+        lead = Lead.objects.get(pk=lead_id)
+    except Lead.DoesNotExist:
+        return 0
+    title = "Новая заявка"
+    body = f"{lead.name}: {lead.get_lead_type_display()}"
+    url = f"/admin/leads/lead/{lead.pk}/change/"
+    sent = 0
+    for sub in queryset_staff_alerts().iterator():
+        if send_push_to_subscription(
+            sub,
+            title=title,
+            body=body,
+            url=url,
+            tag=f"lead-{lead.pk}",
+        ):
             sent += 1
     return sent
 

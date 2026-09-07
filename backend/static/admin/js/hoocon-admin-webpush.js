@@ -1,6 +1,6 @@
 /**
- * Admin: toggle support-chat Web Push for the logged-in staff user.
- * Compact switch in Unfold object-tools (header).
+ * Admin: toggle Web Push for staff (заявки + чат поддержки).
+ * Works with /admin/sw.js (Admin PWA scope) and falls back to legacy /sw.js.
  */
 (function () {
   "use strict";
@@ -21,8 +21,10 @@
     return output;
   }
 
-  function getToggle() {
-    return document.getElementById("hoocon-webpush-enable");
+  function getToggles() {
+    return Array.prototype.slice.call(
+      document.querySelectorAll(".hoocon-admin-push-toggle"),
+    );
   }
 
   /**
@@ -30,35 +32,48 @@
    * @param {string} title
    */
   function setToggleState(state, title) {
-    const btn = getToggle();
-    if (!btn) return;
     const on = state === "on";
-    btn.dataset.state = state;
-    btn.setAttribute("aria-checked", on ? "true" : "false");
-    btn.setAttribute("aria-busy", state === "pending" ? "true" : "false");
-    btn.disabled = state === "pending";
-    btn.title = title;
-    btn.setAttribute(
-      "aria-label",
-      on ? "Push включён — нажмите, чтобы выключить" : "Push выключен — нажмите, чтобы включить",
-    );
+    getToggles().forEach(function (btn) {
+      btn.dataset.state = state;
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+      btn.setAttribute("aria-busy", state === "pending" ? "true" : "false");
+      btn.disabled = state === "pending";
+      btn.title = title;
+      btn.setAttribute(
+        "aria-label",
+        on
+          ? "Push включён (заявки и чат) — нажмите, чтобы выключить"
+          : "Push выключен — нажмите, чтобы включить заявки и чат",
+      );
+    });
   }
 
+  /** Prefer Admin-scoped SW; keep legacy root SW if already subscribed. */
   async function ensureRegistration() {
-    let reg = await navigator.serviceWorker.getRegistration("/");
-    if (!reg) {
-      reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await navigator.serviceWorker.ready;
+    let adminReg = await navigator.serviceWorker.getRegistration("/admin/");
+    if (adminReg) {
+      const sub = await adminReg.pushManager.getSubscription();
+      if (sub) return adminReg;
     }
-    return navigator.serviceWorker.ready;
+    const rootReg = await navigator.serviceWorker.getRegistration("/");
+    if (rootReg) {
+      const sub = await rootReg.pushManager.getSubscription();
+      if (sub) return rootReg;
+    }
+    const reg = await navigator.serviceWorker.register("/admin/sw.js", {
+      scope: "/admin/",
+    });
+    await navigator.serviceWorker.ready;
+    return reg;
   }
 
   async function refreshState() {
-    const btn = getToggle();
-    if (!btn) return;
+    if (!getToggles().length) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setToggleState("error", "Браузер не поддерживает Web Push");
-      btn.disabled = true;
+      getToggles().forEach(function (btn) {
+        btn.disabled = true;
+      });
       return;
     }
     try {
@@ -67,7 +82,7 @@
       const granted =
         typeof Notification !== "undefined" && Notification.permission === "granted";
       if (sub && granted) {
-        setToggleState("on", "Push включён");
+        setToggleState("on", "Push включён: заявки и чат");
       } else {
         setToggleState("off", "Push выключен");
       }
@@ -94,7 +109,7 @@
         setToggleState("error", "Нужно разрешение уведомлений");
         return;
       }
-      reg = await navigator.serviceWorker.ready;
+      reg = await ensureRegistration();
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
         sub = await reg.pushManager.subscribe({
@@ -120,7 +135,7 @@
         setToggleState("error", "Ошибка подписки (" + resp.status + ")");
         return;
       }
-      setToggleState("on", "Push включён");
+      setToggleState("on", "Push включён: заявки и чат");
     } catch (err) {
       setToggleState("error", "Не удалось включить Push");
       console.warn(err);
@@ -134,16 +149,18 @@
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         const json = sub.toJSON();
-        await fetch("/api/webpush/unsubscribe/", {
+        await fetch("/api/webpush/topics/", {
           method: "POST",
           credentials: "same-origin",
           headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": getCookie("csrftoken"),
           },
-          body: JSON.stringify({ endpoint: json.endpoint }),
+          body: JSON.stringify({
+            endpoint: json.endpoint,
+            clear_support: true,
+          }),
         });
-        await sub.unsubscribe();
       }
       setToggleState("off", "Push выключен");
     } catch (err) {
@@ -152,19 +169,30 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const btn = getToggle();
-    if (!btn) return;
-    void refreshState();
-    btn.addEventListener("click", function (e) {
-      e.preventDefault();
-      if (btn.disabled) return;
-      const on = btn.getAttribute("aria-checked") === "true";
-      if (on) {
-        void disablePush();
-      } else {
-        void enablePush();
-      }
+  function bindToggles() {
+    getToggles().forEach(function (btn) {
+      if (btn.dataset.hooconPushBound === "1") return;
+      btn.dataset.hooconPushBound = "1";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (btn.disabled) return;
+        const on = btn.getAttribute("aria-checked") === "true";
+        if (on) {
+          void disablePush();
+        } else {
+          void enablePush();
+        }
+      });
     });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    bindToggles();
+    void refreshState();
+    // Phone shell may clone from <template> after this script runs.
+    window.setTimeout(function () {
+      bindToggles();
+      void refreshState();
+    }, 400);
   });
 })();

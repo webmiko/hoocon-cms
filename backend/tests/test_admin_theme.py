@@ -280,10 +280,15 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "apple-touch-admin.png?v=deploysha1" in html
     assert "/admin/manifest.webmanifest" in html
     assert "hoocon-admin-live-badges.js" in html
+    assert "hoocon-admin-webpush.js" in html
     assert "hoocon-admin-tables.js" in html
     assert "hoocon-admin-phone-shell.js" in html
     assert "hoocon-admin-phone.css" in html
     assert 'name="theme-color" content="#5a626c"' in html
+
+    sw = client.get("/admin/sw.js")
+    assert sw.status_code == 200
+    assert sw["Service-Worker-Allowed"] == "/admin/"
 
     manifest = client.get("/admin/manifest.webmanifest")
     assert manifest.status_code == 200

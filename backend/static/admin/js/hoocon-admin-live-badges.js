@@ -157,9 +157,14 @@
       return;
     }
     try {
-      var reg = await navigator.serviceWorker.getRegistration("/");
+      var reg = await navigator.serviceWorker.getRegistration("/admin/");
       if (!reg) {
-        reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        reg = await navigator.serviceWorker.getRegistration("/");
+      }
+      if (!reg) {
+        reg = await navigator.serviceWorker.register("/admin/sw.js", {
+          scope: "/admin/",
+        });
         await navigator.serviceWorker.ready;
       }
       reg = await navigator.serviceWorker.ready;
@@ -181,7 +186,7 @@
         }),
       });
     } catch (_err) {
-      /* ignore — enable button on support list still works */
+      /* ignore — enable toggle still works */
     }
   }
 

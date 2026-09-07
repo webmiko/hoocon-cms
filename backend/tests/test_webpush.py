@@ -366,3 +366,90 @@ def test_sanitize_push_url_blocks_protocol_relative() -> None:
     assert sanitize_push_url("//evil.example/phish") == "/"
     assert sanitize_push_url("https://evil.example/") == "/"
     assert sanitize_push_url("") == "/"
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+def test_post_lead_triggers_staff_webpush(client, django_capture_on_commit_callbacks) -> None:
+    """Public RFQ schedules Admin Web Push (same topic as support)."""
+    from unittest.mock import patch
+
+    user = get_user_model().objects.create_superuser(
+        username="lead-push@hoocon.ru",
+        email="lead-push@hoocon.ru",
+        password="x",
+    )
+    upsert_subscription(
+        endpoint="https://push.example/lead-staff",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=user,
+    )
+    payload = {
+        "lead_type": "rfq",
+        "name": "Пётр",
+        "email": "petr@example.com",
+        "company": "ООО Тест",
+        "message": "Нужен подбор привода DA2MU для объекта.",
+    }
+    with patch("webpush.services.send_push_to_subscription", return_value=True) as web_send:
+        with patch("staff_api.tasks._send_fcm", return_value=False):
+            with django_capture_on_commit_callbacks(execute=True):
+                resp = client.post(
+                    "/api/leads/",
+                    data=payload,
+                    content_type="application/json",
+                )
+    assert resp.status_code == 201
+    from leads.models import Lead
+
+    lead = Lead.objects.get()
+    assert web_send.called
+    kwargs = web_send.call_args.kwargs
+    assert kwargs["title"] == "Новая заявка"
+    assert "Пётр" in kwargs["body"]
+    assert kwargs["tag"] == f"lead-{lead.pk}"
+    assert f"/admin/leads/lead/{lead.pk}/change/" in kwargs["url"]
+
+
+@pytest.mark.django_db
+def test_staff_subscribe_binds_user() -> None:
+    """Authenticated staff subscribe stores user FK (required for staff alerts)."""
+    staff = get_user_model().objects.create_user(
+        username="mgr@hoocon.ru",
+        email="mgr@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    client = Client()
+    client.force_login(staff)
+    endpoint = "https://push.example/staff-bind"
+    resp = client.post(
+        "/api/webpush/subscribe/",
+        data={
+            "endpoint": endpoint,
+            "keys": {"p256dh": "pk", "auth": "ak"},
+            "topic_support": True,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code in (200, 201)
+    sub = PushSubscription.objects.get(endpoint=endpoint)
+    assert sub.user_id == staff.pk
+    assert sub.topic_support is True
+    from webpush.services import queryset_staff_alerts
+
+    assert queryset_staff_alerts().filter(pk=sub.pk).exists()
+
+
+@pytest.mark.django_db
+def test_admin_sw_js_served_with_scope_header() -> None:
+    """Admin PWA SW is under /admin/ with Service-Worker-Allowed."""
+    client = Client()
+    resp = client.get("/admin/sw.js")
+    assert resp.status_code == 200
+    assert "javascript" in resp["Content-Type"]
+    assert resp["Service-Worker-Allowed"] == "/admin/"
+    assert b"showNotification" in resp.content
+    assert "no-cache" in resp["Cache-Control"]

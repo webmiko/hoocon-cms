@@ -86,15 +86,17 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         lead_id = lead.pk
         transaction.on_commit(lambda: send_lead_notification.delay(lead_id))
 
-        def _fcm() -> None:
+        def _staff_push() -> None:
             try:
                 from staff_api.tasks import notify_staff_fcm_new_lead
+                from webpush.tasks import notify_staff_new_lead
 
                 notify_staff_fcm_new_lead.delay(lead_id)
+                notify_staff_new_lead.delay(lead_id)
             except Exception:  # noqa: BLE001
                 pass
 
-        transaction.on_commit(_fcm)
+        transaction.on_commit(_staff_push)
 
         # PII-safe log: only lead_id and type (NO email/phone).
         logger.info(

@@ -139,6 +139,13 @@
             </a>
           </li>
         {% endif %}
+        <li class="hoocon-phone-more__push">
+          <div class="hoocon-phone-more__push-row">
+            <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
+            <span>{% trans "Push: заявки и чат" %}</span>
+            {% include "admin/includes/hoocon_webpush_toggle.html" %}
+          </div>
+        </li>
         {% if site_url %}
           <li>
             <a href="{{ site_url }}">
