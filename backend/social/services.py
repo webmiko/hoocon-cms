@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 
 from sitesettings.models import SiteSettings
@@ -67,6 +68,43 @@ def _dispatch(
     return PublishResult(ok=False, error=f"Unknown channel: {channel}")
 
 
+def _claim_post(
+    obj: models.Model,
+    channel: SocialChannel,
+    ct: ContentType,
+    text: str,
+    *,
+    force: bool,
+) -> SocialPost | None:
+    """Atomically claim a channel slot for ``obj``.
+
+    Returns ``None`` if a SENT post already exists (and ``force`` is False).
+    Otherwise creates a PENDING row inside a transaction that locks existing
+    SENT rows for the same content+channel, so concurrent callers serialize
+    and cannot both dispatch.
+    """
+    with transaction.atomic():
+        existing = (
+            SocialPost.objects.select_for_update()
+            .filter(
+                content_type=ct,
+                object_id=obj.pk,
+                channel=channel,
+                status=SocialPostStatus.SENT,
+            )
+            .first()
+        )
+        if existing is not None and not force:
+            return None
+        return SocialPost.objects.create(
+            content_type=ct,
+            object_id=obj.pk,
+            channel=channel,
+            status=SocialPostStatus.PENDING,
+            message_preview=text[:2000],
+        )
+
+
 def announce_content(
     obj: models.Model,
     *,
@@ -74,6 +112,11 @@ def announce_content(
     force: bool = False,
 ) -> list[SocialPost]:
     """Announce content to configured social channels.
+
+    The idempotency check and PENDING row creation happen inside a
+    transaction with ``select_for_update`` so concurrent callers cannot
+    both pass the check and dispatch. The external HTTP call runs
+    outside the transaction to avoid holding DB locks during network I/O.
 
     Args:
         obj: Article or News instance (must have pk).
@@ -95,16 +138,11 @@ def announce_content(
     ct = SocialPost.content_type_for(obj)
 
     for channel in target:
-        if not force and _already_sent(obj, channel):
-            continue
         text = compose_telegram_announcement(obj) if channel == SocialChannel.TELEGRAM else compose_announcement(obj)
-        post = SocialPost.objects.create(
-            content_type=ct,
-            object_id=obj.pk,
-            channel=channel,
-            status=SocialPostStatus.PENDING,
-            message_preview=text[:2000],
-        )
+        post = _claim_post(obj, channel, ct, text, force=force)
+        if post is None:
+            continue
+        # Dispatch outside the transaction — no DB lock held during HTTP.
         result = _dispatch(channel, site, text, obj=obj)
         if result.skipped:
             post.mark_skipped(result.error or "skipped")
