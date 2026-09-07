@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
 from rest_framework import serializers
 
 from catalog.models import SKU
@@ -167,21 +168,32 @@ class LeadSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data: dict) -> Lead:
-        """Create Lead + LeadItem rows, then attach RFQ soft-bundle."""
+        """Create Lead + LeadItem rows, then attach RFQ soft-bundle.
+
+        Wrapped in ``transaction.atomic()`` so a failure in any step (item
+        creation, bundle attachment) rolls back the whole lead instead of
+        leaving a partial row in the database.
+        """
         validated_data.pop("website", None)
         items_data: list[dict[str, Any]] = validated_data.pop("_resolved_items", [])
         validated_data.pop("items", None)
 
-        lead = Lead.objects.create(**validated_data)
-        for index, row in enumerate(items_data):
-            sku = row.get("sku")
-            LeadItem.objects.create(
-                lead=lead,
-                sku=sku,
-                sku_code=(row.get("sku_code") or "").strip() or (sku.sku_code if sku is not None else ""),
-                quantity=row.get("quantity") or 1,
-                sort_order=index,
-            )
-        attach_rfq_bundle(lead)
-        lead.refresh_from_db()
+        with transaction.atomic():
+            lead = Lead.objects.create(**validated_data)
+            lead_items: list[LeadItem] = []
+            for index, row in enumerate(items_data):
+                sku = row.get("sku")
+                lead_items.append(
+                    LeadItem(
+                        lead=lead,
+                        sku=sku,
+                        sku_code=(row.get("sku_code") or "").strip() or (sku.sku_code if sku is not None else ""),
+                        quantity=row.get("quantity") or 1,
+                        sort_order=index,
+                    )
+                )
+            if lead_items:
+                LeadItem.objects.bulk_create(lead_items)
+            attach_rfq_bundle(lead)
+            lead.refresh_from_db()
         return lead

@@ -296,3 +296,29 @@ def test_post_lead_rejects_unpublished_sku(client) -> None:
     }
     response = client.post("/api/leads/", data=payload, content_type="application/json")
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_post_lead_rolls_back_on_bundle_failure(client) -> None:
+    """A failure after Lead/LeadItem creation rolls back the whole transaction.
+
+    Regresses partial-lead writes if attach_rfq_bundle or later steps raise.
+    """
+    from unittest.mock import patch
+
+    from leads.models import Lead, LeadItem
+
+    payload = {
+        "lead_type": "rfq",
+        "name": "Иван Иванов",
+        "email": "ivan@example.com",
+        "company": "ООО Ромашка",
+        "message": "Нужен КП на 10 приводов HVA-5NM для объекта.",
+        "items": [{"sku_code": "HVA-5NM", "quantity": 10}],
+    }
+    with patch("leads.serializers.attach_rfq_bundle", side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            client.post("/api/leads/", data=payload, content_type="application/json")
+
+    assert Lead.objects.count() == 0
+    assert LeadItem.objects.count() == 0
