@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
@@ -21,9 +22,9 @@ from crm.services import (
 )
 from leads.models import Lead
 from leads.services import (
-    apply_lead_manager_on_save,
     count_new_leads,
     scope_leads_for_manager,
+    set_lead_status,
     take_lead_in_work,
 )
 from staff_api.authentication import IsStaffManager, StaffTokenAuthentication
@@ -225,9 +226,15 @@ class LeadStatusView(StaffAuthMixin, APIView):
         ser.is_valid(raise_exception=True)
         qs = scope_leads_for_manager(Lead.objects.all(), request.user)
         lead = get_object_or_404(qs, pk=pk)
-        lead.status = ser.validated_data["status"]
-        apply_lead_manager_on_save(lead, actor=request.user)
-        lead.save()
+        new_status = ser.validated_data["status"]
+        lead, error = set_lead_status(lead, status=new_status, actor=request.user)
+        if error == "conflict":
+            return Response(
+                {"detail": "Заявку уже взял другой менеджер."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serialize_lead(lead, detail=True))
 
 
@@ -372,15 +379,28 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
             return blocked
         ser = MessageCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        conv = get_object_or_404(Conversation, pk=pk)
-        try:
-            msg = add_staff_reply(conv, ser.validated_data["body"], author=request.user)
-        except Exception as exc:  # noqa: BLE001
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            _conversation_for_update(pk)
+            conv = _conversation_for_staff(pk=pk)
+            try:
+                msg = add_staff_reply(conv, ser.validated_data["body"], author=request.user)
+            except SupportChatError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         from supportchat.tasks import deliver_outbound_message
 
-        deliver_outbound_message.delay(msg.pk)
+        try:
+            deliver_outbound_message.delay(msg.pk)
+        except Exception:  # noqa: BLE001 — broker may be unreachable
+            logger.exception("deliver_outbound_message_enqueue_failed msg_id=%s", msg.pk)
         return Response(serialize_message(msg), status=status.HTTP_201_CREATED)
+
+
+def _conversation_for_update(pk: int) -> None:
+    """Acquire a row lock on the conversation (no select_related)."""
+    get_object_or_404(
+        Conversation.objects.select_for_update(of=("self",)),
+        pk=pk,
+    )
 
 
 def _conversation_for_staff(*, pk: int) -> Conversation:
@@ -396,10 +416,12 @@ class ConversationAssignView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = _conversation_for_staff(pk=pk)
-        conv.assignee = request.user
-        conv.status = ConversationStatus.OPEN
-        conv.save(update_fields=["assignee", "status", "updated_at"])
+        with transaction.atomic():
+            _conversation_for_update(pk)
+            conv = _conversation_for_staff(pk=pk)
+            conv.assignee = request.user
+            conv.status = ConversationStatus.OPEN
+            conv.save(update_fields=["assignee", "status", "updated_at"])
         return Response(serialize_conversation(conv))
 
 
@@ -408,9 +430,11 @@ class ConversationCloseView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = _conversation_for_staff(pk=pk)
-        conv.status = ConversationStatus.CLOSED
-        conv.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            _conversation_for_update(pk)
+            conv = _conversation_for_staff(pk=pk)
+            conv.status = ConversationStatus.CLOSED
+            conv.save(update_fields=["status", "updated_at"])
         return Response(serialize_conversation(conv))
 
 
@@ -419,9 +443,11 @@ class ConversationReadView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        conv = _conversation_for_staff(pk=pk)
-        conv.staff_unread_count = 0
-        conv.save(update_fields=["staff_unread_count", "updated_at"])
+        with transaction.atomic():
+            _conversation_for_update(pk)
+            conv = _conversation_for_staff(pk=pk)
+            conv.staff_unread_count = 0
+            conv.save(update_fields=["staff_unread_count", "updated_at"])
         return Response(serialize_conversation(conv))
 
 
