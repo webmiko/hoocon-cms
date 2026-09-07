@@ -289,6 +289,13 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "hoocon-admin-phone.css" in html
     assert 'name="theme-color" content="#5a626c"' in html
 
+    webpush_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-webpush.js").read_text(
+        encoding="utf-8"
+    )
+    assert "clear_support: true" in webpush_js
+    assert "await sub.unsubscribe()" in webpush_js
+
+
     sw = client.get("/admin/sw.js")
     assert sw.status_code == 200
     assert sw["Service-Worker-Allowed"] == "/admin/"

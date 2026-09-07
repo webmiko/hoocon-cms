@@ -161,6 +161,7 @@
             clear_support: true,
           }),
         });
+        await sub.unsubscribe();
       }
       setToggleState("off", "Push выключен");
     } catch (err) {
