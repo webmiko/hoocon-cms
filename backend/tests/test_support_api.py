@@ -179,6 +179,7 @@ def test_add_staff_reply_locks_conversation_before_write() -> None:
     from unittest.mock import patch
 
     from django.contrib.auth import get_user_model
+
     from supportchat.models import Channel, Conversation
     from supportchat.services import add_staff_reply
 

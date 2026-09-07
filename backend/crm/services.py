@@ -6,7 +6,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Q, QuerySet
 
 from config.logging_utils import setup_logger
