@@ -101,7 +101,7 @@ def welcome_photo_url() -> str:
     configured = getattr(settings, "TELEGRAM_WELCOME_PHOTO_URL", "").strip()
     if configured:
         return configured
-    return "https://hoocon.ru/og-image.jpg"
+    return "https://hoocon.ru/static/social/telegram-welcome.webp"
 
 
 def _clip(text: str, limit: int) -> str:
@@ -269,11 +269,13 @@ def _publish_photo_or_text(
     reply_markup: dict[str, Any],
 ) -> PublishResult:
     """sendPhoto with welcome cover; fall back to text if photo fails."""
+    local = welcome_photo_path()
+    # Prefer local multipart when the static cover is on disk (URL default was 404).
     result = publish_telegram(
         chat_id=chat_id,
         text=caption,
-        photo_path=welcome_photo_path(),
-        photo_url=welcome_photo_url(),
+        photo_path=local,
+        photo_url=None if local is not None else welcome_photo_url(),
         reply_markup=reply_markup,
     )
     if not result.ok and not result.skipped:

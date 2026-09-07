@@ -437,7 +437,7 @@ TELEGRAM_CHANNEL_USERNAME = (
 TELEGRAM_WELCOME_PHOTO_PATH = os.getenv("TELEGRAM_WELCOME_PHOTO_PATH", "").strip()
 TELEGRAM_WELCOME_PHOTO_URL = os.getenv(
     "TELEGRAM_WELCOME_PHOTO_URL",
-    "https://hoocon.ru/og-image.jpg",
+    "https://hoocon.ru/static/social/telegram-welcome.webp",
 ).strip()
 # Outbound Bot API base (Cloudflare Worker reverse proxy when VPS cannot reach
 # api.telegram.org). Example: https://hoocon-telegram-api.npok9.workers.dev

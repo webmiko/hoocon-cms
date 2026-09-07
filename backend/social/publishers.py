@@ -326,7 +326,14 @@ def _publish_telegram_photo_url(
             timeout=_TELEGRAM_TIMEOUT_SEC,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        logger.warning("telegram_photo_url_failed error=%s", type(exc).__name__)
+        detail = type(exc).__name__
+        if isinstance(exc, HTTPError):
+            try:
+                body = exc.read().decode("utf-8", errors="replace")[:200]
+                detail = f"{detail}:{exc.code}:{body}"
+            except OSError:
+                detail = f"{detail}:{exc.code}"
+        logger.warning("telegram_photo_url_failed error=%s", detail)
         return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
     return _telegram_api_result(status, data)
 
