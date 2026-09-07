@@ -11,6 +11,19 @@ let lastPath: string | null = null;
 let csrfReady: Promise<void> | null = null;
 let hitTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Wait for window.load so the first hit does not compete with LCP. */
+function afterLoad(callback: () => void): void {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    callback();
+    return;
+  }
+  if (document.readyState === "complete") {
+    callback();
+    return;
+  }
+  window.addEventListener("load", callback, { once: true });
+}
+
 /** Defer hit slightly so LCP is not competing with CSRF + POST. */
 export const SITE_ANALYTICS_DELAY_MS = 800;
 
@@ -107,20 +120,22 @@ export function trackSitePageView(path: string, title?: string): void {
     title ?? (typeof document !== "undefined" ? document.title : "");
   const classified = classifySitePath(normalized.split("?")[0] || normalized);
 
-  hitTimer = setTimeout(() => {
-    hitTimer = null;
-    void (async () => {
-      try {
-        await ensureCsrf();
-        await api.trackSiteHit({
-          path: normalized.split("?")[0] || normalized,
-          title: pageTitle,
-          object_type: classified.object_type,
-          object_key: classified.object_key,
-        });
-      } catch {
-        // Best-effort — never break the UI for analytics.
-      }
-    })();
-  }, SITE_ANALYTICS_DELAY_MS);
+  afterLoad(() => {
+    hitTimer = setTimeout(() => {
+      hitTimer = null;
+      void (async () => {
+        try {
+          await ensureCsrf();
+          await api.trackSiteHit({
+            path: normalized.split("?")[0] || normalized,
+            title: pageTitle,
+            object_type: classified.object_type,
+            object_key: classified.object_key,
+          });
+        } catch {
+          // Best-effort — never break the UI for analytics.
+        }
+      })();
+    }, SITE_ANALYTICS_DELAY_MS);
+  });
 }
