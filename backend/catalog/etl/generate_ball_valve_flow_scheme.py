@@ -12,6 +12,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 from typing import Final
@@ -19,6 +20,8 @@ from typing import Final
 from PIL import Image, ImageDraw, ImageFont
 
 from catalog.etl.webp import convert_bytes_to_webp
+
+logger = logging.getLogger("hoocon.catalog.etl.ball_valve_flow")
 
 _PACK_DIR: Final[Path] = Path(__file__).resolve().parent / "data" / "ball-valve-flow-scheme"
 _OUT_NAME: Final[str] = "flow-3way.webp"
@@ -331,7 +334,7 @@ def write_pack(*, pack_dir: Path | None = None) -> Path:
 def main() -> None:
     """CLI entry: regenerate pack WebP."""
     path = write_pack()
-    print(f"wrote {path} ({path.stat().st_size} bytes)")
+    logger.info("wrote %s (%s bytes)", path, path.stat().st_size)
 
 
 if __name__ == "__main__":

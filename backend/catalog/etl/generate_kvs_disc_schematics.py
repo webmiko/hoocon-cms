@@ -13,6 +13,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 from typing import Final
@@ -20,6 +21,8 @@ from typing import Final
 from PIL import Image, ImageDraw, ImageFont
 
 from catalog.etl.webp import convert_bytes_to_webp
+
+logger = logging.getLogger("hoocon.catalog.etl.kvs_discs")
 
 _PACK_DIR: Final[Path] = Path(__file__).resolve().parent / "data" / "ball-valve-kvs-discs"
 _SRC_DIR: Final[Path] = _PACK_DIR / "src"
@@ -148,9 +151,9 @@ def main() -> None:
     """CLI entry."""
     result = generate_kvs_disc_schematics()
     for key, info in result.items():
-        print(f"{key}: {info}")
+        logger.info("%s: %s", key, info)
     done = sum(1 for info in result.values() if info.startswith("webp="))
-    print(f"composed {done}/{len(result)} photo tiles → {_PACK_DIR}")
+    logger.info("composed %s/%s photo tiles → %s", done, len(result), _PACK_DIR)
 
 
 if __name__ == "__main__":
