@@ -67,6 +67,9 @@ class CategoryAdmin(OpenChangeLinkMixin, ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     ordering = ("name",)
 
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("parent")
+
 
 @admin.register(Product)
 class ProductAdmin(OpenChangeLinkMixin, ModelAdmin):
@@ -79,6 +82,10 @@ class ProductAdmin(OpenChangeLinkMixin, ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("category",)
     ordering = ("name",)
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("category")
+
     fieldsets = (
         (
             None,
@@ -161,6 +168,10 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
     readonly_fields = ("stock_updated_at",)
     inlines = (AttributeValueInline, ProductImageInline, ProductFileInline)
     ordering = ("sku_code",)
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("product")
+
     fieldsets = (
         (
             None,
@@ -312,6 +323,9 @@ class AttributeValueAdmin(OpenChangeLinkMixin, ModelAdmin):
     search_fields = ("sku__sku_code", "attribute__name", "value")
     autocomplete_fields = ("sku", "attribute")
 
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("sku", "attribute")
+
 
 @admin.register(ProductFile)
 class ProductFileAdmin(OpenChangeLinkMixin, ModelAdmin):
@@ -331,6 +345,9 @@ class ProductFileAdmin(OpenChangeLinkMixin, ModelAdmin):
     autocomplete_fields = ("sku",)
     ordering = ("sort_order", "title")
 
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("sku")
+
 
 @admin.register(ProductImage)
 class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
@@ -342,3 +359,6 @@ class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
     search_fields = ("alt", "sku__sku_code", "source_url")
     autocomplete_fields = ("sku",)
     ordering = ("sku", "sort_order")
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("sku")

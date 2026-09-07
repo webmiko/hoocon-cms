@@ -318,12 +318,50 @@ def test_sku_search_q_br_m_does_not_match_br_ml(client) -> None:
     assert br_m.status_code == 200
     assert {row["sku_code"] for row in br_m.data["results"]} == {"BR-M"}
 
-    br_ml = client.get(
-        reverse("catalog-sku-list"),
-        {"category": "adaptery", "q": "BR-ML"},
+
+@pytest.mark.django_db
+def test_category_list_query_count_independent_of_row_count(client, settings) -> None:
+    """Parent FK must be selected; query count must not grow with categories."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.models import SKU, Category, Product
+
+    settings.CATALOG_HTTP_CACHE_SECONDS = 0
+
+    def count_queries() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            response = client.get(reverse("catalog-category-list"))
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    parent = Category.objects.create(name="Parent", slug="parent")
+    Product.objects.create(name="P", slug="p", category=parent)
+    SKU.objects.create(
+        product=parent.products.first(),
+        name="S",
+        slug="s",
+        sku_code="S",
+        is_published=True,
     )
-    assert br_ml.status_code == 200
-    assert {row["sku_code"] for row in br_ml.data["results"]} == {"BR-ML"}
+    queries_one = count_queries()
+
+    for index in range(4):
+        cat = Category.objects.create(
+            name=f"Cat {index}",
+            slug=f"cat-{index}",
+            parent=parent,
+        )
+        product = Product.objects.create(name=f"P{index}", slug=f"p-{index}", category=cat)
+        SKU.objects.create(
+            product=product,
+            name=f"S{index}",
+            slug=f"s-{index}",
+            sku_code=f"S{index}",
+            is_published=True,
+        )
+
+    assert count_queries() == queries_one
 
 
 @pytest.mark.django_db

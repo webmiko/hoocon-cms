@@ -173,7 +173,12 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         """Annotate lead count; scope cards for non-superuser managers."""
         from django.db.models import Count
 
-        qs = super().get_queryset(request).annotate(_leads_count=Count("leads", distinct=True))
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related("assignee")
+            .annotate(_leads_count=Count("leads", distinct=True))
+        )
         return scope_clients_for_manager(qs, request.user)
 
     def save_formset(

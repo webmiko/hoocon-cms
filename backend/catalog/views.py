@@ -136,7 +136,8 @@ class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def get_queryset(self) -> QuerySet[Category]:
         """Return non-empty categories in series-table order."""
         return (
-            Category.objects.annotate(product_count=Count("products"))
+            Category.objects.select_related("parent")
+            .annotate(product_count=Count("products"))
             .filter(product_count__gt=0)
             .annotate(spec_order=spec_order_case())
             .order_by("spec_order", "name")

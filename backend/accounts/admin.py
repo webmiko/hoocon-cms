@@ -335,6 +335,9 @@ class PasskeyCredentialAdmin(ModelAdmin):
         "last_used_at",
     )
 
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("user")
+
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
