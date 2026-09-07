@@ -116,8 +116,15 @@ def ensure_go_live_news(article: Article) -> tuple[News, bool]:
 
 
 def process_due_article(article: Article, *, announce: bool = True) -> GoLiveResult:
-    """Ensure go-live news exists and optionally announce to social."""
-    news, created = ensure_go_live_news(article)
+    """Ensure go-live news exists and optionally announce to social.
+
+    News creation is wrapped in a short transaction; the external social
+    publisher runs after the commit so a slow/failing network call cannot
+    hold the DB transaction open or roll back the created news row.
+    """
+    with transaction.atomic():
+        news, created = ensure_go_live_news(article)
+
     announced = 0
     if announce:
         from sitesettings.models import SiteSettings
@@ -171,8 +178,7 @@ def publish_due_articles(*, announce: bool = True) -> list[GoLiveResult]:
     ).order_by("published_at", "id")[:1]
     results: list[GoLiveResult] = []
     for article in due:
-        with transaction.atomic():
-            result = process_due_article(article, announce=announce)
+        result = process_due_article(article, announce=announce)
         if result.news_created or result.announced:
             logger.info(
                 "go_live article=%s news=%s created=%s announced=%s",

@@ -132,6 +132,30 @@ def test_go_live_skips_when_announce_flag_off() -> None:
 
 
 @pytest.mark.django_db
+def test_go_live_news_persists_when_announce_fails() -> None:
+    """A failing social publisher must not roll back the created news row.
+
+    Regresses running external HTTP calls inside the news-creation transaction.
+    """
+    slug = "analog-belimo-hoocon"
+    _due_article(slug, title="News outlives announce failure")
+    with (
+        patch(
+            "sitesettings.models.SiteSettings.load",
+            return_value=MagicMock(social_announce_on_publish=True),
+        ),
+        patch(
+            "social.services.announce_content",
+            side_effect=RuntimeError("network down"),
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="network down"):
+            publish_due_articles(announce=True)
+
+    assert News.objects.filter(slug=go_live_news_slug(slug)).exists()
+
+
+@pytest.mark.django_db
 def test_go_live_does_not_starve_older_due_without_news() -> None:
     """Newest due guide that already has news must not block an older one."""
     older = "tipy-upravleniya-privodom"
