@@ -9,6 +9,59 @@ import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+_WORKERS_WELCOME = "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
+
+
+def test_welcome_photo_url_default_is_workers_dev_jpeg(settings) -> None:
+    """Default cover must be on workers.dev (Telegram cannot fetch hoocon.ru)."""
+    settings.TELEGRAM_WELCOME_PHOTO_URL = ""
+    from social.telegram_bot import welcome_photo_url
+
+    url = welcome_photo_url()
+    assert url == _WORKERS_WELCOME
+    assert "hoocon.ru" not in url
+    assert not url.endswith((".webp", ".svg"))
+
+
+@pytest.mark.django_db
+def test_publish_photo_or_text_prefers_url_over_local_file(settings, tmp_path) -> None:
+    """Even with a local cover on disk, send JSON photo_url (not multipart).
+
+    Multipart via VPS→Worker often times out; URL on workers.dev is the
+    reliable path for Telegram to fetch the image.
+    """
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    settings.TELEGRAM_WELCOME_PHOTO_URL = _WORKERS_WELCOME
+    cover = tmp_path / "welcome.webp"
+    cover.write_bytes(b"WEBPFAKE")
+    settings.TELEGRAM_WELCOME_PHOTO_PATH = str(cover)
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":42}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    from social.telegram_bot import _publish_photo_or_text, main_menu_keyboard
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        result = _publish_photo_or_text(
+            chat_id="4242",
+            caption="<b>HOOCON</b>",
+            reply_markup=main_menu_keyboard(),
+        )
+
+    assert result.ok
+    assert result.external_id == "42"
+    assert mocked.call_count == 1
+    req = mocked.call_args.args[0]
+    assert "sendPhoto" in req.full_url
+    content_type = req.headers.get("Content-type", "")
+    assert "multipart/form-data" not in content_type
+    body = json.loads(req.data.decode("utf-8"))
+    assert body["photo"] == _WORKERS_WELCOME
+    assert b"WEBPFAKE" not in req.data
+
 
 @pytest.mark.django_db
 def test_telegram_webhook_rejects_bad_secret(settings) -> None:
@@ -39,9 +92,7 @@ def test_telegram_webhook_start_sends_photo(settings) -> None:
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     settings.SITE_URL = "https://hoocon.ru"
     settings.TELEGRAM_WELCOME_PHOTO_PATH = ""
-    settings.TELEGRAM_WELCOME_PHOTO_URL = (
-        "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
-    )
+    settings.TELEGRAM_WELCOME_PHOTO_URL = "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
 
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -71,7 +122,9 @@ def test_telegram_webhook_start_sends_photo(settings) -> None:
     assert "sendPhoto" in req.full_url
     body = json.loads(req.data.decode("utf-8"))
     assert body["chat_id"] == "4242"
-    assert body["photo"].endswith("/welcome.jpg")
+    assert body["photo"] == _WORKERS_WELCOME
+    assert "hoocon.ru" not in body["photo"]
+    assert "multipart/form-data" not in req.headers.get("Content-type", "")
     assert "HOOCON" in body["caption"]
     kb = body["reply_markup"]["keyboard"]
     assert kb[0][0]["text"] == "Перейти в канал"
@@ -126,9 +179,7 @@ def test_telegram_webhook_contacts_sends_photo(settings) -> None:
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     settings.SITE_URL = "https://hoocon.ru"
     settings.TELEGRAM_WELCOME_PHOTO_PATH = ""
-    settings.TELEGRAM_WELCOME_PHOTO_URL = (
-        "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
-    )
+    settings.TELEGRAM_WELCOME_PHOTO_URL = "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
 
     mock_resp = MagicMock()
     mock_resp.status = 200
