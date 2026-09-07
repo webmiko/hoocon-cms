@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
@@ -66,6 +67,8 @@ def attach_rfq_bundle(lead: Lead) -> None:
     """Set ``rfq_bundle_key`` / ``rfq_bundle_root`` for an RFQ lead.
 
     Non-RFQ leads clear the key. Call after the lead row exists (has pk).
+    The root lookup runs inside ``select_for_update`` so two concurrent
+    leads with the same company+name cannot both become independent roots.
     """
     if lead.lead_type != Lead.LeadType.RFQ:
         if lead.rfq_bundle_key or lead.rfq_bundle_root_id:
@@ -75,10 +78,11 @@ def attach_rfq_bundle(lead: Lead) -> None:
         return
 
     key = build_rfq_bundle_key(company=lead.company, name=lead.name)
-    root = resolve_open_bundle_root(key, exclude_pk=lead.pk)
-    lead.rfq_bundle_key = key
-    lead.rfq_bundle_root = root
-    lead.save(update_fields=["rfq_bundle_key", "rfq_bundle_root", "updated_at"])
+    with transaction.atomic():
+        root = resolve_open_bundle_root(key, exclude_pk=lead.pk)
+        lead.rfq_bundle_key = key
+        lead.rfq_bundle_root = root
+        lead.save(update_fields=["rfq_bundle_key", "rfq_bundle_root", "updated_at"])
 
 
 def rfq_bundle_queryset(lead: Lead) -> QuerySet[Lead]:
