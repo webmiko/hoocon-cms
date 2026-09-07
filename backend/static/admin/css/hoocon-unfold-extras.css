@@ -1518,19 +1518,6 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     padding: 0.85rem 0.35rem 1rem;
     box-sizing: border-box;
   }
-}
-
-/* Wide desktop: room for a third card without crushing ~24rem tracks. */
-@media (min-width: 1280px) {
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
-    grid-template-columns: repeat(3, minmax(0, 24rem));
-  }
-}
-
-@media (min-width: 768px) {
 
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked
@@ -1644,6 +1631,16 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     tr.hoocon-lead-wall-heading
     td::before {
     display: none !important;
+  }
+}
+
+/* Wide desktop: room for a third card without crushing ~24rem tracks. */
+@media (min-width: 1280px) {
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
+    grid-template-columns: repeat(3, minmax(0, 24rem));
   }
 }
 
