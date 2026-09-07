@@ -2,34 +2,38 @@
 
 Аналоги для DA2MU24-D/DS (24 В, 2Нм):
 
-– Dastech DA-02N24A
-– Nanotek LM 24 B
+– Belimo TMC24A
+– Belimo TMC24A-S
 – Belimo CM24-L/R
+– Dastech DA-02N24 / DA-02N24A
+– Lufberg DA02N24 / DA02N24S
 – Sputnik AR24-2-S
-– Lufberg DA02N24S
 – BVM TM24-2
-– Siemens GSD326.1E (версия на 24В)
-– Gruner 225-24Т-05-S2
+– Siemens GSD121.1A / GSD126.1A
 
 Аналоги для DA2MU24-A/AS (24 В, 2Нм):
 
-– Belimo LM24A-SR
-– Belimo LM24A-SR-S
+– Belimo TMC24A-SR
+– Dastech DA-02N24-SR / DA-02N24A-SR
+– Lufberg DA02N24P / DA02N24PS
+– Siemens GSD161.1A / GSD166.1A
 
 Аналоги для DA2MU230-D/DS (230 В, 2Нм):
 
-– Dastech DA-02N220A
-– Nanotek LM 230 B (4НМ)
+– Belimo TMC230A
+– Belimo TMC230A-S
 – Belimo CM230-L/R
+– Dastech DA-02N220 / DA-02N220A
+– Lufberg DA02N220 / DA02N220S
 – Sputnik AR230-2-S
-– Lufberg DA02N220S
 – BVM TM230-2
-– Siemens GSD326.1E
-– Gruner 225-230Т-05-S2 (5НМ)
+– Siemens GSD321.1A / GSD326.1A
 
 Аналоги для DA2MU230-A/AS (230 В, 2Нм):
 
-– Belimo LM230A-SR
-– Belimo LM230A-SR-S
+– Belimo TMC230A-SR
+– Dastech DA-02N220-SR / DA-02N220A-SR
+– Lufberg DA02N220P / DA02N220PS
+– Siemens GSD361.1A
 
 Важно: При выборе аналога необходимо проверить соответствие всех технических параметров конкретной системе вентиляции, включая размер вала, направление вращения и требуемое усилие.

@@ -8,6 +8,7 @@ from django.urls import reverse
 from catalog.etl.belimo_analogs import (
     analogs_plain_text_for_sku,
     belimo_code_is_modulating,
+    belimo_code_is_open_close,
     belimo_code_is_thermal,
     belimo_code_matches_control,
     belimo_codes_for_sku,
@@ -30,6 +31,8 @@ def test_normalize_belimo_code_dashes() -> None:
     """Unicode dashes collapse to ASCII hyphen."""
     assert normalize_belimo_code("nf24a−s") == "NF24A-S"
     assert normalize_belimo_code(" LM24A-S. ") == "LM24A-S"
+    assert normalize_belimo_code("TMC230ASR") == "TMC230A-SR"
+    assert normalize_belimo_code("lm230asr") == "LM230A-SR"
 
 
 def test_analogs_plain_text_for_sku_tolerates_missing_product() -> None:
@@ -171,7 +174,21 @@ def test_belimo_codes_strips_lone_s_for_non_aux_damu_d() -> None:
 
 
 def test_infer_air_no_spring_by_moment_voltage_aux_control() -> None:
-    """HVD-class: LM/NM/GM by moment + voltage + aux + control."""
+    """HVD-class: TMC/LM/NM/GM by moment + voltage + aux + control."""
+    assert infer_belimo_codes(
+        purpose="air_no_spring",
+        moment_nm=2.0,
+        voltage="24",
+        control="on_off",
+        aux_spdt=0,
+    ) == ["TMC24A"]
+    assert infer_belimo_codes(
+        purpose="air_no_spring",
+        moment_nm=2.0,
+        voltage="230",
+        control="modulating",
+        aux_spdt=1,
+    ) == ["TMC230A-SR"]
     assert infer_belimo_codes(
         purpose="air_no_spring",
         moment_nm=5.0,
@@ -238,8 +255,34 @@ def test_infer_fire_spring_family() -> None:
     ) == ["BFN230-T"]
 
 
+def test_infer_smoke_control_not_cm() -> None:
+    """SA..MU smoke must infer BEN/BLE/BEE — never CM 2 Нм air compact."""
+    assert infer_belimo_codes(
+        purpose="smoke",
+        moment_nm=10.0,
+        voltage="24",
+        control="on_off",
+        aux_spdt=2,
+    ) == ["BEN24"]
+    assert infer_belimo_codes(
+        purpose="smoke",
+        moment_nm=15.0,
+        voltage="230",
+        control="on_off",
+        aux_spdt=2,
+        thermal=True,
+    ) == ["BLE230-T"]
+    assert infer_belimo_codes(
+        purpose="smoke",
+        moment_nm=30.0,
+        voltage="24",
+        control="on_off",
+        aux_spdt=2,
+    ) == ["BEE24"]
+
+
 def test_detect_purpose_hvd_is_fire_spring() -> None:
-    """HVD-…F must not inherit category smoke→CM (SA..MU lives in same category)."""
+    """HVD-…F must not inherit category smoke (SA..MU lives in same category)."""
     from catalog.etl.belimo_analogs import detect_purpose
 
     slug = "elektroprivody-dlya-klapanov-dymoudaleniya"
@@ -309,8 +352,13 @@ def test_belimo_code_control_sr_token() -> None:
     assert belimo_code_is_modulating("NM24A-SR-20") is True
     assert belimo_code_is_modulating("LM24A-S") is False
     assert belimo_code_is_modulating("CM230-L/R") is False
+    assert belimo_code_is_open_close("TMC230A") is True
+    assert belimo_code_is_open_close("TMC230A-S") is True
     assert belimo_code_matches_control("CM230-L/R", "on_off") is True
     assert belimo_code_matches_control("CM230-L/R", "modulating") is False
+    assert belimo_code_matches_control("TMC230A", "on_off") is True
+    assert belimo_code_matches_control("TMC230A", "modulating") is False
+    assert belimo_code_matches_control("TMC230A-S", "on_off") is True
     assert belimo_code_matches_control("LM230A-S", "modulating") is False
     assert belimo_code_matches_control("LM230A-SR-S", "modulating") is True
     assert belimo_code_matches_control("LM230A-SR-S", "on_off") is False
@@ -371,8 +419,8 @@ def test_shared_ds_as_block_splits_belimo_by_control() -> None:
     AttributeValue.objects.create(sku=as_sku, attribute=aux, value="SPDT-1")
 
     assert belimo_codes_for_sku(ds) == ["CM230-L/R"]
-    assert belimo_codes_for_sku(as_sku) == ["LM230A-SR-S"]
-    assert primary_belimo_code_for_sku(as_sku) == "LM230A-SR-S"
+    assert belimo_codes_for_sku(as_sku) == ["TMC230A-SR"]
+    assert primary_belimo_code_for_sku(as_sku) == "TMC230A-SR"
 
     as_text = analogs_plain_text_for_sku(as_sku)
     assert "CM230-L/R" not in as_text
@@ -383,7 +431,7 @@ def test_shared_ds_as_block_splits_belimo_by_control() -> None:
 
 @pytest.mark.django_db
 def test_damu_2nm_split_analogs_by_control() -> None:
-    """Split DA2MU card: on/off keeps CM*, modulating keeps LM*-SR only."""
+    """Split DA2MU card: on/off keeps TMC/CM*, modulating keeps TMC*-SR."""
     from pathlib import Path
 
     text = (Path(__file__).resolve().parents[1] / "catalog" / "etl" / "data" / "damu_2nm_analogs.txt").read_text(
@@ -418,14 +466,21 @@ def test_damu_2nm_split_analogs_by_control() -> None:
     ds_text = analogs_plain_text_for_sku(ds)
     as_text = analogs_plain_text_for_sku(as_sku)
     assert "CM230-L/R" in ds_text
+    assert "TMC230A" in ds_text
+    assert "TMC230A-S" in ds_text
+    assert "TMC230A-SR" not in ds_text
     assert "LM230A-SR" not in ds_text
     assert "Dastech" in ds_text
+    assert "Nanotek" not in ds_text
+    assert "Gruner" not in ds_text
     assert "CM230-L/R" not in as_text
-    assert extract_belimo_codes_from_text(as_text) == ["LM230A-SR-S"]
-    assert "Dastech" not in as_text
-    assert belimo_codes_for_sku(ds) == ["CM230-L/R"]
-    assert belimo_codes_for_sku(as_sku) == ["LM230A-SR-S"]
-    assert primary_belimo_code_for_sku(as_sku) == "LM230A-SR-S"
+    assert extract_belimo_codes_from_text(as_text) == ["TMC230A-SR"]
+    assert "Dastech" in as_text
+    assert "Lufberg" in as_text
+    assert belimo_codes_for_sku(ds) == ["TMC230A-S", "CM230-L/R"]
+    assert belimo_codes_for_sku(as_sku) == ["TMC230A-SR"]
+    assert primary_belimo_code_for_sku(as_sku) == "TMC230A-SR"
+    assert primary_belimo_code_for_sku(ds) == "TMC230A-S"
 
 
 @pytest.mark.django_db

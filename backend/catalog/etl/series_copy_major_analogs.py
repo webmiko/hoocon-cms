@@ -25,8 +25,9 @@ _FOOTNOTE = normalize_tech_copy(
     "уточняйте по паспорту / шильдику заменяемого привода.",
 )
 
-# Belimo non-spring families by torque (EU).
+# Belimo non-spring families by torque (EU datasheets: TMC2 / LM5 / NM10 / SM20 / GM40).
 _BELIMO_AIR: Final[dict[int, str]] = {
+    2: "TMC",
     5: "LM",
     8: "NM",
     10: "NM",
@@ -80,7 +81,8 @@ def _belimo_air(family: str, voltage: str, *, modulating: bool, aux: bool) -> st
     code = f"{family}{voltage}A"
     if modulating:
         code += "-SR"
-    if aux:
+    # TMC modulating: factory ``…-SR-S`` does not exist (aux = add-on S1A).
+    if aux and not (family == "TMC" and modulating):
         code += "-S"
     return f"Belimo {code}"
 
@@ -367,7 +369,11 @@ def build_qx_analogs(brand: str, nm: int) -> str:
     return normalize_tech_copy("\n".join(blocks).strip())
 
 
+_DAMU_SLUG = re.compile(r"(?i)^privod-vozdushniy-bez-pruzhini-damu-(?P<nm>\d+)nm$")
 _DAMQU_SLUG = re.compile(r"(?i)^privod-vozdushniy-da(?P<nm>\d+)mqu-\d+nm$")
+_SAMU_SLUG = re.compile(r"(?i)^privod-dimoudaleniya-(?P<nm>\d+)nm$")
+_DAFU_SLUG = re.compile(r"(?i)^privod-vozdushniy-pruzhina-dafu-(?P<nm>\d+)nm$")
+_SAFU_SLUG = re.compile(r"(?i)^privod-protivopozharniy-(?P<nm>\d+)nm$")
 _HVA_STD = re.compile(r"(?i)^privod-vozdushniy-hva-(?P<nm>\d+)nm$")
 _HVA_Q = re.compile(
     r"(?i)^privod-vozdushniy-bez-pruzhini-uskorenniy-hva-q-(?P<nm>\d+)nm$",
@@ -380,9 +386,30 @@ _HVD_QX = re.compile(r"(?i)^privod-vozdushniy-kondensator-hvd-(?P<nm>\d+)qx$")
 
 def analogs_text_for_product(product: Product) -> str | None:
     """Return curated major-brand analogs for a known gap product slug."""
+    from catalog.etl.series_copy_damu_analogs import build_damu_analogs
+    from catalog.etl.series_copy_spring_analogs import (
+        build_dafu_analogs,
+        build_safu_analogs,
+        build_samu_analogs,
+    )
+
     slug = product.slug or ""
     if slug == "privod-dimoudaleniya-7nm":
         return build_sa7mu_analogs()
+    m = _DAMU_SLUG.match(slug)
+    if m:
+        return build_damu_analogs(int(m.group("nm")))
+    m = _SAMU_SLUG.match(slug)
+    if m:
+        nm = int(m.group("nm"))
+        if nm != 7:
+            return build_samu_analogs(nm)
+    m = _DAFU_SLUG.match(slug)
+    if m:
+        return build_dafu_analogs(int(m.group("nm")))
+    m = _SAFU_SLUG.match(slug)
+    if m:
+        return build_safu_analogs(int(m.group("nm")))
     m = _DAMQU_SLUG.match(slug)
     if m:
         return build_damqu_analogs(int(m.group("nm")))

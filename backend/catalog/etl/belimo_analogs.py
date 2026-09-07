@@ -65,7 +65,10 @@ def normalize_belimo_code(raw: str) -> str:
     code = code.replace("−", "-").replace("—", "-").replace("–", "-")
     code = _TRAILING_PUNCT.sub("", code)
     code = " ".join(code.split())
-    return code.upper()
+    code = code.upper()
+    # Shop spelling ``TMC230ASR`` / ``LM230ASR`` → hyphenated ``…A-SR``.
+    return re.sub(r"ASR((?:-S)?)$", r"A-SR\1", code)
+
 
 
 def extract_belimo_codes_from_text(
@@ -175,6 +178,9 @@ def infer_belimo_codes(
 def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
     """Map purpose + torque band to Belimo series letters."""
     if purpose == "air_no_spring":
+        # TMC = 2 Нм (~35 с); LM = 5 Нм (~150 с). Do not map DA2MU → LM.
+        if moment_nm <= 2:
+            return "TMC"
         if moment_nm <= 6:
             return "LM"
         if moment_nm <= 12:
@@ -183,20 +189,22 @@ def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
             return "SM"
         return "GM"
     if purpose == "air_spring":
+        if moment_nm <= 3:
+            return "TF"
         if moment_nm <= 6:
             return "LF"
         if moment_nm <= 12:
             return "NF"
         return "SF"
     if purpose == "fire_spring":
-        # Compact fire/smoke spring-return: BFL 4/3 → BLF 6/4 → BFN 9/7.
+        # Compact fire/smoke spring-return: BFL 4/3 → BLF 6/4 → BFN 9/7 → BF 18/12.
         if moment_nm <= 4:
             return "BFL"
         if moment_nm <= 6.5:
             return "BLF"
         if moment_nm <= 12:
             return "BFN"
-        return "BFS"
+        return "BF"
     if purpose == "fast":
         # HVA compact uses BM compose path for ≤6; DAMQU/HVD-Q use L/N/S/GMQ.
         if moment_nm <= 6:
@@ -207,7 +215,15 @@ def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
             return "SMQ"
         return "GMQ"
     if purpose == "smoke":
-        return "CM"
+        # Smoke-control (no spring): BEN/BLE 15, BEE 25, BE 40.
+        # CM 2 Нм is compact *air* — never use it for SA..MU.
+        if moment_nm <= 12:
+            return "BEN"
+        if moment_nm <= 20:
+            return "BLE"
+        if moment_nm <= 30:
+            return "BEE"
+        return "BE"
     return None
 
 
@@ -228,8 +244,15 @@ def _compose_belimo_article(
         return base
 
     if purpose == "smoke":
-        # CM24-L/R style from smoke-removal cards.
-        return f"CM{voltage}-L/R"
+        # BEN24 / BLE24-T / BEE24ST / BE230 — not CM…-L/R (air compact).
+        if family == "CM":
+            return f"CM{voltage}-L/R"
+        if family == "BEE":
+            return f"BEE{voltage}{'ST' if thermal else ''}"
+        code = f"{family}{voltage}"
+        if thermal:
+            code += "-T"
+        return code
 
     if purpose == "fast" and family in {"LMQ", "NMQ", "SMQ", "GMQ"}:
         code = f"{family}{voltage}A"
@@ -239,35 +262,42 @@ def _compose_belimo_article(
             code += "-S"
         return code
 
-    if purpose == "fire_spring":
-        # BFL/BLF ship with 2× SPDT; classic BF/BFN/BFS use optional -S.
-        code = f"{family}{voltage}"
-        if family in {"BF", "BFN", "BFS"} and aux_spdt >= 1:
-            code += "-S"
-        if thermal:
-            code += "-T"
-        return code
-
     if purpose == "air_spring":
-        # NF24A / LF24-S / SF24A pattern from existing cards.
+        # TF24 / LF24-S / NF24A / SF24A-SR patterns from datasheets.
+        if family == "TF":
+            code = f"TF{voltage}"
+            if aux_spdt >= 1:
+                code += "-S"
+            return code
         if family == "LF":
+            if modulating:
+                return f"LF{voltage}-RS"
             code = f"LF{voltage}"
             if aux_spdt >= 1:
                 code += "-S"
             return code
         code = f"{family}{voltage}A"
         if modulating:
-            code += "-SR" if family != "NF" else "-A"
+            code += "-SR"
         if aux_spdt >= 1 and not code.endswith("-S"):
             code += "-S"
         return code
 
-    # Classic non-spring LM/NM/SM/GM.
+    if purpose == "fire_spring":
+        # BFL/BLF/BFN/BF ship with 2× SPDT; optional -T thermal.
+        code = f"{family}{voltage}"
+        if thermal:
+            code += "-T"
+        return code
+
+    # Classic non-spring LM/NM/SM/GM/TMC.
     code = f"{family}{voltage}A"
     if modulating:
         code += "-SR"
     if aux_spdt >= 1:
-        code += "-S"
+        # TMC modulating: Belimo ships aux as add-on S1A, not a factory ``…-SR-S``.
+        if not (family == "TMC" and modulating):
+            code += "-S"
     return code
 
 
@@ -384,17 +414,18 @@ def belimo_code_is_modulating(code: str | None) -> bool:
 def belimo_code_is_open_close(code: str | None) -> bool:
     """True for clear open/close Belimo articles (not proportional ``-SR``).
 
-    Matches ``CM230-L/R`` and ``LM24A-S`` / ``LM24A-S2``. Does **not** match
-    spring-return ``LF24-RS`` / ``LF24-S`` (``-RS`` / bare ``-S`` on LF/NF),
-    which appear on both control sides in Tilda cards.
+    Matches ``CM230-L/R``, ``TMC230A`` / ``TMC230A-S``, and ``LM24A`` /
+    ``LM24A-S``. Does **not** match spring-return ``LF24-RS`` / ``LF24-S``
+    (``-RS`` / bare ``-S`` on LF/NF), which appear on both control sides in
+    Tilda cards.
     """
     normalized = normalize_belimo_code(code or "")
     if not normalized or belimo_code_is_modulating(normalized):
         return False
     if re.search(r"-L(?:/R)?$|-R$", normalized):
         return True
-    # Classic non-spring LM/NM/SM/GM with aux ``-S`` and no ``-SR``.
-    return bool(re.search(r"^(?:LM|NM|SM|GM)\d+A-S\d?$", normalized))
+    # Non-spring LM/NM/SM/GM/TMC/LMC (± aux ``-S``), no ``-SR``.
+    return bool(re.search(r"^(?:LM|NM|SM|GM|TMC|LMC)\d+A(?:-S\d?)?$", normalized))
 
 
 def belimo_code_matches_control(code: str | None, control: str | None) -> bool:

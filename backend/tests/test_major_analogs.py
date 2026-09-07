@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from catalog.etl.series_copy_damu_analogs import build_damu_analogs
 from catalog.etl.series_copy_major_analogs import (
     analogs_text_for_product,
     apply_major_analogs_enrichment,
@@ -11,7 +12,54 @@ from catalog.etl.series_copy_major_analogs import (
     build_hvd_air_analogs,
     build_sa7mu_analogs,
 )
+from catalog.etl.series_copy_spring_analogs import (
+    build_dafu_analogs,
+    build_safu_analogs,
+    build_samu_analogs,
+)
 from catalog.models import SKU, Category, Product
+
+
+def test_build_damu_analogs_belimo_bands() -> None:
+    """DAMU 16/32 Нм map to SM/GM — not NM (10 Нм) from old Tilda cards."""
+    d16 = build_damu_analogs(16)
+    assert "DA16MU24-D" in d16
+    assert "Belimo SM24A" in d16
+    assert "Belimo NM24A" not in d16
+    assert "16 Нм" in d16.splitlines()[0]
+    d24 = build_damu_analogs(24)
+    assert "DA.MU 16 Нм" not in d24
+    assert "24 Нм" in d24.splitlines()[0]
+    assert "Belimo SM24A" in d24
+    d32 = build_damu_analogs(32)
+    assert "Belimo GM24A" in d32
+    assert "Belimo SM24A" not in d32
+    d2 = build_damu_analogs(2)
+    assert "Belimo TMC24A" in d2
+    assert "Belimo TMC230A-SR" in d2
+
+
+def test_build_samu_analogs_no_emf_or_cm() -> None:
+    """SA10/15 smoke use BEN/BLE — not invented EMF / CM 2 Нм."""
+    sa10 = build_samu_analogs(10)
+    assert "Belimo BEN24" in sa10
+    assert "EMF" not in sa10
+    assert "CM24" not in sa10
+    sa15 = build_samu_analogs(15)
+    assert "Belimo BLE24" in sa15 or "Belimo BEN24" in sa15
+    assert "Belimo BLE24-T" in sa15 or "Belimo BEN24-T" in sa15
+
+
+def test_build_dafu_safu_belimo_families() -> None:
+    """DA15FU → SF (not BF/BX); SA20FU → BF (not BFL-20N)."""
+    da15 = build_dafu_analogs(15)
+    assert "Belimo SF24A" in da15
+    assert "BX24" not in da15
+    assert "Belimo BF24" not in da15
+    sa20 = build_safu_analogs(20)
+    assert "Belimo BF24" in sa20
+    assert "BFL24-20" not in sa20
+    assert "BLF230-20" not in sa20
 
 
 def test_build_damqu_analogs_major_brands_only() -> None:
