@@ -878,6 +878,40 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   top: 0;
 }
 
+/* Keep sticky header tools inset from the viewport/header right edge. */
+.hoocon-header-userlinks {
+  margin-right: 2rem;
+}
+
+/* Sticky header: nav_global_side is bare <li>s (no ul.object-tools). */
+.hoocon-header-object-tools {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.hoocon-header-object-tools > li {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  max-width: 100%;
+  overflow: visible;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+}
+
+.hoocon-header-object-tools > li::marker {
+  content: none;
+}
+
 /* ── Sidebar shell / rail ───────────────────────────────────────────
  * ≥1024: 72px flex spacer + fixed panel (does not scroll with page).
  * <1024: hide until .hoocon-nav-shell--open; panel is fixed overlay.
@@ -1740,7 +1774,6 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     background: var(--hoocon-surface);
     box-shadow: var(--hoocon-shadow-soft);
     cursor: pointer;
-  }
 
   .hoocon-lead-kanban__cards > tr > td.field-open_link,
   .hoocon-lead-kanban__cards > tr > th.field-open_link,

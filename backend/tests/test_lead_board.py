@@ -40,15 +40,20 @@ def _css_rule_body(css: str, selector: str) -> str:
 
 
 def test_lead_board_css_header_object_tools_row() -> None:
-    """Sticky header object-tools stay a horizontal row (bare <li>, no ul)."""
-    admin_css = (_BACKEND / "static/admin/css/hoocon-admin.css").read_text(encoding="utf-8")
-    row = _css_rule_body(admin_css, ".hoocon-header-object-tools")
+    """Sticky header object-tools stay a horizontal row (bare <li>, no ul).
+
+    Must live in hoocon-unfold-extras.css — Unfold does not load hoocon-admin.css.
+    """
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    row = _css_rule_body(css, ".hoocon-header-object-tools")
     assert "display: flex" in row
     assert "flex-direction: row" in row
     assert "align-items: center" in row
-    items = _css_rule_body(admin_css, ".hoocon-header-object-tools > li")
+    items = _css_rule_body(css, ".hoocon-header-object-tools > li")
     assert "display: inline-flex" in items
     assert "list-style: none" in items
+    userlinks = _css_rule_body(css, ".hoocon-header-userlinks")
+    assert "margin-right: 2rem" in userlinks
 
 
 def test_lead_board_css_phone_header_hamburger() -> None:
@@ -139,6 +144,7 @@ def test_lead_board_js_classifies_status_badges_and_wall_headings() -> None:
     assert 'new: "Новая"' in src
     assert 'in_progress: "В работе"' in src
     assert 'done: "Завершена"' in src
+
 
 
 @pytest.mark.django_db
