@@ -439,6 +439,11 @@ TELEGRAM_WELCOME_PHOTO_URL = os.getenv(
     "TELEGRAM_WELCOME_PHOTO_URL",
     "https://hoocon.ru/og-image.jpg",
 ).strip()
+# Outbound Bot API base (Cloudflare Worker reverse proxy when VPS cannot reach
+# api.telegram.org). Example: https://hoocon-telegram-api.npok9.workers.dev
+TELEGRAM_API_BASE = os.getenv("TELEGRAM_API_BASE", "").strip().rstrip("/")
+# Optional HTTP(S) proxy for Telegram only (overrides HTTPS_PROXY for Bot API).
+TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL", "").strip()
 
 # Web Push (VAPID). Generate: poetry run vapid --gen && set env on VPS.
 WEBPUSH_VAPID_PUBLIC_KEY = os.getenv("WEBPUSH_VAPID_PUBLIC_KEY", "").strip()

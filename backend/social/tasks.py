@@ -56,3 +56,28 @@ def announce_content_task(
     for post in posts:
         counts[post.status] = counts.get(post.status, 0) + 1
     return counts
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(OSError, TimeoutError),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 2},
+    name="social.process_telegram_update",
+)
+def process_telegram_update_task(self: Any, update: dict[str, Any]) -> None:
+    """Handle an inbound Telegram Update off the webhook request thread.
+
+    Keeps the webhook fast (Telegram retries on slow/timeout responses) while
+    outbound Bot API calls may take several seconds via proxy retries.
+    """
+    from social.telegram_bot import handle_telegram_update
+
+    try:
+        handle_telegram_update(update)
+    except Exception as exc:
+        logger.warning(
+            "telegram_update_task_failed error=%s",
+            type(exc).__name__,
+        )
+        raise

@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 def test_telegram_webhook_rejects_bad_secret(settings) -> None:
     """Missing or wrong secret token returns 403."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     client = APIClient()
     url = reverse("telegram-webhook")
@@ -31,14 +32,13 @@ def test_telegram_webhook_rejects_bad_secret(settings) -> None:
 
 
 @pytest.mark.django_db
-def test_telegram_webhook_start_sends_photo(settings, tmp_path) -> None:
-    """/start replies via multipart sendPhoto with welcome caption."""
+def test_telegram_webhook_start_sends_photo(settings) -> None:
+    """/start replies via sendPhoto with public photo URL + welcome caption."""
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     settings.SITE_URL = "https://hoocon.ru"
-    cover = tmp_path / "welcome.webp"
-    cover.write_bytes(b"WEBPFAKE")
-    settings.TELEGRAM_WELCOME_PHOTO_PATH = str(cover)
+    settings.TELEGRAM_WELCOME_PHOTO_URL = "https://hoocon.ru/og-image.jpg"
 
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -66,22 +66,22 @@ def test_telegram_webhook_start_sends_photo(settings, tmp_path) -> None:
     assert response.json() == {"ok": True}
     req = mocked.call_args.args[0]
     assert "sendPhoto" in req.full_url
-    assert "multipart/form-data" in req.headers.get("Content-type", "")
-    raw = req.data
-    assert b"4242" in raw
-    assert b"HOOCON" in raw
-    assert "Перейти в канал".encode() in raw
-    assert "На сайт".encode() in raw
-    assert "Контакты".encode() in raw
-    assert "Где купить".encode() in raw
-    assert "Помощь".encode() not in raw
-    assert b"reply_markup" in raw
-    assert b"WEBPFAKE" in raw
+    body = json.loads(req.data.decode("utf-8"))
+    assert body["chat_id"] == "4242"
+    assert body["photo"] == "https://hoocon.ru/og-image.jpg"
+    assert "HOOCON" in body["caption"]
+    kb = body["reply_markup"]["keyboard"]
+    assert kb[0][0]["text"] == "Перейти в канал"
+    assert kb[1][0]["text"] == "На сайт"
+    assert kb[1][1]["text"] == "Контакты"
+    assert kb[2][0]["text"] == "Где купить"
+    assert "Помощь" not in json.dumps(body, ensure_ascii=False)
 
 
 @pytest.mark.django_db
 def test_telegram_webhook_menu_button_channel(settings) -> None:
     """Reply-keyboard «Перейти в канал» triggers channel action (not ingest)."""
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
 
@@ -117,14 +117,13 @@ def test_telegram_webhook_menu_button_channel(settings) -> None:
 
 
 @pytest.mark.django_db
-def test_telegram_webhook_contacts_sends_photo(settings, tmp_path) -> None:
-    """«Контакты» replies with cover photo and requisites caption."""
+def test_telegram_webhook_contacts_sends_photo(settings) -> None:
+    """«Контакты» replies with cover photo URL and requisites caption."""
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     settings.SITE_URL = "https://hoocon.ru"
-    cover = tmp_path / "welcome.webp"
-    cover.write_bytes(b"WEBPFAKE")
-    settings.TELEGRAM_WELCOME_PHOTO_PATH = str(cover)
+    settings.TELEGRAM_WELCOME_PHOTO_URL = "https://hoocon.ru/og-image.jpg"
 
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -149,17 +148,18 @@ def test_telegram_webhook_contacts_sends_photo(settings, tmp_path) -> None:
     assert response.status_code == 200
     req = mocked.call_args.args[0]
     assert "sendPhoto" in req.full_url
-    raw = req.data
-    assert b"WEBPFAKE" in raw
-    assert "Реквизиты".encode() in raw
-    assert b"5024199634" in raw
-    assert b"kontakty" in raw
+    body = json.loads(req.data.decode("utf-8"))
+    assert body["photo"] == "https://hoocon.ru/og-image.jpg"
+    assert "Реквизиты" in body["caption"]
+    assert "5024199634" in body["caption"]
+    assert "kontakty" in body["caption"]
 
 
 @pytest.mark.django_db
 def test_telegram_webhook_where_to_buy_lists_partners(settings) -> None:
     """«Где купить» lists retail partners without photo."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     settings.SITE_URL = "https://hoocon.ru"
 
@@ -224,6 +224,7 @@ def test_sync_telegram_bot_menu_calls_set_my_commands(settings) -> None:
 def test_telegram_webhook_plain_text_goes_to_support_inbox(settings) -> None:
     """Free-form text creates a support Conversation + Message (no Bot API send)."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     from supportchat.models import Channel, Conversation, Message
     from supportchat.schedule import ensure_default_schedule
@@ -315,6 +316,7 @@ def test_staff_reply_delivers_to_telegram(settings) -> None:
 def test_telegram_webhook_channel_command_sends_message(settings) -> None:
     """/channel uses sendMessage with channel link."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
 
     mock_resp = MagicMock()
@@ -366,6 +368,7 @@ def test_parse_bot_command_strips_bot_suffix() -> None:
 def test_telegram_webhook_photo_caption_goes_to_support_inbox(settings) -> None:
     """Photo/document caption is ingested when ``text`` is absent."""
     settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.TELEGRAM_BOT_TOKEN = "bot-token"
     from supportchat.models import Channel, Conversation, Message
     from supportchat.schedule import ensure_default_schedule

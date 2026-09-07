@@ -13,8 +13,6 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from social.telegram_bot import handle_telegram_update
-
 logger = logging.getLogger("hoocon.social")
 
 _TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
@@ -27,7 +25,8 @@ class TelegramWebhookView(APIView):
     Validates ``X-Telegram-Bot-Api-Secret-Token`` against
     ``TELEGRAM_WEBHOOK_SECRET``. Always returns JSON ``{"ok": true}`` on
     accepted requests so Telegram does not retry forever on handler bugs
-    after auth succeeded.
+    after auth succeeded. Processing runs in Celery so egress retries do not
+    block the webhook response.
     """
 
     permission_classes = [AllowAny]
@@ -36,7 +35,7 @@ class TelegramWebhookView(APIView):
     throttle_scope = _THROTTLE_SCOPE
 
     def post(self, request: Request) -> Response:
-        """Accept a Telegram Update and optionally reply to a command."""
+        """Accept a Telegram Update and enqueue reply handling."""
         expected = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "").strip()
         provided = (request.headers.get(_TELEGRAM_SECRET_HEADER) or "").strip()
         if not expected or provided != expected:
@@ -46,9 +45,23 @@ class TelegramWebhookView(APIView):
         if not isinstance(payload, dict):
             return Response({"ok": True}, status=status.HTTP_200_OK)
 
+        from social.tasks import process_telegram_update_task
+
         try:
-            handle_telegram_update(payload)
+            process_telegram_update_task.delay(payload)
         except Exception as exc:
-            # Never leak update body / PII; log exception type only.
-            logger.warning("telegram_webhook_handler_failed error=%s", type(exc).__name__)
+            # Broker down: fall back to sync so /start still works in local/dev.
+            logger.warning(
+                "telegram_webhook_enqueue_failed error=%s falling_back_sync",
+                type(exc).__name__,
+            )
+            try:
+                from social.telegram_bot import handle_telegram_update
+
+                handle_telegram_update(payload)
+            except Exception as sync_exc:
+                logger.warning(
+                    "telegram_webhook_handler_failed error=%s",
+                    type(sync_exc).__name__,
+                )
         return Response({"ok": True}, status=status.HTTP_200_OK)

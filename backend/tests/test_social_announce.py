@@ -261,8 +261,9 @@ def test_site_settings_admin_blank_token_keeps_existing(django_user_model) -> No
 
 @pytest.mark.django_db
 def test_announce_telegram_with_cover_uses_send_photo(settings, tmp_path) -> None:
-    """Cover file triggers multipart sendPhoto instead of sendMessage."""
+    """Cover triggers sendPhoto with public URL (preferred over multipart)."""
     settings.TELEGRAM_BOT_TOKEN = "bot-token-test"
+    settings.SITE_URL = "https://hoocon.ru"
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     from content.models import News
@@ -275,7 +276,6 @@ def test_announce_telegram_with_cover_uses_send_photo(settings, tmp_path) -> Non
     site.telegram_chat_id = "-100999"
     site.save()
 
-    # Minimal valid WebP (1×1) is overkill — Telegram accepts any bytes in our mock.
     cover = SimpleUploadedFile("cover.webp", b"WEBPFAKE", content_type="image/webp")
     news = News.objects.create(
         title="С обложкой",
@@ -299,9 +299,10 @@ def test_announce_telegram_with_cover_uses_send_photo(settings, tmp_path) -> Non
     assert created[0].external_id == "99"
     req = mocked.call_args.args[0]
     assert "sendPhoto" in req.full_url
-    assert b"multipart/form-data" in req.headers.get("Content-type", "").encode() or (
-        "multipart/form-data" in req.headers.get("Content-type", "")
-    )
+    body = req.data.decode("utf-8")
+    assert "parse_mode" in body
+    assert "cover.webp" in body or "/media/" in body
+    assert "multipart/form-data" not in req.headers.get("Content-type", "")
 
 
 @pytest.mark.django_db

@@ -269,12 +269,11 @@ def _publish_photo_or_text(
     reply_markup: dict[str, Any],
 ) -> PublishResult:
     """sendPhoto with welcome cover; fall back to text if photo fails."""
-    local = welcome_photo_path()
     result = publish_telegram(
         chat_id=chat_id,
         text=caption,
-        photo_path=local,
-        photo_url=None if local is not None else welcome_photo_url(),
+        photo_path=welcome_photo_path(),
+        photo_url=welcome_photo_url(),
         reply_markup=reply_markup,
     )
     if not result.ok and not result.skipped:

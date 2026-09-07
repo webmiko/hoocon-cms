@@ -5,19 +5,32 @@ from __future__ import annotations
 import json
 import logging
 import mimetypes
+import os
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
+from http.client import HTTPResponse
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
+
+from django.conf import settings
 
 from sitesettings.credentials import max_bot_token, telegram_bot_token, vk_access_token
 
 logger = logging.getLogger("hoocon.social")
 
 _HTTP_TIMEOUT_SEC = 20
+# Shorter per-attempt timeout + retries: VPS→Telegram often stalls ~20s then fails.
+_TELEGRAM_TIMEOUT_SEC = 8
+_TELEGRAM_RETRIES = 3
+# workers.dev blocks default Python-urllib UA (Cloudflare error 1010).
+_TELEGRAM_USER_AGENT = "HooconCMS/1.12 (+https://hoocon.ru)"
+
+UrlOpenFn = Callable[..., HTTPResponse]
 
 
 @dataclass(frozen=True)
@@ -30,11 +43,66 @@ class PublishResult:
     skipped: bool = False
 
 
+def telegram_api_base() -> str:
+    """Bot API host (default ``https://api.telegram.org``).
+
+    Set ``TELEGRAM_API_BASE`` to a Cloudflare Worker / reverse proxy when the
+    VPS cannot reach ``api.telegram.org`` reliably (e.g. reg.ru MSK egress).
+    """
+    base = (getattr(settings, "TELEGRAM_API_BASE", "") or "").strip()
+    if not base:
+        base = "https://api.telegram.org"
+    return base.rstrip("/")
+
+
+def telegram_method_url(token: str, method: str) -> str:
+    """Build ``{base}/bot{token}/{method}``."""
+    return f"{telegram_api_base()}/bot{token}/{method}"
+
+
+def _telegram_proxy_url() -> str:
+    """Optional HTTPS proxy for Telegram egress (``TELEGRAM_PROXY_URL`` / env)."""
+    explicit = (getattr(settings, "TELEGRAM_PROXY_URL", "") or "").strip()
+    if explicit:
+        return explicit
+    return (os.getenv("HTTPS_PROXY") or os.getenv("https_proxy") or "").strip()
+
+
+def _telegram_urlopen(
+    request: Request,
+    *,
+    timeout: float = _TELEGRAM_TIMEOUT_SEC,
+) -> HTTPResponse:
+    """urlopen with optional proxy and short retries (network / 5xx / 429)."""
+    if not request.has_header("User-agent"):
+        request.add_header("User-Agent", _TELEGRAM_USER_AGENT)
+    proxy = _telegram_proxy_url()
+    last_exc: BaseException | None = None
+    for attempt in range(_TELEGRAM_RETRIES):
+        try:
+            if proxy:
+                opener = build_opener(ProxyHandler({"https": proxy, "http": proxy}))
+                return opener.open(request, timeout=timeout)  # noqa: S310
+            return urlopen(request, timeout=timeout)  # noqa: S310
+        except HTTPError as exc:
+            last_exc = exc
+            if exc.code < 500 and exc.code != 429:
+                raise
+        except (URLError, TimeoutError, OSError) as exc:
+            last_exc = exc
+        if attempt + 1 < _TELEGRAM_RETRIES:
+            time.sleep(0.15 * (2**attempt))
+    assert last_exc is not None
+    raise last_exc
+
+
 def _post_json(
     url: str,
     *,
     payload: dict[str, Any],
     headers: dict[str, str] | None = None,
+    open_fn: UrlOpenFn = urlopen,
+    timeout: float = _HTTP_TIMEOUT_SEC,
 ) -> tuple[int, dict[str, Any]]:
     """POST JSON and return status + parsed body (empty dict on non-JSON)."""
     body = json.dumps(payload).encode("utf-8")
@@ -42,7 +110,7 @@ def _post_json(
     if headers:
         req_headers.update(headers)
     request = Request(url, data=body, headers=req_headers, method="POST")
-    with urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:  # noqa: S310
+    with open_fn(request, timeout=timeout) as response:  # noqa: S310
         raw = response.read().decode("utf-8", errors="replace")
         status = getattr(response, "status", 200)
     return int(status), _parse_json_dict(raw)
@@ -64,6 +132,8 @@ def _post_multipart(
     *,
     fields: dict[str, str],
     files: dict[str, tuple[str, bytes, str]],
+    open_fn: UrlOpenFn = urlopen,
+    timeout: float = _HTTP_TIMEOUT_SEC,
 ) -> tuple[int, dict[str, Any]]:
     """POST multipart/form-data (Telegram file upload).
 
@@ -71,6 +141,8 @@ def _post_multipart(
         url: Endpoint URL.
         fields: Text form fields.
         files: ``name -> (filename, content, content_type)``.
+        open_fn: urllib opener (Telegram uses retries + optional proxy).
+        timeout: Socket timeout seconds.
     """
     boundary = f"----HooconBoundary{uuid.uuid4().hex}"
     chunks: list[bytes] = []
@@ -97,7 +169,7 @@ def _post_multipart(
         },
         method="POST",
     )
-    with urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:  # noqa: S310
+    with open_fn(request, timeout=timeout) as response:  # noqa: S310
         raw = response.read().decode("utf-8", errors="replace")
         status = getattr(response, "status", 200)
     return int(status), _parse_json_dict(raw)
@@ -114,13 +186,18 @@ def _telegram_api_result(status: int, data: dict[str, Any]) -> PublishResult:
 
 
 def telegram_api_call(method: str, payload: dict[str, Any] | None = None) -> PublishResult:
-    """POST JSON to ``https://api.telegram.org/bot<token>/<method>``."""
+    """POST JSON to ``{TELEGRAM_API_BASE}/bot<token>/<method>``."""
     token = telegram_bot_token()
     if not token:
         return PublishResult(ok=False, skipped=True, error="Telegram не настроен")
-    url = f"https://api.telegram.org/bot{token}/{method}"
+    url = telegram_method_url(token, method)
     try:
-        status, data = _post_json(url, payload=payload or {})
+        status, data = _post_json(
+            url,
+            payload=payload or {},
+            open_fn=_telegram_urlopen,
+            timeout=_TELEGRAM_TIMEOUT_SEC,
+        )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_api_%s_failed error=%s", method, type(exc).__name__)
         return PublishResult(ok=False, error=f"Telegram: {type(exc).__name__}")
@@ -137,9 +214,9 @@ def publish_telegram(
 ) -> PublishResult:
     """Send message (or cover photo + caption) via Telegram Bot API.
 
-    Prefer local ``photo_path`` (multipart ``sendPhoto``); else public
-    ``photo_url``; else plain ``sendMessage``. Caption / text uses HTML
-    parse_mode (Telegram HTML subset).
+    Prefer public ``photo_url`` (Telegram fetches it; smaller egress from VPS);
+    else local ``photo_path`` (multipart ``sendPhoto``); else plain
+    ``sendMessage``. Caption / text uses HTML parse_mode (Telegram HTML subset).
 
     Args:
         chat_id: Target chat / channel id.
@@ -156,6 +233,14 @@ def publish_telegram(
         return PublishResult(ok=False, skipped=True, error="Telegram не настроен")
 
     chat = chat_id.strip()
+    if photo_url and photo_url.strip():
+        return _publish_telegram_photo_url(
+            token,
+            chat=chat,
+            caption=text,
+            photo_url=photo_url.strip(),
+            reply_markup=reply_markup,
+        )
     path = Path(photo_path) if photo_path else None
     if path is not None and path.is_file():
         return _publish_telegram_photo_file(
@@ -163,14 +248,6 @@ def publish_telegram(
             chat=chat,
             caption=text,
             path=path,
-            reply_markup=reply_markup,
-        )
-    if photo_url and photo_url.strip():
-        return _publish_telegram_photo_url(
-            token,
-            chat=chat,
-            caption=text,
-            photo_url=photo_url.strip(),
             reply_markup=reply_markup,
         )
     return _publish_telegram_message(
@@ -201,7 +278,7 @@ def _publish_telegram_message(
     reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """Plain sendMessage with HTML parse_mode."""
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = telegram_method_url(token, "sendMessage")
     try:
         status, data = _post_json(
             url,
@@ -214,6 +291,8 @@ def _publish_telegram_message(
                 },
                 reply_markup,
             ),
+            open_fn=_telegram_urlopen,
+            timeout=_TELEGRAM_TIMEOUT_SEC,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_publish_failed error=%s", type(exc).__name__)
@@ -230,7 +309,7 @@ def _publish_telegram_photo_url(
     reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """sendPhoto with a publicly reachable photo URL."""
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    url = telegram_method_url(token, "sendPhoto")
     try:
         status, data = _post_json(
             url,
@@ -243,6 +322,8 @@ def _publish_telegram_photo_url(
                 },
                 reply_markup,
             ),
+            open_fn=_telegram_urlopen,
+            timeout=_TELEGRAM_TIMEOUT_SEC,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_photo_url_failed error=%s", type(exc).__name__)
@@ -259,7 +340,7 @@ def _publish_telegram_photo_file(
     reply_markup: dict[str, Any] | None = None,
 ) -> PublishResult:
     """sendPhoto multipart upload from a local cover file."""
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    url = telegram_method_url(token, "sendPhoto")
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     fields = {
         "chat_id": chat,
@@ -274,6 +355,8 @@ def _publish_telegram_photo_file(
             url,
             fields=fields,
             files={"photo": (path.name, content, content_type)},
+            open_fn=_telegram_urlopen,
+            timeout=_TELEGRAM_TIMEOUT_SEC,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_photo_file_failed error=%s", type(exc).__name__)
