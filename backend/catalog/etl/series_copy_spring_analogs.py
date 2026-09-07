@@ -103,15 +103,9 @@ def build_samu_analogs(nm: int) -> str:
         raise ValueError(f"No Belimo smoke band for SA{nm}MU")
     primary, secondary = families
     blocks: list[str] = [
-        (
-            f"Список аналогов для привода заслонки дымоудаления Hoocon "
-            f"серии SA{nm}MU (без возвратной пружины, {nm} Нм)"
-        ),
+        (f"Список аналогов для привода заслонки дымоудаления Hoocon серии SA{nm}MU (без возвратной пружины, {nm} Нм)"),
         "",
-        (
-            "Belimo smoke-control (каталог): BEN/BLE ≈ 15 Нм, BEE ≈ 25 Нм, "
-            "BE ≈ 40 Нм. CM 2 Нм — не класс дымоудаления."
-        ),
+        ("Belimo smoke-control (каталог): BEN/BLE ≈ 15 Нм, BEE ≈ 25 Нм, BE ≈ 40 Нм. CM 2 Нм — не класс дымоудаления."),
         "",
         "Крупные марки: Belimo, Siemens, Honeywell, Gruner.",
         "",
@@ -148,10 +142,7 @@ def build_dafu_analogs(nm: int) -> str:
     if not family:
         raise ValueError(f"No Belimo spring band for DA{nm}FU")
     blocks: list[str] = [
-        (
-            f"Список аналогов для привода заслонки Hoocon серии DA{nm}FU "
-            f"(с возвратной пружиной, {nm} Нм)"
-        ),
+        (f"Список аналогов для привода заслонки Hoocon серии DA{nm}FU (с возвратной пружиной, {nm} Нм)"),
         "",
         (
             "Belimo spring-return air (каталог): TF ≈ 2.5 / LF ≈ 4 / NF ≈ 10 / "
@@ -172,8 +163,7 @@ def build_dafu_analogs(nm: int) -> str:
                 f"– {_spring_air_belimo(family, voltage, modulating=False, aux=aux)}",
             )
             blocks.append(
-                f"– Siemens {'GCA' if voltage == '230' else 'GDB'}"
-                f"{'126' if aux else '121'}.1E",
+                f"– Siemens {'GCA' if voltage == '230' else 'GDB'}{'126' if aux else '121'}.1E",
             )
             blocks.append("")
         # Modulating editions exist on 24 В cards for 5/10/15/20 Нм.
@@ -197,15 +187,9 @@ def build_safu_analogs(nm: int) -> str:
     if not family:
         raise ValueError(f"No Belimo fire band for SA{nm}FU")
     blocks: list[str] = [
-        (
-            f"Список аналогов для противопожарного привода Hoocon серии SA{nm}FU "
-            f"(пружинный возврат, {nm} Нм)"
-        ),
+        (f"Список аналогов для противопожарного привода Hoocon серии SA{nm}FU (пружинный возврат, {nm} Нм)"),
         "",
-        (
-            "Belimo fire (каталог): BFL ≈ 4/3, BLF ≈ 6/4, BFN ≈ 9/7, "
-            "BF ≈ 18/12 Нм (мотор/пружина)."
-        ),
+        ("Belimo fire (каталог): BFL ≈ 4/3, BLF ≈ 6/4, BFN ≈ 9/7, BF ≈ 18/12 Нм (мотор/пружина)."),
         "",
         "Крупные марки: Belimo, Siemens, Honeywell, Gruner.",
         "",
@@ -221,8 +205,7 @@ def build_safu_analogs(nm: int) -> str:
                 tag = "FST" if thermal else "FSR"
                 blocks.append(f"– Belimo {tag}-{voltage}-3N")
             blocks.append(
-                f"– Gruner 340{'TA' if thermal else ''}-{voltage}-"
-                f"{'05' if nm <= 5 else '10'}-S2",
+                f"– Gruner 340{'TA' if thermal else ''}-{voltage}-{'05' if nm <= 5 else '10'}-S2",
             )
             blocks.append("")
     blocks.append(_FOOTNOTE)

@@ -42,10 +42,7 @@ def build_damu_analogs(nm: int) -> str:
 
     band = DAMU_BELIMO_NM.get(nm, nm)
     blocks: list[str] = [
-        (
-            f"Список аналогов для привода заслонки Hoocon серии DA{nm}MU "
-            f"(без возвратной пружины, {nm} Нм)"
-        ),
+        (f"Список аналогов для привода заслонки Hoocon серии DA{nm}MU (без возвратной пружины, {nm} Нм)"),
         "",
         (
             "Belimo: ближайший класс по каталогу "
@@ -63,11 +60,7 @@ def build_damu_analogs(nm: int) -> str:
             (True, True, "AS"),
         ):
             code = f"DA{nm}MU{voltage}-{suf}"
-            mode = (
-                "пропорциональное (модулирующее) 0…10 В"
-                if modulating
-                else "2-/3-позиционное"
-            )
+            mode = "пропорциональное (модулирующее) 0…10 В" if modulating else "2-/3-позиционное"
             aux_note = ", со вспомогательным(и) переключателем(ями)" if aux else ""
             blocks.append(f"Аналоги для {code} ({voltage} В, {mode}{aux_note}):")
             blocks.extend(

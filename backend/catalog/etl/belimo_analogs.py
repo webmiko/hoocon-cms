@@ -70,7 +70,6 @@ def normalize_belimo_code(raw: str) -> str:
     return re.sub(r"ASR((?:-S)?)$", r"A-SR\1", code)
 
 
-
 def extract_belimo_codes_from_text(
     text: str,
     *,
