@@ -1375,6 +1375,17 @@
   margin-top: 2px;
 }
 
+/* Carousel cards are narrow: split spec rows evenly so the label never
+   collapses to a near-zero width and renders vertically letter-by-letter. */
+.card.cardCarousel .cardSpecs li {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: flex-start;
+}
+
+.card.cardCarousel .cardSpecValue {
+  text-align: left;
+}
+
 .card.cardCarousel .cardFooter {
   flex-shrink: 0;
   margin-top: auto;
