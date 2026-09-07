@@ -109,23 +109,34 @@ def resend_staff_otp(request: HttpRequest, challenge_id: str) -> None:
 
 
 def verify_staff_otp(challenge_id: str, raw_code: str) -> AbstractBaseUser:
-    """Validate code; return staff user. Deletes challenge on success."""
+    """Validate code; return staff user. Deletes challenge on success.
+
+    Uses ``cache.incr`` for the attempt counter so concurrent verify
+    calls cannot race past the attempt limit.
+    """
     key = _challenge_key(challenge_id)
+    attempts_key = f"{key}:attempts"
     raw = cache.get(key)
     if not isinstance(raw, dict):
         raise AdminOtpVerifyError("Код истёк. Запросите новый.")
-    attempts = int(raw.get("attempts") or 0)
-    if attempts >= otp_max_attempts():
+    # Atomic increment — two concurrent verify calls both get counted.
+    try:
+        attempts = cache.incr(attempts_key)
+    except ValueError:
+        # Key expired between get and incr — treat as first attempt.
+        cache.set(attempts_key, 1, timeout=otp_ttl_seconds())
+        attempts = 1
+    if attempts > otp_max_attempts():
         cache.delete(key)
+        cache.delete(attempts_key)
         raise AdminOtpVerifyError("Слишком много попыток. Запросите новый код.")
     if not hmac_compare(raw.get("code_hash", ""), hash_otp_code(raw_code)):
-        raw["attempts"] = attempts + 1
-        cache.set(key, raw, timeout=otp_ttl_seconds())
         raise AdminOtpVerifyError("Неверный код.")
     from django.contrib.auth import get_user_model
 
     user = get_user_model().objects.filter(pk=raw["user_id"], is_active=True, is_staff=True).first()
     cache.delete(key)
+    cache.delete(attempts_key)
     if user is None:
         raise AdminOtpVerifyError("Учётная запись недоступна.")
     return user
