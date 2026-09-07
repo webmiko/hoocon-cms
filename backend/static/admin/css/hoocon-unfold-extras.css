@@ -1475,6 +1475,338 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   cursor: pointer;
 }
 
+/* Leads board: tablet/desktop wall grid — 2–3 cards per row, fixed card width.
+ * Unfold puts each result row in its own <tbody>; grid the <table> and use
+ * display:contents on tbodies so all <tr> participate in one grid. */
+@media (min-width: 768px) {
+  /* Unfold uses -mx-4 on #changelist — restore inset so cards don't hug edges. */
+  body.hoocon-lead-board #changelist.module,
+  body.hoocon-lead-board #changelist {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-bottom: 1rem;
+    box-sizing: border-box;
+  }
+
+  /* White results frame hugs the table — keep inner inset on the board. */
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    .results,
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    .overflow-x-auto {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
+    display: grid !important;
+    /* Fixed 3 tracks on desktop wall; cards share width and stay centered. */
+    grid-template-columns: repeat(3, minmax(0, 24rem));
+    gap: 1.15rem 1.25rem;
+    align-items: stretch;
+    justify-content: center;
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.85rem 0.35rem 1rem;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody {
+    display: contents;
+  }
+
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin-bottom: 0;
+    height: 100%;
+    min-height: 100%;
+  }
+
+  /* Pin «Открыть» to the card footer so buttons share one baseline in a row. */
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > td.field-open_link,
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > th.field-open_link,
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > td.field-open_lead,
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > th.field-open_lead,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > td.field-open_link,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > th.field-open_link,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > td.field-open_lead,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr
+    > th.field-open_lead {
+    margin-top: auto;
+    padding-top: 0.75rem !important;
+  }
+
+  body.hoocon-lead-board #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr.hoocon-lead-wall-heading {
+    display: block !important;
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+    margin: 0.65rem 0 0.15rem;
+    padding: 0.2rem 0.2rem 0.1rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    cursor: default;
+    height: auto;
+  }
+
+  body.hoocon-lead-board #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr.hoocon-lead-wall-heading
+    td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--hoocon-quiet);
+  }
+
+  body.hoocon-lead-board #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr.hoocon-lead-wall-heading
+    td::before {
+    display: none !important;
+  }
+}
+
+/* Leads kanban (tablet/desktop only). */
+@media (min-width: 768px) {
+  .hoocon-lead-kanban {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(16rem, 1fr));
+    gap: 1.15rem 1.25rem;
+    align-items: start;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.35rem 0.15rem 0.75rem;
+    box-sizing: border-box;
+  }
+
+  .hoocon-lead-kanban__col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 16rem;
+    padding: 0.85rem;
+    border: 1px solid var(--hoocon-glass-border);
+    border-radius: var(--hoocon-radius);
+    background: color-mix(in srgb, var(--hoocon-surface-muted) 55%, transparent);
+  }
+
+  .hoocon-lead-kanban__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    min-height: 1.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--hoocon-quiet);
+    line-height: 1.2;
+  }
+
+  .hoocon-lead-kanban__count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--hoocon-ink, inherit);
+  }
+
+  .hoocon-lead-kanban__cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .hoocon-lead-kanban__cards > tr {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 0;
+    padding: 0.85rem 1.05rem 0.95rem;
+    border: 1px solid var(--hoocon-glass-border);
+    border-radius: var(--hoocon-radius);
+    background: var(--hoocon-surface);
+    box-shadow: var(--hoocon-shadow-soft);
+    cursor: pointer;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.field-open_link,
+  .hoocon-lead-kanban__cards > tr > th.field-open_link,
+  .hoocon-lead-kanban__cards > tr > td.field-open_lead,
+  .hoocon-lead-kanban__cards > tr > th.field-open_lead {
+    margin-top: auto;
+    padding-top: 0.75rem !important;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td,
+  .hoocon-lead-kanban__cards > tr > th {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 32%) minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: baseline;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.45rem 0;
+    border: none;
+    border-bottom: 1px solid var(--hoocon-hairline);
+    text-align: left;
+    white-space: normal;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td:last-child,
+  .hoocon-lead-kanban__cards > tr > th:last-child {
+    border-bottom: none;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td::before,
+  .hoocon-lead-kanban__cards > tr > th::before {
+    content: attr(data-label);
+    display: block;
+    font-weight: 600;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--hoocon-quiet);
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.action-checkbox {
+    display: inline-flex !important;
+    width: auto !important;
+    border-bottom: 1px solid var(--hoocon-hairline);
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.action-checkbox::before {
+    content: attr(data-label);
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.hoocon-admin-cell-blank,
+  .hoocon-lead-kanban__cards > tr > th.hoocon-admin-cell-blank,
+  .hoocon-lead-kanban__cards > tr > td:empty,
+  .hoocon-lead-kanban__cards > tr > th:empty {
+    display: none !important;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.field-status_badge::before,
+  .hoocon-lead-kanban__cards > tr > th.field-status_badge::before {
+    display: none;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.field-status_badge,
+  .hoocon-lead-kanban__cards > tr > th.field-status_badge {
+    order: -1;
+  }
+
+  body.hoocon-lead-board[data-hoocon-lead-view="kanban"] #changelist
+    table.hoocon-admin-card-table.hoocon-lead-kanban-source {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .hoocon-lead-kanban {
+    display: none !important;
+  }
+}
+
+/* Lead view mode toggle (changelist object-tools). */
+.hoocon-lead-view-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--hoocon-glass-border);
+  border-radius: var(--hoocon-radius-pill, 999px);
+  overflow: hidden;
+  background: var(--hoocon-surface);
+}
+
+.hoocon-lead-view-toggle a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--hoocon-quiet);
+  text-decoration: none;
+  border: none;
+}
+
+.hoocon-lead-view-toggle a:hover {
+  color: var(--hoocon-ink, inherit);
+  background: var(--hoocon-surface-muted);
+}
+
+.hoocon-lead-view-toggle a.is-active {
+  color: #fff;
+  background: var(--hoocon-primary);
+}
+
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr.selected,
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr:has(.action-select:checked) {
   background: var(--hoocon-surface-muted);

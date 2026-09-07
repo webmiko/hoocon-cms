@@ -172,6 +172,9 @@
   /**
    * Stack into cards when the full table cannot fit the container width.
    *
+   * Lead changelist always uses cards so tablet/desktop can show a multi-column
+   * grid (CSS) instead of a stretched single-column sheet or a wide table.
+   *
    * @param {HTMLTableElement} table
    */
   function updateStackMode(table) {
@@ -180,7 +183,13 @@
       return;
     }
 
-    if (window.matchMedia(STACK_MQ).matches) {
+    const forceLeadCards =
+      table.closest("#changelist") &&
+      (document.body.classList.contains("hoocon-lead-board") ||
+        (document.body.classList.contains("app-leads") &&
+          document.body.classList.contains("model-lead")));
+
+    if (forceLeadCards || window.matchMedia(STACK_MQ).matches) {
       table.classList.add(STACKED_CLASS);
       return;
     }
@@ -356,7 +365,7 @@
         return;
       }
       const row = target.closest(
-        "table.hoocon-admin-table-stacked tbody tr",
+        "table.hoocon-admin-table-stacked tbody tr, .hoocon-lead-kanban__cards > tr",
       );
       if (!row) {
         return;

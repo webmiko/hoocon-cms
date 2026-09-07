@@ -119,6 +119,12 @@ def test_lead_changelist_has_open_button_and_new_badge() -> None:
     assert "hoocon-lead-status--new" in html
     assert "hoocon-admin-lead-open" in html
     assert "Открыть" in html
+    assert "hoocon-lead-board" in html
+    assert "hoocon-lead-view-toggle" in html
+    assert "hoocon-admin-leads-board.js" in html
+    assert "Стена" in html
+    assert "Канбан" in html
+    assert "view=kanban" in html
     # New leads before in_progress; among new — newer first.
     pos_newer = html.find("Newer New")
     pos_older = html.find("Older New")
@@ -126,6 +132,12 @@ def test_lead_changelist_has_open_button_and_new_badge() -> None:
     assert pos_newer != -1 and pos_older != -1 and pos_prog != -1
     assert pos_newer < pos_older < pos_prog
     assert older_new.pk and newer_new.pk and in_progress.pk
+
+    kanban = client.get("/admin/leads/lead/?view=kanban")
+    assert kanban.status_code == 200
+    kanban_html = kanban.content.decode()
+    assert 'data-hoocon-lead-view="kanban"' in kanban_html
+    assert "hoocon-lead-view-toggle" in kanban_html
 
 
 @override_settings(SITE_URL="https://hoocon.ru")

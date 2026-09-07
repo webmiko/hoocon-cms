@@ -640,7 +640,10 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         request: HttpRequest,
         extra_context: dict | None = None,
     ) -> HttpResponse:
-        """Add stats link to the leads changelist chrome.
+        """Add stats link and wall/kanban view toggle to the leads list.
+
+        ``view`` is not a model lookup — strip it before ChangeList runs, and
+        remember the choice in the session so pagination/filters keep the mode.
 
         Args:
             request: admin request.
@@ -651,6 +654,29 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         """
         extra = dict(extra_context or {})
         extra["hoocon_leads_stats_url"] = reverse("admin:leads_lead_stats")
+
+        original = request.GET.copy()
+        raw_view = (original.get("view") or "").strip().lower()
+        if raw_view in {"wall", "kanban"}:
+            view = raw_view
+            request.session["hoocon_lead_view"] = view
+        else:
+            view = (request.session.get("hoocon_lead_view") or "wall").strip().lower()
+            if view not in {"wall", "kanban"}:
+                view = "wall"
+
+        filter_params = original.copy()
+        filter_params.pop("view", None)
+        wall_params = filter_params.copy()
+        wall_params["view"] = "wall"
+        kanban_params = filter_params.copy()
+        kanban_params["view"] = "kanban"
+        extra["hoocon_lead_view"] = view
+        extra["hoocon_lead_view_wall_url"] = f"?{wall_params.urlencode()}"
+        extra["hoocon_lead_view_kanban_url"] = f"?{kanban_params.urlencode()}"
+
+        # ChangeList rejects unknown GET keys (redirects with ?e=1).
+        request.GET = filter_params  # type: ignore[assignment]
         return super().changelist_view(request, extra_context=extra)
 
     def get_urls(self) -> list:

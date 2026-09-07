@@ -1,9 +1,30 @@
 {% extends "admin/change_list.html" %}
 {% load static %}
 
+{% block bodyclass %}{{ block.super }} hoocon-lead-board{% endblock %}
+
 {% block object-tools-items %}
   <li class="hoocon-admin-push-tool">
     {% include "admin/includes/hoocon_webpush_toggle.html" %}
+  </li>
+  <li class="hoocon-lead-view-tool">
+    <span
+      class="hoocon-lead-view-toggle"
+      role="group"
+      aria-label="Вид списка заявок"
+      data-hoocon-lead-view="{{ hoocon_lead_view|default:'wall' }}"
+    >
+      <a
+        href="{{ hoocon_lead_view_wall_url }}"
+        class="{% if hoocon_lead_view == 'wall' %}is-active{% endif %}"
+        {% if hoocon_lead_view == 'wall' %}aria-current="page"{% endif %}
+      >Стена</a>
+      <a
+        href="{{ hoocon_lead_view_kanban_url }}"
+        class="{% if hoocon_lead_view == 'kanban' %}is-active{% endif %}"
+        {% if hoocon_lead_view == 'kanban' %}aria-current="page"{% endif %}
+      >Канбан</a>
+    </span>
   </li>
   {% if hoocon_leads_stats_url %}
   <li>
@@ -18,4 +39,5 @@
   <link rel="stylesheet"
     href="{% static 'admin/css/hoocon-webpush.css' %}?v={{ STATIC_VERSION }}">
   <script src="{% static 'admin/js/hoocon-admin-webpush.js' %}?v={{ STATIC_VERSION }}" defer></script>
+  <script src="{% static 'admin/js/hoocon-admin-leads-board.js' %}?v={{ STATIC_VERSION }}" defer></script>
 {% endblock %}

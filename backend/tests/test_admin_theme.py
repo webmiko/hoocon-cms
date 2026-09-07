@@ -220,11 +220,32 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
+    assert "body.hoocon-lead-board" in css
+    assert "repeat(3, minmax(0, 24rem))" in css
+    assert "justify-content: center" in css
+    assert "display: contents" in css
+    assert "gap: 1.15rem 1.25rem" in css
+    assert "align-items: stretch" in css
+    assert "margin-top: auto" in css
+    assert ".hoocon-lead-kanban" in css
+    assert ".hoocon-lead-view-toggle" in css
+    assert "hoocon-lead-wall-heading" in css
     assert "box-shadow: var(--hoocon-shadow-soft)" in css
 
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
     assert "table.hoocon-lead-stats__table" in js
+    assert 'classList.contains("hoocon-lead-board")' in js
+    assert "hoocon-lead-kanban__cards" in js
     assert "hoocon-phone-filter-chips" in js
+
+    board_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-leads-board.js").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-lead-wall-heading" in board_js
+    assert "hoocon-lead-kanban" in board_js
+    assert 'view === "kanban"' in board_js
+    assert "restoreRowsToTable(table)" in board_js
+    assert "Re-entrant" in board_js
 
 
 @pytest.mark.django_db
@@ -294,7 +315,6 @@ def test_admin_pwa_manifest_and_icons() -> None:
     )
     assert "clear_support: true" in webpush_js
     assert "await sub.unsubscribe()" in webpush_js
-
 
     sw = client.get("/admin/sw.js")
     assert sw.status_code == 200
