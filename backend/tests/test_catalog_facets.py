@@ -93,6 +93,35 @@ def test_facets_endpoint_reads_attribute_table_once(client) -> None:
 
 
 @pytest.mark.django_db
+def test_attribute_ids_for_facet_checks_power_values_in_bulk() -> None:
+    """Power-as-moment guard hits AttributeValue once, not per attribute."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.facets.defs import FACET_BY_KEY, attribute_ids_for_facet
+    from catalog.models import SKU, Attribute, AttributeValue
+
+    _seed_with_attrs()
+    # Create several "Мощность" attributes; only the one with torque-like values
+    # should be accepted by the moment facet.
+    for i in range(5):
+        Attribute.objects.create(name=f"Мощность {i}", slug=f"attr-power-{i}")
+    power_with_torque = Attribute.objects.create(name="Мощность TX", slug="attr-power-tx")
+    sku = SKU.objects.first()
+    AttributeValue.objects.create(sku=sku, attribute=power_with_torque, value="8 Нм")
+
+    moment_facet = FACET_BY_KEY["moment"]
+    attributes = list(Attribute.objects.all().only("id", "name", "slug"))
+    with CaptureQueriesContext(connection) as ctx:
+        ids = attribute_ids_for_facet(moment_facet, attributes=attributes)
+    assert power_with_torque.id in ids
+    power_value_queries = [
+        q["sql"] for q in ctx.captured_queries if 'from "catalog_attributevalue"' in q["sql"].lower()
+    ]
+    assert len(power_value_queries) == 1, power_value_queries
+
+
+@pytest.mark.django_db
 def test_sku_filter_by_canonical_moment_alias(client) -> None:
     """?moment=5 Нм filters via name-based facet (not Attribute.slug)."""
     _seed_with_attrs()

@@ -221,15 +221,23 @@ def attribute_ids_for_facet(
         Attribute PKs belonging to the facet.
     """
     rows = attributes if attributes is not None else Attribute.objects.all().only("id", "name", "slug")
+    attribute_ids = [attr.id for attr in rows]
+    # Pre-check torque values once for the power-as-moment guard instead of
+    # issuing an .exists() query per attribute inside the loop.
+    power_moment_ids: set[int] = set()
+    if facet.include_power_as_moment and attribute_ids:
+        power_moment_ids = set(
+            AttributeValue.objects.filter(
+                attribute_id__in=attribute_ids,
+                value__icontains="Нм",
+            ).values_list("attribute_id", flat=True)
+        )
     ids: list[int] = []
     for attr in rows:
         if attribute_matches_facet(attr, facet):
             # For mislabeled «Мощность»: only if some values look like torque.
             if facet.include_power_as_moment and "мощность" in (attr.name or "").casefold():
-                if not AttributeValue.objects.filter(
-                    attribute=attr,
-                    value__icontains="Нм",
-                ).exists():
+                if attr.id not in power_moment_ids:
                     continue
             ids.append(attr.id)
     return ids
