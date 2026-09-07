@@ -508,8 +508,45 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             form: ModelForm instance.
             change: True when editing an existing row.
         """
+        prev_status = ""
+        prev_assignee_id: int | None = None
+        if change and obj.pk:
+            prev = Lead.objects.filter(pk=obj.pk).values("status", "assignee_id").first()
+            if prev is not None:
+                prev_status = str(prev.get("status") or "")
+                prev_assignee_id = prev.get("assignee_id")
         apply_lead_manager_on_save(obj, actor=request.user)
         super().save_model(request, obj, form, change)
+        if not change:
+            return
+        status_changed = prev_status != obj.status
+        assignee_changed = prev_assignee_id != obj.assignee_id
+        if not (status_changed or assignee_changed):
+            return
+        from django.db import transaction
+
+        lead_id = obj.pk
+        status_label = obj.get_status_display()
+        actor_name = (getattr(request.user, "first_name", "") or "").strip() or str(
+            request.user,
+        )
+
+        def _crm_tg() -> None:
+            from accounts.tasks import notify_superuser_telegram_crm
+
+            bits: list[str] = [f"Заявка #{lead_id}"]
+            if status_changed:
+                bits.append(f"статус → {status_label}")
+            if assignee_changed:
+                bits.append("сменён ответственный")
+            bits.append(f"({actor_name})")
+            notify_superuser_telegram_crm.delay(
+                "Изменение заявки",
+                "; ".join(bits),
+                f"/admin/leads/lead/{lead_id}/change/",
+            )
+
+        transaction.on_commit(_crm_tg)
 
     @admin.action(description="Взять в работу (назначить на меня)")
     def action_take_in_work(

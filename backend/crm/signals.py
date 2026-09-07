@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -46,3 +46,32 @@ def link_new_lead_to_client(
         )
     except (DatabaseError, IntegrityError):
         logger.exception("crm_link_lead_failed lead_id=%s", instance.pk)
+
+
+@receiver(post_save, sender="crm.Activity")
+def notify_superuser_on_staff_activity(
+    sender: type,  # noqa: ARG001
+    instance: object,
+    created: bool,
+    **kwargs: object,
+) -> None:
+    """Telegram superusers when a staff-authored CRM Activity is created."""
+    if not created:
+        return
+    author_id = getattr(instance, "author_id", None)
+    if not author_id:
+        return
+    subject = (getattr(instance, "subject", "") or "").strip()
+    activity_type = getattr(instance, "get_activity_type_display", None)
+    type_label = activity_type() if callable(activity_type) else "Активность"
+    client_id = getattr(instance, "client_id", None)
+    pk = getattr(instance, "pk", None)
+    body = f"{type_label}: {subject or f'#{pk}'}"
+    url = f"/admin/crm/client/{client_id}/change/" if client_id else "/admin/crm/client/"
+
+    def _enqueue() -> None:
+        from accounts.tasks import notify_superuser_telegram_crm
+
+        notify_superuser_telegram_crm.delay("CRM: активность", body, url)
+
+    transaction.on_commit(_enqueue)

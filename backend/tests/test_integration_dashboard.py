@@ -25,6 +25,7 @@ def test_build_integration_dashboard_telegram_connected(settings) -> None:
     assert by_name["Telegram"]["status"] == "on"
     assert by_name["Яндекс.Метрика"]["status"] == "on"
     assert by_name["Цены на сайте"]["status"] == "off"
+    assert by_name["Уведомления персоналу"]["status"] == "on"
     assert dash["connected_count"] >= 2
     assert "sitesettings" in dash["change_url"]
 
@@ -55,6 +56,7 @@ def test_sitesettings_changelist_shows_integration_dashboard(
     assert "hoocon-integrations" in html
     assert "Telegram" in html
     assert "Подключён" in html
+    assert "Уведомления персоналу" in html
     assert "Настроить" in html
     assert "Настройки сайта (цены:" not in html
 

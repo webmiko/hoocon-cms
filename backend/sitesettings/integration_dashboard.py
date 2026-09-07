@@ -123,6 +123,26 @@ def build_integration_dashboard(site: SiteSettings | None = None) -> dict[str, A
             "detail": "При первой публикации статьи/новости",
             "hint": "Нужен рабочий Celery worker",
         },
+        {
+            "name": "Уведомления персоналу",
+            "status": (
+                "on"
+                if row.staff_push_leads_enabled and row.staff_push_support_enabled
+                else ("off" if not row.staff_push_leads_enabled and not row.staff_push_support_enabled else "partial")
+            ),
+            "status_label": (
+                "Заявки + чат"
+                if row.staff_push_leads_enabled and row.staff_push_support_enabled
+                else (
+                    "Выкл" if not row.staff_push_leads_enabled and not row.staff_push_support_enabled else "Частично"
+                )
+            ),
+            "detail": (
+                f"Заявки: {'вкл' if row.staff_push_leads_enabled else 'выкл'}; "
+                f"поддержка: {'вкл' if row.staff_push_support_enabled else 'выкл'}"
+            ),
+            "hint": "Тексты и подписки — в карточке настроек",
+        },
     ]
 
     return {

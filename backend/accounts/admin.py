@@ -20,9 +20,21 @@ from unfold.admin import ModelAdmin
 from unfold.forms import ActionForm
 
 from accounts.forms import StaffUserChangeForm, StaffUserCreationForm
-from accounts.models import PasskeyCredential
+from accounts.models import PasskeyCredential, StaffTelegramProfile
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
+
+
+class StaffTelegramProfileInline(admin.StackedInline):
+    """Personal Telegram chat id for staff alerts."""
+
+    model = StaffTelegramProfile
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = ("telegram_chat_id", "telegram_alerts_enabled")
+    verbose_name = "Telegram"
+    verbose_name_plural = "Telegram сотрудника"
 
 
 class UserAdmin(BaseUserAdmin, ModelAdmin):
@@ -33,7 +45,15 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     show_add_link = True
     form = StaffUserChangeForm
     add_form = StaffUserCreationForm
-    list_display = ("email", "first_name", "is_staff", "is_active", "is_superuser")
+    inlines = (StaffTelegramProfileInline,)
+    list_display = (
+        "email",
+        "first_name",
+        "is_staff",
+        "is_active",
+        "is_superuser",
+        "telegram_chat_short",
+    )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("email", "first_name", "username", "last_name")
     ordering = ("email",)
@@ -160,6 +180,22 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             if name not in out:
                 out = (*out, name)
         return out
+
+    @admin.display(description="Telegram")
+    def telegram_chat_short(self, obj: User) -> str:
+        """Show linked chat id on the user list."""
+        profile = getattr(obj, "telegram_profile", None)
+        if profile is None:
+            return "—"
+        chat = (profile.telegram_chat_id or "").strip()
+        if not chat:
+            return "—"
+        if not profile.telegram_alerts_enabled:
+            return f"{chat} (выкл)"
+        return chat
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        return super().get_queryset(request).select_related("telegram_profile")
 
     @admin.display(description="Резервные коды")
     def recovery_codes_summary(self, obj: User) -> str:

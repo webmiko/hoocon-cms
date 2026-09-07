@@ -49,6 +49,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "channel", "description": "Перейти в канал"},
     {"command": "site", "description": "На сайт"},
     {"command": "help", "description": "Помощь"},
+    {"command": "chatid", "description": "Узнать ID чата (для админки)"},
 ]
 
 
@@ -114,6 +115,15 @@ def compose_site_reply() -> str:
     site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
     safe = html.escape(site)
     return f"Сайт и каталог: {safe}\nЗаявка / RFQ: {safe}/consultation"
+
+
+def compose_chatid_reply(chat_id: str) -> str:
+    """Reply for /chatid — staff copies this into Admin user card."""
+    safe = html.escape(str(chat_id).strip())
+    return (
+        f"Ваш ID чата Telegram: <code>{safe}</code>\n\n"
+        "Скопируйте число в админку → Пользователи → Telegram сотрудника."
+    )
 
 
 def compose_fallback_reply() -> str:
@@ -270,6 +280,12 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
         return publish_telegram(
             chat_id=chat_key,
             text=compose_site_reply(),
+            reply_markup=keyboard,
+        )
+    if action == "chatid":
+        return publish_telegram(
+            chat_id=chat_key,
+            text=compose_chatid_reply(chat_key),
             reply_markup=keyboard,
         )
     if action is not None:

@@ -97,3 +97,38 @@ class PasskeyCredential(models.Model):
     def __str__(self) -> str:
         label = self.device_name or self.credential_id[:12]
         return f"Passkey({self.user_id}, {label})"
+
+
+class StaffTelegramProfile(models.Model):
+    """Personal Telegram DM destination for staff alerts (not the announce channel)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="telegram_profile",
+        verbose_name=_("Пользователь"),
+    )
+    telegram_chat_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name=_("ID чата Telegram"),
+        help_text=_(
+            "Числовой ID личного чата с ботом. В личке бота отправьте команду "
+            "для получения ID и скопируйте ответ сюда."
+        ),
+    )
+    telegram_alerts_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("уведомления в Telegram включены"),
+        help_text=_("Выкл — не слать личные уведомления этому сотруднику."),
+    )
+
+    class Meta:
+        verbose_name = _("Telegram сотрудника")
+        verbose_name_plural = _("Telegram сотрудников")
+
+    def __str__(self) -> str:
+        chat = (self.telegram_chat_id or "").strip() or "—"
+        return f"TG({self.user_id}, {chat})"

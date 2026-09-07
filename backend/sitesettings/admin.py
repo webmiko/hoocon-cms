@@ -8,7 +8,8 @@ from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.http import HttpRequest, HttpResponse
-from django.utils.html import format_html
+from django.urls import reverse
+from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin
@@ -83,6 +84,8 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_display_links = ("__str__",)
     readonly_fields = (
         "lead_rr_last_user",
+        "staff_push_subscribers",
+        "staff_telegram_subscribers",
         "telegram_token_status",
         "vk_token_status",
         "max_token_status",
@@ -103,6 +106,44 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "ответственного менеджера. В очередь попадают только "
                     "сотрудники группы «Менеджер» со статусом «Активен» и "
                     "адресом в профиле. Письмо менеджеру — на этот адрес."
+                ),
+            },
+        ),
+        (
+            "Уведомления на устройство",
+            {
+                "fields": (
+                    "staff_push_leads_enabled",
+                    "staff_push_support_enabled",
+                    "staff_push_lead_title",
+                    "staff_push_lead_body",
+                    "staff_push_support_title",
+                    "staff_push_support_body",
+                    "staff_push_subscribers",
+                ),
+                "description": (
+                    "Глобальные флаги и тексты браузерных уведомлений админки. "
+                    "У каждого сотрудника их ещё нужно включить на устройстве "
+                    "(список заявок / поддержки или «Ещё»). Топики подписок — "
+                    "в разделе уведомлений."
+                ),
+            },
+        ),
+        (
+            "Telegram персоналу",
+            {
+                "fields": (
+                    "staff_telegram_leads_enabled",
+                    "staff_telegram_support_enabled",
+                    "staff_telegram_superuser_crm_enabled",
+                    "staff_telegram_subscribers",
+                ),
+                "description": (
+                    "Каналы: почта всегда (заявки / первое обращение в чат); "
+                    "браузерные уведомления — дополнительно; Telegram — только "
+                    "если у сотрудника нет активных уведомлений на устройстве. "
+                    "ID чата — в карточке пользователя (команда бота). "
+                    "Менеджерам: заявки и чат. Супер-админу: то же плюс CRM."
                 ),
             },
         ),
@@ -176,6 +217,87 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             },
         ),
     )
+
+    @admin.display(description="Подписки персонала")
+    def staff_push_subscribers(self, obj: SiteSettings) -> str:
+        """List staff Web Push endpoints with links to edit topics."""
+        del obj  # singleton context only
+        from webpush.models import PushSubscription
+
+        try:
+            list_url = reverse("admin:webpush_pushsubscription_changelist")
+        except Exception:  # noqa: BLE001
+            list_url = ""
+        rows = (
+            PushSubscription.objects.filter(user__isnull=False, user__is_staff=True)
+            .select_related("user")
+            .order_by("user__email", "-last_seen_at")[:40]
+        )
+        if not rows:
+            empty = "Пока нет подписок сотрудников."
+            if list_url:
+                return format_html(
+                    '<p>{}</p><p><a href="{}?user__is_staff__exact=1">Открыть подписки</a></p>',
+                    empty,
+                    list_url,
+                )
+            return empty
+        items: list[tuple[str, str, str]] = []
+        for sub in rows:
+            user = sub.user
+            assert user is not None
+            name = (user.get_username() or user.email or f"#{user.pk}").strip()
+            topics: list[str] = []
+            if sub.topic_support:
+                topics.append("оповещения")
+            if sub.topic_marketing:
+                topics.append("новости")
+            topic_label = ", ".join(topics) if topics else "выкл"
+            change_url = reverse("admin:webpush_pushsubscription_change", args=[sub.pk])
+            items.append((change_url, name, topic_label))
+        html_list = format_html_join(
+            "",
+            '<li><a href="{}">{}</a> — {}</li>',
+            items,
+        )
+        footer = ""
+        if list_url:
+            footer = format_html(
+                '<p style="margin-top:0.75rem;"><a href="{}?user__is_staff__exact=1">Все подписки персонала →</a></p>',
+                list_url,
+            )
+        return format_html('<ul style="margin:0;padding-left:1.25rem;">{}</ul>{}', html_list, footer)
+
+    @admin.display(description="Сотрудники с Telegram")
+    def staff_telegram_subscribers(self, obj: SiteSettings) -> str:
+        """List staff with a personal Telegram chat id."""
+        del obj
+        from accounts.models import StaffTelegramProfile
+
+        rows = (
+            StaffTelegramProfile.objects.exclude(telegram_chat_id="")
+            .select_related("user")
+            .order_by("user__email")[:40]
+        )
+        if not rows:
+            return (
+                "Пока никто не привязал ID чата. В личке бота отправьте команду "
+                "для получения ID → Пользователи → Telegram сотрудника."
+            )
+        items: list[tuple[str, str, str]] = []
+        for profile in rows:
+            user = profile.user
+            name = (user.get_username() or user.email or f"#{user.pk}").strip()
+            change_url = reverse("admin:auth_user_change", args=[user.pk])
+            flag = "вкл" if profile.telegram_alerts_enabled else "выкл"
+            role = "супер" if user.is_superuser else "сотрудник"
+            items.append(
+                (change_url, name, f"{profile.telegram_chat_id} · {role} · {flag}"),
+            )
+        return format_html(
+            '<ul style="margin:0;padding-left:1.25rem;">{}</ul>',
+            format_html_join("", '<li><a href="{}">{}</a> — {}</li>', items),
+        )
 
     @admin.display(description="Статус токена Telegram")
     def telegram_token_status(self, obj: SiteSettings) -> str:

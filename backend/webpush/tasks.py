@@ -11,17 +11,20 @@ logger = setup_logger("hoocon.webpush")
 
 @shared_task
 def notify_staff_support_inbound(conversation_id: int) -> int:
-    """Push staff: new inbound support message."""
+    """Push staff: new inbound support message (if enabled in SiteSettings)."""
+    from sitesettings.models import SiteSettings
+    from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
     from webpush.services import queryset_staff_alerts, send_push_to_subscription
 
+    if not SiteSettings.load().staff_push_support_enabled:
+        return 0
     try:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
         return 0
-    title = "Новое сообщение в поддержке"
     label = conv.display_name or conv.get_channel_display()
-    body = f"{label}: новое обращение"
+    title, body = staff_support_push_copy(label=label)
     url = f"/admin/supportchat/conversation/{conv.pk}/change/"
     sent = 0
     for sub in queryset_staff_alerts().iterator():
@@ -38,16 +41,22 @@ def notify_staff_support_inbound(conversation_id: int) -> int:
 
 @shared_task
 def notify_staff_new_lead(lead_id: int) -> int:
-    """Push staff Admin PWA: new RFQ / consultation / replacement lead."""
+    """Push staff Admin PWA: new lead (if enabled in SiteSettings)."""
     from leads.models import Lead
+    from sitesettings.models import SiteSettings
+    from sitesettings.staff_push import staff_lead_push_copy
     from webpush.services import queryset_staff_alerts, send_push_to_subscription
 
+    if not SiteSettings.load().staff_push_leads_enabled:
+        return 0
     try:
         lead = Lead.objects.get(pk=lead_id)
     except Lead.DoesNotExist:
         return 0
-    title = "Новая заявка"
-    body = f"{lead.name}: {lead.get_lead_type_display()}"
+    title, body = staff_lead_push_copy(
+        name=lead.name,
+        lead_type=lead.get_lead_type_display(),
+    )
     url = f"/admin/leads/lead/{lead.pk}/change/"
     sent = 0
     for sub in queryset_staff_alerts().iterator():

@@ -181,9 +181,11 @@ def _schedule_staff_support_push(
     from django.db import transaction
 
     def _enqueue() -> None:
+        from accounts.tasks import notify_staff_telegram_support
         from webpush.tasks import notify_staff_support_inbound
 
         notify_staff_support_inbound.delay(conversation_id)
+        notify_staff_telegram_support.delay(conversation_id)
         try:
             from staff_api.tasks import notify_staff_fcm_support
 
@@ -224,7 +226,29 @@ def add_staff_reply(
         update_fields.append("assignee")
     conversation.save(update_fields=update_fields)
     _schedule_visitor_support_push(conversation.pk)
+    _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
     return msg
+
+
+def _schedule_superuser_staff_reply_telegram(
+    conversation_id: int,
+    author: AbstractBaseUser | None,
+) -> None:
+    """Notify superusers that staff replied in support chat."""
+    from django.db import transaction
+
+    author_label = staff_public_name(author)
+
+    def _enqueue() -> None:
+        from accounts.tasks import notify_superuser_telegram_crm
+
+        notify_superuser_telegram_crm.delay(
+            "Ответ в поддержке",
+            f"{author_label}: ответ клиенту",
+            f"/admin/supportchat/conversation/{conversation_id}/change/",
+        )
+
+    transaction.on_commit(_enqueue)
 
 
 def staff_public_name(user: AbstractBaseUser | None) -> str:

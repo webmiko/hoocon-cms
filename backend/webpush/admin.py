@@ -18,19 +18,22 @@ from webpush.tasks import broadcast_marketing_push
 
 @admin.register(PushSubscription)
 class PushSubscriptionAdmin(ModelAdmin):
-    """List subscriptions; custom broadcast view for marketing."""
+    """List subscriptions; edit topic flags; marketing broadcast."""
 
     change_list_template = "admin/webpush/pushsubscription/change_list.html"
     list_display = (
         "id",
         "topics_badge",
         "subscriber",
+        "topic_support",
+        "topic_marketing",
         "short_endpoint",
         "last_seen_at",
         "created_at",
     )
     list_display_links = ("id", "subscriber")
-    list_filter = ("topic_support", "topic_marketing", "created_at")
+    list_editable = ("topic_support", "topic_marketing")
+    list_filter = ("topic_support", "topic_marketing", "user__is_staff", "created_at")
     search_fields = ("endpoint", "session_key", "user__email", "user__username")
     readonly_fields = (
         "endpoint",
@@ -38,8 +41,17 @@ class PushSubscriptionAdmin(ModelAdmin):
         "auth",
         "user",
         "session_key",
+        "created_at",
+        "last_seen_at",
+    )
+    fields = (
+        "user",
+        "session_key",
         "topic_support",
         "topic_marketing",
+        "endpoint",
+        "p256dh",
+        "auth",
         "created_at",
         "last_seen_at",
     )
@@ -50,7 +62,7 @@ class PushSubscriptionAdmin(ModelAdmin):
     def topics_badge(self, obj: PushSubscription) -> str:
         chips: list[tuple[str, str]] = []
         if obj.topic_support:
-            chips.append(("support", "Чат"))
+            chips.append(("support", "Оповещения"))
         if obj.topic_marketing:
             chips.append(("marketing", "Новости"))
         if not chips:
@@ -71,12 +83,14 @@ class PushSubscriptionAdmin(ModelAdmin):
         if obj.user_id and obj.user is not None:
             raw = obj.user.get_username() or obj.user.email or f"#{obj.user_id}"
             label = raw.strip()
+            role = "staff" if obj.user.is_staff else "user"
             return format_html(
                 '<div class="hoocon-push-subscriber">'
                 '<span class="hoocon-push-subscriber__name">{}</span>'
-                '<span class="hoocon-push-subscriber__meta">staff / user</span>'
+                '<span class="hoocon-push-subscriber__meta">{}</span>'
                 "</div>",
                 label,
+                role,
             )
         key = (obj.session_key or "").strip()
         short = f"{key[:10]}…" if len(key) > 10 else (key or "—")

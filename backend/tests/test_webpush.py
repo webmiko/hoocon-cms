@@ -453,3 +453,157 @@ def test_admin_sw_js_served_with_scope_header() -> None:
     assert resp["Service-Worker-Allowed"] == "/admin/"
     assert b"showNotification" in resp.content
     assert "no-cache" in resp["Cache-Control"]
+
+
+@pytest.mark.django_db
+def test_staff_push_disabled_skips_lead_and_support() -> None:
+    """SiteSettings flags gate staff Web Push tasks."""
+    from sitesettings.models import SiteSettings
+    from supportchat.models import Channel, Conversation
+    from webpush.tasks import notify_staff_new_lead, notify_staff_support_inbound
+
+    user = get_user_model().objects.create_superuser(
+        username="gate@hoocon.ru",
+        email="gate@hoocon.ru",
+        password="x",
+    )
+    upsert_subscription(
+        endpoint="https://push.example/gate",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=user,
+    )
+    from leads.models import Lead
+
+    lead = Lead.objects.create(
+        name="Гейт",
+        email="gate-lead@example.com",
+        message="x" * 25,
+        company="ООО Гейт",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-gate",
+        display_name="Гость",
+    )
+    site = SiteSettings.load()
+    site.staff_push_leads_enabled = False
+    site.staff_push_support_enabled = False
+    site.save(
+        update_fields=[
+            "staff_push_leads_enabled",
+            "staff_push_support_enabled",
+            "updated_at",
+        ],
+    )
+    with patch("webpush.services.send_push_to_subscription", return_value=True) as send:
+        assert notify_staff_new_lead(lead.pk) == 0
+        assert notify_staff_support_inbound(conv.pk) == 0
+    assert not send.called
+
+
+@pytest.mark.django_db
+def test_staff_push_uses_site_templates() -> None:
+    """Custom title/body templates from SiteSettings are applied."""
+    from sitesettings.models import SiteSettings
+    from webpush.tasks import notify_staff_new_lead
+
+    user = get_user_model().objects.create_superuser(
+        username="tpl@hoocon.ru",
+        email="tpl@hoocon.ru",
+        password="x",
+    )
+    upsert_subscription(
+        endpoint="https://push.example/tpl",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=user,
+    )
+    from leads.models import Lead
+
+    lead = Lead.objects.create(
+        name="Анна",
+        email="anna@example.com",
+        message="x" * 25,
+        company="ООО Анна",
+        lead_type=Lead.LeadType.CONSULTATION,
+    )
+    site = SiteSettings.load()
+    site.staff_push_lead_title = "RFQ alert"
+    site.staff_push_lead_body = "Клиент {имя} — {тип}"
+    site.save(
+        update_fields=["staff_push_lead_title", "staff_push_lead_body", "updated_at"],
+    )
+    with patch("webpush.services.send_push_to_subscription", return_value=True) as send:
+        assert notify_staff_new_lead(lead.pk) == 1
+    kwargs = send.call_args.kwargs
+    assert kwargs["title"] == "RFQ alert"
+    assert kwargs["body"] == "Клиент Анна — Консультация"
+
+
+@pytest.mark.django_db
+def test_sitesettings_admin_shows_staff_push_fieldset() -> None:
+    """Site settings change form exposes staff push controls and subscriber list."""
+    staff = get_user_model().objects.create_superuser(
+        username="push-set@hoocon.ru",
+        email="push-set@hoocon.ru",
+        password="x",
+    )
+    upsert_subscription(
+        endpoint="https://push.example/listed",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=staff,
+    )
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    client = Client()
+    client.force_login(staff)
+    resp = client.get(f"/admin/sitesettings/sitesettings/{site.pk}/change/")
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Уведомления на устройство" in html
+    assert "staff_push_leads_enabled" in html
+    assert "staff_push_lead_title" in html
+    assert "push-set@hoocon.ru" in html
+    assert "оповещения" in html
+
+
+@pytest.mark.django_db
+def test_admin_can_edit_staff_push_topic() -> None:
+    """Staff can clear topic_support on a subscription from Admin."""
+    admin_user = get_user_model().objects.create_superuser(
+        username="edit-push@hoocon.ru",
+        email="edit-push@hoocon.ru",
+        password="x",
+    )
+    mgr = get_user_model().objects.create_user(
+        username="mgr-push@hoocon.ru",
+        email="mgr-push@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    sub = upsert_subscription(
+        endpoint="https://push.example/edit-topic",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=mgr,
+    )
+    client = Client()
+    client.force_login(admin_user)
+    resp = client.post(
+        f"/admin/webpush/pushsubscription/{sub.pk}/change/",
+        {
+            "topic_support": "",
+            "topic_marketing": "",
+            "_save": "Save",
+        },
+    )
+    assert resp.status_code in {200, 302}
+    sub.refresh_from_db()
+    assert sub.topic_support is False

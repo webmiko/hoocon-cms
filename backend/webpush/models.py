@@ -34,8 +34,9 @@ class PushSubscription(models.Model):
         help_text="Django session key for anonymous support-chat visitors.",
     )
     topic_support: models.BooleanField = models.BooleanField(
-        "чат поддержки",
+        "оповещения админки (заявки и чат)",
         default=False,
+        help_text="Для персонала: заявки и поддержка. Для гостей сайта — чат поддержки.",
     )
     topic_marketing: models.BooleanField = models.BooleanField(
         "маркетинг / новости",

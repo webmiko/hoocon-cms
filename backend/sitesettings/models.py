@@ -24,8 +24,8 @@ class SiteSettings(models.Model):
     (TELEGRAM_BOT_TOKEN / VK_ACCESS_TOKEN / MAX_BOT_TOKEN). В публичный API
     токены и chat ID **не** попадают.
 
-    Маршрутизация заявок (``lead_routing_mode``) — только Admin; в публичный
-    API не отдаётся.
+    Маршрутизация заявок (``lead_routing_mode``) и staff Web Push
+    (``staff_push_*``) — только Admin; в публичный API не отдаются.
     """
 
     class LeadRoutingMode(models.TextChoices):
@@ -70,6 +70,74 @@ class SiteSettings(models.Model):
         verbose_name="последний назначенный в очереди",
         help_text="Курсор очереди распределения (служебное; меняется автоматически).",
         limit_choices_to={"is_staff": True},
+    )
+
+    # ── Staff browser notifications (Admin only; not in public API) ──
+    staff_push_leads_enabled: models.BooleanField = models.BooleanField(
+        "уведомления на устройство при новой заявке",
+        default=True,
+        help_text=(
+            "Браузерные уведомления в установленном приложении админки при новой "
+            "заявке / консультации / замене. Сотрудник включает их у себя "
+            "(список заявок или «Ещё»)."
+        ),
+    )
+    staff_push_support_enabled: models.BooleanField = models.BooleanField(
+        "уведомления на устройство при сообщении в поддержке",
+        default=True,
+        help_text=("Браузерные уведомления в админке при входящем сообщении в чате поддержки."),
+    )
+    staff_push_lead_title: models.CharField = models.CharField(
+        "заголовок уведомления: заявка",
+        max_length=80,
+        blank=True,
+        default="Новая заявка",
+        help_text="Пусто = «Новая заявка».",
+    )
+    staff_push_lead_body: models.CharField = models.CharField(
+        "текст уведомления: заявка",
+        max_length=200,
+        blank=True,
+        default="{имя}: {тип}",
+        help_text="Подстановки в фигурных скобках: имя, тип. Пусто = шаблон по умолчанию.",
+    )
+    staff_push_support_title: models.CharField = models.CharField(
+        "заголовок уведомления: поддержка",
+        max_length=80,
+        blank=True,
+        default="Новое сообщение в поддержке",
+        help_text="Пусто = «Новое сообщение в поддержке».",
+    )
+    staff_push_support_body: models.CharField = models.CharField(
+        "текст уведомления: поддержка",
+        max_length=200,
+        blank=True,
+        default="{метка}: новое обращение",
+        help_text=("Подстановка в фигурных скобках: метка (имя или канал). Пусто = шаблон по умолчанию."),
+    )
+
+    # ── Staff Telegram DMs (Admin only; personal chat_id on StaffTelegramProfile) ──
+    staff_telegram_leads_enabled: models.BooleanField = models.BooleanField(
+        "Telegram при новой заявке (если нет уведомлений на устройстве)",
+        default=True,
+        help_text=(
+            "Личные сообщения бота, только если у сотрудника нет активных "
+            "браузерных уведомлений админки. Почта по заявкам — всегда; "
+            "уведомления на устройстве — доп. канал. Нужен ID чата (команда бота)."
+        ),
+    )
+    staff_telegram_support_enabled: models.BooleanField = models.BooleanField(
+        "Telegram при сообщении в поддержке (если нет уведомлений на устройстве)",
+        default=True,
+        help_text=("Входящий чат → Telegram только без браузерных уведомлений. Почта на первое обращение — отдельно."),
+    )
+    staff_telegram_superuser_crm_enabled: models.BooleanField = models.BooleanField(
+        "Telegram супер-админу по CRM (если нет уведомлений на устройстве)",
+        default=True,
+        help_text=(
+            "Статус/ответственный, ответ сотрудника в чате, заметки CRM — "
+            "супер-админам без активных браузерных уведомлений."
+        ),
     )
 
     # ── Analytics (public counter IDs; loaded after cookie consent) ──
