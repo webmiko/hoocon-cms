@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django import forms
@@ -16,6 +17,8 @@ from config.admin_mixins import OpenChangeLinkMixin
 from sitesettings.credentials import token_source_label
 from sitesettings.integration_dashboard import build_integration_dashboard
 from sitesettings.models import SiteSettings
+
+logger = logging.getLogger(__name__)
 
 
 class SiteSettingsAdminForm(forms.ModelForm):
@@ -226,7 +229,8 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
 
         try:
             list_url = reverse("admin:webpush_pushsubscription_changelist")
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 — app may not be installed in this project
+            logger.exception("webpush_changelist_reverse_failed")
             list_url = ""
         rows = (
             PushSubscription.objects.filter(user__isnull=False, user__is_staff=True)
