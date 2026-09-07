@@ -26,6 +26,7 @@ logger = logging.getLogger("hoocon.social")
 _HTTP_TIMEOUT_SEC = 20
 # Shorter per-attempt timeout + retries: VPS→Telegram often stalls ~20s then fails.
 _TELEGRAM_TIMEOUT_SEC = 8
+_TELEGRAM_UPLOAD_TIMEOUT_SEC = 45
 _TELEGRAM_RETRIES = 3
 # workers.dev blocks default Python-urllib UA (Cloudflare error 1010).
 _TELEGRAM_USER_AGENT = "HooconCMS/1.12 (+https://hoocon.ru)"
@@ -363,7 +364,7 @@ def _publish_telegram_photo_file(
             fields=fields,
             files={"photo": (path.name, content, content_type)},
             open_fn=_telegram_urlopen,
-            timeout=_TELEGRAM_TIMEOUT_SEC,
+            timeout=_TELEGRAM_UPLOAD_TIMEOUT_SEC,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_photo_file_failed error=%s", type(exc).__name__)
