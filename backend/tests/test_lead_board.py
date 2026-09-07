@@ -48,6 +48,8 @@ def test_lead_board_css_phone_header_hamburger() -> None:
     assert "hoocon-phone-header-menu__btn" in phone
     assert "hoocon-lead-view-tool" in phone
     assert "display: none !important" in phone
+    assert ":has(.hoocon-phone-header-menu.is-open)" in phone
+    assert "overflow: visible" in phone
     assert "hoocon-lead-board #changelist" in phone
     assert "margin-left: 0 !important" in phone
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
