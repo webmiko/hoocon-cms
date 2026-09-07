@@ -72,7 +72,9 @@ def test_telegram_webhook_start_sends_photo(settings, tmp_path) -> None:
     assert b"HOOCON" in raw
     assert "Перейти в канал".encode() in raw
     assert "На сайт".encode() in raw
-    assert "Помощь".encode() in raw
+    assert "Контакты".encode() in raw
+    assert "Где купить".encode() in raw
+    assert "Помощь".encode() not in raw
     assert b"reply_markup" in raw
     assert b"WEBPFAKE" in raw
 
@@ -109,7 +111,86 @@ def test_telegram_webhook_menu_button_channel(settings) -> None:
     body = json.loads(req.data.decode("utf-8"))
     assert "hoocon_moscow" in body["text"]
     assert body["reply_markup"]["keyboard"][0][0]["text"] == "Перейти в канал"
+    assert body["reply_markup"]["keyboard"][1][1]["text"] == "Контакты"
+    assert body["reply_markup"]["keyboard"][2][0]["text"] == "Где купить"
     assert body["reply_markup"]["is_persistent"] is True
+
+
+@pytest.mark.django_db
+def test_telegram_webhook_contacts_sends_photo(settings, tmp_path) -> None:
+    """«Контакты» replies with cover photo and requisites caption."""
+    settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    settings.SITE_URL = "https://hoocon.ru"
+    cover = tmp_path / "welcome.webp"
+    cover.write_bytes(b"WEBPFAKE")
+    settings.TELEGRAM_WELCOME_PHOTO_PATH = str(cover)
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":12}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        response = APIClient().post(
+            reverse("telegram-webhook"),
+            data={
+                "update_id": 21,
+                "message": {
+                    "message_id": 5,
+                    "chat": {"id": 12, "type": "private"},
+                    "text": "Контакты",
+                },
+            },
+            format="json",
+            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+        )
+    assert response.status_code == 200
+    req = mocked.call_args.args[0]
+    assert "sendPhoto" in req.full_url
+    raw = req.data
+    assert b"WEBPFAKE" in raw
+    assert "Реквизиты".encode() in raw
+    assert b"5024199634" in raw
+    assert b"kontakty" in raw
+
+
+@pytest.mark.django_db
+def test_telegram_webhook_where_to_buy_lists_partners(settings) -> None:
+    """«Где купить» lists retail partners without photo."""
+    settings.TELEGRAM_WEBHOOK_SECRET = "expected-secret"
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    settings.SITE_URL = "https://hoocon.ru"
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"ok":true,"result":{"message_id":13}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("social.publishers.urlopen", return_value=mock_resp) as mocked:
+        response = APIClient().post(
+            reverse("telegram-webhook"),
+            data={
+                "update_id": 22,
+                "message": {
+                    "message_id": 6,
+                    "chat": {"id": 13, "type": "private"},
+                    "text": "Где купить",
+                },
+            },
+            format="json",
+            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+        )
+    assert response.status_code == 200
+    req = mocked.call_args.args[0]
+    assert "sendMessage" in req.full_url
+    body = json.loads(req.data.decode("utf-8"))
+    assert "Панорамавент" in body["text"]
+    assert "Аэро Групп" in body["text"]
+    assert "Смарт Альянс" in body["text"]
+    assert "gde-kupit" in body["text"]
 
 
 @pytest.mark.django_db
@@ -133,7 +214,10 @@ def test_sync_telegram_bot_menu_calls_set_my_commands(settings) -> None:
     by_cmd = {row["command"]: row["description"] for row in body["commands"]}
     assert by_cmd["channel"] == "Перейти в канал"
     assert by_cmd["site"] == "На сайт"
-    assert by_cmd["help"] == "Помощь"
+    assert by_cmd["contacts"] == "Контакты и реквизиты"
+    assert by_cmd["where"] == "Где купить в розницу"
+    assert "help" not in by_cmd
+    assert "chatid" not in by_cmd
 
 
 @pytest.mark.django_db
@@ -269,7 +353,9 @@ def test_parse_bot_command_strips_bot_suffix() -> None:
     assert parse_bot_command("hello") is None
     assert resolve_menu_action("Перейти в канал") == "channel"
     assert resolve_menu_action("На сайт") == "site"
-    assert resolve_menu_action("Помощь") == "help"
+    assert resolve_menu_action("Контакты") == "contacts"
+    assert resolve_menu_action("Где купить") == "where"
+    assert resolve_menu_action("Помощь") is None
     # Former short aliases must not steal free-text (full button labels only).
     assert resolve_menu_action("канал") is None
     assert resolve_menu_action("сайт") is None

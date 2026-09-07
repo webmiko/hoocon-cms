@@ -18,8 +18,20 @@ _COMMAND_RE = re.compile(
     r"^/(?P<cmd>[a-zA-Z0-9_]+)(?:@(?P<bot>[A-Za-z0-9_]+))?(?:\s|$)",
 )
 _TELEGRAM_CAPTION_MAX = 1024
+_TELEGRAM_MESSAGE_MAX = 4096
 _DEFAULT_CHANNEL_USERNAME = "hoocon_moscow"
 _DEFAULT_WELCOME_STATIC = Path("static/social/telegram-welcome.webp")
+
+# Site copy (aligned with seed_site_content / WhereToBuyPage).
+_PHONE = "8 800 350-58-98"
+_EMAIL_SALES = "sales@hoocon.ru"
+_EMAIL_INFO = "info@hoocon.ru"
+_HOURS = "Пн–Пт 9:30–17:30 (МСК), сб–вс — выходной"
+_ADDRESS = "143440, Московская область, г. о. Красногорск, пгт Путилково, тер. Гринвуд, стр. 7, помещ. 98 (3-й этаж)"
+_INN = "5024199634"
+_KPP = "502401001"
+_OGRN = "1195081070986"
+_BANK = "р/с 40702810838000199148, к/с 30101810400000000225, БИК 044525225, ПАО Сбербанк"
 
 
 def telegram_channel_username() -> str:
@@ -36,33 +48,37 @@ def telegram_channel_url() -> str:
 # Reply-keyboard labels → internal command names (exact button text only).
 BTN_CHANNEL = "Перейти в канал"
 BTN_SITE = "На сайт"
-BTN_HELP = "Помощь"
+BTN_CONTACTS = "Контакты"
+BTN_WHERE_TO_BUY = "Где купить"
 
 _MENU_TEXT_ALIASES: dict[str, str] = {
     BTN_CHANNEL.lower(): "channel",
     BTN_SITE.lower(): "site",
-    BTN_HELP.lower(): "help",
+    BTN_CONTACTS.lower(): "contacts",
+    BTN_WHERE_TO_BUY.lower(): "where",
 }
 
+# Public BotFather menu only — /chatid stays hidden (staff who know it still get a reply).
 BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "start", "description": "Начать"},
     {"command": "channel", "description": "Перейти в канал"},
     {"command": "site", "description": "На сайт"},
-    {"command": "help", "description": "Помощь"},
-    {"command": "chatid", "description": "Узнать ID чата (для админки)"},
+    {"command": "contacts", "description": "Контакты и реквизиты"},
+    {"command": "where", "description": "Где купить в розницу"},
 ]
 
 
 def main_menu_keyboard() -> dict[str, Any]:
-    """Persistent reply keyboard: Перейти в канал · На сайт · Помощь."""
+    """Persistent reply keyboard: канал · сайт · контакты · где купить."""
     return {
         "keyboard": [
             [{"text": BTN_CHANNEL}],
-            [{"text": BTN_SITE}, {"text": BTN_HELP}],
+            [{"text": BTN_SITE}, {"text": BTN_CONTACTS}],
+            [{"text": BTN_WHERE_TO_BUY}],
         ],
         "resize_keyboard": True,
         "is_persistent": True,
-        "input_field_placeholder": "Напишите вопрос менеджеру…",
+        "input_field_placeholder": "Напишите ваш вопрос…",
     }
 
 
@@ -88,19 +104,76 @@ def welcome_photo_url() -> str:
     return "https://hoocon.ru/og-image.jpg"
 
 
+def _clip(text: str, limit: int) -> str:
+    """Trim to Telegram length limits with an ellipsis when needed."""
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
 def compose_welcome_caption() -> str:
-    """HTML caption for /start and /help (Telegram HTML subset, ≤1024)."""
+    """HTML caption for /start (Telegram HTML subset, ≤1024)."""
     text = (
         "<b>HOOCON</b> — электроприводы и арматура для вентиляции и ОВК.\n\n"
         "Кнопки меню:\n"
         f"• <b>{html.escape(BTN_CHANNEL)}</b> — официальный Telegram-канал\n"
         f"• <b>{html.escape(BTN_SITE)}</b> — каталог и заявки на сайте\n"
-        f"• <b>{html.escape(BTN_HELP)}</b> — эта подсказка\n\n"
-        "Или просто напишите сообщение — ответит менеджер."
+        f"• <b>{html.escape(BTN_CONTACTS)}</b> — телефон, почта, адрес, реквизиты\n"
+        f"• <b>{html.escape(BTN_WHERE_TO_BUY)}</b> — розничные партнёры\n\n"
+        "Или просто напишите вопрос — мы ответим в этом чате."
     )
-    if len(text) > _TELEGRAM_CAPTION_MAX:
-        return text[: _TELEGRAM_CAPTION_MAX - 1].rstrip() + "…"
-    return text
+    return _clip(text, _TELEGRAM_CAPTION_MAX)
+
+
+def compose_contacts_caption() -> str:
+    """HTML caption for «Контакты» — site /kontakty + реквизиты (≤1024)."""
+    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+    text = (
+        "<b>Контакты ООО «Хогон»</b> (бренд Hoocon)\n"
+        "Ответим до 2 рабочих часов в рабочие дни.\n\n"
+        f"<b>Телефон:</b> {html.escape(_PHONE)}\n"
+        f"<b>Продажи:</b> {html.escape(_EMAIL_SALES)}\n"
+        f"<b>Сотрудничество / ПДн:</b> {html.escape(_EMAIL_INFO)}\n"
+        f"<b>Адрес:</b> {html.escape(_ADDRESS)}\n"
+        f"<b>Режим:</b> {html.escape(_HOURS)}\n\n"
+        "<b>Реквизиты</b>\n"
+        f"ИНН {_INN}, КПП {_KPP}, ОГРН {_OGRN}\n"
+        f"{html.escape(_BANK)}\n\n"
+        f"Полная страница: {html.escape(site)}/kontakty"
+    )
+    return _clip(text, _TELEGRAM_CAPTION_MAX)
+
+
+def compose_where_to_buy_reply() -> str:
+    """HTML text for «Где купить» — retail partners from /gde-kupit."""
+    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+    text = (
+        "<b>Где купить в розницу</b>\n"
+        "Физическим лицам удобнее обратиться к партнёру "
+        "в своём городе. "
+        "Юрлица могут заказать напрямую у ООО «Хогон» "
+        f"({html.escape(_PHONE)}, {html.escape(_EMAIL_SALES)}).\n\n"
+        "<b>«ТД Панорамавент» — Москва</b>\n"
+        "ул. Производственная, д. 11, стр. 6\n"
+        "+7 (495) 380-06-76 · info@panoramavent.ru\n"
+        "Пн–Пт 9:00–19:00\n\n"
+        "<b>ООО «Аэро Групп» — Москва</b>\n"
+        "ул. Электрозаводская, д. 24, офис 306\n"
+        "+7 (495) 780-31-41 · office@aerostarmsk.ru\n"
+        "aerogrupp.ru · Telegram @aerogrupp\n"
+        "Пн–Пт 9:00–18:00\n\n"
+        "<b>ООО «Смарт Альянс» — Санкт-Петербург</b>\n"
+        "Офис: ул. Мельничная, д. 16, корп. 1, этаж 3\n"
+        "Склад: ул. Мельничная, д. 11\n"
+        "8 (800) 333-28-19 · hoocon.spb.ru\n"
+        "Пн–Пт 10:00–17:00\n\n"
+        "<b>ООО «РосАвтоматизация» — Минск</b>\n"
+        "ул. Мележа, 1\n"
+        "+375 29 697-11-02 · mail.sensorica.by@gmail.com\n"
+        "hoocon.by\n\n"
+        f"Подробнее на сайте: {html.escape(site)}/gde-kupit"
+    )
+    return _clip(text, _TELEGRAM_MESSAGE_MAX)
 
 
 def compose_channel_reply() -> str:
@@ -122,7 +195,8 @@ def compose_chatid_reply(chat_id: str) -> str:
     safe = html.escape(str(chat_id).strip())
     return (
         f"Ваш ID чата Telegram: <code>{safe}</code>\n\n"
-        "Скопируйте число в админку → Пользователи → Telegram сотрудника."
+        "Скопируйте число в админку → Пользователи → "
+        "Telegram сотрудника."
     )
 
 
@@ -130,8 +204,9 @@ def compose_fallback_reply() -> str:
     """Reply when the message is not a known command."""
     return (
         f"Доступны кнопки: {html.escape(BTN_CHANNEL)} · "
-        f"{html.escape(BTN_SITE)} · {html.escape(BTN_HELP)}.\n"
-        "Или напишите вопрос менеджеру обычным текстом."
+        f"{html.escape(BTN_SITE)} · {html.escape(BTN_CONTACTS)} · "
+        f"{html.escape(BTN_WHERE_TO_BUY)}.\n"
+        "Или напишите вопрос обычным текстом — мы ответим в этом чате."
     )
 
 
@@ -185,6 +260,31 @@ def _display_name_from_message(message: dict[str, Any]) -> str:
         return name
     username = str(sender.get("username") or "").strip()
     return f"@{username}" if username else ""
+
+
+def _publish_photo_or_text(
+    *,
+    chat_id: str,
+    caption: str,
+    reply_markup: dict[str, Any],
+) -> PublishResult:
+    """sendPhoto with welcome cover; fall back to text if photo fails."""
+    local = welcome_photo_path()
+    result = publish_telegram(
+        chat_id=chat_id,
+        text=caption,
+        photo_path=local,
+        photo_url=None if local is not None else welcome_photo_url(),
+        reply_markup=reply_markup,
+    )
+    if not result.ok and not result.skipped:
+        logger.warning("telegram_photo_failed falling_back_to_text")
+        return publish_telegram(
+            chat_id=chat_id,
+            text=caption,
+            reply_markup=reply_markup,
+        )
+    return result
 
 
 def _ingest_support_text(
@@ -252,23 +352,26 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     keyboard = main_menu_keyboard()
 
     if action in {"start", "help"}:
-        caption = compose_welcome_caption()
-        local = welcome_photo_path()
-        result = publish_telegram(
+        # /help kept as welcome alias for older clients; not in the menu.
+        return _publish_photo_or_text(
             chat_id=chat_key,
-            text=caption,
-            photo_path=local,
-            photo_url=None if local is not None else welcome_photo_url(),
+            caption=compose_welcome_caption(),
             reply_markup=keyboard,
         )
-        if not result.ok and not result.skipped:
-            logger.warning("telegram_welcome_photo_failed falling_back_to_text")
-            return publish_telegram(
-                chat_id=chat_key,
-                text=caption,
-                reply_markup=keyboard,
-            )
-        return result
+
+    if action in {"contacts", "contact"}:
+        return _publish_photo_or_text(
+            chat_id=chat_key,
+            caption=compose_contacts_caption(),
+            reply_markup=keyboard,
+        )
+
+    if action in {"where", "gdekupit", "where_to_buy"}:
+        return publish_telegram(
+            chat_id=chat_key,
+            text=compose_where_to_buy_reply(),
+            reply_markup=keyboard,
+        )
 
     if action == "channel":
         return publish_telegram(
