@@ -59,31 +59,35 @@ def start_or_resume_web_conversation(
 ) -> Conversation:
     """Create or resume the web Conversation for this browser session."""
     session_id = get_or_create_web_session_id(request)
-    conv, created = Conversation.objects.get_or_create(
-        channel=Channel.WEB,
-        external_user_id=session_id,
-        defaults={
-            "display_name": (display_name or "").strip()[:200],
-            "contact_email": (contact_email or "").strip()[:254],
-            "status": ConversationStatus.OPEN,
-        },
-    )
-    if not created:
-        updates: list[str] = []
-        name = (display_name or "").strip()[:200]
-        email = (contact_email or "").strip()[:254]
-        if name and name != conv.display_name:
-            conv.display_name = name
-            updates.append("display_name")
-        if email and email != conv.contact_email:
-            conv.contact_email = email
-            updates.append("contact_email")
-        if conv.status == ConversationStatus.CLOSED:
-            conv.status = ConversationStatus.OPEN
-            updates.append("status")
-        if updates:
-            updates.append("updated_at")
-            conv.save(update_fields=updates)
+    with transaction.atomic():
+        conv, created = Conversation.objects.get_or_create(
+            channel=Channel.WEB,
+            external_user_id=session_id,
+            defaults={
+                "display_name": (display_name or "").strip()[:200],
+                "contact_email": (contact_email or "").strip()[:254],
+                "status": ConversationStatus.OPEN,
+            },
+        )
+        # Re-lock so concurrent resume/update for the same session does not
+        # overwrite display_name/contact_email/status.
+        conv = Conversation.objects.select_for_update().get(pk=conv.pk)
+        if not created:
+            updates: list[str] = []
+            name = (display_name or "").strip()[:200]
+            email = (contact_email or "").strip()[:254]
+            if name and name != conv.display_name:
+                conv.display_name = name
+                updates.append("display_name")
+            if email and email != conv.contact_email:
+                conv.contact_email = email
+                updates.append("contact_email")
+            if conv.status == ConversationStatus.CLOSED:
+                conv.status = ConversationStatus.OPEN
+                updates.append("status")
+            if updates:
+                updates.append("updated_at")
+                conv.save(update_fields=updates)
     return conv
 
 
@@ -112,6 +116,9 @@ def add_inbound_message(
         existing inbound, no auto-reply.
     """
     ext = (external_message_id or "").strip()
+    # Lock the conversation so concurrent inbound messages are serialized;
+    # this also makes the "first inbound" check reliable.
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
     if ext:
         existing = Message.objects.filter(
             conversation=conversation,
@@ -210,6 +217,9 @@ def add_staff_reply(
     """Staff outbound message; clears staff unread; claims assignee if empty."""
     text = _sanitize_body(body)
     author_user = author if author is not None and getattr(author, "pk", None) else None
+    # Lock before read-modify-write so two staff replies cannot race on
+    # assignee and unread counter.
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
     msg = Message.objects.create(
         conversation=conversation,
         direction=MessageDirection.OUTBOUND,
@@ -464,18 +474,22 @@ def get_or_create_messenger_conversation(
     ext = (external_user_id or "").strip()
     if not ext:
         raise SupportChatError("Пустой external_user_id")
-    conv, created = Conversation.objects.get_or_create(
-        channel=channel,
-        external_user_id=ext,
-        defaults={
-            "display_name": (display_name or "").strip()[:200],
-            "status": ConversationStatus.OPEN,
-        },
-    )
-    if not created and display_name.strip() and not conv.display_name:
-        conv.display_name = display_name.strip()[:200]
-        conv.save(update_fields=["display_name", "updated_at"])
-    if conv.status == ConversationStatus.CLOSED:
-        conv.status = ConversationStatus.OPEN
-        conv.save(update_fields=["status", "updated_at"])
+    with transaction.atomic():
+        conv, created = Conversation.objects.get_or_create(
+            channel=channel,
+            external_user_id=ext,
+            defaults={
+                "display_name": (display_name or "").strip()[:200],
+                "status": ConversationStatus.OPEN,
+            },
+        )
+        # Lock the row before any status/display_name update so concurrent
+        # messenger updates for the same external id are serialized.
+        conv = Conversation.objects.select_for_update().get(pk=conv.pk)
+        if not created and display_name.strip() and not conv.display_name:
+            conv.display_name = display_name.strip()[:200]
+            conv.save(update_fields=["display_name", "updated_at"])
+        if conv.status == ConversationStatus.CLOSED:
+            conv.status = ConversationStatus.OPEN
+            conv.save(update_fields=["status", "updated_at"])
     return conv

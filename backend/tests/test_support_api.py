@@ -174,6 +174,29 @@ def test_staff_outbound_visible_on_poll_after() -> None:
 
 
 @pytest.mark.django_db
+def test_add_staff_reply_locks_conversation_before_write() -> None:
+    """add_staff_reply re-fetches the conversation with select_for_update()."""
+    from unittest.mock import patch
+
+    from django.contrib.auth import get_user_model
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import add_staff_reply
+
+    staff = get_user_model().objects.create_user(username="locker", password="x")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="lock-session",
+        status="open",
+    )
+    with patch("supportchat.services.Conversation.objects.select_for_update") as mock_sf:
+        mock_sf.return_value.get.return_value = conv
+        add_staff_reply(conv, "Locked reply", author=staff)
+
+    mock_sf.assert_called_once()
+    assert mock_sf.return_value.get.call_args.kwargs["pk"] == conv.pk
+
+
+@pytest.mark.django_db
 def test_support_poll_throttle_scope_allows_burst() -> None:
     """GET poll must not share the tight POST support_message budget."""
     ensure_default_schedule()
