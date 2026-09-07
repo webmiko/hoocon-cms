@@ -6,19 +6,34 @@ Spec: ПЛАН §6 Iter 4 — F10 (CSP draft); docs/security-baseline.md §CSP;
 
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import Callable
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
+
+logger = logging.getLogger(__name__)
+
+_CSP_COUNTER_CACHE_KEY = "hoocon:csp:counter_ids"
+_CSP_COUNTER_CACHE_TTL = 60
 
 
 def _analytics_counter_ids() -> tuple[str, str]:
     """Resolve Metrika/GA4 IDs from SiteSettings with env fallback.
 
+    Cached for one minute so CSP header construction does not hit the
+    database on every request. Falls back to env settings on cache miss or
+    DB error.
+
     Returns:
         Tuple ``(yandex_metrika_id, ga4_measurement_id)``.
     """
+    cached = cache.get(_CSP_COUNTER_CACHE_KEY)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        return cached
+
     ym = getattr(settings, "YANDEX_METRIKA_ID", "") or ""
     ga = getattr(settings, "GA4_MEASUREMENT_ID", "") or ""
     try:
@@ -28,8 +43,10 @@ def _analytics_counter_ids() -> tuple[str, str]:
         ym = (site.yandex_metrika_id or "").strip() or ym
         ga = (site.ga4_measurement_id or "").strip() or ga
     except Exception:  # noqa: BLE001 — CSP must not break on DB errors
-        pass
-    return ym.strip(), ga.strip()
+        logger.exception("csp_site_settings_load_failed")
+    result = (ym.strip(), ga.strip())
+    cache.set(_CSP_COUNTER_CACHE_KEY, result, timeout=_CSP_COUNTER_CACHE_TTL)
+    return result
 
 
 def build_csp(*, nonce: str | None = None, allow_unsafe_eval: bool = False) -> str:

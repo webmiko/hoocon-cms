@@ -140,3 +140,24 @@ def test_csp_public_html_forbids_unsafe_eval() -> None:
     client = Client()
     response = client.get("/")
     assert "'unsafe-eval'" not in _csp_value(response)
+
+
+@pytest.mark.django_db
+def test_csp_analytics_ids_are_cached_between_requests(settings) -> None:
+    """CSP counter IDs use cache, not a DB query per request."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    settings.CATALOG_HTTP_CACHE_SECONDS = 0
+    client = Client()
+
+    def site_settings_queries() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            client.get("/api/health/")
+        return sum("sitesettings" in q["sql"].lower() for q in ctx.captured_queries)
+
+    # Warm the cache with the first request.
+    first = site_settings_queries()
+    assert first <= 1
+    # Subsequent requests must not hit the DB for settings again.
+    assert site_settings_queries() == 0
