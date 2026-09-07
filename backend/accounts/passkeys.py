@@ -9,6 +9,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
 from webauthn import (
@@ -231,18 +232,22 @@ def complete_authentication(
         clear_authentication_challenge(request)
         raise ValueError("Учётная запись не имеет доступа в админку.")
 
-    verified = verify_authentication_response(
-        credential=credential,
-        expected_challenge=base64url_to_bytes(challenge_b64),
-        expected_rp_id=passkey_rp_id(),
-        expected_origin=passkey_origin(),
-        credential_public_key=bytes(row.public_key),
-        credential_current_sign_count=row.sign_count,
-        require_user_verification=True,
-    )
-    row.sign_count = verified.new_sign_count
-    row.last_used_at = timezone.now()
-    row.save(update_fields=["sign_count", "last_used_at"])
+    # Lock the credential row so two parallel passkey logins with the same
+    # authenticator cannot both pass sign_count verification.
+    with transaction.atomic():
+        row = PasskeyCredential.objects.select_for_update().get(pk=row.pk)
+        verified = verify_authentication_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=passkey_rp_id(),
+            expected_origin=passkey_origin(),
+            credential_public_key=bytes(row.public_key),
+            credential_current_sign_count=row.sign_count,
+            require_user_verification=True,
+        )
+        row.sign_count = verified.new_sign_count
+        row.last_used_at = timezone.now()
+        row.save(update_fields=["sign_count", "last_used_at"])
     clear_authentication_challenge(request)
     return user, next_url
 
