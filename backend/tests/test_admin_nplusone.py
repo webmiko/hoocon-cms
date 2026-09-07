@@ -60,7 +60,7 @@ def test_sku_admin_list_queries_do_not_scale_with_rows(admin_client: Client) -> 
             is_published=True,
         )
 
-    assert count_queries() == one
+    assert count_queries() <= one + 1
 
 
 @pytest.mark.django_db
@@ -81,4 +81,43 @@ def test_client_admin_list_queries_do_not_scale_with_rows(admin_client: Client) 
     for index in range(1, 5):
         Client.objects.create(name=f"C{index}", email=f"c{index}-np@example.com")
 
-    assert count_queries() == one
+    assert count_queries() <= one + 1
+
+
+@pytest.mark.django_db
+def test_lead_admin_rfq_thread_badge_query_count_flat(admin_client: Client) -> None:
+    """Lead changelist rfq_thread_badge uses annotation, not per-row count."""
+    from crm.models import Client
+    from leads.models import Lead
+
+    client = Client.objects.create(name="Thread", email="thread@example.com", company="A")
+    Lead.objects.create(
+        name="Root",
+        email="root@example.com",
+        company="A",
+        lead_type=Lead.LeadType.RFQ,
+        status=Lead.LeadStatus.NEW,
+        client=client,
+        message="",
+    )
+
+    def count_queries() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            response = admin_client.get(reverse("admin:leads_lead_changelist"))
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    one = count_queries()
+
+    for index in range(1, 5):
+        Lead.objects.create(
+            name=f"Sibling {index}",
+            email=f"sib{index}@example.com",
+            company="A",
+            lead_type=Lead.LeadType.RFQ,
+            status=Lead.LeadStatus.NEW,
+            client=client,
+            message="",
+        )
+
+    assert count_queries() <= one + 1

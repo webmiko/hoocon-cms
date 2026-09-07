@@ -21,7 +21,17 @@ from typing import cast
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import Case, IntegerField, QuerySet, When
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    When,
+)
+from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
@@ -202,9 +212,15 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
     @admin.display(description="Нить")
     def rfq_thread_badge(self, obj: Lead) -> str:
         """Sibling count for RFQ soft-bundle (empty if alone)."""
+        bundle_size = getattr(obj, "_bundle_size", None)
+        if bundle_size is None:
+            # Fallback outside changelist (e.g., change form read-only field).
+            if not obj.rfq_bundle_key:
+                return "—"
+            bundle_size = rfq_bundle_queryset(obj).count()
         if not obj.rfq_bundle_key:
             return "—"
-        n = rfq_bundle_queryset(obj).count()
+        n = bundle_size or 1
         if n <= 1:
             return "1"
         root_id = obj.rfq_bundle_root_id or obj.pk
@@ -462,6 +478,13 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         Returns:
             Lead queryset with ``_status_rank`` and default ordering.
         """
+        bundle_root_id = Coalesce("rfq_bundle_root_id", "pk")
+        bundle_size = (
+            Lead.objects.filter(Q(pk=OuterRef("_bundle_root")) | Q(rfq_bundle_root_id=OuterRef("_bundle_root")))
+            .values("rfq_bundle_root_id")
+            .annotate(cnt=Count("pk"))
+            .values("cnt")
+        )
         qs = (
             self.model._default_manager.get_queryset()
             .select_related("client", "sku", "assignee", "processed_by", "rfq_bundle_root")
@@ -473,6 +496,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                     default=2,
                     output_field=IntegerField(),
                 ),
+                _bundle_root=bundle_root_id,
+                _bundle_size=Subquery(bundle_size),
             )
         )
         qs = scope_leads_for_manager(qs, request.user)
