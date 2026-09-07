@@ -14,15 +14,13 @@ import {
   readCookieConsent,
   type CookieConsentState,
 } from "../utils/cookieConsent";
-import {
-  getSupportChatState,
-  subscribeSupportChat,
-} from "../utils/supportChatControl";
+import { getSupportChatState, subscribeSupportChat } from "../utils/supportChatControl";
 import {
   hasBrowserPushSubscription,
   pushSupported,
   subscribeWebPush,
   subscribeWebPushStatusRu,
+  syncMarketingPushConsent,
   type SubscribeWebPushResult,
 } from "../utils/webPush";
 import styles from "./MarketingPushPrompt.module.css";
@@ -179,9 +177,7 @@ export function MarketingPushPrompt() {
       if (!marketingOn) {
         clearMarketingPushDone();
         setVisible(false);
-        void import("../utils/webPush").then(({ syncMarketingPushConsent }) =>
-          syncMarketingPushConsent(false),
-        );
+        void syncMarketingPushConsent(false);
         return;
       }
       if (!pushSupported()) {
@@ -264,8 +260,7 @@ export function MarketingPushPrompt() {
           Новости Hoocon в браузере
         </p>
         <p className={styles.text}>
-          Включить push о новинках и предложениях? Можно отключить в настройках
-          cookie.
+          Включить push о новинках и предложениях? Можно отключить в настройках cookie.
         </p>
         <div className={styles.actions}>
           <button

@@ -20,19 +20,18 @@ import { api } from "../api/client";
 import styles from "./Layout.module.css";
 
 /** Hero «Запросить КП» on the home page — sticky CTA waits until it leaves the viewport. */
-export const HERO_KP_CTA_ID = "hero-kp-cta";
+const HERO_KP_CTA_ID = "hero-kp-cta";
 
 /**
  * Inline factory contact CTAs on /zavod (not «Запросить образец»).
  * Top: OEM inquiry · bottom: OEM partnership.
  */
-export const ZAVOD_FACTORY_CTA_SELECTOR = [
+const ZAVOD_FACTORY_CTA_SELECTOR = [
   'a.cta-btn[href^="mailto:hoocon@hoocon.com.cn"][href*="OEM%20inquiry"]',
   'a.cta-btn[href^="mailto:hoocon@hoocon.com.cn"][href*="OEM%20partnership"]',
 ].join(", ");
 
-const ZAVOD_FACTORY_MAILTO =
-  "mailto:hoocon@hoocon.com.cn?subject=OEM%20inquiry%20from%20hoocon.ru";
+const ZAVOD_FACTORY_MAILTO = "mailto:hoocon@hoocon.com.cn?subject=OEM%20inquiry%20from%20hoocon.ru";
 
 /**
  * App shell: utility masthead + brand header + main + dark footer.
@@ -48,8 +47,7 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const hideMobileCta =
-    location.pathname.startsWith("/statyi") ||
-    location.pathname.startsWith("/novosti");
+    location.pathname.startsWith("/statyi") || location.pathname.startsWith("/novosti");
   const isHome = location.pathname === "/";
   const isZavod = /^\/zavod\/?$/.test(location.pathname);
   /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
@@ -82,8 +80,7 @@ export function Layout() {
     }
   }
 
-  const showMobileStickyCta =
-    !hideMobileCta && !((isHome || isZavod) && inlineCtaVisible);
+  const showMobileStickyCta = !hideMobileCta && !((isHome || isZavod) && inlineCtaVisible);
 
   // Close mobile menu when the route changes (adjust state during render).
   if (menuRoute !== routeKey) {
@@ -248,11 +245,7 @@ export function Layout() {
             <DesktopNav />
 
             <div className={styles.siteHeadActions}>
-              <form
-                className={styles.searchFormDesktop}
-                onSubmit={handleSearch}
-                role="search"
-              >
+              <form className={styles.searchFormDesktop} onSubmit={handleSearch} role="search">
                 <input
                   type="search"
                   name="q"
@@ -312,11 +305,7 @@ export function Layout() {
           </button>
         </div>
         <div className={`container ${styles.mobilePanelInner}`}>
-          <form
-            className={styles.searchFormMobile}
-            onSubmit={handleSearch}
-            role="search"
-          >
+          <form className={styles.searchFormMobile} onSubmit={handleSearch} role="search">
             <input
               type="search"
               name="q"
@@ -333,11 +322,7 @@ export function Layout() {
             <Link to="/catalog" className={styles.navMobileLink} onClick={closeMenu}>
               Каталог
             </Link>
-            <Link
-              to="/zavod"
-              className={styles.navMobileLink}
-              onClick={closeMenu}
-            >
+            <Link to="/zavod" className={styles.navMobileLink} onClick={closeMenu}>
               Завод · OEM напрямую
             </Link>
             <Link to="/statyi" className={styles.navMobileLink} onClick={closeMenu}>
@@ -346,18 +331,10 @@ export function Layout() {
             <Link to="/novosti" className={styles.navMobileLink} onClick={closeMenu}>
               Новости
             </Link>
-            <Link
-              to="/company"
-              className={styles.navMobileLink}
-              onClick={closeMenu}
-            >
+            <Link to="/company" className={styles.navMobileLink} onClick={closeMenu}>
               О компании
             </Link>
-            <Link
-              to="/gde-kupit"
-              className={styles.navMobileLink}
-              onClick={closeMenu}
-            >
+            <Link to="/gde-kupit" className={styles.navMobileLink} onClick={closeMenu}>
               Где купить
             </Link>
             <Link to="/kontakty" className={styles.navMobileLink} onClick={closeMenu}>
@@ -366,11 +343,7 @@ export function Layout() {
             <Link to="/faq" className={styles.navMobileLink} onClick={closeMenu}>
               Вопросы
             </Link>
-            <Link
-              to="/compare"
-              className={styles.navMobileLink}
-              onClick={closeMenu}
-            >
+            <Link to="/compare" className={styles.navMobileLink} onClick={closeMenu}>
               Сравнение
             </Link>
           </nav>
@@ -381,11 +354,7 @@ export function Layout() {
 
       <main
         id="main-content"
-        className={
-          !showMobileStickyCta
-            ? `${styles.main} ${styles.mainNoStickyCta}`
-            : styles.main
-        }
+        className={!showMobileStickyCta ? `${styles.main} ${styles.mainNoStickyCta}` : styles.main}
       >
         <div className="container">
           <RouteSlideOutlet />
@@ -398,10 +367,7 @@ export function Layout() {
             <p className={styles.footerLogo}>
               <BrandLogo onDark alt="Hoocon" />
             </p>
-            <p>
-              Электроприводы для вентиляции, противопожарной безопасности и
-              дымоудаления.
-            </p>
+            <p>Электроприводы для вентиляции, противопожарной безопасности и дымоудаления.</p>
             <p>Склад в Москве · поставки по РФ</p>
           </div>
           <div>
@@ -464,11 +430,7 @@ export function Layout() {
               </li>
               {telegramLinks.map((ch) => (
                 <li key={ch.channel}>
-                  <a
-                    href={ch.deep_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <a href={ch.deep_link} target="_blank" rel="noopener noreferrer">
                     {ch.label}
                   </a>
                 </li>
@@ -478,8 +440,7 @@ export function Layout() {
         </div>
         <div className={`container ${styles.footerBottom}`}>
           <p>
-            © {new Date().getFullYear()} Hoocon · Системы вентиляции и
-            кондиционирования
+            © {new Date().getFullYear()} Hoocon · Системы вентиляции и кондиционирования
             <span className={styles.footerRelease}> · {releaseLabel(false)}</span>
           </p>
           <nav className={styles.footerLegal} aria-label="Правовая информация">

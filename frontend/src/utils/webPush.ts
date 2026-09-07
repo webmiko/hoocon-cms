@@ -6,6 +6,7 @@
  */
 
 import { api } from "../api/client";
+import { isMarketingAllowed, readCookieConsent } from "./cookieConsent";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -21,10 +22,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 /** Some engines want a detached ArrayBuffer, not a Uint8Array view. */
 function applicationServerKeyBytes(publicKey: string): ArrayBuffer {
   const bytes = urlBase64ToUint8Array(publicKey);
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 export function pushSupported(): boolean {
@@ -105,9 +103,7 @@ function classifySubscribeError(err: unknown): SubscribeWebPushResult {
 }
 
 function looksLikeVapidMismatch(err: unknown): boolean {
-  const message = (
-    err instanceof Error ? err.message : String(err)
-  ).toLowerCase();
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
   return (
     message.includes("applicationserverkey") ||
     message.includes("application server key") ||
@@ -126,9 +122,6 @@ async function postSubscriptionToApi(
   }
   const topicMarketing = Boolean(topics.topic_marketing);
   if (topicMarketing) {
-    const { isMarketingAllowed, readCookieConsent } = await import(
-      "./cookieConsent"
-    );
     if (!isMarketingAllowed(readCookieConsent())) {
       return { ok: false, reason: "api_error", detail: "marketing consent required" };
     }
@@ -268,9 +261,7 @@ export async function subscribeWebPush(topics: {
  * Sync cookie marketing opt-in to Django session and clear server topic
  * when the visitor turns marketing off.
  */
-export async function syncMarketingPushConsent(
-  marketingAllowed: boolean,
-): Promise<void> {
+export async function syncMarketingPushConsent(marketingAllowed: boolean): Promise<void> {
   try {
     await api.fetchCsrfToken();
     const payload: {
@@ -280,9 +271,7 @@ export async function syncMarketingPushConsent(
     } = { marketing_consent: marketingAllowed };
     if (!marketingAllowed && pushSupported()) {
       const registration = await getRegistration();
-      const existing = registration
-        ? await registration.pushManager.getSubscription()
-        : null;
+      const existing = registration ? await registration.pushManager.getSubscription() : null;
       if (existing?.endpoint) {
         payload.endpoint = existing.endpoint;
         payload.clear_marketing = true;
@@ -333,9 +322,7 @@ function pushServiceUnavailableRu(): string {
 }
 
 /** Short RU status for SupportWidget / marketing prompt. */
-export function subscribeWebPushStatusRu(
-  result: SubscribeWebPushResult,
-): string {
+export function subscribeWebPushStatusRu(result: SubscribeWebPushResult): string {
   if (result.ok) return "";
   switch (result.reason) {
     case "unsupported":
