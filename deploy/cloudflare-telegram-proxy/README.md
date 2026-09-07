@@ -38,3 +38,9 @@ Point Bot API webhook at the Worker (same `secret_token` as Django):
 `https://hoocon-telegram-api.npok9.workers.dev/webhook`
 
 Restart `web` + `celery_worker` after changing env.
+
+## Welcome cover
+
+Telegram cannot fetch `hoocon.ru` images. Serve
+`public/welcome.jpg` via Worker ASSETS at `/welcome.jpg` and set
+`TELEGRAM_WELCOME_PHOTO_URL` to that URL.

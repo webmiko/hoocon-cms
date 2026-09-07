@@ -17,6 +17,14 @@ export default {
       return forwardInboundWebhook(request, env);
     }
 
+    // Static cover for Telegram sendPhoto URL (ASSETS); TG cannot fetch hoocon.ru.
+    if (url.pathname === "/welcome.jpg" || url.pathname === "/welcome.webp") {
+      if (env.ASSETS) {
+        return env.ASSETS.fetch(request);
+      }
+      return serveWelcomePhoto();
+    }
+
     const allowed = String(env.ALLOWED_IPS || "")
       .split(",")
       .map((s) => s.trim())
@@ -49,8 +57,8 @@ export default {
       redirect: "follow",
     };
     if (request.method !== "GET" && request.method !== "HEAD") {
-      init.body = request.body;
-      init.duplex = "half";
+      // Buffer the body: streaming duplex often stalls urllib multipart from VPS.
+      init.body = await request.arrayBuffer();
     }
 
     try {
@@ -68,6 +76,27 @@ export default {
     }
   },
 };
+
+async function serveWelcomePhoto() {
+  const origin = "https://hoocon.ru/static/social/telegram-welcome.webp";
+  try {
+    const upstream = await fetch(origin, {
+      cf: { cacheEverything: true, cacheTtl: 86400 },
+    });
+    if (!upstream.ok) {
+      return new Response("Not Found", { status: 404 });
+    }
+    const headers = new Headers(upstream.headers);
+    headers.set("Content-Type", "image/webp");
+    headers.set("Cache-Control", "public, max-age=86400");
+    return new Response(upstream.body, { status: 200, headers });
+  } catch (err) {
+    return Response.json(
+      { ok: false, error: "welcome_fetch_failed", detail: String(err && err.message) },
+      { status: 502 },
+    );
+  }
+}
 
 async function forwardInboundWebhook(request, env) {
   if (request.method !== "POST") {
