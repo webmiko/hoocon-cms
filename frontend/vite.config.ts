@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import type { InlineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -69,6 +70,22 @@ export default defineConfig({
       // Dev SW intercepts ``/src/*.tsx`` and yields a blank #root — keep PWA prod-only.
       devOptions: {
         enabled: false,
+      },
+      integration: {
+        configureCustomSWViteBuild: (inlineConfig: InlineConfig) => {
+          const output = inlineConfig.build?.rollupOptions?.output;
+          if (
+            output &&
+            !Array.isArray(output) &&
+            "inlineDynamicImports" in output
+          ) {
+            // Vite 8 / Rolldown deprecates `inlineDynamicImports` in favor of
+            // `codeSplitting: false` for a single-file service worker.
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+            delete output.inlineDynamicImports;
+            output.codeSplitting = false;
+          }
+        },
       },
     }),
     // After PWA HTML inject — last transformIndexHtml wins for stylesheet links.
