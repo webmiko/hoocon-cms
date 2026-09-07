@@ -1,5 +1,5 @@
 /**
- * Leads changelist board: wall status headers + kanban columns.
+ * Leads changelist board: wall status headers + kanban columns + DnD status.
  * Expects body.hoocon-lead-board and data-hoocon-lead-view=wall|kanban.
  *
  * Unfold renders each result row in its own <tbody> — collect rows across all.
@@ -14,6 +14,7 @@
     done: "Завершена",
   };
   const BOARD_BUILT = "data-hoocon-lead-board-built";
+  const DRAG_MIME = "application/x-hoocon-lead-pk";
 
   function leadView() {
     const toggle = document.querySelector(".hoocon-lead-view-toggle");
@@ -32,6 +33,11 @@
     return document.querySelector(
       "#changelist table.hoocon-admin-card-table, #changelist table",
     );
+  }
+
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
   }
 
   /**
@@ -62,6 +68,212 @@
       return "in_progress";
     }
     return "new";
+  }
+
+  /**
+   * @param {HTMLTableRowElement} row
+   * @returns {string}
+   */
+  function rowPk(row) {
+    const box = row.querySelector("input.action-select[value], input.action-select");
+    if (box && box.value) {
+      return String(box.value);
+    }
+    const open = row.querySelector("a.hoocon-admin-lead-open, a[href*='/change/']");
+    if (open && open.getAttribute("href")) {
+      const m = open.getAttribute("href").match(/\/lead\/(\d+)\/change\//);
+      if (m) {
+        return m[1];
+      }
+    }
+    return "";
+  }
+
+  /**
+   * @param {HTMLTableRowElement} row
+   * @param {string} status
+   */
+  function setRowStatusBadge(row, status) {
+    const badge = row.querySelector(".hoocon-lead-status");
+    if (!badge) {
+      return;
+    }
+    STATUS_ORDER.forEach(function (key) {
+      badge.classList.remove("hoocon-lead-status--" + key);
+    });
+    badge.classList.add("hoocon-lead-status--" + status);
+    badge.textContent = STATUS_LABELS[status] || status;
+  }
+
+  /**
+   * @param {HTMLElement} board
+   */
+  function recountKanban(board) {
+    board.querySelectorAll(".hoocon-lead-kanban__col").forEach(function (col) {
+      const n = col.querySelectorAll(".hoocon-lead-kanban__cards > tr").length;
+      const count = col.querySelector(".hoocon-lead-kanban__count");
+      if (count) {
+        count.textContent = String(n);
+      }
+    });
+  }
+
+  /**
+   * @param {string} pk
+   * @param {string} status
+   * @returns {Promise<{ok: boolean, status?: string, error?: string, http: number}>}
+   */
+  function postLeadStatus(pk, status) {
+    return fetch("/admin/leads/lead/" + encodeURIComponent(pk) + "/set-status/", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ status: status }),
+    }).then(function (res) {
+      return res.json().then(
+        function (data) {
+          return {
+            ok: Boolean(data && data.ok),
+            status: data && data.status,
+            error: data && data.error,
+            http: res.status,
+          };
+        },
+        function () {
+          return { ok: false, error: "invalid_json", http: res.status };
+        },
+      );
+    });
+  }
+
+  /**
+   * @param {HTMLElement} board
+   */
+  function enableKanbanDragDrop(board) {
+    let dragRow = null;
+    let originCards = null;
+    let originNext = null;
+
+    board.querySelectorAll(".hoocon-lead-kanban__cards > tr").forEach(function (row) {
+      if (!rowPk(row)) {
+        return;
+      }
+      row.setAttribute("draggable", "true");
+      row.addEventListener("dragstart", function (event) {
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          target.closest("a, button, input, label, select, textarea")
+        ) {
+          event.preventDefault();
+          return;
+        }
+        dragRow = row;
+        originCards = row.parentElement;
+        originNext = row.nextElementSibling;
+        row.classList.add("hoocon-lead-kanban__dragging");
+        row.setAttribute("data-hoocon-just-dragged", "1");
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData(DRAG_MIME, rowPk(row));
+          event.dataTransfer.setData("text/plain", rowPk(row));
+        }
+      });
+      row.addEventListener("dragend", function () {
+        row.classList.remove("hoocon-lead-kanban__dragging");
+        board.querySelectorAll(".hoocon-lead-kanban__drop-target").forEach(function (col) {
+          col.classList.remove("hoocon-lead-kanban__drop-target");
+        });
+        window.setTimeout(function () {
+          row.removeAttribute("data-hoocon-just-dragged");
+        }, 400);
+        dragRow = null;
+        originCards = null;
+        originNext = null;
+      });
+    });
+
+    board.querySelectorAll(".hoocon-lead-kanban__col").forEach(function (col) {
+      const status = col.dataset.status || "";
+      const cards = col.querySelector(".hoocon-lead-kanban__cards");
+      if (!cards || STATUS_ORDER.indexOf(status) < 0) {
+        return;
+      }
+
+      col.addEventListener("dragover", function (event) {
+        if (!dragRow) {
+          return;
+        }
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = "move";
+        }
+        col.classList.add("hoocon-lead-kanban__drop-target");
+      });
+
+      col.addEventListener("dragleave", function (event) {
+        if (!col.contains(event.relatedTarget)) {
+          col.classList.remove("hoocon-lead-kanban__drop-target");
+        }
+      });
+
+      col.addEventListener("drop", function (event) {
+        event.preventDefault();
+        col.classList.remove("hoocon-lead-kanban__drop-target");
+        if (!dragRow) {
+          return;
+        }
+        const pk = rowPk(dragRow);
+        const fromStatus = rowStatus(dragRow);
+        if (!pk || status === fromStatus) {
+          return;
+        }
+
+        const moving = dragRow;
+        const backParent = originCards;
+        const backNext = originNext;
+        cards.appendChild(moving);
+        setRowStatusBadge(moving, status);
+        recountKanban(board);
+
+        postLeadStatus(pk, status)
+          .then(function (result) {
+            if (result.ok) {
+              return;
+            }
+            if (backParent) {
+              if (backNext && backNext.parentElement === backParent) {
+                backParent.insertBefore(moving, backNext);
+              } else {
+                backParent.appendChild(moving);
+              }
+            }
+            setRowStatusBadge(moving, fromStatus);
+            recountKanban(board);
+            if (result.http === 409) {
+              window.alert("Заявку уже взял другой менеджер.");
+            } else {
+              window.alert("Не удалось сменить статус заявки.");
+            }
+          })
+          .catch(function () {
+            if (backParent) {
+              if (backNext && backNext.parentElement === backParent) {
+                backParent.insertBefore(moving, backNext);
+              } else {
+                backParent.appendChild(moving);
+              }
+            }
+            setRowStatusBadge(moving, fromStatus);
+            recountKanban(board);
+            window.alert("Не удалось сменить статус заявки.");
+          });
+      });
+    });
   }
 
   function clearWallHeadings(table) {
@@ -161,6 +373,7 @@
 
     table.classList.add("hoocon-lead-kanban-source");
     results.appendChild(board);
+    enableKanbanDragDrop(board);
   }
 
   function restoreRowsToTable(table) {

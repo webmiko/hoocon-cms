@@ -1773,7 +1773,18 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     border-radius: var(--hoocon-radius);
     background: var(--hoocon-surface);
     box-shadow: var(--hoocon-shadow-soft);
-    cursor: pointer;
+    cursor: grab;
+  }
+
+  .hoocon-lead-kanban__cards > tr.hoocon-lead-kanban__dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+  }
+
+  .hoocon-lead-kanban__col.hoocon-lead-kanban__drop-target {
+    border-color: color-mix(in srgb, var(--hoocon-primary) 45%, transparent);
+    background: color-mix(in srgb, var(--hoocon-primary) 8%, var(--hoocon-surface-muted));
+  }
 
   .hoocon-lead-kanban__cards > tr > td.field-open_link,
   .hoocon-lead-kanban__cards > tr > th.field-open_link,

@@ -4,8 +4,9 @@ Spec: ПЛАН §6 Iter 3 — leads.Lead; docs/readiness-backend-ux.md §2.2.
 Staff manages leads via Django Admin: read/edit status, view PII in admin
 context only (PII never exposed in public API — Slice 19).
 
-Also exposes ``/admin/leads/lead/new-count/`` for the header sticker poll
-and ``/admin/leads/lead/stats/`` for processing statistics.
+Also exposes ``/admin/leads/lead/new-count/`` for the header sticker poll,
+``/admin/leads/lead/stats/`` for processing statistics, and
+``POST /admin/leads/lead/<id>/set-status/`` for kanban drag-and-drop.
 Opening a lead marks it seen (sticker drops); status «Новая» stays until edited.
 
 Change form opens in **view mode** by default; editing requires ``?edit=1``
@@ -14,6 +15,7 @@ or the «Редактировать» button.
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from typing import cast
 
@@ -21,7 +23,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Case, IntegerField, QuerySet, When
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -38,6 +40,7 @@ from leads.services import (
     log_manager_activity,
     mark_lead_seen,
     scope_leads_for_manager,
+    set_lead_status,
     take_lead_in_work,
 )
 
@@ -696,8 +699,82 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 self.admin_site.admin_view(self.stats_view),
                 name="leads_lead_stats",
             ),
+            path(
+                "<int:object_id>/set-status/",
+                self.admin_site.admin_view(self.set_status_view),
+                name="leads_lead_set_status",
+            ),
         ]
         return custom + super().get_urls()
+
+    def set_status_view(self, request: HttpRequest, object_id: int) -> JsonResponse:
+        """JSON status update for kanban drag-and-drop.
+
+        POST body: ``{"status": "new"|"in_progress"|"done"}``.
+
+        Args:
+            request: authenticated staff request (admin_view + CSRF).
+            object_id: Lead primary key.
+
+        Returns:
+            ``{"ok": true, "status": "..."}`` or an error payload.
+        """
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
+        if not request.user.has_perm("leads.change_lead"):
+            raise PermissionDenied
+
+        try:
+            payload = json.loads(request.body.decode() or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+        if not isinstance(payload, dict):
+            return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+
+        status = str(payload.get("status") or "").strip()
+        scoped = scope_leads_for_manager(Lead.objects.all(), request.user)
+        lead = get_object_or_404(scoped, pk=object_id)
+        prev_status = lead.status
+        prev_assignee_id = lead.assignee_id
+
+        updated, error = set_lead_status(lead, status=status, actor=request.user)
+        if error == "invalid_status":
+            return JsonResponse({"ok": False, "error": error}, status=400)
+        if error == "conflict":
+            return JsonResponse(
+                {"ok": False, "error": error, "status": updated.status},
+                status=409,
+            )
+
+        status_changed = prev_status != updated.status
+        assignee_changed = prev_assignee_id != updated.assignee_id
+        if status_changed or assignee_changed:
+            from django.db import transaction
+
+            lead_id = updated.pk
+            status_label = updated.get_status_display()
+            actor_name = (getattr(request.user, "first_name", "") or "").strip() or str(
+                request.user,
+            )
+
+            def _crm_tg() -> None:
+                from accounts.tasks import notify_superuser_telegram_crm
+
+                bits: list[str] = [f"Заявка #{lead_id}"]
+                if status_changed:
+                    bits.append(f"статус → {status_label}")
+                if assignee_changed:
+                    bits.append("сменён ответственный")
+                bits.append(f"({actor_name})")
+                notify_superuser_telegram_crm.delay(
+                    "Изменение заявки",
+                    "; ".join(bits),
+                    f"/admin/leads/lead/{lead_id}/change/",
+                )
+
+            transaction.on_commit(_crm_tg)
+
+        return JsonResponse({"ok": True, "status": updated.status})
 
     def new_leads_count_view(self, request: HttpRequest) -> JsonResponse:
         """Return ``{"count": N}`` for staff sticker refresh.

@@ -13,6 +13,7 @@ from leads.models import Lead
 from leads.services import (
     apply_lead_manager_on_save,
     build_lead_processing_stats,
+    set_lead_status,
     take_lead_in_work,
 )
 
@@ -479,3 +480,174 @@ def test_admin_mark_done_creates_activity() -> None:
         lead=lead,
         activity_type=ActivityType.STATUS,
     ).exists()
+
+
+@pytest.mark.django_db
+def test_set_lead_status_service_new_to_done() -> None:
+    """Kanban helper marks done and stamps processed_by."""
+    manager = User.objects.create_user(
+        username="kanban-svc",
+        email="kanban-svc@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    lead = Lead.objects.create(
+        name="Kanban Svc",
+        email="kanban-svc-lead@example.com",
+        message="Смена статуса через сервис канбана.",
+        status=Lead.LeadStatus.NEW,
+    )
+    updated, error = set_lead_status(lead, status=Lead.LeadStatus.DONE, actor=manager)
+    assert error is None
+    updated.refresh_from_db()
+    assert updated.status == Lead.LeadStatus.DONE
+    assert updated.processed_by_id == manager.pk
+    assert updated.assignee_id == manager.pk
+
+
+@pytest.mark.django_db
+def test_admin_set_status_endpoint_moves_lead_and_rejects_conflict() -> None:
+    """POST set-status updates a visible lead; foreign assignee → 409."""
+    import json
+
+    from django.contrib.auth.models import Permission
+
+    manager = User.objects.create_user(
+        username="kanban-mgr",
+        email="kanban-mgr@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    for codename in ("view_lead", "change_lead"):
+        manager.user_permissions.add(Permission.objects.get(codename=codename))
+    other = User.objects.create_user(
+        username="kanban-other",
+        email="kanban-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    mine = Lead.objects.create(
+        name="Kanban Mine",
+        email="kanban-mine@example.com",
+        message="Перетащить в работу.",
+        status=Lead.LeadStatus.NEW,
+    )
+    foreign = Lead.objects.create(
+        name="Kanban Foreign",
+        email="kanban-foreign@example.com",
+        message="Уже у другого менеджера.",
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+    )
+
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(manager)
+    # Prime CSRF cookie via a safe GET.
+    client.get("/admin/leads/lead/")
+    csrf = client.cookies["csrftoken"].value
+
+    ok = client.post(
+        f"/admin/leads/lead/{mine.pk}/set-status/",
+        data=json.dumps({"status": "in_progress"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["ok"] is True
+    assert body["status"] == "in_progress"
+    mine.refresh_from_db()
+    assert mine.status == Lead.LeadStatus.IN_PROGRESS
+    assert mine.assignee_id == manager.pk
+
+    done = client.post(
+        f"/admin/leads/lead/{mine.pk}/set-status/",
+        data=json.dumps({"status": "done"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert done.status_code == 200
+    assert done.json()["status"] == "done"
+    mine.refresh_from_db()
+    assert mine.status == Lead.LeadStatus.DONE
+
+    # Out of scope for manager → 404 (scoped queryset).
+    missing = client.post(
+        f"/admin/leads/lead/{foreign.pk}/set-status/",
+        data=json.dumps({"status": "done"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert missing.status_code == 404
+
+    # Conflict: superuser sees foreign in-progress lead; take must not steal.
+    su = User.objects.create_superuser(
+        username="kanban-su",
+        email="kanban-su@example.com",
+        password="password12",
+    )
+    su_client = Client(enforce_csrf_checks=True)
+    su_client.force_login(su)
+    su_client.get("/admin/leads/lead/")
+    su_csrf = su_client.cookies["csrftoken"].value
+    race = su_client.post(
+        f"/admin/leads/lead/{foreign.pk}/set-status/",
+        data=json.dumps({"status": "in_progress"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=su_csrf,
+    )
+    assert race.status_code == 409
+    assert race.json()["error"] == "conflict"
+    foreign.refresh_from_db()
+    assert foreign.assignee_id == other.pk
+
+
+@pytest.mark.django_db
+def test_admin_set_status_requires_change_perm_and_csrf() -> None:
+    """set-status needs change_lead; CSRF is enforced."""
+    import json
+
+    from django.contrib.auth.models import Permission
+
+    viewer = User.objects.create_user(
+        username="kanban-view",
+        email="kanban-view@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    viewer.user_permissions.add(Permission.objects.get(codename="view_lead"))
+    lead = Lead.objects.create(
+        name="Kanban ViewOnly",
+        email="kanban-viewonly@example.com",
+        message="Без права change.",
+        status=Lead.LeadStatus.NEW,
+    )
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(viewer)
+    client.get("/admin/leads/lead/")
+    csrf = client.cookies["csrftoken"].value
+
+    forbidden = client.post(
+        f"/admin/leads/lead/{lead.pk}/set-status/",
+        data=json.dumps({"status": "done"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert forbidden.status_code == 403
+
+    manager = User.objects.create_superuser(
+        username="kanban-csrf",
+        email="kanban-csrf@example.com",
+        password="password12",
+    )
+    staff = Client(enforce_csrf_checks=True)
+    staff.force_login(manager)
+    staff.get("/admin/leads/lead/")
+    no_csrf = staff.post(
+        f"/admin/leads/lead/{lead.pk}/set-status/",
+        data=json.dumps({"status": "done"}),
+        content_type="application/json",
+    )
+    assert no_csrf.status_code == 403

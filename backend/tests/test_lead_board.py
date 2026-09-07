@@ -146,6 +146,30 @@ def test_lead_board_js_classifies_status_badges_and_wall_headings() -> None:
     assert 'done: "Завершена"' in src
 
 
+def test_lead_board_js_kanban_dnd_posts_status_with_csrf() -> None:
+    """Kanban DnD posts set-status, updates badge classes, and uses CSRF cookie."""
+    src = _BOARD_JS.read_text(encoding="utf-8")
+    assert "enableKanbanDragDrop" in src
+    assert "enableKanbanDragDrop(board)" in _apply_kanban_fn_source(src)
+    assert 'setAttribute("draggable", "true")' in src
+    assert "/set-status/" in src
+    assert "X-CSRFToken" in src
+    assert 'getCookie("csrftoken")' in src
+    assert "setRowStatusBadge" in src
+    assert "hoocon-lead-status--" in src
+    assert "data-hoocon-just-dragged" in src
+    tables = (_BACKEND / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
+    assert "data-hoocon-just-dragged" in tables
+
+
+def test_lead_board_css_kanban_dnd_affordances() -> None:
+    """Kanban cards use grab cursor; drop target column is highlighted."""
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    cards = _css_rule_body(css, ".hoocon-lead-kanban__cards > tr")
+    assert "cursor: grab" in cards
+    assert "hoocon-lead-kanban__dragging" in css
+    assert "hoocon-lead-kanban__drop-target" in css
+
 
 @pytest.mark.django_db
 def test_lead_changelist_renders_header_hamburger_markup() -> None:

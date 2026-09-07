@@ -322,6 +322,53 @@ def apply_lead_manager_on_save(lead: Lead, *, actor: Any) -> None:
             lead.assignee = actor
 
 
+def set_lead_status(lead: Lead, *, status: str, actor: Any) -> tuple[Lead, str | None]:
+    """Update lead status from Admin kanban (or similar staff actions).
+
+    ``in_progress`` uses :func:`take_lead_in_work` (no steal). Other statuses
+    set the field and apply manager stamps via :func:`apply_lead_manager_on_save`.
+
+    Args:
+        lead: Lead to update (caller must already scope visibility).
+        status: one of ``Lead.LeadStatus`` values.
+        actor: staff user performing the change.
+
+    Returns:
+        ``(lead, error)`` — ``error`` is ``None`` on success, ``"invalid_status"``,
+        or ``"conflict"`` when another assignee holds the lead.
+    """
+    allowed = {choice.value for choice in Lead.LeadStatus}
+    if status not in allowed:
+        return lead, "invalid_status"
+
+    if status == Lead.LeadStatus.IN_PROGRESS:
+        updated, taken = take_lead_in_work(lead, actor)
+        if not taken:
+            return updated, "conflict"
+        return updated, None
+
+    prev_status = lead.status
+    lead.status = status
+    apply_lead_manager_on_save(lead, actor=actor)
+    lead.save()
+    if status == Lead.LeadStatus.DONE and prev_status != Lead.LeadStatus.DONE:
+        log_manager_activity(
+            lead,
+            author=actor,
+            subject=f"Завершена: {manager_display_name(actor)}",
+            body="Статус → Завершена",
+        )
+    elif status == Lead.LeadStatus.NEW and prev_status != Lead.LeadStatus.NEW:
+        log_manager_activity(
+            lead,
+            author=actor,
+            subject=f"Возвращена в новые: {manager_display_name(actor)}",
+            body="Статус → Новая",
+        )
+    lead.refresh_from_db()
+    return lead, None
+
+
 def log_manager_activity(
     lead: Lead,
     *,

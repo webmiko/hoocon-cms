@@ -370,6 +370,9 @@
       if (!row) {
         return;
       }
+      if (row.hasAttribute("data-hoocon-just-dragged")) {
+        return;
+      }
       const openLink =
         row.querySelector("a.hoocon-admin-lead-open") ||
         row.querySelector("a[href*='/change/']");
