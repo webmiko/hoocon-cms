@@ -226,7 +226,8 @@ export function SupportWidget() {
 
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el || !open) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages, open]);
 
   // Mobile fullscreen chat: lock page scroll; track viewport changes.
