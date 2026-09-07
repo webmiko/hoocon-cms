@@ -221,7 +221,9 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-card-table" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
     assert "body.hoocon-lead-board" in css
+    assert "repeat(2, minmax(0, 24rem))" in css
     assert "repeat(3, minmax(0, 24rem))" in css
+    assert "@media (min-width: 1280px)" in css
     assert "justify-content: center" in css
     assert "display: contents" in css
     assert "gap: 1.15rem 1.25rem" in css

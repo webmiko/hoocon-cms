@@ -1475,9 +1475,10 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   cursor: pointer;
 }
 
-/* Leads board: tablet/desktop wall grid — 2–3 cards per row, fixed card width.
+/* Leads board: tablet/desktop wall grid — 2 cards, then 3 when wide enough.
  * Unfold puts each result row in its own <tbody>; grid the <table> and use
- * display:contents on tbodies so all <tr> participate in one grid. */
+ * display:contents on tbodies so all <tr> participate in one grid.
+ * Content ~720px (sidebar open) cannot fit 3×24rem tracks — start at 2. */
 @media (min-width: 768px) {
   /* Unfold uses -mx-4 on #changelist — restore inset so cards don't hug edges. */
   body.hoocon-lead-board #changelist.module,
@@ -1505,8 +1506,8 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked {
     display: grid !important;
-    /* Fixed 3 tracks on desktop wall; cards share width and stay centered. */
-    grid-template-columns: repeat(3, minmax(0, 24rem));
+    /* Tablet / narrow content: 2 equal tracks, centered, max 24rem each. */
+    grid-template-columns: repeat(2, minmax(0, 24rem));
     gap: 1.15rem 1.25rem;
     align-items: stretch;
     justify-content: center;
@@ -1517,6 +1518,19 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     padding: 0.85rem 0.35rem 1rem;
     box-sizing: border-box;
   }
+}
+
+/* Wide desktop: room for a third card without crushing ~24rem tracks. */
+@media (min-width: 1280px) {
+  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
+    grid-template-columns: repeat(3, minmax(0, 24rem));
+  }
+}
+
+@media (min-width: 768px) {
 
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked

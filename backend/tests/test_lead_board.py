@@ -40,9 +40,11 @@ def _css_rule_body(css: str, selector: str) -> str:
 
 
 def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
-    """Wall grid: 3 columns, centered, stretch rows, «Открыть» pinned to footer."""
+    """Wall grid: 2 cols, then 3 from 1280px; centered; «Открыть» at footer."""
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    assert "repeat(2, minmax(0, 24rem))" in css
     assert "repeat(3, minmax(0, 24rem))" in css
+    assert "@media (min-width: 1280px)" in css
     assert "justify-content: center" in css
     assert "align-items: stretch" in css
     assert "display: contents" in css
