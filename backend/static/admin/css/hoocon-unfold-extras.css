@@ -410,48 +410,17 @@ a.hoocon-leads-stats-link {
   overflow: hidden;
 }
 
-/* Xeloro-like bottom accent strip (Hoocon red family only). */
+/* Decorative bottom mark — short pill, not a progress meter. */
 .hoocon-lead-stats__card::after {
   content: "";
   position: absolute;
-  right: 1.2rem;
-  bottom: 0.85rem;
   left: 1.2rem;
+  bottom: 0.9rem;
+  width: 1.65rem;
   height: var(--hoocon-kpi-strip-h);
   border-radius: var(--hoocon-radius-pill);
-  background: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-hairline));
-}
-
-.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 1)::after {
-  background: linear-gradient(
-    90deg,
-    var(--hoocon-primary) 62%,
-    color-mix(in srgb, var(--hoocon-primary) 18%, transparent) 62%
-  );
-}
-
-.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 2)::after {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--hoocon-primary) 72%, #b01010) 48%,
-    color-mix(in srgb, var(--hoocon-primary) 14%, transparent) 48%
-  );
-}
-
-.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 3)::after {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--hoocon-primary) 55%, #6f6f6f) 35%,
-    color-mix(in srgb, var(--hoocon-primary) 12%, transparent) 35%
-  );
-}
-
-.hoocon-lead-stats__cards > .hoocon-lead-stats__card:nth-child(4n + 4)::after {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--hoocon-primary) 40%, #8f0d0d) 78%,
-    color-mix(in srgb, var(--hoocon-primary) 16%, transparent) 78%
-  );
+  background: color-mix(in srgb, var(--hoocon-primary) 55%, var(--hoocon-hairline));
+  pointer-events: none;
 }
 
 .hoocon-lead-stats__card--accent {
@@ -460,11 +429,8 @@ a.hoocon-leads-stats-link {
 }
 
 .hoocon-lead-stats__card--accent::after {
-  background: linear-gradient(
-    90deg,
-    var(--hoocon-primary) 88%,
-    color-mix(in srgb, var(--hoocon-primary) 20%, transparent) 88%
-  ) !important;
+  width: 2.25rem;
+  background: var(--hoocon-primary);
 }
 
 .hoocon-lead-stats__label {
@@ -1275,8 +1241,20 @@ kbd.hoocon-sidebar-shortcut > span {
   border-color: color-mix(in srgb, #16a34a 28%, transparent);
 }
 
+.hoocon-integrations__card--on::after {
+  background: #16a34a;
+}
+
 .hoocon-integrations__card--partial {
   border-color: color-mix(in srgb, #ca8a04 30%, transparent);
+}
+
+.hoocon-integrations__card--partial::after {
+  background: #ca8a04;
+}
+
+.hoocon-integrations__card--off::after {
+  background: color-mix(in srgb, var(--hoocon-quiet) 35%, var(--hoocon-hairline));
 }
 
 .hoocon-integrations__detail {

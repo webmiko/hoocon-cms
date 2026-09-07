@@ -195,6 +195,9 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "--hoocon-card-pad:" in css
     assert "--hoocon-kpi-strip-h:" in css
     assert ".hoocon-lead-stats__card::after" in css
+    assert "nth-child(4n + 1)::after" not in css
+    assert ".hoocon-integrations__card--on::after" in css
+    assert "background: #16a34a" in css
     assert ".dark .hoocon-dash__panel-head a" in css
     assert ".hoocon-admin-lead-sticker" in css
     assert "hoocon-admin-lead-sticker__count" in css
