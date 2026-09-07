@@ -111,6 +111,10 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
     Multiple requests with the same email attach to one client card.
     Name/company are used for profile match and to fill empty fields.
 
+    The whole read/create/merge sequence runs in one transaction and the
+    returned row is re-locked with ``select_for_update()`` so concurrent
+    leads with the same email cannot overwrite each other's merge.
+
     Args:
         lead: saved Lead instance.
 
@@ -118,28 +122,22 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         Client linked (or to be linked) to this lead.
     """
     email = normalize_client_email(lead.email)
-    existing = find_client_for_lead(lead)
-    if existing is not None:
-        return _merge_lead_contact_into_client(existing, lead)
-
     defaults = {
         "name": normalize_client_name(lead.name) or email,
         "phone": lead.phone or "",
         "company": normalize_client_company(lead.company),
     }
-    try:
-        with transaction.atomic():
-            client, created = Client.objects.get_or_create(
-                email=email,
-                defaults=defaults,
-            )
-    except IntegrityError:
-        client = Client.objects.get(email=email)
-        created = False
-
-    if not created:
-        return _merge_lead_contact_into_client(client, lead)
-    return client
+    with transaction.atomic():
+        client, created = Client.objects.get_or_create(
+            email=email,
+            defaults=defaults,
+        )
+        # Re-fetch locked so a concurrent lead with the same email waits for
+        # this transaction before it reads/merges the same card.
+        client = Client.objects.select_for_update().get(pk=client.pk)
+        if not created:
+            return _merge_lead_contact_into_client(client, lead)
+        return client
 
 
 def _merge_lead_contact_into_client(client: Client, lead: Lead) -> Client:

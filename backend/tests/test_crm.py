@@ -132,6 +132,30 @@ def test_get_or_create_client_from_lead_dedupes() -> None:
     assert client.pk == existing.pk
 
 
+@pytest.mark.django_db
+def test_get_or_create_client_from_lead_locks_before_merge() -> None:
+    """Existing Client is re-locked before merging lead contact data.
+
+    Regresses concurrent leads with the same email overwriting the merge.
+    """
+    from unittest.mock import patch
+
+    existing = Client.objects.create(name="Ivan", email="merge.lock@example.com")
+    lead = Lead.objects.create(
+        name="Ivan 2",
+        email="merge.lock@example.com",
+        message="msg",
+        company="NewCo",
+    )
+    with patch("crm.services.Client.objects.select_for_update") as mock_sf:
+        mock_sf.return_value.get.return_value = existing
+        client = get_or_create_client_from_lead(lead)
+
+    mock_sf.assert_called_once()
+    assert mock_sf.return_value.get.call_args.kwargs["pk"] == existing.pk
+    assert client.company == "NewCo"
+
+
 @pytest.mark.django_db(transaction=True)
 def test_create_outbound_email_queues_and_logs_activity(
     settings,
