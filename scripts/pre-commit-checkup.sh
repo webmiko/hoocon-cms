@@ -60,8 +60,9 @@ fi
 
 # ── 4. pytest + coverage ≥ 90% (exit 5 = нет тестов — допустимо на каркасе) ───
 # Порог — сторож на измеряемом коде; не писать тесты ради процента (см. БЗ §0.8).
+# Align with CI: eager Celery so Activity/Telegram on_commit never hits live Redis.
 set +e
-(cd "$BACKEND" && poetry run pytest -q \
+(cd "$BACKEND" && CELERY_TASK_ALWAYS_EAGER=true poetry run pytest -q \
   --cov --cov-report=term-missing:skip-covered --cov-fail-under=90)
 PYTEST_CODE=$?
 set -e

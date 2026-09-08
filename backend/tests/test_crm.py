@@ -295,6 +295,8 @@ def test_compose_email_view_creates_queued_message(
     settings,
 ) -> None:
     """POST compose-email queues outbound mail for the Client."""
+    # Eager: Activity on_commit also enqueues Telegram; avoid live Redis.
+    settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.DEFAULT_FROM_EMAIL = "sales@hoocon.test"
     user = django_user_model.objects.create_user(
         username="crm-mailer",
