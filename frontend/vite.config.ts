@@ -117,40 +117,25 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/admin": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/media": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/robots.txt": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/sitemap.xml": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/llms.txt": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/llm.txt": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/llms-full.txt": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-    },
+    // Pinned for hoocon-cms (other local projects keep 5173/8000).
+    port: Number(process.env.HOCON_FRONTEND_PORT || process.env.PORT || 5174),
+    proxy: Object.fromEntries(
+      [
+        "/api",
+        "/admin",
+        "/media",
+        "/robots.txt",
+        "/sitemap.xml",
+        "/llms.txt",
+        "/llm.txt",
+        "/llms-full.txt",
+      ].map((path) => [
+        path,
+        {
+          target: process.env.HOCON_BACKEND_ORIGIN || "http://127.0.0.1:8002",
+          changeOrigin: true,
+        },
+      ]),
+    ),
   },
 });
