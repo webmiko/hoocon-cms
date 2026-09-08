@@ -193,11 +193,7 @@ def test_site_search_kit_phrase_returns_komplekty_skus(client) -> None:
 
     response = client.get("/api/search/", {"q": "кран с приводом"})
     assert response.status_code == 200
-    sku_slugs = {
-        row["slug"]
-        for row in response.data["results"]
-        if row.get("type") == "sku"
-    }
+    sku_slugs = {row["slug"] for row in response.data["results"] if row.get("type") == "sku"}
     assert "h8102-site-intent" in sku_slugs
 
 
@@ -223,10 +219,6 @@ def test_site_search_kit_phrase_with_residual_uses_fts(client) -> None:
 
     response = client.get("/api/search/", {"q": "кран с приводом DN65"})
     assert response.status_code == 200
-    sku_slugs = {
-        row["slug"]
-        for row in response.data["results"]
-        if row.get("type") == "sku"
-    }
+    sku_slugs = {row["slug"] for row in response.data["results"] if row.get("type") == "sku"}
     assert "kit-site-dn65" in sku_slugs
     assert "kit-site-dn15" not in sku_slugs
