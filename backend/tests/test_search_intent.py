@@ -51,6 +51,30 @@ def test_normalize_search_query_yo_and_plus() -> None:
     assert "ё" not in normalize_search_query("всё")
 
 
+def test_resolve_intent_empty_and_punctuation_only() -> None:
+    """Blank / punctuation-only queries stay without category intent."""
+    empty = resolve_catalog_search_intent("")
+    assert empty.category_slug is None
+    assert empty.residual == ""
+    spaced = resolve_catalog_search_intent("   ")
+    assert spaced.category_slug is None
+    assert spaced.residual == ""
+    punct = resolve_catalog_search_intent("+++")
+    assert punct.category_slug is None
+    assert punct.residual == ""
+
+
+def test_resolve_intent_skips_phrases_that_normalize_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Empty normalized phrase entries are skipped; later phrases still match."""
+    monkeypatch.setattr(
+        "catalog.search_intent._KIT_PHRASES",
+        ("+++", "комплекты"),
+    )
+    intent = resolve_catalog_search_intent("комплекты")
+    assert intent.category_slug == KIT_CATEGORY_SLUG
+    assert intent.matched_phrase == "комплекты"
+
+
 @pytest.mark.django_db
 def test_catalog_q_kran_s_privodom_returns_kits_not_bare_valves(client) -> None:
     """?q=кран с приводом finds komplekty; bare шаровые краны stay out."""
@@ -122,3 +146,87 @@ def test_catalog_q_komplekty_word_lists_kit_category(client) -> None:
     assert response.status_code == 200
     slugs = {row["slug"] for row in response.data["results"]}
     assert slugs == {"h8205-lav-intent"}
+
+
+@pytest.mark.django_db
+def test_catalog_q_kit_phrase_with_residual_narrows_by_fts(client) -> None:
+    """?q=кран с приводом DN65 keeps kits and applies residual FTS."""
+    kits = Category.objects.create(name="Комплекты", slug="komplekty")
+    product = Product.objects.create(name="Kits", slug="kits-residual", category=kits)
+    SKU.objects.create(
+        product=product,
+        name="H8102 | Электрический шаровой кран DN65",
+        slug="kit-dn65-intent",
+        sku_code="H8102-DN65-INTENT",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=product,
+        name="H8101 | Электрический шаровой кран DN15",
+        slug="kit-dn15-intent",
+        sku_code="H8101-DN15-INTENT",
+        is_published=True,
+    )
+
+    response = client.get(
+        reverse("catalog-sku-list"),
+        {"q": "кран с приводом DN65"},
+    )
+    assert response.status_code == 200
+    slugs = {row["slug"] for row in response.data["results"]}
+    assert "kit-dn65-intent" in slugs
+    assert "kit-dn15-intent" not in slugs
+
+
+@pytest.mark.django_db
+def test_site_search_kit_phrase_returns_komplekty_skus(client) -> None:
+    """GET /api/search/?q=кран с приводом includes published kit SKUs."""
+    kits = Category.objects.create(name="Комплекты", slug="komplekty")
+    product = Product.objects.create(name="H8102", slug="h8102-site", category=kits)
+    SKU.objects.create(
+        product=product,
+        name="H8102-BV215A-24AS | Электрический шаровой кран",
+        slug="h8102-site-intent",
+        sku_code="H8102-SITE-INTENT",
+        is_published=True,
+    )
+
+    response = client.get("/api/search/", {"q": "кран с приводом"})
+    assert response.status_code == 200
+    sku_slugs = {
+        row["slug"]
+        for row in response.data["results"]
+        if row.get("type") == "sku"
+    }
+    assert "h8102-site-intent" in sku_slugs
+
+
+@pytest.mark.django_db
+def test_site_search_kit_phrase_with_residual_uses_fts(client) -> None:
+    """Site search keeps komplekty scope and FTS-filters residual tokens."""
+    kits = Category.objects.create(name="Комплекты", slug="komplekty")
+    product = Product.objects.create(name="Kits", slug="kits-site-res", category=kits)
+    SKU.objects.create(
+        product=product,
+        name="Электрический шаровой кран DN65 комплект",
+        slug="kit-site-dn65",
+        sku_code="KIT-SITE-DN65",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=product,
+        name="Электрический шаровой кран DN15 комплект",
+        slug="kit-site-dn15",
+        sku_code="KIT-SITE-DN15",
+        is_published=True,
+    )
+
+    response = client.get("/api/search/", {"q": "кран с приводом DN65"})
+    assert response.status_code == 200
+    sku_slugs = {
+        row["slug"]
+        for row in response.data["results"]
+        if row.get("type") == "sku"
+    }
+    assert "kit-site-dn65" in sku_slugs
+    assert "kit-site-dn15" not in sku_slugs
