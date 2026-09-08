@@ -104,11 +104,12 @@ jobs:
             ~/.cache/pip
           key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
       - run: poetry install --with dev
+      - run: poetry run python manage.py makemigrations --check
       - run: poetry run python manage.py migrate --noinput
       - run: poetry run pytest -q --cov --cov-fail-under=90
       - run: poetry run ruff check .
       - run: poetry run ruff format --check .
-      - run: poetry run mypy config manage.py
+      - run: poetry run mypy config leads crm catalog content manage.py
       - name: pip-audit (supply chain)
         run: poetry run pip-audit --strict
       - uses: actions/setup-node@v4
