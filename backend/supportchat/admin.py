@@ -27,6 +27,7 @@ from supportchat.services import (
     add_staff_reply,
     conversation_party_label,
     count_staff_unread,
+    delete_unlinked_conversation,
     message_sender_name,
     staff_public_name,
 )
@@ -110,7 +111,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     ordering = ("-last_message_at", "-id")
     change_form_template = "admin/supportchat/conversation/change_form.html"
     change_list_template = "admin/supportchat/conversation/change_list.html"
-    actions = ("action_mark_read", "action_close")
+    actions = ("action_mark_read", "action_close", "action_delete_unlinked")
 
     fieldsets = (
         (
@@ -166,14 +167,26 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
 
     @admin.display(description="Собеседник")
     def party_label(self, obj: Conversation) -> str:
-        return conversation_party_label(obj)
+        label = conversation_party_label(obj)
+        initial = (label[:1] or "?").upper()
+        return format_html(
+            '<span class="hoocon-inbox-avatar hoocon-inbox-avatar--{}" aria-hidden="true">'
+            "{}</span>"
+            '<span class="hoocon-inbox-name">{}</span>',
+            obj.channel,
+            initial,
+            label,
+        )
 
     @admin.display(description="Inbox", ordering="staff_unread_count")
     def unread_badge(self, obj: Conversation) -> str:
         if obj.staff_unread_count <= 0:
-            return "—"
+            return format_html(
+                '<span class="hoocon-inbox-unread hoocon-inbox-unread--empty">{}</span>',
+                "—",
+            )
         return format_html(
-            '<span style="color:#b01010;font-weight:700;">● {}</span>',
+            '<span class="hoocon-inbox-unread">{}</span>',
             obj.staff_unread_count,
         )
 
@@ -189,14 +202,24 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     @admin.display(description="Последнее")
     def last_preview(self, obj: Conversation) -> str:
         body = getattr(obj, "_last_body", None)
-        direction = getattr(obj, "_last_direction", None)
+        direction = getattr(obj, "_last_direction", None) or "none"
         if not body:
-            return "—"
-        prefix = "← " if direction == "inbound" else "→ "
+            return format_html(
+                '<span class="hoocon-inbox-preview hoocon-inbox-preview--empty">{}</span>',
+                "Нет сообщений",
+            )
         text = str(body).replace("\n", " ").strip()
         if len(text) > 56:
             text = text[:55].rstrip() + "…"
-        return f"{prefix}{text}"
+        # Desktop keeps arrows; phone CSS hides them via .hoocon-inbox-preview.
+        prefix = "← " if direction == "inbound" else "→ "
+        return format_html(
+            '<span class="hoocon-inbox-preview hoocon-inbox-preview--{}">'
+            '<span class="hoocon-inbox-preview__dir">{}</span>{}</span>',
+            direction,
+            prefix,
+            text,
+        )
 
     def get_urls(self) -> list[Any]:
         urls = super().get_urls()
@@ -215,6 +238,11 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
                 "<path:object_id>/reply/",
                 self.admin_site.admin_view(self.reply_view),
                 name="supportchat_conversation_reply",
+            ),
+            path(
+                "<path:object_id>/delete-chat/",
+                self.admin_site.admin_view(self.delete_chat_view),
+                name="supportchat_conversation_delete_chat",
             ),
         ]
         return custom + urls
@@ -267,6 +295,24 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         messages.success(request, "Ответ отправлен.")
         return HttpResponseRedirect(change_url)
 
+    def delete_chat_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """POST: hard-delete unlinked conversation (same rule as staff API)."""
+        changelist = reverse("admin:supportchat_conversation_changelist")
+        change_url = reverse("admin:supportchat_conversation_change", args=[object_id])
+        if request.method != "POST":
+            return HttpResponseRedirect(change_url)
+        if not request.user.has_perm("supportchat.delete_conversation"):
+            messages.error(request, "Недостаточно прав для удаления диалога.")
+            return HttpResponseRedirect(change_url)
+        conversation = get_object_or_404(Conversation, pk=object_id)
+        try:
+            delete_unlinked_conversation(conversation)
+        except SupportChatError as exc:
+            messages.error(request, str(exc))
+            return HttpResponseRedirect(change_url)
+        messages.success(request, "Диалог удалён.")
+        return HttpResponseRedirect(changelist)
+
     def change_view(
         self,
         request: HttpRequest,
@@ -291,6 +337,13 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["messages_poll_url"] = reverse(
             "admin:supportchat_conversation_messages_poll",
             args=[object_id],
+        )
+        extra["delete_chat_url"] = reverse(
+            "admin:supportchat_conversation_delete_chat",
+            args=[object_id],
+        )
+        extra["chat_deletable"] = conversation.client_id is None and request.user.has_perm(
+            "supportchat.delete_conversation"
         )
         chat_messages = _chat_messages_for_admin(conversation)
         extra["chat_messages"] = chat_messages
@@ -318,6 +371,32 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     ) -> None:
         updated = queryset.update(status=ConversationStatus.CLOSED)
         self.message_user(request, f"Закрыто: {updated}")
+
+    @admin.action(description="Удалить (без CRM)")
+    def action_delete_unlinked(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[Conversation],
+    ) -> None:
+        if not request.user.has_perm("supportchat.delete_conversation"):
+            self.message_user(request, "Недостаточно прав для удаления.", level=messages.ERROR)
+            return
+        deleted = 0
+        blocked = 0
+        for conv in queryset:
+            try:
+                delete_unlinked_conversation(conv)
+                deleted += 1
+            except SupportChatError:
+                blocked += 1
+        if deleted:
+            self.message_user(request, f"Удалено: {deleted}")
+        if blocked:
+            self.message_user(
+                request,
+                f"Пропущено (привязаны к CRM): {blocked}",
+                level=messages.WARNING,
+            )
 
 
 class SupportScheduleIntervalInline(TabularInline):

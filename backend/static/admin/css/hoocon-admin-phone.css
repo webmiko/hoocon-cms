@@ -7,6 +7,8 @@
   --hoocon-phone-tabs-h: 3.75rem;
   --hoocon-phone-cta-h: 3.5rem;
   --hoocon-phone-tap: 3rem;
+  /* Extra lift for IDE embedded browsers (Cursor) that cover bottom:0. */
+  --hoocon-phone-viewport-inset: 0px;
 }
 
 /* ── Shell visibility ─────────────────────────────────────────────── */
@@ -25,7 +27,25 @@
   }
 
   body.hoocon-phone-ready .hoocon-phone-shell {
+    /* Fixed chrome on body — not inside #main footer at document end. */
     display: block !important;
+    position: fixed;
+    z-index: 100;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    /* Cursor IDE chrome covers bottom:0 — pad so tab labels stay visible. */
+    padding-bottom: var(--hoocon-phone-viewport-inset, 0px);
+    /* Opaque: inset padding must mask page content under IDE chrome. */
+    background: var(--hoocon-surface, #fff);
+    pointer-events: none;
+  }
+
+  body.hoocon-phone-ready .hoocon-phone-shell > * {
+    pointer-events: auto;
   }
 
   body.hoocon-phone-ready .hoocon-phone-shell[hidden] {
@@ -34,7 +54,8 @@
 
   body.hoocon-phone-ready {
     padding-bottom: calc(
-      var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px)
+      var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px) +
+        var(--hoocon-phone-viewport-inset, 0px)
     );
     background: var(--hoocon-page-bg, #f3f4f7);
   }
@@ -236,15 +257,13 @@
 
 /* ── Bottom tabs ──────────────────────────────────────────────────── */
 .hoocon-phone-tabs {
-  position: fixed;
-  z-index: 70;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   align-items: stretch;
+  width: 100%;
   min-height: var(--hoocon-phone-tabs-h);
   padding: 0.2rem 0.15rem calc(0.2rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.09));
@@ -597,14 +616,18 @@
   }
 
   .hoocon-lead-view-actions {
-    bottom: calc(var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(
+      var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px) +
+        var(--hoocon-phone-viewport-inset, 0px)
+    );
     padding-bottom: 0.75rem;
     z-index: 65;
   }
 
   .hoocon-lead-view-actions-spacer {
     height: calc(
-      5.5rem + var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px)
+      5.5rem + var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px) +
+        var(--hoocon-phone-viewport-inset, 0px)
     );
   }
 
@@ -623,7 +646,10 @@
 
   body.hoocon-phone-ready.change-form .submit-row:not(.hoocon-lead-view-actions) {
     position: sticky;
-    bottom: calc(var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px));
+    bottom: calc(
+      var(--hoocon-phone-tabs-h) + env(safe-area-inset-bottom, 0px) +
+        var(--hoocon-phone-viewport-inset, 0px)
+    );
     z-index: 60;
     display: flex;
     flex-wrap: wrap;
@@ -663,33 +689,434 @@
   }
 }
 
-/* ── Messenger full-bleed on phone ────────────────────────────────── */
+/* ── Messenger: Signal/iMessage on phone ──────────────────────────── */
 @media (max-width: 767px) {
-  body.hoocon-phone-ready .hoocon-messenger {
-    height: calc(
-      100dvh - 7.5rem - var(--hoocon-phone-tabs-h) - env(safe-area-inset-bottom, 0px)
-    );
+  /* Inbox — flat conversation rows (Signal/iMessage) */
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr {
+    display: grid !important;
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "avatar name time"
+      "avatar preview unread";
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.1rem;
+    margin: 0 !important;
+    padding: 0.55rem 1rem !important;
+    min-height: 3.75rem !important;
+    height: auto !important;
+    border: none !important;
+    border-bottom: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.09)) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  html[data-theme="dark"] body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr,
+  .dark body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr {
+    background: transparent !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
+    tr:active {
+    background: color-mix(in srgb, var(--hoocon-surface-muted, #f3f4f7) 80%, transparent) !important;
+  }
+
+  /* Kill Unfold cell chrome (h-[45px], borders, before:labels) inside inbox rows */
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-party_label,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-party_label,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-party_label
+    > a,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-party_label
+    > a {
+    display: contents !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar {
+    grid-area: avatar;
+    align-self: center;
+    display: grid !important;
+    place-items: center !important;
+    width: 3rem !important;
+    height: 3rem !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    overflow: hidden;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    background: var(--hoocon-primary, #dc1313) !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--telegram {
+    background: #2aabee !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--vk,
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--max {
+    background: #4c6ef5 !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-name {
+    grid-area: name;
+    align-self: end;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: inherit;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-last_preview,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-last_preview {
+    grid-area: preview;
+    display: block !important;
+    align-self: start;
+    min-width: 0;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.8125rem;
+    font-weight: 450;
+    line-height: 1.3;
+    color: var(--hoocon-quiet, #6f6f6f);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-last_preview::before,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-last_preview::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-preview__dir {
+    display: none;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-preview--empty {
+    opacity: 0.55;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-last_message_at,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-last_message_at {
+    grid-area: time;
+    display: block !important;
+    align-self: end;
+    justify-self: end;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--hoocon-quiet, #6f6f6f);
+    white-space: nowrap;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-last_message_at::before,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-last_message_at::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-last_message_at.hoocon-admin-cell-blank {
+    font-size: 0 !important;
+    color: transparent !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-unread_badge,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-unread_badge {
+    grid-area: unread;
+    display: flex !important;
+    align-self: start;
+    justify-self: end;
+    justify-content: flex-end;
+    padding: 0.1rem 0 0 !important;
+    border: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-unread--empty {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-channel_badge,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-channel_badge,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-contact_email,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-contact_email,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-status,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-status,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-assignee,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-assignee {
+    display: none !important;
+  }
+
+  /* Thread — full-screen chat; hide Django form + bottom tabs */
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-phone-shell {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread {
+    padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--hoocon-phone-viewport-inset, 0px)
+    ) !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread #header,
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-admin-breadcrumbs,
+  body.hoocon-phone-ready.hoocon-support-thread #content > h1,
+  body.hoocon-phone-ready.hoocon-support-thread .object-tools,
+  body.hoocon-phone-ready.hoocon-support-thread #content-main > form,
+  body.hoocon-phone-ready.hoocon-support-thread .submit-row {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread #container,
+  body.hoocon-phone-ready.hoocon-support-thread #main,
+  body.hoocon-phone-ready.hoocon-support-thread #content,
+  body.hoocon-phone-ready.hoocon-support-thread #content-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    height: auto;
     max-height: none;
     max-width: none;
-    margin-left: -0.5rem;
-    margin-right: -0.5rem;
+    margin: 0;
+    border: none;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
+    padding-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + var(--hoocon-phone-viewport-inset, 0px)
+    );
+    background: var(--hm-muted, var(--hoocon-surface-muted, #f4f5f7));
   }
 
-  body.hoocon-phone-ready .hoocon-messenger__composer {
-    padding-bottom: 0.35rem;
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__back {
+    display: inline-flex;
   }
 
-  body.hoocon-phone-ready .hoocon-messenger__send {
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__header {
+    padding: 0.55rem 0.65rem;
+    background: color-mix(in srgb, var(--hm-surface, #fff) 92%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__avatar {
+    border-radius: 50%;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__meta {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__status {
+    display: none;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__delete-btn {
+    width: var(--hoocon-phone-tap);
+    height: var(--hoocon-phone-tap);
+    color: #f87171;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__thread {
+    padding: 0.65rem 0.75rem 0.85rem;
+    gap: 0.35rem;
+    background: transparent;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__sender {
+    display: none;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__bubble-wrap {
+    max-width: min(78%, 22rem);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread
+    .hoocon-messenger__row--inbound
+    .hoocon-messenger__bubble {
+    border-radius: 1.15rem;
+    border-bottom-left-radius: 0.25rem;
+    border: none;
+    background: var(--hm-surface, #fff);
+    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread
+    .hoocon-messenger__row--outbound
+    .hoocon-messenger__bubble {
+    border-radius: 1.15rem;
+    border-bottom-right-radius: 0.25rem;
+    box-shadow: none;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__time {
+    font-size: 0.62rem;
+    opacity: 0.75;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer {
+    padding: 0.45rem 0.65rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--hm-surface, #fff) 94%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer textarea {
+    min-height: 2.5rem;
+    border-radius: 1.25rem;
+    padding: 0.55rem 0.9rem;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send {
     min-width: var(--hoocon-phone-tap);
     min-height: var(--hoocon-phone-tap);
-    width: auto;
-    padding: 0 0.85rem;
+    width: var(--hoocon-phone-tap);
+    padding: 0;
+    border-radius: 50%;
   }
 
-  body.hoocon-phone-ready .hoocon-messenger__send-label {
-    display: inline;
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send-label {
+    display: none;
   }
 }

@@ -258,6 +258,49 @@
   color: #7dd3fc;
 }
 
+.hoocon-messenger__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.hoocon-messenger__delete {
+  margin: 0;
+}
+
+.hoocon-messenger__delete-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hm-quiet, #6f6f6f);
+  cursor: pointer;
+}
+
+.hoocon-messenger__delete-btn:hover {
+  background: color-mix(in srgb, #b91c1c 12%, transparent);
+  color: #b91c1c;
+}
+
+.hoocon-messenger__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--hm-border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .hoocon-messenger__status--open {
   color: #2d6a4f;
   border-color: color-mix(in srgb, #2d6a4f 30%, transparent);
@@ -442,6 +485,79 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Inbox row bits (changelist list_display HTML) */
+.hoocon-inbox-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  background: var(--hoocon-primary, #dc1313);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.hoocon-inbox-avatar--telegram {
+  background: #2aabee;
+}
+
+.hoocon-inbox-avatar--vk,
+.hoocon-inbox-avatar--max {
+  background: #4c6ef5;
+}
+
+.hoocon-inbox-name {
+  vertical-align: middle;
+}
+
+.hoocon-inbox-unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--hoocon-primary, #dc1313);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hoocon-inbox-unread--empty {
+  background: transparent;
+  color: var(--hoocon-quiet, #6f6f6f);
+  font-weight: 600;
+  min-width: 0;
+  padding: 0;
+}
+
+.hoocon-messenger__back {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 0.15rem 0 -0.35rem;
+  border-radius: 50%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.hoocon-messenger__back:hover {
+  background: color-mix(in srgb, var(--hm-quiet) 12%, transparent);
+}
+
+.hoocon-messenger__back svg {
+  display: block;
 }
 
 .dark .hoocon-messenger {

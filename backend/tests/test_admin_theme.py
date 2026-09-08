@@ -140,6 +140,16 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "hoocon-phone-header-menu" in phone_css
     assert "overflow-x: clip" in phone_css
     assert "hoocon-lead-board #changelist" in phone_css
+    # Shell itself is the fixed chrome (tabs are relative inside it).
+    assert "body.hoocon-phone-ready .hoocon-phone-shell" in phone_css
+    shell_rule = phone_css.split("body.hoocon-phone-ready .hoocon-phone-shell")[1].split("}")[0]
+    assert "position: fixed" in shell_rule
+    assert "bottom: 0" in shell_rule
+    assert "padding-bottom: var(--hoocon-phone-viewport-inset, 0px)" in shell_rule
+    assert "z-index: 100" in shell_rule
+    tabs_rule = phone_css.split(".hoocon-phone-tabs")[1].split("}")[0]
+    assert "position: relative" in tabs_rule
+    assert "position: fixed" not in tabs_rule
 
     phone_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
         encoding="utf-8"
@@ -148,12 +158,46 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "max-width: 767px" in phone_js
     assert "relocateHeaderTools" in phone_js
     assert "data-hoocon-phone-header-menu" in phone_js
+    assert "shell.parentElement !== document.body" in phone_js
+    assert "document.body.appendChild(shell)" in phone_js
+    assert "isCursorEmbeddedBrowser" in phone_js
+    assert "CURSOR_VIEWPORT_INSET" in phone_js
+    assert "--hoocon-phone-viewport-inset" in phone_js
+    assert "--hoocon-phone-viewport-inset" in phone_css
 
     badges_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-live-badges.js").read_text(
         encoding="utf-8"
     )
     assert "data-hoocon-phone-leads-badge" in badges_js
     assert "data-hoocon-phone-support-badge" in badges_js
+
+
+def test_admin_phone_support_messenger_signal_layout() -> None:
+    """Phone Чат: Signal-like inbox rows + full-screen thread (loaded phone CSS)."""
+    phone_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-support-inbox" in phone_css
+    assert "hoocon-support-thread" in phone_css
+    assert "grid-template-areas:" in phone_css
+    assert '"avatar name time"' in phone_css
+    assert '"avatar preview unread"' in phone_css
+    assert "border-radius: 50% !important" in phone_css
+    assert "body.hoocon-phone-ready.hoocon-support-thread .hoocon-phone-shell" in phone_css
+    assert "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__back" in phone_css
+    assert (
+        "position: fixed"
+        in phone_css.split(
+            "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger",
+        )[1].split("}")[0]
+    )
+    assert "#content-main > form" in phone_css
+
+    messenger_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-support-messenger.css").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-inbox-avatar" in messenger_css
+    assert "hoocon-messenger__back" in messenger_css
 
 
 @pytest.mark.django_db

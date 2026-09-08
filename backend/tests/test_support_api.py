@@ -275,10 +275,123 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert 'name="reply_body"' in html
     assert 'id="hoocon-messenger"' in html
     assert "hoocon-messenger__send" in html
+    assert "hoocon-messenger__back" in html
+    assert "hoocon-support-thread" in html
     assert f"/admin/supportchat/conversation/{conv.pk}/reply/" in html
     assert "hoocon-support-messenger.js" in html
     assert "data-poll-url" in html
     assert f"/admin/supportchat/conversation/{conv.pk}/messages/" in html
+    assert "hoocon-messenger__delete" in html
+    assert f"/admin/supportchat/conversation/{conv.pk}/delete-chat/" in html
+
+
+@pytest.mark.django_db
+def test_admin_delete_chat_removes_unlinked_keeps_crm() -> None:
+    """Admin delete-chat POST: orphan gone; CRM-linked stays with error."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from crm.models import Client as CrmClient
+    from supportchat.models import Channel, Message, MessageDirection
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-del-admin",
+        email="support-del-admin@example.com",
+        password="x",
+    )
+    orphan = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-admin-orphan",
+        display_name="Спам",
+        status="open",
+    )
+    Message.objects.create(
+        conversation=orphan,
+        direction=MessageDirection.INBOUND,
+        body="bye",
+    )
+    linked = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-admin-linked",
+        status="open",
+    )
+    linked.client = CrmClient.objects.create(
+        name="CRM",
+        email="crm-admin-del@example.com",
+        company="Co",
+    )
+    linked.save(update_fields=["client"])
+
+    client = Client()
+    client.force_login(staff)
+
+    linked_page = client.get(reverse("admin:supportchat_conversation_change", args=[linked.pk]))
+    assert linked_page.status_code == 200
+    assert "hoocon-messenger__delete" not in linked_page.content.decode()
+
+    blocked = client.post(
+        reverse("admin:supportchat_conversation_delete_chat", args=[linked.pk]),
+    )
+    assert blocked.status_code == 302
+    assert Conversation.objects.filter(pk=linked.pk).exists()
+
+    ok = client.post(
+        reverse("admin:supportchat_conversation_delete_chat", args=[orphan.pk]),
+    )
+    assert ok.status_code == 302
+    assert ok["Location"].endswith("/admin/supportchat/conversation/")
+    assert not Conversation.objects.filter(pk=orphan.pk).exists()
+    assert not Message.objects.filter(conversation_id=orphan.pk).exists()
+
+
+@pytest.mark.django_db
+def test_admin_conversation_inbox_messenger_row_markup() -> None:
+    """Changelist rows expose Signal-style avatar / preview / unread classes."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from supportchat.models import Channel, Message, MessageDirection
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-inbox-admin",
+        email="support-inbox-admin@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-inbox-row",
+        display_name="Инбокс тест",
+        status="open",
+        staff_unread_count=2,
+        last_message_at=timezone.now(),
+    )
+    Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="tg-empty-unread",
+        display_name="Без непрочитанных",
+        status="open",
+        staff_unread_count=0,
+        last_message_at=timezone.now(),
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Привет из списка",
+    )
+    client = Client()
+    client.force_login(staff)
+    page = client.get(reverse("admin:supportchat_conversation_changelist"))
+    assert page.status_code == 200
+    html = page.content.decode()
+    assert "hoocon-support-inbox" in html
+    assert "hoocon-inbox-avatar" in html
+    assert "hoocon-inbox-name" in html
+    assert "hoocon-inbox-preview" in html
+    assert "hoocon-inbox-unread" in html
+    assert "Привет из списка" in html
 
 
 @pytest.mark.django_db
