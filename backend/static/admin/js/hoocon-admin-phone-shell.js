@@ -7,6 +7,8 @@
 
   var MQ = "(max-width: 767px)";
   var SELECT_STORAGE = "hoocon-phone-select-mode";
+  /* Cursor Simple Browser paints over bottom:0; lift tabs above that chrome. */
+  var CURSOR_VIEWPORT_INSET = "3.25rem";
 
   function phoneMq() {
     return typeof window.matchMedia === "function"
@@ -14,17 +16,43 @@
       : { matches: false, addEventListener: function () {}, addListener: function () {} };
   }
 
+  function isCursorEmbeddedBrowser() {
+    return /Cursor\//i.test(navigator.userAgent || "");
+  }
+
+  function syncViewportInset() {
+    var root = document.documentElement;
+    if (!root || !root.style) return;
+    if (isCursorEmbeddedBrowser() && phoneMq().matches) {
+      root.style.setProperty("--hoocon-phone-viewport-inset", CURSOR_VIEWPORT_INSET);
+    } else {
+      root.style.removeProperty("--hoocon-phone-viewport-inset");
+    }
+  }
+
   function ensureShellMounted() {
-    if (document.getElementById("hoocon-phone-shell")) {
-      return true;
-    }
-    var tpl = document.getElementById("hoocon-phone-shell-template");
-    if (!tpl || !tpl.content) {
-      return false;
-    }
-    document.body.appendChild(tpl.content.cloneNode(true));
     var shell = document.getElementById("hoocon-phone-shell");
-    if (shell && window.Alpine && typeof window.Alpine.initTree === "function") {
+    var freshlyCloned = false;
+    if (!shell) {
+      var tpl = document.getElementById("hoocon-phone-shell-template");
+      if (!tpl || !tpl.content) {
+        return false;
+      }
+      document.body.appendChild(tpl.content.cloneNode(true));
+      shell = document.getElementById("hoocon-phone-shell");
+      freshlyCloned = true;
+    }
+    // Footer render lives under #main; reparent so position:fixed sticks to the
+    // viewport (Unfold long pages / embedded browsers otherwise bury the bar).
+    if (shell && shell.parentElement !== document.body) {
+      document.body.appendChild(shell);
+    }
+    if (
+      freshlyCloned &&
+      shell &&
+      window.Alpine &&
+      typeof window.Alpine.initTree === "function"
+    ) {
       try {
         window.Alpine.initTree(shell);
       } catch (_err) {
@@ -300,6 +328,7 @@
   }
 
   function syncViewport() {
+    syncViewportInset();
     setReady(phoneMq().matches);
     if (phoneMq().matches) {
       markActiveTab();
