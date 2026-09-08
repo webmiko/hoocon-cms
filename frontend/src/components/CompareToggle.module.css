@@ -8,7 +8,7 @@
   padding: 4px 8px 4px 6px;
   margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: rgba(17, 20, 27, 0.54);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
   -webkit-backdrop-filter: blur(8px);
@@ -34,7 +34,7 @@
   width: 18px;
   height: 18px;
   border: 2px solid rgba(255, 255, 255, 0.95);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.35);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
@@ -92,7 +92,7 @@
   left: 0;
   margin-top: 4px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--color-inverse);
   color: var(--color-on-inverse);
   font-size: 0.625rem;
@@ -105,7 +105,7 @@
 .buttonActive {
   min-height: 36px;
   padding: 8px 14px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;

@@ -40,6 +40,17 @@ import {
 } from "../utils/scrollPositions";
 import styles from "./CatalogPage.module.css";
 
+function FiltersMenuIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M4 6.75A.75.75 0 0 1 4.75 6h14.5a.75.75 0 0 1 0 1.5H4.75A.75.75 0 0 1 4 6.75Zm2 5.25a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H6.75A.75.75 0 0 1 6 12Zm2 5.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1-.75-.75Z"
+      />
+    </svg>
+  );
+}
+
 /** Facet query keys synced to the URL (backend catalog.facets). */
 const FACET_KEYS = [
   "moment",
@@ -565,18 +576,6 @@ export function CatalogPage() {
             <div className={styles.filterPanel}>{filterSections}</div>
           </div>
         </div>
-        <details className={styles.filtersMobile}>
-          <summary className={styles.filtersMobileSummary}>
-            <span>Фильтры</span>
-            {activeCount > 0 ? (
-              <span className={styles.filtersMobileBadge}>{activeCount}</span>
-            ) : null}
-          </summary>
-          <div className={styles.filterPanel}>
-            {filterHead}
-            {filterSections}
-          </div>
-        </details>
       </aside>
 
       <div className={styles.content}>
@@ -690,6 +689,31 @@ export function CatalogPage() {
             </button>
           </div>
         ) : null}
+
+        {/* Mobile/tablet: filter menu sits with the product list, not above the title. */}
+        <details className={styles.filtersMobile}>
+          <summary className={styles.filtersMobileSummary}>
+            <span className={styles.filtersMobileLead}>
+              <FiltersMenuIcon className={styles.filtersMobileIcon} />
+              <span className={styles.filtersMobileCopy}>
+                <span className={styles.filtersMobileTitle}>Меню фильтров</span>
+                <span className={styles.filtersMobileHint}>
+                  Категория, момент, напряжение…
+                </span>
+              </span>
+            </span>
+            <span className={styles.filtersMobileTrail}>
+              {activeCount > 0 ? (
+                <span className={styles.filtersMobileBadge}>{activeCount}</span>
+              ) : null}
+              <span className={styles.filtersMobileChevron} aria-hidden="true" />
+            </span>
+          </summary>
+          <div className={styles.filterPanel}>
+            {filterHead}
+            {filterSections}
+          </div>
+        </details>
 
         {category ? (
           <CategoryOverview

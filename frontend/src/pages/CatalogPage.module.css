@@ -75,15 +75,59 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  padding: 10px 12px;
+  min-height: 3rem;
+  padding: 0.65rem 0.85rem;
   font-size: var(--font-size-sm);
   font-weight: 700;
   cursor: pointer;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .filtersMobileSummary::-webkit-details-marker {
   display: none;
+}
+
+.filtersMobileLead {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.filtersMobileIcon {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--color-brand-control, var(--color-brand));
+}
+
+.filtersMobileCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.filtersMobileTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.filtersMobileHint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--color-text-muted, var(--color-muted));
+}
+
+.filtersMobileTrail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
 }
 
 .filtersMobileBadge {
@@ -95,9 +139,24 @@
   padding: 0 6px;
   border-radius: 999px;
   background: var(--color-brand);
-  color: var(--color-on-brand);
+  color: var(--color-on-brand-control, var(--color-on-brand));
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
+}
+
+.filtersMobileChevron {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.65;
+  transition: transform 0.15s ease;
+}
+
+.filtersMobile[open] .filtersMobileChevron {
+  transform: rotate(225deg);
+  margin-top: 0.2rem;
 }
 
 .filterPanel {
@@ -242,7 +301,8 @@
 .filterQuick .optionRowActive {
   min-height: 2.5rem;
   padding-inline: 0.875rem;
-  border-radius: 999px;
+  /* Same visual curve as search (~40px → sm), not a full pill. */
+  border-radius: var(--radius-sm);
   font-weight: 700;
 }
 
@@ -266,7 +326,7 @@
 .categoryNav .optionRowActive {
   min-height: 0;
   padding: 8px 12px;
-  border-radius: 1.25rem;
+  border-radius: var(--radius-sm);
   line-height: 1.22;
 }
 
@@ -510,7 +570,7 @@
   align-items: center;
   justify-content: center;
   padding: 10px 18px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   background: var(--color-brand-control);
   -webkit-backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
   backdrop-filter: saturate(var(--control-saturate)) blur(var(--control-blur));
@@ -764,7 +824,7 @@
   margin: 0 0 2px;
   padding: 0.2rem 0.55rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-xs);
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -829,7 +889,7 @@
   margin: 0;
   padding: 0.2rem 0.55rem;
   border: 1px solid color-mix(in srgb, var(--color-badge-brand-ink) 28%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-xs);
   background: var(--color-brand-soft);
   font-size: 0.6875rem;
   font-weight: 700;
@@ -939,7 +999,7 @@
   min-height: 2rem;
   padding: 0.35rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--color-brand) 28%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-brand) 12%, transparent);
   font-size: 0.75rem;
   font-weight: 700;
@@ -1114,11 +1174,9 @@
     gap: var(--space-md);
   }
 
+  /* Desktop sticky sidebar is unused; mobile menu lives in .content. */
   .sidebar {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding: 0;
+    display: none;
   }
 
   .filtersDesktop {
@@ -1127,9 +1185,12 @@
 
   .filtersMobile {
     display: block;
+    margin: 0 0 var(--space-md);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    /* Same-height bar as search → md (not lg); cards stay lg. */
+    border-radius: var(--radius-md);
     background: var(--glass-bg);
+    box-shadow: var(--shadow-soft);
     overflow: hidden;
   }
 
@@ -1222,6 +1283,10 @@
   }
 
   .filterSummary::after {
+    transition: none;
+  }
+
+  .filtersMobileChevron {
     transition: none;
   }
 }

@@ -159,10 +159,12 @@
   --shadow-header: 0 1px 0 rgba(20, 20, 30, 0.05);
 
   /*
-   * Border radius — concentric scale (шаг ≈ 4px).
+   * Border radius — concentric / proportional scale (шаг ≈ 4px).
    * Крупнее блок → крупнее радиус, чтобы кривизна визуально совпадала
-   * при наложении (r_outer ≈ r_inner + gap).
-   * xs: badges/chips · sm: controls · md: tiles/cards · lg: large cards · xl: bands
+   * (контроль ~36–40px → sm; док ~44px → md; карточка → lg;
+   *  r_outer ≈ r_inner + gap). Не использовать 999px на кнопках/инпутах —
+   *  полный круг только у круговых бейджей/аватаров.
+   * xs: chips/thumbs · sm: inputs/filter rows · md: dock CTAs · lg: cards · xl: bands
    */
   --radius-xs: 6px;
   --radius-sm: 10px;
