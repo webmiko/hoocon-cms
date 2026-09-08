@@ -118,22 +118,22 @@ class SearchView(APIView):
         if not q:
             return self._paginated_response(request, [])
 
-        query = SearchQuery(q, config="russian")
-        items = self._collect_results(query)
+        items = self._collect_results(q)
         return self._paginated_response(request, items)
 
-    def _collect_results(self, query: SearchQuery) -> list[dict[str, str]]:
+    def _collect_results(self, raw_q: str) -> list[dict[str, str]]:
         """Run FTS on SKU, Article, News, Page and merge into a ranked list.
 
         Args:
-            query: pre-built SearchQuery (russian config).
+            raw_q: user search text (may trigger kit intent for SKUs).
 
         Returns:
             List of dicts: {type, slug, title, url, snippet}, sorted by rank.
         """
+        query = SearchQuery(raw_q, config="russian")
         results: list[dict[str, str | float]] = []
 
-        for sku in self._search_skus(query):
+        for sku in self._search_skus(raw_q):
             results.append(
                 {
                     "type": "sku",
@@ -194,11 +194,29 @@ class SearchView(APIView):
         ]
 
     @staticmethod
-    def _search_skus(query: SearchQuery) -> QuerySet[SKU]:
-        """FTS on published SKUs, ranked by SearchRank."""
+    def _search_skus(raw_q: str) -> QuerySet[SKU]:
+        """FTS on published SKUs; kit phrases map to ``komplekty``."""
+        from django.db.models import FloatField, Value
+
+        from catalog.search_intent import resolve_catalog_search_intent
+
+        intent = resolve_catalog_search_intent(raw_q)
+        qs = SKU.objects.filter(is_published=True).select_related("product__category")
+        if intent.category_slug:
+            qs = qs.filter(product__category__slug=intent.category_slug)
+            if not intent.residual:
+                return qs.annotate(rank=Value(1.0, output_field=FloatField())).order_by(
+                    "sku_code",
+                )
+            query = SearchQuery(intent.residual, config="russian")
+            return (
+                qs.filter(search_vector=query)
+                .annotate(rank=SearchRank("search_vector", query))
+                .order_by("-rank", "sku_code")
+            )
+        query = SearchQuery(raw_q, config="russian")
         return (
-            SKU.objects.filter(is_published=True, search_vector=query)
-            .select_related("product__category")
+            qs.filter(search_vector=query)
             .annotate(rank=SearchRank("search_vector", query))
             .order_by("-rank", "sku_code")
         )

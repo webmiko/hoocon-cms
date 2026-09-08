@@ -88,6 +88,9 @@ class SKUFilterSet(django_filters.FilterSet):
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
         """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
 
+        Also applies catalog search intent: phrases like «кран с приводом»
+        map to category ``komplekty`` (kit titles rarely contain «привод»).
+
         FTS (SearchVector with russian config) handles Cyrillic stemming for
         product names. sku_code is matched with icontains because articles
         (e.g. 'HVA-5NM') don't benefit from stemming — exact substring is
@@ -106,6 +109,19 @@ class SKUFilterSet(django_filters.FilterSet):
                 "sku_code",
             )
         from django.contrib.postgres.search import SearchQuery, SearchRank
+
+        from catalog.search_intent import resolve_catalog_search_intent
+
+        intent = resolve_catalog_search_intent(value)
+        if intent.category_slug:
+            queryset = queryset.filter(product__category__slug=intent.category_slug)
+            if not intent.residual:
+                return queryset.order_by(
+                    F("moment_nm").asc(nulls_last=True),
+                    F("sku_code_nm").asc(nulls_last=True),
+                    "sku_code",
+                )
+            value = intent.residual
 
         query = SearchQuery(value, config="russian")
         return (
