@@ -15,6 +15,7 @@ import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
+import { emptyDockCtaForPath } from "../utils/emptyDockCta";
 import { releaseLabel } from "../release";
 import { api } from "../api/client";
 import styles from "./Layout.module.css";
@@ -460,19 +461,9 @@ export function Layout() {
 
       <CompareTray
         showWhenEmpty={showMobileStickyCta}
-        emptyCta={
-          isZavod
-            ? {
-                kind: "href",
-                href: ZAVOD_FACTORY_MAILTO,
-                label: "Связаться с заводом",
-              }
-            : {
-                kind: "to",
-                to: "/consultation",
-                label: "Запросить КП",
-              }
-        }
+        emptyCta={emptyDockCtaForPath(location.pathname, {
+          zavodMailto: ZAVOD_FACTORY_MAILTO,
+        })}
       />
 
       <CookieConsent />

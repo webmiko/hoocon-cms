@@ -40,8 +40,8 @@ function CompareIcon({ className }: { className?: string }) {
 }
 
 export type EmptyDockCta =
-  | { kind: "to"; to: string; label: string }
-  | { kind: "href"; href: string; label: string };
+  | { kind: "to"; to: string; label: string; shortLabel?: string }
+  | { kind: "href"; href: string; label: string; shortLabel?: string };
 
 type CompareTrayProps = {
   /** Mobile empty dock (Chat + KP) when sticky CTA would show. */
@@ -89,12 +89,14 @@ export function CompareTray({
   const slugs = items.map((i) => i.slug);
   const compareTo = `/compare${buildCompareSearch(slugs)}`;
   const rfqTo = `/rfq?skus=${encodeURIComponent(slugs.join(","))}`;
-  const preview = items.slice(0, COMPARE_MAX_SKUS);
+  const lastItem = items.at(-1);
   const emptyOnly = !hasSelection;
 
   const kpClass = `${styles.compare} ${pulse ? styles.comparePulse : ""}`.trim();
-  const shortKp =
-    !hasSelection && emptyCta.kind === "href" ? "OEM" : "КП";
+  const shortKp = hasSelection
+    ? "КП"
+    : (emptyCta.shortLabel
+      ?? (emptyCta.kind === "href" ? "OEM" : "КП"));
   const kpLabel = (
     <>
       <span className={styles.compareFull}>
@@ -203,30 +205,24 @@ export function CompareTray({
             }
             onClick={() => setOpen((v) => !v)}
           >
-            <span className={styles.stack} aria-hidden="true">
-              {preview.map((item, index) => (
-                <span
-                  key={item.slug}
-                  className={styles.stackSlot}
-                  style={{ zIndex: preview.length - index }}
-                >
-                  {item.image ? (
-                    <ProtectedProductImage
-                      src={item.image}
-                      alt=""
-                      frameClassName={styles.stackThumb}
-                      className="u-protect-media"
-                      compact
-                      width={28}
-                      height={28}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className={styles.stackPlaceholder} />
-                  )}
-                </span>
-              ))}
-            </span>
+            {lastItem ? (
+              <span className={styles.stack} aria-hidden="true">
+                {lastItem.image ? (
+                  <ProtectedProductImage
+                    src={lastItem.image}
+                    alt=""
+                    frameClassName={styles.stackThumb}
+                    className="u-protect-media"
+                    compact
+                    width={28}
+                    height={28}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className={styles.stackPlaceholder} />
+                )}
+              </span>
+            ) : null}
             <span className={styles.summaryText} aria-hidden="true">
               <span className={styles.summaryCount}>
                 {count} из {COMPARE_MAX_SKUS}
