@@ -81,7 +81,6 @@ export default defineConfig({
           ) {
             // Vite 8 / Rolldown deprecates `inlineDynamicImports` in favor of
             // `codeSplitting: false` for a single-file service worker.
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete output.inlineDynamicImports;
             output.codeSplitting = false;
           }

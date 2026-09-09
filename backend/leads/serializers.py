@@ -7,7 +7,8 @@ docs/security-baseline.md §3 (validate; whitelist; honeypot silent drop).
 - Публичный POST создаёт Lead (Slice 19 — endpoint + throttle + honeypot).
 - Whitelist полей (no mass assignment): только клиентские поля доступны
   для записи; status/created_at/updated_at — read-only.
-- RFQ: ``company`` обязательна; ``items`` — позиции SKU (или legacy ``sku``).
+- RFQ / consultation / replacement: ``company`` обязательна;
+  ``items`` — позиции SKU (или legacy ``sku``) для RFQ.
 - Валидация: email format, message длина (anti-spam + DoS guard),
   lead_type из choices.
 - PII-safe response: email/phone — write-only (не возвращаются в ответе).
@@ -137,13 +138,12 @@ class LeadSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """RFQ requires company; normalize items vs legacy sku."""
-        lead_type = attrs.get("lead_type", Lead.LeadType.RFQ)
+        """Require company on all public leads; normalize items vs legacy sku."""
         company = (attrs.get("company") or "").strip()
         attrs["company"] = company
-        if lead_type == Lead.LeadType.RFQ and not company:
+        if not company:
             raise serializers.ValidationError(
-                {"company": "Для запроса КП укажите компанию."},
+                {"company": "Укажите компанию."},
             )
 
         items = attrs.get("items")

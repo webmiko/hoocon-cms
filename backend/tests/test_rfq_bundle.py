@@ -61,6 +61,25 @@ def test_post_rfq_requires_company(client) -> None:
         content_type="application/json",
     )
     assert response.status_code == 400
+    body = response.json()
+    assert "company" in body
+    assert "компанию" in str(body["company"]).lower()
+
+
+@pytest.mark.django_db
+def test_post_consultation_requires_company(client) -> None:
+    """Consultation without company → 400 (same rule as RFQ)."""
+    response = client.post(
+        "/api/leads/",
+        data={
+            "lead_type": "consultation",
+            "name": "Иван",
+            "email": "a@example.com",
+            "message": "Нужен подбор привода под задвижку DN50.",
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 400
     assert "company" in response.json()
 
 
@@ -227,22 +246,6 @@ def test_mark_rfq_bundle_done(django_user_model) -> None:
     n = mark_rfq_bundle_done(b, actor=manager)
     assert n == 2
     assert Lead.objects.filter(status=Lead.LeadStatus.DONE).count() == 2
-
-
-@pytest.mark.django_db
-def test_consultation_without_company_ok(client) -> None:
-    """Non-RFQ leads do not require company."""
-    response = client.post(
-        "/api/leads/",
-        data={
-            "lead_type": "consultation",
-            "name": "Анна",
-            "email": "anna@example.com",
-            "message": "Помогите подобрать привод для вентиляции.",
-        },
-        content_type="application/json",
-    )
-    assert response.status_code == 201
 
 
 @pytest.mark.django_db

@@ -64,6 +64,7 @@ def test_lead_post_with_csrf_token_succeeds() -> None:
         "lead_type": "consultation",
         "name": "Иван Тестов",
         "email": "ivan.test@example.com",
+        "company": "ООО Тест",
         "message": "Тестовая заявка для проверки CSRF.",
     }
     response = client.post(

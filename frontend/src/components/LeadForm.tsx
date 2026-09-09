@@ -4,15 +4,17 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useCompare } from "../compare/useCompare";
 import { BallValveKitFields } from "./BallValveKitFields";
+import { PhoneField } from "./PhoneField";
 import type { BallValveKitOptions } from "../utils/ballValveKit";
 import { trackLeadSubmit } from "../utils/analyticsTrack";
+import { formatPhone, parsePhone } from "../utils/phoneMask";
 import styles from "./LeadForm.module.css";
 
 /**
  * Lead form for RFQ / consultation / replacement requests.
  *
  * Spec: ПЛАН §6 Iter 3–4; docs/security-baseline.md §3.
- * RFQ: company required; multi-SKU via ``items``; soft-bundle hint.
+ * Company required on all lead types; RFQ: multi-SKU via ``items``; soft-bundle hint.
  */
 
 type LeadType = "rfq" | "consultation" | "replacement";
@@ -229,19 +231,23 @@ export function LeadForm({
       });
       return;
     }
-    if (leadType === "rfq" && !form.company.trim()) {
-      setErrors({ company: "Для запроса КП укажите компанию." });
+    if (!form.company.trim()) {
+      setErrors({ company: "Укажите компанию." });
       return;
     }
     setSubmitting(true);
     setErrors({});
 
     const message = (form.message || defaultMessage).trim();
+    const phoneParsed = parsePhone(form.phone);
+    const phone = phoneParsed.nationalDigits
+      ? formatPhone(phoneParsed.countryId, phoneParsed.nationalDigits)
+      : "";
     const payload: Record<string, unknown> = {
       lead_type: leadType,
       name: form.name,
       email: form.email,
-      phone: form.phone,
+      phone,
       company: form.company.trim(),
       message: message || "Прошу подготовить коммерческое предложение.",
       website: form.website, // honeypot
@@ -323,6 +329,12 @@ export function LeadForm({
   const messageValue = form.message || defaultMessage;
   const showBallValveKit = leadType === "rfq" && ballValveKit;
   const showLines = leadType === "rfq" && lines.length > 0;
+  const messagePlaceholder =
+    leadType === "replacement"
+      ? "Нужна замена Belimo LM24A-SR, напряжение 24 В"
+      : leadType === "consultation"
+        ? "Нужен подбор привода под задвижку DN50"
+        : "Нужно КП, срок поставки и условия";
 
   return (
     <form
@@ -366,6 +378,7 @@ export function LeadForm({
                     value={line.quantity}
                     onChange={(e) => updateLineQty(index, e.target.value)}
                     className={styles.input}
+                    placeholder="1"
                   />
                 </label>
               </li>
@@ -391,6 +404,7 @@ export function LeadForm({
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
             className={styles.input}
+            placeholder="Иван Петров"
           />
           {errors.name && <span className={styles.error}>{errors.name}</span>}
         </div>
@@ -408,6 +422,7 @@ export function LeadForm({
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
             className={styles.input}
+            placeholder="ivan@mail.ru"
           />
           {errors.email && <span className={styles.error}>{errors.email}</span>}
         </div>
@@ -416,30 +431,29 @@ export function LeadForm({
           <label htmlFor="phone" className={styles.label}>
             Телефон
           </label>
-          <input
-            type="tel"
+          <PhoneField
             id="phone"
             name="phone"
-            autoComplete="tel"
             value={form.phone}
-            onChange={(e) => update("phone", e.target.value)}
-            className={styles.input}
+            onChange={(phone) => update("phone", phone)}
+            inputClassName={styles.input}
           />
         </div>
 
         <div className={styles.field}>
           <label htmlFor="company" className={styles.label}>
-            Компания{leadType === "rfq" ? " *" : ""}
+            Компания *
           </label>
           <input
             type="text"
             id="company"
             name="company"
-            required={leadType === "rfq"}
+            required
             autoComplete="organization"
             value={form.company}
             onChange={(e) => update("company", e.target.value)}
             className={styles.input}
+            placeholder="ООО «Строймонтаж»"
           />
           {errors.company ? (
             <span className={styles.error}>{errors.company}</span>
@@ -460,6 +474,7 @@ export function LeadForm({
             value={form.quantity}
             onChange={(e) => update("quantity", e.target.value)}
             className={styles.input}
+            placeholder="10"
           />
         </div>
       ) : null}
@@ -476,7 +491,7 @@ export function LeadForm({
             value={form.analog_belimo_code}
             onChange={(e) => update("analog_belimo_code", e.target.value)}
             className={styles.input}
-            placeholder="напр. LM24A-SR"
+            placeholder="LM24A-SR"
           />
         </div>
       )}
@@ -501,6 +516,7 @@ export function LeadForm({
           value={messageValue}
           onChange={(e) => update("message", e.target.value)}
           className={styles.textarea}
+          placeholder={messagePlaceholder}
         />
         {errors.message && <span className={styles.error}>{errors.message}</span>}
       </div>
