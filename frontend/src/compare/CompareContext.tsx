@@ -18,7 +18,7 @@ import { productCardImageSrc } from "../utils/productImageSrc";
 export type { CompareAddResult };
 
 /**
- * Provider for catalog compare tray (localStorage-backed, max 4).
+ * Provider for catalog compare tray (localStorage-backed, max 8).
  */
 export function CompareProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CompareItem[]>(() => readCompareStorage());

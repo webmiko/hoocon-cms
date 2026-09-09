@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api, type CompareResponse, type SKUList } from "../api/client";
@@ -9,6 +16,7 @@ import { isModulatingSignalKey } from "../utils/isModulatingSignalKey";
 import { ProtectedProductImage } from "../components/ProtectedProductImage";
 import { useCompare } from "../compare/useCompare";
 import {
+  COMPARE_CAROUSEL_VISIBLE_COLS,
   COMPARE_MAX_SKUS,
   COMPARE_MIN_FOR_PAGE,
 } from "../compare/constants";
@@ -45,6 +53,10 @@ export function ComparePage() {
   const [addQuery, setAddQuery] = useState("");
   const [addError, setAddError] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const skuStripRef = useRef<HTMLDivElement>(null);
+  const scrollSyncLock = useRef(false);
+  const [carouselScroll, setCarouselScroll] = useState({ atStart: true, atEnd: true });
 
   const urlSlugs = useMemo(
     () => parseCompareSlugsParam(searchParams.get("skus")),
@@ -188,6 +200,89 @@ export function ComparePage() {
   const skus = data?.skus ?? [];
   const tooFew = slugs.length > 0 && slugs.length < COMPARE_MIN_FOR_PAGE;
   const canAddMore = slugs.length < COMPARE_MAX_SKUS;
+  const showCarouselNav = skus.length > COMPARE_CAROUSEL_VISIBLE_COLS;
+
+  const syncCarouselScroll = useCallback(() => {
+    const el = carouselRef.current ?? skuStripRef.current;
+    if (!el) {
+      setCarouselScroll({ atStart: true, atEnd: true });
+      return;
+    }
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 1) {
+      setCarouselScroll({ atStart: true, atEnd: true });
+      return;
+    }
+    setCarouselScroll({
+      atStart: el.scrollLeft <= 1,
+      atEnd: el.scrollLeft >= maxScroll - 1,
+    });
+  }, []);
+
+  const syncHorizontalScroll = useCallback(
+    (source: "strip" | "table") => {
+      if (scrollSyncLock.current) return;
+      const strip = skuStripRef.current;
+      const table = carouselRef.current;
+      if (!strip || !table) return;
+      scrollSyncLock.current = true;
+      const left = source === "strip" ? strip.scrollLeft : table.scrollLeft;
+      if (source === "strip") {
+        table.scrollLeft = left;
+      } else {
+        strip.scrollLeft = left;
+      }
+      syncCarouselScroll();
+      window.requestAnimationFrame(() => {
+        scrollSyncLock.current = false;
+      });
+    },
+    [syncCarouselScroll],
+  );
+
+  const compareSlugsKey = slugs.join(",");
+
+  useEffect(() => {
+    const table = carouselRef.current;
+    const strip = skuStripRef.current;
+    if (table) table.scrollLeft = 0;
+    if (strip) strip.scrollLeft = 0;
+    syncCarouselScroll();
+  }, [compareSlugsKey, syncCarouselScroll]);
+
+  useEffect(() => {
+    const table = carouselRef.current;
+    const strip = skuStripRef.current;
+    if (!table && !strip) return undefined;
+
+    const onTableScroll = () => syncHorizontalScroll("table");
+    const onStripScroll = () => syncHorizontalScroll("strip");
+    table?.addEventListener("scroll", onTableScroll, { passive: true });
+    strip?.addEventListener("scroll", onStripScroll, { passive: true });
+
+    const ro = new ResizeObserver(() => syncCarouselScroll());
+    if (table) ro.observe(table);
+    if (strip) ro.observe(strip);
+
+    return () => {
+      table?.removeEventListener("scroll", onTableScroll);
+      strip?.removeEventListener("scroll", onStripScroll);
+      ro.disconnect();
+    };
+  }, [syncCarouselScroll, syncHorizontalScroll, skus.length]);
+
+  function scrollCarousel(direction: -1 | 1) {
+    const table = carouselRef.current;
+    const strip = skuStripRef.current;
+    const col =
+      strip?.querySelector<HTMLElement>("[data-compare-col]")
+      ?? table?.querySelector<HTMLElement>("[data-compare-col]");
+    const step = col?.offsetWidth ?? 200;
+    const current = table?.scrollLeft ?? strip?.scrollLeft ?? 0;
+    const next = Math.max(0, current + direction * step);
+    table?.scrollTo({ left: next, behavior: "smooth" });
+    strip?.scrollTo({ left: next, behavior: "smooth" });
+  }
   const rfqHref = `/rfq?skus=${encodeURIComponent(
     skus.map((s) => s.slug).join(","),
   )}`;
@@ -292,63 +387,101 @@ export function ComparePage() {
             </button>
           </div>
 
-          <div
-            className={`${styles.scroll} ${styles.desktopOnly} u-protect-content`}
-            {...protectedContentHandlers}
-          >
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col" className={styles.stickyCol}>
-                    Характеристика
-                  </th>
-                  {skus.map((sku) => (
-                    <th key={sku.slug} scope="col" className={styles.skuCol}>
-                      <CompareSkuHead
-                        sku={sku}
-                        onRemove={() => handleRemove(sku.slug)}
-                      />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={skus.length + 1} className={styles.noDiff}>
-                      Все выбранные характеристики совпадают. Снимите «Только
-                      отличия», чтобы увидеть полный список.
-                    </td>
-                  </tr>
-                ) : (
-                  groupedRows.map((group) => (
-                    <CompareGroupFragment
-                      key={group.key || "core"}
-                      group={group}
-                      skus={skus}
-                      showHeading={Boolean(allSpecs && group.title)}
+          <div className={`${styles.carouselWrap} ${styles.desktopOnly}`}>
+            {showCarouselNav ? (
+              <div className={`${styles.carouselNav} ${styles.noPrint}`}>
+                <button
+                  type="button"
+                  className={styles.carouselBtn}
+                  onClick={() => scrollCarousel(-1)}
+                  disabled={carouselScroll.atStart}
+                  aria-label="Предыдущие модели"
+                >
+                  ←
+                </button>
+                <span className={styles.carouselHint}>
+                  {skus.length} моделей — прокрутите или листайте
+                </span>
+                <button
+                  type="button"
+                  className={styles.carouselBtn}
+                  onClick={() => scrollCarousel(1)}
+                  disabled={carouselScroll.atEnd}
+                  aria-label="Следующие модели"
+                >
+                  →
+                </button>
+              </div>
+            ) : null}
+            <div
+              className={`${styles.compareDesktop} u-protect-content`}
+              {...protectedContentHandlers}
+            >
+              <div ref={skuStripRef} className={styles.skuHeadStrip}>
+                <div className={styles.skuHeadGutter} aria-hidden="true" />
+                {skus.map((sku) => (
+                  <div
+                    key={sku.slug}
+                    className={styles.skuHeadCol}
+                    data-compare-col=""
+                  >
+                    <CompareSkuHead
+                      sku={sku}
+                      onRemove={() => handleRemove(sku.slug)}
                     />
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </div>
+                ))}
+              </div>
+              <div ref={carouselRef} className={styles.scroll}>
+                <table
+                  className={styles.table}
+                  style={
+                    { "--compare-sku-cols": skus.length } as CSSProperties
+                  }
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col" className={styles.stickyCol}>
+                        Характеристика
+                      </th>
+                      {skus.map((sku) => (
+                        <th key={sku.slug} scope="col" className={styles.skuCol}>
+                          <span className={`${styles.skuCode} text-tech`}>
+                            {softBreak(sku.sku_code)}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={skus.length + 1} className={styles.noDiff}>
+                          Все выбранные характеристики совпадают. Снимите
+                          «Только отличия», чтобы увидеть полный список.
+                        </td>
+                      </tr>
+                    ) : (
+                      groupedRows.map((group) => (
+                        <CompareGroupFragment
+                          key={group.key || "core"}
+                          group={group}
+                          skus={skus}
+                          showHeading={Boolean(allSpecs && group.title)}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <div
             className={`${styles.mobileCompare} ${styles.mobileOnly} u-protect-content`}
             {...protectedContentHandlers}
           >
-            <ul className={styles.mobileProducts}>
-              {skus.map((sku) => (
-                <li key={sku.slug} className={styles.mobileProduct}>
-                  <CompareSkuHead
-                    sku={sku}
-                    onRemove={() => handleRemove(sku.slug)}
-                    compact
-                  />
-                </li>
-              ))}
-            </ul>
+            <CompareMobileProducts skus={skus} onRemove={handleRemove} />
 
             {rows.length === 0 ? (
               <p className={styles.noDiff} role="status">
@@ -478,6 +611,140 @@ export function ComparePage() {
           )}
         </div>
       </dialog>
+    </div>
+  );
+}
+
+function CompareMobileProducts({
+  skus,
+  onRemove,
+}: {
+  skus: SKUList[];
+  onRemove: (slug: string) => void;
+}) {
+  const isCarousel = skus.length > COMPARE_CAROUSEL_VISIBLE_COLS;
+  const trackRef = useRef<HTMLUListElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const currentIndex = Math.min(activeIndex, Math.max(0, skus.length - 1));
+
+  useEffect(() => {
+    const root = trackRef.current;
+    if (!root || !isCarousel || skus.length === 0) return undefined;
+
+    const updateActive = () => {
+      const slides = Array.from(root.children) as HTMLElement[];
+      if (slides.length === 0) return;
+      const mid = root.scrollLeft + root.clientWidth / 2;
+      let best = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      slides.forEach((el, index) => {
+        const center = el.offsetLeft + el.offsetWidth / 2;
+        const dist = Math.abs(center - mid);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = index;
+        }
+      });
+      setActiveIndex(best);
+    };
+
+    let raf = 0;
+    const scheduleUpdate = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateActive();
+      });
+    };
+
+    updateActive();
+    root.addEventListener("scroll", scheduleUpdate, { passive: true });
+    const ro = new ResizeObserver(scheduleUpdate);
+    ro.observe(root);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      root.removeEventListener("scroll", scheduleUpdate);
+      ro.disconnect();
+    };
+  }, [isCarousel, skus.length]);
+
+  function scrollToIndex(index: number) {
+    const root = trackRef.current;
+    if (!root) return;
+    const slide = root.children[index] as HTMLElement | undefined;
+    if (!slide) return;
+    root.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+  }
+
+  function go(delta: -1 | 1) {
+    scrollToIndex(Math.max(0, Math.min(skus.length - 1, currentIndex + delta)));
+  }
+
+  const listClass = isCarousel
+    ? `${styles.mobileProducts} ${styles.mobileProductsCarousel}`
+    : styles.mobileProducts;
+
+  return (
+    <div
+      className={isCarousel ? styles.mobileCarousel : styles.mobileProductsBlock}
+      role={isCarousel ? "region" : undefined}
+      aria-roledescription={isCarousel ? "карусель" : undefined}
+      aria-label={isCarousel ? "Выбранные модели" : undefined}
+    >
+      <ul ref={isCarousel ? trackRef : undefined} className={listClass}>
+        {skus.map((sku) => (
+          <li key={sku.slug} className={styles.mobileProduct}>
+            <CompareSkuHead
+              sku={sku}
+              onRemove={() => onRemove(sku.slug)}
+              compact
+            />
+          </li>
+        ))}
+      </ul>
+      {isCarousel ? (
+        <div className={styles.mobileCarouselControls}>
+          <button
+            type="button"
+            className={styles.mobileCarouselBtn}
+            onClick={() => go(-1)}
+            disabled={currentIndex <= 0}
+            aria-label="Предыдущая модель"
+          >
+            ←
+          </button>
+          <div
+            className={styles.mobileCarouselDots}
+            role="tablist"
+            aria-label="Модели в сравнении"
+          >
+            {skus.map((sku, index) => (
+              <button
+                key={sku.slug}
+                type="button"
+                role="tab"
+                aria-selected={index === currentIndex}
+                aria-label={`${sku.sku_code}, ${index + 1} из ${skus.length}`}
+                className={
+                  index === currentIndex
+                    ? `${styles.mobileCarouselDot} ${styles.mobileCarouselDotActive}`
+                    : styles.mobileCarouselDot
+                }
+                onClick={() => scrollToIndex(index)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className={styles.mobileCarouselBtn}
+            onClick={() => go(1)}
+            disabled={currentIndex >= skus.length - 1}
+            aria-label="Следующая модель"
+          >
+            →
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

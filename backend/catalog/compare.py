@@ -1,6 +1,6 @@
 """Build side-by-side SKU compare matrix for public API.
 
-Spec: docs/plan-compare-sku.md — max 4 SKU, highlights + full ТТХ groups, «—» gaps.
+Spec: docs/plan-compare-sku.md — max 8 SKU, highlights + full ТТХ groups, «—» gaps.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from catalog.facets import EXTRA_HIGHLIGHT_DEFS, FACET_DEFS
 from catalog.models import SKU, AttributeValue, ProductImage
 from catalog.serializers import SKUListSerializer, _sku_attribute_rows
 
-COMPARE_MAX_SKUS = 4
+COMPARE_MAX_SKUS = 8
 COMPARE_EMPTY_CELL = "—"
 COMPARE_META_GROUP = "meta"
 COMPARE_META_GROUP_TITLE = "Основные"

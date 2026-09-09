@@ -4,7 +4,7 @@
   right: 0;
   bottom: var(--bottom-chrome, 0px);
   z-index: 200;
-  /* Shared dock CTA box — Chat / 4 из 4 / КП. */
+  /* Shared dock CTA box — Chat / N из 8 / КП. */
   --dock-btn-h: 2.75rem;
   --dock-btn-pad-x: 16px;
   --dock-btn-gap: 8px;
@@ -269,21 +269,6 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  margin-left: -4px;
-  padding-right: 2px;
-}
-
-.stackSlot {
-  position: relative;
-  width: 28px;
-  height: 28px;
-  margin-right: -10px;
-  border-radius: var(--radius-xs);
-  box-shadow: 0 0 0 1px var(--color-surface);
-}
-
-.stackSlot:last-child {
-  margin-right: 0;
 }
 
 .stackThumb,
@@ -509,7 +494,7 @@
 
 /*
  * Phone dock (ambidextrous):
- * [Чат left] [N из 4 center] [КП right]
+ * [Чат left] [N из 8 center] [КП right]
  * Sticky page KP is hidden while this tray is mounted.
  */
 @media (max-width: 768px) {
@@ -560,12 +545,8 @@
   }
 }
 
-/* Phone: icon-only Chat + Compare in selection tray; hide thumb stack. */
+/* Phone: icon-only Chat + Compare in selection tray. */
 @media (max-width: 480px) {
-  .stack {
-    display: none;
-  }
-
   .chatLabel,
   .secondaryLabel {
     display: none;

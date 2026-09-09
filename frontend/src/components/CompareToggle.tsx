@@ -17,7 +17,7 @@ interface CompareToggleProps {
 }
 
 /**
- * Add/remove SKU from the RFQ selection set (also used for compare, max 4).
+ * Add/remove SKU from the RFQ selection set (also used for compare, max 8).
  */
 export function CompareToggle({
   item,

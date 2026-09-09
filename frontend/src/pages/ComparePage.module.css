@@ -115,18 +115,119 @@
   border: 0;
 }
 
-.scroll {
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  max-height: min(70vh, 900px);
+.carouselWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.carouselNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.carouselHint {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.carouselBtn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.carouselBtn:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+  background: var(--color-subtle, #f5f5f5);
+}
+
+.carouselBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.carouselBtn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.compareDesktop {
+  --compare-sticky-col-w: 156px;
+  --compare-sku-col-w: 200px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg, 12px);
   background: var(--color-surface);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.skuHeadStrip {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-subtle, #f5f5f5);
+  scrollbar-width: none;
+}
+
+.skuHeadStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.skuHeadGutter {
+  flex: 0 0 var(--compare-sticky-col-w);
+  width: var(--compare-sticky-col-w);
+  min-width: var(--compare-sticky-col-w);
+  border-right: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.skuHeadCol {
+  flex: 0 0 var(--compare-sku-col-w);
+  width: var(--compare-sku-col-w);
+  min-width: var(--compare-sku-col-w);
+  max-width: var(--compare-sku-col-w);
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border-right: 1px solid var(--color-border);
+}
+
+.skuHeadCol:last-child {
+  border-right: none;
+}
+
+.scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: min(60vh, 800px);
+  background: var(--color-surface);
+  scrollbar-width: none;
+}
+
+.scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .table {
-  width: 100%;
-  min-width: 640px;
+  width: max-content;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.8125rem;
@@ -140,33 +241,51 @@
   text-align: left;
 }
 
+.table tbody td {
+  background-color: var(--color-surface);
+}
+
 .table thead th {
   position: sticky;
   top: 0;
   z-index: 4;
-  background: var(--color-subtle, #f5f5f5);
+  background-color: var(--color-subtle, #f5f5f5);
+  background-clip: padding-box;
   font-weight: 600;
-  box-shadow: 0 1px 0 var(--color-border);
+  box-shadow:
+    0 1px 0 var(--color-border),
+    0 6px 12px rgba(0, 0, 0, 0.06);
 }
 
 .stickyCol {
   position: sticky;
   left: 0;
   z-index: 2;
-  min-width: 140px;
-  max-width: 200px;
-  background: var(--color-surface);
-  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.04);
+  width: var(--compare-sticky-col-w, 156px);
+  min-width: var(--compare-sticky-col-w, 156px);
+  max-width: var(--compare-sticky-col-w, 156px);
+  background-color: var(--color-surface);
+  background-clip: padding-box;
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.06);
 }
 
 .table thead .stickyCol {
-  z-index: 5;
+  z-index: 6;
   left: 0;
-  background: var(--color-subtle, #f5f5f5);
+  background-color: var(--color-subtle, #f5f5f5);
+  box-shadow:
+    4px 0 8px rgba(0, 0, 0, 0.06),
+    0 1px 0 var(--color-border),
+    0 6px 12px rgba(0, 0, 0, 0.06);
+}
+
+.table thead .skuCol {
+  background-color: var(--color-subtle, #f5f5f5);
+  background-clip: padding-box;
 }
 
 .groupRow th {
-  background: var(--color-subtle, #f0f0f0);
+  background-color: var(--color-subtle, #f0f0f0);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -290,9 +409,14 @@
     padding: 0;
   }
 
+  .compareDesktop,
   .scroll {
     overflow: visible;
     border: none;
+  }
+
+  .skuHeadStrip {
+    overflow: visible;
   }
 
   .table {
@@ -314,8 +438,10 @@
 }
 
 .skuCol {
-  min-width: 168px;
-  max-width: 220px;
+  width: var(--compare-sku-col-w);
+  min-width: var(--compare-sku-col-w);
+  max-width: var(--compare-sku-col-w);
+  scroll-snap-align: start;
 }
 
 .skuHead {
@@ -408,11 +534,11 @@
 
 .diffRow td,
 .diffRow th {
-  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 6%, var(--color-surface));
 }
 
 .diffRow .stickyCol {
-  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 6%, var(--color-surface));
 }
 
 .noDiff {
@@ -433,6 +559,15 @@
   display: none;
 }
 
+.mobileProductsBlock {
+  margin-bottom: 16px;
+}
+
+.mobileCarousel {
+  margin-bottom: 16px;
+  min-width: 0;
+}
+
 .mobileProducts {
   list-style: none;
   margin: 0 0 16px;
@@ -442,12 +577,134 @@
   gap: 10px;
 }
 
+.mobileCarousel .mobileProducts {
+  margin-bottom: 0;
+}
+
+.mobileProductsCarousel {
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 4px;
+  scrollbar-width: none;
+}
+
+.mobileProductsCarousel::-webkit-scrollbar {
+  display: none;
+}
+
+.mobileCarouselControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.mobileCarouselBtn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.mobileCarouselBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+  color: var(--color-link-hover);
+  transform: scale(1.04);
+}
+
+.mobileCarouselBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mobileCarouselBtn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.mobileCarouselDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+}
+
+/* Apple-style pill: inactive dot → active capsule morphs in place. */
+.mobileCarouselDot {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 18px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.mobileCarouselDot::before {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-muted) 40%, transparent);
+  transition:
+    width 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    height 0.38s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.28s ease,
+    opacity 0.28s ease;
+}
+
+.mobileCarouselDot:hover::before {
+  background: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+}
+
+.mobileCarouselDotActive {
+  width: 24px;
+}
+
+.mobileCarouselDotActive::before {
+  width: 22px;
+  height: 7px;
+  background: var(--color-text);
+}
+
+:global([data-theme="dark"]) .mobileCarouselDotActive::before {
+  background: var(--color-text);
+}
+
 .mobileProduct {
   margin: 0;
   padding: 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg, 12px);
   background: var(--color-surface);
+}
+
+.mobileProductsCarousel .mobileProduct {
+  flex: 0 0 min(280px, calc(100% - 32px));
+  scroll-snap-align: start;
 }
 
 .skuHeadCompact {
@@ -580,11 +837,37 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .mobileCarouselBtn,
+  .mobileCarouselDot::before {
+    transition: none;
+  }
+
+  .mobileCarouselBtn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
+  .table thead th,
+  .table thead .stickyCol,
+  .table thead .skuCol {
+    box-shadow:
+      0 1px 0 var(--color-border),
+      0 6px 12px rgba(0, 0, 0, 0.28);
+  }
+
+  .table thead .stickyCol {
+    box-shadow:
+      4px 0 8px rgba(0, 0, 0, 0.22),
+      0 1px 0 var(--color-border),
+      0 6px 12px rgba(0, 0, 0, 0.28);
+  }
+
   .diffRow td,
   .diffRow th,
   .diffRow .stickyCol {
-    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+    background-color: color-mix(in srgb, var(--color-brand) 12%, var(--color-surface));
   }
 
   .mobileDiff {
@@ -592,10 +875,25 @@
   }
 }
 
+:global([data-theme="dark"]) .table thead th,
+:global([data-theme="dark"]) .table thead .stickyCol,
+:global([data-theme="dark"]) .table thead .skuCol {
+  box-shadow:
+    0 1px 0 var(--color-border),
+    0 6px 12px rgba(0, 0, 0, 0.28);
+}
+
+:global([data-theme="dark"]) .table thead .stickyCol {
+  box-shadow:
+    4px 0 8px rgba(0, 0, 0, 0.22),
+    0 1px 0 var(--color-border),
+    0 6px 12px rgba(0, 0, 0, 0.28);
+}
+
 :global([data-theme="dark"]) .diffRow td,
 :global([data-theme="dark"]) .diffRow th,
 :global([data-theme="dark"]) .diffRow .stickyCol {
-  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 12%, var(--color-surface));
 }
 
 :global([data-theme="dark"]) .mobileDiff {

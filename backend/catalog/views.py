@@ -184,7 +184,7 @@ class FacetViewSet(viewsets.ViewSet):
 class CompareViewSet(viewsets.ViewSet):
     """GET /api/catalog/compare/?skus=slug-a,slug-b — side-by-side ТТХ.
 
-    Spec: docs/plan-compare-sku.md (max 4, free mix of categories).
+    Spec: docs/plan-compare-sku.md (max 8, free mix of categories).
     """
 
     permission_classes = (AllowAny,)
