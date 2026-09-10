@@ -15,7 +15,7 @@
       data-match="/admin/"
       data-match-exact
     >
-      <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+      <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">dashboard</span>
       <span class="hoocon-phone-tab__label">{% trans "Панель" %}</span>
     </a>
     {% if perms.leads.view_lead %}
@@ -25,7 +25,7 @@
         data-hoocon-phone-tab="leads"
         data-match="/admin/leads/lead/"
       >
-        <span class="material-symbols-outlined" aria-hidden="true">inbox</span>
+        <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">inbox</span>
         <span class="hoocon-phone-tab__label">{% trans "Заявки" %}</span>
         <span
           class="hoocon-phone-tab__badge"
@@ -41,7 +41,7 @@
         data-hoocon-phone-tab="chat"
         data-match="/admin/supportchat/conversation/"
       >
-        <span class="material-symbols-outlined" aria-hidden="true">forum</span>
+        <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">forum</span>
         <span class="hoocon-phone-tab__label">{% trans "Чат" %}</span>
         <span
           class="hoocon-phone-tab__badge"
@@ -57,7 +57,7 @@
         data-hoocon-phone-tab="clients"
         data-match="/admin/crm/client/"
       >
-        <span class="material-symbols-outlined" aria-hidden="true">groups</span>
+        <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">groups</span>
         <span class="hoocon-phone-tab__label">{% trans "Клиенты" %}</span>
       </a>
     {% endif %}
@@ -70,7 +70,7 @@
       aria-controls="hoocon-phone-more"
       aria-expanded="false"
     >
-      <span class="material-symbols-outlined" aria-hidden="true">more_horiz</span>
+      <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">more_horiz</span>
       <span class="hoocon-phone-tab__label">{% trans "Ещё" %}</span>
     </button>
   </nav>
@@ -90,6 +90,7 @@
       aria-label="{% trans 'Закрыть' %}"
     ></button>
     <div class="hoocon-phone-more__sheet">
+      <div class="hoocon-phone-more__handle" aria-hidden="true"></div>
       <div class="hoocon-phone-more__head">
         <p class="hoocon-phone-more__title">{% trans "Ещё" %}</p>
         <button

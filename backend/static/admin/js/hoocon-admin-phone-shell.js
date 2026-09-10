@@ -191,7 +191,9 @@
       var isMore = tab.getAttribute("data-hoocon-phone-tab") === "more";
       var exact = tab.hasAttribute("data-match-exact");
       var active = false;
-      if (!isMore && match) {
+      if (isMore) {
+        active = document.body.classList.contains("hoocon-phone-more-open");
+      } else if (match) {
         if (exact) {
           active = pathNorm === normalizeAdminPath(match);
         } else {
@@ -217,6 +219,7 @@
     more.removeAttribute("hidden");
     if (btn) btn.setAttribute("aria-expanded", "true");
     document.body.classList.add("hoocon-phone-more-open");
+    markActiveTab();
   }
 
   function closeMore() {
@@ -226,6 +229,7 @@
     more.setAttribute("hidden", "");
     if (btn) btn.setAttribute("aria-expanded", "false");
     document.body.classList.remove("hoocon-phone-more-open");
+    markActiveTab();
   }
 
   function toggleMore() {

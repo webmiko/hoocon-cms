@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -126,6 +127,8 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert 'href="/admin/"' in html or 'href="/admin"' in html
     assert "data-hoocon-phone-more-open" in html
     assert 'id="hoocon-phone-more"' in html
+    assert "hoocon-phone-more__handle" in html
+    assert "hoocon-phone-tab__icon" in html
     assert 'name="apple-mobile-web-app-capable" content="yes"' in html
     assert "viewport-fit=cover" in html
 
@@ -145,11 +148,26 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     shell_rule = phone_css.split("body.hoocon-phone-ready .hoocon-phone-shell")[1].split("}")[0]
     assert "position: fixed" in shell_rule
     assert "bottom: 0" in shell_rule
-    assert "padding-bottom: var(--hoocon-phone-viewport-inset, 0px)" in shell_rule
+    assert "--hoocon-phone-viewport-inset" in shell_rule
+    assert "padding-bottom: calc(" in shell_rule
     assert "z-index: 100" in shell_rule
     tabs_rule = phone_css.split(".hoocon-phone-tabs")[1].split("}")[0]
     assert "position: relative" in tabs_rule
     assert "position: fixed" not in tabs_rule
+    assert "border-radius: 999px" in tabs_rule
+    assert "background: rgba(255, 255, 255, 0.72)" in tabs_rule
+    assert "blur(80px)" in tabs_rule
+    assert "hoocon-phone-tab__icon" in phone_css
+    assert "hoocon-phone-tab--active" in phone_css
+    assert "backdrop-filter: blur(20px)" in phone_css
+    assert "--hoocon-phone-chrome-h: 5.25rem" in phone_css
+    assert "max(1rem, env(safe-area-inset-bottom, 0px))" in phone_css
+    assert "background: transparent" in shell_rule
+    assert "hoocon-phone-more__handle" in phone_css
+    more_sheet_rule = phone_css.split(".hoocon-phone-more__sheet")[1].split("}")[0]
+    assert "max-height: 90vh" in more_sheet_rule
+    assert "height: auto" in more_sheet_rule
+    assert re.search(r"(?<![\w-])height:\s*90vh", more_sheet_rule) is None
 
     phone_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
         encoding="utf-8"
