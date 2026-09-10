@@ -17,6 +17,7 @@ from config.admin_mixins import OpenChangeLinkMixin
 from supportchat.models import (
     Conversation,
     ConversationStatus,
+    FaqItem,
     Message,
     SupportSchedule,
     SupportScheduleDay,
@@ -444,6 +445,32 @@ class SupportScheduleAdmin(ModelAdmin):
         return redirect(
             reverse("admin:supportchat_supportschedule_change", args=[schedule.pk]),
         )
+
+
+@admin.register(FaqItem)
+class FaqItemAdmin(ModelAdmin):
+    """Вопросы-ответы для быстрых кнопок виджета чата на сайте."""
+
+    list_display = ("order", "question", "is_active", "show_in_chat")
+    list_display_links = ("question",)
+    list_editable = ("order", "is_active", "show_in_chat")
+    list_filter = ("is_active", "show_in_chat")
+    search_fields = ("question", "answer")
+    ordering = ("order", "id")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "question",
+                    "answer",
+                    "order",
+                    "is_active",
+                    "show_in_chat",
+                ),
+            },
+        ),
+    )
 
 
 @admin.register(Message)

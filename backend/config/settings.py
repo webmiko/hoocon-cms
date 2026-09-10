@@ -363,6 +363,14 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_conversation",
                     },
                     {
+                        "title": _("FAQ чата"),
+                        "icon": "quiz",
+                        "link": reverse_lazy(
+                            "admin:supportchat_faqitem_changelist",
+                        ),
+                        "permission": "config.unfold_callbacks.perm_view_faqitem",
+                    },
+                    {
                         "title": _("Web Push"),
                         "icon": "notifications",
                         "link": reverse_lazy(
@@ -473,6 +481,7 @@ REST_FRAMEWORK = {
         "support_message": "60/hour",
         # GET poll every ~4s needs headroom (15/min); separate from POST scope.
         "support_poll": "120/minute",
+        "support_faq": "60/minute",
         "webpush_subscribe": "30/hour",
         # First-party SPA pageviews (essential); per-IP, headroom for SPA navigations.
         "analytics_hit": "120/min",

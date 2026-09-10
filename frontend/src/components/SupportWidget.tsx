@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
 import {
@@ -26,6 +27,82 @@ type ChatMessage = {
 };
 
 type ChannelLink = { channel: string; label: string; deep_link: string };
+
+type SupportFaqItem = { id: number; question: string; answer: string };
+
+const FAQ_PATH_LABELS: Record<string, string> = {
+  "/consultation": "заявка на КП",
+  "/gde-kupit": "где купить",
+};
+
+const FAQ_PATH_RE = /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:#[a-z0-9-]+)?/gi;
+
+function faqAnswerNodes(text: string, onNavigate?: () => void): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(FAQ_PATH_RE.source, "gi");
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) {
+      nodes.push(text.slice(last, match.index));
+    }
+    const raw = match[0];
+    const trailing = raw.match(/[.,;:!?)\]»"']+$/);
+    const href = trailing ? raw.slice(0, -trailing[0].length) : raw;
+    const suffix = trailing ? trailing[0] : "";
+    nodes.push(
+      <Link
+        key={`faq-link-${match.index}`}
+        to={href}
+        className={styles.faqLink}
+        onClick={onNavigate}
+      >
+        {FAQ_PATH_LABELS[href] ?? href}
+      </Link>,
+    );
+    if (suffix) {
+      nodes.push(suffix);
+    }
+    last = match.index + raw.length;
+  }
+  if (last < text.length) {
+    nodes.push(text.slice(last));
+  }
+  return nodes;
+}
+
+function QuickFaqChips({
+  items,
+  activeId,
+  onPick,
+}: {
+  items: SupportFaqItem[];
+  activeId: number | null;
+  onPick: (item: SupportFaqItem) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className={styles.quickFaq} role="group" aria-label="Частые вопросы">
+      <p className={styles.quickFaqLabel}>Частые вопросы</p>
+      <div className={styles.quickFaqList}>
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={
+              item.id === activeId
+                ? `${styles.quickFaqChip} ${styles.quickFaqChipActive}`
+                : styles.quickFaqChip
+            }
+            onClick={() => onPick(item)}
+          >
+            {item.question}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function mergeMessages(
   prev: ChatMessage[],
@@ -115,6 +192,8 @@ export function SupportWidget() {
   const [isOpenNow, setIsOpenNow] = useState(true);
   const [outsideHint, setOutsideHint] = useState("");
   const [channels, setChannels] = useState<ChannelLink[]>([]);
+  const [faqItems, setFaqItems] = useState<SupportFaqItem[]>([]);
+  const [activeFaq, setActiveFaq] = useState<SupportFaqItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pushStatus, setPushStatus] = useState("");
@@ -130,6 +209,10 @@ export function SupportWidget() {
       subscribeSupportChat((next) => {
         setVisible(next.visible);
         setOpen(next.open);
+        if (!next.open) {
+          setFaqItems([]);
+          setActiveFaq(null);
+        }
       }),
     [],
   );
@@ -168,6 +251,22 @@ export function SupportWidget() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void api
+      .supportChatFaq()
+      .then((data) => {
+        if (!cancelled) setFaqItems(data.items);
+      })
+      .catch(() => {
+        if (!cancelled) setFaqItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // On open: resume session + full history (PWA reload must see staff replies).
   useEffect(() => {
@@ -228,7 +327,11 @@ export function SupportWidget() {
     const el = listRef.current;
     if (!el || !open) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, open]);
+  }, [messages, open, activeFaq]);
+
+  function pickFaq(item: SupportFaqItem) {
+    setActiveFaq((prev) => (prev?.id === item.id ? null : item));
+  }
 
   // Mobile fullscreen chat: lock page scroll; track viewport changes.
   useEffect(() => {
@@ -411,6 +514,7 @@ export function SupportWidget() {
       setMessages((prev) => mergeMessages(prev, next));
       lastIdRef.current = maxMessageId(next, lastIdRef.current);
       setDraft("");
+      setActiveFaq(null);
       if (result.message.outside_hours) setIsOpenNow(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось отправить");
@@ -513,7 +617,7 @@ export function SupportWidget() {
           ) : null}
 
           <div className={styles.messages} ref={listRef}>
-            {messages.length === 0 ? (
+            {messages.length === 0 && !activeFaq ? (
               <div className={styles.empty}>
                 <p className={styles.emptyTitle}>Чем помочь?</p>
                 <p className={styles.emptyText}>
@@ -521,8 +625,8 @@ export function SupportWidget() {
                   Telegram — напишите боту кнопкой ниже.
                 </p>
               </div>
-            ) : (
-              messages.map((m) => {
+            ) : null}
+            {messages.map((m) => {
                 const fromVisitor = m.direction === "inbound";
                 const time = formatMessageTime(m.created_at);
                 const label = m.sender_name || (fromVisitor ? "Вы" : "Поддержка");
@@ -542,9 +646,28 @@ export function SupportWidget() {
                     {time ? <time className={styles.time}>{time}</time> : null}
                   </div>
                 );
-              })
-            )}
+              })}
+            {activeFaq ? (
+              <>
+                <div className={styles.rowOut}>
+                  <span className={styles.sender}>Вы</span>
+                  <div className={styles.bubbleOut}>{activeFaq.question}</div>
+                </div>
+                <div className={styles.rowIn}>
+                  <span className={styles.sender}>Поддержка</span>
+                  <div className={styles.bubbleIn}>
+                    {faqAnswerNodes(activeFaq.answer, () => closeSupportChat())}
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
+
+          <QuickFaqChips
+            items={faqItems}
+            activeId={activeFaq?.id ?? null}
+            onPick={pickFaq}
+          />
 
           <div className={styles.footerBar}>
             {channels.some((ch) => ch.channel === "telegram_bot") ? (

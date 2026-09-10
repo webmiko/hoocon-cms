@@ -480,6 +480,13 @@
   box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
 }
 
+.faqLink {
+  color: var(--color-link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
 .bubbleOut {
   background: var(--color-brand);
   color: var(--color-on-brand);
@@ -585,6 +592,66 @@
 
 .hideWidget:hover {
   color: var(--color-text-soft);
+}
+
+.quickFaq {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0.45rem 0.9rem 0.55rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.quickFaqLabel {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.quickFaqList {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.15rem;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.quickFaqList::-webkit-scrollbar {
+  display: none;
+}
+
+.quickFaqChip {
+  appearance: none;
+  flex: 0 0 auto;
+  max-width: min(18rem, 88vw);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-subtle);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+.quickFaqChip:hover,
+.quickFaqChipActive {
+  background: color-mix(in srgb, var(--color-brand) 12%, var(--color-subtle));
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border));
 }
 
 .composer {

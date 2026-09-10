@@ -497,3 +497,25 @@ def get_or_create_messenger_conversation(
             conv.status = ConversationStatus.OPEN
             conv.save(update_fields=["status", "updated_at"])
     return conv
+
+
+CHAT_FAQ_LIMIT = 10
+
+
+def chat_faq_items(*, limit: int = CHAT_FAQ_LIMIT) -> list[dict[str, str | int]]:
+    """Активные FAQ с флагом быстрой кнопки для виджета на сайте."""
+    from supportchat.models import FaqItem
+
+    qs = (
+        FaqItem.objects.filter(is_active=True, show_in_chat=True)
+        .order_by("order", "id")
+        .values("id", "question", "answer")[: max(1, limit)]
+    )
+    return [
+        {
+            "id": int(row["id"]),
+            "question": str(row["question"]),
+            "answer": str(row["answer"]),
+        }
+        for row in qs
+    ]

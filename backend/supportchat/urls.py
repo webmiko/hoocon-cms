@@ -8,10 +8,12 @@ from supportchat.views import (
     ConversationStartView,
     CurrentMessagesView,
     SupportChannelsView,
+    SupportFaqView,
     SupportScheduleView,
 )
 
 urlpatterns = [
+    path("faq/", SupportFaqView.as_view(), name="support-faq"),
     path("schedule/", SupportScheduleView.as_view(), name="support-schedule"),
     path("channels/", SupportChannelsView.as_view(), name="support-channels"),
     path(

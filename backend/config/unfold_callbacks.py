@@ -41,6 +41,14 @@ def perm_view_conversation(request: HttpRequest) -> bool:
     return _can_view_conversations(request)
 
 
+def perm_view_faqitem(request: HttpRequest) -> bool:
+    """Whether the user may see chat FAQ items in the sidebar."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and user.has_perm("supportchat.view_faqitem"),
+    )
+
+
 def perm_view_webpush(request: HttpRequest) -> bool:
     """Whether the user may see Web Push subscriptions in the sidebar."""
     user = getattr(request, "user", None)

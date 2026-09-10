@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.test import Client, override_settings
 
-from supportchat.models import Conversation
+from supportchat.models import Conversation, FaqItem
 from supportchat.schedule import ensure_default_schedule
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -30,6 +30,47 @@ def test_schedule_endpoint_public() -> None:
     assert "is_open_now" in data
     assert data["timezone"] == "Europe/Moscow"
     assert len(data["days"]) == 7
+
+
+@pytest.mark.django_db
+def test_chat_faq_public_only_show_in_chat() -> None:
+    """Публичный FAQ виджета: только is_active + show_in_chat, без auth."""
+    FaqItem.objects.all().delete()
+    FaqItem.objects.create(
+        question="Скрытый",
+        answer="x",
+        order=1,
+        is_active=True,
+        show_in_chat=False,
+    )
+    FaqItem.objects.create(
+        question="Неактивный",
+        answer="y",
+        order=2,
+        is_active=False,
+        show_in_chat=True,
+    )
+    FaqItem.objects.create(
+        question="Fail-safe?",
+        answer="FU / EU",
+        order=3,
+        is_active=True,
+        show_in_chat=True,
+    )
+    FaqItem.objects.create(
+        question="Момент?",
+        answer="M ≈ …",
+        order=0,
+        is_active=True,
+        show_in_chat=True,
+    )
+
+    resp = Client().get("/api/support/faq/")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert [i["question"] for i in items] == ["Момент?", "Fail-safe?"]
+    assert items[0]["answer"] == "M ≈ …"
+    assert set(items[0]) == {"id", "question", "answer"}
 
 
 @pytest.mark.django_db

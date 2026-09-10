@@ -284,6 +284,36 @@ class SupportScheduleInterval(models.Model):
         return f"{self.start_time}–{self.end_time}"
 
 
+class FaqItem(models.Model):
+    """Вопрос-ответ для быстрых кнопок виджета чата на сайте."""
+
+    question: models.CharField = models.CharField("вопрос", max_length=300)
+    answer: models.TextField = models.TextField("ответ")
+    order: models.PositiveIntegerField = models.PositiveIntegerField(
+        "порядок",
+        default=0,
+    )
+    is_active: models.BooleanField = models.BooleanField(
+        "активен",
+        default=True,
+        db_index=True,
+    )
+    show_in_chat: models.BooleanField = models.BooleanField(
+        "быстрая кнопка в чате",
+        default=False,
+        db_index=True,
+        help_text="Показывать вопрос чипом в виджете чата на сайте.",
+    )
+
+    class Meta:
+        verbose_name = "вопрос FAQ"
+        verbose_name_plural = "FAQ чата"
+        ordering = ("order", "id")
+
+    def __str__(self) -> str:
+        return self.question
+
+
 def touch_conversation_message(conversation: Conversation, *, inbound: bool) -> None:
     """Update last_message_at and staff unread counter (atomic unread bump)."""
     from django.db.models import F

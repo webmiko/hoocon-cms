@@ -21,6 +21,7 @@ from supportchat.serializers import (
 from supportchat.services import (
     SupportChatError,
     add_inbound_message,
+    chat_faq_items,
     get_web_conversation,
     start_or_resume_web_conversation,
 )
@@ -166,3 +167,18 @@ class CurrentMessagesView(APIView):
         if auto is not None:
             payload["auto_reply"] = MessageSerializer(auto).data
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class SupportFaqView(APIView):
+    """GET /api/support/faq/ — FAQ-чипы для виджета (публично, только show_in_chat)."""
+
+    permission_classes = (AllowAny,)
+    authentication_classes: list = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "support_faq"
+
+    def get(self, request: Request) -> Response:
+        del request
+        response = Response({"items": chat_faq_items()})
+        response["Cache-Control"] = "public, max-age=60"
+        return response

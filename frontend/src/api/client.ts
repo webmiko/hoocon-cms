@@ -404,6 +404,12 @@ export const api = {
     return apiFetch("/api/support/channels/");
   },
 
+  supportChatFaq(): Promise<{
+    items: Array<{ id: number; question: string; answer: string }>;
+  }> {
+    return apiFetch("/api/support/faq/");
+  },
+
   supportStartConversation(data: {
     display_name?: string;
     contact_email?: string;
