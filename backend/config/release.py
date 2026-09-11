@@ -67,6 +67,15 @@ def display_version(version: str | None = None, *, channel: str | None = None) -
     return f"{major}.{minor}.{patch}"
 
 
+def unfold_environment_badge() -> tuple[str, str]:
+    """Unfold ``UNFOLD['ENVIRONMENT']``: ``(label, type)`` for ``label.html``.
+
+    A plain string breaks the template: ``environment.0`` on ``"v2.0"`` is only
+    the first character.
+    """
+    return (release_label(), "")
+
+
 def release_label(*, with_v: bool = True) -> str:
     """Human-readable release string for Admin / footer / docs.
 

@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
 from config.media_hotlink import build_media_hotlink_hosts
-from config.release import RELEASE_VERSION, release_label
+from config.release import RELEASE_VERSION, unfold_environment_badge
 from config.static_urls import versioned_static
 
 # Load project-root .env; do not call load_dotenv() twice (avoid CWD-anchored
@@ -306,8 +306,8 @@ UNFOLD = {
     "SITE_HEADER": _("Hoocon"),
     "SITE_SUBHEADER": _("Панель управления"),
     "SITE_URL": "/",
-    # Release badge next to branding (e.g. «v0.0.3 beta»).
-    "ENVIRONMENT": release_label(),
+    # Release badge next to branding (e.g. «v0.0.3 beta»). Tuple — not a string.
+    "ENVIRONMENT": unfold_environment_badge(),
     # Distinct Admin PWA / home-screen icons (gray + ADMIN; not the public site).
     "SITE_FAVICONS": [
         {

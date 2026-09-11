@@ -13,6 +13,7 @@ from config.release import (
     display_version,
     package_version,
     release_label,
+    unfold_environment_badge,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +27,13 @@ def test_release_label_ga_format() -> None:
     assert release_label() == f"v{display_version()}"
     assert release_label(with_v=False) == display_version()
     assert release_label() == f"v{RELEASE_VERSION}"
+
+
+def test_unfold_environment_badge_is_full_label_tuple() -> None:
+    """Unfold ENVIRONMENT must be (label, type) — not a bare string."""
+    badge = unfold_environment_badge()
+    assert badge == (release_label(), "")
+    assert len(badge[0]) > 1
 
 
 def test_package_version_pads_two_part() -> None:
