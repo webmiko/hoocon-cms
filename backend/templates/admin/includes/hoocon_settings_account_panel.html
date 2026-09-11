@@ -1,0 +1,74 @@
+{% load i18n %}
+<div class="hoocon-phone-settings__account-panel-user">
+  <span class="hoocon-phone-settings__avatar">{{ hoocon_phone_settings.account_initials }}</span>
+  <div>
+    <p class="hoocon-phone-settings__account-name">{{ hoocon_phone_settings.account_name }}</p>
+    {% if hoocon_phone_settings.account_email %}
+      <p class="hoocon-phone-settings__account-email">{{ hoocon_phone_settings.account_email }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<ul
+  class="hoocon-phone-settings__list hoocon-phone-settings__account-links"
+  aria-label="{% trans 'Действия с учётной записью' %}"
+>
+  <li class="hoocon-phone-settings__item">
+    <a
+      href="{{ hoocon_phone_settings.site_url }}"
+      class="hoocon-phone-settings__row hoocon-phone-settings__row--link"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span class="material-symbols-outlined hoocon-phone-settings__account-link-icon" aria-hidden="true">
+        public
+      </span>
+      <span class="hoocon-phone-settings__row-label">{% trans "Открыть сайт" %}</span>
+      <span class="material-symbols-outlined hoocon-phone-settings__chevron" aria-hidden="true">
+        chevron_right
+      </span>
+    </a>
+  </li>
+  {% if hoocon_phone_settings.profile_url %}
+    <li class="hoocon-phone-settings__item">
+      <a
+        href="{{ hoocon_phone_settings.profile_url }}"
+        class="hoocon-phone-settings__row hoocon-phone-settings__row--link"
+      >
+        <span class="material-symbols-outlined hoocon-phone-settings__account-link-icon" aria-hidden="true">
+          person
+        </span>
+        <span class="hoocon-phone-settings__row-label">{% trans "Профиль учётной записи" %}</span>
+        <span class="material-symbols-outlined hoocon-phone-settings__chevron" aria-hidden="true">
+          chevron_right
+        </span>
+      </a>
+    </li>
+  {% endif %}
+  <li class="hoocon-phone-settings__item">
+    <a
+      href="{{ hoocon_phone_settings.password_change_url }}"
+      class="hoocon-phone-settings__row hoocon-phone-settings__row--link"
+    >
+      <span class="material-symbols-outlined hoocon-phone-settings__account-link-icon" aria-hidden="true">
+        key
+      </span>
+      <span class="hoocon-phone-settings__row-label">{% trans "Изменить пароль" %}</span>
+      <span class="material-symbols-outlined hoocon-phone-settings__chevron" aria-hidden="true">
+        chevron_right
+      </span>
+    </a>
+  </li>
+</ul>
+
+<div class="hoocon-phone-settings__account-theme">
+  {% include "unfold/helpers/theme_switch.html" %}
+</div>
+
+<form method="post" action="{% url 'admin:logout' %}" class="hoocon-phone-settings__logout">
+  {% csrf_token %}
+  <button type="submit">
+    <span class="material-symbols-outlined" aria-hidden="true">logout</span>
+    {% trans "Выйти" %}
+  </button>
+</form>

@@ -5,10 +5,7 @@
         <a
             class="cursor-pointer flex items-center h-[64px] px-6 py-3 hover:text-primary-600 dark:hover:text-primary-400"
             title="{% trans 'All applications' %}"
-            x-on:click="
-                openAllApplications = !openAllApplications;
-                if (openAllApplications && isDesktopNav()) sidebarPeek = true;
-            "
+            x-on:click="openAllApplications = !openAllApplications"
         >
             <span class="material-symbols-outlined md-18 mr-3 shrink-0">
                 apps

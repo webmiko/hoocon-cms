@@ -12,8 +12,15 @@
   --hoocon-page-bg: #f3f4f7;
   --hoocon-glass-border: rgba(30, 30, 40, 0.1);
   --hoocon-quiet: #6f6f6f;
-  --hoocon-radius: 0.875rem;
+  /* Single admin corner scale (cards, groups, Unfold rounded-default). */
+  --hoocon-radius: 0.75rem;
+  --hoocon-radius-sm: 0.5rem;
+  --hoocon-radius-xs: 0.375rem;
+  --hoocon-radius-lg: calc(var(--hoocon-radius) * 1.35);
+  --hoocon-radius-sheet: calc(var(--hoocon-radius) * 1.65);
+  --hoocon-radius-bubble: calc(var(--hoocon-radius) * 1.5);
   --hoocon-radius-pill: 999px;
+  --border-radius: var(--hoocon-radius);
   --hoocon-btn-height: 2.25rem;
   --hoocon-inline-padding: 1.1rem;
   --hoocon-card-pad: 1.15rem 1.2rem 1.25rem;
@@ -21,6 +28,8 @@
   --hoocon-hairline: rgba(30, 30, 40, 0.09);
   --hoocon-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --hoocon-kpi-strip-h: 0.28rem;
+  /* Phone canvas: inset from screen edges (Settings, dash, changelist, account). */
+  --hoocon-phone-edge-inset: 0.5rem;
 }
 
 .dark {
@@ -36,11 +45,56 @@
 }
 
 /* Soft canvas behind Unfold white cards (desktop + phone). */
+body.bg-base-50,
+.dark body.bg-base-50,
+.bg-base-50.hoocon-nav-panel,
+.bg-base-50.hoocon-os27-sidebar-panel,
+.hoocon-desktop-settings-nav.bg-base-50 {
+  background-color: var(--hoocon-page-bg) !important;
+}
+
 #main,
 #main.bg-white,
 .dark #main,
 .dark #main.bg-white {
   background-color: var(--hoocon-page-bg) !important;
+}
+
+/* Unfold rounded-default + native admin controls — same radius as Hoocon cards. */
+.rounded-default,
+fieldset.module,
+#changelist-filter,
+.object-tools a,
+.paginator a,
+.actions select,
+.actions .button,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="password"],
+select,
+textarea {
+  border-radius: var(--hoocon-radius);
+}
+
+/*
+ * Unfold fieldset descriptions (admin/includes/fieldset.html) sit outside the
+ * bordered .form-rows block and ship without px-3; field lines use px-3.
+ */
+#content-main form fieldset.module > div.leading-relaxed.text-subtle,
+#content-main form fieldset.module > .description {
+  padding-inline: 0.75rem;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#content-main form fieldset.module > div.leading-relaxed.text-subtle:first-child,
+#content-main form fieldset.module > .description:first-child {
+  padding-top: 0.75rem;
 }
 
 .hoocon-admin-lead-sticker {
@@ -279,7 +333,7 @@ a.hoocon-leads-stats-link {
   max-width: 40rem;
   padding: 0.85rem 1rem;
   border: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.1));
-  border-radius: 10px;
+  border-radius: var(--hoocon-radius);
   background: color-mix(in srgb, var(--hoocon-surface, #fff) 94%, transparent);
 }
 
@@ -912,8 +966,8 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   content: none;
 }
 
-/* ── Sidebar shell / rail ───────────────────────────────────────────
- * ≥1024: 72px flex spacer + fixed panel (does not scroll with page).
+/* ── Sidebar shell (OS27: full macOS Settings width on desktop) ───
+ * ≥1024: 260px flex spacer + fixed panel (does not scroll with page).
  * <1024: hide until .hoocon-nav-shell--open; panel is fixed overlay.
  */
 @media (max-width: 1023px) {
@@ -942,9 +996,6 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
     display: revert !important;
   }
 
-  .hoocon-nav-shell--open .hoocon-nav-panel.hoocon-sidebar-rail {
-    width: min(300px, 85vw) !important;
-  }
 }
 
 @media (min-width: 1024px) {
@@ -954,9 +1005,9 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
     visibility: visible !important;
     flex-shrink: 0;
     align-self: stretch;
-    width: 72px !important;
-    min-width: 72px !important;
-    max-width: 72px !important;
+    width: var(--os27-sidebar-w, 16.25rem) !important;
+    min-width: var(--os27-sidebar-w, 16.25rem) !important;
+    max-width: var(--os27-sidebar-w, 16.25rem) !important;
     min-height: 100vh;
   }
 
@@ -965,22 +1016,17 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: 50;
+    z-index: 100;
     overflow-x: hidden;
     overflow-y: auto;
+    width: var(--os27-sidebar-w, 16.25rem) !important;
+    pointer-events: auto;
   }
 
-  .hoocon-nav-panel.hoocon-sidebar-rail {
-    width: 72px !important;
-  }
-
-  .hoocon-nav-panel.hoocon-sidebar-peek {
-    z-index: 70;
-    box-shadow: 8px 0 24px rgba(20, 20, 30, 0.12);
-  }
-
-  .dark .hoocon-nav-panel.hoocon-sidebar-peek {
-    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.35);
+  .hoocon-nav-panel .hoocon-desktop-settings-sidebar,
+  .hoocon-nav-panel .hoocon-desktop-settings-sidebar a,
+  .hoocon-nav-panel .hoocon-desktop-settings-sidebar button {
+    pointer-events: auto;
   }
 
   .hoocon-mobile-nav-toggle {
@@ -1472,8 +1518,29 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked {
   border-spacing: 0;
 }
 
+/* Changelist card grid canvas — neutral gray, not Unfold bg-base-50 blue tint.
+ * Rows keep --hoocon-surface so cards stay lighter/darker than the canvas. */
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+#changelist table#result_list.hoocon-admin-card-table.hoocon-admin-table-stacked {
+  background-color: var(--hoocon-page-bg) !important;
+}
+
+#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody {
+  background-color: transparent !important;
+}
+
+#changelist #changelist-form .results > .overflow-x-auto {
+  background-color: var(--hoocon-page-bg) !important;
+}
+
 #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
 #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
+  display: grid !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  align-items: start;
   padding-left: 0 !important;
   padding-right: 0 !important;
   width: 100% !important;
@@ -1495,12 +1562,13 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0;
+  gap: 0.15rem;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   margin-bottom: 0.85rem;
-  padding: 0.85rem 1.05rem 0.95rem;
+  padding: 0.95rem 1.1rem 1.05rem;
+  min-height: 4.5rem;
   border: 1px solid var(--hoocon-glass-border);
   border-radius: var(--hoocon-radius);
   background: var(--hoocon-surface);
@@ -1509,10 +1577,489 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
   cursor: pointer;
 }
 
-/* Leads board: tablet/desktop wall — full content width, 2rem gutters.
+/* Card hierarchy — title / meta / badges (all stacked changelists). */
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-status_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-status_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-unread_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-unread_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-channel_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-channel_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-rfq_thread_badge,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-rfq_thread_badge {
+  order: -2;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0 0.35rem !important;
+  border-bottom: none;
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-name,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-name,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-party_label,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-party_label,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-email_id,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-email_id,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-title,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-title,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-subject,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-subject,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-sku_code,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-sku_code,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-question,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-question,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-from_path,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-from_path {
+  order: -1;
+  grid-template-columns: 1fr !important;
+  padding-top: 0.15rem !important;
+  padding-bottom: 0.15rem !important;
+  border-bottom: none;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* FAQ changelist: ответ редактируется в той же карточке, под вопросом. */
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-answer,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-answer {
+  order: 0;
+  grid-template-columns: 1fr !important;
+  align-items: stretch !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.55rem !important;
+  border-bottom: 1px solid var(--hoocon-hairline);
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-question
+  input[type="text"],
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-question
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+  width: 100%;
+  max-width: 100%;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-answer
+  textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-name::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-name::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-party_label::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-party_label::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-email_id::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-email_id::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-title::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-title::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-subject::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-subject::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-sku_code::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-sku_code::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-question::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-question::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-from_path::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-from_path::before {
+  display: none;
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-company,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-company,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-contact_email,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-contact_email,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-created_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-created_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-last_message_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-last_message_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-updated_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-updated_at,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-assignee,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-assignee,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-processed_by,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-processed_by,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-lead_type,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-lead_type,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-channel,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-channel,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-category,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-category,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-parent,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-parent {
+  grid-template-columns: 1fr !important;
+  padding-top: 0.1rem !important;
+  padding-bottom: 0.1rem !important;
+  border-bottom: none;
+  font-size: 0.8125rem;
+  color: var(--hoocon-quiet);
+}
+
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-company::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-company::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-contact_email::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-contact_email::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-created_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-created_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-last_message_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-last_message_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-updated_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-updated_at::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-assignee::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-assignee::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-processed_by::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-processed_by::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-lead_type::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-lead_type::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-channel::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-channel::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-category::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-category::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  td.field-parent::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-parent::before {
+  display: none;
+}
+
+/* Stacked changelist cards: 2 columns from tablet width (640px+).
  * Unfold puts each result row in its own <tbody>; grid the <table> and use
  * display:contents on tbodies so all <tr> participate in one grid.
- * Narrow content (~720–1100px): 2 equal tracks; wide: 3.
+ * Phones (≤639px) stay single-column cards. */
+@media (min-width: 640px) {
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.15rem 1.25rem;
+    align-items: stretch;
+    justify-content: stretch;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0.85rem 1rem 1.25rem;
+    box-sizing: border-box;
+  }
+
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody {
+    display: contents;
+  }
+
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody
+    tr {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin-bottom: 0;
+    height: 100%;
+    min-height: 100%;
+  }
+
+  /* Pin «Открыть» to the card footer so buttons share one baseline in a row. */
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody
+    tr
+    > td.field-open_link,
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody
+    tr
+    > th.field-open_link,
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody
+    tr
+    > td.field-open_lead,
+  body:not([data-hoocon-lead-view="kanban"]) #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+    tbody
+    tr
+    > th.field-open_lead {
+    margin-top: auto;
+    padding-top: 0.75rem !important;
+  }
+}
+
+/* Leads board: lift Unfold container cap + 2rem gutters on tablet/desktop.
  * Root cause of “not full width”: Unfold #content.container mx-auto caps at
  * Tailwind container breakpoints (e.g. 768px at ~953px viewport). */
 @media (min-width: 768px) {
@@ -1571,91 +2118,8 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     table.hoocon-admin-card-table.hoocon-admin-table-stacked,
   body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked {
-    display: grid !important;
-    /* Fill the row: equal tracks, no 24rem cap. */
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.15rem 1.25rem;
-    align-items: stretch;
-    justify-content: stretch;
-    width: 100%;
-    max-width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    /* Horizontal inset so cards don't flush against the results frame. */
-    padding: 0.85rem 1.5rem 1.5rem;
-    box-sizing: border-box;
-  }
-
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody {
-    display: contents;
-  }
-
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr {
-    display: flex !important;
-    flex-direction: column;
-    width: 100%;
-    max-width: none;
-    min-width: 0;
-    margin-bottom: 0;
-    height: 100%;
-    min-height: 100%;
-  }
-
-  /* Pin «Открыть» to the card footer so buttons share one baseline in a row. */
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > td.field-open_link,
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > th.field-open_link,
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > td.field-open_lead,
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > th.field-open_lead,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > td.field-open_link,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > th.field-open_link,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > td.field-open_lead,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked
-    tbody
-    tr
-    > th.field-open_lead {
-    margin-top: auto;
-    padding-top: 0.75rem !important;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
 
   body.hoocon-lead-board #changelist
@@ -1698,16 +2162,6 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr {
     tr.hoocon-lead-wall-heading
     td::before {
     display: none !important;
-  }
-}
-
-/* Wide desktop: third equal track across the full content width. */
-@media (min-width: 1280px) {
-  body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
-  body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1902,14 +2356,18 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr:has(.action-se
 
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th {
-  display: grid;
+  display: grid !important;
   grid-template-columns: minmax(5.5rem, 32%) minmax(0, 1fr);
   column-gap: 0.75rem;
-  align-items: baseline;
+  align-items: start;
   box-sizing: border-box;
   width: 100% !important;
   max-width: none !important;
   min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
   padding: 0.45rem 0;
   border: none;
   border-bottom: 1px solid var(--hoocon-hairline);
@@ -1934,6 +2392,21 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th::before {
   line-height: 1.35;
   color: var(--hoocon-quiet);
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Boolean columns (is_superuser, is_staff, …): icon in the value column. */
+table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td[class*="field-is_"] {
+  align-items: center;
+}
+
+table.hoocon-admin-card-table.hoocon-admin-table-stacked
+  tbody
+  td[class*="field-is_"]
+  .material-symbols-outlined {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td.action-checkbox {
@@ -1981,30 +2454,169 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th.hoocon-admin-c
   padding-top: 0.55rem !important;
 }
 
-#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge::before,
-#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge::before,
-#changelist table.hoocon-admin-table-stacked tbody td.field-unread_badge::before,
-#changelist table.hoocon-admin-table-stacked tbody th.field-unread_badge::before,
-#changelist table.hoocon-admin-table-stacked tbody td.field-channel_badge::before,
-#changelist table.hoocon-admin-table-stacked tbody th.field-channel_badge::before {
-  display: none;
-}
-
-#changelist table.hoocon-admin-table-stacked tbody td.field-status_badge,
-#changelist table.hoocon-admin-table-stacked tbody th.field-status_badge,
-#changelist table.hoocon-admin-table-stacked tbody td.field-unread_badge,
-#changelist table.hoocon-admin-table-stacked tbody th.field-unread_badge {
-  order: -1;
-  margin-bottom: 0.15rem;
-}
-
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
   overflow-wrap: break-word;
   word-break: normal;
 }
 
-.inline-group .tabular {
+.inline-group .tabular,
+[data-inline-type="tabular"] .tabular.inline-related,
+.tabular.inline-related {
   overflow-x: clip;
   max-width: 100%;
   min-width: 0;
+}
+
+.inline-group .tabular table,
+[data-inline-type="tabular"] table.formset,
+.tabular.inline-related table.formset {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Unfold tabular inlines on phones — vertical cards; do not use changelist card-stack JS. */
+@media (max-width: 767px) {
+  body.change-form .formset-wrapper.overflow-x-auto {
+    overflow-x: clip !important;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body.change-form [data-inline-type="tabular"] fieldset.module {
+    overflow-x: clip;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    table-layout: auto;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset thead {
+    display: none;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset > tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset > tfoot tr {
+    display: block;
+    width: 100%;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset > tfoot td {
+    display: block;
+    width: 100%;
+    padding: 0.65rem 0.75rem 0.85rem;
+    box-sizing: border-box;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset tbody.form-group {
+    display: block;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 0.85rem;
+    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+    border-radius: var(--hoocon-radius);
+    background: var(--hoocon-surface, #fff);
+    overflow: hidden;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset tbody.form-group > tr.hidden {
+    display: none !important;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset tbody.form-group > tr:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  body.change-form [data-inline-type="tabular"] table.formset tbody.form-group > tr > td {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--hoocon-hairline);
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td:last-child {
+    border-bottom: none;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td
+    select,
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td
+    textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Delete overlay — only when the row is marked for removal. */
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr.form-row:has(.delete:checked)
+    + tr.form-delete {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr.form-row:has(.delete:checked)
+    + tr.form-delete
+    > td {
+    display: flex !important;
+    flex: 1 1 auto;
+    align-items: stretch;
+    width: 100% !important;
+    min-height: 100%;
+    padding: 0 !important;
+    border: none !important;
+    position: relative;
+  }
 }

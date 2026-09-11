@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from django.apps import apps
 from django.contrib import admin
@@ -10,10 +12,12 @@ from django.test import Client
 
 from config.ru_ui_lint import (
     PROJECT_APP_LABELS,
+    find_unexpected_english_in_html,
     iter_admin_ui_strings,
     iter_model_ui_strings,
     unexpected_latin_tokens,
 )
+from supportchat.models import FaqItem
 
 User = get_user_model()
 
@@ -134,3 +138,100 @@ def test_project_ui_strings_have_no_unexpected_english() -> None:
                 failures.append(f"{where}: {bad!r} in {text!r}")
 
     assert not failures, "English leftovers in RU Admin UI:\n" + "\n".join(failures)
+
+
+@pytest.mark.django_db
+def test_faqitem_changelist_has_no_english_ui_strings() -> None:
+    """FAQ changelist labels and hints must stay Russian (no Inbox/Select record)."""
+    admin_user = User.objects.create_superuser(
+        username="admin-faq-ru",
+        email="admin-faq-ru@example.com",
+        password="password12",
+    )
+    FaqItem.objects.create(
+        question="SA вместо DA?",
+        answer="Серия SA — для регулирования; DA — для полного открытия/закрытия.",
+        order=1,
+        is_active=True,
+        show_in_chat=True,
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/supportchat/faqitem/").content.decode()
+
+    assert "SA вместо DA?" in html
+    assert "частые вопросы чата" in html or "вопрос чата" in html
+
+    start = html.find('id="changelist-form"')
+    end = html.find("</form>", start)
+    changelist_html = html[start:end] if start >= 0 and end > start else html
+
+    html_failures = find_unexpected_english_in_html(changelist_html)
+    assert not html_failures, "English UI on FAQ changelist:\n" + "\n".join(html_failures)
+
+    for english in (
+        ">Inbox<",
+        "Select record",
+        "Type to search",
+        "Search apps and models",
+        "Select action",
+        ">Add FAQ",
+        ">Delete selected",
+    ):
+        assert english not in changelist_html
+
+    assert 'class="field-answer' in changelist_html
+    assert 'name="form-0-answer"' in changelist_html
+    assert "Серия SA — для регулирования" in changelist_html
+
+
+@pytest.mark.django_db
+def test_faqitem_changelist_saves_answer_inline() -> None:
+    """FAQ answer can be edited on the changelist without opening change form."""
+    admin_user = User.objects.create_superuser(
+        username="admin-faq-inline",
+        email="admin-faq-inline@example.com",
+        password="password12",
+    )
+    item = FaqItem.objects.create(
+        question="SA вместо DA?",
+        answer="Старый ответ",
+        order=1,
+        is_active=True,
+        show_in_chat=True,
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/supportchat/faqitem/").content.decode()
+    assert 'name="form-0-answer"' in html
+
+    response = client.post(
+        "/admin/supportchat/faqitem/",
+        {
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-id": str(item.pk),
+            "form-0-order": "1",
+            "form-0-question": "SA вместо DA?",
+            "form-0-answer": "Новый ответ в карточке",
+            "form-0-is_active": "on",
+            "form-0-show_in_chat": "on",
+            "_save": "Сохранить",
+        },
+        follow=True,
+    )
+    assert response.status_code == 200
+    item.refresh_from_db()
+    assert item.answer == "Новый ответ в карточке"
+
+
+def test_tables_js_overrides_prefilled_select_record_label() -> None:
+    """Stacked cards must replace Unfold's English checkbox data-label."""
+    js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
+    assert 'const CHECKBOX_LABEL = "Выберите запись"' in js
+    assert 'cell.setAttribute("data-label", CHECKBOX_LABEL)' in js
+    checkbox_block = js[js.find("function applyRowLabels") : js.find("function markBlankCells")]
+    assert 'cell.classList.contains("action-checkbox")' in checkbox_block
+    assert checkbox_block.index("action-checkbox") < checkbox_block.index("hasAttribute")

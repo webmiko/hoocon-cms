@@ -1,6 +1,8 @@
 {% extends "admin/base.html" %}
 {% load i18n static %}
 
+{% block bodyclass %}{{ block.super }} hoocon-os27{% endblock %}
+
 {% block title %}
   {% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_("Django site admin") }}
 {% endblock %}
@@ -45,5 +47,6 @@
 
 {% block footer %}
   {{ block.super }}
+  {% include "admin/includes/hoocon_settings_drill_templates.html" %}
   {% include "admin/includes/hoocon_phone_shell.html" %}
 {% endblock %}

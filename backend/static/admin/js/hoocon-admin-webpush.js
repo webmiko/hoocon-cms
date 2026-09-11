@@ -42,8 +42,8 @@
       btn.setAttribute(
         "aria-label",
         on
-          ? "Push включён (заявки и чат) — нажмите, чтобы выключить"
-          : "Push выключен — нажмите, чтобы включить заявки и чат",
+          ? "Уведомления включены (заявки и чат) — нажмите, чтобы выключить"
+          : "Уведомления выключены — нажмите, чтобы включить заявки и чат",
       );
     });
   }
@@ -70,7 +70,7 @@
   async function refreshState() {
     if (!getToggles().length) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setToggleState("error", "Браузер не поддерживает Web Push");
+      setToggleState("error", "Браузер не поддерживает веб-уведомления");
       getToggles().forEach(function (btn) {
         btn.disabled = true;
       });
@@ -82,19 +82,19 @@
       const granted =
         typeof Notification !== "undefined" && Notification.permission === "granted";
       if (sub && granted) {
-        setToggleState("on", "Push включён: заявки и чат");
+        setToggleState("on", "Уведомления включены: заявки и чат");
       } else {
-        setToggleState("off", "Push выключен");
+        setToggleState("off", "Уведомления выключены");
       }
     } catch (_err) {
-      setToggleState("off", "Push выключен");
+      setToggleState("off", "Уведомления выключены");
     }
   }
 
   async function enablePush() {
-    setToggleState("pending", "Подключаем Push…");
+    setToggleState("pending", "Подключаем уведомления…");
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setToggleState("error", "Браузер не поддерживает Web Push");
+      setToggleState("error", "Браузер не поддерживает веб-уведомления");
       return;
     }
     try {
@@ -135,15 +135,15 @@
         setToggleState("error", "Ошибка подписки (" + resp.status + ")");
         return;
       }
-      setToggleState("on", "Push включён: заявки и чат");
+      setToggleState("on", "Уведомления включены: заявки и чат");
     } catch (err) {
-      setToggleState("error", "Не удалось включить Push");
+      setToggleState("error", "Не удалось включить уведомления");
       console.warn(err);
     }
   }
 
   async function disablePush() {
-    setToggleState("pending", "Отключаем Push…");
+    setToggleState("pending", "Отключаем уведомления…");
     try {
       const reg = await ensureRegistration();
       const sub = await reg.pushManager.getSubscription();
@@ -163,9 +163,9 @@
         });
         await sub.unsubscribe();
       }
-      setToggleState("off", "Push выключен");
+      setToggleState("off", "Уведомления выключены");
     } catch (err) {
-      setToggleState("error", "Не удалось выключить Push");
+      setToggleState("error", "Не удалось выключить уведомления");
       console.warn(err);
     }
   }

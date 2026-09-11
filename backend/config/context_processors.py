@@ -92,3 +92,11 @@ def new_leads_sticker(request: HttpRequest) -> dict[str, object]:
         )
 
     return out
+
+
+def phone_settings_nav(request: HttpRequest) -> dict[str, object]:
+    """iOS Settings-style grouped navigation for Admin phone hub."""
+    from config.phone_settings_nav import build_phone_settings_nav
+
+    nav = build_phone_settings_nav(request)
+    return {"hoocon_phone_settings": nav}

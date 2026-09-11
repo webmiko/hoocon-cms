@@ -1,0 +1,27 @@
+{% load i18n %}
+{% if hoocon_phone_settings %}
+<section
+  id="hoocon-desktop-settings-account"
+  class="hoocon-desktop-settings-account"
+  data-hoocon-desktop-settings-account
+  hidden
+  aria-label="{% trans 'Учётная запись' %}"
+>
+  <header class="hoocon-desktop-settings-detail__hero hoocon-desktop-settings-account__hero">
+    <span
+      class="hoocon-desktop-settings-detail__hero-icon hoocon-desktop-settings-account__hero-icon"
+      aria-hidden="true"
+      style="--settings-icon-bg: #007aff; --settings-icon-fg: #ffffff;"
+    >
+      <span class="material-symbols-outlined">person</span>
+    </span>
+    <h1 class="hoocon-desktop-settings-detail__hero-title">
+      {% trans "Учётная запись" %}
+    </h1>
+  </header>
+
+  <div class="hoocon-desktop-settings-account__panel hoocon-os27-group">
+    {% include "admin/includes/hoocon_settings_account_panel.html" %}
+  </div>
+</section>
+{% endif %}

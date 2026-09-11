@@ -1,0 +1,29 @@
+{% load i18n %}
+{% if hoocon_phone_settings %}
+  {% for group in hoocon_phone_settings.groups %}
+    {% if group.items %}
+      <template id="hoocon-settings-group-{{ group.id }}">
+        {% for item in group.items %}
+          <li class="hoocon-phone-settings__item">
+            <a href="{{ item.url }}" class="hoocon-phone-settings__row hoocon-phone-settings__row--link">
+              <span class="hoocon-phone-settings__row-label">{{ item.title }}</span>
+              <span class="material-symbols-outlined hoocon-phone-settings__chevron" aria-hidden="true">
+                chevron_right
+              </span>
+            </a>
+            {% if item.add_url %}
+              <a
+                href="{{ item.add_url }}"
+                class="hoocon-phone-settings__add"
+                title="{% trans 'Добавить' %}"
+                aria-label="{% trans 'Добавить' %}"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>
+              </a>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </template>
+    {% endif %}
+  {% endfor %}
+{% endif %}

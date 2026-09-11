@@ -81,11 +81,13 @@ def test_lead_board_css_phone_header_hamburger() -> None:
 
 
 def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
-    """Wall grid: lift Unfold #content.container cap; 2rem gutters; 2→3 cols."""
+    """Wall grid: 2 cols from 640px; lift Unfold #content.container cap; 2rem gutters."""
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    assert "@media (min-width: 640px)" in css
     assert "repeat(2, minmax(0, 1fr))" in css
-    assert "repeat(3, minmax(0, 1fr))" in css
-    assert "@media (min-width: 1280px)" in css
+    wall_grid = css.split("@media (min-width: 640px)")[1].split("/* Leads board:")[0]
+    assert "display: grid !important" in wall_grid
+    assert "repeat(3, minmax(0, 1fr))" not in wall_grid
     assert "justify-content: stretch" in css
     assert "align-items: stretch" in css
     assert "display: contents" in css
@@ -97,8 +99,8 @@ def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
     assert "max-width: none !important" in css
     assert "padding-left: 2rem !important" in css
     assert "padding-right: 2rem !important" in css
-    # Wall table keeps cards inset from the results frame edges.
-    assert "padding: 0.85rem 1.5rem 1.5rem" in css
+    # Wall table keeps extra horizontal inset on lead board (768+).
+    assert "padding-left: 1.5rem" in css
     open_pin = css[css.index("Pin «Открыть»") : css.index("hoocon-lead-wall-heading")]
     assert "field-open_link" in open_pin
     assert "margin-top: auto" in open_pin

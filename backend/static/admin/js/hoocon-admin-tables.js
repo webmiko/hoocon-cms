@@ -13,7 +13,7 @@
     "table.hoocon-lead-stats__table",
   ];
 
-  const CHECKBOX_LABEL = "Выбрать";
+  const CHECKBOX_LABEL = "Выберите запись";
   /* Phones always use cards; wider screens stack when the table cannot fit. */
   const STACK_MQ = "(max-width: 767px)";
   const STACKED_CLASS = "hoocon-admin-table-stacked";
@@ -58,15 +58,16 @@
 
   function applyRowLabels(row, labels) {
     Array.from(row.cells).forEach((cell, index) => {
+      if (cell.classList.contains("action-checkbox")) {
+        cell.setAttribute("data-label", CHECKBOX_LABEL);
+        return;
+      }
+
       if (cell.hasAttribute("data-label")) {
         return;
       }
 
-      let label = labels[index] || "";
-      if (cell.classList.contains("action-checkbox")) {
-        label = CHECKBOX_LABEL;
-      }
-
+      const label = labels[index] || "";
       if (label) {
         cell.setAttribute("data-label", label);
       }
@@ -93,6 +94,10 @@
         cell.classList.add(BLANK_CLASS);
       }
     });
+  }
+
+  function isUnfoldTabularInline(table) {
+    return Boolean(table.closest("[data-inline-type='tabular']"));
   }
 
   function fitContainer(table) {
@@ -172,8 +177,8 @@
   /**
    * Stack into cards when the full table cannot fit the container width.
    *
-   * Lead changelist always uses cards so tablet/desktop can show a multi-column
-   * grid (CSS) instead of a stretched single-column sheet or a wide table.
+   * All changelists use cards so tablet/desktop can show the shared 2-column
+   * grid (CSS) instead of a wide table or a stretched single-column sheet.
    *
    * @param {HTMLTableElement} table
    */
@@ -183,13 +188,9 @@
       return;
     }
 
-    const forceLeadCards =
-      table.closest("#changelist") &&
-      (document.body.classList.contains("hoocon-lead-board") ||
-        (document.body.classList.contains("app-leads") &&
-          document.body.classList.contains("model-lead")));
+    const isChangelist = Boolean(table.closest("#changelist"));
 
-    if (forceLeadCards || window.matchMedia(STACK_MQ).matches) {
+    if (isChangelist || window.matchMedia(STACK_MQ).matches) {
       table.classList.add(STACKED_CLASS);
       return;
     }
@@ -240,6 +241,13 @@
   }
 
   function processTable(table) {
+    /* Unfold tabular inlines use their own phone layout (CSS); card-stack breaks delete rows. */
+    if (isUnfoldTabularInline(table)) {
+      table.classList.remove(STACKED_CLASS);
+      table.classList.remove(CARD_CLASS);
+      return;
+    }
+
     const labels = headerLabels(table);
     if (!labels.length) {
       return;

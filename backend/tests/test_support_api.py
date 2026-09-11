@@ -314,6 +314,8 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert page.status_code == 200
     html = page.content.decode()
     assert 'name="reply_body"' in html
+    assert 'placeholder="Напишите ответ…"' in html
+    assert "Shift+Enter" not in html
     assert 'id="hoocon-messenger"' in html
     assert "hoocon-messenger__send" in html
     assert "hoocon-messenger__back" in html

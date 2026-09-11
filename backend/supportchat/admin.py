@@ -179,7 +179,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             label,
         )
 
-    @admin.display(description="Inbox", ordering="staff_unread_count")
+    @admin.display(description="Непрочитано", ordering="staff_unread_count")
     def unread_badge(self, obj: Conversation) -> str:
         if obj.staff_unread_count <= 0:
             return format_html(
@@ -451,9 +451,9 @@ class SupportScheduleAdmin(ModelAdmin):
 class FaqItemAdmin(ModelAdmin):
     """Вопросы-ответы для быстрых кнопок виджета чата на сайте."""
 
-    list_display = ("order", "question", "is_active", "show_in_chat")
+    list_display = ("question", "order", "answer", "is_active", "show_in_chat")
     list_display_links = ("question",)
-    list_editable = ("order", "is_active", "show_in_chat")
+    list_editable = ("order", "answer", "is_active", "show_in_chat")
     list_filter = ("is_active", "show_in_chat")
     search_fields = ("question", "answer")
     ordering = ("order", "id")

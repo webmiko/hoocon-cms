@@ -122,6 +122,12 @@ def _versioned_static(relative: str) -> str:
     return url
 
 
+def os27_css(request: HttpRequest) -> str:
+    """OS27 layout layer: macOS Settings desktop · iOS Settings mobile."""
+    del request
+    return _versioned_static("admin/css/hoocon-os27.css")
+
+
 def unfold_extras_css(request: HttpRequest) -> str:
     """URL of thin CSS for Unfold shell (cache-busted)."""
     del request
@@ -150,6 +156,18 @@ def admin_phone_shell_js(request: HttpRequest) -> str:
     """Bottom tabs + more sheet for Admin phone (cache-busted)."""
     del request
     return _versioned_static("admin/js/hoocon-admin-phone-shell.js")
+
+
+def admin_phone_settings_js(request: HttpRequest) -> str:
+    """iOS Settings-style phone hub drill-down (cache-busted)."""
+    del request
+    return _versioned_static("admin/js/hoocon-admin-phone-settings.js")
+
+
+def admin_desktop_settings_js(request: HttpRequest) -> str:
+    """macOS Settings-style desktop sidebar + content drill-down (cache-busted)."""
+    del request
+    return _versioned_static("admin/js/hoocon-admin-desktop-settings.js")
 
 
 def _can_view_leads(request: HttpRequest) -> bool:

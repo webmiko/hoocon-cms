@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 from unfold.admin import ModelAdmin
@@ -16,6 +17,7 @@ from leads.admin import LeadAdmin
 User = get_user_model()
 
 _EXTRAS_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
+_OS27_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-os27.css"
 
 
 @pytest.mark.django_db
@@ -33,7 +35,12 @@ def test_admin_index_uses_unfold_and_hoocon_branding() -> None:
     assert response.status_code == 200
     html = response.content.decode()
     assert "unfold" in html.lower()
+    assert "hoocon-os27.css" in html
     assert "hoocon-unfold-extras.css" in html
+    assert "hoocon-os27" in html
+    extras_pos = html.index("hoocon-unfold-extras.css")
+    os27_pos = html.index("hoocon-os27.css")
+    assert os27_pos > extras_pos, "OS27 must load after unfold-extras to win cascade"
     assert "hoocon-admin-leads-sticker.js" in html
     assert "hoocon-admin-tables.js" in html
     assert "hoocon-admin.css" not in html
@@ -42,6 +49,59 @@ def test_admin_index_uses_unfold_and_hoocon_branding() -> None:
     assert 'href="/"' in html
     # Sidebar navigation includes leads entry (badge when count > 0).
     assert "/admin/leads/lead/" in html
+
+
+def test_sidebar_active_item_keeps_default_text_color() -> None:
+    """Selected sidebar rows tint background only — label color must not switch to accent."""
+    os27_css = _OS27_CSS.read_text(encoding="utf-8")
+    app_list = (Path(__file__).resolve().parents[1] / "templates/unfold/helpers/app_list.html").read_text(
+        encoding="utf-8"
+    )
+
+    active_row_rule = os27_css.split("body.hoocon-os27 .hoocon-desktop-settings-sidebar__row.is-active")[1].split("}")[
+        0
+    ]
+    assert "background: var(--os27-accent-soft)" in active_row_rule
+    assert "color: var(--os27-accent)" not in active_row_rule
+
+    nav_active_rule = os27_css.split('body.hoocon-os27 #nav-sidebar-apps a[class*="bg-primary"]')[1].split("}")[0]
+    assert "background: var(--os27-accent-soft)" in nav_active_rule
+    assert "color: var(--os27-accent)" not in nav_active_rule
+
+    assert "color: inherit !important" in os27_css
+    assert "selection tint on background only" in os27_css
+
+    assert "item.active %}bg-base-100 font-semibold dark:bg-white/[.06] active" in app_list
+    assert "text-primary-600" not in app_list.split("item.active %}")[1].split('"')[0]
+
+
+def test_unfold_border_radius_matches_hoocon_scale() -> None:
+    """Unfold rounded-default uses the same 0.75rem corner scale as Hoocon tokens."""
+    assert settings.UNFOLD["BORDER_RADIUS"] == "0.75rem"
+
+
+def test_unfold_base_colors_are_neutral_gray() -> None:
+    """Unfold base scale must not use default blue-tinted oklch backgrounds."""
+    base = settings.UNFOLD["COLORS"]["base"]
+    assert base["50"] == "#f3f4f7"
+    assert base["950"] == "#0f0f10"
+    assert all(not str(value).startswith("oklch") for value in base.values())
+
+
+@pytest.mark.django_db
+def test_admin_injects_neutral_base_theme_colors() -> None:
+    """Inline Unfold theme colors expose neutral base-50 for body/sidebar canvas."""
+    admin_user = User.objects.create_superuser(
+        username="admin-base-colors",
+        email="admin-base-colors@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/").content.decode()
+    assert "--color-base-50: rgb(243, 244, 247)" in html
+    assert "--border-radius: 0.75rem" in html
+    assert "oklch(98.5% .002 247" not in html
 
 
 @pytest.mark.django_db
@@ -142,6 +202,29 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "hoocon-shadow-soft" in phone_css
     assert "hoocon-phone-header-menu" in phone_css
     assert "overflow-x: clip" in phone_css
+    assert "body.hoocon-phone-ready.change-form #content-main > form" in phone_css
+    assert "--hoocon-phone-header-h:" in phone_css
+    assert "body.hoocon-phone-ready.change-form .hoocon-admin-header" in phone_css
+    assert (
+        "position: fixed !important"
+        in phone_css.split("body.hoocon-phone-ready.change-form .hoocon-admin-header")[1].split("}")[0]
+    )
+    scroll_margin_selector = (
+        "body.hoocon-phone-ready.change-form fieldset.module,\n"
+        '  body.hoocon-phone-ready.change-form [data-inline-type="tabular"]'
+    )
+    assert scroll_margin_selector in phone_css
+    assert "scroll-margin-top:" in phone_css
+    assert "min-width: 0 !important" in phone_css.split("Fieldset defaults to min-width:min-content")[1].split("}")[0]
+    assert "body.hoocon-phone-ready.change-form fieldset.module .form-rows" in phone_css
+    related_widget_block = phone_css.split("Autocomplete FK: native <select> is clipped/absolutely positioned")[
+        1
+    ].split("/* Unfold bulk-actions")[0]
+    assert ".select2-container" in related_widget_block
+    assert "flex: 1 1 0" in related_widget_block
+    assert '[x-ref^="relatedWidgetWrapper"]' in related_widget_block
+    assert "margin-left: 0" in related_widget_block
+    assert "select:not(.select2-hidden-accessible)" in related_widget_block
     assert "hoocon-lead-board #changelist" in phone_css
     # Shell itself is the fixed chrome (tabs are relative inside it).
     assert "body.hoocon-phone-ready .hoocon-phone-shell" in phone_css
@@ -149,11 +232,14 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "position: fixed" in shell_rule
     assert "bottom: 0" in shell_rule
     assert "--hoocon-phone-viewport-inset" in shell_rule
+    assert "padding-inline: var(--hoocon-phone-edge-inset" in shell_rule
     assert "padding-bottom: calc(" in shell_rule
     assert "z-index: 100" in shell_rule
     tabs_rule = phone_css.split(".hoocon-phone-tabs")[1].split("}")[0]
     assert "position: relative" in tabs_rule
     assert "position: fixed" not in tabs_rule
+    assert "width: 100%" in tabs_rule
+    assert "max-width: 100%" in tabs_rule
     assert "border-radius: 999px" in tabs_rule
     assert "background: rgba(255, 255, 255, 0.72)" in tabs_rule
     assert "blur(80px)" in tabs_rule
@@ -215,7 +301,32 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
         encoding="utf-8"
     )
     assert "hoocon-inbox-avatar" in messenger_css
+    assert "body.hoocon-support-inbox" in messenger_css
+    assert "hoocon-inbox-avatar--web" in messenger_css
+    assert "background: var(--hm-brand" in messenger_css
+    assert "box-shadow: none" in messenger_css.split(".hoocon-messenger__send {")[1].split("}")[0]
     assert "hoocon-messenger__back" in messenger_css
+    assert ".hoocon-messenger__composer textarea::placeholder" in messenger_css
+    assert (
+        "font-size: 0.8125rem"
+        in messenger_css.split(".hoocon-messenger__composer textarea::placeholder")[1].split("}")[0]
+    )
+    phone_textarea_rule = phone_css.split(
+        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer textarea"
+    )[1].split("}")[0]
+    assert "height: var(--hoocon-phone-tap)" in phone_textarea_rule
+    assert "min-height: var(--hoocon-phone-tap)" in phone_textarea_rule
+    phone_avatar_rule = phone_css.split("body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__avatar")[
+        1
+    ].split("}")[0]
+    assert "width: var(--hoocon-phone-tap)" in phone_avatar_rule
+    assert "background: var(--hm-brand" in phone_avatar_rule
+    phone_send_rule = phone_css.split(
+        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send {\n"
+        "    min-width: var(--hoocon-phone-tap)"
+    )[1].split("}")[0]
+    assert "box-shadow: none" in phone_send_rule
+    assert "background: var(--hm-brand" in phone_send_rule
 
 
 @pytest.mark.django_db
@@ -251,6 +362,53 @@ def test_lead_and_sku_admins_use_unfold_modeladmin() -> None:
     assert issubclass(SKUAdmin, ModelAdmin)
 
 
+def test_changelist_actions_bar_offsets_full_sidebar() -> None:
+    """Bulk actions bar must not sit under the 260px desktop sidebar (was 72px)."""
+    template = (Path(__file__).resolve().parents[1] / "templates/unfold/helpers/change_list_actions.html").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-changelist-actions-bar" in template
+    assert "nav-sidebar" in template
+    assert "? 72 :" not in template
+
+
+def test_os27_css_covers_settings_layout() -> None:
+    """OS27 layer ships macOS/iOS Settings tokens and grouped surfaces."""
+    css = _OS27_CSS.read_text(encoding="utf-8")
+    assert "--os27-accent: var(--hoocon-primary" in css
+    assert "--os27-sidebar-w: 16.25rem" in css
+    assert "--os27-group-radius: var(--hoocon-radius)" in css
+    assert "border-radius: var(--hoocon-radius-sm)" in css
+    assert "--os27-bg: #f2f2f7" in css
+    assert "html.dark" in css
+    dark_tokens = css.split(".dark,\nhtml.dark {", 1)[1].split("}", 1)[0]
+    assert "--os27-accent: var(--hoocon-primary-on-dark" in dark_tokens
+    assert "--os27-accent-hover:" in dark_tokens
+    assert "body.hoocon-os27.hoocon-phone-ready.change-form fieldset.module" in css
+    assert (
+        "overflow: visible"
+        in css.split("body.hoocon-os27.hoocon-phone-ready.change-form fieldset.module")[1].split("}")[0]
+    )
+    assert "body.hoocon-os27 .hoocon-dash__quick" in css
+    assert "hoocon-os27-sidebar-panel" in css
+    assert "box-shadow: none !important" in css
+    assert "@media (min-width: 1024px)" in css
+    assert "@media (max-width: 767px)" in css
+    assert "table.hoocon-admin-table-stacked:not(.hoocon-admin-card-table)" in css
+    assert ":has(table.hoocon-admin-card-table)" in css
+    assert "hoocon-dash + .hoocon-dash__apps" in css
+    assert "hoocon-desktop-settings-sidebar" in css
+    assert "hoocon-desktop-settings-detail__hero" in css
+    assert "hoocon-desktop-settings-app" in css
+    assert "hoocon-changelist-actions-bar" in css
+    assert "width: 50vw" in css
+    assert "left: auto !important" in css
+    assert "right: 0 !important" in css
+    assert "body.hoocon-os27.change-form #page" in css
+    assert "overflow-x: clip" in css
+    assert "body.hoocon-os27.change-form .selector" in css
+
+
 def test_unfold_extras_css_covers_lead_ui() -> None:
     """Extras CSS keeps lead sticker, status tags, open button, stats layout."""
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
@@ -258,7 +416,20 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "--hoocon-primary-hover: #b01010" in css
     assert "--hoocon-primary-on-dark: #f87171" in css
     assert "--hoocon-page-bg: #f3f4f7" in css
-    assert "--hoocon-radius: 0.875rem" in css
+    assert "--hoocon-phone-edge-inset: 0.5rem" in css
+    assert "body.bg-base-50" in css
+    assert "--hoocon-radius: 0.75rem" in css
+    fieldset_desc = css.split("fieldset.module > div.leading-relaxed.text-subtle")[1].split("}")[0]
+    assert "padding-inline: 0.75rem" in fieldset_desc
+    assert "overflow-wrap: anywhere" in fieldset_desc
+    assert '[data-inline-type="tabular"] .tabular.inline-related' in css
+    assert 'body.change-form [data-inline-type="tabular"] table.formset tbody.form-group' in css
+    assert "tr.form-row:has(.delete:checked)" in css
+    assert "tbody.form-group > tr.hidden" in css
+    assert "--hoocon-radius-sm:" in css
+    assert "--hoocon-radius-lg:" in css
+    assert "--border-radius: var(--hoocon-radius)" in css
+    assert ".rounded-default" in css
     assert "--hoocon-card-pad:" in css
     assert "--hoocon-kpi-strip-h:" in css
     assert ".hoocon-lead-stats__card::after" in css
@@ -273,7 +444,7 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "a.hoocon-admin-lead-open" in css
     assert ".hoocon-lead-stats" in css
     assert ".hoocon-admin-breadcrumbs" in css
-    assert ".hoocon-sidebar-rail" in css
+    assert "--os27-sidebar-w" in css or "16.25rem" in css
     assert ".hoocon-sidebar-label" in css
     assert ".hoocon-nav-shell" in css
     assert ".hoocon-admin-header" in css
@@ -286,13 +457,15 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-table-stacked" in css
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
+    assert "Changelist card grid canvas" in css
+    assert "#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked" in css
+    assert "background-color: var(--hoocon-page-bg) !important" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
     assert "body.hoocon-lead-board" in css
     assert "body.hoocon-lead-board #content.container" in css
     assert "max-width: none !important" in css
+    assert "@media (min-width: 640px)" in css
     assert "repeat(2, minmax(0, 1fr))" in css
-    assert "repeat(3, minmax(0, 1fr))" in css
-    assert "@media (min-width: 1280px)" in css
     assert "padding-left: 2rem !important" in css
     assert "justify-content: stretch" in css
     assert "display: contents" in css
@@ -303,10 +476,23 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert ".hoocon-lead-view-toggle" in css
     assert "hoocon-lead-wall-heading" in css
     assert "box-shadow: var(--hoocon-shadow-soft)" in css
+    assert "/* Card hierarchy — title / meta / badges" in css
+    assert "td.field-email_id" in css
+    assert "td.field-sku_code" in css
+    assert "td.field-answer" in css
+    assert "min-height: 5.5rem" in css
+    assert "order: -2" in css
+    assert "font-weight: 700" in css
+    assert "body:not(.hoocon-support-inbox) #changelist" in css
+    assert "height: auto !important" in css
+    assert "display: grid !important" in css
+    assert 'td[class*="field-is_"]' in css
 
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
     assert "table.hoocon-lead-stats__table" in js
-    assert 'classList.contains("hoocon-lead-board")' in js
+    assert "isUnfoldTabularInline" in js
+    assert "[data-inline-type='tabular'] table.formset" not in js.split("CARD_TABLE_SELECTORS")[1].split("];")[0]
+    assert 'table.closest("#changelist")' in js
     assert "hoocon-lead-kanban__cards" in js
     assert "hoocon-phone-filter-chips" in js
 
@@ -337,27 +523,31 @@ def test_admin_header_is_sticky_to_top() -> None:
 
 
 @pytest.mark.django_db
-def test_admin_sidebar_keeps_icon_rail_when_collapsed() -> None:
-    """Collapsed desktop sidebar stays as a narrow icon rail (not fully hidden)."""
+def test_admin_sidebar_os27_full_width_settings_layout() -> None:
+    """Desktop sidebar uses macOS 27 Settings full-width panel (not icon rail)."""
     admin_user = User.objects.create_superuser(
-        username="admin-rail",
-        email="admin-rail@example.com",
+        username="admin-os27-sidebar",
+        email="admin-os27-sidebar@example.com",
         password="password12",
     )
     client = Client()
     client.force_login(admin_user)
     html = client.get("/admin/").content.decode()
-    assert "hoocon-sidebar-rail" in html or "hoocon-sidebar-peek" in html
+    assert "hoocon-os27-sidebar" in html
+    assert "hoocon-os27-sidebar-panel" in html
     assert "hoocon-nav-shell" in html
     assert "hoocon-nav-panel" in html
-    assert "railWidth" in html
+    assert "sidebarWidth: 260" in html
     assert "panelWidth" in html
-    assert "sidebarPeek" in html
-    assert "hoocon-sidebar-expand" not in html
     assert "isDesktopNav" in html
+    assert "sidebarPeek" not in html
+    assert "railWidth" not in html
     assert "hoocon-sidebar-shortcut" in html
     assert "Закрыть меню" in html
-    assert 'title="Панель"' in html or 'title="Панель"' in html
+    assert "data-hoocon-desktop-settings-sidebar" in html
+    assert "data-hoocon-desktop-settings-select" in html
+    assert "hoocon-admin-desktop-settings.js" in html
+    assert "data-hoocon-desktop-settings-detail" in html
 
 
 @pytest.mark.django_db
@@ -379,6 +569,8 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "hoocon-admin-webpush.js" in html
     assert "hoocon-admin-tables.js" in html
     assert "hoocon-admin-phone-shell.js" in html
+    assert "hoocon-admin-phone-settings.js" in html
+    assert "hoocon-os27.css" in html
     assert "hoocon-admin-phone.css" in html
     assert 'name="theme-color" content="#5a626c"' in html
 

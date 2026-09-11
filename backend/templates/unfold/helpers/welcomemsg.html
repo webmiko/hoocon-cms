@@ -6,11 +6,21 @@
         <a
             href="{% url 'admin:index' %}"
             class="hoocon-phone-home-link cursor-pointer flex flex-row items-center"
-            title="{% trans 'Панель' %}"
-            aria-label="{% trans 'Панель' %}"
+            title="{% trans 'Настройки' %}"
+            aria-label="{% trans 'Настройки' %}"
         >
             <span class="material-symbols-outlined" aria-hidden="true">home</span>
         </a>
+
+        <button
+            type="button"
+            class="hoocon-phone-settings-back"
+            data-hoocon-settings-header-back
+            hidden
+        >
+            <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+            <span data-hoocon-settings-header-back-label>{% trans "Настройки" %}</span>
+        </button>
 
         <span class="hoocon-mobile-nav-toggle cursor-pointer flex flex-row items-center">
             <span class="material-symbols-outlined" x-on:click="sidebarToggle()">

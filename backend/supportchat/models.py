@@ -46,10 +46,10 @@ class Conversation(models.Model):
         db_index=True,
     )
     external_user_id: models.CharField = models.CharField(
-        "внешний id / session",
+        "внешний идентификатор",
         max_length=128,
         db_index=True,
-        help_text="Telegram chat id, VK user id, или web support_session_id.",
+        help_text=("Идентификатор в канале: Telegram, VK или сессия виджета на сайте."),
     )
     display_name: models.CharField = models.CharField(
         "имя",
@@ -58,7 +58,7 @@ class Conversation(models.Model):
         default="",
     )
     contact_email: models.EmailField = models.EmailField(
-        "email",
+        "электронная почта",
         blank=True,
         default="",
     )
@@ -100,7 +100,7 @@ class Conversation(models.Model):
         db_index=True,
     )
     staff_unread_count: models.PositiveIntegerField = models.PositiveIntegerField(
-        "непрочитано (staff)",
+        "непрочитано менеджером",
         default=0,
     )
     created_at = models.DateTimeField("создан", auto_now_add=True)
@@ -144,7 +144,7 @@ class Message(models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text="Идемпотентность webhook (Telegram message_id и т.п.).",
+        help_text="Для идемпотентности вебхука (идентификатор сообщения Telegram и т.п.).",
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -152,14 +152,14 @@ class Message(models.Model):
         null=True,
         blank=True,
         related_name="support_messages",
-        verbose_name="автор (staff)",
+        verbose_name="автор (менеджер)",
     )
     outside_hours: models.BooleanField = models.BooleanField(
         "вне рабочих часов",
         default=False,
     )
     raw_payload = models.JSONField(
-        "сырой payload",
+        "сырые данные",
         null=True,
         blank=True,
         default=None,
@@ -306,8 +306,8 @@ class FaqItem(models.Model):
     )
 
     class Meta:
-        verbose_name = "вопрос FAQ"
-        verbose_name_plural = "FAQ чата"
+        verbose_name = "вопрос чата"
+        verbose_name_plural = "частые вопросы чата"
         ordering = ("order", "id")
 
     def __str__(self) -> str:

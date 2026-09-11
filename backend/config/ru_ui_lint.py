@@ -6,8 +6,10 @@ env keys, example paths/articles) is allowlisted or stripped before check.
 
 from __future__ import annotations
 
+import inspect
 import re
 from collections.abc import Iterable
+from html import unescape
 from typing import Any
 
 # Project apps whose Admin labels must be Russian.
@@ -23,6 +25,7 @@ PROJECT_APP_LABELS: frozenset[str] = frozenset(
         "search",
         "sitesettings",
         "social",
+        "supportchat",
     },
 )
 
@@ -55,6 +58,7 @@ LATIN_UI_ALLOWLIST: frozenset[str] = frozenset(
         "google",
         "analytics",
         "hoocon",
+        "cms",
         "tilda",
         "botfather",
     },
@@ -152,3 +156,56 @@ def iter_admin_ui_strings(model_admin: Any, model: type[Any]) -> Iterable[tuple[
                 f"admin:{label}.fieldset[{index}].description",
                 str(description),
             )
+
+    app_label = model._meta.app_label
+    for name, member in inspect.getmembers(model_admin):
+        if name.startswith("_") or not callable(member):
+            continue
+        origin_module = ""
+        for cls in type(model_admin).mro():
+            if name in cls.__dict__:
+                origin_module = cls.__module__ or ""
+                break
+        if not (origin_module.startswith("config.") or origin_module.startswith(f"{app_label}.")):
+            continue
+        for attr in ("short_description", "description"):
+            text = getattr(member, attr, None)
+            if text and isinstance(text, str):
+                yield f"admin:{label}.{name}.{attr}", text
+                break
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def extract_html_text_chunks(html: str) -> list[str]:
+    """Return visible text fragments from Admin HTML (labels, buttons, headers)."""
+    chunks: list[str] = []
+    for match in re.finditer(
+        r"<(th|label|button|option|title|h[1-6])(?:\s[^>]*)?>([^<]*)</\1>",
+        html,
+        flags=re.IGNORECASE,
+    ):
+        text = unescape(_WS_RE.sub(" ", match.group(2)).strip())
+        if text:
+            chunks.append(text)
+    for match in re.finditer(
+        r'(?:placeholder|title|aria-label)="([^"]+)"',
+        html,
+        flags=re.IGNORECASE,
+    ):
+        text = unescape(_WS_RE.sub(" ", match.group(1)).strip())
+        if text:
+            chunks.append(text)
+    return chunks
+
+
+def find_unexpected_english_in_html(html: str) -> list[str]:
+    """Lint rendered Admin HTML for leftover English UI copy."""
+    failures: list[str] = []
+    for chunk in extract_html_text_chunks(html):
+        bad = unexpected_latin_tokens(chunk)
+        if bad:
+            failures.append(f"{bad!r} in {chunk!r}")
+    return failures

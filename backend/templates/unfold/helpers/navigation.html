@@ -1,15 +1,23 @@
 {% load i18n unfold %}
 
-<nav id="nav-sidebar-inner" class="bg-base-50 flex flex-col min-h-screen dark:text-font-default-dark dark:bg-base-950/20 {% element_classes 'navigation_inner' %}">
+<nav
+    id="nav-sidebar-inner"
+    class="bg-base-50 flex flex-col min-h-screen dark:text-font-default-dark dark:bg-base-950/20 {% if hoocon_phone_settings %}hoocon-desktop-settings-nav{% endif %} {% element_classes 'navigation_inner' %}"
+>
     {% include "unfold/helpers/navigation_header.html" %}
 
     {% include "unfold/helpers/search.html" %}
 
-    {% if sidebar_navigation|length > 0 %}
+    {% if hoocon_phone_settings %}
+        {% include "admin/includes/hoocon_settings_sidebar.html" %}
+    {% elif sidebar_navigation|length > 0 %}
         {% include "unfold/helpers/app_list.html" with app_list=available_apps %}
     {% else %}
         {% include "admin/app_list.html" with app_list=available_apps show_changelinks=False %}
     {% endif %}
 
-    {% include "unfold/helpers/navigation_user.html" %}
+    {% if not hoocon_phone_settings %}
+        {% include "unfold/helpers/navigation_user.html" %}
+    {% endif %}
+
 </nav>

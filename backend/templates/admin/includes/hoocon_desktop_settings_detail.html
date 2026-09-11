@@ -1,0 +1,29 @@
+{% load i18n %}
+{% if hoocon_phone_settings %}
+<section
+  id="hoocon-desktop-settings-detail"
+  class="hoocon-desktop-settings-detail"
+  data-hoocon-desktop-settings-detail
+  hidden
+  aria-label="{% trans 'Раздел' %}"
+>
+  <header class="hoocon-desktop-settings-detail__hero" data-hoocon-desktop-settings-hero>
+    <span
+      class="hoocon-desktop-settings-detail__hero-icon"
+      data-hoocon-desktop-settings-hero-icon
+      aria-hidden="true"
+    >
+      <span class="material-symbols-outlined" data-hoocon-desktop-settings-hero-symbol>folder</span>
+    </span>
+    <h1 class="hoocon-desktop-settings-detail__hero-title" data-hoocon-desktop-settings-hero-title>
+      {% trans "Раздел" %}
+    </h1>
+    <p class="hoocon-desktop-settings-detail__hero-desc" data-hoocon-desktop-settings-hero-desc hidden></p>
+  </header>
+
+  <ul
+    class="hoocon-phone-settings__list hoocon-os27-group hoocon-desktop-settings-detail__models"
+    data-hoocon-desktop-settings-models
+  ></ul>
+</section>
+{% endif %}

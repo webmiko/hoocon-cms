@@ -209,6 +209,7 @@ TEMPLATES = [
                 "config.context_processors.static_version",
                 "config.context_processors.release_info",
                 "config.context_processors.new_leads_sticker",
+                "config.context_processors.phone_settings_nav",
             ],
         },
     },
@@ -249,6 +250,7 @@ LANGUAGE_CODE = "ru-ru"
 TIME_ZONE = "Europe/Moscow"
 USE_I18N = True
 USE_TZ = True
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 # After staff auth (incl. Admin Email OTP) land in Admin, not Django's
 # default /accounts/profile/ (SPA shell → empty page on :8000).
@@ -283,7 +285,23 @@ _UNFOLD_PRIMARY = {
     "950": "#2c0404",
 }
 
+# Neutral gray scale (Unfold default base uses blue-tinted oklch ~hue 260).
+_UNFOLD_BASE = {
+    "50": "#f3f4f7",
+    "100": "#ececf1",
+    "200": "#e2e3e8",
+    "300": "#cfd0d6",
+    "400": "#a8aab4",
+    "500": "#6f7179",
+    "600": "#56585f",
+    "700": "#3f4147",
+    "800": "#2a2b30",
+    "900": "#17181c",
+    "950": "#0f0f10",
+}
+
 UNFOLD = {
+    "BORDER_RADIUS": "0.75rem",
     "SITE_TITLE": _("HOOCON CMS"),
     "SITE_HEADER": _("Hoocon"),
     "SITE_SUBHEADER": _("Панель управления"),
@@ -317,16 +335,20 @@ UNFOLD = {
         },
     ],
     "COLORS": {
+        "base": _UNFOLD_BASE,
         "primary": _UNFOLD_PRIMARY,
     },
     "STYLES": [
         "config.unfold_callbacks.unfold_extras_css",
         "config.unfold_callbacks.admin_phone_css",
+        "config.unfold_callbacks.os27_css",
     ],
     "SCRIPTS": [
         "config.unfold_callbacks.admin_live_badges_js",
         "config.unfold_callbacks.admin_tables_js",
         "config.unfold_callbacks.admin_phone_shell_js",
+        "config.unfold_callbacks.admin_phone_settings_js",
+        "config.unfold_callbacks.admin_desktop_settings_js",
     ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     "SIDEBAR": {
@@ -352,8 +374,8 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_lead",
                     },
                     {
-                        "title": _("Поддержка"),
-                        "icon": "forum",
+                        "title": _("Сообщения"),
+                        "icon": "chat",
                         "link": reverse_lazy(
                             "admin:supportchat_conversation_changelist",
                         ),
@@ -371,7 +393,7 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_faqitem",
                     },
                     {
-                        "title": _("Web Push"),
+                        "title": _("Веб-уведомления"),
                         "icon": "notifications",
                         "link": reverse_lazy(
                             "admin:webpush_pushsubscription_changelist",

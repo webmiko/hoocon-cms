@@ -1,0 +1,53 @@
+# Russian UI strings missing from django-unfold / django.contrib.admin catalogs.
+msgid ""
+msgstr ""
+"Project-Id-Version: hoocon-cms\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
+"(n%100>=11 && n%100<=14) ? 2 : 3);\n"
+
+msgid "Select record"
+msgstr "Выберите запись"
+
+msgid "Select action"
+msgstr "Выберите действие"
+
+msgid "Select action to run"
+msgstr "Выберите действие для выполнения"
+
+msgid "Type to search"
+msgstr "Введите для поиска"
+
+msgid "Run the selected action"
+msgstr "Выполнить выбранное действие"
+
+msgid "Select all rows"
+msgstr "Выбрать все строки"
+
+msgid "Select all objects on this page for an action"
+msgstr "Выбрать все объекты на странице для действия"
+
+msgid "Expand row"
+msgstr "Развернуть строку"
+
+msgid "Filters"
+msgstr "Фильтры"
+
+msgid "Apply Filters"
+msgstr "Применить фильтры"
+
+msgid "Hide counts"
+msgstr "Скрыть количество"
+
+msgid "Show counts"
+msgstr "Показать количество"
+
+msgid "Clear all filters"
+msgstr "Сбросить все фильтры"
+
+msgid "Search apps and models..."
+msgstr "Поиск приложений и моделей…"

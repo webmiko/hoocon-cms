@@ -477,7 +477,7 @@ def get_or_create_messenger_conversation(
     """Messenger thread keyed by channel + external user id."""
     ext = (external_user_id or "").strip()
     if not ext:
-        raise SupportChatError("Пустой external_user_id")
+        raise SupportChatError("Пустой внешний идентификатор")
     with transaction.atomic():
         conv, created = Conversation.objects.get_or_create(
             channel=channel,

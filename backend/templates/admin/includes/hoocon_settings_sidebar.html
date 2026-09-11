@@ -1,0 +1,139 @@
+{% load i18n %}
+{% if hoocon_phone_settings %}
+<div class="hoocon-desktop-settings-sidebar" data-hoocon-desktop-settings-sidebar>
+  <a
+    href="{{ hoocon_phone_settings.account_page_url }}"
+    class="hoocon-desktop-settings-sidebar__account hoocon-desktop-settings-sidebar__row"
+    data-hoocon-desktop-settings-select="account"
+    data-hoocon-desktop-settings-title="{% trans 'Учётная запись' %}"
+    data-hoocon-desktop-settings-icon="person"
+    data-hoocon-desktop-settings-icon-bg="#007aff"
+    data-hoocon-desktop-settings-icon-fg="#ffffff"
+    data-hoocon-desktop-settings-description=""
+  >
+    <span class="hoocon-phone-settings__avatar" aria-hidden="true">
+      {{ hoocon_phone_settings.account_initials }}
+    </span>
+    <span class="hoocon-desktop-settings-sidebar__account-text">
+      <span class="hoocon-phone-settings__account-name">
+        {{ hoocon_phone_settings.account_name }}
+      </span>
+      {% if hoocon_phone_settings.account_email %}
+        <span class="hoocon-phone-settings__account-email">
+          {{ hoocon_phone_settings.account_email }}
+        </span>
+      {% endif %}
+    </span>
+    <span class="material-symbols-outlined hoocon-phone-settings__chevron" aria-hidden="true">
+      chevron_right
+    </span>
+  </a>
+
+  <div class="hoocon-desktop-settings-sidebar__sections">
+    {% for section in hoocon_phone_settings.sections %}
+      <section class="hoocon-desktop-settings-sidebar__section">
+        {% if section.label %}
+          <h2 class="hoocon-phone-settings__section-label">{{ section.label }}</h2>
+        {% endif %}
+        <ul class="hoocon-desktop-settings-sidebar__list">
+          {% for row in section.rows %}
+            <li>
+              {% if row.action == "dashboard" %}
+                <a
+                  href="{{ row.url }}"
+                  class="hoocon-phone-settings__row hoocon-phone-settings__row--dashboard hoocon-desktop-settings-sidebar__row"
+                  data-hoocon-desktop-settings-select="home"
+                  data-hoocon-desktop-settings-title="{{ row.title }}"
+                  data-hoocon-desktop-settings-icon="{{ row.icon }}"
+                  data-hoocon-desktop-settings-icon-bg="{{ row.icon_bg }}"
+                  data-hoocon-desktop-settings-icon-fg="{{ row.icon_fg }}"
+                  data-hoocon-desktop-settings-description="{{ row.description }}"
+                >
+                  <span
+                    class="hoocon-phone-settings__icon-tile"
+                    style="--settings-icon-bg: {{ row.icon_bg }}; --settings-icon-fg: {{ row.icon_fg }};"
+                    aria-hidden="true"
+                  >
+                    <span class="material-symbols-outlined">{{ row.icon }}</span>
+                  </span>
+                  <span class="hoocon-phone-settings__row-text">
+                    <span class="hoocon-phone-settings__row-label">{{ row.title }}</span>
+                    {% if row.subtitle %}
+                      <span class="hoocon-phone-settings__row-sub">{{ row.subtitle }}</span>
+                    {% endif %}
+                  </span>
+                </a>
+              {% elif row.action == "link" %}
+                <a
+                  href="{{ row.url }}"
+                  class="hoocon-phone-settings__row hoocon-desktop-settings-sidebar__row"
+                  data-hoocon-desktop-settings-select="{{ row.id }}"
+                  data-hoocon-desktop-settings-title="{{ row.title }}"
+                  data-hoocon-desktop-settings-icon="{{ row.icon }}"
+                  data-hoocon-desktop-settings-icon-bg="{{ row.icon_bg }}"
+                  data-hoocon-desktop-settings-icon-fg="{{ row.icon_fg }}"
+                  data-hoocon-desktop-settings-description="{{ row.description }}"
+                >
+                  <span
+                    class="hoocon-phone-settings__icon-tile"
+                    style="--settings-icon-bg: {{ row.icon_bg }}; --settings-icon-fg: {{ row.icon_fg }};"
+                    aria-hidden="true"
+                  >
+                    <span class="material-symbols-outlined">{{ row.icon }}</span>
+                  </span>
+                  <span class="hoocon-phone-settings__row-text">
+                    <span class="hoocon-phone-settings__row-label">{{ row.title }}</span>
+                    {% if row.subtitle %}
+                      <span class="hoocon-phone-settings__row-sub">{{ row.subtitle }}</span>
+                    {% endif %}
+                  </span>
+                  {% if row.badge %}
+                    <span
+                      class="hoocon-phone-settings__badge"
+                      {% if row.id == "supportchat-messages" %}data-hoocon-phone-support-badge{% endif %}
+                    >{{ row.badge }}</span>
+                  {% elif row.id == "supportchat-messages" %}
+                    <span
+                      class="hoocon-phone-settings__badge"
+                      data-hoocon-phone-support-badge
+                      hidden
+                    >0</span>
+                  {% endif %}
+                </a>
+              {% else %}
+                <a
+                  href="{{ row.url }}"
+                  class="hoocon-phone-settings__row hoocon-desktop-settings-sidebar__row"
+                  data-hoocon-desktop-settings-select="{{ row.id }}"
+                  data-hoocon-desktop-settings-title="{{ row.title }}"
+                  data-hoocon-desktop-settings-icon="{{ row.icon }}"
+                  data-hoocon-desktop-settings-icon-bg="{{ row.icon_bg }}"
+                  data-hoocon-desktop-settings-icon-fg="{{ row.icon_fg }}"
+                  data-hoocon-desktop-settings-description="{{ row.description }}"
+                >
+                  <span
+                    class="hoocon-phone-settings__icon-tile"
+                    style="--settings-icon-bg: {{ row.icon_bg }}; --settings-icon-fg: {{ row.icon_fg }};"
+                    aria-hidden="true"
+                  >
+                    <span class="material-symbols-outlined">{{ row.icon }}</span>
+                  </span>
+                  <span class="hoocon-phone-settings__row-text">
+                    <span class="hoocon-phone-settings__row-label">{{ row.title }}</span>
+                    {% if row.subtitle %}
+                      <span class="hoocon-phone-settings__row-sub">{{ row.subtitle }}</span>
+                    {% endif %}
+                  </span>
+                  {% if row.badge %}
+                    <span class="hoocon-phone-settings__badge">{{ row.badge }}</span>
+                  {% endif %}
+                </a>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
