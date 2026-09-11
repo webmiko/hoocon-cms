@@ -101,6 +101,17 @@
           {% trans "Закрыть" %}
         </button>
       </div>
+      <div
+        class="hoocon-phone-more__page-actions-wrap"
+        data-hoocon-phone-more-page-actions-wrap
+        hidden
+      >
+        <p class="hoocon-phone-more__section-label">{% trans "На этой странице" %}</p>
+        <ul
+          class="hoocon-phone-more__list hoocon-phone-more__page-actions"
+          data-hoocon-phone-more-page-actions
+        ></ul>
+      </div>
       <ul class="hoocon-phone-more__list">
         <li>
           <a href="{% url 'admin:index' %}">

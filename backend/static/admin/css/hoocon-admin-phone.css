@@ -365,9 +365,7 @@
     overflow-x: clip;
   }
 
-  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open),
-  body.hoocon-phone-ready
-    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) {
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) {
     /* Dropdown hangs below the bar — clip would hide it under the page body. */
     overflow: visible;
     /* Above #main content and bottom tabs (100); PWA standalone stacking. */
@@ -376,14 +374,13 @@
 
   body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .container,
   body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) #header-inner,
-  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .hoocon-header-userlinks,
-  body.hoocon-phone-ready
-    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) .container,
-  body.hoocon-phone-ready
-    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) #header-inner,
-  body.hoocon-phone-ready
-    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) .hoocon-header-userlinks {
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .hoocon-header-userlinks {
     overflow: visible;
+  }
+
+  /* Unfold action_list moves into the bottom «Ещё» sheet on phone (JS). */
+  body.hoocon-phone-ready [data-hoocon-phone-action-list] {
+    display: none !important;
   }
 
   body.hoocon-phone-ready .hoocon-header-userlinks {
@@ -456,18 +453,6 @@
     right: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
     left: auto;
     z-index: 136;
-  }
-
-  /* Unfold action_list (more_horiz): max-lg:absolute top-16 paints under #main in PWA. */
-  body.hoocon-phone-ready .hoocon-header-userlinks > div > ul.bg-white.max-lg\:flex {
-    position: fixed !important;
-    top: calc(var(--hoocon-phone-header-h) + 0.25rem);
-    right: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
-    left: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
-    z-index: 136;
-    width: auto;
-    max-width: none;
-    margin-inline: 0;
   }
 
   body.hoocon-phone-ready .hoocon-phone-header-menu__list {
@@ -754,6 +739,63 @@ html.dark .hoocon-phone-more__sheet,
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
+}
+
+.hoocon-phone-more__section-label {
+  margin: 0 0 0.35rem;
+  padding: 0 0.35rem;
+  color: var(--hoocon-quiet, #5a626c);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hoocon-phone-more__page-actions-wrap {
+  margin-bottom: 0.5rem;
+}
+
+.hoocon-phone-more__page-actions > li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.hoocon-phone-more__page-actions > li > a {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.35rem;
+  border: none;
+  border-bottom: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.08));
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hoocon-phone-more__page-actions > li:last-child > a {
+  border-bottom: none;
+}
+
+.hoocon-phone-more__page-actions .hoocon-admin-push-tool,
+.hoocon-phone-more__page-actions > li.hoocon-admin-push-tool {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid var(--hoocon-hairline, rgba(30, 30, 40, 0.08));
+}
+
+.hoocon-phone-more__page-actions .hoocon-admin-push-toggle {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.hoocon-phone-more__page-actions .material-symbols-outlined {
+  color: var(--hoocon-quiet, #5a626c);
 }
 
 .hoocon-phone-more__close {

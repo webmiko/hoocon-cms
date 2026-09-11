@@ -113,6 +113,10 @@ def test_client_change_form_lists_leads_inline(client, django_user_model) -> Non
     assert "Заявка А" in html
     assert "Заявка Б" in html
     assert "заявки клиента" in html.lower() or "Заявки" in html
+    # Unfold action_list (e.g. История) — phone shell relocates into «Ещё» via JS.
+    assert "data-hoocon-phone-action-list" in html
+    assert "/history/" in html
+    assert "История" in html
 
 
 @pytest.mark.django_db

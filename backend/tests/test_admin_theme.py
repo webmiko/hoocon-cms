@@ -199,6 +199,8 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "data-hoocon-phone-more-open" in html
     assert 'id="hoocon-phone-more"' in html
     assert "hoocon-phone-more__handle" in html
+    assert "data-hoocon-phone-more-page-actions" in html
+    assert "hoocon-phone-more__page-actions-wrap" in html
     assert "hoocon-phone-tab__icon" in html
     assert 'name="apple-mobile-web-app-capable" content="yes"' in html
     assert "viewport-fit=cover" in html
@@ -304,6 +306,11 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "hoocon-phone-ready" in phone_js
     assert "max-width: 767px" in phone_js
     assert "relocateHeaderTools" in phone_js
+    assert "relocateActionList" in phone_js
+    assert "data-hoocon-phone-page-action-from" in phone_js
+    assert 'movePageAction(child, "header-tools", mount)' in phone_js
+    assert "data-hoocon-phone-more-page-actions" in phone_js
+    assert "hoocon-phone-more__page-actions" in phone_css
     assert "data-hoocon-phone-header-menu" in phone_js
     assert "shell.parentElement !== document.body" in phone_js
     assert "document.body.appendChild(shell)" in phone_js

@@ -1,6 +1,6 @@
 /**
  * Admin phone shell: activate ≤767px, more sheet, select-mode, tab active state,
- * header hamburger for overflowing object-tools.
+ * page actions (Unfold action_list + object-tools) into the bottom «Ещё» sheet.
  */
 (function () {
   "use strict";
@@ -125,11 +125,77 @@
     }
   }
 
+  function actionListRoot() {
+    return document.querySelector("[data-hoocon-phone-action-list]");
+  }
+
+  function actionListUl() {
+    var root = actionListRoot();
+    return root ? root.querySelector("ul.bg-white") : null;
+  }
+
+  function pageActionsMount() {
+    return document.querySelector("[data-hoocon-phone-more-page-actions]");
+  }
+
+  function pageActionsWrap() {
+    return document.querySelector("[data-hoocon-phone-more-page-actions-wrap]");
+  }
+
+  var PAGE_ACTION_FROM = "data-hoocon-phone-page-action-from";
+
+  function syncPageActionsVisibility() {
+    var mount = pageActionsMount();
+    var wrap = pageActionsWrap();
+    if (!mount || !wrap) return;
+    if (mount.children.length) {
+      wrap.removeAttribute("hidden");
+    } else {
+      wrap.setAttribute("hidden", "");
+    }
+  }
+
+  function movePageAction(node, from, mount) {
+    node.setAttribute(PAGE_ACTION_FROM, from);
+    mount.appendChild(node);
+  }
+
+  function restorePageActionsFrom(from, target) {
+    var mount = pageActionsMount();
+    if (!mount || !target) return;
+    Array.prototype.slice.call(mount.children).forEach(function (child) {
+      if (child.getAttribute(PAGE_ACTION_FROM) !== from) return;
+      child.removeAttribute(PAGE_ACTION_FROM);
+      target.appendChild(child);
+    });
+  }
+
+  function hideHeaderMenuShell() {
+    var root = headerMenuRoot();
+    if (!root) return;
+    root.setAttribute("hidden", "");
+    closeHeaderMenu();
+  }
+
+  function relocateActionList(toPhone) {
+    var ul = actionListUl();
+    var mount = pageActionsMount();
+    if (!ul || !mount) return;
+
+    if (toPhone) {
+      while (ul.firstElementChild) {
+        movePageAction(ul.firstElementChild, "action-list", mount);
+      }
+    } else {
+      restorePageActionsFrom("action-list", ul);
+    }
+    syncPageActionsVisibility();
+  }
+
   function relocateHeaderTools(toPhone) {
     var source = headerToolsSource();
-    var list = headerMenuList();
-    var root = headerMenuRoot();
-    if (!source || !list || !root) return;
+    var mount = pageActionsMount();
+    if (!source || !mount) return;
 
     if (toPhone) {
       Array.prototype.slice.call(source.children).forEach(function (child) {
@@ -138,26 +204,19 @@
           child.setAttribute("hidden", "");
           return;
         }
-        list.appendChild(child);
+        movePageAction(child, "header-tools", mount);
       });
-      if (list.children.length) {
-        root.removeAttribute("hidden");
-      } else {
-        root.setAttribute("hidden", "");
-        closeHeaderMenu();
-      }
+      hideHeaderMenuShell();
     } else {
-      Array.prototype.slice.call(list.children).forEach(function (child) {
-        source.appendChild(child);
-      });
+      restorePageActionsFrom("header-tools", source);
       Array.prototype.slice.call(source.querySelectorAll(".hoocon-lead-view-tool[hidden]")).forEach(
         function (child) {
           child.removeAttribute("hidden");
         },
       );
-      root.setAttribute("hidden", "");
-      closeHeaderMenu();
+      hideHeaderMenuShell();
     }
+    syncPageActionsVisibility();
   }
 
   function setReady(on) {
@@ -172,6 +231,7 @@
       }
     }
     relocateHeaderTools(on);
+    relocateActionList(on);
   }
 
   function normalizeAdminPath(path) {

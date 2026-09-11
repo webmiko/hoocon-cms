@@ -76,21 +76,20 @@ def test_lead_board_css_phone_header_hamburger() -> None:
     )[1].split("body.hoocon-phone-ready .hoocon-phone-header-menu__list")[0]
     assert "position: fixed" in open_panel_rule
     assert "z-index: 136" in open_panel_rule
-    action_list_rule = phone.split(
-        "body.hoocon-phone-ready .hoocon-header-userlinks > div > ul.bg-white.max-lg\\:flex"
-    )[1].split("body.hoocon-phone-ready .hoocon-phone-header-menu__list")[0]
-    assert "position: fixed" in action_list_rule
-    assert "z-index: 136" in action_list_rule
-    action_header_rule = phone.split(
-        "body.hoocon-phone-ready\n    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\\:flex)"
-    )[1].split("body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .container")[0]
-    assert "z-index: 135" in action_header_rule
+    assert "body.hoocon-phone-ready [data-hoocon-phone-action-list]" in phone
+    action_list_hide = phone.split("body.hoocon-phone-ready [data-hoocon-phone-action-list]")[1].split("}")[0]
+    assert "display: none !important" in action_list_hide
+    assert "hoocon-phone-more__page-actions" in phone
     assert "hoocon-lead-board #changelist" in phone
     assert "margin-left: 0 !important" in phone
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
         encoding="utf-8"
     )
     assert "relocateHeaderTools" in js
+    assert "relocateActionList" in js
+    assert "data-hoocon-phone-page-action-from" in js
+    assert 'movePageAction(child, "header-tools", mount)' in js
+    assert "data-hoocon-phone-more-page-actions" in js
     assert "data-hoocon-phone-header-menu" in js
     assert "isDesktopOnlyTool" in js
     assert "hoocon-lead-view-tool" in js
@@ -210,6 +209,8 @@ def test_lead_changelist_renders_header_hamburger_markup() -> None:
     html = client.get("/admin/leads/lead/?view=wall").content.decode()
     assert "data-hoocon-phone-header-menu" in html
     assert "data-hoocon-header-object-tools" in html
+    assert "data-hoocon-phone-more-page-actions" in html
+    assert "hoocon-leads-stats-link" in html
     assert "Меню действий" in html
 
     """Changelist HTML exposes badge classes so wall/kanban JS can bucket rows."""
