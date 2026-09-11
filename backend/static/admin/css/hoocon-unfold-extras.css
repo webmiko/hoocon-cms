@@ -1,6 +1,6 @@
 /**
  * Thin Unfold extras — lead sticker, status tags, open button, stats page.
- * Do not load the full hoocon-admin.css shell (conflicts with Unfold DOM).
+ * Loaded via UNFOLD STYLES on top of Unfold DOM (no legacy admin shell).
  * Brand: #dc1313 / #b01010 (aligned with frontend tokens.css).
  */
 

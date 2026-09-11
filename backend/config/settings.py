@@ -269,7 +269,7 @@ MEDIA_ROOT = str(BASE_DIR / "media")
 # Optional deploy SHA for admin CSS/JS cache-bust (?v=); empty → mtime in DEBUG.
 BUILD_SHA = os.getenv("BUILD_SHA", "").strip()
 
-# ── django-unfold Admin UI (Hoocon brand; no heavy hoocon-admin.css shell) ─
+# ── django-unfold Admin UI (Hoocon brand on Unfold) ─
 # Primary scale around brand #dc1313 / hover #b01010 (frontend tokens.css).
 _UNFOLD_PRIMARY = {
     "50": "#fef2f2",
