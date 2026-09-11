@@ -365,8 +365,24 @@
     overflow-x: clip;
   }
 
-  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) {
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open),
+  body.hoocon-phone-ready
+    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) {
     /* Dropdown hangs below the bar — clip would hide it under the page body. */
+    overflow: visible;
+    /* Above #main content and bottom tabs (100); PWA standalone stacking. */
+    z-index: 135;
+  }
+
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .container,
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) #header-inner,
+  body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .hoocon-header-userlinks,
+  body.hoocon-phone-ready
+    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) .container,
+  body.hoocon-phone-ready
+    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) #header-inner,
+  body.hoocon-phone-ready
+    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\:flex) .hoocon-header-userlinks {
     overflow: visible;
   }
 
@@ -431,6 +447,27 @@
     border-radius: var(--hoocon-radius);
     background: var(--hoocon-surface, #fff);
     box-shadow: var(--hoocon-shadow-soft, 0 8px 28px rgba(20, 20, 30, 0.12));
+  }
+
+  /* Fixed to viewport when open — avoids painting under #main in iOS PWA. */
+  body.hoocon-phone-ready .hoocon-phone-header-menu.is-open .hoocon-phone-header-menu__panel {
+    position: fixed;
+    top: calc(var(--hoocon-phone-header-h) + 0.25rem);
+    right: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
+    left: auto;
+    z-index: 136;
+  }
+
+  /* Unfold action_list (more_horiz): max-lg:absolute top-16 paints under #main in PWA. */
+  body.hoocon-phone-ready .hoocon-header-userlinks > div > ul.bg-white.max-lg\:flex {
+    position: fixed !important;
+    top: calc(var(--hoocon-phone-header-h) + 0.25rem);
+    right: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
+    left: max(var(--hoocon-phone-edge-inset, 0.5rem), 0.75rem);
+    z-index: 136;
+    width: auto;
+    max-width: none;
+    margin-inline: 0;
   }
 
   body.hoocon-phone-ready .hoocon-phone-header-menu__list {

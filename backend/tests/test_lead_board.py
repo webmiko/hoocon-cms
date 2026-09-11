@@ -67,6 +67,24 @@ def test_lead_board_css_phone_header_hamburger() -> None:
     assert "display: none !important" in phone
     assert ":has(.hoocon-phone-header-menu.is-open)" in phone
     assert "overflow: visible" in phone
+    open_header_rule = phone.split(
+        "body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open)"
+    )[1].split("body.hoocon-phone-ready .hoocon-header-userlinks")[0]
+    assert "z-index: 135" in open_header_rule
+    open_panel_rule = phone.split(
+        "body.hoocon-phone-ready .hoocon-phone-header-menu.is-open .hoocon-phone-header-menu__panel"
+    )[1].split("body.hoocon-phone-ready .hoocon-phone-header-menu__list")[0]
+    assert "position: fixed" in open_panel_rule
+    assert "z-index: 136" in open_panel_rule
+    action_list_rule = phone.split(
+        "body.hoocon-phone-ready .hoocon-header-userlinks > div > ul.bg-white.max-lg\\:flex"
+    )[1].split("body.hoocon-phone-ready .hoocon-phone-header-menu__list")[0]
+    assert "position: fixed" in action_list_rule
+    assert "z-index: 136" in action_list_rule
+    action_header_rule = phone.split(
+        "body.hoocon-phone-ready\n    .hoocon-admin-header:has(.hoocon-header-userlinks > div > ul.max-lg\\:flex)"
+    )[1].split("body.hoocon-phone-ready .hoocon-admin-header:has(.hoocon-phone-header-menu.is-open) .container")[0]
+    assert "z-index: 135" in action_header_rule
     assert "hoocon-lead-board #changelist" in phone
     assert "margin-left: 0 !important" in phone
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-phone-shell.js").read_text(
