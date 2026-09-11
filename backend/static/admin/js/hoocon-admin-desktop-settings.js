@@ -5,7 +5,8 @@
 (function () {
   "use strict";
 
-  var DESKTOP_MQ = "(min-width: 1024px)";
+  /* Match OS27 settings sidebar (tablet flyout + desktop panel from 768px). */
+  var DESKTOP_MQ = "(min-width: 768px)";
   var APP_QUERY = "hoocon_app";
   var VIEW_QUERY = "hoocon_view";
   var ACCOUNT_VIEW = "account";
@@ -133,10 +134,27 @@
     }
   }
 
+  function appTemplate(appId) {
+    return document.getElementById("hoocon-settings-group-" + appId);
+  }
+
+  function navigateToFirstAppModel(appId) {
+    var tpl = appTemplate(appId);
+    if (!tpl || !tpl.content) {
+      return false;
+    }
+    var link = tpl.content.querySelector("a.hoocon-phone-settings__row--link");
+    if (!link || !link.href) {
+      return false;
+    }
+    window.location.replace(link.href);
+    return true;
+  }
+
   function openAppDetail(appId) {
     var detail = detailRoot();
     var list = modelsList();
-    var tpl = document.getElementById("hoocon-settings-group-" + appId);
+    var tpl = appTemplate(appId);
     var row = document.querySelector(
       '[data-hoocon-desktop-settings-select="' + appId + '"]',
     );
@@ -194,12 +212,21 @@
       }
     }
 
-    if (view === "dashboard" || (!appId && !params.get(APP_QUERY))) {
+    if (view === "dashboard") {
+      showDashboard();
+      return;
+    }
+
+    if (!appId && !view) {
       showDashboard();
       return;
     }
 
     if (appId && openAppDetail(appId)) {
+      return;
+    }
+
+    if (appId && navigateToFirstAppModel(appId)) {
       return;
     }
 
@@ -219,7 +246,7 @@
         highlightSidebar("account");
         return;
       }
-      if (view === "dashboard" || (!appId && !params.get(APP_QUERY))) {
+      if (view === "dashboard" || (!appId && !view)) {
         highlightSidebar("home");
       } else if (appId) {
         highlightSidebar(appId);

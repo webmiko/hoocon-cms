@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -137,6 +138,64 @@ def test_changelist_includes_desktop_account_nav_link() -> None:
     assert 'id="hoocon-phone-settings-account"' not in html
 
 
+def _sidebar_hrefs(html: str) -> dict[str, str]:
+    """Parse desktop sidebar row id → href from rendered admin HTML."""
+    found: dict[str, str] = {}
+    for match in re.finditer(
+        r'<a\s+([^>]*data-hoocon-desktop-settings-select="([^"]+)"[^>]*)>',
+        html,
+        flags=re.IGNORECASE,
+    ):
+        attrs, row_id = match.group(1), match.group(2)
+        href_match = re.search(r'href="([^"]+)"', attrs)
+        if href_match:
+            found[row_id] = href_match.group(1)
+    for match in re.finditer(
+        r'<a\s+([^>]*href="([^"]+)"[^>]*data-hoocon-desktop-settings-select="([^"]+)"[^>]*)>',
+        html,
+        flags=re.IGNORECASE,
+    ):
+        found[match.group(3)] = match.group(2)
+    return found
+
+
+@pytest.mark.django_db
+@override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+def test_desktop_sidebar_links_match_nav_on_index_and_changelists() -> None:
+    """Sidebar hrefs are stable on /admin/ and changelist pages (OS27 split-pane nav)."""
+    admin_user = User.objects.create_superuser(
+        username="settings-nav-links",
+        email="settings-nav-links@example.com",
+        password="password12",
+    )
+    request = RequestFactory().get("/admin/")
+    request.user = admin_user
+    nav = build_phone_settings_nav(request)
+    assert nav is not None
+    expected = {group["id"]: group["url"] for group in nav["groups"]}
+    expected["account"] = nav["account_page_url"]
+
+    client = Client()
+    client.force_login(admin_user)
+    for path in (
+        "/admin/",
+        "/admin/catalog/sku/",
+        "/admin/leads/lead/",
+        reverse("admin:supportchat_conversation_changelist"),
+    ):
+        html = client.get(path).content.decode()
+        sidebar = _sidebar_hrefs(html)
+        for row_id, url in expected.items():
+            assert sidebar.get(row_id) == url, f"{path}: {row_id}"
+
+    leads = next(group for group in nav["groups"] if group["id"] == "leads")
+    assert any(item["url"].endswith("/admin/leads/lead/") for item in leads["items"])
+    messages = next(group for group in nav["groups"] if group["id"] == "supportchat-messages")
+    assert messages["url"] == reverse("admin:supportchat_conversation_changelist")
+    support = next(group for group in nav["groups"] if group["id"] == "supportchat")
+    assert not any("/conversation/" in item["url"] for item in support["items"])
+
+
 def test_phone_settings_loaded_surface_css_and_js() -> None:
     """Phone Settings hub styles and drill-down live in loaded admin assets."""
     css = _PHONE_CSS.read_text(encoding="utf-8")
@@ -205,6 +264,8 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
     assert "hoocon_app" in desktop_js
     assert "supportchat-messages" in desktop_js
     assert "activeNavIdFromPath" in desktop_js
+    assert 'DESKTOP_MQ = "(min-width: 768px)"' in desktop_js
+    assert "navigateToFirstAppModel" in desktop_js
     assert 'closest("[data-hoocon-desktop-settings-select]")' not in desktop_js
     assert "showAccountPage" in desktop_js
     assert "hoocon-desktop-settings-account" in desktop_js
