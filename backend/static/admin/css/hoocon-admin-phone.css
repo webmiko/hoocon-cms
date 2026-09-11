@@ -151,6 +151,41 @@
     max-width: 100%;
   }
 
+  /*
+   * Stacked inlines (e.g. Telegram profile): Unfold uses ml-3 + before:-left-3 stripe on
+   * fieldset.module — ~12px past the phone content inset (field lines clip on the right).
+   */
+  body.hoocon-phone-ready.change-form .formset-wrapper,
+  body.hoocon-phone-ready.change-form .formset-wrapper > div,
+  body.hoocon-phone-ready.change-form .formset-wrapper .form-group,
+  body.hoocon-phone-ready.change-form .formset-wrapper .form-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip;
+  }
+
+  body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module.border-l {
+    margin-left: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0 !important;
+    border-left-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module.border-l::before {
+    display: none !important;
+  }
+
+  body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module .field-line .help,
+  body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module .field-line .helptext {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   body.hoocon-phone-ready.change-form .related-widget-wrapper {
     display: flex;
     flex-wrap: nowrap;
@@ -199,10 +234,80 @@
     width: 100% !important;
   }
 
+  /*
+   * filter_horizontal / M2M .selector in related-widget-wrapper: Unfold leaves a
+   * 300px row on phone — uneven inset vs field card. Stack full-width, center chooser.
+   */
+  body.hoocon-phone-ready.change-form .field-line .grow .flex-col.items-center.w-full {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper:has(.selector) {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+    gap: 0.75rem;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector-available,
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector-chosen {
+    flex: none;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector-chooser {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    align-self: center;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.25rem 0;
+    gap: 0.5rem;
+    list-style: none;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector-chooser li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper .selector select {
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   /* Unfold bulk-actions: above floating pill (~0.75rem gap). */
   body.hoocon-phone-ready #changelist-form > .fixed.bottom-0 {
     bottom: 6.5rem !important;
     z-index: 120;
+  }
+
+  /* Changelist filter sheet — above floating bottom tabs (shell z-index 100). */
+  body.hoocon-phone-ready #changelist .changelist-form-container > #changelist-filter {
+    z-index: 130 !important;
   }
 
   body.hoocon-phone-ready #page,
@@ -674,58 +779,8 @@ html.dark .hoocon-phone-more__sheet,
 
 /* ── Changelist: select mode + filters ────────────────────────────── */
 @media (max-width: 767px) {
-  #changelist #changelist-filter {
-    position: static !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 0 0.85rem !important;
-    padding: 0.65rem 0.75rem !important;
-    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.1));
-    border-radius: var(--hoocon-radius);
-    background: var(--hoocon-surface, #fff);
-    box-shadow: var(--hoocon-shadow-soft, 0 8px 28px rgba(20, 20, 30, 0.06));
-  }
-
-  #changelist #changelist-filter h2,
-  #changelist #changelist-filter summary {
+  #changelist #changelist-filter h3 {
     font-size: 0.8125rem;
-  }
-
-  #changelist #changelist-filter details {
-    margin: 0 0 0.45rem;
-  }
-
-  #changelist #changelist-filter ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin: 0.35rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  #changelist #changelist-filter li {
-    margin: 0;
-  }
-
-  #changelist #changelist-filter li a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.25rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: 999px;
-    border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
-    background: var(--hoocon-surface-muted, #f4f5f6);
-    color: var(--hoocon-quiet, #5a626c);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  #changelist #changelist-filter li.selected a {
-    border-color: color-mix(in srgb, var(--hoocon-primary, #dc1313) 45%, transparent);
-    background: color-mix(in srgb, var(--hoocon-primary, #dc1313) 12%, #fff);
-    color: var(--hoocon-primary, #dc1313);
   }
 
   .hoocon-phone-select-toggle {
@@ -1457,14 +1512,6 @@ html.dark .hoocon-phone-more__sheet,
     list-style: none;
   }
 
-  .hoocon-phone-settings__account-page .hoocon-phone-settings__account-links .hoocon-phone-settings__item {
-    border-bottom: 1px solid var(--os27-hairline, rgba(60, 60, 67, 0.16));
-  }
-
-  .hoocon-phone-settings__account-page .hoocon-phone-settings__account-links .hoocon-phone-settings__item:last-child {
-    border-bottom: none;
-  }
-
   .hoocon-phone-settings__account-page .hoocon-phone-settings__account-links .hoocon-phone-settings__row--link {
     display: flex;
     align-items: center;
@@ -1591,17 +1638,6 @@ html.dark .hoocon-phone-more__sheet,
     margin: 0;
     padding: 0;
     overflow: hidden;
-  }
-
-  .hoocon-phone-settings__section-row,
-  .hoocon-phone-settings__item {
-    position: relative;
-    border-bottom: 1px solid var(--os27-hairline, rgba(60, 60, 67, 0.16));
-  }
-
-  .hoocon-phone-settings__section-row:last-child,
-  .hoocon-phone-settings__item:last-child {
-    border-bottom: none;
   }
 
   .hoocon-phone-settings__row {

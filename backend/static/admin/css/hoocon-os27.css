@@ -38,6 +38,7 @@ html.dark {
 /* ── Shared: page canvas + grouped inset surfaces ─────────────────── */
 body.hoocon-os27 {
   background: var(--os27-bg) !important;
+  --hoocon-group-divider: var(--os27-hairline);
 }
 
 body.hoocon-os27 #page,
@@ -165,13 +166,7 @@ body.hoocon-os27 .hoocon-dash__feed > li > div {
   padding: 0.7rem 1rem;
   border-radius: 0;
   border: none;
-  border-bottom: 1px solid var(--os27-hairline);
   background: transparent;
-}
-
-body.hoocon-os27 .hoocon-dash__feed li:last-child a,
-body.hoocon-os27 .hoocon-dash__feed li:last-child > div {
-  border-bottom: none;
 }
 
 body.hoocon-os27 .hoocon-dash__feed a:hover {
@@ -205,14 +200,75 @@ body.hoocon-os27 .hoocon-admin-header {
   box-shadow: none !important;
 }
 
-/* ── Desktop: macOS 27 System Settings ───────────────────────────── */
-@media (min-width: 1024px) {
-  body.hoocon-os27 .hoocon-nav-shell {
-    width: var(--os27-sidebar-w) !important;
-    min-width: var(--os27-sidebar-w) !important;
-    max-width: var(--os27-sidebar-w) !important;
-  }
+/* Change form: clip overflow + constrain M2M selector at every viewport. */
+body.hoocon-os27.change-form #page,
+body.hoocon-os27.change-form #main,
+body.hoocon-os27.change-form #main > div {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
 
+body.hoocon-os27.change-form #content,
+body.hoocon-os27.change-form #content.container,
+body.hoocon-os27.change-form #content-main,
+body.hoocon-os27.change-form #content-main > form {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+body.hoocon-os27.change-form fieldset.module .description,
+body.hoocon-os27.change-form fieldset.module .max-w-4xl,
+body.hoocon-os27.change-form fieldset.module .text-subtle,
+body.hoocon-os27.change-form #content-main form .help,
+body.hoocon-os27.change-form #content-main form .helptext {
+  max-width: 100% !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+body.hoocon-os27.change-form #content-main form .grow {
+  min-width: 0;
+}
+
+body.hoocon-os27.change-form #content-main form .related-widget-wrapper:has(.selector) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+body.hoocon-os27.change-form .selector {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+body.hoocon-os27.change-form .selector-available,
+body.hoocon-os27.change-form .selector-chosen {
+  flex: 1 1 12rem;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+body.hoocon-os27.change-form .selector select {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* ── Sidebar nav (tablet flyout + desktop fixed panel) ───────────── */
+@media (min-width: 768px) {
   body.hoocon-os27 .hoocon-nav-panel.hoocon-os27-sidebar-panel {
     width: var(--os27-sidebar-w) !important;
     background: color-mix(in srgb, var(--os27-surface) 72%, transparent) !important;
@@ -269,73 +325,46 @@ body.hoocon-os27 .hoocon-admin-header {
     padding: 0.85rem 0.65rem 0.35rem;
   }
 
+  /* Wrapper is layout only — single border on the inner chip (Unfold ships its own). */
   body.hoocon-os27 .hoocon-sidebar-search {
     margin: 0.35rem 0.65rem 0.75rem;
-    border-radius: var(--hoocon-radius-sm);
-    border: 1px solid var(--os27-hairline);
-    background: var(--os27-surface-muted);
-  }
-
-  body.hoocon-os27 #content {
-    padding-top: 0.5rem;
-  }
-
-  body.hoocon-os27 #content-main {
-    max-width: calc(var(--os27-content-max) + 2rem);
-    margin-inline: auto;
-    width: 100%;
-  }
-
-  body.hoocon-os27 .hoocon-dash {
-    margin-bottom: var(--os27-group-gap);
-  }
-
-  body.hoocon-os27 .hoocon-dash__head {
-    align-items: flex-start;
-    margin-bottom: var(--os27-group-gap);
-  }
-
-  body.hoocon-os27 .hoocon-dash__quick {
-    min-width: 14rem;
-  }
-
-  body.hoocon-os27 .hoocon-dash__grid,
-  body.hoocon-os27 .hoocon-dash__cards {
-    gap: var(--os27-group-gap);
-  }
-
-  body.hoocon-os27 .hoocon-integrations__grid {
-    gap: var(--os27-group-gap);
-  }
-
-  body.hoocon-os27 #changelist .results {
-    border-radius: var(--os27-group-radius);
-    border: 1px solid var(--os27-hairline);
-    background: var(--os27-bg);
-    overflow: hidden;
-  }
-
-  body.hoocon-os27 #changelist .results:has(table.hoocon-admin-card-table) {
-    border: none;
+    border: 0;
     background: transparent;
+    box-shadow: none;
   }
 
-  body.hoocon-os27 #changelist #changelist-filter {
-    border-radius: var(--os27-group-radius);
-    border: 1px solid var(--os27-hairline);
-    overflow: hidden;
-    margin-bottom: var(--os27-group-gap);
+  body.hoocon-os27 .hoocon-glass-search-chip {
+    border-color: var(--os27-hairline) !important;
+    background: color-mix(in srgb, var(--os27-surface-muted) 50%, transparent) !important;
+    backdrop-filter: var(--hoocon-search-glass-blur, blur(80px) saturate(1.8));
+    -webkit-backdrop-filter: var(--hoocon-search-glass-blur, blur(80px) saturate(1.8));
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #ffffff 44%, transparent),
+      0 1px 0 color-mix(in srgb, #ffffff 22%, transparent) !important;
   }
 
-  body.hoocon-os27 .hoocon-all-apps-panel {
-    border-radius: var(--os27-group-radius);
-    border: 1px solid var(--os27-hairline);
-    box-shadow: 0 18px 48px rgba(20, 20, 30, 0.14);
+  body.hoocon-os27.dark .hoocon-glass-search-chip,
+  html.dark body.hoocon-os27 .hoocon-glass-search-chip {
+    background: color-mix(in srgb, var(--os27-surface-muted) 44%, transparent) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
   }
 
-  /* Dashboard: hide duplicate Unfold app grid when custom dash is shown. */
-  body.hoocon-os27 .hoocon-dash + .hoocon-dash__apps {
-    display: none;
+  body.hoocon-os27 .hoocon-glass-search-chip:focus-within {
+    border-color: var(--os27-accent) !important;
+    box-shadow: 0 0 0 1px var(--os27-accent) !important;
+  }
+
+  body.hoocon-os27 .hoocon-glass-search-chip .material-symbols-outlined,
+  body.hoocon-os27 .hoocon-glass-search-chip input::placeholder,
+  body.hoocon-os27 .hoocon-glass-search-chip .hoocon-sidebar-label,
+  body.hoocon-os27 .hoocon-glass-search-chip .hoocon-sidebar-shortcut {
+    color: var(--os27-quiet);
+  }
+
+  body.hoocon-os27 .hoocon-glass-search-chip .hoocon-sidebar-shortcut,
+  body.hoocon-os27 #changelist-search kbd {
+    border-color: var(--os27-hairline);
+    background: color-mix(in srgb, var(--os27-surface) 58%, transparent);
   }
 
   /* macOS Settings sidebar — account + grouped icon rows (shared with phone markup). */
@@ -545,6 +574,10 @@ body.hoocon-os27 .hoocon-admin-header {
     flex-shrink: 0;
   }
 
+  body.hoocon-os27 .hoocon-desktop-settings-sidebar__account {
+    text-decoration: none;
+  }
+
   /* Content pane — macOS Settings detail (hero + grouped model rows). */
   body.hoocon-os27 .hoocon-desktop-settings-detail {
     margin-bottom: var(--os27-group-gap);
@@ -596,15 +629,6 @@ body.hoocon-os27 .hoocon-admin-header {
   body.hoocon-os27 .hoocon-desktop-settings-detail__models {
     max-width: var(--os27-content-max);
     margin-inline: auto;
-  }
-
-  body.hoocon-os27 .hoocon-desktop-settings-detail .hoocon-phone-settings__item {
-    position: relative;
-    border-bottom: 1px solid var(--os27-hairline);
-  }
-
-  body.hoocon-os27 .hoocon-desktop-settings-detail .hoocon-phone-settings__item:last-child {
-    border-bottom: none;
   }
 
   body.hoocon-os27 .hoocon-desktop-settings-detail .hoocon-phone-settings__row--link {
@@ -709,10 +733,6 @@ body.hoocon-os27 .hoocon-admin-header {
     border-top: 1px solid var(--os27-hairline);
   }
 
-  body.hoocon-os27 .hoocon-desktop-settings-sidebar__account {
-    text-decoration: none;
-  }
-
   body.hoocon-os27 .hoocon-phone-settings__account-links .hoocon-phone-settings__row--link {
     display: flex;
     align-items: center;
@@ -738,6 +758,90 @@ body.hoocon-os27 .hoocon-admin-header {
     font-weight: 600;
     cursor: pointer;
   }
+}
+
+/* ── Desktop: macOS 27 System Settings (layout + content) ────────── */
+@media (min-width: 1024px) {
+  body.hoocon-os27 .hoocon-nav-shell {
+    width: var(--os27-sidebar-w) !important;
+    min-width: var(--os27-sidebar-w) !important;
+    max-width: var(--os27-sidebar-w) !important;
+  }
+
+  body.hoocon-os27 #content {
+    padding-top: 0.5rem;
+  }
+
+  body.hoocon-os27 #content-main {
+    max-width: calc(var(--os27-content-max) + 2rem);
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  body.hoocon-os27 .hoocon-dash {
+    margin-bottom: var(--os27-group-gap);
+  }
+
+  body.hoocon-os27 .hoocon-dash__head {
+    align-items: flex-start;
+    margin-bottom: var(--os27-group-gap);
+  }
+
+  body.hoocon-os27 .hoocon-dash__quick {
+    min-width: 14rem;
+  }
+
+  body.hoocon-os27 .hoocon-dash__grid,
+  body.hoocon-os27 .hoocon-dash__cards {
+    gap: var(--os27-group-gap);
+  }
+
+  body.hoocon-os27 .hoocon-integrations__grid {
+    gap: var(--os27-group-gap);
+  }
+
+  body.hoocon-os27 #changelist .results {
+    border-radius: var(--os27-group-radius);
+    border: 1px solid var(--os27-hairline);
+    background: var(--os27-bg);
+    overflow: hidden;
+  }
+
+  body.hoocon-os27 #changelist .results:has(table.hoocon-admin-card-table) {
+    border: none;
+    background: transparent;
+  }
+
+  body.hoocon-os27 #changelist #changelist-filter > div.z-20 {
+    border-radius: var(--os27-group-radius);
+    border: 1px solid var(--os27-hairline);
+    background: var(--os27-bg) !important;
+    overflow: hidden;
+  }
+
+  body.hoocon-os27 #changelist #changelist-filter ul {
+    background: var(--os27-surface) !important;
+    border-color: var(--os27-hairline) !important;
+    box-shadow: none;
+  }
+
+  @media (min-width: 1536px) {
+    body.hoocon-os27 #changelist #changelist-filter {
+      margin-bottom: var(--os27-group-gap);
+    }
+  }
+
+  body.hoocon-os27 .hoocon-all-apps-panel {
+    border-radius: var(--os27-group-radius);
+    border: 1px solid var(--os27-hairline);
+    box-shadow: 0 18px 48px rgba(20, 20, 30, 0.14);
+  }
+
+  /* Dashboard: hide duplicate Unfold app grid when custom dash is shown. */
+  body.hoocon-os27 .hoocon-dash + .hoocon-dash__apps {
+    display: none;
+  }
+
 
   /* Bulk actions bar: right half of the viewport on desktop. */
   body.hoocon-os27 .hoocon-changelist-actions-bar {
@@ -755,63 +859,68 @@ body.hoocon-os27 .hoocon-admin-header {
     min-width: 0;
   }
 
-  /* Change form: no horizontal scroll (sidebar + container + selector widgets). */
-  body.hoocon-os27.change-form #page,
-  body.hoocon-os27.change-form #main,
-  body.hoocon-os27.change-form #main > div {
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: clip;
+  /*
+   * Unfold submit row is lg:sticky z-40 inside #main (below fixed nav panel z-100).
+   * Full-width bar + centered .container parks «Delete» under the sidebar (~195px).
+   * Pin the bar to the content column and keep actions above the nav panel.
+   */
+  body.hoocon-os27.change-form #submit-row {
+    position: fixed !important;
+    right: 0;
+    bottom: 0;
+    left: var(--os27-sidebar-w, 16.25rem);
+    z-index: 110 !important;
+    width: auto;
+    max-width: none;
     box-sizing: border-box;
   }
 
-  body.hoocon-os27.change-form #content,
-  body.hoocon-os27.change-form #content.container,
-  body.hoocon-os27.change-form #content-main,
-  body.hoocon-os27.change-form #content-main > form {
+  body.hoocon-os27.change-form #submit-row > div {
     width: 100%;
     max-width: 100%;
-    min-width: 0;
-    overflow-x: clip;
     box-sizing: border-box;
   }
 
-  body.hoocon-os27.change-form fieldset.module .description,
-  body.hoocon-os27.change-form fieldset.module .max-w-4xl,
-  body.hoocon-os27.change-form fieldset.module .text-subtle,
-  body.hoocon-os27.change-form #content-main form .help,
-  body.hoocon-os27.change-form #content-main form .helptext {
-    max-width: 100% !important;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  body.hoocon-os27.change-form #content-main form .grow {
-    min-width: 0;
-  }
-
-  body.hoocon-os27.change-form .selector {
+  body.hoocon-os27.change-form #submit-row .container {
+    margin-inline: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-width: 0 !important;
-    flex-wrap: wrap;
     box-sizing: border-box;
   }
 
-  body.hoocon-os27.change-form .selector-available,
-  body.hoocon-os27.change-form .selector-chosen {
-    flex: 1 1 12rem;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    box-sizing: border-box;
+  body.hoocon-os27.change-form #submit-row [class*="backdrop-blur"] {
+    pointer-events: none;
+  }
+
+  body.hoocon-os27.change-form #main > div.grow {
+    padding-bottom: 5rem;
   }
 
 }
 
-@media (max-width: 1023px) {
-  body.hoocon-os27 #nav-sidebar-inner.hoocon-desktop-settings-nav
-    > div.border-b.flex.gap-3.items-center {
-    display: flex;
+/* Tablet overlay (768–1023): full-width content column; sidebar is a flyout. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  body.hoocon-os27 #main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-os27 #main > div.grow {
+    padding-inline: 1rem;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-os27 #content,
+  body.hoocon-os27 #content.container,
+  body.hoocon-os27 #content-main {
+    max-width: none !important;
+    width: 100% !important;
+    margin-inline: 0 !important;
+    box-sizing: border-box;
   }
 }
 
@@ -925,21 +1034,10 @@ body.hoocon-os27 .hoocon-admin-header {
     border-bottom: none;
   }
 
-  body.hoocon-os27 #changelist #changelist-filter,
-  body.hoocon-os27.hoocon-phone-ready #changelist #changelist-filter {
+  body.hoocon-os27 #changelist #changelist-filter > div.z-20,
+  body.hoocon-os27.hoocon-phone-ready #changelist #changelist-filter > div.z-20 {
     border-radius: var(--os27-group-radius);
-    margin-bottom: var(--os27-group-gap);
     overflow: hidden;
-  }
-
-  body.hoocon-os27 #toolbar form input[type="search"],
-  body.hoocon-os27 #changelist-search input,
-  body.hoocon-os27.hoocon-phone-ready #toolbar form input[type="search"],
-  body.hoocon-os27.hoocon-phone-ready #changelist-search input {
-    border-radius: var(--hoocon-radius);
-    min-height: var(--os27-row-min-h);
-    background: var(--os27-surface-muted);
-    border: 1px solid var(--os27-hairline);
   }
 
   body.hoocon-os27 .hoocon-dash + .hoocon-dash__apps,

@@ -80,6 +80,17 @@ def test_unfold_border_radius_matches_hoocon_scale() -> None:
     assert settings.UNFOLD["BORDER_RADIUS"] == "0.75rem"
 
 
+def test_unfold_environment_badge_is_tuple_not_string() -> None:
+    """ENVIRONMENT badge must be (label, type) so label.html gets full release string."""
+    from config.release import release_label, unfold_environment_badge
+
+    badge = settings.UNFOLD["ENVIRONMENT"]
+    assert badge == unfold_environment_badge()
+    assert isinstance(badge, tuple)
+    assert badge[0] == release_label()
+    assert len(badge[0]) > 1
+
+
 def test_unfold_base_colors_are_neutral_gray() -> None:
     """Unfold base scale must not use default blue-tinted oklch backgrounds."""
     base = settings.UNFOLD["COLORS"]["base"]
@@ -217,6 +228,19 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "scroll-margin-top:" in phone_css
     assert "min-width: 0 !important" in phone_css.split("Fieldset defaults to min-width:min-content")[1].split("}")[0]
     assert "body.hoocon-phone-ready.change-form fieldset.module .form-rows" in phone_css
+    stacked_inline_block = phone_css.split("Stacked inlines (e.g. Telegram profile)")[1].split(
+        "Autocomplete FK: native <select> is clipped/absolutely positioned"
+    )[0]
+    assert "body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module.border-l" in stacked_inline_block
+    stacked_fieldset_rule = stacked_inline_block.split(
+        "body.hoocon-phone-ready.change-form .formset-wrapper fieldset.module.border-l"
+    )[1].split("}")[0]
+    assert "margin-left: 0 !important" in stacked_fieldset_rule
+    assert "border-left-width: 0 !important" in stacked_fieldset_rule
+    assert "fieldset.module.border-l::before" in stacked_inline_block
+    assert (
+        "display: none !important" in stacked_inline_block.split("fieldset.module.border-l::before")[1].split("}")[0]
+    )
     related_widget_block = phone_css.split("Autocomplete FK: native <select> is clipped/absolutely positioned")[
         1
     ].split("/* Unfold bulk-actions")[0]
@@ -225,6 +249,20 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert '[x-ref^="relatedWidgetWrapper"]' in related_widget_block
     assert "margin-left: 0" in related_widget_block
     assert "select:not(.select2-hidden-accessible)" in related_widget_block
+    assert "#content-main form .related-widget-wrapper:has(.selector)" in related_widget_block
+    assert (
+        "display: block !important"
+        in related_widget_block.split("#content-main form .related-widget-wrapper:has(.selector)")[1].split("}")[0]
+    )
+    assert (
+        "flex-direction: column"
+        in related_widget_block.split("#content-main form .related-widget-wrapper .selector")[1].split("}")[0]
+    )
+    assert (
+        "align-items: stretch"
+        in related_widget_block.split(".field-line .grow .flex-col.items-center.w-full")[1].split("}")[0]
+    )
+    assert ".selector-chooser" in related_widget_block
     assert "hoocon-lead-board #changelist" in phone_css
     # Shell itself is the fixed chrome (tabs are relative inside it).
     assert "body.hoocon-phone-ready .hoocon-phone-shell" in phone_css
@@ -235,6 +273,11 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "padding-inline: var(--hoocon-phone-edge-inset" in shell_rule
     assert "padding-bottom: calc(" in shell_rule
     assert "z-index: 100" in shell_rule
+    filter_sheet_rule = phone_css.split(
+        "/* Changelist filter sheet — above floating bottom tabs (shell z-index 100). */"
+    )[1].split("}")[0]
+    assert "z-index: 130 !important" in filter_sheet_rule
+    assert "#changelist-filter" in filter_sheet_rule
     tabs_rule = phone_css.split(".hoocon-phone-tabs")[1].split("}")[0]
     assert "position: relative" in tabs_rule
     assert "position: fixed" not in tabs_rule
@@ -372,6 +415,26 @@ def test_changelist_actions_bar_offsets_full_sidebar() -> None:
     assert "? 72 :" not in template
 
 
+def test_changelist_filter_sheet_has_back_to_close() -> None:
+    """Filter sheet below 2xl exposes iOS back control that closes filterOpen."""
+    template = (
+        Path(__file__).resolve().parents[1] / "templates/unfold/helpers/change_list_filter_vertical.html"
+    ).read_text(encoding="utf-8")
+    assert "hoocon-changelist-filter-toolbar" in template
+    assert "hoocon-changelist-filter-back" in template
+    assert 'x-on:click="filterOpen = false"' in template
+    assert "2xl:hidden" in template
+    assert "Назад" in template
+
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    filter_back_block = css.split("/* Changelist filter sheet — iOS back row to close")[1].split(
+        "/* OS27 glass search chip"
+    )[0]
+    assert "@media (max-width: 1535px)" in filter_back_block
+    assert ".hoocon-changelist-filter-back" in filter_back_block
+    assert "color: var(--os27-accent, var(--hoocon-primary))" in filter_back_block
+
+
 def test_os27_css_covers_settings_layout() -> None:
     """OS27 layer ships macOS/iOS Settings tokens and grouped surfaces."""
     css = _OS27_CSS.read_text(encoding="utf-8")
@@ -391,12 +454,25 @@ def test_os27_css_covers_settings_layout() -> None:
     )
     assert "body.hoocon-os27 .hoocon-dash__quick" in css
     assert "hoocon-os27-sidebar-panel" in css
+    assert "hoocon-glass-search-chip" in css
+    assert "blur(80px)" in css
     assert "box-shadow: none !important" in css
     assert "@media (min-width: 1024px)" in css
+    assert "@media (min-width: 768px)" in css
+    assert "/* ── Sidebar nav (tablet flyout + desktop fixed panel)" in css
+    assert "@media (min-width: 768px) and (max-width: 1023px)" in css
     assert "@media (max-width: 767px)" in css
     assert "table.hoocon-admin-table-stacked:not(.hoocon-admin-card-table)" in css
     assert ":has(table.hoocon-admin-card-table)" in css
     assert "hoocon-dash + .hoocon-dash__apps" in css
+    sidebar_search_rule = css.split("body.hoocon-os27 .hoocon-sidebar-search {")[1].split(
+        "body.hoocon-os27 .hoocon-sidebar-search > div"
+    )[0]
+    assert "border: 0" in sidebar_search_rule
+    assert "background: transparent" in sidebar_search_rule
+    os27_search_chip = css.split("body.hoocon-os27 .hoocon-glass-search-chip {")[1].split("}")[0]
+    assert "blur(80px)" in os27_search_chip
+    assert "--os27-surface-muted" in os27_search_chip
     assert "hoocon-desktop-settings-sidebar" in css
     assert "hoocon-desktop-settings-detail__hero" in css
     assert "hoocon-desktop-settings-app" in css
@@ -407,6 +483,25 @@ def test_os27_css_covers_settings_layout() -> None:
     assert "body.hoocon-os27.change-form #page" in css
     assert "overflow-x: clip" in css
     assert "body.hoocon-os27.change-form .selector" in css
+    selector_global = css.split("/* Change form: clip overflow + constrain M2M selector")[1].split(
+        "/* ── Sidebar nav (tablet flyout + desktop fixed panel)"
+    )[0]
+    assert "#content-main form .related-widget-wrapper:has(.selector)" in selector_global
+    assert "body.hoocon-os27.change-form .selector select" in selector_global
+    assert (
+        "max-width: 100%" in selector_global.split("body.hoocon-os27.change-form .selector-available")[1].split("}")[0]
+    )
+    submit_row_rule = css.split("body.hoocon-os27.change-form #submit-row")[1].split("}")[0]
+    assert "position: fixed !important" in submit_row_rule
+    assert "left: var(--os27-sidebar-w" in submit_row_rule
+    assert "z-index: 110 !important" in submit_row_rule
+    submit_container_rule = css.split("body.hoocon-os27.change-form #submit-row .container")[1].split("}")[0]
+    assert "margin-inline: 0 !important" in submit_container_rule
+    assert "width: 100% !important" in submit_container_rule
+    assert (
+        "pointer-events: none"
+        in css.split('body.hoocon-os27.change-form #submit-row [class*="backdrop-blur"]')[1].split("}")[0]
+    )
 
 
 def test_unfold_extras_css_covers_lead_ui() -> None:
@@ -416,12 +511,74 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "--hoocon-primary-hover: #b01010" in css
     assert "--hoocon-primary-on-dark: #f87171" in css
     assert "--hoocon-page-bg: #f3f4f7" in css
+    assert "--hoocon-input-glass-bg:" in css
+    assert "--hoocon-input-glass-blur:" in css
     assert "--hoocon-phone-edge-inset: 0.5rem" in css
+    assert "--hoocon-group-inset: 1rem" in css
+    grouped_inset_block = css.split("/*\n * Grouped card inset dividers")[1].split(
+        "/* Soft canvas behind Unfold white cards"
+    )[0]
+    assert "left: var(--hoocon-group-inset)" in grouped_inset_block
+    assert "right: var(--hoocon-group-inset)" in grouped_inset_block
+    assert ".hoocon-desktop-settings-sidebar__list > li:not(:last-child)::after" in grouped_inset_block
+    assert ".hoocon-desktop-settings-sidebar__account::after" in grouped_inset_block
+    assert "#changelist #changelist-filter ul.flex-col > li:not(:last-child)::after" in grouped_inset_block
+    assert "#changelist #changelist-filter ul.flex:not(.flex-col)" not in grouped_inset_block
+    assert "Boolean segments (ul.flex without flex-col) keep Unfold border-r" in grouped_inset_block
+    assert "border-bottom: 0 !important" in grouped_inset_block
+    assert ".hoocon-grouped-inset-dividers > li" in grouped_inset_block
     assert "body.bg-base-50" in css
     assert "--hoocon-radius: 0.75rem" in css
     fieldset_desc = css.split("fieldset.module > div.leading-relaxed.text-subtle")[1].split("}")[0]
     assert "padding-inline: 0.75rem" in fieldset_desc
     assert "overflow-wrap: anywhere" in fieldset_desc
+    input_glass_block = css.split("/* Admin text fields: frosted glass fill")[1].split(
+        "/* Change-form submit row — compact labels"
+    )[0]
+    assert "backdrop-filter: var(--hoocon-input-glass-blur)" in input_glass_block
+    assert "background: var(--hoocon-input-glass-bg) !important" in input_glass_block
+    assert "background: var(--hoocon-input-glass-bg-focus) !important" in input_glass_block
+    assert "#changelist-search input" not in input_glass_block
+    filter_layout_block = css.split("/*\n * Unfold vertical changelist filter")[1].split("/* OS27 glass search chip")[
+        0
+    ]
+    assert "position: fixed !important" in filter_layout_block
+    assert "#changelist #changelist-filter > div.z-20" in filter_layout_block
+    assert "flex: 0 0 20rem" in filter_layout_block
+    assert "width: 100% !important" in filter_layout_block.split("@media (max-width: 767px)")[1]
+    assert "Filter panel canvas muted" in css
+    assert (
+        "#changelist #changelist-filter > div.z-20"
+        in css.split("Filter panel canvas muted")[1].split("/* OS27 glass search chip")[0]
+    )
+    assert (
+        "background: var(--hoocon-page-bg) !important"
+        in css.split("Filter panel canvas muted")[1].split("/* OS27 glass search chip")[0]
+    )
+    assert (
+        "#changelist #changelist-filter ul"
+        in css.split("Filter panel canvas muted")[1].split("/* OS27 glass search chip")[0]
+    )
+    assert (
+        "background: var(--hoocon-surface) !important"
+        in css.split("Filter panel canvas muted")[1].split("/* OS27 glass search chip")[0]
+    )
+    search_chip_block = css.split("/* OS27 glass search chip")[1].split("/* Login / OTP")[0]
+    assert ".hoocon-glass-search-chip" in search_chip_block
+    assert "--hoocon-search-glass-bg" in css
+    assert "--hoocon-search-glass-blur" in css
+    assert "backdrop-filter: var(--hoocon-search-glass-blur)" in search_chip_block
+    assert "blur(80px)" in css.split("--hoocon-search-glass-blur:")[1].split(";")[0]
+    assert "#changelist-search #searchbar" in search_chip_block
+    assert "background: transparent !important" in search_chip_block
+    assert "#changelist-search kbd" in search_chip_block
+    assert ".select2-selection--single" in input_glass_block
+    assert "@supports not ((backdrop-filter: blur(1px))" in input_glass_block
+    submit_row_buttons = css.split("/* Change-form submit row — compact labels")[1].split("/* OS27 glass search chip")[
+        0
+    ]
+    assert "#submit-row .container button" in submit_row_buttons
+    assert "font-size: 0.8125rem !important" in submit_row_buttons
     assert '[data-inline-type="tabular"] .tabular.inline-related' in css
     assert 'body.change-form [data-inline-type="tabular"] table.formset tbody.form-group' in css
     assert "tr.form-row:has(.delete:checked)" in css
@@ -447,7 +604,22 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "--os27-sidebar-w" in css or "16.25rem" in css
     assert ".hoocon-sidebar-label" in css
     assert ".hoocon-nav-shell" in css
+    tablet_nav_block = css.split("@media (max-width: 1023px)")[1].split("@media (min-width: 1024px)")[0]
+    assert ".hoocon-nav-backdrop" in tablet_nav_block
+    assert "body.hoocon-nav-overlay-open" in tablet_nav_block
+    assert "hoocon-desktop-settings-nav" in tablet_nav_block
+    assert (
+        "display: none !important"
+        in tablet_nav_block.split("hoocon-desktop-settings-nav")[1].split(".hoocon-nav-panel")[0]
+    )
+    assert "transform: translateX(-100%)" in tablet_nav_block
+    assert "transform: translateX(0)" in tablet_nav_block
+    assert "var(--os27-sidebar-w, 16.25rem)" in tablet_nav_block
+    assert "transition:" in tablet_nav_block
     assert ".hoocon-admin-header" in css
+    header_actions_rule = css.split(".hoocon-header-userlinks > div > ul.bg-white")[1].split("}")[0]
+    assert "border-radius: var(--hoocon-radius" in header_actions_rule
+    assert "overflow: hidden" in header_actions_rule
     assert ".hoocon-all-apps-panel" in css
     assert ".hoocon-all-apps-flyout" in css
     assert "z-index: 80" in css
@@ -536,6 +708,8 @@ def test_admin_sidebar_os27_full_width_settings_layout() -> None:
     assert "hoocon-os27-sidebar" in html
     assert "hoocon-os27-sidebar-panel" in html
     assert "hoocon-nav-shell" in html
+    assert "hoocon-nav-backdrop" in html
+    assert "hoocon-nav-overlay-open" in html
     assert "hoocon-nav-panel" in html
     assert "sidebarWidth: 260" in html
     assert "panelWidth" in html
