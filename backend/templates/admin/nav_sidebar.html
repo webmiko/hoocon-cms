@@ -8,14 +8,24 @@
         sidebarWidth: 260,
         isDesktopNav() { return window.innerWidth >= 1024; },
         panelWidth() {
-            if (this.isDesktopNav()) {
-                return this.sidebarWidth;
-            }
-            const raw = Number(this.sidebarWidth) || 288;
-            return Math.min(360, Math.max(260, raw));
+            return this.sidebarWidth;
         },
     }"
+    x-effect="document.body.classList.toggle(
+        'hoocon-nav-overlay-open',
+        sidebarOpen && !isDesktopNav()
+    )"
 >
+    <button
+        type="button"
+        class="hoocon-nav-backdrop"
+        aria-label="{% trans 'Закрыть меню' %}"
+        tabindex="-1"
+        x-show="sidebarOpen && !isDesktopNav()"
+        x-on:click="sidebarToggle()"
+        x-cloak
+    ></button>
+
     <div
         id="nav-sidebar"
         class="hoocon-nav-panel hoocon-os27-sidebar-panel bg-base-50 border-r border-base-200 dark:border-base-800 dark:bg-base-900 {% element_classes 'navigation' %}"
