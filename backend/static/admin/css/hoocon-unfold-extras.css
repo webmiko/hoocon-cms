@@ -1966,7 +1966,8 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked {
   background-color: transparent !important;
 }
 
-#changelist #changelist-form .results > .overflow-x-auto {
+/* Unfold: .overflow-x-auto is a direct #changelist-form child (no .results wrapper). */
+#changelist #changelist-form > .overflow-x-auto {
   background-color: var(--hoocon-page-bg) !important;
 }
 
@@ -2496,11 +2497,11 @@ body:not(.hoocon-support-inbox) #changelist
   }
 }
 
-/* Leads board: lift Unfold container cap + 2rem gutters on tablet/desktop.
+/* Leads board: lift Unfold container cap + 0.5rem gutters on tablet/desktop.
  * Root cause of “not full width”: Unfold #content.container mx-auto caps at
  * Tailwind container breakpoints (e.g. 768px at ~953px viewport). */
 @media (min-width: 768px) {
-  /* Drop Unfold shell px-4 so the only horizontal inset is 2rem below. */
+  /* Drop Unfold shell px-4 so the only horizontal inset is 0.5rem below. */
   body.hoocon-lead-board #main > div.px-4,
   body.hoocon-lead-board #main > div.pb-4 {
     padding-left: 0 !important;
@@ -2514,8 +2515,8 @@ body:not(.hoocon-support-inbox) #changelist
     width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
     box-sizing: border-box;
   }
 
@@ -2532,12 +2533,75 @@ body:not(.hoocon-support-inbox) #changelist
     box-sizing: border-box;
   }
 
+  /* Tablet overlay adds padding-inline on #main > div.grow — gutter is on #content. */
+  body.hoocon-lead-board #main > div.grow {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* os27 desktop caps #content-main at ~50rem — board must use full column. */
+  body.hoocon-lead-board #content-main {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+  }
+
   body.hoocon-lead-board #changelist .result-list-wrapper,
-  body.hoocon-lead-board #changelist .changelist-form-container {
+  body.hoocon-lead-board #changelist .changelist-form-container,
+  body.hoocon-lead-board #changelist .grow.min-w-0 {
     width: 100%;
     max-width: 100%;
     padding-left: 0 !important;
     padding-right: 0 !important;
+    box-sizing: border-box;
+  }
+
+  /* Search/filter bar: 0.5rem horizontal inset (matches wall card canvas). */
+  body.hoocon-lead-board #changelist .grow.min-w-0 > .flex.lg\:border {
+    width: 100%;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.65rem 0.75rem;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-lead-board #changelist #toolbar {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+    max-width: 24rem;
+  }
+
+  body.hoocon-lead-board #changelist #toolbar form,
+  body.hoocon-lead-board #changelist #toolbar .hoocon-glass-search-chip {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body.hoocon-lead-board #changelist .grow.min-w-0 > .flex.lg\:border .filter-open-button {
+    margin-left: auto;
+    flex: 0 0 auto;
+    align-self: center;
+    min-height: 2.375rem;
+  }
+
+  body.hoocon-lead-board #changelist #changelist-form {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-lead-board #changelist #result_list {
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
@@ -2551,12 +2615,13 @@ body:not(.hoocon-support-inbox) #changelist
     box-sizing: border-box;
   }
 
+  /* Wall cards: 0.5rem inset inside the bordered board canvas. */
   body.hoocon-lead-board:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source),
   body.app-leads.model-lead:not([data-hoocon-lead-view="kanban"]) #changelist
-    table.hoocon-admin-card-table.hoocon-admin-table-stacked {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source) {
+    padding: 0.5rem;
+    box-sizing: border-box;
   }
 
   body.hoocon-lead-board #changelist
@@ -2740,11 +2805,42 @@ body:not(.hoocon-support-inbox) #changelist
   .hoocon-lead-kanban__cards > tr > td.field-status_badge,
   .hoocon-lead-kanban__cards > tr > th.field-status_badge {
     order: -1;
+    display: flex !important;
+    flex-flow: row wrap;
+    align-items: center;
+    gap: 0.35rem;
+    width: auto !important;
+    max-width: 100%;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 0 0.35rem !important;
+    border-bottom: none;
+    grid-template-columns: unset;
+  }
+
+  .hoocon-lead-kanban__cards > tr > td.field-status_badge .hoocon-lead-status,
+  .hoocon-lead-kanban__cards > tr > th.field-status_badge .hoocon-lead-status {
+    width: auto;
+    max-width: 100%;
+    flex: 0 0 auto;
   }
 
   body.hoocon-lead-board[data-hoocon-lead-view="kanban"] #changelist
     table.hoocon-admin-card-table.hoocon-lead-kanban-source {
     display: none !important;
+  }
+
+  /* Kanban board + columns: 0.5rem inset (aligned with wall search/cards). */
+  html[data-hoocon-lead-view="kanban"] body.hoocon-lead-board .hoocon-lead-kanban,
+  body.hoocon-lead-board[data-hoocon-lead-view="kanban"] .hoocon-lead-kanban {
+    padding: 0.5rem;
+    background-color: var(--hoocon-page-bg);
+    box-sizing: border-box;
+  }
+
+  html[data-hoocon-lead-view="kanban"] body.hoocon-lead-board .hoocon-lead-kanban__col,
+  body.hoocon-lead-board[data-hoocon-lead-view="kanban"] .hoocon-lead-kanban__col {
+    padding: 0.5rem;
   }
 }
 
@@ -2752,6 +2848,18 @@ body:not(.hoocon-support-inbox) #changelist
   .hoocon-lead-kanban {
     display: none !important;
   }
+}
+
+/* Leads board sort — lives in the filter panel (same list pattern as Unfold filters). */
+#changelist #changelist-filter .hoocon-lead-sort-filter {
+  width: 100%;
+}
+
+#changelist #changelist-filter .hoocon-lead-sort-filter > ul {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* Lead view mode toggle (changelist object-tools). */

@@ -56,6 +56,16 @@ from leads.services import (
 
 _LEAD_EDIT_QUERY = "edit"
 
+# Changelist sort UI: (label, list_display column name). ``None`` = default status order.
+_LEAD_SORT_COLUMNS: tuple[tuple[str, str | None], ...] = (
+    ("По статусу", None),
+    ("Дата", "created_at"),
+    ("Имя", "name"),
+    ("Компания", "company"),
+    ("Email", "email_id"),
+    ("Статус", "status_badge"),
+)
+
 
 class LeadItemInline(TabularInline):
     """SKU lines on a lead (multi-RFQ)."""
@@ -500,8 +510,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 _bundle_size=Subquery(bundle_size),
             )
         )
-        qs = scope_leads_for_manager(qs, request.user)
-        return qs.order_by("_status_rank", "-created_at", "-pk")
+        return scope_leads_for_manager(qs, request.user)
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
         """New-first only on Lead changelist (needs ``_status_rank`` annotate).
@@ -520,6 +529,68 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         if url_name.startswith("leads_lead_changelist"):
             return ("_status_rank", "-created_at", "-pk")
         return ("-created_at", "-pk")
+
+    def _lead_changelist_sort_options(
+        self,
+        request: HttpRequest,
+        query: dict[str, str] | object,
+    ) -> list[dict[str, str | bool]]:
+        """Build sort dropdown entries (А→Я / Я→А) for the leads board.
+
+        Uses Django admin ``?o=<col>`` / ``?o=-<col>`` (0-based ``list_display`` index).
+
+        Args:
+            request: admin request.
+            query: preserved GET params (filters/search; without ``view``).
+
+        Returns:
+            Options for the changelist sort ``<select>``.
+        """
+        from django.http import QueryDict
+
+        params = query.copy() if hasattr(query, "copy") else QueryDict(mutable=True)
+        if hasattr(params, "pop"):
+            params.pop("view", None)
+        list_display = list(self.get_list_display(request))
+        current_o = (params.get("o") if hasattr(params, "get") else "") or ""
+        current_o = str(current_o).strip()
+        options: list[dict[str, str | bool]] = []
+
+        def _url(extra: dict[str, str | None]) -> str:
+            merged = params.copy()
+            for key, value in extra.items():
+                if value is None:
+                    merged.pop(key, None)
+                else:
+                    merged[key] = value
+            encoded = merged.urlencode()
+            return f"?{encoded}" if encoded else "?"
+
+        options.append(
+            {
+                "label": "По статусу",
+                "url": _url({"o": None}),
+                "selected": not current_o,
+            }
+        )
+
+        for field_label, column in _LEAD_SORT_COLUMNS[1:]:
+            if not column:
+                continue
+            try:
+                col_index = list_display.index(column)
+            except ValueError:
+                continue
+            for desc, suffix in ((False, "А→Я"), (True, "Я→А")):
+                o_val = f"-{col_index}" if desc else str(col_index)
+                options.append(
+                    {
+                        "label": f"{field_label} · {suffix}",
+                        "url": _url({"o": o_val}),
+                        "selected": current_o == o_val,
+                    }
+                )
+        return options
 
     def save_model(
         self,
@@ -702,6 +773,10 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["hoocon_lead_view"] = view
         extra["hoocon_lead_view_wall_url"] = f"?{wall_params.urlencode()}"
         extra["hoocon_lead_view_kanban_url"] = f"?{kanban_params.urlencode()}"
+        extra["hoocon_lead_sort_options"] = self._lead_changelist_sort_options(
+            request,
+            filter_params,
+        )
 
         # ChangeList rejects unknown GET keys (redirects with ?e=1).
         request.GET = filter_params  # type: ignore[assignment]

@@ -645,7 +645,7 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "max-width: none !important" in css
     assert "@media (min-width: 640px)" in css
     assert "repeat(2, minmax(0, 1fr))" in css
-    assert "padding-left: 2rem !important" in css
+    assert "padding-left: 0.5rem !important" in css
     assert "justify-content: stretch" in css
     assert "display: contents" in css
     assert "gap: 1.15rem 1.25rem" in css

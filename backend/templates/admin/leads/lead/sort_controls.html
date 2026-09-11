@@ -1,0 +1,19 @@
+{% if hoocon_lead_sort_options %}
+<div class="hoocon-lead-sort-filter flex flex-col gap-2">
+  <h3 class="font-semibold text-important">Сортировка</h3>
+  <ul
+    class="border border-base-200 flex flex-col rounded-default shadow-xs dark:border-base-700 dark:bg-base-900 hoocon-grouped-inset-dividers"
+  >
+    {% for opt in hoocon_lead_sort_options %}
+      <li
+        class="border-base-200 dark:border-base-700 {% if opt.selected %}font-semibold text-primary-600 dark:text-primary-500{% else %}hover:text-base-700 dark:hover:text-base-200{% endif %}"
+      >
+        <a
+          href="{{ opt.url }}"
+          class="block px-3 py-2 truncate hover:text-primary-600 dark:hover:text-primary-500"
+        >{{ opt.label }}</a>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

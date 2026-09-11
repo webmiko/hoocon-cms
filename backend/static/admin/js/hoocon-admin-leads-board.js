@@ -22,6 +22,7 @@
     const raw = (fromToggle || document.body.dataset.hooconLeadView || "wall").toLowerCase();
     const view = raw === "kanban" ? "kanban" : "wall";
     document.body.dataset.hooconLeadView = view;
+    document.documentElement.dataset.hooconLeadView = view;
     return view;
   }
 
