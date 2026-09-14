@@ -81,6 +81,46 @@ def test_wiki_read_fragment_uses_admin_wrapper(client) -> None:
 
 
 @pytest.mark.django_db
+def test_csp_wiki_read_allows_inline_scripts_for_dashboards(client) -> None:
+    """Wiki read CSP allows inline Chart.js bootstrap (staff HTML dashboards)."""
+    admin_user = User.objects.create_superuser(
+        username="wiki-csp",
+        email="wiki-csp@example.com",
+        password="password12",
+    )
+    WikiDocument.objects.create(
+        title="Dashboard",
+        slug="dash-csp",
+        body="<!DOCTYPE html><html><body><script>window.ok=1</script></body></html>",
+    )
+    client.force_login(admin_user)
+    url = reverse("admin:content_wikidocument_read", args=["dash-csp"])
+    response = client.get(url)
+    csp = (
+        response.headers.get("Content-Security-Policy")
+        or response.headers.get("Content-Security-Policy-Report-Only")
+        or ""
+    )
+    assert response.status_code == 200
+    assert "'unsafe-inline'" in csp
+
+
+@pytest.mark.django_db
+def test_wiki_stock_fixture_uses_self_hosted_chart_js() -> None:
+    """Stock dashboard fixture loads Chart.js from static (CSP script-src 'self')."""
+    from pathlib import Path
+
+    fixture = Path(__file__).resolve().parents[1] / "content" / "fixtures" / "wiki" / "stock-dashboard-14-09-2026.html"
+    html = fixture.read_text(encoding="utf-8")
+    assert "/static/admin/js/vendor/chart-4.4.4.umd.min.js" in html
+    assert "cdn.jsdelivr.net" not in html
+
+    chart_js = Path(__file__).resolve().parents[1] / "static" / "admin" / "js" / "vendor" / "chart-4.4.4.umd.min.js"
+    assert chart_js.is_file()
+    assert "Chart" in chart_js.read_text(encoding="utf-8", errors="ignore")[:500]
+
+
+@pytest.mark.django_db
 def test_wiki_browse_requires_permission(client) -> None:
     """User without content.view_wikidocument cannot open Wiki browse."""
     user = User.objects.create_user(
