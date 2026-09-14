@@ -124,6 +124,9 @@ def test_lead_board_css_wall_three_centered_equal_height_cards() -> None:
     assert "hoocon-lead-kanban-source" in board_block
     # Search bar + table span #content inner width (no Unfold lg:p-3 / #main.grow inset).
     assert "body.hoocon-lead-board #main > div.grow" in board_block
+    assert "body.hoocon-lead-board #main > div.grow.px-4" in board_block
+    assert "body.hoocon-lead-board .hoocon-admin-header > .container" in board_block
+    assert "body.hoocon-lead-board #main > div.px-4.lg\\:border-t" in board_block
     search_bar = _css_rule_body(css, "body.hoocon-lead-board #changelist .grow.min-w-0 > .flex.lg\\:border")
     assert "padding-left: 0.5rem !important" in search_bar
     assert "padding-right: 0.5rem !important" in search_bar

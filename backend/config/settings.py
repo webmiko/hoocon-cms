@@ -346,6 +346,7 @@ UNFOLD = {
     "SCRIPTS": [
         "config.unfold_callbacks.admin_live_badges_js",
         "config.unfold_callbacks.admin_tables_js",
+        "config.unfold_callbacks.admin_submit_menu_js",
         "config.unfold_callbacks.admin_phone_shell_js",
         "config.unfold_callbacks.admin_phone_settings_js",
         "config.unfold_callbacks.admin_desktop_settings_js",

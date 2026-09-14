@@ -43,6 +43,7 @@ def test_admin_index_uses_unfold_and_hoocon_branding() -> None:
     assert os27_pos > extras_pos, "OS27 must load after unfold-extras to win cascade"
     assert "hoocon-admin-leads-sticker.js" in html
     assert "hoocon-admin-tables.js" in html
+    assert "hoocon-admin-submit-menu.js" in html
     assert "hoocon-admin.css" not in html
     assert "hoocon-admin-overrides.css" not in html
     assert "Hoocon" in html
@@ -586,6 +587,42 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     ]
     assert "#submit-row .container button" in submit_row_buttons
     assert "font-size: 0.8125rem !important" in submit_row_buttons
+    submit_wrap_block = css.split("/* Long RU labels")[1].split("/*\n * Unfold vertical changelist filter")[0]
+    assert "body.change-form #submit-row .container" in submit_wrap_block
+    assert "flex-wrap: wrap !important" in submit_wrap_block
+    submit_menu_block = css.split("/* Save actions collapse into «Сохранить ▾»")[1].split(
+        "/*\n * Unfold vertical changelist filter"
+    )[0]
+    assert ".hoocon-submit-menu-active" in submit_menu_block
+    assert "flex-direction: row !important" in submit_menu_block
+    assert ".hoocon-submit-menu__panel" in submit_menu_block
+    assert ".hoocon-submit-menu.is-open .hoocon-submit-menu__panel" in submit_menu_block
+    open_panel_block = submit_menu_block.split(".hoocon-submit-menu.is-open .hoocon-submit-menu__panel")[1].split(
+        ".hoocon-submit-menu__panel[hidden]"
+    )[0]
+    assert "position: fixed" in open_panel_block
+    submit_menu_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-submit-menu.js").read_text(
+        encoding="utf-8"
+    )
+    assert "(max-width: 1023px)" in submit_menu_js
+    assert "ResizeObserver" in submit_menu_js
+    assert "MutationObserver" in submit_menu_js
+    assert "rowNeedsCollapse" in submit_menu_js
+    assert "hoocon-submit-menu" in submit_menu_js
+    assert 'setAttribute("role", "menu")' in submit_menu_js
+    assert '"_save"' in submit_menu_js
+    assert 'button[name="' in submit_menu_js
+    assert "Anchor before moving nodes" in submit_menu_js
+    assert "container.insertBefore(menu, anchor)" in submit_menu_js
+    assert "function positionOpenPanel" in submit_menu_js
+    assert "function unfoldTriggerClasses" in submit_menu_js
+    assert "unfoldTriggerClasses(buttons[0])" in submit_menu_js
+    assert "window.innerWidth - inset - panelWidth" in submit_menu_js
+    assert "window.innerHeight - rect.top + PANEL_GAP_PX" in submit_menu_js
+    trigger_rule = submit_menu_block.split(".hoocon-submit-menu__trigger {")[1].split("}")[0]
+    assert "background: var(--hoocon-primary" not in trigger_rule
+    assert "border-radius:" not in trigger_rule
+    assert "justify-content: flex-start" not in submit_menu_block.split(".hoocon-submit-menu__action")[1].split("}")[0]
     assert '[data-inline-type="tabular"] .tabular.inline-related' in css
     assert 'body.change-form [data-inline-type="tabular"] table.formset tbody.form-group' in css
     assert "tr.form-row:has(.delete:checked)" in css
@@ -749,6 +786,7 @@ def test_admin_pwa_manifest_and_icons() -> None:
     assert "hoocon-admin-live-badges.js" in html
     assert "hoocon-admin-webpush.js" in html
     assert "hoocon-admin-tables.js" in html
+    assert "hoocon-admin-submit-menu.js" in html
     assert "hoocon-admin-phone-shell.js" in html
     assert "hoocon-admin-phone-settings.js" in html
     assert "hoocon-os27.css" in html

@@ -872,12 +872,15 @@ body.hoocon-os27.change-form .selector select {
     z-index: 110 !important;
     width: auto;
     max-width: none;
+    height: auto !important;
     box-sizing: border-box;
   }
 
   body.hoocon-os27.change-form #submit-row > div {
     width: 100%;
     max-width: 100%;
+    height: auto !important;
+    min-height: 4rem;
     box-sizing: border-box;
   }
 
@@ -885,6 +888,15 @@ body.hoocon-os27.change-form .selector select {
     margin-inline: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: auto !important;
+    min-height: 4rem;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    align-content: center;
+    row-gap: 0.5rem;
+    column-gap: 0.65rem;
+    padding-inline: 0.5rem !important;
+    padding-block: 0.65rem !important;
     box-sizing: border-box;
   }
 
@@ -893,7 +905,8 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27.change-form #main > div.grow {
-    padding-bottom: 5rem;
+    /* Extra room when RU save labels wrap to a second row. */
+    padding-bottom: 7rem;
   }
 
 }

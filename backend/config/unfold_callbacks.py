@@ -160,6 +160,12 @@ def admin_tables_js(request: HttpRequest) -> str:
     return _versioned_static("admin/js/hoocon-admin-tables.js")
 
 
+def admin_submit_menu_js(request: HttpRequest) -> str:
+    """Change-form save actions dropdown on narrow viewports (cache-busted)."""
+    del request
+    return _versioned_static("admin/js/hoocon-admin-submit-menu.js")
+
+
 def admin_phone_shell_js(request: HttpRequest) -> str:
     """Bottom tabs + more sheet for Admin phone (cache-busted)."""
     del request

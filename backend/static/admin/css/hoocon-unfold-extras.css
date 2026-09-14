@@ -1700,6 +1700,109 @@ body.login select:focus,
   line-height: 1.25;
 }
 
+@media (min-width: 768px) {
+  /* Long RU labels («Сохранить и продолжить…») must wrap instead of clipping. */
+  body.change-form #submit-row {
+    height: auto !important;
+  }
+
+  body.change-form #submit-row > div {
+    height: auto !important;
+    min-height: 4rem;
+  }
+
+  body.change-form #submit-row .container {
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    align-content: center;
+    height: auto !important;
+    min-height: 4rem;
+    row-gap: 0.5rem;
+    column-gap: 0.65rem;
+    padding-block: 0.65rem !important;
+  }
+}
+
+/* Save actions collapse into «Сохранить ▾» when JS adds .hoocon-submit-menu-active. */
+body.change-form #submit-row .container.hoocon-submit-menu-active {
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.5rem !important;
+  height: auto !important;
+  min-height: 3.25rem;
+  padding-block: 0.5rem !important;
+}
+
+body.change-form #submit-row .container.hoocon-submit-menu-active > .flex {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  min-width: 0;
+  margin-right: auto !important;
+}
+
+.hoocon-submit-menu {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(14rem, 52vw);
+}
+
+/* Trigger inherits Unfold primary button classes from «Сохранить» (see submit-menu.js). */
+.hoocon-submit-menu__trigger {
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hoocon-submit-menu__trigger .hoocon-submit-menu__chevron {
+  font-size: 1.15rem;
+  line-height: 1;
+  margin-inline: -0.1rem 0;
+  transition: transform 0.15s ease;
+}
+
+.hoocon-submit-menu.is-open .hoocon-submit-menu__chevron {
+  transform: rotate(180deg);
+}
+
+.hoocon-submit-menu__panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.4rem);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: min(18rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.45rem;
+  border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+  border-radius: var(--hoocon-radius);
+  background: var(--hoocon-surface, #fff);
+  box-shadow: var(--hoocon-shadow-soft, 0 8px 28px rgba(20, 20, 30, 0.12));
+}
+
+/* Open panel is pinned to the viewport so it cannot slide under the sidebar. */
+.hoocon-submit-menu.is-open .hoocon-submit-menu__panel {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  z-index: 130;
+}
+
+.hoocon-submit-menu__panel[hidden] {
+  display: none !important;
+}
+
+/* Panel rows keep Unfold default/primary variants — layout only. */
+.hoocon-submit-menu__action {
+  width: 100% !important;
+  max-width: none !important;
+  flex: none !important;
+  white-space: normal !important;
+}
+
 /*
  * Unfold vertical changelist filter — sheet below 2xl, sidebar at 2xl+.
  * Legacy phone CSS used position:static and crushed the panel in flex-row.
@@ -2501,11 +2604,28 @@ body:not(.hoocon-support-inbox) #changelist
  * Root cause of “not full width”: Unfold #content.container mx-auto caps at
  * Tailwind container breakpoints (e.g. 768px at ~953px viewport). */
 @media (min-width: 768px) {
-  /* Drop Unfold shell px-4 so the only horizontal inset is 0.5rem below. */
-  body.hoocon-lead-board #main > div.px-4,
-  body.hoocon-lead-board #main > div.pb-4 {
+  /* Drop Unfold grow shell px-4 — not sticky footer (pagination bar). */
+  body.hoocon-lead-board #main > div.grow.px-4,
+  body.hoocon-lead-board #main > div.grow.pb-4 {
     padding-left: 0 !important;
     padding-right: 0 !important;
+  }
+
+  /* Header + bottom bar: same 0.5rem inset as #content board canvas. */
+  body.hoocon-lead-board .hoocon-admin-header > .container {
+    max-width: none !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    box-sizing: border-box;
+  }
+
+  body.hoocon-lead-board #main > div.px-4.lg\:border-t {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    box-sizing: border-box;
   }
 
   /* Unfold #content.container mx-auto — lift the container max-width cap. */
