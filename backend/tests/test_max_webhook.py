@@ -114,6 +114,27 @@ def test_main_menu_has_legal_links() -> None:
 
 
 @pytest.mark.django_db
+def test_dialog_cleared_sends_welcome() -> None:
+    """Clearing bot chat history triggers welcome with cover again."""
+    with (
+        patch("sitesettings.credentials.max_bot_token", return_value="token"),
+        patch("social.max_bot.welcome_cover_path", return_value=None),
+        patch(
+            "social.max_bot.publish_max",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+    ):
+        handle_max_update(
+            {
+                "update_type": "dialog_cleared",
+                "user": {"user_id": 501, "first_name": "Клиент"},
+            },
+        )
+    assert pub.called
+    assert "Добро пожаловать" in pub.call_args.kwargs["text"]
+
+
+@pytest.mark.django_db
 def test_free_text_opens_support_thread() -> None:
     """Client question is stored in supportchat as MAX channel."""
     with patch(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -55,6 +56,7 @@ BOT_COMMANDS: list[dict[str, str]] = [
 
 STAFF_COMMANDS: list[dict[str, str]] = [
     {"command": "chatid", "description": "Ваш user_id для алертов в Admin"},
+    {"command": "reply", "description": "Ответ клиенту: /reply ID текст"},
 ]
 
 BTN_CATALOG = "Каталог"
@@ -152,11 +154,40 @@ def main_menu_keyboard() -> list[dict[str, Any]]:
 def compose_welcome_text() -> str:
     """Plain welcome for /start and bot_started."""
     text = (
+        "Добро пожаловать в Hoocon!\n\n"
         "HOOCON — электроприводы и арматура для вентиляции и ОВК.\n\n"
-        "Кнопки ниже — каталог, заявка, юридические документы и контакты.\n"
-        "Или напишите вопрос — ответим в рабочие дни (Пн–Пт 9:30–17:30 МСК)."
+        "Кнопки ниже — каталог, заявка, документы, контакты и канал MAX.\n"
+        "Или напишите вопрос — ответим в рабочие дни.\n\n"
+        f"Канал новостей: {max_channel_deep_link()}\n"
+        f"Режим ответа: {_HOURS} · {_PHONE}"
     )
     return _clip(text, _MESSAGE_MAX)
+
+
+def welcome_cover_path() -> Path | None:
+    """Welcome cover reused from Telegram/MAX channel asset."""
+    from social.max_channel import channel_cover_path
+
+    return channel_cover_path()
+
+
+def _welcome_attachments(token: str | None) -> list[dict[str, Any]]:
+    """Cover image + inline menu for the first /start reply."""
+    attachments: list[dict[str, Any]] = list(main_menu_keyboard())
+    if not token:
+        return attachments
+    cover = welcome_cover_path()
+    if cover is None:
+        return attachments
+    try:
+        from social.max_http import max_upload_image
+
+        image_token = max_upload_image(token, cover)
+    except (OSError, RuntimeError, FileNotFoundError) as exc:
+        logger.warning("max_welcome_cover_failed error=%s", type(exc).__name__)
+        return attachments
+    attachments.insert(0, {"type": "image", "payload": {"token": image_token}})
+    return attachments
 
 
 def compose_contacts_text() -> str:
@@ -344,6 +375,55 @@ def _send_to_user(
     )
 
 
+def _send_welcome_to_user(user_id: str, text: str) -> PublishResult:
+    """Welcome reply with cover image when the asset is available."""
+    from sitesettings.credentials import max_bot_token
+
+    token = max_bot_token()
+    return _send_to_user(
+        user_id,
+        text,
+        attachments=_welcome_attachments(token or None),
+    )
+
+
+def _send_reply_for_action(user_key: str, action: str) -> PublishResult:
+    """Route menu action to welcome (with cover) or plain text reply."""
+    reply_text, keyboard = _reply_for_action(action, user_key)
+    if action in {"start", "help"}:
+        return _send_welcome_to_user(user_key, reply_text)
+    return _send_to_user(user_key, reply_text, attachments=keyboard)
+
+
+def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
+    """Handle manager reply (#ID text) or help; None → treat as client message."""
+    from social.max_staff_reply import (
+        compose_staff_reply_help,
+        parse_staff_reply_text,
+        staff_user_for_max_user_id,
+        submit_staff_reply_from_max,
+    )
+
+    staff_user = staff_user_for_max_user_id(user_key)
+    if staff_user is None:
+        return None
+
+    parsed = parse_staff_reply_text(text)
+    if parsed is not None:
+        conv_id, reply_body = parsed
+        ok, status = submit_staff_reply_from_max(staff_user, conv_id, reply_body)
+        return _send_to_user(user_key, status if ok else f"Не отправлено: {status}")
+
+    raw = (text or "").strip().casefold()
+    if raw.startswith("/reply"):
+        return _send_to_user(user_key, compose_staff_reply_help())
+
+    if resolve_menu_action(text) is not None:
+        return None
+
+    return _send_to_user(user_key, compose_staff_reply_help())
+
+
 def _ingest_support_text(
     *,
     user_id: str,
@@ -414,17 +494,33 @@ def _reply_for_action(action: str, user_key: str) -> tuple[str, list[dict[str, A
     return compose_fallback_reply(), keyboard
 
 
-def _handle_bot_started(update: dict[str, Any]) -> PublishResult | None:
+def _user_key_from_update(update: dict[str, Any]) -> str | None:
+    """MAX user_id from bot_started / dialog_cleared and similar updates."""
     user = update.get("user")
-    if not isinstance(user, dict):
+    if isinstance(user, dict) and user.get("user_id") is not None:
+        return str(user.get("user_id"))
+    raw = update.get("user_id")
+    if raw is not None:
+        return str(raw)
+    return None
+
+
+def _handle_bot_started(update: dict[str, Any]) -> PublishResult | None:
+    user_key = _user_key_from_update(update)
+    if user_key is None:
         return None
-    user_id = user.get("user_id")
-    if user_id is None:
-        return None
-    user_key = str(user_id)
     action = _start_payload_from_update(update)
-    text, keyboard = _reply_for_action(action, user_key)
-    return _send_to_user(user_key, text, attachments=keyboard)
+    if action in {"start", "help"}:
+        return _send_welcome_to_user(user_key, compose_welcome_text())
+    return _send_reply_for_action(user_key, action)
+
+
+def _handle_dialog_cleared(update: dict[str, Any]) -> PublishResult | None:
+    """Re-send welcome when the user clears the 1:1 bot chat history."""
+    user_key = _user_key_from_update(update)
+    if user_key is None:
+        return None
+    return _send_welcome_to_user(user_key, compose_welcome_text())
 
 
 def _handle_message_created(update: dict[str, Any]) -> PublishResult | None:
@@ -450,11 +546,15 @@ def _handle_message_created(update: dict[str, Any]) -> PublishResult | None:
 
     user_key = str(user_id)
     display_name = _display_name_from_user(sender)
+
+    staff_reply = _try_staff_max_reply(user_key, text)
+    if staff_reply is not None:
+        return staff_reply
+
     action = resolve_menu_action(text)
 
     if action is not None:
-        reply_text, keyboard = _reply_for_action(action, user_key)
-        return _send_to_user(user_key, reply_text, attachments=keyboard)
+        return _send_reply_for_action(user_key, action)
 
     return _ingest_support_text(
         user_id=user_key,
@@ -471,6 +571,8 @@ def handle_max_update(update: dict[str, Any]) -> PublishResult | None:
     update_type = (update.get("update_type") or "").strip()
     if update_type == "bot_started":
         return _handle_bot_started(update)
+    if update_type == "dialog_cleared":
+        return _handle_dialog_cleared(update)
     if update_type == "message_created":
         return _handle_message_created(update)
     return None

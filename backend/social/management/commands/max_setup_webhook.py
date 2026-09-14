@@ -18,13 +18,18 @@ from sitesettings.credentials import max_bot_token
 from social.max_http import max_json_request
 
 _MAX_API = "https://platform-api2.max.ru"
-_UPDATE_TYPES = ("bot_started", "message_created", "message_callback")
+_UPDATE_TYPES = (
+    "bot_started",
+    "dialog_cleared",
+    "message_created",
+    "message_callback",
+)
 
 
 class Command(BaseCommand):
     """Upsert MAX webhook subscription for hoocon.ru."""
 
-    help = "Register MAX webhook (bot_started + message_created) on platform-api2.max.ru."
+    help = "Register MAX webhook (bot_started, dialog_cleared, messages) on platform-api2."
 
     def add_arguments(self, parser: Any) -> None:
         parser.add_argument(

@@ -84,8 +84,11 @@ def notify_staff_max_support(conversation_id: int) -> int:
         if snippet:
             channel_label = conv.get_channel_display()
             body = f"{body}\n\n{channel_label}: {snippet}"
+    from social.max_staff_reply import staff_reply_hint
+
+    body = f"{body}\n\n{staff_reply_hint(conv.pk)}"
     text = format_staff_max_message(
-        title=title,
+        title=f"{title} · #{conv.pk}",
         body=body,
         url=f"/admin/supportchat/conversation/{conv.pk}/change/",
     )

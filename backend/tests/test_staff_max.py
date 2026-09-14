@@ -92,4 +92,7 @@ def test_support_max_alert() -> None:
     ) as pub:
         assert notify_staff_max_support(conv.pk) == 1
     assert pub.call_args.kwargs["user_id"] == "222"
-    assert "DA10N" in pub.call_args.kwargs["text"]
+    alert = pub.call_args.kwargs["text"]
+    assert "DA10N" in alert
+    assert f"#{conv.pk}" in alert
+    assert "Ответить из MAX" in alert
