@@ -15,7 +15,11 @@ import {
   subscribeWebPushStatusRu,
   syncExistingWebPush,
 } from "../utils/webPush";
+import { MaxLogo } from "./icons/MaxLogo";
+import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
 import styles from "./SupportWidget.module.css";
+
+const SUPPORT_SURFACE_KEY = "hoocon-support-surface";
 
 type ChatMessage = {
   id: number;
@@ -26,7 +30,7 @@ type ChatMessage = {
   sender_name: string;
 };
 
-type ChannelLink = { channel: string; label: string; deep_link: string };
+type SupportSurface = "pick" | "web";
 
 type SupportFaqItem = { id: number; question: string; answer: string };
 
@@ -122,6 +126,32 @@ function maxMessageId(messages: ChatMessage[], fallback = 0): number {
   return Math.max(fallback, ...messages.map((m) => m.id));
 }
 
+function readSupportSurfacePref(): SupportSurface | null {
+  try {
+    const raw = localStorage.getItem(SUPPORT_SURFACE_KEY);
+    return raw === "web" ? "web" : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSupportSurfacePref(surface: SupportSurface) {
+  try {
+    localStorage.setItem(SUPPORT_SURFACE_KEY, surface);
+  } catch {
+    /* private mode */
+  }
+}
+
+function hasMessengerBots(channels: MessengerChannel[]): boolean {
+  return channels.some(
+    (ch) =>
+      ch.kind === "bot" ||
+      ch.channel === "max_bot" ||
+      ch.channel === "telegram_bot",
+  );
+}
+
 function formatMessageTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -191,7 +221,8 @@ export function SupportWidget() {
   const [contactsLocked, setContactsLocked] = useState(false);
   const [isOpenNow, setIsOpenNow] = useState(true);
   const [outsideHint, setOutsideHint] = useState("");
-  const [channels, setChannels] = useState<ChannelLink[]>([]);
+  const [channels, setChannels] = useState<MessengerChannel[]>([]);
+  const [chatSurface, setChatSurface] = useState<SupportSurface>("web");
   const [faqItems, setFaqItems] = useState<SupportFaqItem[]>([]);
   const [activeFaq, setActiveFaq] = useState<SupportFaqItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -270,7 +301,7 @@ export function SupportWidget() {
 
   // On open: resume session + full history (PWA reload must see staff replies).
   useEffect(() => {
-    if (!open) {
+    if (!open || chatSurface !== "web") {
       resumeOnceRef.current = false;
       return;
     }
@@ -303,10 +334,10 @@ export function SupportWidget() {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, chatSurface]);
 
   useEffect(() => {
-    if (!open || !started) return;
+    if (!open || chatSurface !== "web" || !started) return;
     const tick = async () => {
       try {
         const after = lastIdRef.current > 0 ? lastIdRef.current : undefined;
@@ -321,7 +352,7 @@ export function SupportWidget() {
     void tick();
     const id = window.setInterval(() => void tick(), 2500);
     return () => window.clearInterval(id);
-  }, [open, started]);
+  }, [open, started, chatSurface]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -537,6 +568,17 @@ export function SupportWidget() {
     }
   }
 
+  function chooseWebChat() {
+    writeSupportSurfacePref("web");
+    setChatSurface("web");
+  }
+
+  function showChannelPicker() {
+    setChatSurface("pick");
+  }
+
+  const showPicker = open && chatSurface === "pick" && hasMessengerBots(channels);
+
   if (!visible) return null;
 
   return (
@@ -565,6 +607,15 @@ export function SupportWidget() {
                 />
                 {isOpenNow ? "Сейчас на связи" : "Вне рабочего времени"}
               </p>
+              {chatSurface === "web" && hasMessengerBots(channels) ? (
+                <button
+                  type="button"
+                  className={styles.surfaceSwitch}
+                  onClick={showChannelPicker}
+                >
+                  Другой способ связи
+                </button>
+              ) : null}
             </div>
             <button
               type="button"
@@ -576,11 +627,37 @@ export function SupportWidget() {
             </button>
           </header>
 
-          {!isOpenNow && outsideHint ? (
+          {showPicker ? (
+            <div className={styles.surfacePicker}>
+              <p className={styles.surfaceTitle}>Как удобнее связаться?</p>
+              <p className={styles.surfaceHint}>
+                Чат на сайте или личные сообщения в MAX / Telegram — ответим в
+                рабочие дни.
+              </p>
+              <button
+                type="button"
+                className={styles.surfacePrimary}
+                onClick={chooseWebChat}
+              >
+                <ChatIcon className={styles.surfacePrimaryIcon} />
+                <span>
+                  <strong>Чат на сайте</strong>
+                  <small>Без установки приложений</small>
+                </span>
+              </button>
+              <MessengerLinks
+                channels={channels}
+                variant="compact"
+                onNavigate={() => closeSupportChat()}
+              />
+            </div>
+          ) : null}
+
+          {!showPicker && !isOpenNow && outsideHint ? (
             <p className={styles.banner}>{outsideHint}</p>
           ) : null}
 
-          {!contactsLocked ? (
+          {!showPicker && !contactsLocked ? (
             <form className={styles.metaDetails} onSubmit={(e) => void onSaveContacts(e)}>
               <p className={styles.metaSummary}>Контакты (необязательно)</p>
               <div className={styles.meta}>
@@ -616,13 +693,14 @@ export function SupportWidget() {
             </form>
           ) : null}
 
+          {!showPicker ? (
           <div className={styles.messages} ref={listRef}>
             {messages.length === 0 && !activeFaq ? (
               <div className={styles.empty}>
                 <p className={styles.emptyTitle}>Чем помочь?</p>
                 <p className={styles.emptyText}>
                   Вопрос по приводам, арматуре или КП — ответим здесь. Удобнее в
-                  Telegram — напишите боту кнопкой ниже.
+                  MAX или Telegram — кнопки ниже.
                 </p>
               </div>
             ) : null}
@@ -662,30 +740,20 @@ export function SupportWidget() {
               </>
             ) : null}
           </div>
+          ) : null}
 
+          {!showPicker ? (
           <QuickFaqChips
             items={faqItems}
             activeId={activeFaq?.id ?? null}
             onPick={pickFaq}
           />
+          ) : null}
 
+          {!showPicker ? (
           <div className={styles.footerBar}>
-            {channels.some((ch) => ch.channel === "telegram_bot") ? (
-              <div className={styles.channels}>
-                {channels
-                  .filter((ch) => ch.channel === "telegram_bot")
-                  .map((ch) => (
-                    <a
-                      key={ch.channel}
-                      className={styles.channelChip}
-                      href={ch.deep_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {ch.label}
-                    </a>
-                  ))}
-              </div>
+            {hasMessengerBots(channels) ? (
+              <MessengerLinks channels={channels} variant="compact" />
             ) : null}
 
             {pushSupported() ? (
@@ -720,7 +788,9 @@ export function SupportWidget() {
               Скрыть чат
             </button>
           </div>
+          ) : null}
 
+          {!showPicker ? (
           <form className={styles.composer} onSubmit={(e) => void onSubmit(e)}>
             <label className={styles.srOnly} htmlFor={`${titleId}-draft`}>
               Сообщение
@@ -743,6 +813,7 @@ export function SupportWidget() {
               <SendIcon className={styles.sendIcon} />
             </button>
           </form>
+          ) : null}
           {error ? <p className={styles.error}>{error}</p> : null}
         </section>
       ) : null}
@@ -762,13 +833,26 @@ export function SupportWidget() {
         }
         aria-expanded={open}
         aria-label={open ? "Закрыть чат" : "Открыть чат поддержки"}
-        onClick={() => setSupportChatOpen(!open)}
+        onClick={() => {
+          if (!open) {
+            setChatSurface(
+              hasMessengerBots(channels)
+                ? (readSupportSurfacePref() ?? "pick")
+                : "web",
+            );
+          }
+          setSupportChatOpen(!open);
+        }}
       >
         {open ? (
           <CloseIcon className={styles.fabIcon} />
         ) : (
           <>
-            <ChatIcon className={styles.fabIcon} />
+            {channels.some((ch) => ch.provider === "max" || ch.channel.startsWith("max_")) ? (
+              <MaxLogo className={styles.fabMaxIcon} title="" />
+            ) : (
+              <ChatIcon className={styles.fabIcon} />
+            )}
             <span className={styles.fabLabel}>Чат</span>
           </>
         )}

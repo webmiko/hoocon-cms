@@ -13,6 +13,7 @@ import { ScrollProgress } from "./ScrollProgress";
 import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
+import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
 import { ThemeToggle } from "./ThemeToggle";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { emptyDockCtaForPath } from "../utils/emptyDockCta";
@@ -54,16 +55,14 @@ export function Layout() {
   /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
   const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
   const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
-  const [telegramLinks, setTelegramLinks] = useState<
-    Array<{ channel: string; label: string; deep_link: string }>
-  >([]);
+  const [messengerLinks, setMessengerLinks] = useState<MessengerChannel[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const data = await api.supportChannels();
-        if (!cancelled) setTelegramLinks(data.channels);
+        if (!cancelled) setMessengerLinks(data.channels);
       } catch {
         /* footer stays without TG links */
       }
@@ -370,6 +369,7 @@ export function Layout() {
             </p>
             <p>Электроприводы для вентиляции, противопожарной безопасности и дымоудаления.</p>
             <p>Склад в Москве · поставки по РФ</p>
+            <MessengerLinks channels={messengerLinks} variant="footer" />
           </div>
           <div>
             <h2 className={styles.footerHeading}>Каталог</h2>
@@ -429,13 +429,6 @@ export function Layout() {
               <li>
                 <Link to="/kontakty">Все контакты</Link>
               </li>
-              {telegramLinks.map((ch) => (
-                <li key={ch.channel}>
-                  <a href={ch.deep_link} target="_blank" rel="noopener noreferrer">
-                    {ch.label}
-                  </a>
-                </li>
-              ))}
             </ul>
           </div>
         </div>

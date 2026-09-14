@@ -252,6 +252,95 @@
   text-wrap: pretty;
 }
 
+.surfaceSwitch {
+  appearance: none;
+  border: none;
+  background: transparent;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  color: var(--color-link);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  cursor: pointer;
+}
+
+.surfaceSwitch:hover {
+  color: var(--color-text);
+}
+
+.surfacePicker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.5rem;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.surfaceTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.surfaceHint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.surfacePrimary {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 35%, transparent);
+  background: var(--color-brand-soft);
+  color: var(--color-text);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out);
+}
+
+.surfacePrimary:hover {
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface));
+}
+
+.surfacePrimary strong {
+  display: block;
+  font-size: var(--font-size-md);
+}
+
+.surfacePrimary small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.surfacePrimaryIcon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+
+.fabMaxIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
 .status {
   margin: 0.2rem 0 0;
   display: inline-flex;

@@ -399,7 +399,13 @@ export const api = {
   },
 
   supportChannels(): Promise<{
-    channels: Array<{ channel: string; label: string; deep_link: string }>;
+    channels: Array<{
+      channel: string;
+      label: string;
+      deep_link: string;
+      provider?: string;
+      kind?: string;
+    }>;
   }> {
     return apiFetch("/api/support/channels/");
   },
