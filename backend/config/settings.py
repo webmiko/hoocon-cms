@@ -421,6 +421,14 @@ UNFOLD = {
                         "permission": "config.unfold_callbacks.perm_view_analytics",
                     },
                     {
+                        "title": _("Вики"),
+                        "icon": "menu_book",
+                        "link": reverse_lazy(
+                            "admin:content_wikidocument_browse",
+                        ),
+                        "permission": "config.unfold_callbacks.perm_view_wikidocument",
+                    },
+                    {
                         "title": _("Настройки сайта"),
                         "icon": "settings",
                         "link": reverse_lazy(

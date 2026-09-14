@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hoocon — Анализ остатков и продаж · 10.08–14.09.2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --border: #2d3a4f;
+      --text: #e8edf4;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent2: #06b6d4;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --orange: #f97316;
+      --radius: 12px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      overflow-x: hidden;
+      width: 100%;
+      max-width: 100vw;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f1419 60%);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 2rem 1.5rem;
+    }
+
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      word-break: break-word;
+    }
+
+    .header .sub {
+      color: var(--muted);
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 3rem;
+      width: 100%;
+      min-width: 0;
+      overflow-x: hidden;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      min-width: 0;
+    }
+
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+
+    .kpi .label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .kpi .value {
+      font-size: 1.85rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .kpi.red .value { color: var(--red); }
+    .kpi.yellow .value { color: var(--yellow); }
+    .kpi.green .value { color: var(--green); }
+    .kpi.blue .value { color: var(--accent2); }
+
+    .section {
+      margin-bottom: 2.5rem;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .section-desc {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+      max-width: 900px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      min-width: 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--muted);
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .chart-wrap canvas {
+      display: block;
+      max-width: 100% !important;
+    }
+
+    .chart-wrap.tall { height: 360px; }
+    .chart-wrap.short { height: 220px; }
+
+    .table-scroll {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .desktop-table { display: table; }
+
+    .mobile-cards {
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .m-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+    }
+
+    .m-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .m-card-head strong {
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+
+    .m-card-name {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-bottom: 0.65rem;
+      word-break: break-word;
+    }
+
+    .m-card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem 0.75rem;
+      font-size: 0.78rem;
+    }
+
+    .m-card-grid span:nth-child(odd) { color: var(--muted); }
+    .m-card-grid span:nth-child(even) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .m-history {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.25rem;
+      margin-top: 0.65rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .m-history span {
+      flex: 1;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .container { padding: 1rem; }
+      .header { padding: 1.25rem 1rem 1rem; }
+      .header h1 { font-size: 1.35rem; }
+      .header .sub { font-size: 0.85rem; }
+      .section-desc { font-size: 0.85rem; }
+      .kpi .value { font-size: 1.5rem; }
+      .chart-wrap { height: 260px; }
+      .chart-wrap.tall { height: 420px; }
+      .chart-wrap.short { height: 260px; }
+    }
+
+    @media (max-width: 640px) {
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+      .kpi { padding: 0.9rem; }
+      .kpi .value { font-size: 1.25rem; }
+      .kpi .label { font-size: 0.68rem; }
+      .card { padding: 1rem; }
+      .desktop-table { display: none; }
+      .mobile-cards { display: flex; }
+      .table-scroll { overflow-x: visible; }
+      th, td { padding: 0.5rem 0.45rem; font-size: 0.78rem; }
+    }
+
+    @media (max-width: 380px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+
+    .insight {
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .insight strong { color: var(--text); }
+    .insight.warn { border-color: var(--yellow); }
+    .insight.danger { border-color: var(--red); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-p1 { background: rgba(239,68,68,0.2); color: var(--red); }
+    .badge-p2 { background: rgba(234,179,8,0.2); color: var(--yellow); }
+    .badge-p3 { background: rgba(59,130,246,0.2); color: var(--accent); }
+    .badge-ok { background: rgba(34,197,94,0.15); color: var(--green); }
+
+    .num { font-variant-numeric: tabular-nums; text-align: right; }
+    .num-red { color: var(--red); font-weight: 600; }
+    .num-green { color: var(--green); }
+
+    .spark {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 28px;
+    }
+
+    .spark span {
+      flex: 1;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+      min-width: 4px;
+      opacity: 0.7;
+    }
+
+    .spark span:last-child { opacity: 1; background: var(--accent2); }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .legend-row span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 0.35rem;
+      vertical-align: middle;
+    }
+
+
+    .nav-anchors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .nav-anchors a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-size: 0.82rem;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+    }
+
+    .narrative-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+      gap: 1rem;
+    }
+
+    .narrative-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+    }
+
+    .narrative-card h4 {
+      font-size: 0.92rem;
+      margin-bottom: 0.55rem;
+      color: var(--accent2);
+    }
+
+    .narrative-card p {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .narrative-card p strong { color: var(--text); }
+
+    .method-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .method-box strong { color: var(--text); }
+
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: rgba(59,130,246,0.18);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .cat-block {
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .cat-head {
+      padding: 0.85rem 1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cat-head h4 {
+      font-size: 0.92rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .cat-head p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .cat-head .action {
+      font-size: 0.78rem;
+      color: var(--yellow);
+    }
+
+    .cat-items {
+      padding: 0.35rem 0;
+    }
+
+    .cat-item {
+      display: grid;
+      grid-template-columns: 110px 1fr auto;
+      gap: 0.75rem;
+      padding: 0.55rem 1rem;
+      border-bottom: 1px solid rgba(45,58,79,0.55);
+      font-size: 0.82rem;
+      align-items: start;
+    }
+
+    .cat-item:last-child { border-bottom: none; }
+
+    .cat-item .sku { font-weight: 700; word-break: break-word; }
+    .cat-item .name { color: var(--muted); word-break: break-word; }
+    .cat-item .stock {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .cat-item {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+      }
+      .cat-item .stock { text-align: left; }
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 2rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Анализ остатков и продаж Hoocon</h1>
+    <p class="sub">Период: 10.08.2026 — 14.09.2026 · 4 снимка склада · 35 дней</p>
+  </header>
+
+  <div class="container">
+    <!-- KPI -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+
+    <nav class="nav-anchors" aria-label="Разделы отчёта">
+      <a href="#method">Метод</a>
+      <a href="#meaning">Что за цифрами</a>
+      <a href="#charts">Графики</a>
+      <a href="#idle">Без движения</a>
+      <a href="#plan">План</a>
+    </nav>
+
+    <section class="section" id="method">
+      <h2 class="section-title">Как читать этот отчёт</h2>
+      <div class="method-box">
+        Цифры — это <strong>изменение свободных остатков</strong> между 4 снимками склада (10.08, 24.08, 07.09, 14.09).
+        Падение остатка без оприходования = <strong>отгрузка / реализация</strong>.
+        Рост = <strong>поставка</strong>.
+        Это <strong>пульс склада</strong>, а не выручка и не заказы с сайта.
+      </div>
+    </section>
+
+    <section class="section" id="meaning">
+      <h2 class="section-title">Что за цифрами</h2>
+      <p class="section-desc">
+        Не только «сколько», но и <strong>что это значит для склада и закупки</strong>.
+      </p>
+      <div class="narrative-grid" id="narrative-grid"></div>
+    </section>
+
+    <section class="section" id="charts">
+      <h2 class="section-title">Динамика склада и продаж</h2>
+      <p class="section-desc">
+        Сравнение суммарных остатков по датам снимков и объёма «продаж» (списаний/отгрузок)
+        между снимками. Снижение остатков без пополнений интерпретируется как расход.
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Остатки на складе (шт, все позиции)</h3>
+          <div class="chart-wrap"><canvas id="chartStock"></canvas></div>
+          <div class="insight">
+            <strong>−4 190 шт (−11,8%)</strong> за период. Склад активно отгружается,
+            пополнений почти не было (кроме DA24MU230-DS).
+          </div>
+        </div>
+        <div class="card">
+          <h3>Продажи по интервалам (шт/день)</h3>
+          <div class="chart-wrap"><canvas id="chartPeriods"></canvas></div>
+          <div class="insight warn">
+            Темп замедляется: <strong>165 → 117 → 74 шт/день</strong>.
+            Возможно — сезонность, исчерпание горячих SKU или меньше отгрузок в конце периода.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Series breakdown -->
+    <section class="section">
+      <h2 class="section-title">Структура по сериям</h2>
+      <p class="section-desc">
+        DA (воздушные приводы) и SA (дымоудаление/противопожарка) дают 87% всего расхода.
+        BR (кронштейны) расходуется вместе с приводами.
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Доля продаж по сериям</h3>
+          <div class="chart-wrap short"><canvas id="chartSeriesPie"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Остаток vs продано (по сериям)</h3>
+          <div class="chart-wrap"><canvas id="chartSeriesBar"></canvas></div>
+          <div class="insight">
+            DA: запас ~230 дней при текущем темпе. SA: ~194 дня.
+            BV и HVA — очень медленный ход, заказы не срочны.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Top movers -->
+    <section class="section">
+      <h2 class="section-title">Ходовой товар — топ-15</h2>
+      <p class="section-desc">
+        Позиции с наибольшим расходом за 35 дней. Красным отмечены SKU с запасом ≤14 дней
+        или нулевым остатком.
+      </p>
+      <div class="card">
+        <div class="chart-wrap tall"><canvas id="chartTopSold"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Stock history top SKUs -->
+    <section class="section">
+      <h2 class="section-title">Траектория остатков — критичные SKU</h2>
+      <p class="section-desc">
+        Как менялись остатки у позиций, требующих срочного пополнения (P1).
+      </p>
+      <div class="card">
+        <div class="chart-wrap tall"><canvas id="chartCritical"></canvas></div>
+        <div class="insight danger">
+          <strong>DA5FU230-DS</strong> обнулён за 35 дней (544→0).
+          <strong>SA5FU230-DS</strong> — 486→43, запас ~3 дня.
+          Без заказа SA5FU обнулится к ~17.09.
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="idle">
+      <h2 class="section-title">Позиции без движения за период</h2>
+      <p class="section-desc" id="idle-intro"></p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>По категориям (остаток, шт)</h3>
+          <div class="chart-wrap short"><canvas id="chartIdle"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Исключение из «без движения»</h3>
+          <div class="insight warn" id="idle-exception"></div>
+          <div class="insight">
+            «Не продаётся» ≠ «мертвый SKU».
+            Часто это <strong>другой канал</strong> (24В, плавное, краны) или
+            <strong>замороженный запас</strong> редких DN.
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <div class="filter-bar" id="idle-filters"></div>
+        <div id="idle-list"></div>
+      </div>
+    </section>
+
+    <!-- Replenishment plan -->
+    <section class="section" id="plan">
+      <h2 class="section-title">План пополнения (цель: 60 дней запаса)</h2>
+      <p class="section-desc">
+        Расчёт: средняя скорость за 35 дней × 60 − текущий остаток.
+        P1 — срочно (≤14 дней или обнулён).
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>P1 — срочный заказ</h3>
+          <div class="chart-wrap short"><canvas id="chartP1"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Распределение по приоритетам</h3>
+          <div class="chart-wrap short"><canvas id="chartPriority"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <div class="table-scroll">
+          <table id="table-p1" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Артикул</th>
+                <th>Наименование</th>
+                <th class="num">Остаток</th>
+                <th class="num">шт/день</th>
+                <th class="num">Запас, дн</th>
+                <th class="num">Заказ</th>
+                <th>Динамика</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="mobile-p1-cards" class="mobile-cards"></div>
+      </div>
+    </section>
+
+    <!-- Full top table -->
+    <section class="section">
+      <h2 class="section-title">Сводная таблица — топ-15 ходовых</h2>
+      <div class="card">
+        <div class="table-scroll">
+          <table id="table-top" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Приор.</th>
+                <th>Артикул</th>
+                <th>10.08</th>
+                <th>24.08</th>
+                <th>07.09</th>
+                <th>14.09</th>
+                <th class="num">Продано</th>
+                <th class="num">шт/день</th>
+                <th class="num">Запас</th>
+                <th class="num">Заказ</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="mobile-top-cards" class="mobile-cards"></div>
+      </div>
+    </section>
+
+    <!-- Recommendations -->
+    <section class="section" id="recs">
+      <h2 class="section-title">Рекомендации</h2>
+      <p class="section-desc">
+        Не «заказать всё», а <strong>закрыть конкретные разрывы</strong>.
+        P1 — это 6 SKU, которые блокируют отгрузки; 94% объёма — DA5FU + SA5FU.
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Немедленно</h3>
+          <ul style="padding-left:1.2rem; color:var(--muted); font-size:0.9rem;">
+            <li style="margin-bottom:0.5rem;"><strong style="color:var(--text)">DA5FU230-DS</strong> — 930 шт (обнулён, 15,5/день)</li>
+            <li style="margin-bottom:0.5rem;"><strong style="color:var(--text)">SA5FU230-DS</strong> — 719 шт (43 шт, ~3 дня)</li>
+            <li><strong style="color:var(--text)">Итого P1:</strong> 2 187 шт · 94% — 6 позиций</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>На этой неделе</h3>
+          <ul style="padding-left:1.2rem; color:var(--muted); font-size:0.9rem;">
+            <li style="margin-bottom:0.5rem;">DA16MQU230-DS — 270 шт (24 шт, 5 дней)</li>
+            <li style="margin-bottom:0.5rem;">DA8MQU230-DS — 94 шт · BV232B — 96 шт · DA6MU24-A — 78 шт</li>
+            <li>BR-M, SA10MU230-DS — запас 130–260 дней, заказ не срочен</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Источник: выгрузки «Остатки товаров» 10.08, 24.08, 07.09, 14.09.2026 ·
+    Сгенерировано 14.09.2026 · Hoocon CMS
+  </footer>
+
+  <script>
+    const DATA = {
+  "period_start": "10.08.2026",
+  "period_end": "14.09.2026",
+  "period_days": 35,
+  "date_labels": ["10.08.2026", "24.08.2026", "07.09.2026", "14.09.2026"],
+  "date_cols": ["10.08", "24.08", "07.09", "14.09"],
+  "stock_totals": [35396, 33085, 31727, 31206],
+  "positions": [152, 152, 147, 145],
+  "total_sold": 4388,
+  "avg_daily": 125.4,
+  "total_order": 2323,
+  "periods": [
+    {"label": "10.08 → 24.08", "days": 14, "sold": 2311, "daily": 165.1, "items": 59, "stock_end": 33085},
+    {"label": "24.08 → 07.09", "days": 14, "sold": 1638, "daily": 117.0, "items": 55, "stock_end": 31727},
+    {"label": "07.09 → 14.09", "days": 7, "sold": 521, "daily": 74.4, "items": 35, "stock_end": 31206}
+  ],
+  "series": [
+    {"series": "DA", "sold": 2367, "stock": 15492, "daily": 67.5, "order": 1406, "days": 230},
+    {"series": "SA", "sold": 1446, "stock": 8087, "daily": 41.6, "order": 786, "days": 194},
+    {"series": "BR", "sold": 318, "stock": 2382, "daily": 9.1, "order": 0, "days": 262},
+    {"series": "BV", "sold": 210, "stock": 4558, "daily": 5.7, "order": 100, "days": 800},
+    {"series": "HVD", "sold": 42, "stock": 263, "daily": 1.2, "order": 31, "days": 219},
+    {"series": "HVA", "sold": 1, "stock": 424, "daily": 0, "order": 0, "days": 9999}
+  ],
+  "top_sold": [
+    {"sku": "DA5FU230-DS", "name": "DA5FU230-DS Электропривод 5Нм 230В FU", "sold": 544, "daily": 15.5, "stock": 0, "days_left": 0, "order": 930, "priority": "P1", "history": [544, 182, 32, 0]},
+    {"sku": "SA5FU230-DS", "name": "SA5FU230-DS Противопожарный 5Нм 230В", "sold": 443, "daily": 12.7, "stock": 43, "days_left": 3, "order": 719, "priority": "P1", "history": [486, 116, 55, 43]},
+    {"sku": "SA10MU230-DS", "name": "SA10MU230-DS Дымоудаление 10Нм", "sold": 282, "daily": 8.1, "stock": 1056, "days_left": 130, "order": 0, "priority": "OK", "history": [1338, 1336, 1057, 1056]},
+    {"sku": "BR-M", "name": "BR-M Адаптер (кронштейн)", "sold": 276, "daily": 7.9, "stock": 2040, "days_left": 258, "order": 0, "priority": "OK", "history": [2316, 2286, 2060, 2040]},
+    {"sku": "DA10FU230-D", "name": "DA10FU230-D 10Нм 230В D", "sold": 213, "daily": 6.1, "stock": 350, "days_left": 57, "order": 16, "priority": "P3", "history": [563, 396, 373, 350]},
+    {"sku": "DA10FU230-DS", "name": "DA10FU230-DS 10Нм 230В DS", "sold": 205, "daily": 5.9, "stock": 938, "days_left": 159, "order": 0, "priority": "OK", "history": [1143, 1046, 999, 938]},
+    {"sku": "SA15MU230-DS", "name": "SA15MU230-DS 15Нм дымоудаление", "sold": 174, "daily": 5.0, "stock": 719, "days_left": 144, "order": 0, "priority": "OK", "history": [893, 858, 726, 719]},
+    {"sku": "DA16MQU230-DS", "name": "DA16MQU230-DS 16Нм ускоренный", "sold": 170, "daily": 4.9, "stock": 24, "days_left": 5, "order": 270, "priority": "P1", "history": [194, 184, 24, 24]},
+    {"sku": "SA10FU230-DS", "name": "SA10FU230-DS 10Нм 230В", "sold": 167, "daily": 4.8, "stock": 221, "days_left": 46, "order": 67, "priority": "P3", "history": [388, 225, 221, 221]},
+    {"sku": "DA5FU230-D", "name": "DA5FU230-D 5Нм пружинный", "sold": 143, "daily": 4.1, "stock": 567, "days_left": 138, "order": 0, "priority": "OK", "history": [710, 658, 647, 567]},
+    {"sku": "DA5FU24-DS", "name": "DA5FU24-DS 5Нм 24В", "sold": 124, "daily": 3.5, "stock": 879, "days_left": 251, "order": 0, "priority": "OK", "history": [1003, 802, 882, 879]},
+    {"sku": "DA15FU230-D", "name": "DA15FU230-D 15Нм 230В", "sold": 123, "daily": 3.5, "stock": 452, "days_left": 129, "order": 0, "priority": "OK", "history": [575, 461, 461, 452]},
+    {"sku": "SA3FU230-DS", "name": "SA3FU230-DS 3Нм 230В", "sold": 120, "daily": 3.4, "stock": 234, "days_left": 69, "order": 0, "priority": "OK", "history": [354, 234, 234, 234]},
+    {"sku": "SA5FU24-DS", "name": "SA5FU24-DS 5Нм 24В", "sold": 108, "daily": 3.1, "stock": 203, "days_left": 65, "order": 0, "priority": "OK", "history": [311, 280, 208, 203]},
+    {"sku": "SA10MU24-DS", "name": "SA10MU24-DS 10Нм 24В", "sold": 104, "daily": 3.0, "stock": 833, "days_left": 278, "order": 0, "priority": "OK", "history": [937, 833, 833, 833]}
+  ],
+  "p1": [
+    {"sku": "DA5FU230-DS", "name": "DA5FU230-DS 5Нм 230В FU", "stock": 0, "daily": 15.5, "days_left": 0, "order": 930},
+    {"sku": "SA5FU230-DS", "name": "SA5FU230-DS 5Нм 230В SA", "stock": 43, "daily": 12.7, "days_left": 3, "order": 719},
+    {"sku": "DA16MQU230-DS", "name": "DA16MQU230-DS 16Нм ускоренный", "stock": 24, "daily": 4.9, "days_left": 5, "order": 270},
+    {"sku": "BV232B", "name": "BV232B DN32", "stock": 0, "daily": 1.6, "days_left": 0, "order": 96},
+    {"sku": "DA8MQU230-DS", "name": "DA8MQU230-DS 8Нм ускоренный", "stock": 8, "daily": 1.7, "days_left": 5, "order": 94},
+    {"sku": "DA6MU24-A", "name": "DA6MU24-A 6Нм 24В плавный", "stock": 0, "daily": 1.3, "days_left": 0, "order": 78}
+  ],
+  "priorities": {
+    "OK": {"count": 136, "sold": 2572, "order": 0},
+    "P1": {"count": 6, "sold": 1319, "order": 2187},
+    "P2": {"count": 4, "sold": 4, "order": 0},
+    "P3": {"count": 6, "sold": 493, "order": 136}
+  },
+  "out_of_stock_count": 7,
+  "low_stock_count": 3,
+  "unchanged": 64,
+  "unchanged_zero_net": 65,
+  "declined": 87
+};
+
+const INSIGHTS = {
+  "count_stable": 64,
+  "count_zero_net": 65,
+  "stock_total": 5631,
+  "by_category": [
+    {
+      "category": "MU без движения",
+      "count": 2,
+      "stock": 260
+    },
+    {
+      "category": "Исполнение 24В",
+      "count": 13,
+      "stock": 1925
+    },
+    {
+      "category": "Краны BV",
+      "count": 21,
+      "stock": 1659
+    },
+    {
+      "category": "Крупный остаток (≥100)",
+      "count": 2,
+      "stock": 286
+    },
+    {
+      "category": "Малый остаток (≤5)",
+      "count": 8,
+      "stock": 26
+    },
+    {
+      "category": "Плавное / D / A исполнение",
+      "count": 6,
+      "stock": 905
+    },
+    {
+      "category": "Прочие DA/SA",
+      "count": 1,
+      "stock": 66
+    },
+    {
+      "category": "Серия HVA/HVD",
+      "count": 11,
+      "stock": 504
+    }
+  ],
+  "category_meta": {
+    "Краны BV": {
+      "meaning": "Шаровые краны DN15–DN150. Продаются под комплекты «кран + привод» или проектно, не потоком.",
+      "action": "Не пополнять без заявок. Крупные DN (BV325B 491 шт) — замороженный капитал, не дефицит."
+    },
+    "Исполнение 24В": {
+      "meaning": "Приводы на 24В для BMS/автоматики. В период рынок брал 230В — другой канал сбыта.",
+      "action": "Отдельная стратегия через интеграторов. Не смешивать с закупкой 230В ходовых."
+    },
+    "Плавное / D / A исполнение": {
+      "meaning": "Модулирующее управление (0–10V, 4–20mA) и исполнения D/A. Спрос есть, но в разы меньше ON/OFF.",
+      "action": "Держать минимальный страховой запас. Пополнение — только под заказ."
+    },
+    "Серия HVA/HVD": {
+      "meaning": "Параллельная линейка HV. Не DA/SA — другой сегмент и, возможно, другая витрина.",
+      "action": "Проверить активность в CRM/сайте. Без спроса — не расширять запас."
+    },
+    "MU без движения": {
+      "meaning": "Нишевые моменты 32 Нм и 7 Нм (MU). Рядом AS-версии тоже без движения.",
+      "action": "Уточнить: нет спроса на момент или SKU не в активных продажах."
+    },
+    "Крупный остаток (≥100)": {
+      "meaning": "SA15FU230-DS/DST — много на складе, ноль отгрузок. Возможна каннибализация SA15MU.",
+      "action": "Сверить с реальными заявками: клиенты могут брать другой суффикс (-MU vs -FU)."
+    },
+    "Малый остаток (≤5)": {
+      "meaning": "Почти пустая полка (2–5 шт). Не «не продаётся», а «почти нет для отгрузки».",
+      "action": "Либо довести до минимума и снять с активного склада, либо точечно пополнить под заказ."
+    },
+    "Прочие DA/SA": {
+      "meaning": "Единичные SKU без движения вне основных групп.",
+      "action": "Разбор вручную по истории заявок."
+    }
+  },
+  "exception": {
+    "sku": "DA24MU230-DS",
+    "history": [
+      87,
+      87,
+      287,
+      285
+    ],
+    "note": "Чистый расход 0, но была поставка +198 шт между 24.08 и 07.09."
+  },
+  "narrative": [
+    {
+      "title": "4 388 шт за 35 дней (~125 шт/день)",
+      "body": "Это не продажи с сайта, а <strong>списание свободных остатков</strong> между снимками. Рабочий ритм ~2–3 паллеты в день. Темп падает: <strong>165 → 117 → 74 шт/день</strong> — частично из‑за обнуления DA5FU и исхода SA5FU."
+    },
+    {
+      "title": "−4 190 шт (−11,8%) на складе",
+      "body": "Склад <strong>расходный</strong>, пополнений почти нет. Исключение — <strong>DA24MU230-DS</strong> (+198 шт). Закупка точечная, но <strong>не успевает за DA5FU/SA5FU</strong>."
+    },
+    {
+      "title": "DA + SA = 87% расхода",
+      "body": "<strong>DA</strong> — массовые ON/OFF 5–10 Нм 230В. <strong>SA</strong> — пожарка/дымоудаление, часто <strong>пакетами под объекты</strong>. <strong>BR-M</strong> — расходник к монтажу."
+    },
+    {
+      "title": "DA5FU230-DS: 544 → 0",
+      "body": "Главный DA-SKU (5 Нм FU 230В). Обнуление = <strong>разрыв по ключевой позиции</strong>. Клиенты на эту модель <strong>не получат товар со склада</strong>."
+    },
+    {
+      "title": "SA5FU230-DS: 486 → 43",
+      "body": "Аналог в пожарке. <strong>43 шт ≈ 3 дня</strong>. Второй критический разрыв. Без заказа обнулится к ~17.09."
+    },
+    {
+      "title": "64 позиции без движения (5 631 шт)",
+      "body": "<strong>65</strong> с нулевым чистым расходом, <strong>64</strong> буквально не меняли остаток. Это <strong>18% склада</strong>, не участвовавшего в отгрузках — см. раздел ниже."
+    }
+  ],
+  "items": [
+    {
+      "sku": "BR-H",
+      "name": "BR-H Кронштейн",
+      "category": "Малый остаток (≤5)",
+      "series": "BR-H",
+      "stock": 2,
+      "history": [
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "sku": "BV2100",
+      "name": "BV2100 DN100 Шаровой кран двухходовой Kvs160 DN100",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 6,
+      "history": [
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "sku": "BV2125",
+      "name": "BV2125 DN125 Шаровой кран двухходовой Kvs250 DN125",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 9,
+      "history": [
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "sku": "BV2150",
+      "name": "BV2150 DN150 Шаровой кран двухходовой Kvs400 DN150",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 10,
+      "history": [
+        10,
+        10,
+        10,
+        10
+      ]
+    },
+    {
+      "sku": "BV215A",
+      "name": "BV215A Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 57,
+      "history": [
+        57,
+        57,
+        57,
+        57
+      ]
+    },
+    {
+      "sku": "BV215D",
+      "name": "BV215D Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 25,
+      "history": [
+        25,
+        25,
+        25,
+        25
+      ]
+    },
+    {
+      "sku": "BV215E",
+      "name": "BV215E Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 24,
+      "history": [
+        24,
+        24,
+        24,
+        24
+      ]
+    },
+    {
+      "sku": "BV220A",
+      "name": "BV220A Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 99,
+      "history": [
+        99,
+        99,
+        99,
+        99
+      ]
+    },
+    {
+      "sku": "BV220B",
+      "name": "BV220B ШАРОВЫЕ  КРАНЫ",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 93,
+      "history": [
+        93,
+        93,
+        93,
+        93
+      ]
+    },
+    {
+      "sku": "BV220C",
+      "name": "BV220C Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 34,
+      "history": [
+        34,
+        34,
+        34,
+        34
+      ]
+    },
+    {
+      "sku": "BV220D",
+      "name": "BV220D Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 101,
+      "history": [
+        101,
+        101,
+        101,
+        101
+      ]
+    },
+    {
+      "sku": "BV232A",
+      "name": "BV232A Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 67,
+      "history": [
+        67,
+        67,
+        67,
+        67
+      ]
+    },
+    {
+      "sku": "BV265",
+      "name": "BV265 Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 24,
+      "history": [
+        24,
+        24,
+        24,
+        24
+      ]
+    },
+    {
+      "sku": "BV265 DN65",
+      "name": "BV265 DN65 - Комплект с кронштейном (адаптером)",
+      "category": "Малый остаток (≤5)",
+      "series": "BV",
+      "stock": 4,
+      "history": [
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "sku": "BV280",
+      "name": "BV280 DN80 Шаровой кран двухходовой Kvs100 DN80",
+      "category": "Малый остаток (≤5)",
+      "series": "BV",
+      "stock": 5,
+      "history": [
+        5,
+        5,
+        5,
+        5
+      ]
+    },
+    {
+      "sku": "BV315C",
+      "name": "BV315C Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 40,
+      "history": [
+        40,
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "sku": "BV315D",
+      "name": "BV315D Шаровой кран серии BV трех-ходовой DN15 kvs 6.3",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 40,
+      "history": [
+        40,
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "sku": "BV315E",
+      "name": "BV315E Шаровой кран серии BV трех-ходовой DN15 kvs 10.1",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 50,
+      "history": [
+        50,
+        50,
+        50,
+        50
+      ]
+    },
+    {
+      "sku": "BV320A",
+      "name": "BV320A Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 65,
+      "history": [
+        65,
+        65,
+        65,
+        65
+      ]
+    },
+    {
+      "sku": "BV320B",
+      "name": "BV320B ШАРОВЫЕ  КРАНЫ",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 54,
+      "history": [
+        54,
+        54,
+        54,
+        54
+      ]
+    },
+    {
+      "sku": "BV320E",
+      "name": "BV320E Шаровой кран серии BV трех-ходовой DN20 kvs 10.1",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 70,
+      "history": [
+        70,
+        70,
+        70,
+        70
+      ]
+    },
+    {
+      "sku": "BV325B",
+      "name": "BV325B ШАРОВЫЕ  КРАНЫ",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 491,
+      "history": [
+        491,
+        491,
+        491,
+        491
+      ]
+    },
+    {
+      "sku": "BV340A",
+      "name": "BV340A ШАРОВЫЕ  КРАНЫ",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 184,
+      "history": [
+        184,
+        184,
+        184,
+        184
+      ]
+    },
+    {
+      "sku": "BV340B",
+      "name": "BV340B Шаровый кран",
+      "category": "Краны BV",
+      "series": "BV",
+      "stock": 116,
+      "history": [
+        116,
+        116,
+        116,
+        116
+      ]
+    },
+    {
+      "sku": "DA10FU24-AS 4-20 mA",
+      "name": "DA10FU24-AS Электропривод воздушный 10Нм 24V плавное упр-е      4-20 mA, сигнал обратной связи 4-20",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 58,
+      "history": [
+        58,
+        58,
+        58,
+        58
+      ]
+    },
+    {
+      "sku": "DA10FU24-D",
+      "name": "DA10FU24-D Электропривод воздушный 10Нм 24В откр./закр. с пружинным возвратом",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 25,
+      "history": [
+        25,
+        25,
+        25,
+        25
+      ]
+    },
+    {
+      "sku": "DA15FU24-AS 4-20mA",
+      "name": "DA15FU24-AS Электропривод воздушный 15Нм 24V плавное упр-е 4-20 mA, сигнал обратной связи 4-20",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 60,
+      "history": [
+        60,
+        60,
+        60,
+        60
+      ]
+    },
+    {
+      "sku": "DA15FU24-D",
+      "name": "DA15FU24-D Электропривод воздушный 15Нм 24В откр./закр. с пружинным возвратом",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 34,
+      "history": [
+        34,
+        34,
+        34,
+        34
+      ]
+    },
+    {
+      "sku": "DA16MU230-AS",
+      "name": "DA16MU230-AS  Электропривод воздушный 16Нм 230В плавное упр-е 2-SPDT",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 160,
+      "history": [
+        160,
+        160,
+        160,
+        160
+      ]
+    },
+    {
+      "sku": "DA24MU230-AS",
+      "name": "DA24MU230-AS Электропривод воздушный 24Нм плавное упр-е 2-SPDT",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 107,
+      "history": [
+        107,
+        107,
+        107,
+        107
+      ]
+    },
+    {
+      "sku": "DA2MU24-DS",
+      "name": "DA2MU24-DS Электропривод воздушный 2Нм 24В откр./закр. 1-SPDT",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 147,
+      "history": [
+        147,
+        147,
+        147,
+        147
+      ]
+    },
+    {
+      "sku": "DA32MU230-AS",
+      "name": "DA32MU230-AS Электропривод воздушный серии DA 32HM 230B плавное упр-е 2-SPDT",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 149,
+      "history": [
+        149,
+        149,
+        149,
+        149
+      ]
+    },
+    {
+      "sku": "DA32MU230-DS",
+      "name": "DA32MU230-DS Электропривод воздушный серии DA 32HM 230B откр./закр. 2-SPDT",
+      "category": "MU без движения",
+      "series": "DA",
+      "stock": 130,
+      "history": [
+        130,
+        130,
+        130,
+        130
+      ]
+    },
+    {
+      "sku": "DA32MU24-DS",
+      "name": "DA32MU24-DS Электропривод воздушный серии DA 32HM 24Bоткр./закр. 2-SPDT",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 47,
+      "history": [
+        47,
+        47,
+        47,
+        47
+      ]
+    },
+    {
+      "sku": "DA5FU24-A",
+      "name": "DA5FU24-A Электропривод воздушный",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 148,
+      "history": [
+        148,
+        148,
+        148,
+        148
+      ]
+    },
+    {
+      "sku": "DA6MU230-A",
+      "name": "DA6MU230-A Электропривод воздушный 6Нм 230В плавное упр-е",
+      "category": "Малый остаток (≤5)",
+      "series": "DA",
+      "stock": 2,
+      "history": [
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "sku": "DA6MU230-D",
+      "name": "DA6MU230-D Электропривод воздушный 6Нм 230В откр./закр.",
+      "category": "Малый остаток (≤5)",
+      "series": "DA",
+      "stock": 4,
+      "history": [
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "sku": "DA6MU24-D",
+      "name": "DA6MU24-D Электропривод воздушный 6Нм 24В откр./закр.",
+      "category": "Малый остаток (≤5)",
+      "series": "DA",
+      "stock": 5,
+      "history": [
+        5,
+        5,
+        5,
+        5
+      ]
+    },
+    {
+      "sku": "DA6MU24-DS",
+      "name": "DA6MU24-DS Электроприводы воздушные без пружинного возврата",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 236,
+      "history": [
+        236,
+        236,
+        236,
+        236
+      ]
+    },
+    {
+      "sku": "DA8MQU230-A",
+      "name": "DA8MQU230-A Электропривод воздушный ускоренный 8Нм 230В плавное упр-е",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 60,
+      "history": [
+        60,
+        60,
+        60,
+        60
+      ]
+    },
+    {
+      "sku": "DA8MQU230-AS",
+      "name": "DA8MQU230-AS Электропривод воздушный ускоренный 8Нм 230В плавное упр-е 2-SPDT",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 174,
+      "history": [
+        174,
+        174,
+        174,
+        174
+      ]
+    },
+    {
+      "sku": "DA8MQU24-DS",
+      "name": "DA8MQU24-DS Электропривод воздушный ускоренный 8Нм 24В откр./закр. 2-SPDT",
+      "category": "Исполнение 24В",
+      "series": "DA",
+      "stock": 313,
+      "history": [
+        313,
+        313,
+        313,
+        313
+      ]
+    },
+    {
+      "sku": "DA8MU230-AS",
+      "name": "DA8MU230-AS Электропривод воздушный 8Нм 230В плавное упр-е 2-SPDT",
+      "category": "Плавное / D / A исполнение",
+      "series": "DA",
+      "stock": 255,
+      "history": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "sku": "HVA230S-10",
+      "name": "HVA230S-10 Электропривод воздушный 10Nm без возвратной пружины",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 46,
+      "history": [
+        46,
+        46,
+        46,
+        46
+      ]
+    },
+    {
+      "sku": "HVA230S-20",
+      "name": "HVA230S-20 Электропривод воздушный серии HV плавное управление 20Нм 230В 2-SPDT",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 81,
+      "history": [
+        81,
+        81,
+        81,
+        81
+      ]
+    },
+    {
+      "sku": "HVA230S-40Q",
+      "name": "HVA230S-40Q Электропривод воздушный 40Nm ускоренного срабатывания",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 48,
+      "history": [
+        48,
+        48,
+        48,
+        48
+      ]
+    },
+    {
+      "sku": "HVA230S-5",
+      "name": "HVA230S-5 Электропривод воздушный серии HV плавное управление 5Нм 230В 2-SPDT",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 63,
+      "history": [
+        63,
+        63,
+        63,
+        63
+      ]
+    },
+    {
+      "sku": "HVA24-20",
+      "name": "HVA24-20 Электропривод воздушный серии hva",
+      "category": "Малый остаток (≤5)",
+      "series": "HVA",
+      "stock": 2,
+      "history": [
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "sku": "HVA24-40Q",
+      "name": "HVA24-40Q Электропривод воздушный серии hva",
+      "category": "Малый остаток (≤5)",
+      "series": "HVA",
+      "stock": 2,
+      "history": [
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "sku": "HVA24S-10",
+      "name": "HVA24S-10 Электропривод воздушный 10Nm без возвратной пружины",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 42,
+      "history": [
+        42,
+        42,
+        42,
+        42
+      ]
+    },
+    {
+      "sku": "HVA24S-40Q",
+      "name": "HVA24S-40Q Электропривод воздушный 40Nm ускоренного срабатывания",
+      "category": "Серия HVA/HVD",
+      "series": "HVA",
+      "stock": 40,
+      "history": [
+        40,
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "sku": "HVD230S-10QX",
+      "name": "HVD230S-10QX Электропривод воздушный ускор. с электронным самовозвратном 10 Нм 230В, упр.отк.закр",
+      "category": "Серия HVA/HVD",
+      "series": "HVD",
+      "stock": 12,
+      "history": [
+        12,
+        12,
+        12,
+        12
+      ]
+    },
+    {
+      "sku": "HVD230S-20QX",
+      "name": "HVD230S-20QX Электропривод воздушный ускор. с электронным самовозвратном 20 Нм 230В, упр.отк.закр",
+      "category": "Серия HVA/HVD",
+      "series": "HVD",
+      "stock": 12,
+      "history": [
+        12,
+        12,
+        12,
+        12
+      ]
+    },
+    {
+      "sku": "HVD230S-40Q",
+      "name": "HVD230S-40Q Электропривод воздушный серии HVD 40НМ 230В откр./закр., 2Х./3Х-поз., 2-SPDT",
+      "category": "Серия HVA/HVD",
+      "series": "HVD",
+      "stock": 71,
+      "history": [
+        71,
+        71,
+        71,
+        71
+      ]
+    },
+    {
+      "sku": "HVD24S-40Q",
+      "name": "HVD24S-40Q Электропривод воздушный 40Nm ускоренного срабатывания",
+      "category": "Серия HVA/HVD",
+      "series": "HVD",
+      "stock": 48,
+      "history": [
+        48,
+        48,
+        48,
+        48
+      ]
+    },
+    {
+      "sku": "HVD24S-5",
+      "name": "HVD24S-5 Электропривод воздушный 5Nm 24V без возвратной пружины",
+      "category": "Серия HVA/HVD",
+      "series": "HVD",
+      "stock": 41,
+      "history": [
+        41,
+        41,
+        41,
+        41
+      ]
+    },
+    {
+      "sku": "SA10FU230-DST",
+      "name": "SA10FU230-DST Электроприводы для противопожарных и дымовых клапанов с пружинным возвратом",
+      "category": "Прочие DA/SA",
+      "series": "SA",
+      "stock": 66,
+      "history": [
+        66,
+        66,
+        66,
+        66
+      ]
+    },
+    {
+      "sku": "SA15FU230-DS",
+      "name": "SA15FU230-DS Электроприводы для противопожарных и дымовых клапанов с пружинным возвратом",
+      "category": "Крупный остаток (≥100)",
+      "series": "SA",
+      "stock": 184,
+      "history": [
+        184,
+        184,
+        184,
+        184
+      ]
+    },
+    {
+      "sku": "SA15FU230-DST",
+      "name": "SA15FU230-DST Электропривод воздушный серии SA 15Нм 230В откр./закр. 2-SPDT с пружинным возвратом и",
+      "category": "Крупный остаток (≥100)",
+      "series": "SA",
+      "stock": 102,
+      "history": [
+        102,
+        102,
+        102,
+        102
+      ]
+    },
+    {
+      "sku": "SA20FU24-DS",
+      "name": "SA20FU24-DS Электропривод 20 Нм 24В для противопожарных клапанов с пружинным возвратом",
+      "category": "Исполнение 24В",
+      "series": "SA",
+      "stock": 248,
+      "history": [
+        248,
+        248,
+        248,
+        248
+      ]
+    },
+    {
+      "sku": "SA30MU24-DS",
+      "name": "SA30MU24-DS Электропривод воздушный серии SA 30Нм 24В откр./закр. 2-SPDT без пружинного возврата",
+      "category": "Исполнение 24В",
+      "series": "SA",
+      "stock": 268,
+      "history": [
+        268,
+        268,
+        268,
+        268
+      ]
+    },
+    {
+      "sku": "SA5FU24-DST",
+      "name": "SA5FU24-DST Электропривод воздушный серии SA 5Нм 24В откр./закр. 2- SPDT с пружинным возвратом и тер",
+      "category": "Исполнение 24В",
+      "series": "SA",
+      "stock": 245,
+      "history": [
+        245,
+        245,
+        245,
+        245
+      ]
+    },
+    {
+      "sku": "SA7MU230-DS",
+      "name": "SA7MU230-DS-Электропривод воздушный серии SA 7Нм 230В откр./закр. 2-SPDT",
+      "category": "MU без движения",
+      "series": "SA",
+      "stock": 130,
+      "history": [
+        130,
+        130,
+        130,
+        130
+      ]
+    },
+    {
+      "sku": "SA7MU24-DS",
+      "name": "SA7MU24-DS Электропривод воздушный серии SA 7Нм 24В откр./закр.",
+      "category": "Исполнение 24В",
+      "series": "SA",
+      "stock": 96,
+      "history": [
+        96,
+        96,
+        96,
+        96
+      ]
+    }
+  ]
+};
+
+    Chart.defaults.color = '#8b9cb3';
+    Chart.defaults.borderColor = '#2d3a4f';
+    Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
+
+    const fmt = n => n.toLocaleString('ru-RU');
+    const p1Total = DATA.p1.reduce((s, r) => s + r.order, 0);
+    const charts = [];
+    const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
+    const isTablet = () => window.matchMedia('(max-width: 900px)').matches;
+
+    const baseChartOpts = () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: isMobile() ? 'bottom' : 'bottom',
+          labels: {
+            boxWidth: isMobile() ? 10 : 12,
+            padding: isMobile() ? 8 : 12,
+            font: { size: isMobile() ? 10 : 12 },
+          },
+        },
+      },
+    });
+
+    const makeChart = (el, config) => {
+      const chart = new Chart(el, config);
+      charts.push(chart);
+      return chart;
+    };
+
+    // KPI cards
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi blue"><div class="label">Продано за период</div><div class="value">${fmt(DATA.total_sold)}</div><div class="hint">${DATA.avg_daily} шт/день · ${DATA.declined} поз.</div></div>
+      <div class="kpi"><div class="label">Остаток 14.09</div><div class="value">${fmt(DATA.stock_totals[3])}</div><div class="hint">${DATA.positions[3]} позиций</div></div>
+      <div class="kpi yellow"><div class="label">Списание за период</div><div class="value">−${fmt(DATA.stock_totals[0] - DATA.stock_totals[3])}</div><div class="hint">−11,8% от старта</div></div>
+      <div class="kpi red"><div class="label">P1 — срочный заказ</div><div class="value">${fmt(p1Total)}</div><div class="hint">${DATA.p1.length} позиций</div></div>
+      <div class="kpi red"><div class="label">Обнулено SKU</div><div class="value">${DATA.out_of_stock_count}</div><div class="hint">${DATA.low_stock_count} с запасом ≤14 дн</div></div>
+      <div class="kpi green"><div class="label">Без движения</div><div class="value">${DATA.unchanged}</div><div class="hint">${DATA.unchanged_zero_net} с net=0 · ${fmt(INSIGHTS.stock_total)} шт</div></div>
+    `;
+
+    // Stock line chart
+    makeChart(document.getElementById('chartStock'), {
+      type: 'line',
+      data: {
+        labels: DATA.date_labels.map(l => isMobile() ? l.slice(0, 5) : l),
+        datasets: [{
+          label: 'Остаток, шт',
+          data: DATA.stock_totals,
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6,182,212,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: isMobile() ? 4 : 6,
+          pointBackgroundColor: '#06b6d4',
+        }, {
+          label: 'Позиций в отчёте',
+          data: DATA.positions,
+          borderColor: '#8b5cf6',
+          yAxisID: 'y1',
+          tension: 0.3,
+          pointRadius: isMobile() ? 3 : 4,
+          hidden: isMobile(),
+        }]
+      },
+      options: {
+        ...baseChartOpts(),
+        scales: {
+          x: { ticks: { maxRotation: isMobile() ? 45 : 0, font: { size: isMobile() ? 10 : 12 } } },
+          y: {
+            beginAtZero: false,
+            title: { display: !isMobile(), text: 'Остаток, шт' },
+            ticks: { font: { size: isMobile() ? 10 : 12 } },
+          },
+          y1: {
+            display: !isMobile(),
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Позиций' },
+          },
+        },
+      },
+    });
+
+    // Periods bar
+    makeChart(document.getElementById('chartPeriods'), {
+      type: 'bar',
+      data: {
+        labels: DATA.periods.map(p => isMobile() ? p.label.replace(' → ', '→') : p.label),
+        datasets: [
+          { label: 'Продано, шт', data: DATA.periods.map(p => p.sold), backgroundColor: '#3b82f6', borderRadius: 6 },
+          {
+            label: 'шт/день',
+            data: DATA.periods.map(p => p.daily),
+            backgroundColor: '#f97316',
+            borderRadius: 6,
+            yAxisID: isMobile() ? 'y' : 'y1',
+            hidden: isMobile(),
+          },
+        ],
+      },
+      options: {
+        ...baseChartOpts(),
+        scales: {
+          x: { ticks: { font: { size: isMobile() ? 10 : 12 } } },
+          y: {
+            title: { display: !isMobile(), text: 'Продано, шт' },
+            ticks: { font: { size: isMobile() ? 10 : 12 } },
+          },
+          y1: {
+            display: !isMobile(),
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'шт/день' },
+          },
+        },
+      },
+    });
+
+    const seriesColors = ['#3b82f6','#06b6d4','#8b5cf6','#22c55e','#eab308','#64748b'];
+
+    // Series pie
+    makeChart(document.getElementById('chartSeriesPie'), {
+      type: 'doughnut',
+      data: {
+        labels: DATA.series.map(s => s.series),
+        datasets: [{ data: DATA.series.map(s => s.sold), backgroundColor: seriesColors, borderWidth: 0 }]
+      },
+      options: {
+        ...baseChartOpts(),
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { size: isMobile() ? 10 : 12 } },
+          },
+          tooltip: { callbacks: { label: ctx => {
+            const pct = (ctx.raw / DATA.total_sold * 100).toFixed(1);
+            return ` ${ctx.label}: ${fmt(ctx.raw)} шт (${pct}%)`;
+          }}}
+        }
+      }
+    });
+
+    // Series bar
+    makeChart(document.getElementById('chartSeriesBar'), {
+      type: 'bar',
+      data: {
+        labels: DATA.series.map(s => s.series),
+        datasets: [
+          { label: 'Продано', data: DATA.series.map(s => s.sold), backgroundColor: '#ef4444', borderRadius: 4 },
+          { label: 'Остаток 14.09', data: DATA.series.map(s => s.stock), backgroundColor: '#22c55e', borderRadius: 4 }
+        ]
+      },
+      options: {
+        ...baseChartOpts(),
+        scales: {
+          x: { ticks: { font: { size: isMobile() ? 10 : 12 } } },
+          y: { title: { display: !isMobile(), text: 'шт' }, ticks: { font: { size: isMobile() ? 10 : 12 } } },
+        },
+      }
+    });
+
+    // Top sold horizontal
+    const topColors = DATA.top_sold.map(t =>
+      t.priority === 'P1' ? '#ef4444' : t.priority === 'P3' ? '#3b82f6' : '#64748b'
+    );
+    makeChart(document.getElementById('chartTopSold'), {
+      type: 'bar',
+      data: {
+        labels: DATA.top_sold.map(t => t.sku),
+        datasets: [{ label: 'Продано за 35 дней', data: DATA.top_sold.map(t => t.sold), backgroundColor: topColors, borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y',
+        ...baseChartOpts(),
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { afterLabel: ctx => {
+            const t = DATA.top_sold[ctx.dataIndex];
+            return [`Остаток: ${t.stock} шт`, `Запас: ${t.days_left} дн`, `Заказ: ${t.order} шт`];
+          }}}
+        },
+        scales: {
+          x: { title: { display: !isMobile(), text: 'Продано, шт' }, ticks: { font: { size: isMobile() ? 10 : 12 } } },
+          y: { ticks: { font: { size: isMobile() ? 9 : 11 }, autoSkip: false } },
+        },
+      }
+    });
+
+    // Critical SKU lines
+    const critical = DATA.top_sold.filter(t => t.priority === 'P1');
+    makeChart(document.getElementById('chartCritical'), {
+      type: 'line',
+      data: {
+        labels: DATA.date_cols,
+        datasets: critical.map((t, i) => ({
+          label: isMobile() ? t.sku.replace('230-DS', '').replace('230', '') : t.sku,
+          data: t.history,
+          borderColor: ['#ef4444','#f97316','#eab308','#ec4899','#a855f7','#06b6d4'][i],
+          tension: 0.2,
+          pointRadius: isMobile() ? 3 : 5,
+        }))
+      },
+      options: {
+        ...baseChartOpts(),
+        scales: {
+          x: { ticks: { font: { size: isMobile() ? 10 : 12 } } },
+          y: {
+            beginAtZero: true,
+            title: { display: !isMobile(), text: 'Остаток, шт' },
+            ticks: { font: { size: isMobile() ? 10 : 12 } },
+          },
+        },
+      }
+    });
+
+    // P1 order chart
+    makeChart(document.getElementById('chartP1'), {
+      type: 'bar',
+      data: {
+        labels: DATA.p1.map(p => isMobile() ? p.sku.replace('230-DS', '') : p.sku),
+        datasets: [{ label: 'Заказ, шт', data: DATA.p1.map(p => p.order), backgroundColor: '#ef4444', borderRadius: 6 }]
+      },
+      options: {
+        ...baseChartOpts(),
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: isMobile() ? 9 : 11 } } },
+          y: { title: { display: !isMobile(), text: 'Заказ, шт' }, ticks: { font: { size: isMobile() ? 10 : 12 } } },
+        },
+      }
+    });
+
+    // Priority doughnut
+    const prioLabels = ['P1 срочно', 'P3 план', 'OK', 'P2'];
+    const prioKeys = ['P1', 'P3', 'OK', 'P2'];
+    makeChart(document.getElementById('chartPriority'), {
+      type: 'doughnut',
+      data: {
+        labels: prioLabels,
+        datasets: [{
+          data: prioKeys.map(k => DATA.priorities[k]?.order || 0),
+          backgroundColor: ['#ef4444','#3b82f6','#22c55e','#eab308'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        ...baseChartOpts(),
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 10, font: { size: isMobile() ? 10 : 12 } },
+          },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} шт к заказу` } }
+        }
+      }
+    });
+
+    // P1 table
+    const p1History = {};
+    DATA.top_sold.forEach(t => { p1History[t.sku] = t.history; });
+    const p1Body = document.querySelector('#table-p1 tbody');
+    const mobileP1 = document.getElementById('mobile-p1-cards');
+    DATA.p1.forEach(p => {
+      const hist = p1History[p.sku] || [0,0,0,p.stock];
+      const max = Math.max(...hist, 1);
+      const spark = hist.map(v => `<span style="height:${Math.max(4, v/max*28)}px"></span>`).join('');
+      p1Body.innerHTML += `<tr>
+        <td><strong>${p.sku}</strong></td>
+        <td>${p.name}</td>
+        <td class="num num-red">${p.stock}</td>
+        <td class="num">${p.daily}</td>
+        <td class="num num-red">${p.days_left}</td>
+        <td class="num"><strong>${fmt(p.order)}</strong></td>
+        <td><div class="spark">${spark}</div></td>
+      </tr>`;
+
+      mobileP1.innerHTML += `<article class="m-card">
+        <div class="m-card-head">
+          <strong>${p.sku}</strong>
+          <span class="badge badge-p1">P1</span>
+        </div>
+        <div class="m-card-name">${p.name}</div>
+        <div class="m-card-grid">
+          <span>Остаток</span><span class="num-red">${p.stock} шт</span>
+          <span>Скорость</span><span>${p.daily} шт/день</span>
+          <span>Запас</span><span class="num-red">${p.days_left} дн</span>
+          <span>Заказ</span><span><strong>${fmt(p.order)} шт</strong></span>
+        </div>
+        <div class="m-history">
+          ${DATA.date_cols.map((d, i) => `<span><small>${d}</small><br>${hist[i]}</span>`).join('')}
+        </div>
+      </article>`;
+    });
+
+    // Top table
+    const badge = p => `<span class="badge badge-${p.toLowerCase()}">${p}</span>`;
+    const topBody = document.querySelector('#table-top tbody');
+    const mobileTop = document.getElementById('mobile-top-cards');
+    DATA.top_sold.forEach(t => {
+      const stockClass = t.days_left <= 14 ? 'num-red' : '';
+      topBody.innerHTML += `<tr>
+        <td>${badge(t.priority)}</td>
+        <td><strong>${t.sku}</strong></td>
+        ${t.history.map(v => `<td class="num">${v}</td>`).join('')}
+        <td class="num">${t.sold}</td>
+        <td class="num">${t.daily}</td>
+        <td class="num ${stockClass}">${t.days_left < 999 ? t.days_left + ' д' : '—'}</td>
+        <td class="num">${t.order > 0 ? fmt(t.order) : '—'}</td>
+      </tr>`;
+
+      mobileTop.innerHTML += `<article class="m-card">
+        <div class="m-card-head">
+          <strong>${t.sku}</strong>
+          ${badge(t.priority)}
+        </div>
+        <div class="m-card-name">${t.name}</div>
+        <div class="m-card-grid">
+          <span>Продано</span><span>${fmt(t.sold)} шт</span>
+          <span>Скорость</span><span>${t.daily} шт/день</span>
+          <span>Остаток</span><span class="${stockClass}">${t.stock} шт</span>
+          <span>Запас</span><span class="${stockClass}">${t.days_left < 999 ? t.days_left + ' дн' : '—'}</span>
+          <span>Заказ</span><span>${t.order > 0 ? fmt(t.order) + ' шт' : '—'}</span>
+        </div>
+        <div class="m-history">
+          ${DATA.date_cols.map((d, i) => `<span><small>${d}</small><br>${t.history[i]}</span>`).join('')}
+        </div>
+      </article>`;
+    });
+
+
+    // Narrative cards
+    document.getElementById('narrative-grid').innerHTML = INSIGHTS.narrative.map(n => `
+      <article class="narrative-card">
+        <h4>${n.title}</h4>
+        <p>${n.body}</p>
+      </article>
+    `).join('');
+
+    // Idle section intro
+    document.getElementById('idle-intro').innerHTML =
+      `<strong>${INSIGHTS.count_stable} позиций</strong> с одинаковым остатком во всех 4 снимках `
+      + `(суммарно <strong>${fmt(INSIGHTS.stock_total)} шт</strong>, ~18% склада). `
+      + `Ещё <strong>1 SKU</strong> (${INSIGHTS.exception.sku}) — чистый расход 0, но была поставка.`;
+
+    document.getElementById('idle-exception').innerHTML =
+      `<strong>${INSIGHTS.exception.sku}</strong>: ${INSIGHTS.exception.history.join(' → ')}. `
+      + INSIGHTS.exception.note;
+
+    // Idle chart
+    const idleColors = ['#64748b','#3b82f6','#8b5cf6','#22c55e','#eab308','#f97316','#06b6d4','#ef4444'];
+    makeChart(document.getElementById('chartIdle'), {
+      type: 'bar',
+      data: {
+        labels: INSIGHTS.by_category.map(c => c.category.replace(' / ', '/').slice(0, 22)),
+        datasets: [{
+          label: 'Остаток, шт',
+          data: INSIGHTS.by_category.map(c => c.stock),
+          backgroundColor: idleColors,
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: isMobile() ? 'y' : 'x',
+        ...baseChartOpts(),
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { font: { size: isMobile() ? 9 : 11 }, maxRotation: 45 } },
+          y: { ticks: { font: { size: isMobile() ? 9 : 11 } } },
+        },
+      },
+    });
+
+    let idleFilter = 'all';
+    const categories = ['all', ...INSIGHTS.by_category.map(c => c.category)];
+
+    const renderIdleList = () => {
+      const list = document.getElementById('idle-list');
+      const items = idleFilter === 'all'
+        ? INSIGHTS.items
+        : INSIGHTS.items.filter(i => i.category === idleFilter);
+
+      const grouped = {};
+      items.forEach(i => {
+        grouped[i.category] = grouped[i.category] || [];
+        grouped[i.category].push(i);
+      });
+
+      list.innerHTML = Object.keys(grouped).sort().map(cat => {
+        const meta = INSIGHTS.category_meta[cat] || {};
+        const catStock = grouped[cat].reduce((s, i) => s + i.stock, 0);
+        return `<div class="cat-block">
+          <div class="cat-head">
+            <h4>${cat} · ${grouped[cat].length} поз. · ${fmt(catStock)} шт</h4>
+            ${meta.meaning ? `<p>${meta.meaning}</p>` : ''}
+            ${meta.action ? `<p class="action">→ ${meta.action}</p>` : ''}
+          </div>
+          <div class="cat-items">
+            ${grouped[cat].map(i => `<div class="cat-item">
+              <div class="sku">${i.sku}</div>
+              <div class="name">${i.name}</div>
+              <div class="stock">${fmt(i.stock)} шт</div>
+            </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    };
+
+    document.getElementById('idle-filters').innerHTML = categories.map(c => {
+      const label = c === 'all' ? `Все (${INSIGHTS.items.length})` : c;
+      return `<button type="button" class="filter-btn${c === idleFilter ? ' active' : ''}" data-filter="${c}">${label}</button>`;
+    }).join('');
+
+    document.getElementById('idle-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      idleFilter = btn.dataset.filter;
+      document.querySelectorAll('#idle-filters .filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === idleFilter);
+      });
+      renderIdleList();
+    });
+
+    renderIdleList();
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => charts.forEach(c => c.resize()), 150);
+    });
+  </script>
+</body>
+</html>

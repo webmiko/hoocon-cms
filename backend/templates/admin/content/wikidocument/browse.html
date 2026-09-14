@@ -1,0 +1,61 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <span>Вики</span>
+</nav>
+
+<div class="hoocon-lead-stats">
+  <div class="hoocon-lead-stats__toolbar">
+    <h1>Вики</h1>
+    <nav class="hoocon-lead-stats__periods" aria-label="Действия">
+      <a href="{{ changelist_url }}">Управление страницами</a>
+      <a href="{{ changelist_url }}add/">+ Новая страница</a>
+    </nav>
+  </div>
+
+  <p class="hoocon-dash__sub" style="margin:0 0 1.25rem;">
+    Внутренние HTML-отчёты и справочники для команды. Не публикуются на сайте.
+    Цифры в отчётах — это изменение остатков склада, а не выручка.
+  </p>
+
+  {% if grouped_docs %}
+    {% for category, docs in grouped_docs.items %}
+    <section class="module hoocon-lead-stats__table-wrap" style="margin-bottom:1.25rem;">
+      <h2>{{ category }}</h2>
+      <table class="hoocon-lead-stats__table">
+        <thead>
+          <tr>
+            <th scope="col">Документ</th>
+            <th scope="col">Описание</th>
+            <th scope="col">Обновлено</th>
+            <th scope="col">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs %}
+          <tr>
+            <td><strong>{{ doc.title }}</strong></td>
+            <td>{{ doc.summary|default:"—" }}</td>
+            <td>{{ doc.updated_at|date:"d.m.Y H:i" }}</td>
+            <td>
+              <a href="{% url 'admin:content_wikidocument_read' doc.slug %}" target="_blank" rel="noopener">
+                Открыть
+              </a>
+              ·
+              <a href="{% url 'admin:content_wikidocument_change' doc.pk %}">Редактировать</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endfor %}
+  {% else %}
+    <p class="hoocon-dash__sub">Пока нет активных страниц. Создайте первую в «Управление страницами».</p>
+  {% endif %}
+</div>
+{% endblock %}

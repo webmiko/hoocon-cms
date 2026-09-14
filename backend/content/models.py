@@ -244,3 +244,64 @@ class News(_ContentBase):
         if self.cover:
             ensure_field_file_webp(self.cover)
         super().save(*args, **kwargs)  # type: ignore[arg-type]
+
+
+class WikiDocument(models.Model):
+    """Staff-only HTML reference pages (Wiki) — not exposed on the public API.
+
+    Used for internal analytics dashboards, runbooks, and other HTML artifacts
+    that editors keep at hand from Admin (sidebar «Wiki»).
+    """
+
+    title: models.CharField = models.CharField("заголовок", max_length=300)
+    slug: models.SlugField = models.SlugField(
+        "сегмент URL",
+        max_length=300,
+        unique=True,
+        db_index=True,
+    )
+    category: models.CharField = models.CharField(
+        "категория",
+        max_length=100,
+        blank=True,
+        default="Общее",
+        db_index=True,
+    )
+    summary: models.TextField = models.TextField(
+        "краткое описание",
+        blank=True,
+        default="",
+        help_text="Пояснение для списка: что за цифрами и зачем документ.",
+    )
+    body: models.TextField = models.TextField(
+        "HTML",
+        blank=True,
+        default="",
+        help_text="Полный HTML-документ или фрагмент. Только для сотрудников в админке.",
+    )
+    sort_order: models.PositiveIntegerField = models.PositiveIntegerField(
+        "порядок",
+        default=0,
+        db_index=True,
+    )
+    is_active: models.BooleanField = models.BooleanField(
+        "активна",
+        default=True,
+        db_index=True,
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "страница вики"
+        verbose_name_plural = "вики"
+        ordering = ("category", "sort_order", "title")
+
+    def __str__(self) -> str:
+        return self.title
+
+    @property
+    def is_full_html_document(self) -> bool:
+        """True when ``body`` is a standalone HTML page (DOCTYPE or <html>)."""
+        head = self.body.lstrip().lower()
+        return head.startswith("<!doctype") or head.startswith("<html")

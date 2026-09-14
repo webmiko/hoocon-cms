@@ -106,6 +106,14 @@ def perm_view_analytics(request: HttpRequest) -> bool:
     )
 
 
+def perm_view_wikidocument(request: HttpRequest) -> bool:
+    """Whether the user may see staff Wiki in the sidebar."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and user.has_perm("content.view_wikidocument"),
+    )
+
+
 def _versioned_static(relative: str) -> str:
     """Cache-bust a static admin asset (BUILD_SHA or DEBUG mtime)."""
     url = static(relative)

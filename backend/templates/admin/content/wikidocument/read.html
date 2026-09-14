@@ -1,0 +1,59 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .hoocon-wiki-read {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .hoocon-wiki-read__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .hoocon-wiki-read__body {
+    background: #fff;
+    color: #111;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  html.dark .hoocon-wiki-read__body {
+    background: #0f1419;
+    color: #e8edf4;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{{ browse_url }}">Вики</a>
+  <span aria-hidden="true">›</span>
+  <span>{{ doc.title }}</span>
+</nav>
+
+<div class="hoocon-wiki-read">
+  <div class="hoocon-wiki-read__toolbar">
+    <h1>{{ doc.title }}</h1>
+    <nav class="hoocon-lead-stats__periods">
+      <a href="{{ browse_url }}">← Вики</a>
+      <a href="{{ change_url }}">Редактировать HTML</a>
+    </nav>
+  </div>
+  {% if doc.summary %}
+  <p class="hoocon-dash__sub" style="margin:0 0 1rem;">{{ doc.summary }}</p>
+  {% endif %}
+  <article class="hoocon-wiki-read__body">
+    {{ doc.body|safe }}
+  </article>
+</div>
+{% endblock %}
