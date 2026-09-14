@@ -85,7 +85,8 @@ def _copy_cover(news: News, article: Article) -> None:
         return
     if not payload:
         return
-    basename = article.cover.name.rsplit("/", 1)[-1] or "cover.webp"
+    cover_name = article.cover.name or ""
+    basename = cover_name.rsplit("/", 1)[-1] or "cover.webp"
     news.cover.save(basename, ContentFile(payload), save=True)
 
 

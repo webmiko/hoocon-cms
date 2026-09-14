@@ -50,7 +50,10 @@ def attach_sku_cover_to_news(
         logger.info("news cover skip: no image for SKU %s", sku_code)
         return False
 
-    basename = Path(product_image.image.name).name or f"{sku_code.lower()}.webp"
+    image_name = product_image.image.name
+    if not image_name:
+        return False
+    basename = Path(image_name).name or f"{sku_code.lower()}.webp"
     with product_image.image.open("rb") as handle:
         payload = handle.read()
     if not payload:

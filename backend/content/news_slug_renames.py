@@ -96,7 +96,7 @@ def relocate_all_news_covers() -> list[tuple[str, str]]:
     for news in News.objects.exclude(cover="").iterator():
         old = news.cover.name
         new = relocate_news_cover_to_slug(news)
-        if new:
+        if new and old:
             moved.append((old, new))
     return moved
 

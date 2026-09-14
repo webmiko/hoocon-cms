@@ -6,7 +6,7 @@ Manager ownership: assignee (в работе) / processed_by (завершил).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.utils import parseaddr
 from typing import Any
 
@@ -488,8 +488,8 @@ def build_lead_processing_stats(
     if staff_ids:
         users = User.objects.filter(pk__in=staff_ids).order_by("first_name", "username")
         for user in users:
-            a = by_assignee.get(user.pk, {})
-            p = by_processed.get(user.pk, {})
+            a = dict(by_assignee.get(user.pk, {}))
+            p = dict(by_processed.get(user.pk, {}))
             mgr_avg = p.get("avg_duration")
             managers.append(
                 {
@@ -500,7 +500,9 @@ def build_lead_processing_stats(
                     "in_progress": a.get("in_progress", 0),
                     "done_total": p.get("done_total", 0),
                     "done_in_period": p.get("done_in_period", 0),
-                    "avg_hours_to_done": (round(mgr_avg.total_seconds() / 3600, 1) if mgr_avg else None),
+                    "avg_hours_to_done": (
+                        round(mgr_avg.total_seconds() / 3600, 1) if isinstance(mgr_avg, timedelta) else None
+                    ),
                 },
             )
 

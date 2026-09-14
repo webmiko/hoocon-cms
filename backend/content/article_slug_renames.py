@@ -95,7 +95,7 @@ def relocate_all_article_covers() -> list[tuple[str, str]]:
     for article in Article.objects.exclude(cover="").iterator():
         old = article.cover.name
         new = relocate_article_cover_to_slug(article)
-        if new:
+        if new and old:
             moved.append((old, new))
     return moved
 

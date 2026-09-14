@@ -792,18 +792,22 @@ toml = ["tomli ; python_full_version <= \"3.11.0a6\""]
 
 [[package]]
 name = "cron-descriptor"
-version = "1.4.5"
+version = "2.1.0"
 description = "A Python library that converts cron expressions into human readable strings."
 optional = false
-python-versions = "*"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "cron_descriptor-1.4.5-py3-none-any.whl", hash = "sha256:736b3ae9d1a99bc3dbfc5b55b5e6e7c12031e7ba5de716625772f8b02dcd6013"},
-    {file = "cron_descriptor-1.4.5.tar.gz", hash = "sha256:f51ce4ffc1d1f2816939add8524f206c376a42c87a5fca3091ce26725b3b1bca"},
+    {file = "cron_descriptor-2.1.0-py3-none-any.whl", hash = "sha256:e280efae0e375e2cbc62846f833888f12c7921d2d11ab0dca598f94c51af8639"},
+    {file = "cron_descriptor-2.1.0.tar.gz", hash = "sha256:ecddb8b2f6c5286398949aaefe185364666af74f33b01877c61378e1fd4e38e6"},
 ]
 
+[package.dependencies]
+typing_extensions = "*"
+
 [package.extras]
-dev = ["polib"]
+dev = ["mypy", "polib", "ruff"]
+test = ["pytest"]
 
 [[package]]
 name = "cryptography"
@@ -905,14 +909,14 @@ files = [
 
 [[package]]
 name = "django"
-version = "6.0.8"
+version = "6.1.1"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.12"
 groups = ["main", "dev"]
 files = [
-    {file = "django-6.0.8-py3-none-any.whl", hash = "sha256:9b98b7e1902e0e575ea4f42c175fc9512784f7f2580898286aee3388b322219d"},
-    {file = "django-6.0.8.tar.gz", hash = "sha256:cb0bd962d27fc866f3c514b20aae6a7df56ec80b488f9899da46d675cd051526"},
+    {file = "django-6.1.1-py3-none-any.whl", hash = "sha256:585fb82bf15053c42cf52e67c2f1b54a032dca384759315fd6678ab1870d1d72"},
+    {file = "django-6.1.1.tar.gz", hash = "sha256:7ab93536d8e677aa14554c56426290c69480bf2ee68d7513d4a22f57d6bfeb84"},
 ]
 
 [package.dependencies]
@@ -950,18 +954,22 @@ description = "Database-backed Periodic Tasks."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
-files = [
-    {file = "django_celery_beat-2.9.0-py3-none-any.whl", hash = "sha256:4a9e5ebe26d6f8d7215e1fc5c46e466016279dc102435a28141108649bdf2157"},
-    {file = "django_celery_beat-2.9.0.tar.gz", hash = "sha256:92404650f52fcb44cf08e2b09635cb1558327c54b1a5d570f0e2d3a22130934c"},
-]
+files = []
+develop = false
 
 [package.dependencies]
-celery = ">=5.2.3,<6.0"
-cron-descriptor = ">=1.2.32,<2.0.0"
-Django = ">=2.2,<6.1"
-django-timezone-field = ">=5.0"
-python-crontab = ">=2.3.4"
+celery = ">=5.3.0,<6.0"
+cron-descriptor = ">=2.1.0,<3.0.0"
+Django = ">=3.2.25,<6.2"
+django-timezone-field = ">=7.2.1"
+python-crontab = ">=3.3.0"
 tzdata = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/celery/django-celery-beat.git"
+reference = "6b2fab3a01f70c4b9dec30936069a502ff39ad13"
+resolved_reference = "6b2fab3a01f70c4b9dec30936069a502ff39ad13"
 
 [[package]]
 name = "django-cors-headers"
@@ -999,24 +1007,24 @@ drf = ["djangorestframework"]
 
 [[package]]
 name = "django-stubs"
-version = "5.2.9"
+version = "6.1.0"
 description = "Mypy stubs for Django"
 optional = false
-python-versions = ">=3.10"
+python-versions = ">=3.11"
 groups = ["dev"]
 files = [
-    {file = "django_stubs-5.2.9-py3-none-any.whl", hash = "sha256:2317a7130afdaa76f6ff7f623650d7f3bf1b6c86a60f95840e14e6ec6de1a7cd"},
-    {file = "django_stubs-5.2.9.tar.gz", hash = "sha256:c192257120b08785cfe6f2f1c91f1797aceae8e9daa689c336e52c91e8f6a493"},
+    {file = "django_stubs-6.1.0-py3-none-any.whl", hash = "sha256:63b23ccca2616d464ed7e37d1ce44960315cb3cecab75b23c928467ef125e560"},
+    {file = "django_stubs-6.1.0.tar.gz", hash = "sha256:b6aecc5c738a103135f76ba160a6f75e3b27dcf0200c64d7226018cdbc2340dd"},
 ]
 
 [package.dependencies]
 django = "*"
-django-stubs-ext = ">=5.2.9"
+django-stubs-ext = ">=6.0.2"
 types-pyyaml = "*"
 typing-extensions = ">=4.11.0"
 
 [package.extras]
-compatible-mypy = ["mypy (>=1.13,<1.20)"]
+compatible-mypy = ["mypy (>=1.13,<2.4)"]
 oracle = ["oracledb"]
 redis = ["redis", "types-redis"]
 
@@ -1068,14 +1076,14 @@ django = ">=5.2"
 
 [[package]]
 name = "djangorestframework"
-version = "3.18.0"
+version = "3.18.1"
 description = "Web APIs for Django, made easy."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "djangorestframework-3.18.0-py3-none-any.whl", hash = "sha256:381fc44d3249c9565c5f723850855b734e99030eb30957a49f506d3fe11d7dcb"},
-    {file = "djangorestframework-3.18.0.tar.gz", hash = "sha256:2323a5111837e0b784dcb8323abc78ecc54fa2a5af7aff2677cf50cdd849477f"},
+    {file = "djangorestframework-3.18.1-py3-none-any.whl", hash = "sha256:f1409d698967aaf82d5d98d76b549c8fba8bd92ebd0d83d24454508f72168dc2"},
+    {file = "djangorestframework-3.18.1.tar.gz", hash = "sha256:605d79fa2ec2f02905492e5ea13d903c2d842d0b4c915a57f7bf02ab9f3c91dd"},
 ]
 
 [package.dependencies]
@@ -3139,7 +3147,6 @@ files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
 ]
-markers = {main = "python_version == \"3.12\""}
 
 [[package]]
 name = "tzdata"
@@ -3383,4 +3390,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "d4b72cffe19000e9a06fbfd776db7ec62b7d634f6e328cb2259880180f7504cd"
+content-hash = "d0d4b6f4dfaade57419d0f9af6de5577e8c1db0db7c1917446c84d7a249392b8"
