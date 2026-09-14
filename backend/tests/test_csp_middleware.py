@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 
 
 def _csp_value(response) -> str:
@@ -122,6 +123,32 @@ def test_csp_disabled_in_debug() -> None:
         client = Client()
         response = client.get("/api/health/")
         assert "Content-Security-Policy-Report-Only" in response.headers
+
+
+@pytest.mark.django_db
+def test_csp_wiki_read_omits_script_nonce_so_inline_dashboard_runs(client) -> None:
+    """Wiki read must not use script nonces — they disable unsafe-inline for stored HTML."""
+    from django.contrib.auth import get_user_model
+
+    from content.models import WikiDocument
+
+    User = get_user_model()
+    admin_user = User.objects.create_superuser(
+        username="wiki-nonce",
+        email="wiki-nonce@example.com",
+        password="password12",
+    )
+    WikiDocument.objects.create(
+        title="Dashboard",
+        slug="dash-nonce",
+        body="<!DOCTYPE html><html><body><script>window.ok=1</script></body></html>",
+    )
+    client.force_login(admin_user)
+    response = client.get(reverse("admin:content_wikidocument_read", args=["dash-nonce"]))
+    csp = _csp_value(response)
+    script_src = next(part.strip() for part in csp.split(";") if part.strip().startswith("script-src"))
+    assert "'unsafe-inline'" in script_src
+    assert "nonce-" not in script_src
 
 
 @pytest.mark.django_db

@@ -103,6 +103,7 @@ def test_csp_wiki_read_allows_inline_scripts_for_dashboards(client) -> None:
     )
     assert response.status_code == 200
     assert "'unsafe-inline'" in csp
+    assert "nonce-" not in csp.split("script-src", 1)[1].split(";", 1)[0]
 
 
 @pytest.mark.django_db
