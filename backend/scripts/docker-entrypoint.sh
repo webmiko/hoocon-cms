@@ -20,6 +20,7 @@ run_as_appuser() {
 fix_media_permissions
 
 run_as_appuser python manage.py migrate --noinput
+run_as_appuser python manage.py seed_wiki
 run_as_appuser python manage.py collectstatic --noinput
 
 if [ "$(id -u)" -eq 0 ]; then
