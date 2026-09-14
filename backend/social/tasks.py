@@ -81,3 +81,24 @@ def process_telegram_update_task(self: Any, update: dict[str, Any]) -> None:
             type(exc).__name__,
         )
         raise
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(OSError, TimeoutError),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 2},
+    name="social.process_max_update",
+)
+def process_max_update_task(self: Any, update: dict[str, Any]) -> None:
+    """Handle an inbound MAX Update off the webhook request thread."""
+    from social.max_bot import handle_max_update
+
+    try:
+        handle_max_update(update)
+    except Exception as exc:
+        logger.warning(
+            "max_update_task_failed error=%s",
+            type(exc).__name__,
+        )
+        raise

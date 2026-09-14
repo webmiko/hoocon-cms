@@ -23,9 +23,13 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl gosu \
+    libpq5 curl gosu ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 1000 -d /app appuser
+
+# MAX API (platform-api2.max.ru) uses Russian Trusted CA chain.
+COPY certs/max-ca-bundle.pem /usr/local/share/ca-certificates/hoocon-max-ca.crt
+RUN update-ca-certificates
 
 WORKDIR /app
 

@@ -192,11 +192,12 @@ def _schedule_staff_support_push(
     from django.db import transaction
 
     def _enqueue() -> None:
-        from accounts.tasks import notify_staff_telegram_support
+        from accounts.tasks import notify_staff_max_support, notify_staff_telegram_support
         from webpush.tasks import notify_staff_support_inbound
 
         notify_staff_support_inbound.delay(conversation_id)
         notify_staff_telegram_support.delay(conversation_id)
+        notify_staff_max_support.delay(conversation_id)
         try:
             from staff_api.tasks import notify_staff_fcm_support
 

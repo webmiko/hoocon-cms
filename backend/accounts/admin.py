@@ -20,7 +20,7 @@ from unfold.admin import ModelAdmin
 from unfold.forms import ActionForm
 
 from accounts.forms import StaffUserChangeForm, StaffUserCreationForm
-from accounts.models import PasskeyCredential, StaffTelegramProfile
+from accounts.models import PasskeyCredential, StaffMaxProfile, StaffTelegramProfile
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
 
@@ -37,6 +37,18 @@ class StaffTelegramProfileInline(admin.StackedInline):
     verbose_name_plural = "Telegram сотрудника"
 
 
+class StaffMaxProfileInline(admin.StackedInline):
+    """Personal MAX user_id for staff alerts."""
+
+    model = StaffMaxProfile
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = ("max_user_id", "max_alerts_enabled")
+    verbose_name = "MAX"
+    verbose_name_plural = "MAX сотрудника"
+
+
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Staff users — login email, display name, Unfold Add button."""
 
@@ -45,7 +57,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     show_add_link = True
     form = StaffUserChangeForm
     add_form = StaffUserCreationForm
-    inlines = (StaffTelegramProfileInline,)
+    inlines = (StaffTelegramProfileInline, StaffMaxProfileInline)
     list_display = (
         "email",
         "first_name",
@@ -53,6 +65,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         "is_active",
         "is_superuser",
         "telegram_chat_short",
+        "max_user_short",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("email", "first_name", "username", "last_name")
@@ -194,8 +207,21 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             return f"{chat} (выкл)"
         return chat
 
+    @admin.display(description="MAX")
+    def max_user_short(self, obj: User) -> str:
+        """Show linked MAX user id on the user list."""
+        profile = getattr(obj, "max_profile", None)
+        if profile is None:
+            return "—"
+        uid = (profile.max_user_id or "").strip()
+        if not uid:
+            return "—"
+        if not profile.max_alerts_enabled:
+            return f"{uid} (выкл)"
+        return uid
+
     def get_queryset(self, request: HttpRequest) -> Any:
-        return super().get_queryset(request).select_related("telegram_profile")
+        return super().get_queryset(request).select_related("telegram_profile", "max_profile")
 
     @admin.display(description="Резервные коды")
     def recovery_codes_summary(self, obj: User) -> str:

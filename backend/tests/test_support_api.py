@@ -92,15 +92,48 @@ def test_channels_hides_tokens(settings) -> None:
     assert channels == [
         {
             "channel": "telegram_bot",
+            "provider": "telegram",
+            "kind": "bot",
             "label": "Написать в Telegram",
             "deep_link": "https://t.me/hoocon_bot?start=support",
         },
         {
             "channel": "telegram_channel",
+            "provider": "telegram",
+            "kind": "channel",
             "label": "Канал Telegram",
             "deep_link": "https://t.me/hoocon_moscow",
         },
     ]
+
+
+@pytest.mark.django_db
+def test_channels_includes_max_when_enabled(settings) -> None:
+    settings.MAX_BOT_USERNAME = "id5024199634_bot"
+    settings.MAX_CHANNEL_USERNAME = "id5024199634_biz"
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.max_enabled = True
+    site.save()
+    client = Client()
+    resp = client.get("/api/support/channels/")
+    assert resp.status_code == 200
+    channels = resp.json()["channels"]
+    assert {
+        "channel": "max_bot",
+        "provider": "max",
+        "kind": "bot",
+        "label": "Написать в MAX",
+        "deep_link": "https://max.ru/id5024199634_bot?start=support",
+    } in channels
+    assert {
+        "channel": "max_channel",
+        "provider": "max",
+        "kind": "channel",
+        "label": "Канал MAX",
+        "deep_link": "https://max.ru/id5024199634_biz",
+    } in channels
 
 
 @pytest.mark.django_db

@@ -20,6 +20,7 @@ from urllib.request import ProxyHandler, Request, build_opener, urlopen
 from django.conf import settings
 
 from sitesettings.credentials import max_bot_token, telegram_bot_token, vk_access_token
+from social.max_http import max_urlopen
 
 logger = logging.getLogger("hoocon.social")
 
@@ -417,25 +418,42 @@ def publish_vk(*, group_id: str, text: str) -> PublishResult:
     return PublishResult(ok=True, external_id=str(post_id))
 
 
-def publish_max(*, chat_id: str, text: str) -> PublishResult:
+def publish_max(
+    *,
+    user_id: str = "",
+    chat_id: str = "",
+    text: str,
+    attachments: list[dict[str, Any]] | None = None,
+) -> PublishResult:
     """Send message via MAX Bot API (platform-api2.max.ru).
 
     Args:
-        chat_id: Chat id for the bot.
+        user_id: Target user for 1:1 dialog.
+        chat_id: Target chat or channel id (announcements).
         text: Message body.
+        attachments: Optional inline_keyboard and other MAX attachments.
 
     Returns:
         PublishResult when successful.
     """
     token = max_bot_token()
-    if not token or not chat_id.strip():
+    uid = (user_id or "").strip()
+    cid = (chat_id or "").strip()
+    if not token or (not uid and not cid):
         return PublishResult(ok=False, skipped=True, error="MAX не настроен")
-    url = f"https://platform-api2.max.ru/messages?chat_id={chat_id.strip()}"
+    if uid:
+        url = f"https://platform-api2.max.ru/messages?user_id={uid}"
+    else:
+        url = f"https://platform-api2.max.ru/messages?chat_id={cid}"
+    payload: dict[str, Any] = {"text": text}
+    if attachments:
+        payload["attachments"] = attachments
     try:
         status, data = _post_json(
             url,
-            payload={"text": text},
+            payload=payload,
             headers={"Authorization": token},
+            open_fn=max_urlopen,
         )
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("max_publish_failed error=%s", type(exc).__name__)
@@ -443,10 +461,13 @@ def publish_max(*, chat_id: str, text: str) -> PublishResult:
 
     if status >= 400:
         return PublishResult(ok=False, error=f"MAX HTTP {status}")
-    # Response shape varies; keep message id if present.
     mid = ""
     if isinstance(data.get("message"), dict):
-        mid = str(data["message"].get("body", {}).get("mid") or data["message"].get("id") or "")
+        body = data["message"].get("body")
+        if isinstance(body, dict):
+            mid = str(body.get("mid") or "")
+        if not mid:
+            mid = str(data["message"].get("id") or "")
     if not mid:
         mid = str(data.get("message_id") or data.get("id") or "")
     return PublishResult(ok=True, external_id=mid)

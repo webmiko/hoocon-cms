@@ -1,4 +1,4 @@
-"""Public API views for social integrations (Telegram webhook)."""
+"""Public API views for social integrations (Telegram / MAX webhooks)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ from rest_framework.views import APIView
 logger = logging.getLogger("hoocon.social")
 
 _TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
-_THROTTLE_SCOPE = "telegram_webhook"
+_MAX_SECRET_HEADER = "X-Max-Bot-Api-Secret"
+_TELEGRAM_THROTTLE_SCOPE = "telegram_webhook"
+_MAX_THROTTLE_SCOPE = "max_webhook"
 
 
 class TelegramWebhookView(APIView):
@@ -32,7 +34,7 @@ class TelegramWebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes: list[Any] = []
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = _THROTTLE_SCOPE
+    throttle_scope = _TELEGRAM_THROTTLE_SCOPE
 
     def post(self, request: Request) -> Response:
         """Accept a Telegram Update and enqueue reply handling."""
@@ -62,6 +64,49 @@ class TelegramWebhookView(APIView):
             except Exception as sync_exc:
                 logger.warning(
                     "telegram_webhook_handler_failed error=%s",
+                    type(sync_exc).__name__,
+                )
+        return Response({"ok": True}, status=status.HTTP_200_OK)
+
+
+class MaxWebhookView(APIView):
+    """POST /api/integrations/max/webhook/ — MAX Bot API updates.
+
+    Validates ``X-Max-Bot-Api-Secret`` against ``MAX_WEBHOOK_SECRET``.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[Any] = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = _MAX_THROTTLE_SCOPE
+
+    def post(self, request: Request) -> Response:
+        """Accept a MAX Update and enqueue reply handling."""
+        expected = getattr(settings, "MAX_WEBHOOK_SECRET", "").strip()
+        provided = (request.headers.get(_MAX_SECRET_HEADER) or "").strip()
+        if not expected or provided != expected:
+            return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
+
+        payload = request.data
+        if not isinstance(payload, dict):
+            return Response({"ok": True}, status=status.HTTP_200_OK)
+
+        from social.tasks import process_max_update_task
+
+        try:
+            process_max_update_task.delay(payload)
+        except Exception as exc:
+            logger.warning(
+                "max_webhook_enqueue_failed error=%s falling_back_sync",
+                type(exc).__name__,
+            )
+            try:
+                from social.max_bot import handle_max_update
+
+                handle_max_update(payload)
+            except Exception as sync_exc:
+                logger.warning(
+                    "max_webhook_handler_failed error=%s",
                     type(sync_exc).__name__,
                 )
         return Response({"ok": True}, status=status.HTTP_200_OK)

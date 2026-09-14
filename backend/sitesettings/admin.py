@@ -89,6 +89,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         "lead_rr_last_user",
         "staff_push_subscribers",
         "staff_telegram_subscribers",
+        "staff_max_subscribers",
         "telegram_token_status",
         "vk_token_status",
         "max_token_status",
@@ -147,6 +148,21 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "если у сотрудника нет активных уведомлений на устройстве. "
                     "ID чата — в карточке пользователя (команда бота). "
                     "Менеджерам: заявки и чат. Супер-админу: то же плюс CRM."
+                ),
+            },
+        ),
+        (
+            "MAX персоналу",
+            {
+                "fields": (
+                    "staff_max_leads_enabled",
+                    "staff_max_support_enabled",
+                    "staff_max_subscribers",
+                ),
+                "description": (
+                    "Личные уведомления в MAX (параллельно Telegram и браузерным "
+                    "уведомлениям). ID — в карточке пользователя: /chatid в боте "
+                    "@id5024199634_bot."
                 ),
             },
         ),
@@ -297,6 +313,30 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             role = "супер" if user.is_superuser else "сотрудник"
             items.append(
                 (change_url, name, f"{profile.telegram_chat_id} · {role} · {flag}"),
+            )
+        return format_html(
+            '<ul style="margin:0;padding-left:1.25rem;">{}</ul>',
+            format_html_join("", '<li><a href="{}">{}</a> — {}</li>', items),
+        )
+
+    @admin.display(description="Сотрудники с MAX")
+    def staff_max_subscribers(self, obj: SiteSettings) -> str:
+        """List staff with a personal MAX user id."""
+        del obj
+        from accounts.models import StaffMaxProfile
+
+        rows = StaffMaxProfile.objects.exclude(max_user_id="").select_related("user").order_by("user__email")[:40]
+        if not rows:
+            return "Пока никто не привязал ID. В боте MAX отправьте /chatid → Пользователи → MAX сотрудника."
+        items: list[tuple[str, str, str]] = []
+        for profile in rows:
+            user = profile.user
+            name = (user.get_username() or user.email or f"#{user.pk}").strip()
+            change_url = reverse("admin:auth_user_change", args=[user.pk])
+            flag = "вкл" if profile.max_alerts_enabled else "выкл"
+            role = "супер" if user.is_superuser else "сотрудник"
+            items.append(
+                (change_url, name, f"{profile.max_user_id} · {role} · {flag}"),
             )
         return format_html(
             '<ul style="margin:0;padding-left:1.25rem;">{}</ul>',

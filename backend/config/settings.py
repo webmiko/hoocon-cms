@@ -458,6 +458,9 @@ GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "G-DLRV7BZ5JP").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
+MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
+MAX_BOT_USERNAME = os.getenv("MAX_BOT_USERNAME", "id5024199634_bot").strip().lstrip("@")
+MAX_CHANNEL_USERNAME = os.getenv("MAX_CHANNEL_USERNAME", "id5024199634_biz").strip().lstrip("@")
 # Telegram inbound webhook (setWebhook secret_token). Empty = webhook rejects all.
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
 # Public deep-link username for 1:1 bot chat in the support widget.
@@ -518,6 +521,7 @@ REST_FRAMEWORK = {
         "analytics_hit": "120/min",
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
+        "max_webhook": "120/min",
         "staff_otp": "30/hour",
     },
 }

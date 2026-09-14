@@ -144,6 +144,29 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
             msg.external_message_id = result.external_id
             msg.save(update_fields=["external_message_id"])
         return "telegram_ok"
+    if conversation.channel == Channel.MAX:
+        if (msg.external_message_id or "").strip():
+            return "already_delivered"
+        from social.publishers import publish_max
+
+        result = publish_max(
+            user_id=conversation.external_user_id,
+            text=msg.body,
+        )
+        if result.skipped:
+            logger.warning("support_max_outbound_skipped message_id=%s", message_id)
+            return "skipped"
+        if not result.ok:
+            logger.warning(
+                "support_max_outbound_failed message_id=%s err=%s",
+                message_id,
+                (result.error or "")[:120],
+            )
+            raise self.retry(exc=RuntimeError(result.error or "max_failed"))
+        if result.external_id and not msg.external_message_id:
+            msg.external_message_id = result.external_id
+            msg.save(update_fields=["external_message_id"])
+        return "max_ok"
     logger.info(
         "support_outbound_channel_pending channel=%s message_id=%s",
         conversation.channel,

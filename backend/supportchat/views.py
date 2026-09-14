@@ -60,6 +60,8 @@ class SupportChannelsView(APIView):
                 channels.append(
                     {
                         "channel": "telegram_bot",
+                        "provider": "telegram",
+                        "kind": "bot",
                         "label": "Написать в Telegram",
                         "deep_link": f"https://t.me/{bot}?start=support",
                     },
@@ -69,11 +71,33 @@ class SupportChannelsView(APIView):
                 channels.append(
                     {
                         "channel": "telegram_channel",
+                        "provider": "telegram",
+                        "kind": "channel",
                         "label": "Канал Telegram",
                         "deep_link": f"https://t.me/{channel}",
                     },
                 )
-        # VK / MAX: only when enabled + we have a public deep link later.
+        if site.max_enabled:
+            from social.max_bot import max_bot_deep_link, max_channel_deep_link
+
+            channels.append(
+                {
+                    "channel": "max_bot",
+                    "provider": "max",
+                    "kind": "bot",
+                    "label": "Написать в MAX",
+                    "deep_link": max_bot_deep_link("support"),
+                },
+            )
+            channels.append(
+                {
+                    "channel": "max_channel",
+                    "provider": "max",
+                    "kind": "channel",
+                    "label": "Канал MAX",
+                    "deep_link": max_channel_deep_link(),
+                },
+            )
         return Response({"channels": channels})
 
 

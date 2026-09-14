@@ -132,3 +132,37 @@ class StaffTelegramProfile(models.Model):
     def __str__(self) -> str:
         chat = (self.telegram_chat_id or "").strip() or "—"
         return f"TG({self.user_id}, {chat})"
+
+
+class StaffMaxProfile(models.Model):
+    """Personal MAX DM destination for staff alerts."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="max_profile",
+        verbose_name=_("Пользователь"),
+    )
+    max_user_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name=_("ID пользователя в MAX"),
+        help_text=_(
+            "Числовой идентификатор из личного чата с ботом. В боте отправьте /chatid и скопируйте ответ сюда."
+        ),
+    )
+    max_alerts_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("уведомления в MAX включены"),
+        help_text=_("Выкл — не слать личные уведомления этому сотруднику."),
+    )
+
+    class Meta:
+        verbose_name = _("MAX сотрудника")
+        verbose_name_plural = _("MAX сотрудников")
+
+    def __str__(self) -> str:
+        uid = (self.max_user_id or "").strip() or "—"
+        return f"MAX({self.user_id}, {uid})"

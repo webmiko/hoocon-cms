@@ -140,6 +140,21 @@ class SiteSettings(models.Model):
         ),
     )
 
+    # ── Staff MAX DMs (personal user_id on StaffMaxProfile) ──
+    staff_max_leads_enabled: models.BooleanField = models.BooleanField(
+        "MAX при новой заявке",
+        default=True,
+        help_text=(
+            "Личные сообщения бота при новой заявке (RFQ / консультация / замена). "
+            "Нужен ID в карточке сотрудника (/chatid в боте)."
+        ),
+    )
+    staff_max_support_enabled: models.BooleanField = models.BooleanField(
+        "MAX при сообщении в поддержке",
+        default=True,
+        help_text=("Входящее сообщение в чат поддержки → личный MAX менеджерам с привязанным ID пользователя."),
+    )
+
     # ── Analytics (public counter IDs; loaded after cookie consent) ──
     yandex_metrika_id: models.CharField = models.CharField(
         "ID Яндекс.Метрики",
