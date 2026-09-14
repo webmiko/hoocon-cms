@@ -132,8 +132,8 @@ def test_csp_wiki_read_omits_script_nonce_so_inline_dashboard_runs(client) -> No
 
     from content.models import WikiDocument
 
-    User = get_user_model()
-    admin_user = User.objects.create_superuser(
+    user_model = get_user_model()
+    admin_user = user_model.objects.create_superuser(
         username="wiki-nonce",
         email="wiki-nonce@example.com",
         password="password12",
