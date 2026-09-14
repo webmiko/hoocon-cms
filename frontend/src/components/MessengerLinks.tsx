@@ -20,17 +20,32 @@ function providerFor(channel: MessengerChannel): "max" | "telegram" | null {
   return null;
 }
 
+function iconClass(
+  provider: "max" | "telegram",
+  variant: "compact" | "footer",
+): string {
+  if (provider === "max") {
+    return variant === "footer" ? styles.footerIconMax : styles.compactIconMax;
+  }
+  return variant === "footer" ? styles.footerIconTelegram : styles.compactIconTelegram;
+}
+
 function MessengerIcon({
   provider,
   className,
+  withMaxWordmark = false,
+  decorative = false,
 }: {
   provider: "max" | "telegram";
   className?: string;
+  withMaxWordmark?: boolean;
+  decorative?: boolean;
 }) {
+  const title = decorative ? "" : provider === "max" ? "MAX" : "Telegram";
   if (provider === "max") {
-    return <MaxLogo className={className} withWordmark />;
+    return <MaxLogo className={className} withWordmark={withMaxWordmark} title={title} />;
   }
-  return <TelegramLogo className={className} />;
+  return <TelegramLogo className={className} title={title} />;
 }
 
 type MessengerLinksProps = {
@@ -61,6 +76,8 @@ export function MessengerLinks({
       {items.map((ch) => {
         const provider = providerFor(ch);
         const shortLabel = provider === "max" ? "MAX" : "Telegram";
+        const withMaxWordmark = provider === "max";
+        const showTextLabel = provider !== "max";
         return (
           <a
             key={ch.channel}
@@ -76,12 +93,14 @@ export function MessengerLinks({
             {provider ? (
               <MessengerIcon
                 provider={provider}
-                className={
-                  variant === "footer" ? styles.footerIcon : styles.compactIcon
-                }
+                className={iconClass(provider, variant)}
+                withMaxWordmark={withMaxWordmark}
+                decorative={showTextLabel}
               />
             ) : null}
-            <span className={styles.linkLabel}>{shortLabel}</span>
+            {showTextLabel ? (
+              <span className={styles.linkLabel}>{shortLabel}</span>
+            ) : null}
           </a>
         );
       })}
