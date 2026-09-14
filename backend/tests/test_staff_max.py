@@ -96,3 +96,36 @@ def test_support_max_alert() -> None:
     assert "DA10N" in alert
     assert f"#{conv.pk}" in alert
     assert "Ответить из MAX" in alert
+    assert "«Нужен привод DA10N»" in alert
+
+
+@pytest.mark.django_db
+def test_support_max_alert_uses_inbound_message_id() -> None:
+    """Alert quotes the triggering inbound message, not a later one in the thread."""
+    _make_manager(email="mgr-max4@hoocon.ru", user_id="333")
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    conv = Conversation.objects.create(
+        channel=Channel.MAX,
+        external_user_id="9001",
+        display_name="Клиент",
+    )
+    first = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Старое сообщение",
+    )
+    second = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Новый вопрос по DA10",
+    )
+    with patch(
+        "accounts.max_alerts.publish_max",
+        return_value=PublishResult(ok=True),
+    ) as pub:
+        assert notify_staff_max_support(conv.pk, inbound_message_id=second.pk) == 1
+    alert = pub.call_args.kwargs["text"]
+    assert "Новый вопрос по DA10" in alert
+    assert "Старое сообщение" not in alert
+    assert first.pk != second.pk

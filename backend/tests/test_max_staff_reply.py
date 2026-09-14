@@ -69,7 +69,7 @@ def test_staff_plain_text_does_not_open_client_thread() -> None:
                 },
             },
         )
-    assert "Ответ клиенту" in pub.call_args.kwargs["text"]
+    assert "не попадают в поддержку" in pub.call_args.kwargs["text"]
     assert not Conversation.objects.filter(channel=Channel.MAX, external_user_id="555").exists()
 
 

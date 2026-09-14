@@ -63,6 +63,16 @@ def compose_staff_reply_help() -> str:
     )
 
 
+def compose_staff_account_notice() -> str:
+    """Explain why a manager's free text did not open a support thread."""
+    return (
+        "Ваш MAX привязан как сотрудник — обычные сообщения боту "
+        "не попадают в поддержку и не видны в Admin.\n\n"
+        + compose_staff_reply_help()
+        + "\n\nТест клиентского чата — с другого MAX-аккаунта."
+    )
+
+
 def staff_reply_hint(conversation_id: int) -> str:
     """One-line instruction appended to staff support alerts."""
     return f"Ответить из MAX: #{conversation_id} ваш текст"

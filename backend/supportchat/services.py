@@ -197,7 +197,7 @@ def _schedule_staff_support_push(
 
         notify_staff_support_inbound.delay(conversation_id)
         notify_staff_telegram_support.delay(conversation_id)
-        notify_staff_max_support.delay(conversation_id)
+        notify_staff_max_support.delay(conversation_id, message_id)
         try:
             from staff_api.tasks import notify_staff_fcm_support
 

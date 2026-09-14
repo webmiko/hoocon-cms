@@ -134,6 +134,57 @@ def test_dialog_cleared_sends_welcome() -> None:
     assert "Добро пожаловать" in pub.call_args.kwargs["text"]
 
 
+@pytest.mark.django_db(transaction=True)
+def test_free_text_triggers_max_staff_alert_with_body(settings) -> None:
+    """Inbound client text is stored and quoted in the staff MAX alert."""
+    from django.contrib.auth import get_user_model
+    from django.contrib.auth.models import Group
+
+    from accounts.models import StaffMaxProfile
+    from accounts.roles import GROUP_MANAGER
+
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    user = get_user_model().objects.create_user(
+        username="mgr-max-flow@hoocon.ru",
+        email="mgr-max-flow@hoocon.ru",
+        password="x",
+        is_staff=True,
+    )
+    group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
+    user.groups.add(group)
+    StaffMaxProfile.objects.create(
+        user=user,
+        max_user_id="555001",
+        max_alerts_enabled=True,
+    )
+    with (
+        patch(
+            "accounts.max_alerts.publish_max",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+        patch("supportchat.schedule.is_open_now", return_value=True),
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_created",
+                "message": {
+                    "sender": {"user_id": 9001, "first_name": "Клиент", "is_bot": False},
+                    "recipient": {"chat_type": "dialog"},
+                    "body": {"mid": "mid.flow", "text": "Нужен привод DA10"},
+                },
+            },
+        )
+    from supportchat.models import Channel, Conversation
+
+    conv = Conversation.objects.get(channel=Channel.MAX, external_user_id="9001")
+    assert conv.messages.filter(body__icontains="DA10").exists()
+    staff_calls = [call for call in pub.call_args_list if call.kwargs.get("user_id") == "555001"]
+    assert staff_calls
+    alert = staff_calls[-1].kwargs["text"]
+    assert "DA10" in alert
+    assert "Ответить из MAX" in alert
+
+
 @pytest.mark.django_db
 def test_free_text_opens_support_thread() -> None:
     """Client question is stored in supportchat as MAX channel."""

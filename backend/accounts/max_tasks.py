@@ -46,16 +46,16 @@ def notify_staff_max_new_lead(lead_id: int) -> int:
 
 
 @shared_task
-def notify_staff_max_support(conversation_id: int) -> int:
+def notify_staff_max_support(conversation_id: int, inbound_message_id: int | None = None) -> int:
     """MAX alert for inbound support message."""
     from accounts.max_alerts import (
+        compose_staff_max_support_alert,
         format_staff_max_message,
         send_max_to_users,
         staff_max_recipients_managers,
         staff_max_recipients_superusers,
     )
     from sitesettings.models import SiteSettings
-    from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
 
     site = SiteSettings.load()
@@ -65,30 +65,12 @@ def notify_staff_max_support(conversation_id: int) -> int:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
         return 0
-    from supportchat.models import Message, MessageDirection
-
-    label = conv.display_name or conv.get_channel_display()
-    title, body = staff_support_push_copy(label=label)
-    last_inbound = (
-        Message.objects.filter(
-            conversation_id=conversation_id,
-            direction=MessageDirection.INBOUND,
-        )
-        .order_by("-id")
-        .first()
+    title, body = compose_staff_max_support_alert(
+        conv,
+        inbound_message_id=inbound_message_id,
     )
-    if last_inbound is not None:
-        snippet = (last_inbound.body or "").strip().replace("\n", " ")
-        if len(snippet) > 220:
-            snippet = snippet[:219].rstrip() + "…"
-        if snippet:
-            channel_label = conv.get_channel_display()
-            body = f"{body}\n\n{channel_label}: {snippet}"
-    from social.max_staff_reply import staff_reply_hint
-
-    body = f"{body}\n\n{staff_reply_hint(conv.pk)}"
     text = format_staff_max_message(
-        title=f"{title} · #{conv.pk}",
+        title=title,
         body=body,
         url=f"/admin/supportchat/conversation/{conv.pk}/change/",
     )

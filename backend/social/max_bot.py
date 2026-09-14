@@ -346,11 +346,16 @@ def _display_name_from_user(user: dict[str, Any]) -> str:
 
 
 def _message_plain_text(message: dict[str, Any]) -> str | None:
+    """Extract user-visible text from a MAX message (body.text or legacy fields)."""
     body = message.get("body")
-    if not isinstance(body, dict):
-        return None
-    text = (body.get("text") or "").strip()
-    return text or None
+    if isinstance(body, dict):
+        text = (body.get("text") or "").strip()
+        if text:
+            return text
+    top_level = message.get("text")
+    if isinstance(top_level, str) and top_level.strip():
+        return top_level.strip()
+    return None
 
 
 def _message_external_id(message: dict[str, Any]) -> str:
@@ -398,6 +403,7 @@ def _send_reply_for_action(user_key: str, action: str) -> PublishResult:
 def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     """Handle manager reply (#ID text) or help; None → treat as client message."""
     from social.max_staff_reply import (
+        compose_staff_account_notice,
         compose_staff_reply_help,
         parse_staff_reply_text,
         staff_user_for_max_user_id,
@@ -421,7 +427,7 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     if resolve_menu_action(text) is not None:
         return None
 
-    return _send_to_user(user_key, compose_staff_reply_help())
+    return _send_to_user(user_key, compose_staff_account_notice())
 
 
 def _ingest_support_text(
@@ -453,8 +459,12 @@ def _ingest_support_text(
             raw_payload={"max_mid": external_message_id},
             display_name=display_name,
         )
-    except SupportChatError:
-        logger.warning("max_support_ingest_rejected user_id=%s", user_id)
+    except SupportChatError as exc:
+        logger.warning(
+            "max_support_ingest_rejected user_id=%s reason=%s",
+            user_id,
+            str(exc)[:200],
+        )
         return None
 
     if auto is not None:
