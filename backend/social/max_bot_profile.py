@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
+
 from social.max_bot import BOT_COMMANDS, max_bot_username, max_channel_deep_link
 from social.max_channel import channel_cover_path
 from social.max_http import max_json_request, max_upload_image
@@ -39,8 +41,20 @@ def bot_commands_payload() -> list[dict[str, str]]:
     return [{"name": row["command"], "description": row["description"]} for row in BOT_COMMANDS]
 
 
+_BOT_AVATAR_STATIC = Path("static/social/max-bot-avatar.png")
+
+
 def bot_avatar_path() -> Path | None:
-    """Local avatar file (same cover as channel welcome)."""
+    """Local bot profile avatar (square logo; channel cover is separate)."""
+    configured = getattr(settings, "MAX_BOT_AVATAR_PATH", "").strip()
+    candidates: list[Path] = []
+    if configured:
+        candidates.append(Path(configured))
+    base = Path(settings.BASE_DIR)
+    candidates.append(base / _BOT_AVATAR_STATIC)
+    for path in candidates:
+        if path.is_file():
+            return path
     return channel_cover_path()
 
 

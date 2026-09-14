@@ -9,11 +9,19 @@ import pytest
 
 from social.max_bot import compose_welcome_text, handle_max_update
 from social.max_bot_profile import (
+    bot_avatar_path,
     bot_commands_payload,
     bot_description,
     setup_bot,
 )
 from social.publishers import PublishResult
+
+
+def test_bot_avatar_uses_dedicated_logo() -> None:
+    """Bot profile avatar is the square Hoocon H logo, not channel welcome cover."""
+    path = bot_avatar_path()
+    assert path is not None
+    assert path.name == "max-bot-avatar.png"
 
 
 def test_bot_description_mentions_channel() -> None:
