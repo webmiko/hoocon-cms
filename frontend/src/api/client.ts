@@ -441,6 +441,11 @@ export const api = {
       created_at: string;
       sender_name: string;
     }>;
+    conversation?: {
+      id: number;
+      display_name?: string;
+      contact_email?: string;
+    } | null;
   }> {
     const qs = after != null ? `?after=${after}` : "";
     return apiFetch(`/api/support/conversations/current/messages/${qs}`, {

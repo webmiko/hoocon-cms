@@ -152,7 +152,7 @@ class CurrentMessagesView(APIView):
     def get(self, request: Request) -> Response:
         conv = get_web_conversation(request._request)
         if conv is None:
-            return Response({"messages": []})
+            return Response({"messages": [], "conversation": None})
         after = request.query_params.get("after")
         qs = (
             conv.messages.select_related("author", "conversation", "conversation__assignee")
@@ -161,7 +161,16 @@ class CurrentMessagesView(APIView):
         )
         if after and str(after).isdigit():
             qs = qs.filter(id__gt=int(after))
-        response = Response({"messages": MessageSerializer(qs, many=True).data})
+        response = Response(
+            {
+                "messages": MessageSerializer(qs, many=True).data,
+                "conversation": {
+                    "id": conv.pk,
+                    "display_name": conv.display_name,
+                    "contact_email": conv.contact_email,
+                },
+            },
+        )
         # Polling must never be served stale from browser/proxy caches.
         response["Cache-Control"] = "no-store"
         return response

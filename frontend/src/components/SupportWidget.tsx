@@ -311,24 +311,26 @@ export function SupportWidget() {
     void (async () => {
       try {
         await api.fetchCsrfToken();
-        const startedConv = await api.supportStartConversation({});
-        if (cancelled) return;
-        setStarted(true);
-        if (startedConv.display_name) {
-          setName(startedConv.display_name);
-        }
-        if (startedConv.contact_email) {
-          setEmail(startedConv.contact_email);
-        }
-        if (startedConv.display_name || startedConv.contact_email) {
-          setContactsLocked(true);
-        }
         const data = await api.supportMessages();
         if (cancelled) return;
+        if (!data.messages.length && !data.conversation) {
+          return;
+        }
+        setStarted(true);
+        const conv = data.conversation;
+        if (conv?.display_name) {
+          setName(conv.display_name);
+        }
+        if (conv?.contact_email) {
+          setEmail(conv.contact_email);
+        }
+        if (conv?.display_name || conv?.contact_email) {
+          setContactsLocked(true);
+        }
         setMessages(data.messages);
         lastIdRef.current = maxMessageId(data.messages);
       } catch {
-        /* first message path still works via ensureStarted */
+        /* first message creates the thread on send */
       }
     })();
     return () => {
@@ -498,11 +500,6 @@ export function SupportWidget() {
     const displayName = name.trim();
     const contactEmail = email.trim();
     if (!force && !displayName && !contactEmail) {
-      if (!started) {
-        await api.fetchCsrfToken();
-        await api.supportStartConversation({});
-        setStarted(true);
-      }
       return;
     }
     await api.fetchCsrfToken();
@@ -540,6 +537,7 @@ export function SupportWidget() {
     try {
       await ensureStarted();
       const result = await api.supportSendMessage(body);
+      setStarted(true);
       const next = [result.message];
       if (result.auto_reply) next.push(result.auto_reply);
       setMessages((prev) => mergeMessages(prev, next));

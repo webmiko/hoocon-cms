@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.test import Client, override_settings
 
-from supportchat.models import Conversation, FaqItem
+from supportchat.models import Channel, Conversation, FaqItem, Message
 from supportchat.schedule import ensure_default_schedule
 
 MSK = ZoneInfo("Europe/Moscow")
@@ -172,6 +172,42 @@ def test_web_message_roundtrip_and_idor() -> None:
     other = c2.get("/api/support/conversations/current/messages/")
     assert other.status_code == 200
     assert other.json()["messages"] == []
+
+
+@pytest.mark.django_db
+def test_poll_without_start_does_not_create_conversation() -> None:
+    """Opening the widget must not create an empty Admin thread before the first message."""
+    ensure_default_schedule()
+    client = _csrf_client()
+    poll = client.get("/api/support/conversations/current/messages/")
+    assert poll.status_code == 200
+    assert poll.json()["messages"] == []
+    assert poll.json()["conversation"] is None
+    assert not Conversation.objects.filter(channel=Channel.WEB).exists()
+
+
+@pytest.mark.django_db
+def test_first_message_without_start_creates_thread() -> None:
+    """First inbound text creates the web conversation lazily."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Здравствуйте"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+        assert Message.objects.filter(conversation=conv).count() == 1
+
+        poll = client.get("/api/support/conversations/current/messages/")
+        assert poll.status_code == 200
+        body = poll.json()
+        assert len(body["messages"]) == 1
+        assert body["conversation"]["id"] == conv.pk
 
 
 @pytest.mark.django_db
