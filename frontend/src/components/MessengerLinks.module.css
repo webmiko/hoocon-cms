@@ -32,8 +32,9 @@
 }
 
 .compactIcon {
-  width: 3.25rem;
-  height: 1rem;
+  width: 3.35rem;
+  height: auto;
+  aspect-ratio: 131 / 42;
   flex-shrink: 0;
 }
 
@@ -68,8 +69,9 @@
 }
 
 .footerIcon {
-  width: 3.1rem;
-  height: 0.95rem;
+  width: 3.35rem;
+  height: auto;
+  aspect-ratio: 131 / 42;
   flex-shrink: 0;
   color: #fff;
 }
