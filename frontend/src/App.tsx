@@ -8,6 +8,7 @@ import { HomePage } from "./pages/HomePage";
 import { api } from "./api/client";
 import { useAsync } from "./hooks/useAsync";
 import { catalogPathForSku } from "./utils/catalogPaths";
+import { shouldResolveLegacySkuSlug } from "./utils/legacySkuSlug";
 import { lazyWithChunkReload } from "./utils/lazyWithChunkReload";
 
 const CatalogPage = lazyWithChunkReload(() =>
@@ -72,19 +73,23 @@ function NewsLegacyRedirect() {
  */
 function SkuLegacyRedirect() {
   const { slug } = useParams<{ slug: string }>();
-  const { data: sku, loading, error } = useAsync(
-    () => api.skuDetail(slug!),
-    slug,
-    slug ? `catalog:sku:${slug}` : undefined,
-  );
-
-  if (!slug) {
+  if (!slug || !shouldResolveLegacySkuSlug(slug)) {
     return (
       <Suspense fallback={<PageFallback />}>
         <NotFoundPage />
       </Suspense>
     );
   }
+  return <SkuLegacyRedirectResolved slug={slug} />;
+}
+
+function SkuLegacyRedirectResolved({ slug }: { slug: string }) {
+  const { data: sku, loading, error } = useAsync(
+    (signal) => api.skuDetail(slug, { signal }),
+    slug,
+    `catalog:sku:${slug}`,
+  );
+
   if (loading) {
     return <PageFallback />;
   }

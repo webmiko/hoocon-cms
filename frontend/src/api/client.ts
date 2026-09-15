@@ -288,8 +288,8 @@ export const api = {
     return apiFetch<CatalogFacetsResponse>(`/api/catalog/facets/${qs}`);
   },
 
-  skuDetail(slug: string): Promise<SKUDetailResponse> {
-    return apiFetch<SKUDetailResponse>(`/api/catalog/skus/${slug}/`);
+  skuDetail(slug: string, init?: RequestInit): Promise<SKUDetailResponse> {
+    return apiFetch<SKUDetailResponse>(`/api/catalog/skus/${slug}/`, init);
   },
 
   compare(slugs: string[]): Promise<CompareResponse> {
