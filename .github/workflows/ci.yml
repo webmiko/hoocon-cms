@@ -130,6 +130,12 @@ jobs:
         working-directory: frontend
         continue-on-error: true
         run: npm audit --audit-level=high
+      - name: npm lint
+        working-directory: frontend
+        run: npm run lint
+      - name: npm build
+        working-directory: frontend
+        run: npm run build
 
   build:
     name: build (image + frontend)
