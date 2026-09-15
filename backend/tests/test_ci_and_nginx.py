@@ -55,6 +55,21 @@ def test_ci_workflow_has_check_job_with_postgres() -> None:
     assert "pip-audit" in joined
 
 
+def test_ci_advisory_npm_audit_does_not_use_continue_on_error() -> None:
+    """Advisory build-tooling audit must not fail the job or paint check red."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    steps = data["jobs"]["check"]["steps"]
+    advisory = next(
+        s for s in steps if isinstance(s, dict) and s.get("name") == "npm audit (build tooling, advisory only)"
+    )
+    assert advisory.get("continue-on-error") is not True
+    run = advisory.get("run", "")
+    assert "::warning::" in run
+    assert "npm audit --audit-level=high" in run
+
+
 def test_ci_workflow_build_skipped_on_pull_request() -> None:
     """Build (image + frontend) runs only on push / workflow_dispatch."""
     import yaml

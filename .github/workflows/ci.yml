@@ -126,10 +126,14 @@ jobs:
       - name: npm audit (runtime deps, blocking)
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
+      # Log build-tooling advisories without failing the job (continue-on-error
+      # still paints the step red in GitHub UI and confuses gh run watch).
       - name: npm audit (build tooling, advisory only)
         working-directory: frontend
-        continue-on-error: true
-        run: npm audit --audit-level=high
+        run: |
+          if ! npm audit --audit-level=high; then
+            echo "::warning::Build-tooling npm audit reported high+ advisories (non-blocking; not in visitor bundle)."
+          fi
       - name: npm lint
         working-directory: frontend
         run: npm run lint
