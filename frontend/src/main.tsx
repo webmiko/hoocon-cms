@@ -15,7 +15,6 @@ import {
   recoverFromStaleChunk,
 } from "./utils/chunkLoadRecovery";
 import { reloadIfReleaseStale } from "./utils/reloadIfReleaseStale";
-import { initSentry } from "./sentry";
 import { installSupportChatControl } from "./utils/supportChatControl";
 
 /**
@@ -29,7 +28,6 @@ function promoteMainStylesheet(): void {
   }
 }
 
-initSentry();
 promoteMainStylesheet();
 installSupportChatControl();
 
