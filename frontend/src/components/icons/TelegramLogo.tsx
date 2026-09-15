@@ -5,12 +5,12 @@ type TelegramLogoProps = {
 
 /** Monochrome Telegram plane (`currentColor`). */
 export function TelegramLogo({ className, title = "Telegram" }: TelegramLogoProps) {
+  const hidden = title === "";
   return (
     <svg
       className={className}
       viewBox="0 0 24 24"
-      role="img"
-      aria-label={title}
+      {...(hidden ? { "aria-hidden": true } : { role: "img", "aria-label": title })}
       xmlns="http://www.w3.org/2000/svg"
     >
       <path

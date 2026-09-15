@@ -34,13 +34,15 @@ export function MaxLogo({
   title = "MAX",
   withWordmark = false,
 }: MaxLogoProps) {
+  const hidden = title === "";
+  const a11y = hidden ? { "aria-hidden": true as const } : { role: "img" as const, "aria-label": title };
+
   if (withWordmark) {
     return (
       <svg
         className={className}
         viewBox="0 0 131 42"
-        role="img"
-        aria-label={title}
+        {...a11y}
         xmlns="http://www.w3.org/2000/svg"
       >
         <path fill="currentColor" fillRule="evenodd" d={BUBBLE_PATH} clipRule="evenodd" />
@@ -53,8 +55,7 @@ export function MaxLogo({
     <svg
       className={className}
       viewBox="0 0 43 42"
-      role="img"
-      aria-label={title}
+      {...a11y}
       xmlns="http://www.w3.org/2000/svg"
     >
       <path fill="currentColor" fillRule="evenodd" d={BUBBLE_PATH} clipRule="evenodd" />

@@ -72,38 +72,38 @@ export function MessengerLinks({
     variant === "footer" ? styles.footerRow : styles.compactRow;
 
   return (
-    <div className={rootClass} role="list" aria-label="Мессенджеры">
+    <ul className={rootClass} role="list" aria-label="Мессенджеры">
       {items.map((ch) => {
         const provider = providerFor(ch);
         const shortLabel = provider === "max" ? "MAX" : "Telegram";
         const withMaxWordmark = provider === "max";
         const showTextLabel = provider !== "max";
         return (
-          <a
-            key={ch.channel}
-            className={
-              variant === "footer" ? styles.footerLink : styles.compactLink
-            }
-            href={ch.deep_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            role="listitem"
-            onClick={onNavigate}
-          >
-            {provider ? (
-              <MessengerIcon
-                provider={provider}
-                className={iconClass(provider, variant)}
-                withMaxWordmark={withMaxWordmark}
-                decorative={showTextLabel}
-              />
-            ) : null}
-            {showTextLabel ? (
-              <span className={styles.linkLabel}>{shortLabel}</span>
-            ) : null}
-          </a>
+          <li key={ch.channel}>
+            <a
+              className={
+                variant === "footer" ? styles.footerLink : styles.compactLink
+              }
+              href={ch.deep_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onNavigate}
+            >
+              {provider ? (
+                <MessengerIcon
+                  provider={provider}
+                  className={iconClass(provider, variant)}
+                  withMaxWordmark={withMaxWordmark}
+                  decorative={showTextLabel}
+                />
+              ) : null}
+              {showTextLabel ? (
+                <span className={styles.linkLabel}>{shortLabel}</span>
+              ) : null}
+            </a>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
