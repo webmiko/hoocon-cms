@@ -12,6 +12,7 @@ from django.test import Client, override_settings
 from accounts.roles import GROUP_MANAGER
 from leads.models import Lead
 from staff_api.models import StaffAuthToken, StaffDevice
+from staff_api.tokens import hash_staff_token, issue_staff_token, touch_staff_token_last_used
 
 User = get_user_model()
 
@@ -38,9 +39,9 @@ def _manager(*, email: str = "mgr@example.com") -> object:
 
 
 def _auth_client(user: object) -> Client:
-    token = StaffAuthToken.objects.create(user=user)
+    plain = issue_staff_token(user)
     client = Client()
-    client.defaults["HTTP_AUTHORIZATION"] = f"Token {token.key}"
+    client.defaults["HTTP_AUTHORIZATION"] = f"Token {plain}"
     return client
 
 
@@ -73,7 +74,10 @@ def test_otp_start_verify_and_me() -> None:
     )
     assert verify.status_code == 200, verify.content
     token = verify.json()["token"]
-    assert StaffAuthToken.objects.filter(key=token, user=user).exists()
+    assert StaffAuthToken.objects.filter(user=user).count() == 1
+    stored = StaffAuthToken.objects.get(user=user)
+    assert stored.key == hash_staff_token(token)
+    assert stored.key != token
 
     me = Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {token}")
     assert me.status_code == 200
@@ -303,11 +307,88 @@ def test_conversation_mutate_views_select_related_party() -> None:
 @override_settings(**STAFF_SETTINGS)
 def test_logout_deletes_token() -> None:
     user = _manager(email="out@example.com")
-    token = StaffAuthToken.objects.create(user=user)
+    plain = issue_staff_token(user)
     client = Client()
     response = client.post(
         "/api/staff/auth/logout/",
-        HTTP_AUTHORIZATION=f"Token {token.key}",
+        HTTP_AUTHORIZATION=f"Token {plain}",
     )
     assert response.status_code == 200
-    assert not StaffAuthToken.objects.filter(key=token.key).exists()
+    assert not StaffAuthToken.objects.filter(user=user).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS, STAFF_API_TOKEN_TTL_DAYS=1)
+def test_expired_staff_token_rejected() -> None:
+    """Expired bearer tokens are rejected and removed from the database."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    user = _manager(email="expired@example.com")
+    plain = issue_staff_token(user)
+    StaffAuthToken.objects.filter(user=user).update(
+        expires_at=timezone.now() - timedelta(minutes=1),
+    )
+    response = Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {plain}")
+    assert response.status_code in {401, 403}
+    assert not StaffAuthToken.objects.filter(user=user).exists()
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
+def test_touch_staff_token_last_used_is_throttled() -> None:
+    """last_used_at is not rewritten on every authenticated request."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    user = _manager(email="touch@example.com")
+    plain = issue_staff_token(user)
+    token = StaffAuthToken.objects.get(user=user)
+    touch_staff_token_last_used(token)
+    first = StaffAuthToken.objects.get(pk=token.pk).last_used_at
+    assert first is not None
+    touch_staff_token_last_used(StaffAuthToken.objects.get(pk=token.pk))
+    second = StaffAuthToken.objects.get(pk=token.pk).last_used_at
+    assert second == first
+
+    StaffAuthToken.objects.filter(pk=token.pk).update(
+        last_used_at=timezone.now() - timedelta(minutes=10),
+    )
+    stale = StaffAuthToken.objects.get(pk=token.pk)
+    touch_staff_token_last_used(stale)
+    third = StaffAuthToken.objects.get(pk=token.pk).last_used_at
+    assert third is not None
+    assert third > first
+
+    assert Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {plain}").status_code == 200
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
+def test_otp_verify_rotates_previous_token() -> None:
+    """New OTP login invalidates the previous staff API token."""
+    user = _manager(email="rotate@example.com")
+    old_plain = issue_staff_token(user)
+    client = Client()
+    with patch("staff_api.otp.generate_otp_code", return_value="654321"):
+        with patch("config.admin_otp.send_admin_otp_email"):
+            start = client.post(
+                "/api/staff/auth/otp/start/",
+                data={"login": user.email},
+                content_type="application/json",
+            )
+    challenge_id = start.json()["challenge_id"]
+    verify = client.post(
+        "/api/staff/auth/otp/verify/",
+        data={"challenge_id": challenge_id, "code": "654321"},
+        content_type="application/json",
+    )
+    assert verify.status_code == 200
+    new_plain = verify.json()["token"]
+    assert Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {old_plain}").status_code in {
+        401,
+        403,
+    }
+    assert Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {new_plain}").status_code == 200

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from typing import Any
 
 from django.conf import settings
 from django.db import models
@@ -11,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 
 def generate_staff_token() -> str:
-    """Return a new opaque API token (store as-is; treat like a password)."""
+    """Return a new opaque API token (return once to client; store hashed)."""
     return secrets.token_urlsafe(32)
 
 
@@ -25,6 +24,7 @@ class StaffAuthToken(models.Model):
         related_name="staff_auth_tokens",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
     last_used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -33,11 +33,6 @@ class StaffAuthToken(models.Model):
 
     def __str__(self) -> str:
         return f"StaffAuthToken(user={self.user_id})"
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        if not self.key:
-            self.key = generate_staff_token()
-        super().save(*args, **kwargs)
 
 
 class StaffDevice(models.Model):

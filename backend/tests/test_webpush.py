@@ -185,7 +185,7 @@ def test_inbound_bumps_support_sticker_and_triggers_push(
     """Inbound bumps unread sticker (admin + staff badges) and fires Web Push + FCM."""
     from django.urls import reverse
 
-    from staff_api.models import StaffAuthToken, StaffDevice
+    from staff_api.models import StaffDevice
     from supportchat.models import Channel, Conversation
     from supportchat.schedule import ensure_default_schedule
     from supportchat.services import add_inbound_message, count_staff_unread
@@ -221,11 +221,13 @@ def test_inbound_bumps_support_sticker_and_triggers_push(
     unread_url = reverse("admin:supportchat_conversation_unread_count")
     assert admin.get(unread_url).json()["count"] == 0
 
-    token = StaffAuthToken.objects.create(user=user)
+    from staff_api.tokens import issue_staff_token
+
+    plain = issue_staff_token(user)
     staff_api = Client()
     badges0 = staff_api.get(
         "/api/staff/badges/",
-        HTTP_AUTHORIZATION=f"Token {token.key}",
+        HTTP_AUTHORIZATION=f"Token {plain}",
     )
     assert badges0.status_code == 200
     assert badges0.json()["support_unread"] == 0
@@ -242,7 +244,7 @@ def test_inbound_bumps_support_sticker_and_triggers_push(
     assert admin.get(unread_url).json()["count"] == 1
     badges1 = staff_api.get(
         "/api/staff/badges/",
-        HTTP_AUTHORIZATION=f"Token {token.key}",
+        HTTP_AUTHORIZATION=f"Token {plain}",
     )
     assert badges1.json()["support_unread"] == 1
 
@@ -267,7 +269,7 @@ def test_inbound_bumps_support_sticker_and_triggers_push(
     assert admin.get(unread_url).json()["count"] == 0
     badges2 = staff_api.get(
         "/api/staff/badges/",
-        HTTP_AUTHORIZATION=f"Token {token.key}",
+        HTTP_AUTHORIZATION=f"Token {plain}",
     )
     assert badges2.json()["support_unread"] == 0
 

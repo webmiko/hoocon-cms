@@ -50,6 +50,7 @@ from staff_api.serializers import (
     serialize_message,
     serialize_user,
 )
+from staff_api.tokens import issue_staff_token
 from supportchat.models import Conversation, ConversationStatus
 from supportchat.services import (
     SupportChatError,
@@ -118,8 +119,9 @@ class OtpVerifyView(APIView):
             )
         except AdminOtpVerifyError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        token = StaffAuthToken.objects.create(user=user)
-        return Response({"token": token.key, "user": serialize_user(user)})
+        StaffAuthToken.objects.filter(user=user).delete()
+        plain_token = issue_staff_token(user)
+        return Response({"token": plain_token, "user": serialize_user(user)})
 
 
 class OtpResendView(APIView):

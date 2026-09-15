@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from django.contrib.auth.models import AbstractBaseUser
-from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
@@ -13,6 +12,7 @@ from rest_framework.request import Request
 
 from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
 from staff_api.models import StaffAuthToken
+from staff_api.tokens import lookup_staff_token, touch_staff_token_last_used
 
 
 class StaffTokenAuthentication(BaseAuthentication):
@@ -27,14 +27,13 @@ class StaffTokenAuthentication(BaseAuthentication):
         if len(auth) != 2:
             raise AuthenticationFailed("Некорректный заголовок Authorization.")
         raw = auth[1].decode("utf-8")
-        try:
-            token = StaffAuthToken.objects.select_related("user").get(key=raw)
-        except StaffAuthToken.DoesNotExist as exc:
-            raise AuthenticationFailed("Недействительный токен.") from exc
+        token = lookup_staff_token(raw)
+        if token is None:
+            raise AuthenticationFailed("Недействительный токен.")
         user = token.user
         if not user.is_active or not user.is_staff:
             raise AuthenticationFailed("Учётная запись недоступна.")
-        StaffAuthToken.objects.filter(pk=token.pk).update(last_used_at=timezone.now())
+        touch_staff_token_last_used(token)
         return user, token
 
 
