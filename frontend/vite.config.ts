@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 import { asyncEntryCssPlugin } from "./vite.async-css.ts";
+import { fontPreloadPlugin } from "./vite.font-preload.ts";
 import { preserveBackdropFilterPlugin } from "./vite.preserve-backdrop-filter.ts";
 import { COLOR_BG, COLOR_BRAND } from "./src/styles/brandColors.ts";
 
@@ -89,6 +90,7 @@ export default defineConfig({
     }),
     // After PWA HTML inject — last transformIndexHtml wins for stylesheet links.
     asyncEntryCssPlugin(),
+    fontPreloadPlugin(),
     preserveBackdropFilterPlugin(),
   ],
   build: {

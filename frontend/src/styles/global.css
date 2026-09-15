@@ -1,8 +1,7 @@
-/* Global styles: tokens, fonts, reset, a11y, soft motion.
+/* Global styles: tokens, reset, a11y, soft motion (fonts → src/styles/fonts.ts).
  * Spec: docs/readiness-backend-ux.md §4; docs/design-system.md.
  */
 
-@import "./fonts.css";
 @import "./tokens.css";
 
 *,

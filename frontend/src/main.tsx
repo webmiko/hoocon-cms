@@ -7,6 +7,7 @@ import { registerSW } from "virtual:pwa-register";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { HOOCON_MAIN_CSS_ID } from "./hooconMainCss";
+import "./styles/fonts";
 import "./styles/global.css";
 import App from "./App";
 import {
