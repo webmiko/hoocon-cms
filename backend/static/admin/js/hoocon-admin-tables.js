@@ -63,7 +63,8 @@
         return;
       }
 
-      if (cell.hasAttribute("data-label")) {
+      const existing = (cell.getAttribute("data-label") || "").trim();
+      if (existing) {
         return;
       }
 
@@ -240,6 +241,13 @@
     });
   }
 
+  function forEachBodyRow(table, fn) {
+    /* Unfold 0.106+: one <tbody> per changelist row (zebra + row sections). */
+    Array.from(table.tBodies).forEach((body) => {
+      Array.from(body.rows).forEach(fn);
+    });
+  }
+
   function processTable(table) {
     /* Unfold tabular inlines use their own phone layout (CSS); card-stack breaks delete rows. */
     if (isUnfoldTabularInline(table)) {
@@ -256,12 +264,11 @@
     table.classList.add(CARD_CLASS);
     applyHeaderTitles(table);
 
-    const body = table.tBodies[0];
-    if (!body) {
+    if (!table.tBodies.length) {
       return;
     }
 
-    Array.from(body.rows).forEach((row) => {
+    forEachBodyRow(table, (row) => {
       applyRowLabels(row, labels);
       markBlankCells(row);
     });

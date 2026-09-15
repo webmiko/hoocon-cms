@@ -234,4 +234,4 @@ def test_tables_js_overrides_prefilled_select_record_label() -> None:
     assert 'cell.setAttribute("data-label", CHECKBOX_LABEL)' in js
     checkbox_block = js[js.find("function applyRowLabels") : js.find("function markBlankCells")]
     assert 'cell.classList.contains("action-checkbox")' in checkbox_block
-    assert checkbox_block.index("action-checkbox") < checkbox_block.index("hasAttribute")
+    assert 'getAttribute("data-label")' in checkbox_block

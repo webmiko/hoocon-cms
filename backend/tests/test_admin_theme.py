@@ -711,6 +711,10 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert 'table.closest("#changelist")' in js
     assert "hoocon-lead-kanban__cards" in js
     assert "hoocon-phone-filter-chips" in js
+    assert "forEachBodyRow" in js
+    assert "Unfold 0.106" in js
+    process_table = js.split("function processTable")[1].split("function observeInlineRows")[0]
+    assert "table.tBodies[0]" not in process_table
 
     board_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-leads-board.js").read_text(
         encoding="utf-8"
