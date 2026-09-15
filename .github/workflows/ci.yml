@@ -82,7 +82,6 @@ jobs:
       DB_HOST: localhost
       DB_PORT: "5432"
       CELERY_TASK_ALWAYS_EAGER: "true"
-      USE_SQLITE: "False"
       DJANGO_CACHE_URL: "locmem://"
       DJANGO_SECURE_SSL_REDIRECT: "false"
       DJANGO_BEHIND_HTTPS_PROXY: "false"

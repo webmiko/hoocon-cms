@@ -84,7 +84,7 @@ if not DEBUG:
     if _env_bool("DJANGO_BEHIND_HTTPS_PROXY", default=True):
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-_DEFAULT_CORS = "http://localhost:5173,http://127.0.0.1:5173"
+_DEFAULT_CORS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
 CORS_ALLOWED_ORIGINS = [
     origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", _DEFAULT_CORS).split(",") if origin.strip()
 ]
@@ -217,27 +217,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-_use_sqlite = _env_bool("USE_SQLITE", default=False)
-_db_name = os.getenv("DB_NAME", "").strip()
 
-if _db_name and not _use_sqlite:
-    DATABASES = {
+def resolve_default_database() -> dict[str, dict[str, str]]:
+    """Build Django DATABASES for PostgreSQL (only supported engine).
+
+    Raises:
+        ImproperlyConfigured: when DB_NAME is missing — no SQLite fallback.
+    """
+    db_name = os.getenv("DB_NAME", "").strip()
+    if not db_name:
+        raise ImproperlyConfigured(
+            "DB_NAME is required. Hoocon CMS uses PostgreSQL only — set DB_NAME, "
+            "DB_USER, DB_PASSWORD, DB_HOST, and DB_PORT in .env. "
+            "Local: docker compose up -d db",
+        )
+    return {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": _db_name,
+            "NAME": db_name,
             "USER": os.getenv("DB_USER", "hoocon"),
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "127.0.0.1"),
             "PORT": os.getenv("DB_PORT", "5432"),
-        }
+        },
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": str(BASE_DIR / "db.sqlite3"),
-        }
-    }
+
+
+DATABASES = resolve_default_database()
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -499,6 +505,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
@@ -624,6 +633,7 @@ ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS = int(
 
 # Staff mobile API (Flutter manager app). Internal distribution only.
 STAFF_API_ENABLED = _env_bool("STAFF_API_ENABLED", default=False)
+STAFF_API_TOKEN_TTL_DAYS = int(os.getenv("STAFF_API_TOKEN_TTL_DAYS", "90"))
 FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "").strip()
 
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─

@@ -48,6 +48,24 @@ def test_build_rfq_bundle_key_normalizes() -> None:
 
 
 @pytest.mark.django_db
+def test_post_lead_ignores_invalid_basic_auth(client) -> None:
+    """Invalid Basic credentials must not turn a public lead POST into 401."""
+    response = client.post(
+        "/api/leads/",
+        data={
+            "lead_type": "consultation",
+            "name": "Иван",
+            "company": "ООО Тест",
+            "email": "a@example.com",
+            "message": "Нужен подбор привода под задвижку DN50.",
+        },
+        content_type="application/json",
+        HTTP_AUTHORIZATION="Basic invalid",
+    )
+    assert response.status_code == 201
+
+
+@pytest.mark.django_db
 def test_post_rfq_requires_company(client) -> None:
     """RFQ without company → 400."""
     response = client.post(

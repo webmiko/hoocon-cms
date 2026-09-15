@@ -21,10 +21,7 @@ fail() { echo -e "${RED}✗ $1${NC}"; FAIL=$((FAIL + 1)); }
 warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
 
 BACKEND="$ROOT/backend"
-# Postgres — рабочая БД проекта (docs/infra-reg.py.md). Локально поднимается
-# через docker compose up -d или Homebrew postgresql@18. SQLite — только fallback
-# при отсутствии Postgres (явно USE_SQLITE=True).
-export USE_SQLITE="${USE_SQLITE:-False}"
+# PostgreSQL only — локально: docker compose up -d db (см. .env.example).
 
 echo "══════════════════════════════════════════════════"
 echo "  Pre-commit checkup (hoocon-cms)"
