@@ -5,6 +5,10 @@ import { peekAsyncCache, setAsyncCache } from "../utils/asyncDataCache";
 /** Primitive key that triggers a refetch when it changes (Object.is). */
 export type AsyncRefreshKey = string | number | boolean | null | undefined;
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 /**
  * Async data hook for fetching API data in components.
  *
@@ -12,6 +16,7 @@ export type AsyncRefreshKey = string | number | boolean | null | undefined;
  *
  * Args:
  *   asyncFn: function returning a Promise<T> (latest via useEffectEvent).
+ *     Receives an AbortSignal to cancel in-flight fetches on unmount / refresh.
  *   refreshKey: change to re-fetch (compose multi-deps with a string).
  *   cacheKey: optional session cache key — remounts reuse last success so
  *     catalog/PDP do not flash an empty skeleton on back-navigation.
@@ -20,7 +25,7 @@ export type AsyncRefreshKey = string | number | boolean | null | undefined;
  *   { data, loading, error } — standard async state.
  */
 export function useAsync<T>(
-  asyncFn: () => Promise<T>,
+  asyncFn: (signal?: AbortSignal) => Promise<T>,
   refreshKey: AsyncRefreshKey = 0,
   cacheKey?: string,
 ): {
@@ -60,12 +65,13 @@ export function useAsync<T>(
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
     // Keep painted data on remount; only show loading when nothing to show.
     if (cached === undefined) {
       dispatch({ type: "loading" });
     }
-    void load()
+    void load(controller.signal)
       .then((result) => {
         if (cancelled) return;
         if (cacheKey) {
@@ -74,15 +80,15 @@ export function useAsync<T>(
         dispatch({ type: "success", data: result });
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          dispatch({
-            type: "error",
-            error: err instanceof Error ? err : new Error(String(err)),
-          });
-        }
+        if (cancelled || isAbortError(err)) return;
+        dispatch({
+          type: "error",
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [refreshKey, cacheKey]);
 
