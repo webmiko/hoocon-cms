@@ -988,6 +988,38 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   margin-top: 0.5rem;
 }
 
+/*
+ * App index model list (app_list_default): Unfold puts hover:bg-base-50 on <tr>,
+ * but border-separate + transparent th/td never show tr background; base-50 also
+ * matches our #main page canvas. Paint cells instead: white row, gray hover.
+ */
+#content .module table,
+#content-main .module table {
+  background-color: var(--hoocon-surface);
+}
+
+#content .module table tr[class*="model-"] > th,
+#content .module table tr[class*="model-"] > td,
+#content-main .module table tr[class*="model-"] > th,
+#content-main .module table tr[class*="model-"] > td {
+  background-color: var(--hoocon-surface);
+  transition: background-color 0.15s var(--hoocon-ease);
+}
+
+#content .module table tr[class*="model-"]:hover > th,
+#content .module table tr[class*="model-"]:hover > td,
+#content-main .module table tr[class*="model-"]:hover > th,
+#content-main .module table tr[class*="model-"]:hover > td {
+  background-color: var(--hoocon-surface-muted);
+}
+
+.dark #content .module table tr[class*="model-"]:hover > th,
+.dark #content .module table tr[class*="model-"]:hover > td,
+.dark #content-main .module table tr[class*="model-"]:hover > th,
+.dark #content-main .module table tr[class*="model-"]:hover > td {
+  background-color: var(--hoocon-surface-muted);
+}
+
 /* Admin top bar stays under the viewport top while content scrolls. */
 .hoocon-admin-header {
   position: sticky;

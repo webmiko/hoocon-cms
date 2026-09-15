@@ -674,6 +674,11 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
     assert "Changelist card grid canvas" in css
+    assert "App index model list" in css
+    assert '#content .module table tr[class*="model-"]:hover > th' in css
+    app_list_end = "/* Admin top bar stays under the viewport top while content scrolls. */"
+    app_list_hover = css.split("App index model list")[1].split(app_list_end)[0]
+    assert "background-color: var(--hoocon-surface-muted)" in app_list_hover
     assert "#changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked" in css
     assert "background-color: var(--hoocon-page-bg) !important" in css
     assert "table.hoocon-lead-stats__table.hoocon-admin-table-stacked" in css
