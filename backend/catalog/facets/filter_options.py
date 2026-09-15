@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 
 from catalog.facets.aux import AUX_SWITCH_NONE
 from catalog.facets.defs import (
@@ -68,10 +68,12 @@ def filter_skus_by_facet(
         if exact.exists():
             return exact.distinct()
 
+    scoped_sku_ids = queryset.values_list("pk", flat=True)
     matching_sku_ids: set[int] = set()
     if facet.key in {"aux_switch", "voltage", "control", "area", "temp_sensor"}:
         detailed_rows = AttributeValue.objects.filter(
             attribute_id__in=ids,
+            sku_id__in=scoped_sku_ids,
         ).values_list(
             "sku_id",
             "value",
@@ -94,6 +96,7 @@ def filter_skus_by_facet(
     else:
         simple_rows = AttributeValue.objects.filter(
             attribute_id__in=ids,
+            sku_id__in=scoped_sku_ids,
         ).values_list(
             "sku_id",
             "value",
@@ -163,9 +166,10 @@ def collect_facet_options(
         attr_ids = attribute_ids_for_facet(facet, attributes=attributes)
         if not attr_ids:
             continue
-        counts: dict[str, set[int]] = {}
+        chip_counts: dict[str, int]
         need_context = facet.key in _FACETS_NEEDING_SKU_CONTEXT
         if need_context:
+            sku_sets: dict[str, set[int]] = {}
             context_rows = AttributeValue.objects.filter(
                 attribute_id__in=attr_ids,
                 sku_id__in=sku_ids,
@@ -188,28 +192,44 @@ def collect_facet_options(
                     continue
                 if facet.key == "aux_switch" and val == AUX_SWITCH_NONE:
                     continue
-                counts.setdefault(val, set()).add(sku_id)
+                sku_sets.setdefault(val, set()).add(sku_id)
+            chip_counts = {value: len(sku_set) for value, sku_set in sku_sets.items()}
         else:
-            simple_rows = AttributeValue.objects.filter(
-                attribute_id__in=attr_ids,
-                sku_id__in=sku_ids,
-            ).values_list("sku_id", "value")
-            for sku_id, raw in simple_rows:
-                val = normalize_facet_value(facet.key, str(raw))
-                if not val:
-                    continue
-                counts.setdefault(val, set()).add(sku_id)
-        if not counts:
+            chip_counts = _collect_simple_facet_counts(facet.key, attr_ids, sku_ids)
+        if not chip_counts:
             continue
         values = [
-            {"value": value, "count": len(sku_set)}
-            for value, sku_set in sorted(
-                counts.items(),
+            {"value": value, "count": count}
+            for value, count in sorted(
+                chip_counts.items(),
                 key=lambda item: _facet_sort_key(facet.key, item[0]),
             )
         ]
         result.append({"key": facet.key, "label": facet.label, "values": values})
     return result
+
+
+def _collect_simple_facet_counts(
+    facet_key: str,
+    attr_ids: list[int],
+    sku_ids: list[int],
+) -> dict[str, int]:
+    """Aggregate simple facet chips in SQL (normalize is identity on stored value)."""
+    counts: dict[str, int] = {}
+    rows = (
+        AttributeValue.objects.filter(
+            attribute_id__in=attr_ids,
+            sku_id__in=sku_ids,
+        )
+        .values("value")
+        .annotate(sku_count=Count("sku_id", distinct=True))
+    )
+    for row in rows:
+        val = normalize_facet_value(facet_key, str(row["value"]))
+        if not val:
+            continue
+        counts[val] = counts.get(val, 0) + int(row["sku_count"])
+    return counts
 
 
 def _filter_skus_by_belimo_analog(

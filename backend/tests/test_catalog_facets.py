@@ -122,6 +122,62 @@ def test_attribute_ids_for_facet_checks_power_values_in_bulk() -> None:
 
 
 @pytest.mark.django_db
+def test_filter_skus_by_facet_scopes_python_fallback_to_queryset() -> None:
+    """Loose moment match must not include SKUs outside the scoped queryset."""
+    from catalog.facets.defs import FACET_BY_KEY
+    from catalog.facets.filter_options import filter_skus_by_facet
+    from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+
+    cat_a = Category.objects.create(name="A", slug="cat-a-scope")
+    cat_b = Category.objects.create(name="B", slug="cat-b-scope")
+    prod_a = Product.objects.create(name="PA", slug="pa-scope", category=cat_a)
+    prod_b = Product.objects.create(name="PB", slug="pb-scope", category=cat_b)
+    sku_a = SKU.objects.create(
+        product=prod_a,
+        name="SA",
+        slug="sa-scope",
+        sku_code="sa-scope",
+        is_published=True,
+    )
+    sku_b = SKU.objects.create(
+        product=prod_b,
+        name="SB",
+        slug="sb-scope",
+        sku_code="sb-scope",
+        is_published=True,
+    )
+    moment = Attribute.objects.create(name="Момент", slug="attr-moment-scope")
+    AttributeValue.objects.create(sku=sku_a, attribute=moment, value="5")
+    AttributeValue.objects.create(sku=sku_b, attribute=moment, value="5")
+
+    scoped = SKU.objects.filter(product__category=cat_a)
+    matched = filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], "5")
+    assert list(matched.order_by("slug").values_list("slug", flat=True)) == ["sa-scope"]
+
+
+@pytest.mark.django_db
+def test_simple_facet_collection_aggregates_in_sql() -> None:
+    """Simple facets use SQL COUNT instead of per-row Python aggregation."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.facets.filter_options import collect_facet_options
+    from catalog.models import SKU
+
+    _seed_with_attrs()
+    with CaptureQueriesContext(connection) as ctx:
+        payload = collect_facet_options(base_queryset=SKU.objects.filter(is_published=True))
+    moment = next(row for row in payload if row["key"] == "moment")
+    assert {v["value"] for v in moment["values"]} >= {"5 Нм", "10 Нм"}
+    grouped = [
+        query["sql"]
+        for query in ctx.captured_queries
+        if "catalog_attributevalue" in query["sql"].lower() and "group by" in query["sql"].lower()
+    ]
+    assert grouped, grouped
+
+
+@pytest.mark.django_db
 def test_sku_filter_by_canonical_moment_alias(client) -> None:
     """?moment=5 Нм filters via name-based facet (not Attribute.slug)."""
     _seed_with_attrs()
