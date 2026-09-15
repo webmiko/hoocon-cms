@@ -117,7 +117,7 @@ def test_telegram_webhook_start_sends_photo(settings) -> None:
             HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
         )
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json() == {"ok": True, "queued": True}
     req = mocked.call_args.args[0]
     assert "sendPhoto" in req.full_url
     body = json.loads(req.data.decode("utf-8"))

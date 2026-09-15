@@ -13,6 +13,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from social.webhooks import accept_bot_webhook
+
 logger = logging.getLogger("hoocon.social")
 
 _TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
@@ -25,10 +27,8 @@ class TelegramWebhookView(APIView):
     """POST /api/integrations/telegram/webhook/ — Bot API updates.
 
     Validates ``X-Telegram-Bot-Api-Secret-Token`` against
-    ``TELEGRAM_WEBHOOK_SECRET``. Always returns JSON ``{"ok": true}`` on
-    accepted requests so Telegram does not retry forever on handler bugs
-    after auth succeeded. Processing runs in Celery so egress retries do not
-    block the webhook response.
+    ``TELEGRAM_WEBHOOK_SECRET``. Processing runs in Celery so egress retries do
+    not block the webhook response.
     """
 
     permission_classes = [AllowAny]
@@ -43,30 +43,16 @@ class TelegramWebhookView(APIView):
         if not expected or provided != expected:
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
 
-        payload = request.data
-        if not isinstance(payload, dict):
-            return Response({"ok": True}, status=status.HTTP_200_OK)
-
         from social.tasks import process_telegram_update_task
+        from social.telegram_bot import handle_telegram_update
 
-        try:
-            process_telegram_update_task.delay(payload)
-        except Exception as exc:
-            # Broker down: fall back to sync so /start still works in local/dev.
-            logger.warning(
-                "telegram_webhook_enqueue_failed error=%s falling_back_sync",
-                type(exc).__name__,
-            )
-            try:
-                from social.telegram_bot import handle_telegram_update
-
-                handle_telegram_update(payload)
-            except Exception as sync_exc:
-                logger.warning(
-                    "telegram_webhook_handler_failed error=%s",
-                    type(sync_exc).__name__,
-                )
-        return Response({"ok": True}, status=status.HTTP_200_OK)
+        return accept_bot_webhook(
+            channel="telegram",
+            payload=request.data,
+            enqueue=process_telegram_update_task.delay,
+            handle_sync=handle_telegram_update,
+            logger=logger,
+        )
 
 
 class MaxWebhookView(APIView):
@@ -87,26 +73,13 @@ class MaxWebhookView(APIView):
         if not expected or provided != expected:
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
 
-        payload = request.data
-        if not isinstance(payload, dict):
-            return Response({"ok": True}, status=status.HTTP_200_OK)
-
+        from social.max_bot import handle_max_update
         from social.tasks import process_max_update_task
 
-        try:
-            process_max_update_task.delay(payload)
-        except Exception as exc:
-            logger.warning(
-                "max_webhook_enqueue_failed error=%s falling_back_sync",
-                type(exc).__name__,
-            )
-            try:
-                from social.max_bot import handle_max_update
-
-                handle_max_update(payload)
-            except Exception as sync_exc:
-                logger.warning(
-                    "max_webhook_handler_failed error=%s",
-                    type(sync_exc).__name__,
-                )
-        return Response({"ok": True}, status=status.HTTP_200_OK)
+        return accept_bot_webhook(
+            channel="max",
+            payload=request.data,
+            enqueue=process_max_update_task.delay,
+            handle_sync=handle_max_update,
+            logger=logger,
+        )

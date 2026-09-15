@@ -44,7 +44,7 @@ def test_max_webhook_accepts_valid_secret(settings) -> None:
             HTTP_X_MAX_BOT_API_SECRET="expected-secret",
         )
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json() == {"ok": True, "queued": True}
     delay.assert_called_once()
 
 
