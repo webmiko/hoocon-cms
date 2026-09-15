@@ -214,6 +214,11 @@ if [ -n "$FE_CHANGED" ] && [ -f "$ROOT/frontend/package.json" ]; then
   else
     fail "frontend lint — ошибки (cd frontend && npm run lint)"
   fi
+  if (cd "$ROOT/frontend" && npm test) >/dev/null 2>&1; then
+    ok "frontend test (vitest) — чисто"
+  else
+    fail "frontend test — ошибки (cd frontend && npm test)"
+  fi
 fi
 
 # ── Итог ─────────────────────────────────────────────────────

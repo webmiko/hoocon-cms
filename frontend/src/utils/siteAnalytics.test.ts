@@ -22,13 +22,14 @@ describe("siteAnalytics", () => {
     resetSiteAnalyticsTracking();
     vi.mocked(api.fetchCsrfToken).mockClear();
     vi.mocked(api.trackSiteHit).mockClear();
-    vi.stubGlobal("document", { title: "Hoocon" });
+    vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+    document.title = "Hoocon";
   });
 
   afterEach(() => {
     resetSiteAnalyticsTracking();
     vi.useRealTimers();
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("classifies catalog SKU paths", () => {
