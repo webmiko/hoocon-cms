@@ -1,6 +1,7 @@
-import { useEffect, useId, useState, type MouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { ProtectedProductImage } from "./ProtectedProductImage";
 import styles from "./ImageLightbox.module.css";
 
@@ -83,7 +84,10 @@ export function ImageLightbox({
   onIndexChange,
 }: ImageLightboxProps) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const safeIndex = Math.min(Math.max(index, 0), Math.max(images.length - 1, 0));
+
+  useFocusTrap(dialogRef, true);
   const current = images[safeIndex];
   const multi = images.length > 1;
 
@@ -116,6 +120,7 @@ export function ImageLightbox({
 
   return createPortal(
     <div
+      ref={dialogRef}
       className={styles.backdrop}
       role="dialog"
       aria-modal="true"

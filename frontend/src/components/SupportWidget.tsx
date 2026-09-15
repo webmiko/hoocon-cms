@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
@@ -231,9 +240,12 @@ export function SupportWidget() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const lastIdRef = useRef(0);
   const resumeOnceRef = useRef(false);
   const [fabNudge, setFabNudge] = useState(false);
+
+  useFocusTrap(panelRef, open);
 
   useEffect(
     () =>
@@ -583,6 +595,7 @@ export function SupportWidget() {
     <div className={open ? `${styles.root} ${styles.rootOpen}` : styles.root}>
       {open ? (
         <section
+          ref={panelRef}
           className={styles.panel}
           aria-labelledby={titleId}
           role="dialog"

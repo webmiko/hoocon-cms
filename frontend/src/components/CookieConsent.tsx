@@ -4,7 +4,9 @@
  * Spec: ПЛАН §6 Iter 4 — F10; docs/security-baseline.md §privacy; БЗ §8.6.
  */
 
-import { useEffect, useId, useLayoutEffect, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { Link } from "react-router-dom";
 
 import {
@@ -39,6 +41,9 @@ export function CookieConsent() {
     isMarketingAllowed(readCookieConsent()),
   );
   const settingsTitleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(panelRef, mode !== "hidden");
 
   useEffect(() => {
     function onOpen() {
@@ -97,6 +102,7 @@ export function CookieConsent() {
   if (mode === "settings") {
     return (
       <div
+        ref={panelRef}
         className={styles.panel}
         role="dialog"
         aria-modal="true"
@@ -205,8 +211,10 @@ export function CookieConsent() {
 
   return (
     <div
+      ref={panelRef}
       className={styles.banner}
       role="dialog"
+      aria-modal="true"
       aria-label="Согласие на использование cookie"
     >
       <div className={styles.content}>
