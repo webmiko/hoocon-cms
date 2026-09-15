@@ -398,6 +398,32 @@ def test_search_post_not_allowed(client) -> None:
     assert response.status_code == 405
 
 
+# ── Per-source limit (audit: RAM/CPU before Python merge) ───────────────
+
+
+@pytest.mark.django_db
+def test_search_limits_sku_source_before_merge(client) -> None:
+    """Broad SKU FTS is capped per source so merge/sort stays bounded."""
+    from catalog.models import SKU, Category, Product
+    from search.views import _SEARCH_PER_SOURCE_LIMIT
+
+    cat = Category.objects.create(name="Лимит", slug="limit-cat")
+    prod = Product.objects.create(name="Серия лимит", slug="limit-prod", category=cat)
+    for idx in range(_SEARCH_PER_SOURCE_LIMIT + 12):
+        SKU.objects.create(
+            product=prod,
+            name=f"Привод лимитный {idx}",
+            slug=f"privod-limit-{idx}",
+            sku_code=f"LIM-{idx:03d}",
+            is_published=True,
+        )
+
+    response = client.get("/api/search/", {"q": "лимитный"})
+    assert response.status_code == 200
+    sku_hits = [row for row in response.json()["results"] if row["type"] == "sku"]
+    assert len(sku_hits) <= _SEARCH_PER_SOURCE_LIMIT
+
+
 # ── PII: no leads in search ────────────────────────────────────────────
 
 

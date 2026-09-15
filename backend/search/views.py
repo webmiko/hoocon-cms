@@ -37,6 +37,8 @@ from content.views import publicly_visible
 from search.serializers import SearchResponseSerializer
 
 _SNIPPET_MAX_LEN = 220
+# Cap each FTS source before Python merge/sort (audit: RAM/CPU on broad queries).
+_SEARCH_PER_SOURCE_LIMIT = 50
 
 
 def search_title_for_sku(sku: SKU) -> str:
@@ -133,7 +135,7 @@ class SearchView(APIView):
         query = SearchQuery(raw_q, config="russian")
         results: list[dict[str, str | float]] = []
 
-        for sku in self._search_skus(raw_q):
+        for sku in self._search_skus(raw_q)[:_SEARCH_PER_SOURCE_LIMIT]:
             results.append(
                 {
                     "type": "sku",
@@ -145,7 +147,7 @@ class SearchView(APIView):
                 },
             )
 
-        for art in self._search_articles(query):
+        for art in self._search_articles(query)[:_SEARCH_PER_SOURCE_LIMIT]:
             results.append(
                 {
                     "type": "article",
@@ -157,7 +159,7 @@ class SearchView(APIView):
                 },
             )
 
-        for news in self._search_news(query):
+        for news in self._search_news(query)[:_SEARCH_PER_SOURCE_LIMIT]:
             results.append(
                 {
                     "type": "news",
@@ -169,7 +171,7 @@ class SearchView(APIView):
                 },
             )
 
-        for page in self._search_pages(query):
+        for page in self._search_pages(query)[:_SEARCH_PER_SOURCE_LIMIT]:
             results.append(
                 {
                     "type": "page",
