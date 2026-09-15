@@ -13,7 +13,9 @@ test("catalog page loads", async ({ page }) => {
 
 test("PDP shows seeded published SKU", async ({ page }) => {
   await page.goto(SMOKE_SKU_PATH);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("HVA");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("HVA", {
+    timeout: 15_000,
+  });
 });
 
 test("RFQ form is available", async ({ page }) => {

@@ -55,6 +55,16 @@ def test_ci_workflow_has_check_job_with_postgres() -> None:
     assert "pip-audit" in joined
 
 
+def test_e2e_webserver_waits_for_backend_before_vite() -> None:
+    """Playwright must not probe Vite until Django accepts /api/health/ (PDP flake)."""
+    script = (ROOT / "scripts" / "e2e-webserver.sh").read_text(encoding="utf-8")
+    runserver_at = script.index("runserver")
+    health_at = script.index("/api/health/")
+    vite_at = script.index("npm run dev")
+    assert runserver_at < health_at < vite_at
+    assert "curl -fsS" in script
+
+
 def test_ci_advisory_npm_audit_does_not_use_continue_on_error() -> None:
     """Advisory build-tooling audit must not fail the job or paint check red."""
     import yaml
