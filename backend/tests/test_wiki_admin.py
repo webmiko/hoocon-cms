@@ -111,14 +111,33 @@ def test_wiki_stock_fixture_uses_self_hosted_chart_js() -> None:
     """Stock dashboard fixture loads Chart.js from static (CSP script-src 'self')."""
     from pathlib import Path
 
-    fixture = Path(__file__).resolve().parents[1] / "content" / "fixtures" / "wiki" / "stock-dashboard-14-09-2026.html"
-    html = fixture.read_text(encoding="utf-8")
-    assert "/static/admin/js/vendor/chart-4.4.4.umd.min.js" in html
-    assert "cdn.jsdelivr.net" not in html
+    wiki_dir = Path(__file__).resolve().parents[1] / "content" / "fixtures" / "wiki"
+    for name in (
+        "stock-dashboard-14-09-2026.html",
+        "stock-dashboard-year-2025-09-2026-08.html",
+    ):
+        html = (wiki_dir / name).read_text(encoding="utf-8")
+        assert "/static/admin/js/vendor/chart-4.4.4.umd.min.js" in html
+        assert "cdn.jsdelivr.net" not in html
 
     chart_js = Path(__file__).resolve().parents[1] / "static" / "admin" / "js" / "vendor" / "chart-4.4.4.umd.min.js"
     assert chart_js.is_file()
     assert "Chart" in chart_js.read_text(encoding="utf-8", errors="ignore")[:500]
+
+
+@pytest.mark.django_db
+def test_seed_wiki_includes_year_stock_dashboard() -> None:
+    """Yearly stock dashboard seed is wired in seed_wiki."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    out = StringIO()
+    call_command("seed_wiki", stdout=out)
+    doc = WikiDocument.objects.get(slug="ostatki-prodazhi-god-2025-09-2026-08")
+    assert "сен 2025" in doc.title
+    assert "const DATA = " in doc.body
+    assert '"total_sold": 29432' in doc.body
 
 
 @pytest.mark.django_db

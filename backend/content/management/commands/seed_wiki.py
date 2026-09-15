@@ -12,6 +12,17 @@ _FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "wiki"
 
 WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
     {
+        "slug": "ostatki-prodazhi-god-2025-09-2026-08",
+        "title": "Анализ остатков и продаж · сен 2025 — авг 2026",
+        "category": "Аналитика склада",
+        "summary": (
+            "Годовой дашборд по месячным отчётам 1С: динамика продаж и остатков, "
+            "топ SKU, позиции без движения, план пополнения на снимке 14.09.2026."
+        ),
+        "fixture": "stock-dashboard-year-2025-09-2026-08.html",
+        "sort_order": 5,
+    },
+    {
         "slug": "ostatki-prodazhi-14-09-2026",
         "title": "Анализ остатков и продаж · 10.08–14.09.2026",
         "category": "Аналитика склада",
