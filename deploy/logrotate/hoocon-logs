@@ -1,0 +1,10 @@
+# Host cron/monitor logs on VPS — install via scripts/vps-install-logrotate.sh
+/var/log/hoocon-*.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

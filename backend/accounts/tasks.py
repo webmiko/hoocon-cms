@@ -11,4 +11,5 @@ from accounts.telegram_tasks import (  # noqa: F401
     notify_staff_telegram_new_lead,
     notify_staff_telegram_support,
     notify_superuser_telegram_crm,
+    send_ops_telegram_alert_task,
 )

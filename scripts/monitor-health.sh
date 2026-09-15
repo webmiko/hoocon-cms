@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke monitor: API health + SPA GET + disk (cron on VPS).
-# Spec: docs/infra-reg-ru.md § monitoring; ПЛАН Iter 5–6 (pre-Sentry).
+# Spec: deploy/ops/post-deploy-checklist.md; Telegram via ops-telegram-alert.sh.
 #
 # Usage:
 #   ./scripts/monitor-health.sh
@@ -61,6 +61,15 @@ if command -v df >/dev/null 2>&1; then
     else
       log "OK disk ${DISK_PATH} ${USED}% used ${FREE_MB}MiB free"
     fi
+  fi
+fi
+
+if [[ "${RC}" -ne 0 ]]; then
+  ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+  if [[ -x "${ROOT}/scripts/ops-telegram-alert.sh" ]]; then
+    SUMMARY="health/monitor FAIL (see ${LOG_FILE})"
+    DEPLOY_PATH="${DEPLOY_PATH:-/opt/hoocon}" \
+      "${ROOT}/scripts/ops-telegram-alert.sh" "${SUMMARY}" "monitor-health" || true
   fi
 fi
 

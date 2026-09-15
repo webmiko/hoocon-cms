@@ -103,3 +103,13 @@ def notify_superuser_telegram_crm(title: str, body: str, url: str = "") -> int:
     sent = send_telegram_to_users(users, text)
     logger.info("telegram_superuser_crm sent=%s title=%s", sent, title[:40])
     return sent
+
+
+@shared_task
+def send_ops_telegram_alert_task(title: str, body: str, dedup_key: str) -> int:
+    """Ops channel alert (HTTP 5xx, monitor-health failures)."""
+    from config.ops_alerts import send_ops_telegram_alert
+
+    sent = send_ops_telegram_alert(title=title, body=body, dedup_key=dedup_key)
+    logger.info("ops_telegram_alert dedup=%s sent=%s", dedup_key, sent)
+    return sent

@@ -172,8 +172,12 @@ MIDDLEWARE.extend(
         # (before CSP so cached responses still get CSP headers).
         "catalog.middleware.CatalogHttpCacheMiddleware",
         "config.csp_middleware.CspMiddleware",
+        "config.middleware.ops_telegram_alert.OpsTelegramAlertMiddleware",
     ],
 )
+
+OPS_TELEGRAM_CHAT_IDS = [item.strip() for item in os.getenv("OPS_TELEGRAM_CHAT_IDS", "").split(",") if item.strip()]
+OPS_ALERT_DEDUP_SECONDS = int(os.getenv("OPS_ALERT_DEDUP_SECONDS", "900"))
 
 # django-axes: brute-force protection for admin login.
 # Spec: docs/security-baseline.md §3.2; ПЛАН §6 Iter 1.

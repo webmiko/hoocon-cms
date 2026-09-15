@@ -57,10 +57,12 @@ echo "Sync ops scripts → ${DEPLOY_PATH}/scripts"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "mkdir -p '${DEPLOY_PATH}/scripts'"
 rsync -az -e "${RSYNC_SSH}" \
   --include='monitor-health.sh' \
+  --include='ops-telegram-alert.sh' \
   --include='vps-disk-cleanup.sh' \
   --include='vps-maintenance.sh' \
   --include='vps-free-disk.sh' \
   --include='vps-install-cron.sh' \
+  --include='vps-install-logrotate.sh' \
   --include='backup-vps.sh' \
   --include='/' \
   --exclude='*' \
@@ -225,6 +227,12 @@ if [[ -x "${SCRIPT_DIR}/vps-install-cron.sh" ]]; then
   SSH_HOST="${SSH_HOST:-}" SSH_USER="${SSH_USER:-}" SERVER_HOST="${SERVER_HOST:-}" \
     DEPLOY_PATH="${DEPLOY_PATH}" \
     "${SCRIPT_DIR}/vps-install-cron.sh"
+fi
+
+if [[ -x "${SCRIPT_DIR}/vps-install-logrotate.sh" ]]; then
+  echo "Install VPS logrotate (hoocon-*.log)"
+  SSH_HOST="${SSH_HOST:-}" SSH_USER="${SSH_USER:-}" SERVER_HOST="${SERVER_HOST:-}" \
+    "${SCRIPT_DIR}/vps-install-logrotate.sh"
 fi
 
 echo "Deploy finished."
