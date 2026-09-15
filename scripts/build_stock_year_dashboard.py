@@ -48,6 +48,8 @@ PERIOD_START = date(2025, 9, 1)
 PERIOD_END = date(2026, 8, 31)
 PERIOD_DAYS = 365
 SNAPSHOT_DATE = date(2026, 9, 14)
+FORECAST_START = date(2026, 9, 1)
+FORECAST_END = date(2027, 8, 31)
 TARGET_DAYS = 60
 
 
@@ -438,6 +440,178 @@ def _build_procurement(
     }
 
 
+def _build_planning(
+    *,
+    periods: list[dict[str, Any]],
+    sku_monthly: dict[str, list[int]],
+    top_rows: list[dict[str, Any]],
+    procurement: dict[str, Any],
+) -> dict[str, Any]:
+    """Month-by-month review and naive forecast for the next fiscal year."""
+    sales = [period["sold"] for period in periods]
+    avg_month = sum(sales) / len(sales) if sales else 0.0
+    ytd = 0
+    monthly_rows: list[dict[str, Any]] = []
+    for idx, period in enumerate(periods):
+        ytd += period["sold"]
+        prev = sales[idx - 1] if idx > 0 else None
+        mom_pct = None
+        if prev is not None and prev > 0:
+            mom_pct = round((period["sold"] - prev) / prev * 100, 1)
+        vs_avg = round((period["sold"] / avg_month - 1) * 100, 1) if avg_month else 0.0
+        if mom_pct is None:
+            trend = "start"
+        elif mom_pct > 5:
+            trend = "up"
+        elif mom_pct < -5:
+            trend = "down"
+        else:
+            trend = "flat"
+        monthly_rows.append(
+            {
+                "label": period["label"],
+                "cal_month": MONTH_FILES[idx][3],
+                "cal_label": CAL_MONTH_SHORT[MONTH_FILES[idx][3]],
+                "sales": period["sold"],
+                "daily": period["daily"],
+                "mom_pct": mom_pct,
+                "vs_avg_pct": vs_avg,
+                "ytd": ytd,
+                "stock_end": period["stock_end"],
+                "receipts": period["receipts"],
+                "trend": trend,
+            }
+        )
+
+    h1 = sum(sales[0:6])
+    h2 = sum(sales[6:12])
+    growth_rate = 0.0
+    if h1 > 0:
+        raw = (h2 / h1 - 1) * 0.5
+        growth_rate = round(max(-0.05, min(0.15, raw)), 3)
+
+    quarters = [
+        ("Q1 сен–ноя", sum(sales[0:3])),
+        ("Q2 дек–фев", sum(sales[3:6])),
+        ("Q3 мар–май", sum(sales[6:9])),
+        ("Q4 июн–авг", sum(sales[9:12])),
+    ]
+    quarter_rows = [
+        {"label": label, "sales": total, "share": round(total / sum(sales) * 100, 1) if sum(sales) else 0}
+        for label, total in quarters
+    ]
+
+    season_by_month = {row["month"]: row["index"] for row in procurement["season_index"]}
+    forecast_rows: list[dict[str, Any]] = []
+    forecast_total = 0
+    da_monthly = procurement["da_monthly"]
+    sa_monthly = procurement["sa_monthly"]
+    for idx in range(12):
+        cal_m = MONTH_FILES[idx][3]
+        baseline = sales[idx]
+        forecast = int(round(baseline * (1 + growth_rate)))
+        forecast_total += forecast
+        f_year = 2026 if idx <= 3 else 2027
+        order_m = cal_m - LEAD_MONTHS
+        if order_m <= 0:
+            order_m += 12
+        da_base = da_monthly[idx]
+        sa_base = sa_monthly[idx]
+        da_share = da_base / baseline if baseline else 0.5
+        forecast_rows.append(
+            {
+                "label": f"{CAL_MONTH_FULL[cal_m].capitalize()} {f_year}",
+                "cal_month": cal_m,
+                "cal_label": CAL_MONTH_SHORT[cal_m],
+                "baseline": baseline,
+                "forecast": forecast,
+                "growth_pct": round(growth_rate * 100, 1),
+                "season_index": season_by_month.get(cal_m, 1.0),
+                "order_month": CAL_MONTH_FULL[order_m],
+                "order_label": CAL_MONTH_SHORT[order_m],
+                "da_forecast": int(round(forecast * da_share)),
+                "sa_forecast": forecast - int(round(forecast * da_share)),
+            }
+        )
+
+    sku_forecast: list[dict[str, Any]] = []
+    for row in top_rows[:10]:
+        sku = row["sku"]
+        monthly = sku_monthly.get(sku, [0] * 12)
+        baseline_year = sum(monthly)
+        forecast_year = int(round(baseline_year * (1 + growth_rate)))
+        peak_idx = max(range(12), key=lambda i: monthly[i])
+        peak_cal = MONTH_FILES[peak_idx][3]
+        order_m = peak_cal - LEAD_MONTHS
+        if order_m <= 0:
+            order_m += 12
+        sku_forecast.append(
+            {
+                "sku": sku,
+                "baseline_year": baseline_year,
+                "forecast_year": forecast_year,
+                "peak_month": CAL_MONTH_SHORT[peak_cal],
+                "peak_baseline": monthly[peak_idx],
+                "peak_forecast": int(round(monthly[peak_idx] * (1 + growth_rate))),
+                "order_by": CAL_MONTH_SHORT[order_m],
+            }
+        )
+
+    return {
+        "past_label": f"{PERIOD_START:%m.%Y} — {PERIOD_END:%m.%Y}",
+        "forecast_label": f"{FORECAST_START:%m.%Y} — {FORECAST_END:%m.%Y}",
+        "avg_month_sales": int(round(avg_month)),
+        "growth_rate": growth_rate,
+        "growth_pct": round(growth_rate * 100, 1),
+        "h1_sales": h1,
+        "h2_sales": h2,
+        "forecast_total": forecast_total,
+        "monthly_rows": monthly_rows,
+        "quarter_rows": quarter_rows,
+        "forecast_rows": forecast_rows,
+        "sku_forecast": sku_forecast,
+        "method": (
+            "Прогноз = продажи того же календарного месяца прошлого года × "
+            f"(1 + {round(growth_rate * 100, 1)}%). Темп роста — половина разницы "
+            "H2 (мар–авг) и H1 (сен–фев), ограничена −5%…+15%."
+        ),
+        "tips": [
+            {
+                "title": "Помесячное сравнение",
+                "body": (
+                    "Колонка <strong>MoM</strong> — к прошлому месяцу отчёта; "
+                    "<strong>к среднему</strong> — отклонение от среднего месяца года. "
+                    "Ищите развороты за 2–3 месяца до пика."
+                ),
+            },
+            {
+                "title": "Кварталы",
+                "body": (
+                    "<strong>Q4 (июн–авг)</strong> и <strong>Q2 (дек–фев)</strong> — "
+                    "два блока максимального спроса. План закупок привязывайте к ним, "
+                    "не к ровному месяцу."
+                ),
+            },
+            {
+                "title": "Прогноз на год вперёд",
+                "body": (
+                    f"Сумма прогноза: <strong>{forecast_total:,} шт</strong> "
+                    f"(база {sum(sales):,} + {round(growth_rate * 100, 1)}%). "
+                    "Это ориентир для бюджета закупки, не гарантия."
+                ).replace(",", " "),
+            },
+            {
+                "title": "Как использовать",
+                "body": (
+                    "1) Сверьте прогноз помесячно с фактом по мере поступления отчётов. "
+                    "2) За 4 мес. до пика — заказ по колонке «заказ до». "
+                    "3) Топ SKU — проверьте пиковый месяц каждой позиции отдельно."
+                ),
+            },
+        ],
+    }
+
+
 def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     months = [
         _parse_monthly(source_dir / filename, Path(filename).stem, key, days)
@@ -687,6 +861,12 @@ def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         sku_monthly=monthly_sales,
         top_rows=top_rows,
     )
+    planning = _build_planning(
+        periods=periods,
+        sku_monthly=monthly_sales,
+        top_rows=top_rows,
+        procurement=procurement,
+    )
 
     data = {
         "period_start": PERIOD_START.strftime("%d.%m.%Y"),
@@ -715,6 +895,7 @@ def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "snapshot_stock_total": sum(_num(meta["stock"]) for meta in snapshot.values()),
         "snapshot_positions": len(snapshot),
         "procurement": procurement,
+        "planning": planning,
     }
 
     insights = {
@@ -832,7 +1013,111 @@ def render_html(data: dict[str, Any], insights: dict[str, Any], generated: date)
     )
     html = html.replace(
       '<a href="#plan">План</a>',
-      '<a href="#procurement">Закупки</a>\n      <a href="#plan">План</a>',
+      (
+        '<a href="#monthly">Помесячно</a>\n'
+        '      <a href="#forecast">Прогноз</a>\n'
+        '      <a href="#procurement">Закупки</a>\n'
+        '      <a href="#plan">План</a>'
+      ),
+    )
+    planning_section = """
+    <section class="section" id="monthly">
+      <h2 class="section-title">Помесячный разбор прошлого года</h2>
+      <p class="section-desc" id="planning-method"></p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Динамика MoM и кварталы</h3>
+          <div class="chart-wrap"><canvas id="chartMom"></canvas></div>
+          <div class="insight" id="insight-mom"></div>
+        </div>
+        <div class="card">
+          <h3>Кварталы (сен–авг)</h3>
+          <div class="chart-wrap short"><canvas id="chartQuarters"></canvas></div>
+          <div class="insight" id="insight-quarters"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Сравнение по месяцам — факт</h3>
+        <div class="table-scroll">
+          <table id="table-monthly" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Месяц</th>
+                <th class="num">Продажи</th>
+                <th class="num">шт/день</th>
+                <th class="num">MoM</th>
+                <th class="num">к среднему</th>
+                <th class="num">YTD</th>
+                <th class="num">Остаток</th>
+                <th class="num">Поставка</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="forecast">
+      <h2 class="section-title">Прогноз на следующий год</h2>
+      <p class="section-desc">
+        Оценка продаж <strong>сен 2026 — авг 2027</strong> по сезонному профилю прошлого года
+        с поправкой на тренд H2 vs H1. Для планирования закупок и бюджета.
+      </p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Факт vs прогноз (помесячно)</h3>
+          <div class="chart-wrap tall"><canvas id="chartForecast"></canvas></div>
+          <div class="insight" id="insight-forecast"></div>
+        </div>
+        <div class="card">
+          <h3>DA / SA в прогнозе</h3>
+          <div class="chart-wrap tall"><canvas id="chartForecastSeries"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>План продаж по месяцам (прогноз)</h3>
+        <div class="table-scroll">
+          <table id="table-forecast" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Месяц</th>
+                <th class="num">Факт −1 год</th>
+                <th class="num">Прогноз</th>
+                <th class="num">Сезон</th>
+                <th class="num">DA</th>
+                <th class="num">SA</th>
+                <th>Заказ до</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Топ SKU — прогноз года и пиковый месяц</h3>
+        <div class="table-scroll">
+          <table id="table-sku-forecast" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Артикул</th>
+                <th class="num">Факт год</th>
+                <th class="num">Прогноз год</th>
+                <th>Пик</th>
+                <th class="num">Пик (прогноз)</th>
+                <th>Заказ до</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="narrative-grid" id="planning-tips" style="margin-top:1.25rem;"></div>
+    </section>
+"""
+    html = html.replace(
+        '    <section class="section" id="procurement">',
+        planning_section + '\n    <section class="section" id="procurement">',
     )
     procurement_section = """
     <section class="section" id="procurement">
@@ -1118,6 +1403,112 @@ def render_html(data: dict[str, Any], insights: dict[str, Any], generated: date)
             "      });\n"
             "      document.getElementById('procurement-rules').innerHTML = P.rules.map(r =>\n"
             "        `<article class=\"narrative-card\"><h4>${r.title}</h4><p>${r.body}</p></article>`\n"
+            "      ).join('');\n"
+            "    }\n\n"
+            "    const PL = DATA.planning;\n"
+            "    if (PL) {\n"
+            "      document.getElementById('planning-method').textContent = PL.method;\n"
+            "      makeChart(document.getElementById('chartMom'), {\n"
+            "        type: 'bar',\n"
+            "        data: {\n"
+            "          labels: PL.monthly_rows.map(r => r.cal_label),\n"
+            "          datasets: [\n"
+            "            { label: 'Продажи', data: PL.monthly_rows.map(r => r.sales),\n"
+            "              backgroundColor: '#3b82f6', borderRadius: 4 },\n"
+            "            { label: 'MoM %', data: PL.monthly_rows.map(r => r.mom_pct ?? 0),\n"
+            "              backgroundColor: '#f97316', borderRadius: 4, yAxisID: 'y1' },\n"
+            "          ],\n"
+            "        },\n"
+            "        options: {\n"
+            "          ...baseChartOpts(),\n"
+            "          scales: {\n"
+            "            y: { beginAtZero: true, title: { display: !isMobile(), text: 'шт' } },\n"
+            "            y1: { display: !isMobile(), position: 'right', grid: { drawOnChartArea: false },\n"
+            "              title: { display: true, text: 'MoM %' } },\n"
+            "          },\n"
+            "        },\n"
+            "      });\n"
+            "      makeChart(document.getElementById('chartQuarters'), {\n"
+            "        type: 'doughnut',\n"
+            "        data: {\n"
+            "          labels: PL.quarter_rows.map(r => r.label),\n"
+            "          datasets: [{ data: PL.quarter_rows.map(r => r.sales),\n"
+            "            backgroundColor: ['#64748b','#ef4444','#3b82f6','#22c55e'], borderWidth: 0 }],\n"
+            "        },\n"
+            "        options: { ...baseChartOpts() },\n"
+            "      });\n"
+            "      const momBody = document.querySelector('#table-monthly tbody');\n"
+            "      PL.monthly_rows.forEach(row => {\n"
+            "        const mom = row.mom_pct == null ? '—' : `${row.mom_pct > 0 ? '+' : ''}${row.mom_pct}%`;\n"
+            "        const cls = row.vs_avg_pct > 10 ? 'num-green' : row.vs_avg_pct < -10 ? 'num-red' : '';\n"
+            "        momBody.innerHTML += `<tr>\n"
+            "          <th scope=\"row\">${row.label}</th>\n"
+            "          <td class=\"num\">${fmt(row.sales)}</td>\n"
+            "          <td class=\"num\">${row.daily}</td>\n"
+            "          <td class=\"num\">${mom}</td>\n"
+            "          <td class=\"num ${cls}\">${row.vs_avg_pct > 0 ? '+' : ''}${row.vs_avg_pct}%</td>\n"
+            "          <td class=\"num\">${fmt(row.ytd)}</td>\n"
+            "          <td class=\"num\">${fmt(row.stock_end)}</td>\n"
+            "          <td class=\"num\">${row.receipts ? fmt(row.receipts) : '—'}</td>\n"
+            "        </tr>`;\n"
+            "      });\n"
+            "      const best = [...PL.monthly_rows].sort((a,b)=>b.sales-a.sales)[0];\n"
+            "      const worst = [...PL.monthly_rows].sort((a,b)=>a.sales-b.sales)[0];\n"
+            "      document.getElementById('insight-mom').innerHTML = `Макс. <strong>${best.label}</strong> (${fmt(best.sales)}), мин. <strong>${worst.label}</strong> (${fmt(worst.sales)}). Средний месяц — ${fmt(PL.avg_month_sales)} шт.`;\n"
+            "      const topQ = [...PL.quarter_rows].sort((a,b)=>b.sales-a.sales)[0];\n"
+            "      document.getElementById('insight-quarters').innerHTML = `Сильнейший квартал — <strong>${topQ.label}</strong> (${fmt(topQ.sales)} шт, ${topQ.share}% года).`;\n"
+            "      makeChart(document.getElementById('chartForecast'), {\n"
+            "        type: 'line',\n"
+            "        data: {\n"
+            "          labels: PL.forecast_rows.map(r => r.cal_label),\n"
+            "          datasets: [\n"
+            "            { label: 'Факт (год назад)', data: PL.forecast_rows.map(r => r.baseline),\n"
+            "              borderColor: '#64748b', tension: 0.25 },\n"
+            "            { label: 'Прогноз', data: PL.forecast_rows.map(r => r.forecast),\n"
+            "              borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.12)', fill: true, tension: 0.25 },\n"
+            "          ],\n"
+            "        },\n"
+            "        options: { ...baseChartOpts(), scales: { y: { beginAtZero: true } } },\n"
+            "      });\n"
+            "      makeChart(document.getElementById('chartForecastSeries'), {\n"
+            "        type: 'bar',\n"
+            "        data: {\n"
+            "          labels: PL.forecast_rows.map(r => r.cal_label),\n"
+            "          datasets: [\n"
+            "            { label: 'DA прогноз', data: PL.forecast_rows.map(r => r.da_forecast),\n"
+            "              backgroundColor: '#3b82f6', borderRadius: 4 },\n"
+            "            { label: 'SA прогноз', data: PL.forecast_rows.map(r => r.sa_forecast),\n"
+            "              backgroundColor: '#06b6d4', borderRadius: 4 },\n"
+            "          ],\n"
+            "        },\n"
+            "        options: { ...baseChartOpts(), scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } },\n"
+            "      });\n"
+            "      document.getElementById('insight-forecast').innerHTML = `Итого прогноз: <strong>${fmt(PL.forecast_total)} шт</strong> (база ${fmt(PL.h1_sales + PL.h2_sales)}, тренд +${PL.growth_pct}%).`;\n"
+            "      const fBody = document.querySelector('#table-forecast tbody');\n"
+            "      PL.forecast_rows.forEach(row => {\n"
+            "        fBody.innerHTML += `<tr>\n"
+            "          <th scope=\"row\">${row.label}</th>\n"
+            "          <td class=\"num\">${fmt(row.baseline)}</td>\n"
+            "          <td class=\"num\"><strong>${fmt(row.forecast)}</strong></td>\n"
+            "          <td class=\"num\">${row.season_index}×</td>\n"
+            "          <td class=\"num\">${fmt(row.da_forecast)}</td>\n"
+            "          <td class=\"num\">${fmt(row.sa_forecast)}</td>\n"
+            "          <td>${row.order_month}</td>\n"
+            "        </tr>`;\n"
+            "      });\n"
+            "      const sfBody = document.querySelector('#table-sku-forecast tbody');\n"
+            "      PL.sku_forecast.forEach(row => {\n"
+            "        sfBody.innerHTML += `<tr>\n"
+            "          <th scope=\"row\">${row.sku}</th>\n"
+            "          <td class=\"num\">${fmt(row.baseline_year)}</td>\n"
+            "          <td class=\"num\"><strong>${fmt(row.forecast_year)}</strong></td>\n"
+            "          <td>${row.peak_month}</td>\n"
+            "          <td class=\"num\">${fmt(row.peak_forecast)}</td>\n"
+            "          <td>${row.order_by}</td>\n"
+            "        </tr>`;\n"
+            "      });\n"
+            "      document.getElementById('planning-tips').innerHTML = PL.tips.map(t =>\n"
+            "        `<article class=\"narrative-card\"><h4>${t.title}</h4><p>${t.body}</p></article>`\n"
             "      ).join('');\n"
             "    }\n\n    let resizeTimer;"
         ),
