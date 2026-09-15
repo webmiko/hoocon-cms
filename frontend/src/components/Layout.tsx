@@ -2,10 +2,8 @@ import { useEffect, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { CompareProvider } from "../compare/CompareContext";
-import { CompareTray } from "./CompareTray";
 import { CookieConsent } from "./CookieConsent";
-import { SupportWidget } from "./SupportWidget";
-import { MarketingPushPrompt } from "./MarketingPushPrompt";
+import { DeferredShellMount } from "./DeferredShellMount";
 import { Analytics } from "./Analytics";
 import { DesktopNav } from "./DesktopNav";
 import { RouteSlideOutlet } from "./RouteSlideOutlet";
@@ -19,7 +17,21 @@ import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { emptyDockCtaForPath } from "../utils/emptyDockCta";
 import { releaseLabel } from "../release";
 import { api } from "../api/client";
+import { getSupportChatState } from "../utils/supportChatControl";
+import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./Layout.module.css";
+
+const LazyCompareTray = lazyWithChunkReload(() =>
+  import("./CompareTray").then((m) => ({ default: m.CompareTray })),
+);
+const LazyMarketingPushPrompt = lazyWithChunkReload(() =>
+  import("./MarketingPushPrompt").then((m) => ({
+    default: m.MarketingPushPrompt,
+  })),
+);
+const LazySupportWidget = lazyWithChunkReload(() =>
+  import("./SupportWidget").then((m) => ({ default: m.SupportWidget })),
+);
 
 /** Hero «Запросить КП» on the home page — sticky CTA waits until it leaves the viewport. */
 const HERO_KP_CTA_ID = "hero-kp-cta";
@@ -452,16 +464,26 @@ export function Layout() {
         </div>
       </footer>
 
-      <CompareTray
-        showWhenEmpty={showMobileStickyCta}
-        emptyCta={emptyDockCtaForPath(location.pathname, {
-          zavodMailto: ZAVOD_FACTORY_MAILTO,
-        })}
-      />
+      <DeferredShellMount mode="interaction">
+        <LazyCompareTray
+          showWhenEmpty={showMobileStickyCta}
+          emptyCta={emptyDockCtaForPath(location.pathname, {
+            zavodMailto: ZAVOD_FACTORY_MAILTO,
+          })}
+        />
+      </DeferredShellMount>
 
       <CookieConsent />
-      <MarketingPushPrompt />
-      <SupportWidget />
+      <DeferredShellMount mode="interaction">
+        <LazyMarketingPushPrompt />
+      </DeferredShellMount>
+      <DeferredShellMount
+        mode="idle"
+        eagerWhen={() => getSupportChatState().open}
+        watchSupportChat
+      >
+        <LazySupportWidget />
+      </DeferredShellMount>
     </CompareProvider>
   );
 }
