@@ -754,10 +754,7 @@ export function SkuDetailPage() {
       ) : null}
 
       <div className={styles.contentGrid}>
-        <div
-          className={`${styles.contentPrimary} u-protect-content`}
-          {...protectedContentHandlers}
-        >
+        <div className={styles.contentPrimary}>
           {visibleTabs.length > 0 ? (
             <div className={styles.tabs} ref={tabsRef}>
               {/* Desktop: horizontal tabs */}
