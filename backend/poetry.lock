@@ -1061,14 +1061,14 @@ Django = ">=4.2,<6.2"
 
 [[package]]
 name = "django-unfold"
-version = "0.101.0"
+version = "0.106.1"
 description = "Modern Django Admin"
 optional = false
 python-versions = "<4.0,>=3.12"
 groups = ["main"]
 files = [
-    {file = "django_unfold-0.101.0-py3-none-any.whl", hash = "sha256:3b03a28fa87f2dcde16e714a5a93872f725c8af58ff0ee1c739eff744fbee35b"},
-    {file = "django_unfold-0.101.0.tar.gz", hash = "sha256:4b80bbd22e5d2f90568dd5c0a98f3579e748401ece4b63414dc3c8f625abf4a8"},
+    {file = "django_unfold-0.106.1-py3-none-any.whl", hash = "sha256:aaabf6b66571d84b945393fdf24c934bd47e8f1118f3b797ab799e01d35b381f"},
+    {file = "django_unfold-0.106.1.tar.gz", hash = "sha256:1ecbadd9e73c0d4b4b304b1d14fb7bea6fa251de1645fa0ae1cdeae583b7be1e"},
 ]
 
 [package.dependencies]
@@ -3390,4 +3390,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "d0d4b6f4dfaade57419d0f9af6de5577e8c1db0db7c1917446c84d7a249392b8"
+content-hash = "f31ee2abcf54b1ce91df25d3bffc55e9187f5a451ae0fad4d865e0db2da3c7c9"
