@@ -138,6 +138,9 @@ def test_seed_wiki_includes_year_stock_dashboard() -> None:
     assert "сен 2025" in doc.title
     assert "const DATA = " in doc.body
     assert '"total_sold": 29432' in doc.body
+    assert 'id="procurement"' in doc.body
+    assert '"procurement":' in doc.body
+    assert "chartSeason" in doc.body
 
 
 @pytest.mark.django_db

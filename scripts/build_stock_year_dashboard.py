@@ -18,20 +18,30 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "backend/content/fixtures/wiki/stock-dashboard-14-09-2026.html"
 DEFAULT_OUTPUT = ROOT / "backend/content/fixtures/wiki/stock-dashboard-year-2025-09-2026-08.html"
 
-MONTH_FILES: tuple[tuple[str, str, int], ...] = (
-    ("2025-09", "Сентябрь 2025.xlsx", 30),
-    ("2025-10", "Октябрь 2025.xlsx", 31),
-    ("2025-11", "Ноябрь 2025.xlsx", 30),
-    ("2025-12", "Декабрь 2025.xlsx", 31),
-    ("2026-01", "Январь 2026.xlsx", 31),
-    ("2026-02", "Февраль 2026.xlsx", 28),
-    ("2026-03", "Март 2026.xlsx", 31),
-    ("2026-04", "Апрель 2026.xlsx", 30),
-    ("2026-05", "Май 2026.xlsx", 31),
-    ("2026-06", "Июнь 2026.xlsx", 30),
-    ("2026-07", "Июль 2026.xlsx", 31),
-    ("2026-08", "Август 2026.xlsx", 31),
+MONTH_FILES: tuple[tuple[str, str, int, int], ...] = (
+    ("2025-09", "Сентябрь 2025.xlsx", 30, 9),
+    ("2025-10", "Октябрь 2025.xlsx", 31, 10),
+    ("2025-11", "Ноябрь 2025.xlsx", 30, 11),
+    ("2025-12", "Декабрь 2025.xlsx", 31, 12),
+    ("2026-01", "Январь 2026.xlsx", 31, 1),
+    ("2026-02", "Февраль 2026.xlsx", 28, 2),
+    ("2026-03", "Март 2026.xlsx", 31, 3),
+    ("2026-04", "Апрель 2026.xlsx", 30, 4),
+    ("2026-05", "Май 2026.xlsx", 31, 5),
+    ("2026-06", "Июнь 2026.xlsx", 30, 6),
+    ("2026-07", "Июль 2026.xlsx", 31, 7),
+    ("2026-08", "Август 2026.xlsx", 31, 8),
 )
+
+LEAD_MONTHS = 4
+CAL_MONTH_SHORT = {
+    1: "янв", 2: "фев", 3: "мар", 4: "апр", 5: "май", 6: "июн",
+    7: "июл", 8: "авг", 9: "сен", 10: "окт", 11: "ноя", 12: "дек",
+}
+CAL_MONTH_FULL = {
+    1: "январь", 2: "февраль", 3: "март", 4: "апрель", 5: "май", 6: "июнь",
+    7: "июль", 8: "август", 9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь",
+}
 
 STOCK_SNAPSHOT = "Остатки товаров на 14 сентября 2026.xlsx"
 PERIOD_START = date(2025, 9, 1)
@@ -247,10 +257,191 @@ def _priority(stock: int, days_left: int, order: int, sold: int) -> str:
     return "OK"
 
 
+def _build_procurement(
+    *,
+    months: list[MonthRow],
+    periods: list[dict[str, Any]],
+    sku_monthly: dict[str, list[int]],
+    top_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Seasonality and order-calendar for 4-month supplier lead time."""
+    avg_month_sales = sum(period["sold"] for period in periods) / len(periods)
+    cal_sales: dict[int, list[int]] = defaultdict(list)
+    for idx, period in enumerate(periods):
+        cal_sales[MONTH_FILES[idx][3]].append(period["sold"])
+
+    season_index: list[dict[str, Any]] = []
+    for cal_m in range(1, 13):
+        vals = cal_sales.get(cal_m, [0])
+        avg_cal = sum(vals) / len(vals)
+        index = round(avg_cal / avg_month_sales, 2) if avg_month_sales else 0.0
+        order_m = cal_m - LEAD_MONTHS
+        if order_m <= 0:
+            order_m += 12
+        season_index.append(
+            {
+                "month": cal_m,
+                "label": CAL_MONTH_SHORT[cal_m],
+                "index": index,
+                "sales": int(round(avg_cal)),
+                "order_month": order_m,
+                "order_label": CAL_MONTH_FULL[order_m],
+            }
+        )
+
+    season_index.sort(key=lambda row: row["index"], reverse=True)
+    ref_month = SNAPSHOT_DATE.month
+    order_calendar: list[dict[str, Any]] = []
+    for row in season_index:
+        peak_m = row["month"]
+        order_m = row["order_month"]
+        months_to_peak = (peak_m - ref_month) % 12
+        if months_to_peak == 0:
+            months_to_peak = 12
+        months_to_order = (order_m - ref_month) % 12
+        if months_to_order == 0:
+            status = "now"
+            status_label = "Заказ в этом месяце"
+        elif months_to_order == 1:
+            status = "soon"
+            status_label = "Заказ в следующем месяце"
+        elif months_to_order <= 3 and months_to_peak <= LEAD_MONTHS + 1:
+            status = "late"
+            status_label = "Окно закрыто — срочный дозаказ"
+        else:
+            status = "planned"
+            status_label = f"Заказ через {months_to_order} мес."
+        order_calendar.append(
+            {
+                "peak_month": CAL_MONTH_FULL[peak_m],
+                "peak_label": CAL_MONTH_SHORT[peak_m],
+                "sales": row["sales"],
+                "index": row["index"],
+                "order_month": CAL_MONTH_FULL[order_m],
+                "order_label": CAL_MONTH_SHORT[order_m],
+                "months_to_peak": months_to_peak,
+                "status": status,
+                "status_label": status_label,
+            }
+        )
+
+    da_monthly = [0] * len(months)
+    sa_monthly = [0] * len(months)
+    for sku, vals in sku_monthly.items():
+        if sku.startswith("DA"):
+            for idx, sold in enumerate(vals):
+                da_monthly[idx] += sold
+        elif sku.startswith("SA"):
+            for idx, sold in enumerate(vals):
+                sa_monthly[idx] += sold
+
+    dec_idx = next(i for i, item in enumerate(MONTH_FILES) if item[3] == 12)
+    aug_idx = next(i for i, item in enumerate(MONTH_FILES) if item[3] == 8)
+    dec_urgent: list[dict[str, Any]] = []
+    for row in top_rows[:15]:
+        sku = row["sku"]
+        monthly = sku_monthly.get(sku, [0] * len(months))
+        dec_sales = monthly[dec_idx]
+        if dec_sales <= 0 and not sku.startswith("SA"):
+            continue
+        aug_rate = round(monthly[aug_idx] / MONTH_FILES[aug_idx][2], 1)
+        dec_daily = round(dec_sales / MONTH_FILES[dec_idx][2], 1)
+        stock = row["stock"]
+        need_60 = int(round(dec_daily * TARGET_DAYS))
+        gap = max(0, need_60 - stock)
+        runway = round(stock / aug_rate, 1) if aug_rate > 0 else 0.0
+        if gap <= 0 and runway > 90:
+            continue
+        dec_urgent.append(
+            {
+                "sku": sku,
+                "dec_sales": dec_sales,
+                "dec_daily": dec_daily,
+                "aug_rate": aug_rate,
+                "stock": stock,
+                "runway_days": runway,
+                "need_60": need_60,
+                "gap": gap,
+            }
+        )
+    dec_urgent.sort(key=lambda item: item["gap"], reverse=True)
+
+    rolling_3m: list[dict[str, int | str]] = []
+    sales = [period["sold"] for period in periods]
+    for idx in range(2, len(sales)):
+        rolling_3m.append(
+            {
+                "label": MONTH_FILES[idx][0],
+                "total": sum(sales[idx - 2 : idx + 1]),
+            }
+        )
+
+    receipt_pairs = []
+    for idx in range(len(periods) - 1):
+        if periods[idx]["receipts"] > 0:
+            receipt_pairs.append(
+                {
+                    "from": periods[idx]["label"],
+                    "receipts": periods[idx]["receipts"],
+                    "to": periods[idx + 1]["label"],
+                    "sales": periods[idx + 1]["sold"],
+                }
+            )
+
+    da_peak = MONTH_FILES[max(range(len(da_monthly)), key=lambda i: da_monthly[i])][3]
+    sa_peak = MONTH_FILES[max(range(len(sa_monthly)), key=lambda i: sa_monthly[i])][3]
+
+    return {
+        "lead_months": LEAD_MONTHS,
+        "reference_month": CAL_MONTH_FULL[ref_month],
+        "season_index": season_index,
+        "order_calendar": order_calendar,
+        "da_monthly": da_monthly,
+        "sa_monthly": sa_monthly,
+        "da_peak": CAL_MONTH_SHORT[da_peak],
+        "sa_peak": CAL_MONTH_SHORT[sa_peak],
+        "dec_urgent": dec_urgent[:8],
+        "rolling_3m": rolling_3m,
+        "receipt_pairs": receipt_pairs,
+        "rules": [
+            {
+                "title": "Два сезона пика",
+                "body": (
+                    f"<strong>SA</strong> — пик в <strong>{CAL_MONTH_SHORT[sa_peak]}</strong> "
+                    f"(зимний объектный спрос). <strong>DA</strong> — "
+                    f"<strong>{CAL_MONTH_SHORT[da_peak]}</strong>–авг (летний сезон)."
+                ),
+            },
+            {
+                "title": f"Lead time {LEAD_MONTHS} месяца",
+                "body": (
+                    "Заказ размещаем за <strong>4 месяца до пика</strong>, "
+                    "не за месяц до него. Поставка на склад ≈ в момент разгона продаж."
+                ),
+            },
+            {
+                "title": "Декабрь 2026 — срочно",
+                "body": (
+                    "Идеальное окно заказа — <strong>август</strong>. Сейчас "
+                    f"<strong>{CAL_MONTH_FULL[ref_month]}</strong>: дозаказ SA5FU / SA10MU, "
+                    "иначе разрыв к ноябрю–декабрю."
+                ),
+            },
+            {
+                "title": "Лето 2027",
+                "body": (
+                    "Основной DA-заказ — <strong>март–апрель 2027</strong> "
+                    "(под июль–август). Ориентир: продажи лета 2026 × 1,1."
+                ),
+            },
+        ],
+    }
+
+
 def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     months = [
         _parse_monthly(source_dir / filename, Path(filename).stem, key, days)
-        for key, filename, days in MONTH_FILES
+        for key, filename, days, _cal_m in MONTH_FILES
     ]
     snapshot = _parse_stock_snapshot(source_dir / STOCK_SNAPSHOT)
     name_index = _build_name_index(months, snapshot)
@@ -490,6 +681,13 @@ def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         },
     ]
 
+    procurement = _build_procurement(
+        months=months,
+        periods=periods,
+        sku_monthly=monthly_sales,
+        top_rows=top_rows,
+    )
+
     data = {
         "period_start": PERIOD_START.strftime("%d.%m.%Y"),
         "period_end": PERIOD_END.strftime("%d.%m.%Y"),
@@ -516,6 +714,7 @@ def build_payload(source_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "stock_delta_pct": stock_delta_pct,
         "snapshot_stock_total": sum(_num(meta["stock"]) for meta in snapshot.values()),
         "snapshot_positions": len(snapshot),
+        "procurement": procurement,
     }
 
     insights = {
@@ -630,6 +829,77 @@ def render_html(data: dict[str, Any], insights: dict[str, Any], generated: date)
     html = html.replace(
         "<h2 class=\"section-title\">Позиции без движения за период</h2>",
         "<h2 class=\"section-title\">Позиции без продаж за год</h2>",
+    )
+    html = html.replace(
+      '<a href="#plan">План</a>',
+      '<a href="#procurement">Закупки</a>\n      <a href="#plan">План</a>',
+    )
+    procurement_section = """
+    <section class="section" id="procurement">
+      <h2 class="section-title">Календарь закупок и сезонность</h2>
+      <p class="section-desc">
+        Когда продажи растут и <strong>когда ставить заказ</strong>, чтобы партия пришла
+        на склад к пику. Lead time от заказа до склада — <strong>~4 месяца</strong>.
+      </p>
+      <div class="method-box">
+        <strong>Правило:</strong> дата заказа = месяц пика − 4 месяца.
+        Объём ≈ продажи пикового месяца × 2 (≈60 дней запаса + буфер).
+        <strong>SA</strong> — зимний пик (декабрь), <strong>DA</strong> — летний (июль–август).
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Сезонность продаж (индекс к среднему месяцу)</h3>
+          <div class="chart-wrap"><canvas id="chartSeason"></canvas></div>
+          <div class="insight" id="insight-season"></div>
+        </div>
+        <div class="card">
+          <h3>DA vs SA по месяцам</h3>
+          <div class="chart-wrap"><canvas id="chartDaSa"></canvas></div>
+          <div class="insight" id="insight-dasa"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Окна заказа к пикам (относительно сентября 2026)</h3>
+        <div class="table-scroll">
+          <table id="table-order-calendar" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Пик продаж</th>
+                <th class="num">Продажи</th>
+                <th class="num">Индекс</th>
+                <th>Заказ до</th>
+                <th class="num">До пика</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Срочно под декабрьский пик SA (снимок 14.09.2026)</h3>
+        <div class="table-scroll">
+          <table id="table-dec-urgent" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Артикул</th>
+                <th class="num">Дек 2025</th>
+                <th class="num">Остаток</th>
+                <th class="num">Запас, дн</th>
+                <th class="num">Нужно 60д</th>
+                <th class="num">Заказ</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="narrative-grid" id="procurement-rules" style="margin-top:1.25rem;"></div>
+    </section>
+"""
+    html = html.replace(
+        '    <section class="section" id="plan">',
+        procurement_section + '\n    <section class="section" id="plan">',
     )
     html = html.replace(
         "<h2 class=\"section-title\">План пополнения (цель: 60 дней запаса)</h2>",
@@ -775,6 +1045,81 @@ def render_html(data: dict[str, Any], insights: dict[str, Any], generated: date)
             "      `DA: ~${da ? da.days : '—'} дн запаса · SA: ~${sa ? sa.days : '—'} дн "
             "при годовой скорости.`;\n\n"
             "    renderIdleList();\n\n    const recs = document.getElementById('recs-p1');"
+        ),
+    )
+    html = html.replace(
+        "    let resizeTimer;",
+        (
+            "    const P = DATA.procurement;\n"
+            "    if (P) {\n"
+            "      const seasonSorted = [...P.season_index].sort((a, b) => a.month - b.month);\n"
+            "      makeChart(document.getElementById('chartSeason'), {\n"
+            "        type: 'bar',\n"
+            "        data: {\n"
+            "          labels: seasonSorted.map(r => r.label),\n"
+            "          datasets: [{\n"
+            "            label: 'Индекс сезонности',\n"
+            "            data: seasonSorted.map(r => r.index),\n"
+            "            backgroundColor: seasonSorted.map(r =>\n"
+            "              r.index >= 1.2 ? '#ef4444' : r.index >= 0.9 ? '#3b82f6' : '#64748b'),\n"
+            "            borderRadius: 4,\n"
+            "          }],\n"
+            "        },\n"
+            "        options: {\n"
+            "          ...baseChartOpts(),\n"
+            "          plugins: { legend: { display: false } },\n"
+            "          scales: {\n"
+            "            y: { beginAtZero: true, title: { display: !isMobile(), text: '× к среднему' } },\n"
+            "          },\n"
+            "        },\n"
+            "      });\n"
+            "      makeChart(document.getElementById('chartDaSa'), {\n"
+            "        type: 'line',\n"
+            "        data: {\n"
+            "          labels: DATA.date_cols,\n"
+            "          datasets: [\n"
+            "            { label: 'DA', data: P.da_monthly, borderColor: '#3b82f6', tension: 0.25 },\n"
+            "            { label: 'SA', data: P.sa_monthly, borderColor: '#06b6d4', tension: 0.25 },\n"
+            "          ],\n"
+            "        },\n"
+            "        options: { ...baseChartOpts(), scales: { y: { beginAtZero: true } } },\n"
+            "      });\n"
+            "      const topSeason = [...P.season_index].sort((a, b) => b.index - a.index)[0];\n"
+            "      document.getElementById('insight-season').innerHTML =\n"
+            "        `Пик — <strong>${topSeason.label}</strong> (${topSeason.index}×). "
+            "Заказ к нему — <strong>${topSeason.order_label}</strong>.`;\n"
+            "      document.getElementById('insight-dasa').innerHTML =\n"
+            "        `DA пик — <strong>${P.da_peak}</strong>, SA пик — <strong>${P.sa_peak}</strong>. "
+            "Закупку ведём раздельно по сериям.`;\n"
+            "      const calBody = document.querySelector('#table-order-calendar tbody');\n"
+            "      P.order_calendar.forEach(row => {\n"
+            "        const cls = row.status === 'now' ? 'badge-p1'\n"
+            "          : row.status === 'late' ? 'badge-p2' : row.status === 'soon' ? 'badge-p3' : 'badge-ok';\n"
+            "        calBody.innerHTML += `<tr>\n"
+            "          <th scope=\"row\">${row.peak_month}</th>\n"
+            "          <td class=\"num\">${fmt(row.sales)}</td>\n"
+            "          <td class=\"num\">${row.index}</td>\n"
+            "          <td>${row.order_month}</td>\n"
+            "          <td class=\"num\">${row.months_to_peak} м</td>\n"
+            "          <td><span class=\"badge ${cls}\">${row.status_label}</span></td>\n"
+            "        </tr>`;\n"
+            "      });\n"
+            "      const decBody = document.querySelector('#table-dec-urgent tbody');\n"
+            "      P.dec_urgent.forEach(row => {\n"
+            "        const cls = row.gap > 0 ? 'num-red' : '';\n"
+            "        decBody.innerHTML += `<tr>\n"
+            "          <th scope=\"row\">${row.sku}</th>\n"
+            "          <td class=\"num\">${fmt(row.dec_sales)}</td>\n"
+            "          <td class=\"num ${cls}\">${row.stock}</td>\n"
+            "          <td class=\"num ${cls}\">${row.runway_days}</td>\n"
+            "          <td class=\"num\">${fmt(row.need_60)}</td>\n"
+            "          <td class=\"num\"><strong>${fmt(row.gap)}</strong></td>\n"
+            "        </tr>`;\n"
+            "      });\n"
+            "      document.getElementById('procurement-rules').innerHTML = P.rules.map(r =>\n"
+            "        `<article class=\"narrative-card\"><h4>${r.title}</h4><p>${r.body}</p></article>`\n"
+            "      ).join('');\n"
+            "    }\n\n    let resizeTimer;"
         ),
     )
 

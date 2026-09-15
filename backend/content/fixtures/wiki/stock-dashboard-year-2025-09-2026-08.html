@@ -525,6 +525,7 @@
       <a href="#meaning">Что за цифрами</a>
       <a href="#charts">Графики</a>
       <a href="#idle">Без движения</a>
+      <a href="#procurement">Закупки</a>
       <a href="#plan">План</a>
     </nav>
 
@@ -632,6 +633,69 @@
     </section>
 
     <!-- Replenishment plan -->
+
+    <section class="section" id="procurement">
+      <h2 class="section-title">Календарь закупок и сезонность</h2>
+      <p class="section-desc">
+        Когда продажи растут и <strong>когда ставить заказ</strong>, чтобы партия пришла
+        на склад к пику. Lead time от заказа до склада — <strong>~4 месяца</strong>.
+      </p>
+      <div class="method-box">
+        <strong>Правило:</strong> дата заказа = месяц пика − 4 месяца.
+        Объём ≈ продажи пикового месяца × 2 (≈60 дней запаса + буфер).
+        <strong>SA</strong> — зимний пик (декабрь), <strong>DA</strong> — летний (июль–август).
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Сезонность продаж (индекс к среднему месяцу)</h3>
+          <div class="chart-wrap"><canvas id="chartSeason"></canvas></div>
+          <div class="insight" id="insight-season"></div>
+        </div>
+        <div class="card">
+          <h3>DA vs SA по месяцам</h3>
+          <div class="chart-wrap"><canvas id="chartDaSa"></canvas></div>
+          <div class="insight" id="insight-dasa"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Окна заказа к пикам (относительно сентября 2026)</h3>
+        <div class="table-scroll">
+          <table id="table-order-calendar" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Пик продаж</th>
+                <th class="num">Продажи</th>
+                <th class="num">Индекс</th>
+                <th>Заказ до</th>
+                <th class="num">До пика</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Срочно под декабрьский пик SA (снимок 14.09.2026)</h3>
+        <div class="table-scroll">
+          <table id="table-dec-urgent" class="desktop-table">
+            <thead>
+              <tr>
+                <th>Артикул</th>
+                <th class="num">Дек 2025</th>
+                <th class="num">Остаток</th>
+                <th class="num">Запас, дн</th>
+                <th class="num">Нужно 60д</th>
+                <th class="num">Заказ</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="narrative-grid" id="procurement-rules" style="margin-top:1.25rem;"></div>
+    </section>
+
     <section class="section" id="plan">
       <h2 class="section-title">План пополнения на снимке 14.09 (цель: 60 дней)</h2>
       <p class="section-desc">
@@ -1421,7 +1485,441 @@
   "stock_delta": -6487,
   "stock_delta_pct": -15.8,
   "snapshot_stock_total": 31206,
-  "snapshot_positions": 145
+  "snapshot_positions": 145,
+  "procurement": {
+    "lead_months": 4,
+    "reference_month": "сентябрь",
+    "season_index": [
+      {
+        "month": 12,
+        "label": "дек",
+        "index": 2.08,
+        "sales": 5097,
+        "order_month": 8,
+        "order_label": "август"
+      },
+      {
+        "month": 8,
+        "label": "авг",
+        "index": 1.65,
+        "sales": 4040,
+        "order_month": 4,
+        "order_label": "апрель"
+      },
+      {
+        "month": 7,
+        "label": "июл",
+        "index": 1.41,
+        "sales": 3460,
+        "order_month": 3,
+        "order_label": "март"
+      },
+      {
+        "month": 6,
+        "label": "июн",
+        "index": 1.26,
+        "sales": 3079,
+        "order_month": 2,
+        "order_label": "февраль"
+      },
+      {
+        "month": 5,
+        "label": "май",
+        "index": 0.92,
+        "sales": 2253,
+        "order_month": 1,
+        "order_label": "январь"
+      },
+      {
+        "month": 9,
+        "label": "сен",
+        "index": 0.91,
+        "sales": 2225,
+        "order_month": 5,
+        "order_label": "май"
+      },
+      {
+        "month": 10,
+        "label": "окт",
+        "index": 0.86,
+        "sales": 2120,
+        "order_month": 6,
+        "order_label": "июнь"
+      },
+      {
+        "month": 3,
+        "label": "мар",
+        "index": 0.7,
+        "sales": 1710,
+        "order_month": 11,
+        "order_label": "ноябрь"
+      },
+      {
+        "month": 4,
+        "label": "апр",
+        "index": 0.69,
+        "sales": 1696,
+        "order_month": 12,
+        "order_label": "декабрь"
+      },
+      {
+        "month": 11,
+        "label": "ноя",
+        "index": 0.59,
+        "sales": 1441,
+        "order_month": 7,
+        "order_label": "июль"
+      },
+      {
+        "month": 2,
+        "label": "фев",
+        "index": 0.51,
+        "sales": 1262,
+        "order_month": 10,
+        "order_label": "октябрь"
+      },
+      {
+        "month": 1,
+        "label": "янв",
+        "index": 0.43,
+        "sales": 1049,
+        "order_month": 9,
+        "order_label": "сентябрь"
+      }
+    ],
+    "order_calendar": [
+      {
+        "peak_month": "декабрь",
+        "peak_label": "дек",
+        "sales": 5097,
+        "index": 2.08,
+        "order_month": "август",
+        "order_label": "авг",
+        "months_to_peak": 3,
+        "status": "planned",
+        "status_label": "Заказ через 11 мес."
+      },
+      {
+        "peak_month": "август",
+        "peak_label": "авг",
+        "sales": 4040,
+        "index": 1.65,
+        "order_month": "апрель",
+        "order_label": "апр",
+        "months_to_peak": 11,
+        "status": "planned",
+        "status_label": "Заказ через 7 мес."
+      },
+      {
+        "peak_month": "июль",
+        "peak_label": "июл",
+        "sales": 3460,
+        "index": 1.41,
+        "order_month": "март",
+        "order_label": "мар",
+        "months_to_peak": 10,
+        "status": "planned",
+        "status_label": "Заказ через 6 мес."
+      },
+      {
+        "peak_month": "июнь",
+        "peak_label": "июн",
+        "sales": 3079,
+        "index": 1.26,
+        "order_month": "февраль",
+        "order_label": "фев",
+        "months_to_peak": 9,
+        "status": "planned",
+        "status_label": "Заказ через 5 мес."
+      },
+      {
+        "peak_month": "май",
+        "peak_label": "май",
+        "sales": 2253,
+        "index": 0.92,
+        "order_month": "январь",
+        "order_label": "янв",
+        "months_to_peak": 8,
+        "status": "planned",
+        "status_label": "Заказ через 4 мес."
+      },
+      {
+        "peak_month": "сентябрь",
+        "peak_label": "сен",
+        "sales": 2225,
+        "index": 0.91,
+        "order_month": "май",
+        "order_label": "май",
+        "months_to_peak": 12,
+        "status": "planned",
+        "status_label": "Заказ через 8 мес."
+      },
+      {
+        "peak_month": "октябрь",
+        "peak_label": "окт",
+        "sales": 2120,
+        "index": 0.86,
+        "order_month": "июнь",
+        "order_label": "июн",
+        "months_to_peak": 1,
+        "status": "planned",
+        "status_label": "Заказ через 9 мес."
+      },
+      {
+        "peak_month": "март",
+        "peak_label": "мар",
+        "sales": 1710,
+        "index": 0.7,
+        "order_month": "ноябрь",
+        "order_label": "ноя",
+        "months_to_peak": 6,
+        "status": "planned",
+        "status_label": "Заказ через 2 мес."
+      },
+      {
+        "peak_month": "апрель",
+        "peak_label": "апр",
+        "sales": 1696,
+        "index": 0.69,
+        "order_month": "декабрь",
+        "order_label": "дек",
+        "months_to_peak": 7,
+        "status": "planned",
+        "status_label": "Заказ через 3 мес."
+      },
+      {
+        "peak_month": "ноябрь",
+        "peak_label": "ноя",
+        "sales": 1441,
+        "index": 0.59,
+        "order_month": "июль",
+        "order_label": "июл",
+        "months_to_peak": 2,
+        "status": "planned",
+        "status_label": "Заказ через 10 мес."
+      },
+      {
+        "peak_month": "февраль",
+        "peak_label": "фев",
+        "sales": 1262,
+        "index": 0.51,
+        "order_month": "октябрь",
+        "order_label": "окт",
+        "months_to_peak": 5,
+        "status": "soon",
+        "status_label": "Заказ в следующем месяце"
+      },
+      {
+        "peak_month": "январь",
+        "peak_label": "янв",
+        "sales": 1049,
+        "index": 0.43,
+        "order_month": "сентябрь",
+        "order_label": "сен",
+        "months_to_peak": 4,
+        "status": "now",
+        "status_label": "Заказ в этом месяце"
+      }
+    ],
+    "da_monthly": [
+      1428,
+      1702,
+      985,
+      1631,
+      450,
+      810,
+      1174,
+      1147,
+      1763,
+      1914,
+      1829,
+      2096
+    ],
+    "sa_monthly": [
+      630,
+      325,
+      400,
+      2683,
+      542,
+      357,
+      381,
+      457,
+      325,
+      1131,
+      1509,
+      1381
+    ],
+    "da_peak": "авг",
+    "sa_peak": "дек",
+    "dec_urgent": [
+      {
+        "sku": "SA5FU230-DS",
+        "dec_sales": 1090,
+        "dec_daily": 35.2,
+        "aug_rate": 13.9,
+        "stock": 43,
+        "runway_days": 3.1,
+        "need_60": 2112,
+        "gap": 2069
+      },
+      {
+        "sku": "SA10MU230-DS",
+        "dec_sales": 862,
+        "dec_daily": 27.8,
+        "aug_rate": 9.1,
+        "stock": 1056,
+        "runway_days": 116.0,
+        "need_60": 1668,
+        "gap": 612
+      },
+      {
+        "sku": "DA5FU230-DS",
+        "dec_sales": 261,
+        "dec_daily": 8.4,
+        "aug_rate": 17.4,
+        "stock": 0,
+        "runway_days": 0.0,
+        "need_60": 504,
+        "gap": 504
+      },
+      {
+        "sku": "DA3FU230-DS",
+        "dec_sales": 71,
+        "dec_daily": 2.3,
+        "aug_rate": 0.2,
+        "stock": 0,
+        "runway_days": 0.0,
+        "need_60": 138,
+        "gap": 138
+      },
+      {
+        "sku": "SA5FU24-DS",
+        "dec_sales": 171,
+        "dec_daily": 5.5,
+        "aug_rate": 3.3,
+        "stock": 203,
+        "runway_days": 61.5,
+        "need_60": 330,
+        "gap": 127
+      },
+      {
+        "sku": "DA10FU230-D",
+        "dec_sales": 85,
+        "dec_daily": 2.7,
+        "aug_rate": 6.8,
+        "stock": 350,
+        "runway_days": 51.5,
+        "need_60": 162,
+        "gap": 0
+      },
+      {
+        "sku": "SA3FU230-DS",
+        "dec_sales": 31,
+        "dec_daily": 1.0,
+        "aug_rate": 4.0,
+        "stock": 234,
+        "runway_days": 58.5,
+        "need_60": 60,
+        "gap": 0
+      },
+      {
+        "sku": "DA15FU24-DS",
+        "dec_sales": 35,
+        "dec_daily": 1.1,
+        "aug_rate": 0.0,
+        "stock": 605,
+        "runway_days": 0.0,
+        "need_60": 66,
+        "gap": 0
+      }
+    ],
+    "rolling_3m": [
+      {
+        "label": "2025-11",
+        "total": 5786
+      },
+      {
+        "label": "2025-12",
+        "total": 8658
+      },
+      {
+        "label": "2026-01",
+        "total": 7587
+      },
+      {
+        "label": "2026-02",
+        "total": 7408
+      },
+      {
+        "label": "2026-03",
+        "total": 4021
+      },
+      {
+        "label": "2026-04",
+        "total": 4668
+      },
+      {
+        "label": "2026-05",
+        "total": 5659
+      },
+      {
+        "label": "2026-06",
+        "total": 7028
+      },
+      {
+        "label": "2026-07",
+        "total": 8792
+      },
+      {
+        "label": "2026-08",
+        "total": 10579
+      }
+    ],
+    "receipt_pairs": [
+      {
+        "from": "Ноябрь 2025",
+        "receipts": 11406,
+        "to": "Декабрь 2025",
+        "sales": 5097
+      },
+      {
+        "from": "Декабрь 2025",
+        "receipts": 37,
+        "to": "Январь 2026",
+        "sales": 1049
+      },
+      {
+        "from": "Апрель 2026",
+        "receipts": 10,
+        "to": "Май 2026",
+        "sales": 2253
+      },
+      {
+        "from": "Июль 2026",
+        "receipts": 11492,
+        "to": "Август 2026",
+        "sales": 4040
+      }
+    ],
+    "rules": [
+      {
+        "title": "Два сезона пика",
+        "body": "<strong>SA</strong> — пик в <strong>дек</strong> (зимний объектный спрос). <strong>DA</strong> — <strong>авг</strong>–авг (летний сезон)."
+      },
+      {
+        "title": "Lead time 4 месяца",
+        "body": "Заказ размещаем за <strong>4 месяца до пика</strong>, не за месяц до него. Поставка на склад ≈ в момент разгона продаж."
+      },
+      {
+        "title": "Декабрь 2026 — срочно",
+        "body": "Идеальное окно заказа — <strong>август</strong>. Сейчас <strong>сентябрь</strong>: дозаказ SA5FU / SA10MU, иначе разрыв к ноябрю–декабрю."
+      },
+      {
+        "title": "Лето 2027",
+        "body": "Основной DA-заказ — <strong>март–апрель 2027</strong> (под июль–август). Ориентир: продажи лета 2026 × 1,1."
+      }
+    ]
+  }
 };
 
 const INSIGHTS = {
@@ -2358,6 +2856,75 @@ const INSIGHTS = {
       ).join('');
       const total = DATA.p1.reduce((s, p) => s + p.order, 0);
       recs.innerHTML = top + `<li><strong style="color:var(--text)">Итого P1:</strong> ${fmt(total)} шт · ${DATA.p1.length} поз.</li>`;
+    }
+
+    const P = DATA.procurement;
+    if (P) {
+      const seasonSorted = [...P.season_index].sort((a, b) => a.month - b.month);
+      makeChart(document.getElementById('chartSeason'), {
+        type: 'bar',
+        data: {
+          labels: seasonSorted.map(r => r.label),
+          datasets: [{
+            label: 'Индекс сезонности',
+            data: seasonSorted.map(r => r.index),
+            backgroundColor: seasonSorted.map(r =>
+              r.index >= 1.2 ? '#ef4444' : r.index >= 0.9 ? '#3b82f6' : '#64748b'),
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          ...baseChartOpts(),
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, title: { display: !isMobile(), text: '× к среднему' } },
+          },
+        },
+      });
+      makeChart(document.getElementById('chartDaSa'), {
+        type: 'line',
+        data: {
+          labels: DATA.date_cols,
+          datasets: [
+            { label: 'DA', data: P.da_monthly, borderColor: '#3b82f6', tension: 0.25 },
+            { label: 'SA', data: P.sa_monthly, borderColor: '#06b6d4', tension: 0.25 },
+          ],
+        },
+        options: { ...baseChartOpts(), scales: { y: { beginAtZero: true } } },
+      });
+      const topSeason = [...P.season_index].sort((a, b) => b.index - a.index)[0];
+      document.getElementById('insight-season').innerHTML =
+        `Пик — <strong>${topSeason.label}</strong> (${topSeason.index}×). Заказ к нему — <strong>${topSeason.order_label}</strong>.`;
+      document.getElementById('insight-dasa').innerHTML =
+        `DA пик — <strong>${P.da_peak}</strong>, SA пик — <strong>${P.sa_peak}</strong>. Закупку ведём раздельно по сериям.`;
+      const calBody = document.querySelector('#table-order-calendar tbody');
+      P.order_calendar.forEach(row => {
+        const cls = row.status === 'now' ? 'badge-p1'
+          : row.status === 'late' ? 'badge-p2' : row.status === 'soon' ? 'badge-p3' : 'badge-ok';
+        calBody.innerHTML += `<tr>
+          <th scope="row">${row.peak_month}</th>
+          <td class="num">${fmt(row.sales)}</td>
+          <td class="num">${row.index}</td>
+          <td>${row.order_month}</td>
+          <td class="num">${row.months_to_peak} м</td>
+          <td><span class="badge ${cls}">${row.status_label}</span></td>
+        </tr>`;
+      });
+      const decBody = document.querySelector('#table-dec-urgent tbody');
+      P.dec_urgent.forEach(row => {
+        const cls = row.gap > 0 ? 'num-red' : '';
+        decBody.innerHTML += `<tr>
+          <th scope="row">${row.sku}</th>
+          <td class="num">${fmt(row.dec_sales)}</td>
+          <td class="num ${cls}">${row.stock}</td>
+          <td class="num ${cls}">${row.runway_days}</td>
+          <td class="num">${fmt(row.need_60)}</td>
+          <td class="num"><strong>${fmt(row.gap)}</strong></td>
+        </tr>`;
+      });
+      document.getElementById('procurement-rules').innerHTML = P.rules.map(r =>
+        `<article class="narrative-card"><h4>${r.title}</h4><p>${r.body}</p></article>`
+      ).join('');
     }
 
     let resizeTimer;
