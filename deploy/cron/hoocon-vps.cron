@@ -6,5 +6,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Health + SPA GET + disk (every 5 min)
 */5 * * * * root __DEPLOY_PATH__/scripts/monitor-health.sh >> /var/log/hoocon-monitor.log 2>&1
 
+# Nightly Postgres + media backup (03:00 UTC, retention in backup-vps.sh)
+0 3 * * * root __DEPLOY_PATH__/scripts/backup-vps.sh >> /var/log/hoocon-backup.log 2>&1
+
 # Weekly safe cleanup + disk report (Sun 03:15 UTC)
 15 3 * * 0 root __DEPLOY_PATH__/scripts/vps-maintenance.sh

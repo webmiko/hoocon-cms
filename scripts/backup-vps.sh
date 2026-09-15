@@ -14,7 +14,7 @@ set -euo pipefail
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/hoocon}"
 BACKUP_ROOT="${BACKUP_ROOT:-${DEPLOY_PATH}/backups}"
 MEDIA_PATH="${MEDIA_PATH:-/var/www/hoocon/media}"
-RETENTION_DAYS="${RETENTION_DAYS:-3}"
+RETENTION_DAYS="${RETENTION_DAYS:-7}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${BACKUP_ROOT}/${STAMP}"
 
