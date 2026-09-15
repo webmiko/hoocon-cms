@@ -679,3 +679,7 @@ LOGGING = {
         },
     },
 }
+
+from config.sentry import init_sentry  # noqa: E402
+
+init_sentry()
