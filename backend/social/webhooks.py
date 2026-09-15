@@ -9,6 +9,8 @@ from typing import Any
 from rest_framework import status
 from rest_framework.response import Response
 
+from social.webhook_dedup import begin_webhook_processing
+
 
 def accept_bot_webhook(
     *,
@@ -36,6 +38,9 @@ def accept_bot_webhook(
             channel,
             type(exc).__name__,
         )
+
+    if not begin_webhook_processing(channel, payload):
+        return Response({"ok": True, "duplicate": True}, status=status.HTTP_200_OK)
 
     try:
         handle_sync(payload)

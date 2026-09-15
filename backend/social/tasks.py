@@ -72,6 +72,11 @@ def process_telegram_update_task(self: Any, update: dict[str, Any]) -> None:
     outbound Bot API calls may take several seconds via proxy retries.
     """
     from social.telegram_bot import handle_telegram_update
+    from social.webhook_dedup import begin_webhook_processing
+
+    if not begin_webhook_processing("telegram", update):
+        logger.info("telegram_update_duplicate skipped")
+        return
 
     try:
         handle_telegram_update(update)
@@ -93,6 +98,11 @@ def process_telegram_update_task(self: Any, update: dict[str, Any]) -> None:
 def process_max_update_task(self: Any, update: dict[str, Any]) -> None:
     """Handle an inbound MAX Update off the webhook request thread."""
     from social.max_bot import handle_max_update
+    from social.webhook_dedup import begin_webhook_processing
+
+    if not begin_webhook_processing("max", update):
+        logger.info("max_update_duplicate skipped")
+        return
 
     try:
         handle_max_update(update)
