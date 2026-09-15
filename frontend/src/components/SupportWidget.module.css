@@ -170,13 +170,16 @@
   width: min(24rem, 100%);
   max-width: 100%;
   min-width: 0;
-  max-height: min(
-    78dvh,
+  /* Stable viewport-relative height: messages grow when FAQ/footer hide. */
+  --support-panel-height: min(
+    85dvh,
     calc(
       100dvh - 5.5rem - env(safe-area-inset-bottom, 0px) - var(--bottom-chrome, 0px) -
         var(--cookie-chrome, 0px) - var(--compare-tray-chrome, 0px)
     )
   );
+  height: var(--support-panel-height);
+  max-height: var(--support-panel-height);
   display: flex;
   flex-direction: column;
   background: var(--glass-bg-strong);
@@ -239,6 +242,10 @@
 .headerText {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
 }
 
 .title {
@@ -256,7 +263,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  margin: 0.35rem 0 0;
+  margin: 0;
   padding: 0;
   color: var(--color-link);
   font-size: 0.72rem;
@@ -342,13 +349,14 @@
 }
 
 .status {
-  margin: 0.2rem 0 0;
-  display: inline-flex;
+  margin: 0;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   min-width: 0;
+  max-width: 100%;
 }
 
 .statusDotLive,
@@ -683,6 +691,62 @@
   color: var(--color-text-soft);
 }
 
+.extrasToggleRow {
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0.35rem 0.9rem 0.15rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.extrasToggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.15rem 0;
+  color: var(--color-link);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.extrasToggleLabel {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.extrasChevron {
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0 0 1px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.75;
+  transition: transform 180ms var(--ease-out);
+}
+
+.extrasChevronOpen {
+  margin-bottom: 0;
+  margin-top: 1px;
+  transform: rotate(-135deg);
+}
+
+.extrasToggle:hover {
+  color: var(--color-text);
+}
+
+.extrasToggleRow + .quickFaq {
+  border-top: none;
+  padding-top: 0.2rem;
+}
+
 .quickFaq {
   flex-shrink: 0;
   min-width: 0;
@@ -885,6 +949,7 @@
   }
 
   .rootOpen .messages,
+  .rootOpen .extrasToggleRow,
   .rootOpen .footerBar,
   .rootOpen .banner,
   .rootOpen .metaDetails,

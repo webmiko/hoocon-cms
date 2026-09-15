@@ -135,6 +135,10 @@ function maxMessageId(messages: ChatMessage[], fallback = 0): number {
   return Math.max(fallback, ...messages.map((m) => m.id));
 }
 
+function hasVisitorSentMessage(messages: ChatMessage[]): boolean {
+  return messages.some((m) => m.direction === "inbound");
+}
+
 function readSupportSurfacePref(): SupportSurface | null {
   try {
     const raw = localStorage.getItem(SUPPORT_SURFACE_KEY);
@@ -239,6 +243,7 @@ export function SupportWidget() {
   const [pushStatus, setPushStatus] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [extrasExpanded, setExtrasExpanded] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const lastIdRef = useRef(0);
@@ -255,6 +260,7 @@ export function SupportWidget() {
         if (!next.open) {
           setFaqItems([]);
           setActiveFaq(null);
+          setExtrasExpanded(false);
         }
       }),
     [],
@@ -588,6 +594,8 @@ export function SupportWidget() {
   }
 
   const showPicker = open && chatSurface === "pick" && hasMessengerBots(channels);
+  const chatEngaged = hasVisitorSentMessage(messages);
+  const showExtras = !chatEngaged || extrasExpanded;
 
   if (!visible) return null;
 
@@ -753,7 +761,30 @@ export function SupportWidget() {
           </div>
           ) : null}
 
-          {!showPicker ? (
+          {!showPicker && chatEngaged ? (
+            <div className={styles.extrasToggleRow}>
+              <button
+                type="button"
+                className={styles.extrasToggle}
+                aria-expanded={extrasExpanded}
+                onClick={() => setExtrasExpanded((expanded) => !expanded)}
+              >
+                <span className={styles.extrasToggleLabel}>
+                  {extrasExpanded ? "Свернуть подсказки" : "Подсказки и связь"}
+                </span>
+                <span
+                  className={
+                    extrasExpanded
+                      ? `${styles.extrasChevron} ${styles.extrasChevronOpen}`
+                      : styles.extrasChevron
+                  }
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          ) : null}
+
+          {!showPicker && showExtras ? (
           <QuickFaqChips
             items={faqItems}
             activeId={activeFaq?.id ?? null}
@@ -761,7 +792,7 @@ export function SupportWidget() {
           />
           ) : null}
 
-          {!showPicker ? (
+          {!showPicker && showExtras ? (
           <div className={styles.footerBar}>
             {hasMessengerBots(channels) ? (
               <MessengerLinks channels={channels} variant="compact" />
