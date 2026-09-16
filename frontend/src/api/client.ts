@@ -424,6 +424,8 @@ export const api = {
     channel: string;
     display_name?: string;
     contact_email?: string;
+    ai_active?: boolean;
+    ai_escalated?: boolean;
   }> {
     return apiFetch("/api/support/conversations/", {
       method: "POST",
@@ -445,6 +447,8 @@ export const api = {
       id: number;
       display_name?: string;
       contact_email?: string;
+      ai_active?: boolean;
+      ai_escalated?: boolean;
     } | null;
   }> {
     const qs = after != null ? `?after=${after}` : "";

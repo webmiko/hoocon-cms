@@ -19,6 +19,12 @@ import {
   subscribeSupportChat,
 } from "../utils/supportChatControl";
 import {
+  countSupportUnread,
+  maxSupportMessageId,
+  readSupportLastReadId,
+  writeSupportLastReadId,
+} from "../utils/supportUnread";
+import {
   pushSupported,
   subscribeWebPush,
   subscribeWebPushStatusRu,
@@ -43,12 +49,39 @@ type SupportSurface = "pick" | "web";
 
 type SupportFaqItem = { id: number; question: string; answer: string };
 
-const FAQ_PATH_LABELS: Record<string, string> = {
-  "/consultation": "заявка на КП",
-  "/gde-kupit": "где купить",
+type SupportConversationState = {
+  id: number;
+  display_name?: string;
+  contact_email?: string;
+  ai_active?: boolean;
+  ai_escalated?: boolean;
 };
 
-const FAQ_PATH_RE = /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:#[a-z0-9-]+)?/gi;
+const FAQ_PATH_LABELS: Record<string, string> = {
+  "/consultation": "консультация",
+  "/gde-kupit": "где купить",
+  "/kontakty": "контакты",
+  "/dokumentaciya": "документация",
+  "/catalog": "каталог",
+  "/faq": "вопросы и ответы",
+  "/zavod": "OEM · завод",
+  "/company": "о компании",
+  "/rfq": "запрос цены",
+};
+
+const FAQ_PATH_RE =
+  /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:\?[^\s]+)?(?:#[a-z0-9-]+)?/gi;
+
+function faqLinkLabel(href: string): string {
+  const [path, query = ""] = href.split(/[?#]/, 2);
+  if (path === "/dokumentaciya" && query) {
+    const sku = new URLSearchParams(query).get("q");
+    if (sku) {
+      return `документация: ${sku}`;
+    }
+  }
+  return FAQ_PATH_LABELS[path] ?? href;
+}
 
 function faqAnswerNodes(text: string, onNavigate?: () => void): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -70,7 +103,7 @@ function faqAnswerNodes(text: string, onNavigate?: () => void): ReactNode[] {
         className={styles.faqLink}
         onClick={onNavigate}
       >
-        {FAQ_PATH_LABELS[href] ?? href}
+        {faqLinkLabel(href)}
       </Link>,
     );
     if (suffix) {
@@ -130,13 +163,21 @@ function mergeMessages(
   return merged;
 }
 
-function maxMessageId(messages: ChatMessage[], fallback = 0): number {
-  if (!messages.length) return fallback;
-  return Math.max(fallback, ...messages.map((m) => m.id));
-}
-
 function hasVisitorSentMessage(messages: ChatMessage[]): boolean {
   return messages.some((m) => m.direction === "inbound");
+}
+
+function chatStatusText(
+  conversation: SupportConversationState | null,
+  isOpenNow: boolean,
+): string {
+  if (conversation?.ai_escalated) {
+    return "Передано менеджеру";
+  }
+  if (conversation?.ai_active) {
+    return "Отвечает бот";
+  }
+  return isOpenNow ? "Сейчас на связи" : "Вне рабочего времени";
 }
 
 function readSupportSurfacePref(): SupportSurface | null {
@@ -228,6 +269,9 @@ export function SupportWidget() {
   const [open, setOpen] = useState(initial.open);
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversation, setConversation] = useState<SupportConversationState | null>(
+    null,
+  );
   const [draft, setDraft] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -244,13 +288,22 @@ export function SupportWidget() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [extrasExpanded, setExtrasExpanded] = useState(false);
+  const [fabNudge, setFabNudge] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const lastIdRef = useRef(0);
+  const lastReadIdRef = useRef(readSupportLastReadId());
   const resumeOnceRef = useRef(false);
-  const [fabNudge, setFabNudge] = useState(false);
+  const sessionProbeRef = useRef(false);
 
   useFocusTrap(panelRef, open);
+
+  function persistReadCursor(messageList: ChatMessage[]) {
+    const readId = maxSupportMessageId(messageList, lastReadIdRef.current);
+    lastReadIdRef.current = readId;
+    writeSupportLastReadId(readId);
+  }
 
   useEffect(
     () =>
@@ -261,6 +314,9 @@ export function SupportWidget() {
           setFaqItems([]);
           setActiveFaq(null);
           setExtrasExpanded(false);
+          writeSupportLastReadId(lastIdRef.current);
+          lastReadIdRef.current = lastIdRef.current;
+          setUnreadCount(0);
         }
       }),
     [],
@@ -346,7 +402,12 @@ export function SupportWidget() {
           setContactsLocked(true);
         }
         setMessages(data.messages);
-        lastIdRef.current = maxMessageId(data.messages);
+        if (data.conversation) {
+          setConversation(data.conversation);
+        }
+        lastIdRef.current = maxSupportMessageId(data.messages);
+        persistReadCursor(data.messages);
+        setUnreadCount(0);
       } catch {
         /* first message creates the thread on send */
       }
@@ -356,21 +417,64 @@ export function SupportWidget() {
     };
   }, [open, chatSurface]);
 
+  // Resume session while FAB is closed — poll for staff/bot replies + unread badge.
   useEffect(() => {
-    if (!open || chatSurface !== "web" || !started) return;
+    if (open || chatSurface !== "web" || sessionProbeRef.current) return;
+    sessionProbeRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await api.fetchCsrfToken();
+        const data = await api.supportMessages();
+        if (cancelled || (!data.messages.length && !data.conversation)) return;
+        setStarted(true);
+        setMessages(data.messages);
+        if (data.conversation) {
+          setConversation(data.conversation);
+        }
+        lastIdRef.current = maxSupportMessageId(data.messages);
+        setUnreadCount(countSupportUnread(data.messages, lastReadIdRef.current));
+      } catch {
+        /* no session yet */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, chatSurface]);
+
+  useEffect(() => {
+    if (chatSurface !== "web" || !started) return;
     const tick = async () => {
       try {
         const after = lastIdRef.current > 0 ? lastIdRef.current : undefined;
         const data = await api.supportMessages(after);
+        if (data.conversation) {
+          setConversation(data.conversation);
+        }
         if (!data.messages.length) return;
         setMessages((prev) => mergeMessages(prev, data.messages));
-        lastIdRef.current = maxMessageId(data.messages, lastIdRef.current);
+        lastIdRef.current = maxSupportMessageId(
+          data.messages,
+          lastIdRef.current,
+        );
+        if (open) {
+          persistReadCursor(data.messages);
+        } else {
+          const incomingUnread = data.messages.filter(
+            (m) => m.direction !== "inbound" && m.id > lastReadIdRef.current,
+          ).length;
+          if (incomingUnread > 0) {
+            setUnreadCount((prev) => prev + incomingUnread);
+          }
+        }
       } catch {
         /* ignore transient poll errors (network); do not starve UI */
       }
     };
     void tick();
-    const id = window.setInterval(() => void tick(), 2500);
+    const intervalMs = open ? 2500 : 4000;
+    const id = window.setInterval(() => void tick(), intervalMs);
     return () => window.clearInterval(id);
   }, [open, started, chatSurface]);
 
@@ -525,6 +629,13 @@ export function SupportWidget() {
       display_name: displayName || undefined,
       contact_email: contactEmail || undefined,
     });
+    setConversation({
+      id: conv.id ?? 0,
+      display_name: conv.display_name,
+      contact_email: conv.contact_email,
+      ai_active: conv.ai_active,
+      ai_escalated: conv.ai_escalated,
+    });
     setStarted(true);
     if (conv.display_name) setName(conv.display_name);
     if (conv.contact_email) setEmail(conv.contact_email);
@@ -546,6 +657,14 @@ export function SupportWidget() {
     await syncContacts();
   }
 
+  function onDraftKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (busy || !draft.trim()) return;
+    event.currentTarget.form?.requestSubmit();
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const body = draft.trim();
@@ -558,8 +677,14 @@ export function SupportWidget() {
       setStarted(true);
       const next = [result.message];
       if (result.auto_reply) next.push(result.auto_reply);
-      setMessages((prev) => mergeMessages(prev, next));
-      lastIdRef.current = maxMessageId(next, lastIdRef.current);
+      setMessages((prev) => {
+        const merged = mergeMessages(prev, next);
+        lastIdRef.current = maxSupportMessageId(next, lastIdRef.current);
+        if (open) {
+          persistReadCursor(merged);
+        }
+        return merged;
+      });
       setDraft("");
       setActiveFaq(null);
       if (result.message.outside_hours) setIsOpenNow(false);
@@ -624,7 +749,7 @@ export function SupportWidget() {
                   }
                   aria-hidden="true"
                 />
-                {isOpenNow ? "Сейчас на связи" : "Вне рабочего времени"}
+                {chatStatusText(conversation, isOpenNow)}
               </p>
               {chatSurface === "web" && hasMessengerBots(channels) ? (
                 <button
@@ -672,7 +797,13 @@ export function SupportWidget() {
             </div>
           ) : null}
 
-          {!showPicker && !isOpenNow && outsideHint ? (
+          {!showPicker && conversation?.ai_escalated ? (
+            <p className={styles.banner}>
+              Чат передан менеджеру — дальше ответит человек. Ожидайте, пожалуйста.
+            </p>
+          ) : null}
+
+          {!showPicker && !conversation?.ai_escalated && !isOpenNow && outsideHint ? (
             <p className={styles.banner}>{outsideHint}</p>
           ) : null}
 
@@ -725,20 +856,26 @@ export function SupportWidget() {
             ) : null}
             {messages.map((m) => {
                 const fromVisitor = m.direction === "inbound";
+                const isBot = m.direction === "system";
                 const time = formatMessageTime(m.created_at);
                 const label = m.sender_name || (fromVisitor ? "Вы" : "Поддержка");
+                const rowClass = fromVisitor
+                  ? styles.rowOut
+                  : isBot
+                    ? styles.rowBot
+                    : styles.rowIn;
+                const bubbleClass = fromVisitor
+                  ? styles.bubbleOut
+                  : isBot
+                    ? styles.bubbleBot
+                    : styles.bubbleIn;
                 return (
-                  <div
-                    key={m.id}
-                    className={fromVisitor ? styles.rowOut : styles.rowIn}
-                  >
+                  <div key={m.id} className={rowClass}>
                     <span className={styles.sender}>{label}</span>
-                    <div
-                      className={
-                        fromVisitor ? styles.bubbleOut : styles.bubbleIn
-                      }
-                    >
-                      {m.body}
+                    <div className={bubbleClass}>
+                      {isBot
+                        ? faqAnswerNodes(m.body, () => closeSupportChat())
+                        : m.body}
                     </div>
                     {time ? <time className={styles.time}>{time}</time> : null}
                   </div>
@@ -834,18 +971,26 @@ export function SupportWidget() {
 
           {!showPicker ? (
           <form className={styles.composer} onSubmit={(e) => void onSubmit(e)}>
-            <label className={styles.srOnly} htmlFor={`${titleId}-draft`}>
-              Сообщение
-            </label>
-            <textarea
-              id={`${titleId}-draft`}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={1}
-              maxLength={4000}
-              placeholder="Напишите сообщение…"
-              required
-            />
+            <div className={styles.composerMain}>
+              <label className={styles.srOnly} htmlFor={`${titleId}-draft`}>
+                Сообщение
+              </label>
+              <textarea
+                id={`${titleId}-draft`}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={onDraftKeyDown}
+                rows={2}
+                maxLength={4000}
+                placeholder="Сообщение…"
+                enterKeyHint="enter"
+                aria-describedby={`${titleId}-composer-hint`}
+                required
+              />
+              <p className={styles.composerHint} id={`${titleId}-composer-hint`}>
+                Enter — отправить · Shift+Enter — новая строка
+              </p>
+            </div>
             <button
               type="submit"
               className={styles.send}
@@ -874,7 +1019,13 @@ export function SupportWidget() {
                 .join(" ")
         }
         aria-expanded={open}
-        aria-label={open ? "Закрыть чат" : "Открыть чат поддержки"}
+        aria-label={
+          open
+            ? "Закрыть чат"
+            : unreadCount > 0
+              ? `Открыть чат поддержки, ${unreadCount} новых сообщений`
+              : "Открыть чат поддержки"
+        }
         onClick={() => {
           if (!open) {
             setChatSurface(
@@ -896,6 +1047,11 @@ export function SupportWidget() {
               <ChatIcon className={styles.fabIcon} />
             )}
             <span className={styles.fabLabel}>Чат</span>
+            {unreadCount > 0 ? (
+              <span className={styles.fabBadge} aria-hidden="true">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : null}
           </>
         )}
       </button>
