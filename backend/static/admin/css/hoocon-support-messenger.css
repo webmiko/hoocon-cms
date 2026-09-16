@@ -424,12 +424,31 @@ html.dark .hoocon-messenger {
 .hoocon-messenger__composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "input send"
+    "hint hint";
   align-items: end;
   gap: 0.55rem;
   padding: 0.75rem 0.9rem;
   border-top: 1px solid var(--hm-border);
   background: var(--hm-surface);
   flex-shrink: 0;
+}
+
+.hoocon-messenger__composer textarea {
+  grid-area: input;
+}
+
+.hoocon-messenger__composer .hoocon-messenger__send {
+  grid-area: send;
+}
+
+.hoocon-messenger__composer-hint {
+  grid-area: hint;
+  margin: -0.15rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--hm-quiet);
 }
 
 .hoocon-messenger__composer textarea {
@@ -605,6 +624,21 @@ html.dark .hoocon-messenger {
   .hoocon-messenger__bubble-wrap {
     max-width: min(92%, 100%);
   }
+}
+
+.hoocon-messenger__ai-badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: lowercase;
+  background: color-mix(in srgb, var(--hm-brand) 12%, var(--hm-surface));
+  border: 1px solid var(--hm-border);
+}
+
+.hoocon-messenger__ai-badge--bot {
+  color: var(--hm-brand);
 }
 
 /* Phone shell (hoocon-admin-phone.css) overrides ≤767 for full-bleed + tabs. */

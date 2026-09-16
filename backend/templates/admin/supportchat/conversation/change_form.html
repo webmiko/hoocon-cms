@@ -63,6 +63,10 @@
           {% endif %}
           {% if original.assignee %}
             · менеджер: {{ chat_assignee_name }}
+          {% elif original.ai_escalated_at %}
+            · <span class="hoocon-messenger__ai-badge">передано менеджеру</span>
+          {% elif original.ai_active %}
+            · <span class="hoocon-messenger__ai-badge hoocon-messenger__ai-badge--bot">бот</span>
           {% endif %}
         </p>
       </div>
@@ -84,10 +88,13 @@
                    1 1 0-2h4l1-2Zm1 6a1 1 0 0 0-1 1v8a1 1 0 1 0 2 0v-8a1 1 0 0 0-1-1Zm4 0a1 1
                    0 0 0-1 1v8a1 1 0 1 0 2 0v-8a1 1 0 0 0-1-1Z"
               />
-            </svg>
-          </button>
-        </form>
-      {% endif %}
+      </svg>
+    </button>
+    <p class="hoocon-messenger__composer-hint" id="hoocon-reply-hint">
+      Enter — отправить · Shift+Enter — новая строка
+    </p>
+  </form>
+{% endif %}
       <span class="hoocon-messenger__status hoocon-messenger__status--{{ original.status }}">
         {{ original.get_status_display }}
       </span>
@@ -134,7 +141,9 @@
       rows="2"
       required
       maxlength="4000"
-      placeholder="{% trans 'Напишите ответ…' %}"
+      placeholder="{% trans 'Ответ клиенту…' %}"
+      aria-describedby="hoocon-reply-hint"
+      enterkeyhint="enter"
     ></textarea>
     <button type="submit" class="hoocon-messenger__send" aria-label="Отправить">
       <span class="hoocon-messenger__send-label">Отправить</span>
@@ -146,6 +155,9 @@
         />
       </svg>
     </button>
+    <p class="hoocon-messenger__composer-hint" id="hoocon-reply-hint">
+      Enter — отправить · Shift+Enter — новая строка
+    </p>
   </form>
 </section>
 {% endif %}
