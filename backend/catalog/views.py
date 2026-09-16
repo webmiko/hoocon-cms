@@ -148,7 +148,7 @@ class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         cats = list(page) if page is not None else list(queryset)
-        context = self.get_serializer_context()
+        context = dict(self.get_serializer_context())
         context["preview_images"] = preview_images_by_category([c.pk for c in cats])
         serializer = self.get_serializer(cats, many=True, context=context)
         if page is not None:

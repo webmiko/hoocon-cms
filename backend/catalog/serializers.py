@@ -7,6 +7,7 @@ Spec: docs/readiness-backend-ux.md §2.3; docs/security-baseline.md §3.2 —
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from rest_framework import serializers
@@ -49,7 +50,7 @@ from catalog.sku_access import (
 from sitesettings.models import SiteSettings
 
 
-def _prices_visible(context: dict[str, Any] | None = None) -> bool:
+def _prices_visible(context: Mapping[str, Any] | None = None) -> bool:
     """Return True if public API may expose SKU.price.
 
     Reads the singleton once per serializer context. Without that a 20-row list
@@ -65,9 +66,12 @@ def _prices_visible(context: dict[str, Any] | None = None) -> bool:
     """
     if context is None:
         return bool(SiteSettings.load().show_prices_on_site)
-    if "_prices_visible" not in context:
-        context["_prices_visible"] = bool(SiteSettings.load().show_prices_on_site)
-    return bool(context["_prices_visible"])
+    memo = context.get("_prices_visible")
+    if memo is None:
+        memo = bool(SiteSettings.load().show_prices_on_site)
+        if isinstance(context, dict):
+            context["_prices_visible"] = memo
+    return bool(memo)
 
 
 def _sku_own_images(obj: SKU) -> list[ProductImage]:
@@ -174,7 +178,7 @@ def _sku_analogs_text(obj: SKU) -> str:
     return analogs_plain_text_for_sku(obj)
 
 
-def _sku_attribute_rows(obj: SKU, context: dict[str, Any]) -> list[dict[str, Any]]:
+def _sku_attribute_rows(obj: SKU, context: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Deduped + variant-filtered ТТХ rows for API."""
     values = sku_attribute_values(obj)
     deduped = dedupe_attribute_values(values)

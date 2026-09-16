@@ -66,7 +66,8 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         """
         # Honeypot before validation: bots skip required RFQ fields; do not
         # teach them about company/items rules via 400 responses.
-        raw_website = request.data.get("website") or ""
+        payload = request.data if isinstance(request.data, dict) else {}
+        raw_website = payload.get("website") or ""
         if isinstance(raw_website, (list, tuple)):
             raw_website = raw_website[0] if raw_website else ""
         if str(raw_website).strip():
