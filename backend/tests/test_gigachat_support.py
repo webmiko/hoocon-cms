@@ -14,13 +14,14 @@ from supportchat.tasks import gigachat_reply
 
 
 @pytest.fixture
-def gigachat_on(settings) -> SiteSettings:
+def gigachat_on(settings, monkeypatch: pytest.MonkeyPatch) -> SiteSettings:
     settings.GIGACHAT_CREDENTIALS = "test-key"
     site = SiteSettings.load()
     site.gigachat_enabled = True
     site.gigachat_model = "GigaChat-2"
     site.ai_max_turns = 5
     site.save(update_fields=["gigachat_enabled", "gigachat_model", "ai_max_turns"])
+    monkeypatch.setattr("supportchat.services.is_open_now", lambda: True)
     return site
 
 
