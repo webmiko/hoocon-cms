@@ -8,7 +8,7 @@ Spec: docs/readiness-backend-ux.md §2.3; docs/security-baseline.md §3.2 —
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from rest_framework import serializers
 
@@ -182,7 +182,11 @@ def _sku_attribute_rows(obj: SKU, context: Mapping[str, Any]) -> list[dict[str, 
     """Deduped + variant-filtered ТТХ rows for API."""
     values = sku_attribute_values(obj)
     deduped = dedupe_attribute_values(values)
-    rows = AttributeValueSerializer(deduped, many=True, context=context).data
+    rows = AttributeValueSerializer(
+        deduped,
+        many=True,
+        context=cast(dict[str, Any], context),
+    ).data
     filtered = filter_attributes_for_variant(list(rows), parse_sku_variant(obj.sku_code))
     result: list[dict[str, Any]] = []
     for row in filtered:
