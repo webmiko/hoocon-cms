@@ -1085,6 +1085,20 @@ html.dark .hoocon-phone-more__sheet,
     display: contents !important;
   }
 
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    td.field-party_label::before,
+  body.hoocon-phone-ready.hoocon-support-inbox
+    #changelist
+    table.hoocon-admin-table-stacked
+    tbody
+    th.field-party_label::before {
+    display: none !important;
+    content: none !important;
+  }
+
   body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar {
     grid-area: avatar;
     align-self: center;
@@ -1283,6 +1297,12 @@ html.dark .hoocon-phone-more__sheet,
     tbody
     th.field-assignee {
     display: none !important;
+  }
+
+  /* Inbox footer: align «N диалогов» with row inset (os27 zeros #main > div.px-4). */
+  body.hoocon-phone-ready.hoocon-support-inbox #main > div.px-4.lg\:border-t {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
   }
 
   /* Thread — full-screen chat; hide Django form + bottom tabs */

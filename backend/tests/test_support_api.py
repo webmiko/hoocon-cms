@@ -385,6 +385,7 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert 'name="reply_body"' in html
     assert 'placeholder="Ответ клиенту…"' in html
     assert "Shift+Enter" in html
+    assert html.count('id="hoocon-reply-hint"') == 1
     assert 'id="hoocon-messenger"' in html
     assert "hoocon-messenger__send" in html
     assert "hoocon-messenger__back" in html

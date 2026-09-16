@@ -337,6 +337,13 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "grid-template-areas:" in phone_css
     assert '"avatar name time"' in phone_css
     assert '"avatar preview unread"' in phone_css
+    party_label_before = phone_css.split("td.field-party_label::before,")[1].split("}")[0]
+    assert "display: none !important" in party_label_before
+    assert "content: none !important" in party_label_before
+    inbox_footer_rule = phone_css.split("body.hoocon-phone-ready.hoocon-support-inbox #main > div.px-4.lg\\:border-t")[
+        1
+    ].split("}")[0]
+    assert "padding-left: 1rem !important" in inbox_footer_rule
     assert "border-radius: 50% !important" in phone_css
     assert "body.hoocon-phone-ready.hoocon-support-thread .hoocon-phone-shell" in phone_css
     assert "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__back" in phone_css
@@ -357,6 +364,11 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "background: var(--hm-brand" in messenger_css
     send_rule = messenger_css.split(".hoocon-messenger__send {\n  appearance")[1].split("}")[0]
     assert "box-shadow: none" in send_rule
+    who_rule = messenger_css.split(".hoocon-messenger__who {")[1].split("}")[0]
+    assert "flex: 1 1 0" in who_rule
+    title_rule = messenger_css.split(".hoocon-messenger__title {")[1].split("}")[0]
+    assert "overflow-wrap: break-word" in title_rule
+    assert "word-break: normal" in title_rule
     assert "hoocon-messenger__back" in messenger_css
     assert ".hoocon-messenger__composer textarea::placeholder" in messenger_css
     assert (
