@@ -467,6 +467,21 @@ GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "G-DLRV7BZ5JP").strip()
 # Social bots (secrets — never expose via API; chat IDs live in SiteSettings Admin).
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
+# GigaChat API (support assistant; secrets — never expose via public API).
+GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "").strip()
+GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()
+GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-2").strip()
+GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+# triage — приветствие и передача менеджеру; full — ответы из gigachat_kb.txt
+GIGACHAT_MODE = os.getenv("GIGACHAT_MODE", "triage").strip().casefold()
+SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = int(
+    os.getenv("SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS", "300"),
+)
+
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
 MAX_BOT_USERNAME = os.getenv("MAX_BOT_USERNAME", "id5024199634_bot").strip().lstrip("@")

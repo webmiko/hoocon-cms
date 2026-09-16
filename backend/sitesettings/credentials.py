@@ -27,6 +27,16 @@ def vk_access_token(site: SiteSettings | None = None) -> str:
     ).strip()
 
 
+def gigachat_credentials(site: SiteSettings | None = None) -> str:
+    """Return GigaChat Authorization key (Admin, else GIGACHAT_CREDENTIALS env)."""
+    row = site if site is not None else SiteSettings.load()
+    return (getattr(row, "gigachat_credentials", "") or "").strip() or getattr(
+        settings,
+        "GIGACHAT_CREDENTIALS",
+        "",
+    ).strip()
+
+
 def max_bot_token(site: SiteSettings | None = None) -> str:
     """Return MAX bot token (Admin, else MAX_BOT_TOKEN env)."""
     row = site if site is not None else SiteSettings.load()

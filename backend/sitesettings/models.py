@@ -249,6 +249,38 @@ class SiteSettings(models.Model):
         help_text="ID чата для бота MAX.",
     )
 
+    # ── GigaChat support assistant ──
+    gigachat_enabled: models.BooleanField = models.BooleanField(
+        "GigaChat-ассистент в чате",
+        default=False,
+        help_text=(
+            "Первичные ответы в support-чате через GigaChat API. "
+            "По умолчанию режим triage (приветствие, без консультаций по продукции). "
+            "Нужен Authorization Key (Admin или GIGACHAT_CREDENTIALS в .env)."
+        ),
+    )
+    gigachat_credentials: models.CharField = models.CharField(
+        "ключ GigaChat (Authorization Key)",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Authorization Key из Studio. Пустое поле при сохранении не стирает ключ. "
+            "Запасной вариант: GIGACHAT_CREDENTIALS в .env."
+        ),
+    )
+    gigachat_model: models.CharField = models.CharField(
+        "модель GigaChat",
+        max_length=64,
+        blank=True,
+        default="GigaChat-2",
+    )
+    ai_max_turns: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "лимит ответов ассистента",
+        default=5,
+        help_text="После N ответов бота диалог передаётся менеджеру.",
+    )
+
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 

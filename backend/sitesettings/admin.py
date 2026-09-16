@@ -40,6 +40,10 @@ class SiteSettingsAdminForm(forms.ModelForm):
                 render_value=False,
                 attrs={"autocomplete": "new-password", "placeholder": "••••••••"},
             ),
+            "gigachat_credentials": forms.PasswordInput(
+                render_value=False,
+                attrs={"autocomplete": "new-password", "placeholder": "••••••••"},
+            ),
         }
 
     def clean_telegram_bot_token(self) -> str:
@@ -53,6 +57,10 @@ class SiteSettingsAdminForm(forms.ModelForm):
     def clean_max_bot_token(self) -> str:
         """Blank input keeps the previously saved token."""
         return self._keep_secret_if_blank("max_bot_token")
+
+    def clean_gigachat_credentials(self) -> str:
+        """Blank input keeps the previously saved Authorization key."""
+        return self._keep_secret_if_blank("gigachat_credentials")
 
     def _keep_secret_if_blank(self, field_name: str) -> str:
         """Return new value or existing instance value when form field is empty.
@@ -93,6 +101,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         "telegram_token_status",
         "vk_token_status",
         "max_token_status",
+        "gigachat_token_status",
         "created_at",
         "updated_at",
     )
@@ -217,6 +226,23 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "max_chat_id",
                 ),
                 "description": ("Токен бота MAX и ID чата. Пустой токен при сохранении не затирает уже сохранённый."),
+            },
+        ),
+        (
+            "Интеграции: GigaChat",
+            {
+                "fields": (
+                    "gigachat_enabled",
+                    "gigachat_credentials",
+                    "gigachat_token_status",
+                    "gigachat_model",
+                    "ai_max_turns",
+                ),
+                "description": (
+                    "Ассистент первой линии в support-чате (сайт, Telegram, MAX). "
+                    "Authorization Key — из Studio → GigaChat API → Настройки API. "
+                    "Запасной вариант: GIGACHAT_CREDENTIALS в .env."
+                ),
             },
         ),
         (
@@ -367,6 +393,15 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         label = token_source_label(
             obj.max_bot_token,
             getattr(settings, "MAX_BOT_TOKEN", ""),
+        )
+        return format_html("<strong>{}</strong>", label)
+
+    @admin.display(description="Статус ключа GigaChat")
+    def gigachat_token_status(self, obj: SiteSettings) -> str:
+        """Show whether GigaChat Authorization key is configured."""
+        label = token_source_label(
+            obj.gigachat_credentials,
+            getattr(settings, "GIGACHAT_CREDENTIALS", ""),
         )
         return format_html("<strong>{}</strong>", label)
 
