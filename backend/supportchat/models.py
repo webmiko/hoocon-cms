@@ -103,6 +103,20 @@ class Conversation(models.Model):
         "непрочитано менеджером",
         default=0,
     )
+    ai_active: models.BooleanField = models.BooleanField(
+        "ассистент ведёт диалог",
+        default=True,
+        help_text="Пока True — GigaChat отвечает на входящие; False после эскалации менеджеру.",
+    )
+    ai_escalated_at = models.DateTimeField(
+        "передан менеджеру",
+        null=True,
+        blank=True,
+    )
+    ai_turn_count: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "ходов ассистента",
+        default=0,
+    )
     created_at = models.DateTimeField("создан", auto_now_add=True)
     updated_at = models.DateTimeField("обновлён", auto_now=True)
 

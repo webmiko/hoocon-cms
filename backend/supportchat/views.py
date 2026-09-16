@@ -32,6 +32,17 @@ _MSG_THROTTLE = "support_message"
 _POLL_THROTTLE = "support_poll"
 
 
+def _conversation_public_payload(conversation) -> dict[str, object]:
+    """Visitor-facing conversation state for the support widget."""
+    return {
+        "id": conversation.pk,
+        "display_name": conversation.display_name,
+        "contact_email": conversation.contact_email,
+        "ai_active": bool(conversation.ai_active and conversation.ai_escalated_at is None),
+        "ai_escalated": conversation.ai_escalated_at is not None,
+    }
+
+
 class SupportScheduleView(APIView):
     """GET /api/support/schedule/ — open hours (public)."""
 
@@ -128,6 +139,8 @@ class ConversationStartView(APIView):
                 "channel": conv.channel,
                 "display_name": conv.display_name,
                 "contact_email": conv.contact_email,
+                "ai_active": bool(conv.ai_active and conv.ai_escalated_at is None),
+                "ai_escalated": conv.ai_escalated_at is not None,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -164,11 +177,7 @@ class CurrentMessagesView(APIView):
         response = Response(
             {
                 "messages": MessageSerializer(qs, many=True).data,
-                "conversation": {
-                    "id": conv.pk,
-                    "display_name": conv.display_name,
-                    "contact_email": conv.contact_email,
-                },
+                "conversation": _conversation_public_payload(conv),
             },
         )
         # Polling must never be served stale from browser/proxy caches.

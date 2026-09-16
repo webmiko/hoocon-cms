@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import html
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from supportchat.models import Conversation
 
 from celery import shared_task
 from django.conf import settings
@@ -173,3 +176,201 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
         message_id,
     )
     return "pending_channel"
+
+
+_HANDOFF_TEXT = "Чат передан менеджеру — дальше ответит человек. Ожидайте, пожалуйста."
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=15)
+def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> str:
+    """Generate GigaChat assistant reply for an inbound support message."""
+    from django.db import transaction
+
+    from supportchat.gigachat.client import GigachatError
+    from supportchat.gigachat.delivery import deliver_ai_message
+    from supportchat.gigachat.disclosure import apply_bot_disclosure
+    from supportchat.gigachat.policy import (
+        ai_assistant_enabled,
+        ai_max_turns,
+        conversation_ai_eligible,
+    )
+    from supportchat.gigachat.reply import generate_ai_reply
+    from supportchat.models import Conversation, Message, MessageDirection, touch_conversation_message
+
+    if not ai_assistant_enabled():
+        return "disabled"
+
+    try:
+        conversation = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return "missing_conversation"
+
+    try:
+        inbound = Message.objects.get(pk=inbound_message_id, conversation_id=conversation_id)
+    except Message.DoesNotExist:
+        return "missing_inbound"
+
+    if inbound.direction != MessageDirection.INBOUND:
+        return "skip_not_inbound"
+
+    if not conversation_ai_eligible(conversation):
+        return "not_eligible"
+
+    if conversation.ai_turn_count >= ai_max_turns():
+        return _escalate_conversation(conversation, reason="turn_limit")
+
+    try:
+        ai = generate_ai_reply(conversation, inbound_message=inbound)
+    except GigachatError as exc:
+        logger.warning(
+            "gigachat_reply_failed conversation_id=%s err=%s",
+            conversation_id,
+            str(exc)[:200],
+        )
+        raise self.retry(exc=exc)
+
+    with transaction.atomic():
+        conversation = Conversation.objects.select_for_update().get(pk=conversation_id)
+        if not conversation_ai_eligible(conversation):
+            return "not_eligible_race"
+        first_turn = conversation.ai_turn_count == 0
+        reply_body = apply_bot_disclosure(ai.text, first_turn=first_turn)
+        raw_payload: dict[str, object] = {"ai": True}
+        if ai.product_clarify:
+            raw_payload["ai_product_clarify"] = True
+        if ai.payload_extra:
+            raw_payload.update(ai.payload_extra)
+        if ai.escalate:
+            raw_payload["ai_escalate"] = True
+            if ai.escalation_note:
+                raw_payload["manager_summary"] = ai.escalation_note[:500]
+        msg = Message.objects.create(
+            conversation=conversation,
+            direction=MessageDirection.SYSTEM,
+            body=reply_body,
+            raw_payload=raw_payload,
+        )
+        conversation.ai_turn_count += 1
+        conversation.save(update_fields=["ai_turn_count", "updated_at"])
+        touch_conversation_message(conversation, inbound=False)
+
+    deliver_ai_message(conversation, msg)
+
+    if ai.escalate:
+        return _escalate_conversation(
+            conversation,
+            reason="model_escalate",
+            note=ai.escalation_note,
+            post_handoff=False,
+        )
+    return "ok"
+
+
+def _escalate_conversation(
+    conversation: Conversation,
+    *,
+    reason: str,
+    note: str = "",
+    post_handoff: bool = True,
+) -> str:
+    """Stop AI handling and optionally post handoff line to the visitor."""
+    from django.db import transaction
+    from django.db.models import F
+    from django.utils import timezone
+
+    from supportchat.gigachat.delivery import deliver_ai_message
+    from supportchat.models import Conversation, Message, MessageDirection, touch_conversation_message
+    from supportchat.services import _schedule_staff_support_push
+
+    handoff = None
+    with transaction.atomic():
+        conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+        if conversation.ai_escalated_at is not None:
+            return f"already_escalated:{reason}"
+        now = timezone.now()
+        conversation.ai_active = False
+        conversation.ai_escalated_at = now
+        conversation.save(update_fields=["ai_active", "ai_escalated_at", "updated_at"])
+        if post_handoff:
+            handoff = Message.objects.create(
+                conversation=conversation,
+                direction=MessageDirection.SYSTEM,
+                body=_HANDOFF_TEXT,
+                raw_payload={"ai_handoff": True, "reason": reason, "note": note[:500]},
+            )
+            touch_conversation_message(conversation, inbound=False)
+        Conversation.objects.filter(pk=conversation.pk).update(
+            staff_unread_count=F("staff_unread_count") + 1,
+            updated_at=now,
+        )
+        conversation.refresh_from_db(fields=["staff_unread_count", "updated_at"])
+
+    if handoff is not None:
+        deliver_ai_message(conversation, handoff)
+    _schedule_staff_support_push(conversation.pk)
+    _schedule_escalation_busy_followup(conversation.pk)
+    logger.info(
+        "gigachat_escalated conversation_id=%s reason=%s",
+        conversation.pk,
+        reason,
+    )
+    return f"escalated:{reason}"
+
+
+def _schedule_escalation_busy_followup(conversation_id: int) -> None:
+    """Enqueue busy follow-up if managers do not open the chat in time."""
+    from django.db import transaction
+
+    from supportchat.gigachat.busy_followup import escalation_busy_followup_seconds
+
+    delay = escalation_busy_followup_seconds()
+
+    def _enqueue() -> None:
+        from supportchat.tasks import support_escalation_busy_followup
+
+        support_escalation_busy_followup.apply_async(
+            args=[conversation_id],
+            countdown=delay,
+        )
+
+    transaction.on_commit(_enqueue)
+
+
+@shared_task(bind=True, max_retries=1, default_retry_delay=60)
+def support_escalation_busy_followup(self: Any, conversation_id: int) -> str:
+    """Ask for email when escalated chat was not viewed by staff within the delay."""
+    from django.db import transaction
+
+    from supportchat.gigachat.busy_followup import (
+        build_busy_followup_message,
+        escalation_needs_busy_followup,
+    )
+    from supportchat.gigachat.delivery import deliver_ai_message
+    from supportchat.models import Conversation, Message, MessageDirection, touch_conversation_message
+
+    try:
+        conversation = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return "missing_conversation"
+
+    if not escalation_needs_busy_followup(conversation):
+        return "skip"
+
+    with transaction.atomic():
+        conversation = Conversation.objects.select_for_update().get(pk=conversation_id)
+        if not escalation_needs_busy_followup(conversation):
+            return "skip_race"
+        msg = Message.objects.create(
+            conversation=conversation,
+            direction=MessageDirection.SYSTEM,
+            body=build_busy_followup_message(conversation),
+            raw_payload={"ai": True, "ai_busy_followup": True},
+        )
+        touch_conversation_message(conversation, inbound=False)
+
+    deliver_ai_message(conversation, msg)
+    logger.info(
+        "support_busy_followup_sent conversation_id=%s",
+        conversation_id,
+    )
+    return "sent"

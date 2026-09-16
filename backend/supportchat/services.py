@@ -179,7 +179,25 @@ def add_inbound_message(
         message_id=inbound.pk,
         first_inbound=is_first_inbound,
     )
+    _schedule_ai_reply(conversation.pk, inbound.pk)
     return inbound, auto
+
+
+def _schedule_ai_reply(conversation_id: int, inbound_message_id: int) -> None:
+    """Enqueue GigaChat assistant reply after commit."""
+    from django.db import transaction
+
+    from supportchat.gigachat.policy import ai_assistant_enabled
+
+    if not ai_assistant_enabled():
+        return
+
+    def _enqueue() -> None:
+        from supportchat.tasks import gigachat_reply
+
+        gigachat_reply.delay(conversation_id, inbound_message_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def _schedule_staff_support_push(
@@ -239,6 +257,9 @@ def add_staff_reply(
     if author_user is not None and conversation.assignee_id is None:
         conversation.assignee = author_user  # type: ignore[assignment]
         update_fields.append("assignee")
+    if conversation.ai_active:
+        conversation.ai_active = False
+        update_fields.append("ai_active")
     conversation.save(update_fields=update_fields)
     _schedule_visitor_support_push(conversation.pk)
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
@@ -364,6 +385,13 @@ def message_sender_name(message: Message, *, staff_view: bool = False) -> str:
             return label[:80]
         return "Вы"
     if message.direction == MessageDirection.SYSTEM:
+        from supportchat.gigachat.disclosure import BOT_SENDER_NAME
+
+        payload = message.raw_payload if isinstance(message.raw_payload, dict) else {}
+        if payload.get("ai"):
+            return BOT_SENDER_NAME
+        if payload.get("ai_handoff"):
+            return "Поддержка Hoocon"
         return "Hoocon"
     author_name = staff_public_name(message.author)
     if author_name != "Поддержка":
