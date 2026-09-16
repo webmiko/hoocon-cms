@@ -6,12 +6,14 @@ set -euo pipefail
 # Pinned hoocon-cms ports: backend 8002, frontend 5174
 # (/tmp/hoocon-*.port from start-local-dev.sh, with the same defaults).
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 _dev_pids() {
   local backend_port frontend_port
   backend_port="$(cat /tmp/hoocon-backend.port 2>/dev/null || echo 8002)"
   frontend_port="$(cat /tmp/hoocon-frontend.port 2>/dev/null || echo 5174)"
   # rg exits 1 when nothing matches — do not fail the script under pipefail.
-  ps aux | rg "manage\.py runserver 127\.0\.0\.1:${backend_port}|node .*vite --host 127\.0\.0\.1 --port ${frontend_port}" \
+  ps aux | rg "manage\.py runserver 127\.0\.0\.1:${backend_port}|node .*vite --host 127\.0\.0\.1 --port ${frontend_port}|${ROOT}/backend/.venv/bin/celery -A config worker" \
     | awk '{print $2}' || true
 }
 

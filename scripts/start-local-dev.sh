@@ -73,8 +73,24 @@ else
   echo "Vite proxy → ${BACKEND_ORIGIN}"
 fi
 
+# Celery worker — GigaChat bot, outbound Telegram/MAX, web push, etc.
+if pgrep -f "${ROOT}/backend/.venv/bin/celery -A config worker" >/dev/null 2>&1; then
+  echo "Celery worker already running."
+else
+  if [[ -f "${ROOT}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${ROOT}/.env"
+    set +a
+  fi
+  start_detached "${ROOT}/backend" /tmp/hoocon-celery.log \
+    poetry run celery -A config worker -l info -Q celery
+  echo "Started Celery worker (queue: celery)"
+fi
+
 echo "Logs:"
 echo "  backend  -> /tmp/hoocon-backend.log"
 echo "  frontend -> /tmp/hoocon-frontend.log"
+echo "  celery   -> /tmp/hoocon-celery.log"
 echo "Admin: http://127.0.0.1:${BACKEND_PORT}/admin/"
 echo "Site:  http://127.0.0.1:${FRONTEND_PORT}/"
