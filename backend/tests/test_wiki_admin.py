@@ -140,7 +140,8 @@ def test_seed_wiki_includes_year_stock_dashboard() -> None:
     assert '"total_sold": 29432' in doc.body
     assert 'id="procurement"' in doc.body
     assert '"procurement":' in doc.body
-    assert 'id="forecast"' in doc.body
+    assert 'href="#forecast"' in doc.body
+    assert '"forecast_rows":' in doc.body
     assert '"planning":' in doc.body
     assert "chartSeason" in doc.body
     assert "chartForecast" in doc.body

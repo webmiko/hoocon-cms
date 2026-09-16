@@ -250,6 +250,10 @@ def test_site_settings_admin_blank_token_keeps_existing(django_user_model) -> No
             "max_enabled": "",
             "max_bot_token": "",
             "max_chat_id": "",
+            "gigachat_enabled": "",
+            "gigachat_credentials": "",
+            "gigachat_model": "GigaChat-2",
+            "ai_max_turns": "5",
             "_save": "Save",
         },
     )

@@ -383,8 +383,8 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert page.status_code == 200
     html = page.content.decode()
     assert 'name="reply_body"' in html
-    assert 'placeholder="Напишите ответ…"' in html
-    assert "Shift+Enter" not in html
+    assert 'placeholder="Ответ клиенту…"' in html
+    assert "Shift+Enter" in html
     assert 'id="hoocon-messenger"' in html
     assert "hoocon-messenger__send" in html
     assert "hoocon-messenger__back" in html
@@ -550,6 +550,72 @@ def test_admin_messages_poll_returns_new_inbound() -> None:
     conv.refresh_from_db()
     # Poll is read-only — unread clears only on change_view / mark-read action.
     assert conv.staff_unread_count == 1
+
+
+@pytest.mark.django_db
+def test_admin_poll_returns_ai_system_message() -> None:
+    """Ответы бота (SYSTEM) видны в админском мессенджере через poll."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel, Message, MessageDirection
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-ai-poll",
+        email="support-ai-poll@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-ai",
+        display_name="AI poll",
+        status="open",
+    )
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Привет",
+    )
+    bot = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.SYSTEM,
+        body="Здравствуйте! С вами бот.",
+        raw_payload={"ai": True},
+    )
+
+    client = Client()
+    client.force_login(staff)
+    url = reverse("admin:supportchat_conversation_messages_poll", args=[conv.pk])
+    resp = client.get(url, {"after": inbound.pk})
+    assert resp.status_code == 200
+    payload = resp.json()["messages"]
+    assert len(payload) == 1
+    assert payload[0]["id"] == bot.pk
+    assert payload[0]["direction"] == MessageDirection.SYSTEM
+    assert payload[0]["sender_name"] == "Бот Hoocon"
+
+
+@pytest.mark.django_db
+def test_support_messages_expose_ai_escalated_flag(client) -> None:
+    """Виджет получает флаг ai_escalated после передачи менеджеру."""
+    from django.utils import timezone
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="session-flag",
+        ai_active=False,
+        ai_escalated_at=timezone.now(),
+    )
+    session = client.session
+    session["support_session_id"] = conv.external_user_id
+    session.save()
+
+    resp = client.get("/api/support/conversations/current/messages/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["conversation"]["ai_escalated"] is True
+    assert body["conversation"]["ai_active"] is False
 
 
 @pytest.mark.django_db

@@ -61,6 +61,15 @@ LATIN_UI_ALLOWLIST: frozenset[str] = frozenset(
         "cms",
         "tilda",
         "botfather",
+        "gigachat",
+        "support",
+        "triage",
+        "authorization",
+        "key",
+        "studio",
+        "true",
+        "false",
+        "admin",
     },
 )
 

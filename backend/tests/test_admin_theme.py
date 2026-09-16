@@ -355,7 +355,8 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "body.hoocon-support-inbox" in messenger_css
     assert "hoocon-inbox-avatar--web" in messenger_css
     assert "background: var(--hm-brand" in messenger_css
-    assert "box-shadow: none" in messenger_css.split(".hoocon-messenger__send {")[1].split("}")[0]
+    send_rule = messenger_css.split(".hoocon-messenger__send {\n  appearance")[1].split("}")[0]
+    assert "box-shadow: none" in send_rule
     assert "hoocon-messenger__back" in messenger_css
     assert ".hoocon-messenger__composer textarea::placeholder" in messenger_css
     assert (
