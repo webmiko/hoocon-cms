@@ -1,5 +1,5 @@
-/** Visitor/support chat bubbles: shrink to longest wrapped line, cap at 50% of thread. */
-export const CHAT_BUBBLE_WIDTH_CAP_RATIO = 0.5;
+/** Visitor/support chat bubbles: shrink to longest wrapped line, cap at 80% of thread. */
+export const CHAT_BUBBLE_WIDTH_CAP_RATIO = 0.8;
 
 function measureLongestLineWidthFallback(element: HTMLElement): number {
   const style = getComputedStyle(element);

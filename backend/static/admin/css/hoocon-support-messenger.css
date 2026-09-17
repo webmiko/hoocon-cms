@@ -372,7 +372,7 @@ html.dark .hoocon-messenger {
   flex-direction: column;
   gap: 0.2rem;
   width: fit-content;
-  max-width: 50%;
+  max-width: 80%;
   min-width: 0;
 }
 
@@ -648,7 +648,7 @@ html.dark .hoocon-messenger {
   }
 
   .hoocon-messenger__bubble-wrap {
-    max-width: 50%;
+    max-width: 80%;
   }
 }
 

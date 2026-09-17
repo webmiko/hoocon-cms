@@ -1399,7 +1399,7 @@ html.dark .hoocon-phone-more__sheet,
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__bubble-wrap {
     width: fit-content;
-    max-width: 50%;
+    max-width: 80%;
   }
 
   body.hoocon-phone-ready.hoocon-support-thread
