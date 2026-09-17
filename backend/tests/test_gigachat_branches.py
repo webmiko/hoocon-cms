@@ -16,6 +16,7 @@ from supportchat.gigachat.kb_branches import (
     search_kb_context,
     select_kb_branches,
 )
+from supportchat.gigachat.kb_build import build_catalog_series_nav_branch
 
 
 def _sample_document() -> str:
@@ -66,6 +67,20 @@ def test_search_prefers_da2mu_not_da20() -> None:
     assert "manual.html.da2mu-d-ds" in ids
     assert "manual.html.da20fu-d-ds" not in ids
     assert "policy.bot" in ids
+
+
+def test_catalog_series_nav_branch_for_multi_series_query() -> None:
+    """Запрос DA/SA/HVA/HVD поднимает catalog.series.nav в full mode."""
+    branches = (build_policy_branch(), build_catalog_series_nav_branch())
+    picked = select_kb_branches(
+        branches,
+        query="Нужны приводы DA и SA на 24 и 230 В",
+        max_chars=8000,
+    )
+    ids = [branch.id for branch in picked]
+    assert "catalog.series.nav" in ids
+    nav = next(branch for branch in picked if branch.id == "catalog.series.nav")
+    assert "/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata" in nav.body
 
 
 def test_goto_routes_to_manual_branch() -> None:

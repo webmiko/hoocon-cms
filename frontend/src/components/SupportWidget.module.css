@@ -849,6 +849,46 @@
   border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border));
 }
 
+.chatBranch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  max-width: min(100%, 20rem);
+}
+
+.rowBot .chatBranch,
+.rowIn .chatBranch {
+  margin-left: 0;
+}
+
+.chatBranchChip {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 40%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--color-surface));
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+
+.chatBranchChip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border));
+}
+
+.chatBranchChip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

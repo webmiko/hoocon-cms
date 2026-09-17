@@ -71,6 +71,11 @@ function SupportChatBubble({
 
 const SUPPORT_SURFACE_KEY = "hoocon-support-surface";
 
+type ChatAction = {
+  id: string;
+  label: string;
+};
+
 type ChatMessage = {
   id: number;
   direction: string;
@@ -78,6 +83,7 @@ type ChatMessage = {
   outside_hours: boolean;
   created_at: string;
   sender_name: string;
+  actions?: ChatAction[];
 };
 
 type SupportSurface = "pick" | "web";
@@ -91,6 +97,45 @@ type SupportConversationState = {
   ai_active?: boolean;
   ai_escalated?: boolean;
 };
+
+function ChatBranchActions({
+  actions,
+  disabled,
+  onPick,
+}: {
+  actions: ChatAction[];
+  disabled: boolean;
+  onPick: (action: ChatAction) => void;
+}) {
+  if (!actions.length) return null;
+  return (
+    <div className={styles.chatBranch} role="group" aria-label="Действия в чате">
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          className={styles.chatBranchChip}
+          disabled={disabled}
+          onClick={() => onPick(action)}
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function shouldShowMessageActions(
+  message: ChatMessage,
+  messageIndex: number,
+  messages: ChatMessage[],
+  escalated: boolean,
+): boolean {
+  if (escalated || !message.actions?.length) return false;
+  return !messages
+    .slice(messageIndex + 1)
+    .some((row) => row.direction === "inbound");
+}
 
 function QuickFaqChips({
   items,
@@ -626,15 +671,16 @@ export function SupportWidget() {
     event.currentTarget.form?.requestSubmit();
   }
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    const body = draft.trim();
-    if (!body || busy) return;
+  async function sendChatMessage(
+    body: string,
+    chatAction?: "call_manager" | "continue_bot",
+  ) {
+    if (!body.trim() || busy) return;
     setBusy(true);
     setError("");
     try {
       await ensureStarted();
-      const result = await api.supportSendMessage(body);
+      const result = await api.supportSendMessage(body.trim(), chatAction);
       setStarted(true);
       const next = [result.message];
       if (result.auto_reply) next.push(result.auto_reply);
@@ -646,7 +692,9 @@ export function SupportWidget() {
         }
         return merged;
       });
-      setDraft("");
+      if (!chatAction) {
+        setDraft("");
+      }
       setActiveFaq(null);
       if (result.message.outside_hours) setIsOpenNow(false);
     } catch (err) {
@@ -654,6 +702,21 @@ export function SupportWidget() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    const body = draft.trim();
+    if (!body || busy) return;
+    await sendChatMessage(body);
+  }
+
+  async function onChatAction(action: ChatAction) {
+    const chatAction =
+      action.id === "call_manager" || action.id === "continue_bot"
+        ? action.id
+        : undefined;
+    await sendChatMessage(action.label, chatAction);
   }
 
   async function onSaveContacts(event: FormEvent) {
@@ -815,7 +878,7 @@ export function SupportWidget() {
                 </p>
               </div>
             ) : null}
-            {messages.map((m) => {
+            {messages.map((m, index) => {
                 const fromVisitor = m.direction === "inbound";
                 const isBot = m.direction === "system";
                 const time = formatMessageTime(m.created_at);
@@ -830,6 +893,12 @@ export function SupportWidget() {
                   : isBot
                     ? styles.bubbleBot
                     : styles.bubbleIn;
+                const showActions = shouldShowMessageActions(
+                  m,
+                  index,
+                  messages,
+                  Boolean(conversation?.ai_escalated),
+                );
                 return (
                   <div key={m.id} className={rowClass}>
                     <span className={styles.sender}>{label}</span>
@@ -844,6 +913,13 @@ export function SupportWidget() {
                           })
                         : m.body}
                     </SupportChatBubble>
+                    {showActions ? (
+                      <ChatBranchActions
+                        actions={m.actions ?? []}
+                        disabled={busy}
+                        onPick={(action) => void onChatAction(action)}
+                      />
+                    ) : null}
                     {time ? <time className={styles.time}>{time}</time> : null}
                   </div>
                 );

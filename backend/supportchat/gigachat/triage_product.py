@@ -4,13 +4,24 @@ from __future__ import annotations
 
 import re
 
+from supportchat.gigachat.manuals_kb import extract_voltage_hint
 from supportchat.gigachat.triage import is_product_intent
 from supportchat.models import Conversation, Message, MessageDirection
 
 _CATALOG_DAMPERS = "/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
 _CATALOG_FIRE = "/catalog/elektroprivody-protivopozharnye-i-dymovye"
+_CATALOG_FAST = "/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata"
 _CATALOG_BALL = "/catalog/sharovye-krany"
 _QUIZ_PATH = "/#podbor"
+_RFQ_PATH = "/rfq"
+
+_SERIES_CODE_RE = re.compile(r"(?i)\b(?:da|sa|hva|hvd)\b")
+_SERIES_NAV: tuple[tuple[str, str, str], ...] = (
+    ("da", "DA", "общеобменная вентиляция, без пружинного возврата"),
+    ("sa", "SA", "противопожарные и дымовые клапаны"),
+    ("hva", "HVA", "ускоренные приводы"),
+    ("hvd", "HVD", "воздушные заслонки без пружинного возврата"),
+)
 
 _FORBIDDEN_OUTPUT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"##\s*\[", re.IGNORECASE),
@@ -78,9 +89,56 @@ def _catalog_hint(text: str) -> str:
     return _CATALOG_DAMPERS
 
 
+def mentioned_series_codes(text: str) -> tuple[str, ...]:
+    """Series codes DA/SA/HVA/HVD mentioned in the user message."""
+    found = {match.group(0).casefold() for match in _SERIES_CODE_RE.finditer(text or "")}
+    order = ("da", "sa", "hva", "hvd")
+    return tuple(code for code in order if code in found)
+
+
+def _series_catalog_path(code: str) -> str:
+    if code == "sa":
+        return _CATALOG_FIRE
+    if code == "hva":
+        return _CATALOG_FAST
+    return _CATALOG_DAMPERS
+
+
+def triage_multi_series_catalog_reply(text: str) -> str:
+    """B2B-style request for several series — category links, no SKU picks."""
+    body = (text or "").strip()
+    series = mentioned_series_codes(body)
+    volt = extract_voltage_hint(body)
+    lines = ["Понял запрос по приводам Hoocon."]
+    if volt == "24":
+        lines.append("Напряжение: 24 В (в каталоге — фильтр AC/DC 24 В).")
+    elif volt == "230":
+        lines.append("Напряжение: 230 В (в каталоге — фильтр AC 100…240 В).")
+    else:
+        lines.append("Напряжение: уточните 24 В или 230 В — в артикулах это разные исполнения.")
+    lines.append("Категории по сериям:")
+    for code, title, description in _SERIES_NAV:
+        if code not in series:
+            continue
+        lines.append(f"— {title}: {description} → {_series_catalog_path(code)}")
+    lines.extend(
+        [
+            (
+                "Для коммерческого предложения укажите количество и момент (Н·м) по каждой серии "
+                f"или оформите запрос на {_RFQ_PATH}. Когда будете готовы к подбору — "
+                "напишите «позовите менеджера»."
+            ),
+            f"Квиз на главной: {_QUIZ_PATH}.",
+        ],
+    )
+    return "\n".join(lines)
+
+
 def triage_product_clarification_reply(text: str) -> str:
     """First response to a product/sizing question — questions only, no models."""
     body = (text or "").strip()
+    if mentioned_series_codes(body):
+        return triage_multi_series_catalog_reply(body)
     catalog = _catalog_hint(body)
     area_match = _AREA_RE.search(body)
     lines = [
@@ -105,12 +163,9 @@ def triage_product_clarification_reply(text: str) -> str:
     return "\n".join(lines)
 
 
-def triage_product_followup_handoff(history: list[dict[str, str]]) -> tuple[str, str]:
-    """After clarification — hand off to a human with thread summary."""
-    note = build_product_handoff_note(history)
-    text = (
-        "Спасибо за уточнения! Переключаю чат на менеджера — он подберёт подходящий "
-        "вариант и ответит здесь. Если удобнее самостоятельно: каталог по категориям "
-        f"или квиз {_QUIZ_PATH} на главной."
+def triage_product_followup_reply(_history: list[dict[str, str]]) -> str:
+    """After clarification — bot keeps helping; manager only on explicit request."""
+    return (
+        "Спасибо за уточнения! Зафиксировал детали. Пока могу подсказать раздел каталога "
+        f"или квиз {_QUIZ_PATH}. Когда нужен подбор модели — напишите «позовите менеджера»."
     )
-    return text, note or "Запрос на подбор продукции."

@@ -5,6 +5,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from supportchat.gigachat.chat_actions import (
+    inbound_continue_with_bot,
+    inbound_requests_manager_handoff,
+)
 from supportchat.gigachat.client import GigachatError, chat_completion
 from supportchat.gigachat.policy import resolve_gigachat_model
 from supportchat.gigachat.prompts import build_system_prompt
@@ -14,19 +18,19 @@ from supportchat.gigachat.triage import (
     parse_triage_escalation_note,
     triage_handoff_reply,
     triage_site_nav_reply,
-    wants_manager,
 )
 from supportchat.gigachat.triage_docs import is_document_intent, triage_docs_reply
 from supportchat.gigachat.triage_guard import (
     triage_greeting_reply,
     triage_output_blocked,
-    uncertain_handoff,
+    uncertain_branch_reply,
 )
 from supportchat.gigachat.triage_product import (
+    build_product_handoff_note,
     product_clarification_already_sent,
     thread_has_product_topic,
     triage_product_clarification_reply,
-    triage_product_followup_handoff,
+    triage_product_followup_reply,
 )
 from supportchat.gigachat.triage_scope import triage_out_of_scope_reply
 from supportchat.models import Conversation, Message, MessageDirection
@@ -37,6 +41,11 @@ _ESCALATE_PATTERNS = (
     re.compile(r"\[ESCALATE\]", re.IGNORECASE),
     re.compile(r"\b(менеджер|оператор|живой человек)\b", re.IGNORECASE),
     re.compile(r"\b(цена|стоимость|кп|коммерческое предложение)\b", re.IGNORECASE),
+)
+_CONTINUE_BOT_REPLY = "Хорошо, продолжаем. Задайте вопрос — подскажу раздел сайта, документацию или ссылку на каталог."
+_TURN_LIMIT_TEXT = (
+    "Могу ещё подсказать раздел сайта или документацию. Для подбора привода "
+    "напишите «позовите менеджера», когда будете готовы."
 )
 
 
@@ -51,9 +60,34 @@ class AiReply:
     payload_extra: dict[str, object] = field(default_factory=dict)
 
 
+def turn_limit_reply() -> AiReply:
+    """Bot turn cap — suggest typed manager request, no auto handoff."""
+    return AiReply(text=_TURN_LIMIT_TEXT, escalate=False, escalation_note="")
+
+
 def _strip_escalate_marker(text: str) -> str:
     cleaned = re.sub(r"\s*\[ESCALATE\]\s*", "\n", text, flags=re.IGNORECASE).strip()
     return cleaned
+
+
+def _inbound_payload(inbound_message: Message | None) -> dict[str, object] | None:
+    if inbound_message is None:
+        return None
+    payload = inbound_message.raw_payload
+    return payload if isinstance(payload, dict) else None
+
+
+def _manager_escalation_note(
+    user_query: str,
+    history: list[dict[str, str]],
+    *,
+    inbound_payload: dict[str, object] | None,
+) -> str:
+    if inbound_requests_manager_handoff(user_query, inbound_payload):
+        if thread_has_product_topic(history):
+            return build_product_handoff_note(history) or "Клиент просит менеджера."
+        return "Клиент просит менеджера."
+    return build_product_handoff_note(history) or "Клиент запросил менеджера."
 
 
 def _history_messages(
@@ -101,9 +135,16 @@ def generate_ai_reply(
         if not history or history[-1]["role"] != "user":
             raise GigachatError("Нет входящего сообщения для ответа")
         user_query = history[-1]["content"]
-    if wants_manager(user_query):
-        text, note = triage_handoff_reply(user_query)
+    payload = _inbound_payload(inbound_message)
+
+    if inbound_continue_with_bot(payload):
+        return AiReply(text=_CONTINUE_BOT_REPLY, escalate=False, escalation_note="")
+
+    if inbound_requests_manager_handoff(user_query, payload):
+        text, _default_note = triage_handoff_reply(user_query)
+        note = _manager_escalation_note(user_query, history, inbound_payload=payload)
         return AiReply(text=text, escalate=True, escalation_note=note)
+
     docs_text = triage_docs_reply(user_query)
     if docs_text:
         return AiReply(text=docs_text, escalate=False, escalation_note="")
@@ -119,8 +160,11 @@ def generate_ai_reply(
             and thread_has_product_topic(history)
             and not is_document_intent(user_query)
         ):
-            text, note = triage_product_followup_handoff(history)
-            return AiReply(text=text, escalate=True, escalation_note=note)
+            return AiReply(
+                text=triage_product_followup_reply(history),
+                escalate=False,
+                escalation_note="",
+            )
         if is_product_intent(user_query) and not product_clarification_already_sent(conversation):
             return AiReply(
                 text=triage_product_clarification_reply(user_query),
@@ -131,8 +175,7 @@ def generate_ai_reply(
         greeting_text = triage_greeting_reply(user_query)
         if greeting_text:
             return AiReply(text=greeting_text, escalate=False, escalation_note="")
-        text, note = uncertain_handoff()
-        return AiReply(text=text, escalate=True, escalation_note=note)
+        return AiReply(text=uncertain_branch_reply(), escalate=False, escalation_note="")
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": build_system_prompt(user_query=user_query)},
@@ -144,12 +187,19 @@ def generate_ai_reply(
         docs_fallback = triage_docs_reply(user_query)
         if docs_fallback:
             return AiReply(text=docs_fallback, escalate=False, escalation_note="")
-    escalate = any(pattern.search(raw) for pattern in _ESCALATE_PATTERNS)
+    model_escalate = any(pattern.search(raw) for pattern in _ESCALATE_PATTERNS)
     text = _strip_escalate_marker(raw)
     if is_triage_mode() and triage_output_blocked(text, user_query=user_query):
-        if product_clarification_already_sent(conversation):
-            text, note = triage_product_followup_handoff(history)
-            return AiReply(text=text, escalate=True, escalation_note=note)
+        if (
+            product_clarification_already_sent(conversation)
+            and thread_has_product_topic(history)
+            and not is_document_intent(user_query)
+        ):
+            return AiReply(
+                text=triage_product_followup_reply(history),
+                escalate=False,
+                escalation_note="",
+            )
         if is_product_intent(user_query):
             return AiReply(
                 text=triage_product_clarification_reply(user_query),
@@ -157,11 +207,17 @@ def generate_ai_reply(
                 escalation_note="",
                 product_clarify=True,
             )
-        text, note = uncertain_handoff()
-        return AiReply(text=text, escalate=True, escalation_note=note)
+        return AiReply(text=uncertain_branch_reply(), escalate=False, escalation_note="")
+    if model_escalate and not inbound_requests_manager_handoff(user_query, payload):
+        cleaned = text.strip() or "Могу подключить менеджера для точного ответа."
+        return AiReply(
+            text=f"{cleaned} Напишите «позовите менеджера», когда будете готовы.",
+            escalate=False,
+            escalation_note="",
+        )
     note = ""
-    if escalate:
+    if model_escalate:
         note = parse_triage_escalation_note(text) if is_triage_mode() else ""
         if not note:
             note = "Клиент запросил менеджера или вопрос вне компетенции бота."
-    return AiReply(text=text, escalate=escalate, escalation_note=note)
+    return AiReply(text=text, escalate=model_escalate, escalation_note=note)

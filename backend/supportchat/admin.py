@@ -326,8 +326,12 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             Conversation.objects.select_related("assignee", "client", "lead"),
             pk=object_id,
         )
-        if conversation.staff_unread_count and request.user.has_perm(
-            "supportchat.change_conversation",
+        from supportchat.gigachat.busy_followup import clear_staff_unread_allowed
+
+        if (
+            conversation.staff_unread_count
+            and request.user.has_perm("supportchat.change_conversation")
+            and clear_staff_unread_allowed(conversation)
         ):
             conversation.staff_unread_count = 0
             conversation.save(update_fields=["staff_unread_count", "updated_at"])
@@ -361,8 +365,29 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         request: HttpRequest,
         queryset: QuerySet[Conversation],
     ) -> None:
-        updated = queryset.update(staff_unread_count=0)
-        self.message_user(request, f"Прочитано: {updated}")
+        from django.db.models import Exists, OuterRef, Q
+
+        from supportchat.gigachat.busy_followup import staff_acknowledgement_pending
+        from supportchat.models import Message, MessageDirection
+
+        manager_replied = Message.objects.filter(
+            conversation=OuterRef("pk"),
+            direction=MessageDirection.OUTBOUND,
+            author__isnull=False,
+            created_at__gte=OuterRef("ai_escalated_at"),
+        )
+        eligible = queryset.filter(
+            Q(ai_escalated_at__isnull=True) | Exists(manager_replied),
+        )
+        updated = eligible.update(staff_unread_count=0)
+        skipped = sum(1 for conv in queryset if staff_acknowledgement_pending(conv))
+        if skipped:
+            self.message_user(
+                request,
+                f"Прочитано: {updated}. Ожидают ответа менеджера (не сброшено): {skipped}.",
+            )
+        else:
+            self.message_user(request, f"Прочитано: {updated}")
 
     @admin.action(description="Закрыть диалоги")
     def action_close(

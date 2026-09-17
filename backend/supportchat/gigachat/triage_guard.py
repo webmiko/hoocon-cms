@@ -56,8 +56,10 @@ _GREETING_REPLY = (
     "Чем могу помочь? Могу подсказать раздел сайта, ссылку на документацию по артикулу "
     "или подключить менеджера для подбора привода."
 )
-_UNCERTAIN_HANDOFF_TEXT = "Чтобы ответить точно, подключу менеджера — он ответит здесь. Ожидайте, пожалуйста."
-_UNCERTAIN_HANDOFF_NOTE = "Бот не уверен / вопрос вне сценариев первичного приёма."
+_UNCERTAIN_BRANCH_TEXT = (
+    "По этому вопросу точнее ответит менеджер. Напишите «позовите менеджера», "
+    "когда будете готовы, или переформулируйте запрос — подскажу раздел сайта или документацию."
+)
 
 
 def triage_greeting_reply(text: str) -> str | None:
@@ -77,9 +79,9 @@ def is_greeting_intent(text: str) -> bool:
     return bool(_GREETING_RE.match(body) or _VAGUE_HELP_RE.match(body))
 
 
-def uncertain_handoff() -> tuple[str, str]:
+def uncertain_branch_reply() -> str:
     """Fallback when triage cannot answer without guessing."""
-    return _UNCERTAIN_HANDOFF_TEXT, _UNCERTAIN_HANDOFF_NOTE
+    return _UNCERTAIN_BRANCH_TEXT
 
 
 def _path_allowed(path: str) -> bool:
