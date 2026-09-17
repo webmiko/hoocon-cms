@@ -11,7 +11,7 @@
   font-size: 0.7rem;
   line-height: 1.2;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
   border: 1px solid rgba(30, 30, 40, 0.12);
   white-space: nowrap;
 }
@@ -122,7 +122,7 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
   background: var(--hp-muted);
   border: 1px solid var(--hp-border);
   font-size: 0.75rem;
@@ -202,7 +202,7 @@
   gap: 0.4rem;
   min-height: 2.75rem;
   padding: 0 1.15rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-btn, var(--hoocon-radius));
   background: var(--hp-brand);
   color: #fff;
   font-weight: 700;
@@ -275,7 +275,7 @@
   margin: 0 !important;
   padding: 0.2rem 0.45rem 0.2rem 0.35rem !important;
   border: 1px solid rgba(30, 30, 40, 0.14) !important;
-  border-radius: 999px !important;
+  border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm)) !important;
   background: color-mix(in srgb, #fff 88%, #e8e9ec) !important;
   color: #5a5a5a !important;
   box-shadow: none !important;

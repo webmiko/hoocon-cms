@@ -409,7 +409,7 @@
     margin: 0;
     padding: 0;
     border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
-    border-radius: 999px;
+    border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
     background: var(--hoocon-surface, #fff);
     color: var(--hoocon-quiet, #5a626c);
     cursor: pointer;
@@ -533,7 +533,7 @@
   }
 }
 
-/* ── Bottom tabs (LMS-style floating pill) ─────────────────────────── */
+/* ── Bottom tabs (floating glass bar, unified corner scale) ─────────── */
 .hoocon-phone-tabs {
   position: relative;
   z-index: 1;
@@ -549,7 +549,7 @@
   min-height: var(--hoocon-phone-tabs-h);
   padding: 0.25rem;
   border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.1));
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-lg, var(--hoocon-radius));
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(80px) saturate(1.6);
   -webkit-backdrop-filter: blur(80px) saturate(1.6);
@@ -581,7 +581,7 @@ html.dark .hoocon-phone-tabs,
   min-height: 3rem;
   padding: 0.2rem 0.02rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-sm, var(--hoocon-radius));
   background: transparent;
   color: var(--hoocon-quiet, #5a626c);
   font: inherit;
@@ -802,7 +802,7 @@ html.dark .hoocon-phone-more__sheet,
   min-height: 2.5rem;
   padding: 0.35rem 0.85rem;
   border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
   background: var(--hoocon-surface-muted, #f4f5f6);
   color: var(--hoocon-quiet, #5a626c);
   font-size: 0.8125rem;
@@ -870,7 +870,7 @@ html.dark .hoocon-phone-more__sheet,
     margin: 0 0 0.65rem;
     padding: 0.35rem 0.9rem;
     border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
-    border-radius: 999px;
+    border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
     background: var(--hoocon-surface, #fff);
     color: var(--hoocon-quiet, #5a626c);
     font-size: 0.8125rem;

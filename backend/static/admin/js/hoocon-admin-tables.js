@@ -43,8 +43,25 @@
     }
 
     const textNode = headerCell.querySelector(".text");
-    const raw = (textNode ? textNode.textContent : headerCell.textContent) || "";
-    return raw.replace(/\s+/g, " ").trim();
+    if (textNode) {
+      return (textNode.textContent || "").replace(/\s+/g, " ").trim();
+    }
+
+    /* Unfold tabular: label in first span; skip material-symbols «help» tooltip icon. */
+    const unfoldLabel = headerCell.querySelector(
+      "span.flex-row > span:first-child, span.flex > span:first-child",
+    );
+    if (unfoldLabel) {
+      return (unfoldLabel.textContent || "").replace(/\s+/g, " ").trim();
+    }
+
+    const clone = headerCell.cloneNode(true);
+    clone
+      .querySelectorAll(".material-symbols-outlined, .cursor-help, [title]")
+      .forEach((node) => {
+        node.remove();
+      });
+    return (clone.textContent || "").replace(/\s+/g, " ").trim();
   }
 
   function headerLabels(table) {
@@ -248,11 +265,27 @@
     });
   }
 
+  function processTabularInlineLabels(table) {
+    if (!isUnfoldTabularInline(table)) {
+      return;
+    }
+
+    const labels = headerLabels(table);
+    if (!labels.length) {
+      return;
+    }
+
+    table.querySelectorAll("tbody.form-group > tr.form-row").forEach((row) => {
+      applyRowLabels(row, labels);
+    });
+  }
+
   function processTable(table) {
     /* Unfold tabular inlines use their own phone layout (CSS); card-stack breaks delete rows. */
     if (isUnfoldTabularInline(table)) {
       table.classList.remove(STACKED_CLASS);
       table.classList.remove(CARD_CLASS);
+      processTabularInlineLabels(table);
       return;
     }
 
@@ -278,6 +311,16 @@
   function processAllTables(root) {
     CARD_TABLE_SELECTORS.forEach((selector) => {
       root.querySelectorAll(selector).forEach(processTable);
+    });
+  }
+
+  function observeTabularInlineRows() {
+    document.querySelectorAll("[data-inline-type='tabular'] table.formset").forEach((table) => {
+      processTabularInlineLabels(table);
+      const observer = new MutationObserver(() => {
+        processTabularInlineLabels(table);
+      });
+      observer.observe(table, { childList: true, subtree: true });
     });
   }
 
@@ -401,6 +444,7 @@
 
   function init() {
     processAllTables(document);
+    observeTabularInlineRows();
     observeInlineRows();
     collapseIdleFilters();
     enhanceSidebarActionTitles();

@@ -87,7 +87,7 @@ def test_opening_lead_marks_seen_and_drops_sticker_count() -> None:
 
 @pytest.mark.django_db
 def test_lead_changelist_has_open_button_and_new_badge() -> None:
-    """Changelist renders status tag and Открыть button; new leads first."""
+    """Changelist renders status tag and Открыть button; newest leads first."""
     older_new = Lead.objects.create(
         name="Older New",
         email="older@example.com",
@@ -125,12 +125,12 @@ def test_lead_changelist_has_open_button_and_new_badge() -> None:
     assert "Стена" in html
     assert "Канбан" in html
     assert "view=kanban" in html
-    # New leads before in_progress; among new — newer first.
+    # Default changelist order: newest first (-created_at, -pk).
     pos_newer = html.find("Newer New")
     pos_older = html.find("Older New")
     pos_prog = html.find("In Progress")
     assert pos_newer != -1 and pos_older != -1 and pos_prog != -1
-    assert pos_newer < pos_older < pos_prog
+    assert pos_newer < pos_prog < pos_older
     assert older_new.pk and newer_new.pk and in_progress.pk
 
     kanban = client.get("/admin/leads/lead/?view=kanban")

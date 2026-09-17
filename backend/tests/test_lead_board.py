@@ -301,6 +301,39 @@ def test_lead_changelist_renders_header_hamburger_markup() -> None:
 
 
 @pytest.mark.django_db
+def test_lead_changelist_default_orders_newest_first() -> None:
+    """Default board sort is created_at descending (newest lead on top)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    older = Lead.objects.create(
+        name="Старая",
+        email="older-sort@example.com",
+        message="old",
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.filter(pk=older.pk).update(
+        created_at=timezone.now() - timedelta(days=2),
+    )
+    Lead.objects.create(
+        name="Новая",
+        email="newer-sort@example.com",
+        message="new",
+        status=Lead.LeadStatus.DONE,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-date-sort",
+        email="lead-date-sort@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/leads/lead/?view=wall").content.decode()
+    assert html.index("newer-sort@example.com") < html.index("older-sort@example.com")
+
+
+@pytest.mark.django_db
 def test_lead_changelist_sort_controls_and_name_order() -> None:
     """Changelist exposes А→Я / Я→А sort; ``?o=`` orders rows on the server."""
     Lead.objects.create(

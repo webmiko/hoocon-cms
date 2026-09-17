@@ -286,7 +286,9 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     assert "position: fixed" not in tabs_rule
     assert "width: 100%" in tabs_rule
     assert "max-width: 100%" in tabs_rule
-    assert "border-radius: 999px" in tabs_rule
+    assert "border-radius: var(--hoocon-radius-lg" in tabs_rule
+    tab_rule = phone_css.split(".hoocon-phone-tab {")[1].split("}")[0]
+    assert "border-radius: var(--hoocon-radius-sm" in tab_rule
     assert "background: rgba(255, 255, 255, 0.72)" in tabs_rule
     assert "blur(80px)" in tabs_rule
     assert "hoocon-phone-tab__icon" in phone_css
@@ -452,6 +454,9 @@ def test_changelist_filter_sheet_has_back_to_close() -> None:
     assert 'x-on:click="filterOpen = false"' in template
     assert "2xl:hidden" in template
     assert "Назад" in template
+    assert 'id="changelist-filter"' in template
+    assert "z-[1000]" in template
+    assert " z-60 " not in template
 
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
     filter_back_block = css.split("/* Changelist filter sheet — iOS back row to close")[1].split(
@@ -460,6 +465,18 @@ def test_changelist_filter_sheet_has_back_to_close() -> None:
     assert "@media (max-width: 1535px)" in filter_back_block
     assert ".hoocon-changelist-filter-back" in filter_back_block
     assert "color: var(--os27-accent, var(--hoocon-primary))" in filter_back_block
+
+
+def test_changelist_filter_sheet_stacks_above_modal_overlay() -> None:
+    """Filter sheet must sit above Unfold #modal-overlay (z-60) when filterModalOpen."""
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    filter_sheet_rule = (
+        css.split("@media (max-width: 1535px) {")[1]
+        .split("#changelist .changelist-form-container > #changelist-filter")[1]
+        .split("}")[0]
+    )
+    assert "z-index: 1000 !important" in filter_sheet_rule
+    assert "z-index: 60 !important" not in filter_sheet_rule
 
 
 def test_os27_css_covers_settings_layout() -> None:
@@ -600,6 +617,8 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "background: transparent !important" in search_chip_block
     assert "#changelist-search kbd" in search_chip_block
     assert ".select2-selection--single" in input_glass_block
+    assert "#content-main form .form-row select," in input_glass_block
+    assert "#content-main form .form-row select:focus," in input_glass_block
     assert "@supports not ((backdrop-filter: blur(1px))" in input_glass_block
     submit_row_buttons = css.split("/* Change-form submit row — compact labels")[1].split("/* OS27 glass search chip")[
         0
@@ -648,7 +667,12 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "tbody.form-group > tr.hidden" in css
     assert "--hoocon-radius-sm:" in css
     assert "--hoocon-radius-lg:" in css
+    assert "--hoocon-radius-btn:" in css
+    assert "--hoocon-radius-btn-sm:" in css
     assert "--border-radius: var(--hoocon-radius)" in css
+    assert "Admin buttons — corners match cards/windows" in css
+    assert "border-radius: var(--hoocon-radius-btn);" in css
+    assert "border-radius: var(--hoocon-radius-btn-sm);" in css
     assert ".rounded-default" in css
     assert "--hoocon-card-pad:" in css
     assert "--hoocon-kpi-strip-h:" in css
@@ -731,7 +755,21 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(encoding="utf-8")
     assert "table.hoocon-lead-stats__table" in js
     assert "isUnfoldTabularInline" in js
+    assert "processTabularInlineLabels" in js
+    assert "observeTabularInlineRows" in js
+    assert "material-symbols «help» tooltip icon" in js
+    assert "span.flex-row > span:first-child" in js
     assert "[data-inline-type='tabular'] table.formset" not in js.split("CARD_TABLE_SELECTORS")[1].split("];")[0]
+    tabular_phone_block = css.split("/* Unfold tabular inlines on phones")[1].split(
+        "@keyframes hoocon-lead-sticker-pulse"
+    )[0]
+    assert "content: attr(data-label)" in tabular_phone_block
+    assert "> td::before" in tabular_phone_block
+    assert "grid-template-columns: minmax(5.5rem, 34%)" in tabular_phone_block
+    assert "tbody.form-group.empty-form" in tabular_phone_block
+    assert "tbody.form-group.template" in tabular_phone_block
+    assert "tbody.form-group:not(.empty-form)" in tabular_phone_block
+    assert "> td\n    .select2-container" in tabular_phone_block
     assert 'table.closest("#changelist")' in js
     assert "hoocon-lead-kanban__cards" in js
     assert "hoocon-phone-filter-chips" in js
