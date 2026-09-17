@@ -142,7 +142,7 @@ def test_lead_view_reply_button_prefills_recipient_and_body() -> None:
     response = client.get(reverse("admin:leads_lead_change", args=[lead.pk]))
     assert response.status_code == 200
     html = response.content.decode()
-    assert "Ответить в Яндекс.Почте" in html
+    assert "Ответить по почте" in html
     assert 'data-mailto-url="mailto:client@example.com' in html
     assert "mailto=mailto%3Aclient%40example.com" in html
     assert "Просьба%20прислать%20%D0%9A%D0%9F" in html or "body=" in html
