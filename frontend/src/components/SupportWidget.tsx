@@ -1,16 +1,17 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import { useFocusTrap } from "../hooks/useFocusTrap";
-import { Link } from "react-router-dom";
-
 import { api } from "../api/client";
+import { faqAnswerNodes } from "../utils/faqAnswer";
 import {
   closeSupportChat,
   getSupportChatState,
@@ -30,9 +31,43 @@ import {
   subscribeWebPushStatusRu,
   syncExistingWebPush,
 } from "../utils/webPush";
+import { fitChatBubbleWidth } from "../utils/fitChatBubbleWidth";
 import { MaxLogo } from "./icons/MaxLogo";
 import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
 import styles from "./SupportWidget.module.css";
+
+function SupportChatBubble({
+  className,
+  messagesRef,
+  children,
+}: {
+  className: string;
+  messagesRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    const messages = messagesRef.current;
+    if (!bubble || !messages) return;
+
+    const apply = () => {
+      fitChatBubbleWidth(bubble, messages);
+    };
+
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(messages);
+    return () => observer.disconnect();
+  }, [children, messagesRef]);
+
+  return (
+    <div ref={bubbleRef} className={className}>
+      {children}
+    </div>
+  );
+}
 
 const SUPPORT_SURFACE_KEY = "hoocon-support-surface";
 
@@ -56,66 +91,6 @@ type SupportConversationState = {
   ai_active?: boolean;
   ai_escalated?: boolean;
 };
-
-const FAQ_PATH_LABELS: Record<string, string> = {
-  "/consultation": "консультация",
-  "/gde-kupit": "где купить",
-  "/kontakty": "контакты",
-  "/dokumentaciya": "документация",
-  "/catalog": "каталог",
-  "/faq": "вопросы и ответы",
-  "/zavod": "OEM · завод",
-  "/company": "о компании",
-  "/rfq": "запрос цены",
-};
-
-const FAQ_PATH_RE =
-  /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:\?[^\s]+)?(?:#[a-z0-9-]+)?/gi;
-
-function faqLinkLabel(href: string): string {
-  const [path, query = ""] = href.split(/[?#]/, 2);
-  if (path === "/dokumentaciya" && query) {
-    const sku = new URLSearchParams(query).get("q");
-    if (sku) {
-      return `документация: ${sku}`;
-    }
-  }
-  return FAQ_PATH_LABELS[path] ?? href;
-}
-
-function faqAnswerNodes(text: string, onNavigate?: () => void): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let last = 0;
-  let match: RegExpExecArray | null;
-  const re = new RegExp(FAQ_PATH_RE.source, "gi");
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > last) {
-      nodes.push(text.slice(last, match.index));
-    }
-    const raw = match[0];
-    const trailing = raw.match(/[.,;:!?)\]»"']+$/);
-    const href = trailing ? raw.slice(0, -trailing[0].length) : raw;
-    const suffix = trailing ? trailing[0] : "";
-    nodes.push(
-      <Link
-        key={`faq-link-${match.index}`}
-        to={href}
-        className={styles.faqLink}
-        onClick={onNavigate}
-      >
-        {faqLinkLabel(href)}
-      </Link>,
-    );
-    if (suffix) {
-      nodes.push(suffix);
-    }
-    last = match.index + raw.length;
-  }
-  if (last < text.length) {
-    nodes.push(text.slice(last));
-  }
-  return nodes;
-}
 
 function QuickFaqChips({
   items,
@@ -239,20 +214,6 @@ function CloseIcon({ className }: { className?: string }) {
         strokeWidth="2"
         strokeLinecap="round"
         d="M7 7l10 10M17 7 7 17"
-      />
-    </svg>
-  );
-}
-
-function SendIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d={
-          "M3.4 11.2 19.1 3.7a1 1 0 0 1 1.4 1.1l-2.9 14.6a1 1 0 0 1-1.6.6l-4.7-3.5-2.4 " +
-          "2.3a.75.75 0 0 1-1.3-.5v-3.7l11-8.4-13.2 5.9Z"
-        }
       />
     </svg>
   );
@@ -872,11 +833,17 @@ export function SupportWidget() {
                 return (
                   <div key={m.id} className={rowClass}>
                     <span className={styles.sender}>{label}</span>
-                    <div className={bubbleClass}>
+                    <SupportChatBubble
+                      className={bubbleClass}
+                      messagesRef={listRef}
+                    >
                       {isBot
-                        ? faqAnswerNodes(m.body, () => closeSupportChat())
+                        ? faqAnswerNodes(m.body, {
+                            className: styles.faqLink,
+                            onNavigate: () => closeSupportChat(),
+                          })
                         : m.body}
-                    </div>
+                    </SupportChatBubble>
                     {time ? <time className={styles.time}>{time}</time> : null}
                   </div>
                 );
@@ -885,13 +852,24 @@ export function SupportWidget() {
               <>
                 <div className={styles.rowOut}>
                   <span className={styles.sender}>Вы</span>
-                  <div className={styles.bubbleOut}>{activeFaq.question}</div>
+                  <SupportChatBubble
+                    className={styles.bubbleOut}
+                    messagesRef={listRef}
+                  >
+                    {activeFaq.question}
+                  </SupportChatBubble>
                 </div>
                 <div className={styles.rowIn}>
                   <span className={styles.sender}>Поддержка</span>
-                  <div className={styles.bubbleIn}>
-                    {faqAnswerNodes(activeFaq.answer, () => closeSupportChat())}
-                  </div>
+                  <SupportChatBubble
+                    className={styles.bubbleIn}
+                    messagesRef={listRef}
+                  >
+                    {faqAnswerNodes(activeFaq.answer, {
+                      className: styles.faqLink,
+                      onNavigate: () => closeSupportChat(),
+                    })}
+                  </SupportChatBubble>
                 </div>
               </>
             ) : null}
@@ -991,9 +969,8 @@ export function SupportWidget() {
                 type="submit"
                 className={styles.send}
                 disabled={busy || !draft.trim()}
-                aria-label="Отправить"
               >
-                <SendIcon className={styles.sendIcon} />
+                <span className={styles.sendLabel}>Отправить</span>
               </button>
             </div>
             <p className={styles.composerHint} id={`${titleId}-composer-hint`}>

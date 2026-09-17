@@ -451,10 +451,18 @@ class SupportScheduleAdmin(ModelAdmin):
 class FaqItemAdmin(ModelAdmin):
     """Вопросы-ответы для быстрых кнопок виджета чата на сайте."""
 
-    list_display = ("question", "order", "answer", "is_active", "show_in_chat")
+    list_display = (
+        "question",
+        "question_short",
+        "order",
+        "answer",
+        "is_active",
+        "show_in_chat",
+        "show_on_home",
+    )
     list_display_links = ("question",)
-    list_editable = ("order", "answer", "is_active", "show_in_chat")
-    list_filter = ("is_active", "show_in_chat")
+    list_editable = ("order", "answer", "is_active", "show_in_chat", "show_on_home")
+    list_filter = ("is_active", "show_in_chat", "show_on_home")
     search_fields = ("question", "answer")
     ordering = ("order", "id")
     fieldsets = (
@@ -463,10 +471,12 @@ class FaqItemAdmin(ModelAdmin):
             {
                 "fields": (
                     "question",
+                    "question_short",
                     "answer",
                     "order",
                     "is_active",
                     "show_in_chat",
+                    "show_on_home",
                 ),
             },
         ),

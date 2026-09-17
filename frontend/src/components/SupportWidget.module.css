@@ -550,31 +550,24 @@
 }
 
 .rowIn,
-.rowOut {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  width: fit-content;
-  max-width: 50%;
-  min-width: 0;
-}
-
-.rowIn {
-  align-items: flex-start;
-}
-
-.rowOut {
-  align-items: flex-end;
-}
-
+.rowOut,
 .rowBot {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  width: fit-content;
-  max-width: 50%;
   min-width: 0;
+  max-width: 100%;
+}
+
+.rowIn,
+.rowBot {
+  align-self: flex-start;
   align-items: flex-start;
+}
+
+.rowOut {
+  align-self: flex-end;
+  align-items: flex-end;
 }
 
 .sender {
@@ -590,7 +583,7 @@
 .bubbleIn,
 .bubbleOut,
 .bubbleBot {
-  padding: 0.4rem;
+  padding: 1rem;
   font-size: var(--font-size-sm);
   line-height: 1.45;
   text-align: left;
@@ -598,8 +591,8 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   box-sizing: border-box;
-  width: fit-content;
-  max-width: 100%;
+  width: auto;
+  min-width: 0;
   border-radius: 1.125rem;
 }
 
@@ -628,8 +621,16 @@
 .bubbleOut {
   background: var(--color-brand);
   color: var(--color-on-brand);
+  border: none;
   border-bottom-right-radius: 0.25rem;
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-brand) 22%, transparent);
+  box-shadow: none;
+}
+
+:global(html[data-theme="dark"]) .bubbleOut {
+  background: #d2d2d8;
+  color: #121214;
+  border: none;
+  box-shadow: none;
 }
 
 .time {
@@ -939,42 +940,43 @@
 
 .composerField .send {
   flex-shrink: 0;
-  width: auto;
-  min-width: 2.6rem;
   min-height: 2.6rem;
-  height: auto;
-  padding: 0 0.85rem;
+  padding: 0 1rem;
   border-radius: calc(var(--composer-radius) - var(--composer-inset));
 }
 
 .send {
   appearance: none;
   border: none;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
   background: var(--color-brand);
   color: var(--color-on-brand);
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
+  box-shadow: none;
   transition:
     background 160ms var(--ease-out),
-    opacity 160ms var(--ease-out),
-    transform 160ms var(--ease-out);
+    opacity 160ms var(--ease-out);
+}
+
+.sendLabel {
+  white-space: nowrap;
 }
 
 .send:hover:not(:disabled) {
   background: var(--color-brand-hover);
-  transform: scale(0.98);
 }
 
 .send:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.sendIcon {
-  width: 1.05rem;
-  height: 1.05rem;
-  margin-left: 1px;
 }
 
 .error {
@@ -1073,11 +1075,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .rowIn,
-  .rowOut,
-  .rowBot {
-    max-width: 50%;
-  }
 }
 
 @keyframes support-in-full {

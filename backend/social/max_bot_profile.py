@@ -7,10 +7,10 @@ from typing import Any
 
 from django.conf import settings
 
+from social.copy import hours_and_phone_line
 from social.max_bot import BOT_COMMANDS, max_bot_username, max_channel_deep_link
 from social.max_channel import channel_cover_path
 from social.max_http import max_json_request, max_upload_image
-from social.telegram_bot import _HOURS, _PHONE
 
 _BOT_DISPLAY_NAME = "Hoocon"
 
@@ -31,7 +31,7 @@ def bot_description() -> str:
         f"Команда /start — меню с кнопками.\n"
         f"Канал новостей: {max_channel_deep_link()}\n"
         f"Бот: @{bot} · hoocon.ru\n"
-        f"Режим ответа: {_HOURS} · {_PHONE}"
+        f"Режим ответа: {hours_and_phone_line()}"
     )
     return text[:16000]
 

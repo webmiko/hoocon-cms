@@ -528,23 +528,10 @@ def get_or_create_messenger_conversation(
     return conv
 
 
-CHAT_FAQ_LIMIT = 10
-
-
-def chat_faq_items(*, limit: int = CHAT_FAQ_LIMIT) -> list[dict[str, str | int]]:
+def chat_faq_items(*, limit: int | None = None) -> list[dict[str, str | int]]:
     """Активные FAQ с флагом быстрой кнопки для виджета на сайте."""
-    from supportchat.models import FaqItem
+    from supportchat.faq import CHAT_FAQ_LIMIT
+    from supportchat.faq import chat_faq_items as _chat_faq_items
 
-    qs = (
-        FaqItem.objects.filter(is_active=True, show_in_chat=True)
-        .order_by("order", "id")
-        .values("id", "question", "answer")[: max(1, limit)]
-    )
-    return [
-        {
-            "id": int(row["id"]),
-            "question": str(row["question"]),
-            "answer": str(row["answer"]),
-        }
-        for row in qs
-    ]
+    resolved_limit = CHAT_FAQ_LIMIT if limit is None else limit
+    return _chat_faq_items(limit=resolved_limit)

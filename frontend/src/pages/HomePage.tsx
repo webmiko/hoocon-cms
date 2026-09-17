@@ -6,6 +6,7 @@ import { HomeSkeleton } from "../components/HomeSkeleton";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
+import { faqAnswerNodes } from "../utils/faqAnswer";
 import { buildHomeJsonLd } from "../utils/jsonLd";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./HomePage.module.css";
@@ -472,7 +473,12 @@ function HomeDeliverySection() {
   );
 }
 
-function HomeFaqSection() {
+type HomeFaqItem = { id: number; question: string; answer: string };
+
+function HomeFaqSection({ items }: { items: HomeFaqItem[] }) {
+  if (!items.length) {
+    return null;
+  }
   return (
     <section className={styles.section} aria-labelledby="faq-heading">
       <div className={styles.sectionHead}>
@@ -483,39 +489,12 @@ function HomeFaqSection() {
         </p>
       </div>
       <div className={styles.faqList}>
-        <details className={styles.faqItem}>
-          <summary>Можно ли заменить SA10FU230-DS на DA10FU230-DS?</summary>
-          <p>
-            Нет. SA — для огнезадерживающих клапанов (пружина ≤ 25 с, работа при
-            нагреве). DA — для общеобменной вентиляции. Для огнезадерживающих
-            клапанов используйте серию SA.
-          </p>
-        </details>
-        <details className={styles.faqItem}>
-          <summary>Как оценить нужный крутящий момент?</summary>
-          <p>
-            Учитывайте давление, тип заслонки и среду. Ориентир: M ≈ (D³ × P ×
-            k) / C. Для проекта сверяйте таблицы заслонки и паспорт привода в
-            каталоге.
-          </p>
-        </details>
-        <details className={styles.faqItem}>
-          <summary>Как заказать и получить КП?</summary>
-          <p>
-            Подберите модель в каталоге или опишите задачу —{" "}
-            <Link to="/consultation">заявка на консультацию</Link>. Ответ до 2
-            рабочих часов. Партнёры: <Link to="/gde-kupit">где купить</Link>.
-          </p>
-        </details>
-        <details className={styles.faqItem}>
-          <summary>Как подобрать модель на сайте?</summary>
-          <p>
-            На главной — блок{" "}
-            <a href="#podbor">«Подбор за минуту»</a>: укажите тип продукции и
-            параметры из проекта. Сервис покажет подходящие модели в каталоге
-            или поможет оставить заявку инженеру.
-          </p>
-        </details>
+        {items.map((item) => (
+          <details key={item.id} className={styles.faqItem}>
+            <summary>{item.question}</summary>
+            <p>{faqAnswerNodes(item.answer)}</p>
+          </details>
+        ))}
       </div>
     </section>
   );
@@ -527,6 +506,7 @@ function HomeFaqSection() {
  * Spec: docs/readiness-backend-ux.md §4.3; БЗ маркетинг/UX industrial B2B.
  */
 export function HomePage() {
+  const { data: homeFaq } = useAsync(() => api.supportFaqScope("home"), "home-faq");
   const [heroSlide, setHeroSlide] = useState(0);
   /** Only decode slides once shown — keeps inactive hero WebPs off first paint. */
   const [loadedHeroSlides, setLoadedHeroSlides] = useState<ReadonlySet<number>>(
@@ -580,7 +560,7 @@ export function HomePage() {
         }
         path="/"
         preloadImage={HOME_PROJECTS[0].image}
-        jsonLd={buildHomeJsonLd()}
+        jsonLd={buildHomeJsonLd(homeFaq?.items ?? [])}
       />
 
       <section className={styles.hero} aria-labelledby="hero-brand">
@@ -721,7 +701,7 @@ export function HomePage() {
       </DeferredMount>
 
       <DeferredMount rootMargin={BELOW_FOLD_MARGIN} minHeight={280}>
-        <HomeFaqSection />
+        <HomeFaqSection items={homeFaq?.items ?? []} />
       </DeferredMount>
     </div>
   );

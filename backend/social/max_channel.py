@@ -7,6 +7,7 @@ from typing import Any
 
 from django.conf import settings
 
+from social.copy import clip_text, hours_and_phone_line, site_url
 from social.max_bot import (
     BTN_CATALOG,
     BTN_COMPANY,
@@ -15,13 +16,11 @@ from social.max_bot import (
     BTN_DOCS,
     BTN_FAQ,
     BTN_WHERE,
-    _clip,
     max_bot_deep_link,
     max_bot_username,
 )
 from social.max_http import max_json_request, max_upload_image
 from social.publishers import PublishResult, publish_max
-from social.telegram_bot import _HOURS, _PHONE
 
 _CHANNEL_TITLE = "Hoocon — электроприводы ОВК"
 _WELCOME_STATIC = Path("static/social/telegram-welcome.webp")
@@ -55,14 +54,14 @@ def channel_welcome_text() -> str:
         "электроприводов и арматуры для ОВК.\n\n"
         f"Вопросы и заявки — в боте @{max_bot_username()} "
         f"({max_bot_deep_link('support')}).\n"
-        f"Режим ответа: {_HOURS} · {_PHONE}"
+        f"Режим ответа: {hours_and_phone_line()}"
     )
-    return _clip(text, _MESSAGE_MAX)
+    return clip_text(text, _MESSAGE_MAX)
 
 
 def channel_welcome_keyboard() -> list[dict[str, Any]]:
     """Inline buttons under the channel welcome post."""
-    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+    site = site_url()
 
     def link(text: str, url: str) -> dict[str, str]:
         return {"type": "link", "text": text, "url": url}

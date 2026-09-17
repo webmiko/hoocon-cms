@@ -416,6 +416,20 @@ export const api = {
     return apiFetch("/api/support/faq/");
   },
 
+  supportFaqScope(
+    scope: "chat" | "home" | "seo",
+    path?: string,
+  ): Promise<{
+    scope: string;
+    items: Array<{ id: number; question: string; answer: string }>;
+  }> {
+    const params = new URLSearchParams({ scope });
+    if (path) {
+      params.set("path", path);
+    }
+    return apiFetch(`/api/support/faq/?${params.toString()}`);
+  },
+
   supportStartConversation(data: {
     display_name?: string;
     contact_email?: string;

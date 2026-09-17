@@ -212,7 +212,7 @@ class CurrentMessagesView(APIView):
 
 
 class SupportFaqView(APIView):
-    """GET /api/support/faq/ — FAQ-чипы для виджета (публично, только show_in_chat)."""
+    """GET /api/support/faq/ — FAQ из Admin (публично, scope=chat|home|seo)."""
 
     permission_classes = (AllowAny,)
     authentication_classes: list = []
@@ -220,7 +220,17 @@ class SupportFaqView(APIView):
     throttle_scope = "support_faq"
 
     def get(self, request: Request) -> Response:
-        del request
-        response = Response({"items": chat_faq_items()})
+        from supportchat.faq import home_faq_items, seo_faq_tuples
+
+        scope = (request.query_params.get("scope") or "chat").strip().casefold()
+        if scope == "home":
+            items = home_faq_items()
+        elif scope in {"seo", "all"}:
+            path = (request.query_params.get("path") or "/faq").strip() or "/faq"
+            pairs = seo_faq_tuples(path)
+            items = [{"id": index, "question": q, "answer": a} for index, (q, a) in enumerate(pairs, start=1)]
+        else:
+            items = chat_faq_items()
+        response = Response({"items": items, "scope": scope})
         response["Cache-Control"] = "public, max-age=60"
         return response

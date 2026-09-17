@@ -9,18 +9,8 @@ from typing import Any
 
 from django.conf import settings
 
+from social.copy import clip_text, compose_contacts_plain, hours_and_phone_line, site_page
 from social.publishers import PublishResult, publish_max
-from social.telegram_bot import (
-    _ADDRESS,
-    _BANK,
-    _EMAIL_INFO,
-    _EMAIL_SALES,
-    _HOURS,
-    _INN,
-    _KPP,
-    _OGRN,
-    _PHONE,
-)
 
 logger = logging.getLogger("hoocon.social")
 
@@ -98,23 +88,6 @@ def max_channel_deep_link() -> str:
     return f"https://max.ru/{max_channel_username()}"
 
 
-def _site_url() -> str:
-    return getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-
-
-def _page(path: str) -> str:
-    base = _site_url()
-    if not path.startswith("/"):
-        path = f"/{path}"
-    return f"{base}{path}"
-
-
-def _clip(text: str, limit: int) -> str:
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "…"
-
-
 def _link_button(text: str, url: str) -> dict[str, str]:
     return {"type": "link", "text": text, "url": url}
 
@@ -127,23 +100,23 @@ def main_menu_keyboard() -> list[dict[str, Any]]:
             "payload": {
                 "buttons": [
                     [
-                        _link_button(BTN_CATALOG, _page("/catalog")),
-                        _link_button(BTN_CONSULTATION, _page("/consultation")),
-                        _link_button(BTN_WHERE, _page("/gde-kupit")),
+                        _link_button(BTN_CATALOG, site_page("/catalog")),
+                        _link_button(BTN_CONSULTATION, site_page("/consultation")),
+                        _link_button(BTN_WHERE, site_page("/gde-kupit")),
                     ],
                     [
-                        _link_button(BTN_CONTACTS, _page("/kontakty")),
-                        _link_button(BTN_DOCS, _page("/dokumentaciya")),
-                        _link_button(BTN_FAQ, _page("/faq")),
+                        _link_button(BTN_CONTACTS, site_page("/kontakty")),
+                        _link_button(BTN_DOCS, site_page("/dokumentaciya")),
+                        _link_button(BTN_FAQ, site_page("/faq")),
                     ],
                     [
-                        _link_button(BTN_PRIVACY, _page("/privacy-policy")),
-                        _link_button(BTN_TERMS, _page("/terms")),
-                        _link_button(BTN_OFFER, _page("/oferta")),
+                        _link_button(BTN_PRIVACY, site_page("/privacy-policy")),
+                        _link_button(BTN_TERMS, site_page("/terms")),
+                        _link_button(BTN_OFFER, site_page("/oferta")),
                     ],
                     [
                         _link_button(BTN_CHANNEL, max_channel_deep_link()),
-                        _link_button(BTN_COMPANY, _page("/company")),
+                        _link_button(BTN_COMPANY, site_page("/company")),
                     ],
                 ],
             },
@@ -159,9 +132,9 @@ def compose_welcome_text() -> str:
         "Кнопки ниже — каталог, заявка, документы, контакты и канал MAX.\n"
         "Или напишите вопрос — ответим в рабочие дни.\n\n"
         f"Канал новостей: {max_channel_deep_link()}\n"
-        f"Режим ответа: {_HOURS} · {_PHONE}"
+        f"Режим ответа: {hours_and_phone_line()}"
     )
-    return _clip(text, _MESSAGE_MAX)
+    return clip_text(text, _MESSAGE_MAX)
 
 
 def welcome_cover_path() -> Path | None:
@@ -192,20 +165,7 @@ def _welcome_attachments(token: str | None) -> list[dict[str, Any]]:
 
 def compose_contacts_text() -> str:
     """Contacts + requisites (plain text)."""
-    site = _site_url()
-    text = (
-        "Контакты ООО «Хогон» (бренд Hoocon)\n"
-        "Ответим до 2 рабочих часов в рабочие дни.\n\n"
-        f"Телефон: {_PHONE}\n"
-        f"Продажи: {_EMAIL_SALES}\n"
-        f"Сотрудничество / ПДн: {_EMAIL_INFO}\n"
-        f"Адрес: {_ADDRESS}\n"
-        f"Режим: {_HOURS}\n\n"
-        f"ИНН {_INN}, КПП {_KPP}, ОГРН {_OGRN}\n"
-        f"{_BANK}\n\n"
-        f"Полная страница: {site}/kontakty"
-    )
-    return _clip(text, _MESSAGE_MAX)
+    return compose_contacts_plain(limit=_MESSAGE_MAX)
 
 
 def compose_chatid_reply(user_id: str) -> str:
@@ -223,8 +183,8 @@ def compose_fallback_reply() -> str:
 
 
 def compose_catalog_reply() -> str:
-    return _clip(
-        f"Каталог Hoocon: {_page('/catalog')}\n\n"
+    return clip_text(
+        f"Каталог Hoocon: {site_page('/catalog')}\n\n"
         "Электроприводы DA/SA/HV, клапаны, комплектующие. "
         "Подбор по серии и аналогам Belimo — на сайте или вопросом боту.",
         _MESSAGE_MAX,
@@ -232,23 +192,23 @@ def compose_catalog_reply() -> str:
 
 
 def compose_consultation_reply() -> str:
-    return _clip(
-        f"Заявка и коммерческое предложение: {_page('/consultation')}\n\n"
+    return clip_text(
+        f"Заявка и коммерческое предложение: {site_page('/consultation')}\n\n"
         "Опишите задачу текстом — менеджер ответит в рабочие дни.",
         _MESSAGE_MAX,
     )
 
 
 def compose_where_reply() -> str:
-    return _clip(
-        f"Где купить Hoocon в розницу: {_page('/gde-kupit')}\n\n"
+    return clip_text(
+        f"Где купить Hoocon в розницу: {site_page('/gde-kupit')}\n\n"
         "Дилеры и партнёры по регионам — на карте и в списке на сайте.",
         _MESSAGE_MAX,
     )
 
 
 def compose_channel_reply() -> str:
-    return _clip(
+    return clip_text(
         f"Официальный канал Hoocon: {max_channel_deep_link()}\n\nНовости, анонсы каталога и статьи по подбору.",
         _MESSAGE_MAX,
     )
