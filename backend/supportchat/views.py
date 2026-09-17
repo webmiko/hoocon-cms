@@ -195,10 +195,13 @@ class CurrentMessagesView(APIView):
         if conv is None:
             conv = start_or_resume_web_conversation(request._request)
 
+        chat_action = (serializer.validated_data.get("chat_action") or "").strip()
+        raw_payload = {"chat_action": chat_action} if chat_action else None
         try:
             inbound, auto = add_inbound_message(
                 conv,
                 serializer.validated_data["body"],
+                raw_payload=raw_payload,
             )
         except SupportChatError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

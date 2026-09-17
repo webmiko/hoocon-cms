@@ -456,6 +456,7 @@ export const api = {
       outside_hours: boolean;
       created_at: string;
       sender_name: string;
+      actions?: { id: string; label: string }[];
     }>;
     conversation?: {
       id: number;
@@ -471,7 +472,10 @@ export const api = {
     });
   },
 
-  supportSendMessage(body: string): Promise<{
+  supportSendMessage(
+    body: string,
+    chatAction?: "call_manager" | "continue_bot",
+  ): Promise<{
     message: {
       id: number;
       direction: string;
@@ -479,6 +483,7 @@ export const api = {
       outside_hours: boolean;
       created_at: string;
       sender_name: string;
+      actions?: { id: string; label: string }[];
     };
     auto_reply?: {
       id: number;
@@ -487,11 +492,15 @@ export const api = {
       outside_hours: boolean;
       created_at: string;
       sender_name: string;
+      actions?: { id: string; label: string }[];
     };
   }> {
     return apiFetch("/api/support/conversations/current/messages/", {
       method: "POST",
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({
+        body,
+        ...(chatAction ? { chat_action: chatAction } : {}),
+      }),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },

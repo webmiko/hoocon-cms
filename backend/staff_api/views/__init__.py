@@ -448,8 +448,11 @@ class ConversationReadView(StaffAuthMixin, APIView):
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
-            conv.staff_unread_count = 0
-            conv.save(update_fields=["staff_unread_count", "updated_at"])
+            from supportchat.gigachat.busy_followup import clear_staff_unread_allowed
+
+            if clear_staff_unread_allowed(conv):
+                conv.staff_unread_count = 0
+                conv.save(update_fields=["staff_unread_count", "updated_at"])
         return Response(serialize_conversation(conv))
 
 

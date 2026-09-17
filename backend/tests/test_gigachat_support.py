@@ -63,8 +63,8 @@ def test_ai_skipped_when_disabled(settings) -> None:
 
 
 @pytest.mark.django_db
-def test_ai_escalation_after_max_turns(gigachat_on) -> None:
-    """Лимит ходов ассистента → эскалация менеджеру."""
+def test_ai_turn_limit_suggests_typed_manager_request(gigachat_on) -> None:
+    """Лимит ходов ассистента → текст с просьбой написать, без автоэскалации."""
     conv = Conversation.objects.create(
         channel=Channel.WEB,
         external_user_id="sess-3",
@@ -73,16 +73,16 @@ def test_ai_escalation_after_max_turns(gigachat_on) -> None:
     inbound, _ = add_inbound_message(conv, "Ещё вопрос")
 
     result = gigachat_reply(conv.pk, inbound.pk)
-    assert result.startswith("escalated:turn_limit")
+    assert result == "ok"
     conv.refresh_from_db()
-    assert conv.ai_escalated_at is not None
-    assert conv.ai_active is False
-    handoff = Message.objects.filter(
+    assert conv.ai_escalated_at is None
+    hint = Message.objects.filter(
         conversation=conv,
         direction=MessageDirection.SYSTEM,
-        raw_payload__ai_handoff=True,
+        raw_payload__ai=True,
     ).first()
-    assert handoff is not None
+    assert hint is not None
+    assert "позовите менеджера" in hint.body.lower()
 
 
 @pytest.mark.django_db

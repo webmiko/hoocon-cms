@@ -217,17 +217,19 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
         return "not_eligible"
 
     if conversation.ai_turn_count >= ai_max_turns():
-        return _escalate_conversation(conversation, reason="turn_limit")
+        from supportchat.gigachat.reply import turn_limit_reply
 
-    try:
-        ai = generate_ai_reply(conversation, inbound_message=inbound)
-    except GigachatError as exc:
-        logger.warning(
-            "gigachat_reply_failed conversation_id=%s err=%s",
-            conversation_id,
-            str(exc)[:200],
-        )
-        raise self.retry(exc=exc)
+        ai = turn_limit_reply()
+    else:
+        try:
+            ai = generate_ai_reply(conversation, inbound_message=inbound)
+        except GigachatError as exc:
+            logger.warning(
+                "gigachat_reply_failed conversation_id=%s err=%s",
+                conversation_id,
+                str(exc)[:200],
+            )
+            raise self.retry(exc=exc)
 
     with transaction.atomic():
         conversation = Conversation.objects.select_for_update().get(pk=conversation_id)
@@ -318,7 +320,7 @@ def _escalate_conversation(
 
 
 def _schedule_escalation_busy_followup(conversation_id: int) -> None:
-    """Enqueue busy follow-up if managers do not open the chat in time."""
+    """Enqueue busy follow-up if managers do not reply in time."""
     from django.db import transaction
 
     from supportchat.gigachat.busy_followup import escalation_busy_followup_seconds
@@ -338,7 +340,7 @@ def _schedule_escalation_busy_followup(conversation_id: int) -> None:
 
 @shared_task(bind=True, max_retries=1, default_retry_delay=60)
 def support_escalation_busy_followup(self: Any, conversation_id: int) -> str:
-    """Ask for email when escalated chat was not viewed by staff within the delay."""
+    """Ask for email when escalated chat has no manager reply within the delay."""
     from django.db import transaction
 
     from supportchat.gigachat.busy_followup import (

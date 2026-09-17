@@ -4,7 +4,7 @@ from __future__ import annotations
 
 BOT_SENDER_NAME = "Бот Hoocon"
 
-_BOT_DISCLOSURE_PREFIX = "Здравствуйте! С вами на связи автоматический помощник Hoocon (не живой менеджер). "
+_BOT_DISCLOSURE_PREFIX = "Здравствуйте! С вами на связи автоматический помощник Hoocon. "
 
 
 def apply_bot_disclosure(text: str, *, first_turn: bool) -> str:

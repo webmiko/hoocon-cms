@@ -201,8 +201,8 @@ def test_triage_privet_after_outside_hours_auto_reply(gigachat_on) -> None:
 
 
 @pytest.mark.django_db
-def test_triage_task_escalates_after_clarification(gigachat_on) -> None:
-    """Celery: после уточнения бот эскалирует со сводкой для менеджера."""
+def test_triage_task_continues_after_clarification_without_escalation(gigachat_on) -> None:
+    """Celery: после уточнения бот отвечает текстом, без автоэскалации и без кнопок."""
     conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="triage-3")
     first, _ = add_inbound_message(conv, "Подберите привод на заслонку 1 кв.м")
     assert gigachat_reply(conv.pk, first.pk) == "ok"
@@ -212,10 +212,22 @@ def test_triage_task_escalates_after_clarification(gigachat_on) -> None:
         result = gigachat_reply(conv.pk, second.pk)
         api.assert_not_called()
 
-    assert result.startswith("escalated:")
+    assert result == "ok"
     conv.refresh_from_db()
-    assert conv.ai_escalated_at is not None
-    assert conv.ai_active is False
+    assert conv.ai_escalated_at is None
+    followup = (
+        Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.SYSTEM,
+            raw_payload__ai=True,
+        )
+        .order_by("-id")
+        .first()
+    )
+    assert followup is not None
+    assert "позовите менеджера" in followup.body.lower()
+    payload = followup.raw_payload if isinstance(followup.raw_payload, dict) else {}
+    assert not payload.get("chat_actions")
 
 
 @pytest.mark.django_db

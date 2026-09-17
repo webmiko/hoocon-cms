@@ -12,7 +12,7 @@ from supportchat.gigachat.triage_guard import (
     response_has_disallowed_site_paths,
     response_misroutes_docs_to_catalog,
     triage_output_blocked,
-    uncertain_handoff,
+    uncertain_branch_reply,
 )
 from supportchat.gigachat.triage_scope import triage_out_of_scope_reply
 from supportchat.models import Channel, Conversation, Message, MessageDirection
@@ -55,8 +55,8 @@ def test_uncertain_model_phrase_blocked() -> None:
 
 
 @pytest.mark.django_db
-def test_unclear_question_escalates_without_api(settings) -> None:
-    """Вне сценариев → менеджер без вызова GigaChat."""
+def test_unclear_question_offers_manager_branch_without_api(settings) -> None:
+    """Вне сценариев → кнопки ветвления, без автоэскалации."""
     settings.GIGACHAT_MODE = "triage"
     settings.GIGACHAT_CREDENTIALS = "test-key"
     conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="guard-1")
@@ -70,9 +70,9 @@ def test_unclear_question_escalates_without_api(settings) -> None:
         reply = generate_ai_reply(conv)
         api.assert_not_called()
 
-    assert reply.escalate is True
-    text, _note = uncertain_handoff()
-    assert reply.text == text
+    assert reply.escalate is False
+    assert reply.text == uncertain_branch_reply()
+    assert not reply.payload_extra.get("chat_actions")
 
 
 @pytest.mark.django_db

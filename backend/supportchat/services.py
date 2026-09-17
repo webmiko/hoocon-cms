@@ -180,6 +180,12 @@ def add_inbound_message(
         first_inbound=is_first_inbound,
     )
     _schedule_ai_reply(conversation.pk, inbound.pk)
+    from supportchat.gigachat.busy_followup import staff_acknowledgement_pending
+
+    if staff_acknowledgement_pending(conversation):
+        from supportchat.tasks import _schedule_escalation_busy_followup
+
+        _schedule_escalation_busy_followup(conversation.pk)
     return inbound, auto
 
 
