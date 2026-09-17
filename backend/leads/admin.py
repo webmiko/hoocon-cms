@@ -242,8 +242,6 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         """One-screen contact + positions for sales managers."""
         if not obj.pk:
             return "—"
-        from urllib.parse import quote
-
         from django.conf import settings
         from django.utils.safestring import mark_safe
 
@@ -262,12 +260,14 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 format_html('<a href="tel:{}">{}</a>', phone, phone),
             )
         if email:
-            subject = quote(f"КП #{obj.pk} — {company}")
+            from crm.mail_links import build_yandex_compose_url
+
+            subject = f"КП #{obj.pk} — {company}"
+            compose_url = build_yandex_compose_url(to=email, subject=subject)
             contact_bits.append(
                 format_html(
-                    '<a href="mailto:{}?subject={}">{}</a>',
-                    email,
-                    subject,
+                    '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>',
+                    compose_url,
                     email,
                 ),
             )
@@ -431,10 +431,15 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             if obj is not None:
                 change_url = reverse("admin:leads_lead_change", args=[obj.pk])
                 if obj.email:
-                    from urllib.parse import quote
+                    from crm.mail_links import build_lead_reply_email_url
 
                     company = (obj.company or "").strip() or "клиент"
-                    extra["lead_mailto"] = f"mailto:{obj.email}?subject={quote(f'КП #{obj.pk} — {company}')}"
+                    manager_email = (getattr(request.user, "email", "") or "").strip()
+                    extra["lead_reply_email_url"] = build_lead_reply_email_url(
+                        lead_email=obj.email,
+                        subject=f"КП #{obj.pk} — {company}",
+                        manager_email=manager_email,
+                    )
                 if edit_mode:
                     extra["lead_view_url"] = change_url
                     # Keep edit=1 on the form action URL for POST.

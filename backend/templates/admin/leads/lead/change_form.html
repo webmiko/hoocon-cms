@@ -18,12 +18,14 @@
       >
         Вернуться к списку
       </a>
-      {% if lead_mailto %}
+      {% if lead_reply_email_url %}
         <a
-          href="{{ lead_mailto }}"
+          href="{{ lead_reply_email_url }}"
           class="hoocon-admin-open hoocon-lead-view-actions__mail"
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          Ответить по email
+          Ответить в Яндекс.Почте
         </a>
       {% endif %}
       {% if lead_edit_url %}
