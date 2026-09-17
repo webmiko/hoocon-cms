@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from urllib.parse import quote, urlencode
+
+if TYPE_CHECKING:
+    from leads.models import Lead
 
 _YANDEX_COMPOSE_RU = "https://mail.yandex.ru/compose"
 _YANDEX_COMPOSE_COM = "https://mail.yandex.com/compose"
@@ -29,6 +33,41 @@ def yandex_compose_web_base_url(manager_email: str = "") -> str:
     return _YANDEX_COMPOSE_RU
 
 
+def format_lead_reply_body(lead: Lead) -> str:
+    """Plain-text KP reply body: client comment + SKU lines from the lead."""
+    parts: list[str] = []
+    message = (lead.message or "").strip()
+    if message:
+        parts.append(message)
+
+    item_lines: list[str] = []
+    items = list(lead.items.order_by("sort_order", "id"))
+    if not items and lead.sku_id:
+        sku = getattr(lead, "sku", None)
+        code = (getattr(sku, "sku_code", "") or "").strip()
+        if code:
+            qty = lead.quantity or 1
+            item_lines.append(f"- {code} × {qty}")
+    else:
+        for item in items:
+            code = (item.sku_code or "").strip()
+            if not code and item.sku_id:
+                sku = getattr(item, "sku", None)
+                code = (getattr(sku, "sku_code", "") or "").strip()
+            if not code:
+                code = "?"
+            qty = item.quantity or 1
+            item_lines.append(f"- {code} × {qty}")
+
+    if item_lines:
+        if parts:
+            parts.append("")
+        parts.append("Позиции по заявке:")
+        parts.extend(item_lines)
+
+    return "\n".join(parts)
+
+
 def _compose_body(body: str = "", manager_email: str = "") -> str:
     """Optional body with manager mailbox hint (mailto has no reliable From)."""
     text = (body or "").strip()
@@ -50,11 +89,12 @@ def build_yandex_compose_web_url(
     recipient = (to or "").strip()
     if not recipient:
         return ""
+    # Yandex web compose reads recipient from ``mailto=``, not ``to=``.
     params: dict[str, str] = {
-        "to": recipient,
+        "mailto": recipient,
         "subject": (subject or "").strip(),
     }
-    full_body = _compose_body(body, from_email)
+    full_body = (body or "").strip()
     if full_body:
         params["body"] = full_body
     sender = (from_email or "").strip()
@@ -152,10 +192,12 @@ def build_lead_reply_email_url(
     lead_email: str,
     subject: str,
     manager_email: str = "",
+    body: str = "",
 ) -> str:
     """Web compose URL for inline list links (no JS app-try on changelist)."""
     return build_yandex_compose_web_url(
         to=lead_email,
         subject=subject,
+        body=body,
         from_email=manager_email,
     )

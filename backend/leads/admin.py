@@ -260,10 +260,14 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 format_html('<a href="tel:{}">{}</a>', phone, phone),
             )
         if email:
-            from crm.mail_links import build_yandex_compose_web_url
+            from crm.mail_links import build_yandex_compose_web_url, format_lead_reply_body
 
             subject = f"КП #{obj.pk} — {company}"
-            web_url = build_yandex_compose_web_url(to=email, subject=subject)
+            web_url = build_yandex_compose_web_url(
+                to=email,
+                subject=subject,
+                body=format_lead_reply_body(obj),
+            )
             contact_bits.append(
                 format_html(
                     '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>',
@@ -431,7 +435,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             if obj is not None:
                 change_url = reverse("admin:leads_lead_change", args=[obj.pk])
                 if obj.email:
-                    from crm.mail_links import build_lead_reply_email_urls
+                    from crm.mail_links import build_lead_reply_email_urls, format_lead_reply_body
 
                     company = (obj.company or "").strip() or "клиент"
                     manager_email = (getattr(request.user, "email", "") or "").strip()
@@ -439,6 +443,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                         lead_email=obj.email,
                         subject=f"КП #{obj.pk} — {company}",
                         manager_email=manager_email,
+                        body=format_lead_reply_body(obj),
                     )
                 if edit_mode:
                     extra["lead_view_url"] = change_url
