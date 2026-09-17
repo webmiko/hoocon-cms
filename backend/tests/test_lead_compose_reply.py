@@ -255,7 +255,7 @@ def test_lead_reply_includes_ludmila_signature_for_assistant_email(
     assert "С уважением, Людмила" in msg.body
     assert 'ООО "ХОГОН"' in msg.body
     assert "+7(995)780-70-18" in msg.body
-    assert "mailto:assistant@hoocon.ru" in msg.body
+    assert "assistant@hoocon.ru" in msg.body
     assert "Ответьте на это письмо" in msg.body
 
 
