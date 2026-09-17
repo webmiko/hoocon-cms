@@ -1,9 +1,12 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
+  type RefObject,
 } from "react";
 
 import { useFocusTrap } from "../hooks/useFocusTrap";
@@ -28,9 +31,43 @@ import {
   subscribeWebPushStatusRu,
   syncExistingWebPush,
 } from "../utils/webPush";
+import { fitChatBubbleWidth } from "../utils/fitChatBubbleWidth";
 import { MaxLogo } from "./icons/MaxLogo";
 import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
 import styles from "./SupportWidget.module.css";
+
+function SupportChatBubble({
+  className,
+  messagesRef,
+  children,
+}: {
+  className: string;
+  messagesRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
+    const messages = messagesRef.current;
+    if (!bubble || !messages) return;
+
+    const apply = () => {
+      fitChatBubbleWidth(bubble, messages);
+    };
+
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(messages);
+    return () => observer.disconnect();
+  }, [children, messagesRef]);
+
+  return (
+    <div ref={bubbleRef} className={className}>
+      {children}
+    </div>
+  );
+}
 
 const SUPPORT_SURFACE_KEY = "hoocon-support-surface";
 
@@ -796,14 +833,17 @@ export function SupportWidget() {
                 return (
                   <div key={m.id} className={rowClass}>
                     <span className={styles.sender}>{label}</span>
-                    <div className={bubbleClass}>
+                    <SupportChatBubble
+                      className={bubbleClass}
+                      messagesRef={listRef}
+                    >
                       {isBot
                         ? faqAnswerNodes(m.body, {
                             className: styles.faqLink,
                             onNavigate: () => closeSupportChat(),
                           })
                         : m.body}
-                    </div>
+                    </SupportChatBubble>
                     {time ? <time className={styles.time}>{time}</time> : null}
                   </div>
                 );
@@ -812,16 +852,24 @@ export function SupportWidget() {
               <>
                 <div className={styles.rowOut}>
                   <span className={styles.sender}>Вы</span>
-                  <div className={styles.bubbleOut}>{activeFaq.question}</div>
+                  <SupportChatBubble
+                    className={styles.bubbleOut}
+                    messagesRef={listRef}
+                  >
+                    {activeFaq.question}
+                  </SupportChatBubble>
                 </div>
                 <div className={styles.rowIn}>
                   <span className={styles.sender}>Поддержка</span>
-                  <div className={styles.bubbleIn}>
+                  <SupportChatBubble
+                    className={styles.bubbleIn}
+                    messagesRef={listRef}
+                  >
                     {faqAnswerNodes(activeFaq.answer, {
                       className: styles.faqLink,
                       onNavigate: () => closeSupportChat(),
                     })}
-                  </div>
+                  </SupportChatBubble>
                 </div>
               </>
             ) : null}
