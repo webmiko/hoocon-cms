@@ -24,7 +24,10 @@
   --hoocon-radius-lg: calc(var(--hoocon-radius) * 1.35);
   --hoocon-radius-sheet: calc(var(--hoocon-radius) * 1.65);
   --hoocon-radius-bubble: calc(var(--hoocon-radius) * 1.5);
+  /* Pill — only counters, toggle tracks, progress bars, phone tab shell. */
   --hoocon-radius-pill: 999px;
+  --hoocon-radius-btn: var(--hoocon-radius);
+  --hoocon-radius-btn-sm: var(--hoocon-radius-sm);
   --border-radius: var(--hoocon-radius);
   --hoocon-btn-height: 2.25rem;
   --hoocon-inline-padding: 1.1rem;
@@ -142,6 +145,42 @@ textarea {
 }
 
 /*
+ * Admin buttons — corners match cards/windows (proportional scale in :root).
+ * Default actions: --hoocon-radius-btn; compact controls: --hoocon-radius-btn-sm.
+ */
+body.hoocon-os27 :is(
+  #submit-row .container button,
+  #submit-row .container a[href],
+  .object-tools a,
+  .actions .button,
+  .hoocon-mail-compose__send,
+  .hoocon-push-broadcast__send,
+  .hoocon-lead-view-actions__edit,
+  .hoocon-lead-view-actions__back,
+  .hoocon-lead-view-actions__mail,
+  a.hoocon-admin-open,
+  a.hoocon-admin-lead-open,
+  .hoocon-integrations__actions .hoocon-admin-open,
+  .hoocon-integrations__actions .hoocon-admin-lead-open,
+  .hoocon-integrations__link,
+  .hoocon-phone-more__logout button
+) {
+  border-radius: var(--hoocon-radius-btn);
+}
+
+body.hoocon-os27 :is(
+  .hoocon-dash__quick a,
+  .hoocon-lead-stats__periods a,
+  .hoocon-phone-more__close,
+  .hoocon-phone-select-toggle,
+  .hoocon-admin-push-toggle,
+  body.hoocon-phone-ready .hoocon-phone-header-menu__btn,
+  .hoocon-admin-lead-sticker
+) {
+  border-radius: var(--hoocon-radius-btn-sm);
+}
+
+/*
  * Unfold fieldset descriptions (admin/includes/fieldset.html) sit outside the
  * bordered .form-rows block and ship without px-3; field lines use px-3.
  */
@@ -172,7 +211,7 @@ textarea {
   font-size: 0.8125rem;
   line-height: 1.2;
   text-decoration: none !important;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn-sm);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface-muted);
   transition:
@@ -260,7 +299,7 @@ textarea {
   box-sizing: border-box;
   max-width: 100%;
   padding: 0.2rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-btn-sm);
   border: 1px solid transparent;
   font-size: 0.75rem;
   font-weight: 700;
@@ -307,7 +346,7 @@ a.hoocon-admin-lead-open {
   box-sizing: border-box;
   min-height: 2rem;
   padding: 0.35rem 0.9rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn);
   border: 1px solid color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
   background: var(--hoocon-primary);
   color: #fff !important;
@@ -370,7 +409,7 @@ a.hoocon-leads-stats-link {
   min-width: 11rem;
   min-height: 2.5rem;
   padding: 0.5rem 1.25rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.2;
@@ -491,7 +530,7 @@ a.hoocon-leads-stats-link {
   display: inline-flex;
   align-items: center;
   padding: 0.35rem 0.75rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn-sm);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface-muted);
   color: var(--hoocon-quiet);
@@ -729,7 +768,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   display: inline-flex;
   align-items: center;
   padding: 0.4rem 0.85rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn-sm);
   border: 1px solid var(--hoocon-glass-border);
   background: var(--hoocon-surface-muted);
   color: var(--hoocon-quiet);
@@ -1402,7 +1441,7 @@ kbd.hoocon-sidebar-shortcut > span {
   box-sizing: border-box;
   min-height: 2.5rem;
   padding: 0.55rem 1.15rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn);
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.2;
@@ -1456,7 +1495,7 @@ kbd.hoocon-sidebar-shortcut > span {
   display: inline-flex;
   align-items: center;
   padding: 0.15rem 0.5rem;
-  border-radius: var(--hoocon-radius-pill);
+  border-radius: var(--hoocon-radius-btn-sm);
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -1534,6 +1573,7 @@ kbd.hoocon-sidebar-shortcut > span {
 #content-main form .form-row input[type="search"],
 #content-main form .form-row input[type="date"],
 #content-main form .form-row input[type="datetime-local"],
+#content-main form .form-row select,
 #content-main form .aligned textarea,
 #content-main form .aligned select,
 #content-main form .selector-available input[type="text"],
@@ -1592,6 +1632,7 @@ body.login select,
 .dark #content-main form .form-row input[type="search"],
 .dark #content-main form .form-row input[type="date"],
 .dark #content-main form .form-row input[type="datetime-local"],
+.dark #content-main form .form-row select,
 .dark #content-main form .aligned textarea,
 .dark #content-main form .aligned select,
 .dark #content-main form .selector-available input[type="text"],
@@ -1673,6 +1714,7 @@ body.login select,
 #content-main form .form-row:focus-within input[type="url"],
 #content-main form .form-row:focus-within input[type="tel"],
 #content-main form .form-row:focus-within input[type="search"],
+#content-main form .form-row select:focus,
 #content-main form .aligned textarea:focus,
 #content-main form .aligned select:focus,
 #content-main form .selector-available input[type="text"]:focus,
@@ -1847,7 +1889,7 @@ body.change-form #submit-row .container.hoocon-submit-menu-active > .flex {
   #changelist .changelist-form-container > #changelist-filter {
     position: fixed !important;
     inset: 0 !important;
-    z-index: 60 !important;
+    z-index: 1000 !important;
     width: auto !important;
     max-width: none !important;
     min-width: 0 !important;
@@ -3020,7 +3062,7 @@ body:not(.hoocon-support-inbox) #changelist
   align-items: stretch;
   gap: 0;
   border: 1px solid var(--hoocon-glass-border);
-  border-radius: var(--hoocon-radius-pill, 999px);
+  border-radius: var(--hoocon-radius-btn);
   overflow: hidden;
   background: var(--hoocon-surface);
 }
@@ -3213,7 +3255,22 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     box-sizing: border-box;
   }
 
-  body.change-form [data-inline-type="tabular"] table.formset tbody.form-group {
+  /* Unfold .empty-form{display:none} — do not override on the clone-source tbody. */
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group.empty-form,
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group.template {
+    display: none !important;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group:not(.empty-form) {
     display: block;
     position: relative;
     box-sizing: border-box;
@@ -3238,14 +3295,78 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
   }
 
   body.change-form [data-inline-type="tabular"] table.formset tbody.form-group > tr > td {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: baseline;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box;
+    padding: 0.65rem 0.75rem;
     border-bottom: 1px solid var(--hoocon-hairline);
+    text-align: left;
+    white-space: normal;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td::before {
+    content: attr(data-label);
+    grid-column: 1;
+    grid-row: 1 / -1;
+    align-self: start;
+    display: block;
+    font-weight: 600;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--hoocon-quiet);
+    overflow-wrap: anywhere;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td
+    > * {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td:not([data-label])::before,
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td[data-label=""]::before {
+    content: none;
+    display: none;
+  }
+
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td.original,
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td:empty {
+    display: none !important;
   }
 
   body.change-form
@@ -3277,7 +3398,14 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     tbody.form-group
     > tr
     > td
-    textarea {
+    textarea,
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td
+    .select2-container {
     width: 100%;
     max-width: 100%;
     min-width: 0;
