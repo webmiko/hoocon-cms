@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 
 # Beta: three-part; after GA: two-part MAJOR.MINOR (see docs/releases.md).
-RELEASE_VERSION = "2.7"
+RELEASE_VERSION = "2.8"
 
 # Pre-release channel: "beta" | "rc" | "" (stable / GA).
 RELEASE_CHANNEL = ""
