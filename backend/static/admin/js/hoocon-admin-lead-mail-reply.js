@@ -1,10 +1,11 @@
 /**
- * Lead reply: try installed Yandex Mail (app / Android intent), else web compose.
+ * Lead reply: mailto / Android intent for Yandex Mail app, else web compose.
+ * yandexmail:// does not pass compose fields; mailto is the supported path.
  */
 (function () {
   "use strict";
 
-  var FALLBACK_MS = 1200;
+  var FALLBACK_MS = 1500;
 
   function openWeb(webUrl) {
     if (!webUrl) {
@@ -13,7 +14,20 @@
     window.open(webUrl, "_blank", "noopener,noreferrer");
   }
 
-  function tryNativeThenWeb(nativeUrl, webUrl) {
+  function openMailto(mailtoUrl) {
+    if (!mailtoUrl) {
+      return;
+    }
+    var anchor = document.createElement("a");
+    anchor.href = mailtoUrl;
+    anchor.rel = "noopener noreferrer";
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  }
+
+  function tryNativeThenWeb(nativeUrl, webUrl, useMailtoClick) {
     if (!nativeUrl) {
       openWeb(webUrl);
       return;
@@ -50,25 +64,25 @@
       }
     }, FALLBACK_MS);
 
+    if (useMailtoClick) {
+      openMailto(nativeUrl);
+      return;
+    }
     window.location.href = nativeUrl;
   }
 
   function openLeadReply(link) {
     var webUrl = link.dataset.webUrl || link.getAttribute("href") || "";
-    var appUrl = link.dataset.yandexAppUrl || "";
+    var mailtoUrl = link.dataset.mailtoUrl || "";
     var androidUrl = link.dataset.yandexAndroidUrl || "";
     var ua = navigator.userAgent || "";
 
     if (/Android/i.test(ua) && androidUrl) {
-      tryNativeThenWeb(androidUrl, webUrl);
+      tryNativeThenWeb(androidUrl, webUrl, false);
       return;
     }
-    if (/iPhone|iPad|iPod/i.test(ua) && appUrl) {
-      tryNativeThenWeb(appUrl, webUrl);
-      return;
-    }
-    if (appUrl) {
-      tryNativeThenWeb(appUrl, webUrl);
+    if (mailtoUrl) {
+      tryNativeThenWeb(mailtoUrl, webUrl, true);
       return;
     }
     openWeb(webUrl);
