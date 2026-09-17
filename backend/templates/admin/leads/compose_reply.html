@@ -1,5 +1,14 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n static %}
+
+{% block bodyclass %}{{ block.super }} hoocon-mail-compose-page{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet"
+    href="{% static 'admin/css/hoocon-mail-compose.css' %}?v={{ STATIC_VERSION }}">
+  <script src="{% static 'admin/js/hoocon-mail-compose.js' %}?v={{ STATIC_VERSION }}" defer></script>
+{% endblock %}
 
 {% block content %}
 <nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
@@ -12,46 +21,107 @@
   <span>Ответ клиенту</span>
 </nav>
 
-<h1>{{ title }}</h1>
-
-{% if manager_reply_to_email %}
-  <p class="help">
-    Клиенту уйдёт письмо с сайта; при ответе «Ответить» в почте ответ придёт на
-    <strong>{{ manager_reply_to_email }}</strong>.
-  </p>
-{% else %}
-  <p class="help">
-    Укажите email в профиле пользователя Admin — иначе Reply-To не будет задан,
-    и ответ клиента может не дойти до вас.
-  </p>
-{% endif %}
-
-{% if manager_signature_preview %}
-  <fieldset class="module aligned">
-    <h2>Подпись в письме</h2>
-    <pre class="help" style="white-space: pre-wrap; margin: 0;">{{ manager_signature_preview }}</pre>
-  </fieldset>
-{% endif %}
-
-<form method="post" novalidate>
+<form method="post" novalidate class="hoocon-mail-compose" id="hoocon-mail-compose-form">
   {% csrf_token %}
-  <fieldset class="module aligned">
-    {% for field in form %}
-      <div class="form-row">
-        {{ field.errors }}
-        {{ field.label_tag }}
-        {{ field }}
-        {% if field.help_text %}
-          <div class="help">{{ field.help_text }}</div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </fieldset>
-  <div class="submit-row">
-    <input type="submit" value="{% trans 'Отправить' %}" class="default">
-    <a href="{{ lead_change_url }}" class="button cancel-link">
+
+  <header class="hoocon-mail-compose__chrome">
+    <a href="{{ lead_change_url }}" class="hoocon-mail-compose__nav hoocon-mail-compose__nav--cancel">
       {% trans "Отмена" %}
     </a>
-  </div>
+    <div class="hoocon-mail-compose__chrome-center">
+      <h1 class="hoocon-mail-compose__headline">{{ title }}</h1>
+      {% if manager_reply_to_email %}
+        <p class="hoocon-mail-compose__subtitle">
+          {% blocktrans with email=manager_reply_to_email %}
+            Копия и ответы клиента — на <strong>{{ email }}</strong>
+          {% endblocktrans %}
+        </p>
+      {% else %}
+        <p class="hoocon-mail-compose__subtitle">
+          Укажите email в профиле Admin — иначе Reply-To не будет задан.
+        </p>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="hoocon-mail-compose__card" aria-label="{% trans 'Новое письмо' %}">
+    <div class="hoocon-mail-compose__field">
+      <label for="{{ form.to_email.id_for_label }}">{% trans "Кому" %}</label>
+      <div>
+        {{ form.to_email }}
+        {{ form.to_email.errors }}
+      </div>
+    </div>
+
+    <div class="hoocon-mail-compose__field">
+      <label for="{{ form.subject.id_for_label }}">{% trans "Тема" %}</label>
+      <div>
+        {{ form.subject }}
+        {{ form.subject.errors }}
+      </div>
+    </div>
+
+    <div class="hoocon-mail-compose__toolbar" role="toolbar" aria-label="{% trans 'Форматирование' %}">
+      <button type="button" class="hoocon-mail-compose__tool" data-format="bold" title="{% trans 'Жирный' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">format_bold</span>
+      </button>
+      <button type="button" class="hoocon-mail-compose__tool" data-format="italic" title="{% trans 'Курсив' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">format_italic</span>
+      </button>
+      <button type="button" class="hoocon-mail-compose__tool" data-format="underline" title="{% trans 'Подчёркнутый' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">format_underlined</span>
+      </button>
+      <span class="hoocon-mail-compose__tool-divider" aria-hidden="true"></span>
+      <button type="button" class="hoocon-mail-compose__tool" data-format="insertUnorderedList" title="{% trans 'Маркированный список' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">format_list_bulleted</span>
+      </button>
+      <button type="button" class="hoocon-mail-compose__tool" data-format="insertOrderedList" title="{% trans 'Нумерованный список' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">format_list_numbered</span>
+      </button>
+      <span class="hoocon-mail-compose__tool-divider" aria-hidden="true"></span>
+      <button type="button" class="hoocon-mail-compose__tool" data-format="createLink" title="{% trans 'Ссылка' %}">
+        <span class="material-symbols-outlined" aria-hidden="true">link</span>
+      </button>
+    </div>
+
+    <div class="hoocon-mail-compose__editor-wrap">
+      <div
+        class="hoocon-mail-compose__editor"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        aria-labelledby="hoocon-mail-compose-body-label"
+        data-placeholder="{% trans 'Текст письма…' %}"
+      ></div>
+      <span id="hoocon-mail-compose-body-label" class="hoocon-mail-compose__sr-only">
+        {% trans "Текст письма" %}
+      </span>
+      {{ form.body }}
+      {{ form.body.errors }}
+    </div>
+
+    {% if manager_signature_preview %}
+      <footer class="hoocon-mail-compose__signature">
+        <span class="hoocon-mail-compose__signature-label">{% trans "Подпись в письме" %}</span>
+        <pre class="hoocon-mail-compose__signature-text">{{ manager_signature_preview }}</pre>
+      </footer>
+    {% endif %}
+
+    <div class="hoocon-mail-compose__footer">
+      <label class="hoocon-mail-compose__send-now" for="{{ form.send_now.id_for_label }}">
+        {{ form.send_now }}
+        <span>{{ form.send_now.label }}</span>
+      </label>
+      {% if form.body.help_text %}
+        <p class="hoocon-mail-compose__help">{{ form.body.help_text }}</p>
+      {% endif %}
+    </div>
+
+    <div class="hoocon-mail-compose__actions">
+      <button type="submit" class="hoocon-mail-compose__send">
+        {% trans "Отправить" %}
+      </button>
+    </div>
+  </section>
 </form>
 {% endblock %}
