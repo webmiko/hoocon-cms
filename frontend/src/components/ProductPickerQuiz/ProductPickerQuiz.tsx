@@ -23,6 +23,8 @@ import {
 } from "./quizEngine";
 import { iconForChoice } from "./quizChoiceIcons";
 import { quizMomentEstimateNote } from "./quizMomentEstimate";
+import { QuizKitAnalogCard } from "./QuizKitAnalogCard";
+import { QUIZ_CATEGORY } from "./quizCategories";
 import { catalogUrlFromParams } from "./quizToCatalog";
 import { useQuizResults } from "./useQuizResults";
 
@@ -119,7 +121,13 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
     completedTrackedRef.current = false;
   }
 
-  const catalogHref = catalogUrlFromParams(results.params);
+  const catalogHref =
+    results.mode === "kit_components"
+      ? catalogUrlFromParams({
+          ...results.params,
+          category: QUIZ_CATEGORY.ballValve,
+        })
+      : catalogUrlFromParams(results.params);
 
   return (
     <section
@@ -251,13 +259,18 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
                       <span className={styles.loadingDot} />
                     </span>
                   </span>
+                ) : results.mode === "kit_components" && results.totalCount > 0 ? (
+                  formatQuizResultsCount(results.totalCount)
                 ) : results.totalCount > 0 ? (
                   formatQuizResultsCount(results.totalCount)
                 ) : (
                   "По этим параметрам точных моделей нет"
                 )}
               </h3>
-              {results.relaxed && !results.loading ? (
+              {results.analogNote && !results.loading ? (
+                <p className={styles.resultsNote}>{results.analogNote}</p>
+              ) : null}
+              {results.relaxed && !results.loading && results.mode === "primary" ? (
                 <p className={styles.resultsNote}>
                   Часть параметров смягчили — показали близкие варианты.
                 </p>
@@ -284,6 +297,14 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
                   <div className={styles.resultsSkeletonCard} />
                 </div>
               </div>
+            ) : results.mode === "kit_components" && results.bundles.length > 0 ? (
+              <div className={styles.resultsCarousel}>
+                {results.bundles.map((bundle) => (
+                  <div key={bundle.valve.slug} className={styles.resultsSlide}>
+                    <QuizKitAnalogCard bundle={bundle} />
+                  </div>
+                ))}
+              </div>
             ) : results.items.length > 0 ? (
               <div className={styles.resultsCarousel}>
                 {results.items.map((sku) => (
@@ -307,9 +328,11 @@ export function ProductPickerQuiz({ sectionId = "podbor" }: ProductPickerQuizPro
                 data-brand-cta
                 onClick={() => trackQuizToCatalog()}
               >
-                {results.totalCount > 0
-                  ? `Смотреть все ${results.totalCount} в каталоге`
-                  : "Открыть каталог"}
+                {results.mode === "kit_components" && results.totalCount > 0
+                  ? "Смотреть краны в каталоге"
+                  : results.totalCount > 0
+                    ? `Смотреть все ${results.totalCount} в каталоге`
+                    : "Открыть каталог"}
               </Link>
               <Link
                 to="/consultation?from=podbor"

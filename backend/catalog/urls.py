@@ -11,6 +11,7 @@ from catalog.views import (
     CompareViewSet,
     FacetViewSet,
     ProductFileViewSet,
+    QuizAnalogView,
     SKUViewSet,
 )
 
@@ -24,6 +25,7 @@ router.register("skus", SKUViewSet, basename="catalog-sku")
 sku_files = ProductFileViewSet.as_view({"get": "list", "post": "create"})
 
 urlpatterns = [
+    path("quiz-analogs/", QuizAnalogView.as_view(), name="catalog-quiz-analogs"),
     path("docs/", DocsHubListView.as_view(), name="catalog-docs"),
     path(
         "docs/families/<str:key>/zip/",

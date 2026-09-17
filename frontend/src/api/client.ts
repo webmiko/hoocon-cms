@@ -184,6 +184,22 @@ export interface CompareResponse {
   rows: CompareRow[];
 }
 
+export type QuizKitAnalogBundle = {
+  valve: SKUList;
+  drive: SKUList;
+  bracket: SKUList | null;
+  drive_code: string;
+  bracket_code: string;
+  in_stock: boolean;
+};
+
+export interface QuizAnalogResponse {
+  mode: "kit_components";
+  count: number;
+  bundles: QuizKitAnalogBundle[];
+  note: string;
+}
+
 // Search
 export type SearchResultItem = components["schemas"]["SearchResultItem"];
 export type SearchResponse = components["schemas"]["SearchResponse"];
@@ -279,6 +295,11 @@ export const api = {
   skus(params?: Record<string, string>): Promise<SKUListResponse> {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
     return apiFetch<SKUListResponse>(`/api/catalog/skus/${qs}`);
+  },
+
+  quizAnalogs(params: Record<string, string>): Promise<QuizAnalogResponse> {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch<QuizAnalogResponse>(`/api/catalog/quiz-analogs/?${qs}`);
   },
 
   facets(params?: { category?: string }): Promise<CatalogFacetsResponse> {
