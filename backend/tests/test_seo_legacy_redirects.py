@@ -140,6 +140,63 @@ def test_static_inventory_redirects(db: None) -> None:
     ensure_seo_legacy_redirects()
     assert Redirect.objects.get(from_path="/sale").to_path == "/catalog"
     assert Redirect.objects.get(from_path="/sitemap").to_path == "/sitemap.xml"
+    assert Redirect.objects.get(from_path="/news").to_path == "/novosti"
     assert Redirect.objects.get(
         from_path="/elektroprivody-dlya-zaslonok-ventilyatsii",
     ).to_path.endswith("elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata")
+
+
+@pytest.mark.django_db
+def test_resolve_tilda_edition_suffix(db: None) -> None:
+    """Webmaster 404: flat /privod-…-24v-dst must resolve to the matching edition."""
+    cat = Category.objects.create(
+        name="Противопожарные",
+        slug="elektroprivody-protivopozharnye-i-dymovye",
+    )
+    product = Product.objects.create(
+        name="SA5",
+        slug="privod-protivopozharniy-5nm",
+        category=cat,
+    )
+    target = SKU.objects.create(
+        product=product,
+        sku_code="sa5fu24-dst",
+        slug="privod-protivopozharniy-5nm-sa5fu24-dst",
+        name="24 DST",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=product,
+        sku_code="sa5fu230-dst",
+        slug="privod-protivopozharniy-5nm-sa5fu230-dst",
+        name="230 DST",
+        is_published=True,
+    )
+
+    resolved = resolve_legacy_slug_to_sku("privod-protivopozharniy-5nm-24v-dst")
+    assert resolved == target
+
+
+@pytest.mark.django_db
+def test_resolve_sale_suffix_and_brass_dvuh(db: None) -> None:
+    cat = Category.objects.create(name="Краны", slug="sharovye-krany")
+    product = Product.objects.create(name="BV215", slug="8100-bv215", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="8100-BV215A",
+        slug="8100-bv215a",
+        name="A",
+        is_published=True,
+    )
+    assert resolve_legacy_slug_to_sku("sharovoy-dvuhhodoviy-kran-bv215-sale") == sku
+
+
+@pytest.mark.django_db
+def test_flat_tpost_redirects() -> None:
+    old = "vvme9fxcy1-ognezaderzhivayuschii-klapan-printsip-ra"
+    new = ARTICLE_SLUG_RENAMES[old]
+    Article.objects.create(title="x", slug=new, body="<p>x</p>", is_published=True)
+
+    ensure_article_tpost_redirects()
+
+    assert Redirect.objects.get(from_path=f"/tpost/{old}").to_path == f"/statyi/{new}"
