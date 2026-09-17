@@ -12,10 +12,11 @@ from supportchat.gigachat.manuals_kb import extract_sku_tokens
 _MODE_TRIAGE = "triage"
 _MODE_FULL = "full"
 
+_SERIES_CODE_RE = re.compile(r"(?i)\b(?:da|sa|hva|hvd)\b")
 _PRODUCT_KEYWORD_RE = re.compile(
     r"(?i)\b(?:"
-    r"привод|заслонк|клапан|момент|артикул|подбор|аналог|belimo|"
-    r"электропривод|шаровой\s+кран|овк|hvac|вентиляц|кондицион|"
+    r"привод\w*|заслонк\w*|клапан\w*|момент|артикул|подбор|аналог|belimo|"
+    r"электропривод\w*|шаровой\s+кран|овк|hvac|вентиляц|кондицион|"
     r"цена|стоимость|кп|коммерческ|счёт|счет|наличи|"
     r"da\d|sa\d|hv\d|8100"
     r")\b",
@@ -152,6 +153,8 @@ def is_product_intent(text: str) -> bool:
         return False
     if extract_sku_tokens(body):
         return True
+    if _SERIES_CODE_RE.search(body):
+        return True
     if _PRODUCT_KEYWORD_RE.search(body):
         return True
     return False
@@ -166,6 +169,8 @@ def triage_site_nav_reply(text: str) -> str | None:
     """Suggest a site section when the user asks about contacts, catalog, etc."""
     body = (text or "").strip()
     if not body:
+        return None
+    if is_product_intent(body):
         return None
     for section in SITE_NAV_SECTIONS:
         if section.pattern.search(body):

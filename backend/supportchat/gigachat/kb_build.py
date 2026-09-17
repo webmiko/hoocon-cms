@@ -128,6 +128,71 @@ def _manual_branch_tags(chunk: ManualChunk) -> frozenset[str]:
     return frozenset(tags)
 
 
+def build_catalog_series_nav_branch() -> KbBranch:
+    """Catalog navigation for multi-series DA/SA/HVA/HVD requests (full GigaChat mode)."""
+    body = (
+        "Навигация по сериям Hoocon в каталоге (без подбора артикула — фильтры на странице).\n"
+        "\n"
+        "Серия DA (общеобменная вентиляция, без пружинного возврата):\n"
+        "- /catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata\n"
+        "\n"
+        "Серия SA (противопожарные и дымовые клапаны):\n"
+        "- /catalog/elektroprivody-protivopozharnye-i-dymovye\n"
+        "- дымоудаление SAMU: /catalog/elektroprivody-dlya-klapanov-dymoudaleniya\n"
+        "\n"
+        "Серия HVA (ускоренные приводы):\n"
+        "- /catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata\n"
+        "\n"
+        "Серия HVD (воздушные заслонки без пружинного возврата):\n"
+        "- /catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata\n"
+        "\n"
+        "Напряжение в артикуле: суффикс …24 = AC/DC 24 В; …230 = AC 100…240 В.\n"
+        "КП и опт: /rfq. Квиз: /#podbor. Общий каталог: /catalog."
+    )
+    return KbBranch(
+        id="catalog.series.nav",
+        title="Каталог по сериям DA / SA / HVA / HVD",
+        tags=frozenset(
+            {
+                "catalog",
+                "серии",
+                "da",
+                "sa",
+                "hva",
+                "hvd",
+                "привод",
+                "напряжение",
+                "каталог",
+            },
+        ),
+        series=frozenset({"da", "sa", "hva", "hvd"}),
+        tokens=frozenset(
+            {
+                "da",
+                "sa",
+                "hva",
+                "hvd",
+                "привод",
+                "электропривод",
+                "серия",
+                "серии",
+                "каталог",
+                "напряжение",
+            },
+        ),
+        gotos=frozenset(
+            {
+                ("da", "catalog.series.nav"),
+                ("sa", "catalog.series.nav"),
+                ("hva", "catalog.series.nav"),
+                ("hvd", "catalog.series.nav"),
+                ("привод", "catalog.series.nav"),
+            },
+        ),
+        body=body,
+    )
+
+
 def build_site_branches() -> list[KbBranch]:
     """CMS/catalog snapshot as searchable branches (build-time)."""
     from supportchat.gigachat.knowledge import (
@@ -215,6 +280,8 @@ def build_site_branches() -> list[KbBranch]:
                 body=products,
             ),
         )
+
+    branches.append(build_catalog_series_nav_branch())
 
     return branches
 

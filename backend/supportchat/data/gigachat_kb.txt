@@ -1,6 +1,6 @@
 # База знаний бота Hoocon — единственный источник ответов
 
-@META version=2 built_at=2026-09-16T10:46:48.744229+00:00 branches=103
+@META version=2 built_at=2026-09-17T11:43:12.506047+00:00 branches=102
 
 Формат: @BRANCH BEGIN … @BRANCH END. Бот отвечает только по веткам ниже.
 @GOTO — подсказки умного поиска (токен → id ветки).
@@ -43,37 +43,24 @@
   маркой напрямую с завода Ningbo Hoocon: CE, UL, EAC. Без посредников.
 @BRANCH END
 
-@BRANCH BEGIN id=faq.home.1 tags=faq,home,овк
+@BRANCH BEGIN id=faq.home.8 tags=admin,faq,home,овк
 @TITLE FAQ: Можно ли заменить SA10FU230-DS на DA10FU230-DS?
 В: Можно ли заменить SA10FU230-DS на DA10FU230-DS?
-О: Нет. SA — для огнезадерживающих клапанов (пружина ≤ 25 с, работа при нагреве). DA — для общеобменной вентиляции. Для
-   огнезадерживающих клапанов используйте серию SA.
+О: Серия SA — для регулирования.
 @BRANCH END
 
-@BRANCH BEGIN id=faq.home.2 tags=faq,home,овк
-@TITLE FAQ: Как оценить нужный крутящий момент?
-В: Как оценить нужный крутящий момент?
-О: Учитывайте давление, тип заслонки и среду. Ориентир: M ≈ (D³ × P × k) / C. Для проекта сверяйте таблицы заслонки и
-   паспорт привода в каталоге.
-@BRANCH END
-
-@BRANCH BEGIN id=faq.home.3 tags=faq,home,овк
+@BRANCH BEGIN id=faq.home.9 tags=admin,faq,home,овк tokens=catalog,consultation,gde,kupit
 @TITLE FAQ: Как заказать и получить КП?
 В: Как заказать и получить КП?
-О: Подберите модель в каталоге или опишите задачу — заявка на консультацию. Ответ до 2 рабочих часов.
+О: Подберите модель в /catalog или опишите задачу — заявка на /consultation. Ответ до 2 рабочих часов. Партнёры:
+   /gde-kupit.
 @BRANCH END
 
-@BRANCH BEGIN id=faq.home.4 tags=faq,home,овк
+@BRANCH BEGIN id=faq.home.10 tags=admin,faq,home,овк
 @TITLE FAQ: Как подобрать модель на сайте?
 В: Как подобрать модель на сайте?
 О: На главной — блок «Подбор за минуту»: тип продукции (привод, шаровой кран, комплект, кронштейн BR-M/BR-ML),
-   параметры из проекта → подборка в каталоге или заявка инженеру.
-@BRANCH END
-
-@BRANCH BEGIN id=faq.admin.8 tags=admin,faq,чат
-@TITLE FAQ чата: SA вместо DA?
-В: SA вместо DA?
-О: Серия SA — для регулирования.
+   параметры из проекта → подборка в /catalog или заявка на /consultation.
 @BRANCH END
 
 @BRANCH BEGIN id=site.pages tags=pages,site,компания,контакты
@@ -387,6 +374,32 @@ OEM-цикл · ориентир сроков Заявка · 1–3 дня ТЗ 
   электропривод для систем HVAC. Назначение и особенности: – Рабочая среда (по умолчанию): холодная и горячая вода; по
   спецзаказу — с содержанием этиленгликоля не более 50 %. – Рабочая температура среды: –9…+95 °C. – Материал корпуса:
   Латун…
+@BRANCH END
+
+@BRANCH BEGIN id=catalog.series.nav tags=catalog,da,hva,hvd,sa,каталог,напряжение,привод,серии series=da,hva,hvd,sa tokens=da,hva,hvd,sa,каталог,напряжение,привод,серии,серия,электропривод
+@TITLE Каталог по сериям DA / SA / HVA / HVD
+@GOTO da → catalog.series.nav
+@GOTO hva → catalog.series.nav
+@GOTO hvd → catalog.series.nav
+@GOTO sa → catalog.series.nav
+@GOTO привод → catalog.series.nav
+Навигация по сериям Hoocon в каталоге (без подбора артикула — фильтры на странице).
+
+Серия DA (общеобменная вентиляция, без пружинного возврата):
+- /catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata
+
+Серия SA (противопожарные и дымовые клапаны):
+- /catalog/elektroprivody-protivopozharnye-i-dymovye
+- дымоудаление SAMU: /catalog/elektroprivody-dlya-klapanov-dymoudaleniya
+
+Серия HVA (ускоренные приводы):
+- /catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata
+
+Серия HVD (воздушные заслонки без пружинного возврата):
+- /catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata
+
+Напряжение в артикуле: суффикс …24 = AC/DC 24 В; …230 = AC 100…240 В.
+КП и опт: /rfq. Квиз: /#podbor. Общий каталог: /catalog.
 @BRANCH END
 
 @BRANCH BEGIN id=manual.html.da10-15-20fu24-230-d-ds tags=da,fu,html,manual,овк,привод,пружина tokens=20fu24,230,da10,da10-15-20fu24-230-d-ds,da10/15/20fu24/230,da101520fu24230dds,da10fu230,da10fu230dds,da10fu230ddsd,da10fu24,da10fu24dds,da10fu24ddsd,da15fu230,da15fu230dds,da15fu24,da15fu24dds,da20fu230,da20fu230dds,da20fu24,da20fu24dds,html,manuals
@@ -7428,6 +7441,7 @@ Actuator Auxiliary switch
 @GOTO 24mqu230 → manual.html.da8-16-24mqu230-d-ds
 @GOTO 24mqu230 → manual.pdf.da8-16-24mqu230-a-as
 @GOTO 24mqu230 → manual.pdf.da8-16-24mqu230-d-ds
+@GOTO consultation → faq.home.9
 @GOTO da10-15-20fu24-230-d-ds → manual.html.da10-15-20fu24-230-d-ds
 @GOTO da10-15-20fu24-a-as → manual.html.da10-15-20fu24-a-as
 @GOTO da10/15/20fu24 → manual.html.da10-15-20fu24-a-as
@@ -7667,7 +7681,6 @@ Actuator Auxiliary switch
 @GOTO da5mqu24 → manual.html.da5mqu-a-as
 @GOTO da5mqu24 → manual.html.da5mqu-d-ds
 @GOTO da5mqu24 → manual.pdf.da5mqu-a-as
-@GOTO da5mqu24 → manual.pdf.da5mqu-d-ds
 @GOTO da5mqu24aas → manual.html.da5mqu-a-as
 @GOTO da5mqu24aas → manual.pdf.da5mqu-a-as
 @GOTO da5mqu24aasd → manual.html.da5mqu-a-as
@@ -7678,8 +7691,6 @@ Actuator Auxiliary switch
 @GOTO da5mquaas → manual.pdf.da5mqu-a-as
 @GOTO da5mqudds → manual.html.da5mqu-d-ds
 @GOTO da5mqudds → manual.pdf.da5mqu-d-ds
-@GOTO da6mu230 → manual.html.da4-6mu-a-as
-@GOTO da6mu230 → manual.html.da4-6mu-d-ds
 @GOTO da6mu230aas → manual.html.da4-6mu-a-as
 @GOTO da6mu230aas → manual.pdf.da4-6mu-a-as
 @GOTO da6mu230dds → manual.html.da4-6mu-d-ds
@@ -7823,18 +7834,19 @@ Actuator Auxiliary switch
 @GOTO sa7mu24dss → manual.html.sa7mu-ds-dst
 @GOTO sa7mudsdst → manual.html.sa7mu-ds-dst
 @GOTO sa7mudsdst → manual.pdf.sa7mu-ds-dst
+@GOTO напряжение → catalog.series.nav
+@GOTO электропривод → catalog.series.nav
 Карта веток (для умного поиска). Если вопрос про модель — ищи ветку manual.*
 
 - site.routes — Разделы сайта hoocon.ru [faq,routes,site,каталог,контакты]
-- faq.home.1 — FAQ: Можно ли заменить SA10FU230-DS на DA10FU230-DS? [faq,home,овк]
-- faq.home.2 — FAQ: Как оценить нужный крутящий момент? [faq,home,овк]
-- faq.home.3 — FAQ: Как заказать и получить КП? [faq,home,овк]
-- faq.home.4 — FAQ: Как подобрать модель на сайте? [faq,home,овк]
-- faq.admin.8 — FAQ чата: SA вместо DA? [admin,faq,чат]
+- faq.home.8 — FAQ: Можно ли заменить SA10FU230-DS на DA10FU230-DS? [admin,faq,home,овк]
+- faq.home.9 — FAQ: Как заказать и получить КП? [admin,faq,home,овк]
+- faq.home.10 — FAQ: Как подобрать модель на сайте? [admin,faq,home,овк]
 - site.pages — Страницы сайта (CMS) [pages,site,компания,контакты]
 - site.articles — Статьи /statyi [articles,site,статьи]
 - site.catalog.categories — Категории каталога [catalog,категории,серии]
 - site.catalog.products — Линейки каталога (SKU) [catalog,sku,кран,привод]
+- catalog.series.nav — Каталог по сериям DA / SA / HVA / HVD [catalog,da,hva,hvd,sa,каталог]
 - manual.html.da10-15-20fu24-230-d-ds — _manuals-ru/DA/da10-15-20fu24-230-d-ds.html — DA10/15/20FU24/230 …-D/DS —
   руководство (RU) [da,fu,html,manual,овк,привод]
 - manual.html.da10-15-20fu24-a-as — _manuals-ru/DA/da10-15-20fu24-a-as.html — DA10/15/20FU24 …-A/AS — руководство (RU)
