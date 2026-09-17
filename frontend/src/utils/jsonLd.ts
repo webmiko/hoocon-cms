@@ -34,36 +34,7 @@ interface BreadcrumbItem {
   path: string;
 }
 
-/** Shared FAQ (keep in sync with HomePage + backend config.seo.routes). */
-export const HOME_FAQ_ITEMS: Array<{ question: string; answer: string }> = [
-  {
-    question: "Можно ли заменить SA10FU230-DS на DA10FU230-DS?",
-    answer:
-      "Нет. SA — для огнезадерживающих клапанов (пружина ≤ 25 с, работа при " +
-      "нагреве). DA — для общеобменной вентиляции. Для огнезадерживающих " +
-      "клапанов используйте серию SA.",
-  },
-  {
-    question: "Как оценить нужный крутящий момент?",
-    answer:
-      "Учитывайте давление, тип заслонки и среду. Ориентир: " +
-      "M ≈ (D³ × P × k) / C. Для проекта сверяйте таблицы заслонки и " +
-      "паспорт привода в каталоге.",
-  },
-  {
-    question: "Как заказать и получить КП?",
-    answer:
-      "Подберите модель в каталоге или опишите задачу — заявка на консультацию. " +
-      "Ответ до 2 рабочих часов.",
-  },
-  {
-    question: "Как подобрать модель на сайте?",
-    answer:
-      "На главной — блок «Подбор за минуту»: тип продукции (привод, шаровой кран, " +
-      "комплект, кронштейн BR-M/BR-ML), параметры из проекта → подборка в каталоге " +
-      "или заявка инженеру.",
-  },
-];
+export type FaqJsonLdItem = { question: string; answer: string };
 
 /**
  * Build a JSON-LD Product object from a SKU with a strict whitelist.
@@ -119,8 +90,10 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
 }
 
 /** Organization + WebSite (+ SearchAction) for the home page. */
-export function buildHomeJsonLd(): Record<string, unknown>[] {
-  return [
+export function buildHomeJsonLd(
+  faqItems: FaqJsonLdItem[] = [],
+): Record<string, unknown>[] {
+  const blocks: Record<string, unknown>[] = [
     {
       "@context": "https://schema.org",
       "@type": "Organization",
@@ -141,13 +114,16 @@ export function buildHomeJsonLd(): Record<string, unknown>[] {
         "query-input": "required name=search_term_string",
       },
     },
-    buildFaqJsonLd(),
   ];
+  if (faqItems.length) {
+    blocks.push(buildFaqJsonLd(faqItems));
+  }
+  return blocks;
 }
 
-/** FAQPage schema from whitelisted Q&A pairs. */
+/** FAQPage schema from Admin FAQ items. */
 export function buildFaqJsonLd(
-  items: Array<{ question: string; answer: string }> = HOME_FAQ_ITEMS,
+  items: FaqJsonLdItem[],
 ): Record<string, unknown> {
   return {
     "@context": "https://schema.org",

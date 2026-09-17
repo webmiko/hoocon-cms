@@ -299,9 +299,20 @@ class SupportScheduleInterval(models.Model):
 
 
 class FaqItem(models.Model):
-    """Вопрос-ответ для быстрых кнопок виджета чата на сайте."""
+    """Вопрос-ответ для чата, главной и JSON-LD (единый источник FAQ)."""
 
-    question: models.CharField = models.CharField("вопрос", max_length=300)
+    question: models.CharField = models.CharField(
+        "вопрос",
+        max_length=300,
+        help_text="Полная формулировка для главной, /faq и SEO.",
+    )
+    question_short: models.CharField = models.CharField(
+        "короткий вопрос",
+        max_length=300,
+        blank=True,
+        default="",
+        help_text="Чип в виджете чата. Пусто — используется полный вопрос.",
+    )
     answer: models.TextField = models.TextField("ответ")
     order: models.PositiveIntegerField = models.PositiveIntegerField(
         "порядок",
@@ -317,6 +328,12 @@ class FaqItem(models.Model):
         default=False,
         db_index=True,
         help_text="Показывать вопрос чипом в виджете чата на сайте.",
+    )
+    show_on_home: models.BooleanField = models.BooleanField(
+        "блок на главной",
+        default=False,
+        db_index=True,
+        help_text="Показывать в секции «Частые вопросы» на главной и в JSON-LD.",
     )
 
     class Meta:

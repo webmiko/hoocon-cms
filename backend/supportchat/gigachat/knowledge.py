@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from config.seo.routes import HOME_FAQ_ITEMS, PUBLIC_STATIC_ROUTES
+from config.seo.routes import PUBLIC_STATIC_ROUTES
 from content.etl.tilda_articles import strip_html_to_text
 from content.models import Article, Page
 from content.views import publicly_visible
@@ -47,17 +47,6 @@ def build_site_routes_block() -> str:
         if title or desc:
             lines.append(f"- {path}: {title}. {desc}".strip())
     return "\n".join(lines) if lines else "—"
-
-
-def build_home_faq_block() -> str:
-    """FAQ с главной (для сборки KB-файла)."""
-    lines: list[str] = []
-    for question, answer in HOME_FAQ_ITEMS:
-        q = question.strip()
-        a = answer.strip()
-        if q and a:
-            lines.append(f"В: {q}\nО: {a}")
-    return "\n\n".join(lines) if lines else "—"
 
 
 def build_faq_items_block(*, limit: int = 30) -> str:

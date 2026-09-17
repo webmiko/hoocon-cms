@@ -4,13 +4,11 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react";
 
 import { useFocusTrap } from "../hooks/useFocusTrap";
-import { Link } from "react-router-dom";
-
 import { api } from "../api/client";
+import { faqAnswerNodes } from "../utils/faqAnswer";
 import {
   closeSupportChat,
   getSupportChatState,
@@ -56,66 +54,6 @@ type SupportConversationState = {
   ai_active?: boolean;
   ai_escalated?: boolean;
 };
-
-const FAQ_PATH_LABELS: Record<string, string> = {
-  "/consultation": "консультация",
-  "/gde-kupit": "где купить",
-  "/kontakty": "контакты",
-  "/dokumentaciya": "документация",
-  "/catalog": "каталог",
-  "/faq": "вопросы и ответы",
-  "/zavod": "OEM · завод",
-  "/company": "о компании",
-  "/rfq": "запрос цены",
-};
-
-const FAQ_PATH_RE =
-  /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:\?[^\s]+)?(?:#[a-z0-9-]+)?/gi;
-
-function faqLinkLabel(href: string): string {
-  const [path, query = ""] = href.split(/[?#]/, 2);
-  if (path === "/dokumentaciya" && query) {
-    const sku = new URLSearchParams(query).get("q");
-    if (sku) {
-      return `документация: ${sku}`;
-    }
-  }
-  return FAQ_PATH_LABELS[path] ?? href;
-}
-
-function faqAnswerNodes(text: string, onNavigate?: () => void): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let last = 0;
-  let match: RegExpExecArray | null;
-  const re = new RegExp(FAQ_PATH_RE.source, "gi");
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > last) {
-      nodes.push(text.slice(last, match.index));
-    }
-    const raw = match[0];
-    const trailing = raw.match(/[.,;:!?)\]»"']+$/);
-    const href = trailing ? raw.slice(0, -trailing[0].length) : raw;
-    const suffix = trailing ? trailing[0] : "";
-    nodes.push(
-      <Link
-        key={`faq-link-${match.index}`}
-        to={href}
-        className={styles.faqLink}
-        onClick={onNavigate}
-      >
-        {faqLinkLabel(href)}
-      </Link>,
-    );
-    if (suffix) {
-      nodes.push(suffix);
-    }
-    last = match.index + raw.length;
-  }
-  if (last < text.length) {
-    nodes.push(text.slice(last));
-  }
-  return nodes;
-}
 
 function QuickFaqChips({
   items,
@@ -860,7 +798,10 @@ export function SupportWidget() {
                     <span className={styles.sender}>{label}</span>
                     <div className={bubbleClass}>
                       {isBot
-                        ? faqAnswerNodes(m.body, () => closeSupportChat())
+                        ? faqAnswerNodes(m.body, {
+                            className: styles.faqLink,
+                            onNavigate: () => closeSupportChat(),
+                          })
                         : m.body}
                     </div>
                     {time ? <time className={styles.time}>{time}</time> : null}
@@ -876,7 +817,10 @@ export function SupportWidget() {
                 <div className={styles.rowIn}>
                   <span className={styles.sender}>Поддержка</span>
                   <div className={styles.bubbleIn}>
-                    {faqAnswerNodes(activeFaq.answer, () => closeSupportChat())}
+                    {faqAnswerNodes(activeFaq.answer, {
+                      className: styles.faqLink,
+                      onNavigate: () => closeSupportChat(),
+                    })}
                   </div>
                 </div>
               </>

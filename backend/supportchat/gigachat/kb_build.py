@@ -130,7 +130,6 @@ def _manual_branch_tags(chunk: ManualChunk) -> frozenset[str]:
 
 def build_site_branches() -> list[KbBranch]:
     """CMS/catalog snapshot as searchable branches (build-time)."""
-    from config.seo.routes import HOME_FAQ_ITEMS
     from supportchat.gigachat.knowledge import (
         build_articles_block,
         build_catalog_categories_block,
@@ -153,31 +152,21 @@ def build_site_branches() -> list[KbBranch]:
             ),
         )
 
-    for index, (question, answer) in enumerate(HOME_FAQ_ITEMS):
-        q = question.strip()
-        a = answer.strip()
-        if not q or not a:
-            continue
-        branches.append(
-            KbBranch(
-                id=f"faq.home.{index + 1}",
-                title=f"FAQ: {q[:80]}",
-                tags=frozenset({"faq", "home", "овк"}),
-                tokens=_faq_search_tokens(q, a),
-                body=f"В: {q}\nО: {a}",
-            ),
-        )
-
     for row in FaqItem.objects.filter(is_active=True).order_by("order", "id"):
         q = str(row.question).strip()
         a = str(row.answer).strip()
         if not q or not a:
             continue
+        tags = frozenset({"faq", "admin", "чат"})
+        branch_id = f"faq.admin.{row.pk}"
+        if row.show_on_home:
+            tags = frozenset({"faq", "home", "овк", "admin"})
+            branch_id = f"faq.home.{row.pk}"
         branches.append(
             KbBranch(
-                id=f"faq.admin.{row.pk}",
-                title=f"FAQ чата: {q[:80]}",
-                tags=frozenset({"faq", "admin", "чат"}),
+                id=branch_id,
+                title=f"FAQ: {q[:80]}",
+                tags=tags,
                 tokens=_faq_search_tokens(q, a),
                 body=f"В: {q}\nО: {a}",
             ),
