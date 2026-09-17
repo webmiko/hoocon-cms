@@ -208,6 +208,7 @@ def create_outbound_email(
     to_email: str | None = None,
     lead: Lead | None = None,
     author: AbstractBaseUser | None = None,
+    reply_to_email: str | None = None,
     send_now: bool = True,
 ) -> EmailMessage:
     """Create an outbound EmailMessage and optionally queue send.
@@ -219,6 +220,7 @@ def create_outbound_email(
         to_email: override recipient (default client.email).
         lead: optional related Lead.
         author: staff User who composed the message.
+        reply_to_email: optional Reply-To header (manager mailbox).
         send_now: enqueue Celery send after commit.
 
     Returns:
@@ -226,6 +228,7 @@ def create_outbound_email(
     """
     from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "") or "webmaster@localhost"
     created_by = author if author is not None and author.is_authenticated else None
+    reply_to = (reply_to_email or "").strip()
     msg = EmailMessage.objects.create(
         client=client,
         lead=lead,
@@ -233,6 +236,7 @@ def create_outbound_email(
         status=EmailStatus.QUEUED if send_now else EmailStatus.DRAFT,
         to_email=(to_email or client.email).strip(),
         from_email=from_addr,
+        reply_to_email=reply_to,
         subject=subject.strip(),
         body=body.strip(),
         created_by=created_by,  # type: ignore[misc]
@@ -248,6 +252,47 @@ def create_outbound_email(
     if send_now:
         enqueue_crm_email(msg.pk)
     return msg
+
+
+def create_lead_reply_email(
+    *,
+    lead: Lead,
+    subject: str,
+    body: str,
+    to_email: str | None = None,
+    author: AbstractBaseUser | None = None,
+    reply_to_email: str | None = None,
+    send_now: bool = True,
+) -> EmailMessage:
+    """Queue a KP reply to a lead: CRM client card, Reply-To manager, footer hint.
+
+    Args:
+        lead: RFQ / consultation lead being answered.
+        subject: email subject.
+        body: manager-edited plain text (footer appended on send).
+        to_email: override recipient (default lead.email).
+        author: staff user who composed the reply.
+        reply_to_email: manager mailbox for client replies.
+        send_now: enqueue Celery send after commit.
+
+    Returns:
+        Created EmailMessage linked to the lead and CRM client.
+    """
+    from crm.manager_signatures import assemble_lead_reply_body
+
+    client = get_or_create_client_from_lead(lead)
+    reply_to = (reply_to_email or "").strip()
+    full_body = assemble_lead_reply_body(body, reply_to)
+    return create_outbound_email(
+        client=client,
+        lead=lead,
+        subject=subject,
+        body=full_body,
+        to_email=to_email,
+        author=author,
+        reply_to_email=reply_to,
+        send_now=send_now,
+    )
 
 
 def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet[Client]:

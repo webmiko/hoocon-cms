@@ -240,7 +240,7 @@ def test_send_crm_email_task_marks_failed_on_smtp_error(settings) -> None:
 
     from crm.tasks import send_crm_email
 
-    with patch("crm.tasks.send_mail", side_effect=OSError("smtp down")):
+    with patch("crm.tasks.DjangoEmailMessage.send", side_effect=OSError("smtp down")):
         with patch.object(send_crm_email, "retry", side_effect=RuntimeError("retry")):
             with pytest.raises(RuntimeError, match="retry"):
                 send_crm_email.run(msg.pk)

@@ -37,10 +37,20 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import SKU
 from config.admin_mixins import OpenChangeLinkMixin
+from crm.forms import ComposeEmailForm
+from crm.mail_links import (
+    format_lead_reply_body,
+    format_lead_reply_subject,
+    staff_reply_to_email,
+)
+from crm.manager_signatures import manager_reply_signature
+from crm.models import EmailStatus
+from crm.services import create_lead_reply_email
 from leads.models import Lead, LeadItem
 from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
@@ -435,15 +445,9 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             if obj is not None:
                 change_url = reverse("admin:leads_lead_change", args=[obj.pk])
                 if obj.email:
-                    from crm.mail_links import build_lead_reply_email_urls, format_lead_reply_body
-
-                    company = (obj.company or "").strip() or "клиент"
-                    manager_email = (getattr(request.user, "email", "") or "").strip()
-                    extra["lead_reply_email_urls"] = build_lead_reply_email_urls(
-                        lead_email=obj.email,
-                        subject=f"КП #{obj.pk} — {company}",
-                        manager_email=manager_email,
-                        body=format_lead_reply_body(obj),
+                    extra["lead_compose_reply_url"] = reverse(
+                        "admin:leads_lead_compose_reply",
+                        args=[obj.pk],
                     )
                 if edit_mode:
                     extra["lead_view_url"] = change_url
@@ -467,6 +471,79 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             )
 
         return super().changeform_view(request, object_id, form_url, extra_context=extra)
+
+    def compose_reply_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Compose and send a KP reply to the lead contact from Admin."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        lead = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, lead):
+            raise PermissionDenied
+        if not (lead.email or "").strip():
+            self.message_user(
+                request,
+                _("У заявки нет email — отправить ответ нельзя."),
+                messages.ERROR,
+            )
+            return HttpResponseRedirect(
+                reverse("admin:leads_lead_change", args=[lead.pk]),
+            )
+
+        change_url = reverse("admin:leads_lead_change", args=[lead.pk])
+        author = request.user if request.user.is_authenticated else None
+        manager_email = staff_reply_to_email(author)
+
+        if request.method == "POST":
+            form = ComposeEmailForm(request.POST)
+            if form.is_valid():
+                msg = create_lead_reply_email(
+                    lead=lead,
+                    subject=form.cleaned_data["subject"],
+                    body=form.cleaned_data["body"],
+                    to_email=form.cleaned_data["to_email"],
+                    author=author,
+                    reply_to_email=manager_email,
+                    send_now=bool(form.cleaned_data.get("send_now")),
+                )
+                if msg.status == EmailStatus.QUEUED:
+                    self.message_user(
+                        request,
+                        _("Письмо поставлено в очередь на отправку."),
+                        messages.SUCCESS,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        _("Черновик сохранён. Отправьте из раздела «Письма»."),
+                        messages.INFO,
+                    )
+                return HttpResponseRedirect(change_url)
+        else:
+            form = ComposeEmailForm(
+                initial={
+                    "to_email": lead.email,
+                    "subject": format_lead_reply_subject(lead),
+                    "body": format_lead_reply_body(lead),
+                    "send_now": True,
+                },
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": lead,
+            "title": _("Ответ клиенту: %(name)s") % {"name": lead.name},
+            "form": form,
+            "media": self.media,
+            "manager_reply_to_email": manager_email,
+            "manager_signature_preview": manager_reply_signature(manager_email),
+            "lead_change_url": change_url,
+        }
+        return render(request, "admin/leads/compose_reply.html", context)
 
     def response_change(
         self,
@@ -813,6 +890,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 "<int:object_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="leads_lead_set_status",
+            ),
+            path(
+                "<path:object_id>/compose-reply/",
+                self.admin_site.admin_view(self.compose_reply_view),
+                name="leads_lead_compose_reply",
             ),
         ]
         return custom + super().get_urls()
