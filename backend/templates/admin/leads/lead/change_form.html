@@ -1,5 +1,5 @@
 {% extends "admin/change_form.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block form_top %}
   {{ block.super }}
@@ -18,12 +18,13 @@
       >
         Вернуться к списку
       </a>
-      {% if lead_reply_email_url %}
+      {% if lead_reply_email_urls %}
         <a
-          href="{{ lead_reply_email_url }}"
-          class="hoocon-admin-open hoocon-lead-view-actions__mail"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="{{ lead_reply_email_urls.web }}"
+          class="hoocon-admin-open hoocon-lead-view-actions__mail hoocon-lead-yandex-mail-reply"
+          data-web-url="{{ lead_reply_email_urls.web }}"
+          data-yandex-app-url="{{ lead_reply_email_urls.yandex_app }}"
+          data-yandex-android-url="{{ lead_reply_email_urls.yandex_android }}"
         >
           Ответить в Яндекс.Почте
         </a>
@@ -55,5 +56,15 @@
         {{ block.super }}
       </div>
     </div>
+  {% endif %}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  {% if lead_reply_email_urls %}
+    <script
+      src="{% static 'admin/js/hoocon-admin-lead-mail-reply.js' %}?v={{ STATIC_VERSION }}"
+      defer
+    ></script>
   {% endif %}
 {% endblock %}
