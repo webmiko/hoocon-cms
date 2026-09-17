@@ -15,6 +15,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from catalog.compare import (
     COMPARE_MAX_SKUS,
@@ -292,6 +293,63 @@ class SKUViewSet(
         if self.action == "retrieve":
             return SKUDetailSerializer
         return SKUListSerializer
+
+
+class QuizAnalogView(APIView):
+    """GET /api/catalog/quiz-analogs/ — cross-category quiz fallbacks.
+
+    Kit branch: when factory kits are unavailable, pair bare ball valves with
+    compatible drives and brackets from valve EAV.
+    """
+
+    permission_classes = (AllowAny,)
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request: Request) -> Response:
+        """Return kit component bundles for quiz DN/Kvs/ways + electrical intent."""
+        need = (request.query_params.get("need") or "").strip().casefold()
+        if need != "kit":
+            return Response(
+                {"detail": "Поддерживается только need=kit."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from catalog.quiz_analogs import find_kit_analog_bundles
+
+        try:
+            limit = int(request.query_params.get("page_size") or "6")
+        except ValueError:
+            limit = 6
+        limit = max(1, min(limit, 12))
+
+        raw_bundles = find_kit_analog_bundles(request, limit=limit)
+        serializer = SKUListSerializer(
+            context={"request": request, "view": None},
+        )
+        bundles = []
+        for row in raw_bundles:
+            bundles.append(
+                {
+                    "valve": serializer.to_representation(row["valve"]),
+                    "drive": serializer.to_representation(row["drive"]),
+                    "bracket": (serializer.to_representation(row["bracket"]) if row["bracket"] is not None else None),
+                    "drive_code": row["drive_code"],
+                    "bracket_code": row["bracket_code"],
+                    "in_stock": row["in_stock"],
+                },
+            )
+        return Response(
+            {
+                "mode": "kit_components",
+                "count": len(bundles),
+                "bundles": bundles,
+                "note": (
+                    "Готовых комплектов нет в наличии — подобрали кран, привод и кронштейн из отдельных позиций."
+                    if bundles
+                    else ""
+                ),
+            },
+        )
 
 
 class ProductFileViewSet(

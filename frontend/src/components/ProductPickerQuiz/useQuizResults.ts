@@ -1,28 +1,40 @@
 import { useAsync } from "../../hooks/useAsync";
-import { api, type SKUList } from "../../api/client";
+import { api, type QuizKitAnalogBundle, type SKUList } from "../../api/client";
 import type { QuizAnswers } from "./quizEngine";
+import {
+  buildQuizAnalogParams,
+  shouldFetchKitAnalogs,
+} from "./quizAnalogParams";
 import {
   buildCatalogParams,
   relaxCatalogParams,
   type CatalogQueryParams,
 } from "./quizToCatalog";
 
+export type QuizResultsMode = "primary" | "kit_components";
+
 export type QuizResultsState = {
   loading: boolean;
   error: string | null;
   items: SKUList[];
+  bundles: QuizKitAnalogBundle[];
   totalCount: number;
   params: CatalogQueryParams;
   relaxed: boolean;
+  mode: QuizResultsMode;
+  analogNote: string | null;
 };
 
 const EMPTY: QuizResultsState = {
   loading: false,
   error: null,
   items: [],
+  bundles: [],
   totalCount: 0,
   params: {},
   relaxed: false,
+  mode: "primary",
+  analogNote: null,
 };
 
 async function fetchQuizPreview(answers: QuizAnswers): Promise<QuizResultsState> {
@@ -31,24 +43,59 @@ async function fetchQuizPreview(answers: QuizAnswers): Promise<QuizResultsState>
   const strict = buildCatalogParams(answers, facetsRes.results ?? []);
   const variants = relaxCatalogParams(strict);
 
+  let primary: QuizResultsState | null = null;
   for (let index = 0; index < variants.length; index += 1) {
     const params = variants[index]!;
     const response = await api.skus(params);
     if ((response.results?.length ?? 0) > 0 || index === variants.length - 1) {
-      return {
+      primary = {
         loading: false,
         error: null,
         items: response.results ?? [],
+        bundles: [],
         totalCount: response.count ?? response.results?.length ?? 0,
         params,
         relaxed: index > 0,
+        mode: "primary",
+        analogNote: null,
       };
+      break;
     }
   }
 
+  if (primary === null) {
+    primary = {
+      ...EMPTY,
+      params: strict,
+    };
+  }
+
+  if (!shouldFetchKitAnalogs(answers.need, primary.items)) {
+    const inStockItems =
+      answers.need === "kit"
+        ? primary.items.filter((sku) => sku.in_stock)
+        : primary.items;
+    return {
+      ...primary,
+      items: inStockItems.length > 0 ? inStockItems : primary.items,
+      totalCount:
+        inStockItems.length > 0 ? inStockItems.length : primary.totalCount,
+    };
+  }
+
+  const analogParams = buildQuizAnalogParams(answers, primary.params);
+  const analogResponse = await api.quizAnalogs(analogParams);
+  if ((analogResponse.bundles?.length ?? 0) === 0) {
+    return primary;
+  }
+
   return {
-    ...EMPTY,
-    params: strict,
+    ...primary,
+    items: [],
+    bundles: analogResponse.bundles,
+    totalCount: analogResponse.count,
+    mode: "kit_components",
+    analogNote: analogResponse.note || null,
   };
 }
 
@@ -84,9 +131,12 @@ export function useQuizResults(
       loading: false,
       error: "Не удалось загрузить подборку. Откройте каталог или оставьте заявку.",
       items: [],
+      bundles: [],
       totalCount: 0,
       params: buildCatalogParams(answers, []),
       relaxed: false,
+      mode: "primary",
+      analogNote: null,
     };
   }
 
