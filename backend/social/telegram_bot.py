@@ -10,6 +10,7 @@ from typing import Any
 
 from django.conf import settings
 
+from social.copy import EMAIL_SALES, PHONE, clip_text, compose_contacts_html, site_url
 from social.publishers import PublishResult, publish_telegram, telegram_api_call
 
 logger = logging.getLogger("hoocon.social")
@@ -21,17 +22,6 @@ _TELEGRAM_CAPTION_MAX = 1024
 _TELEGRAM_MESSAGE_MAX = 4096
 _DEFAULT_CHANNEL_USERNAME = "hoocon_moscow"
 _DEFAULT_WELCOME_STATIC = Path("static/social/telegram-welcome.webp")
-
-# Site copy (aligned with seed_site_content / WhereToBuyPage).
-_PHONE = "8 800 350-58-98"
-_EMAIL_SALES = "sales@hoocon.ru"
-_EMAIL_INFO = "info@hoocon.ru"
-_HOURS = "Пн–Пт 9:30–17:30 (МСК), сб–вс — выходной"
-_ADDRESS = "143440, Московская область, г. о. Красногорск, пгт Путилково, тер. Гринвуд, стр. 7, помещ. 98 (3-й этаж)"
-_INN = "5024199634"
-_KPP = "502401001"
-_OGRN = "1195081070986"
-_BANK = "р/с 40702810838000199148, к/с 30101810400000000225, БИК 044525225, ПАО Сбербанк"
 
 
 def telegram_channel_username() -> str:
@@ -104,13 +94,6 @@ def welcome_photo_url() -> str:
     return "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
 
 
-def _clip(text: str, limit: int) -> str:
-    """Trim to Telegram length limits with an ellipsis when needed."""
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "…"
-
-
 def compose_welcome_caption() -> str:
     """HTML caption for /start (Telegram HTML subset, ≤1024)."""
     text = (
@@ -122,37 +105,23 @@ def compose_welcome_caption() -> str:
         f"• <b>{html.escape(BTN_WHERE_TO_BUY)}</b> — розничные партнёры\n\n"
         "Или просто напишите вопрос — мы ответим в этом чате."
     )
-    return _clip(text, _TELEGRAM_CAPTION_MAX)
+    return clip_text(text, _TELEGRAM_CAPTION_MAX)
 
 
 def compose_contacts_caption() -> str:
     """HTML caption for «Контакты» — site /kontakty + реквизиты (≤1024)."""
-    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-    text = (
-        "<b>Контакты ООО «Хогон»</b> (бренд Hoocon)\n"
-        "Ответим до 2 рабочих часов в рабочие дни.\n\n"
-        f"<b>Телефон:</b> {html.escape(_PHONE)}\n"
-        f"<b>Продажи:</b> {html.escape(_EMAIL_SALES)}\n"
-        f"<b>Сотрудничество / ПДн:</b> {html.escape(_EMAIL_INFO)}\n"
-        f"<b>Адрес:</b> {html.escape(_ADDRESS)}\n"
-        f"<b>Режим:</b> {html.escape(_HOURS)}\n\n"
-        "<b>Реквизиты</b>\n"
-        f"ИНН {_INN}, КПП {_KPP}, ОГРН {_OGRN}\n"
-        f"{html.escape(_BANK)}\n\n"
-        f"Полная страница: {html.escape(site)}/kontakty"
-    )
-    return _clip(text, _TELEGRAM_CAPTION_MAX)
+    return compose_contacts_html(limit=_TELEGRAM_CAPTION_MAX)
 
 
 def compose_where_to_buy_reply() -> str:
     """HTML text for «Где купить» — retail partners from /gde-kupit."""
-    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+    site = site_url()
     text = (
         "<b>Где купить в розницу</b>\n"
         "Физическим лицам удобнее обратиться к партнёру "
         "в своём городе. "
         "Юрлица могут заказать напрямую у ООО «Хогон» "
-        f"({html.escape(_PHONE)}, {html.escape(_EMAIL_SALES)}).\n\n"
+        f"({html.escape(PHONE)}, {html.escape(EMAIL_SALES)}).\n\n"
         "<b>«ТД Панорамавент» — Москва</b>\n"
         "ул. Производственная, д. 11, стр. 6\n"
         "+7 (495) 380-06-76 · info@panoramavent.ru\n"
@@ -173,7 +142,7 @@ def compose_where_to_buy_reply() -> str:
         "hoocon.by\n\n"
         f"Подробнее на сайте: {html.escape(site)}/gde-kupit"
     )
-    return _clip(text, _TELEGRAM_MESSAGE_MAX)
+    return clip_text(text, _TELEGRAM_MESSAGE_MAX)
 
 
 def compose_channel_reply() -> str:
