@@ -41,6 +41,33 @@ def test_manager_reply_signature_plain_text_for_ludmila() -> None:
     assert "mailto:" not in plain
 
 
+def test_manager_reply_signature_unknown_email_returns_empty() -> None:
+    """Unconfigured manager mailboxes do not get a signature block."""
+    assert manager_reply_signature("") == ""
+    assert manager_reply_signature("other@hoocon.ru") == ""
+
+
+def test_manager_reply_signature_html_supports_legacy_mailto_and_tel_lines() -> None:
+    """Legacy signature lines with mailto:/tel: suffixes still linkify in HTML."""
+    from crm.manager_signatures import _MANAGER_SIGNATURES
+
+    _MANAGER_SIGNATURES["legacy@hoocon.ru"] = (
+        "Legacy\n+7(900)000-00-00 (tel:+79000000000)\nmailto:legacy@hoocon.ru"
+    )
+    html = manager_reply_signature_html("legacy@hoocon.ru")
+    assert 'href="tel:+79000000000"' in html
+    assert 'href="mailto:legacy@hoocon.ru"' in html
+    del _MANAGER_SIGNATURES["legacy@hoocon.ru"]
+
+
+def test_assemble_lead_reply_body_appends_plain_signature() -> None:
+    """Plain-text replies append Ludmila signature and footer."""
+    body = assemble_lead_reply_body("Добрый день!", "assistant@hoocon.ru")
+    assert body.startswith("Добрый день!")
+    assert "С уважением, Людмила" in body
+    assert "Ответьте на это письмо" in body
+
+
 def test_assemble_lead_reply_body_appends_html_signature() -> None:
     """HTML replies keep Ludmila signature and footer as HTML fragments."""
     body = assemble_lead_reply_body(
