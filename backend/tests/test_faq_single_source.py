@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from django.test import Client
 
-from config.seo.json_ld import build_json_ld
 from config.seo.head import SeoHeadContext
-from supportchat.faq import chat_faq_items, home_faq_items, seo_faq_tuples
+from config.seo.json_ld import build_json_ld
+from supportchat.faq import chat_faq_items, home_faq_items
 from supportchat.models import FaqItem
 
 

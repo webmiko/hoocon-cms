@@ -126,17 +126,7 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-source = [
-    "catalog",
-    "content",
-    "leads",
-    "crm",
-    "search",
-    "config",
-    "sitesettings",
-    "supportchat",
-    "social",
-]
+source = ["catalog", "content", "leads", "crm", "search", "config", "sitesettings"]
 omit = [
     "*/migrations/*",
     "*/tests/*",

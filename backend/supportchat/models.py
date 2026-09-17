@@ -333,7 +333,7 @@ class FaqItem(models.Model):
         "блок на главной",
         default=False,
         db_index=True,
-        help_text="Показывать в секции «Частые вопросы» на главной и в JSON-LD.",
+        help_text="Показывать в секции «Частые вопросы» на главной и в разметке для поисковиков.",
     )
 
     class Meta:
