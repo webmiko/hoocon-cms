@@ -26,6 +26,13 @@ export function PageView({ slug: slugProp }: PageViewProps) {
     () => api.pageDetail(slug),
     slug,
   );
+  const { data: faqSeo } = useAsync(
+    () =>
+      slug === "faq"
+        ? api.supportFaqScope("seo", "/faq")
+        : Promise.resolve(null),
+    slug,
+  );
 
   if (!slug) {
     return (
@@ -56,10 +63,13 @@ export function PageView({ slug: slugProp }: PageViewProps) {
   const desc = metaDescription(page.body.replace(/<[^>]+>/g, ""));
   const jsonLd =
     page.slug === "faq"
-      ? [buildFaqJsonLd(), buildBreadcrumbJsonLd([
-          { name: "Главная", path: "/" },
-          { name: page.title, path: `/${page.slug}` },
-        ])]
+      ? [
+          buildFaqJsonLd(faqSeo?.items ?? []),
+          buildBreadcrumbJsonLd([
+            { name: "Главная", path: "/" },
+            { name: page.title, path: `/${page.slug}` },
+          ]),
+        ]
       : [
           buildBreadcrumbJsonLd([
             { name: "Главная", path: "/" },

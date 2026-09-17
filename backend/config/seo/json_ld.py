@@ -7,7 +7,8 @@ from typing import Any
 from django.conf import settings
 
 from config.seo.head import SeoHeadContext
-from config.seo.routes import DEFAULT_DESCRIPTION, HOME_FAQ_ITEMS, SITE_NAME
+from config.seo.routes import DEFAULT_DESCRIPTION, SITE_NAME
+from supportchat.faq import seo_faq_tuples
 
 
 def build_json_ld(context: SeoHeadContext) -> list[dict[str, Any]]:
@@ -25,11 +26,15 @@ def build_json_ld(context: SeoHeadContext) -> list[dict[str, Any]]:
     if context.canonical_path == "/":
         blocks.append(_organization(site_url))
         blocks.append(_website(site_url))
-        blocks.append(_faq_page(site_url, HOME_FAQ_ITEMS))
+        home_faq = seo_faq_tuples("/")
+        if home_faq:
+            blocks.append(_faq_page(site_url, home_faq))
         return blocks
 
     if context.canonical_path == "/faq":
-        blocks.append(_faq_page(site_url, HOME_FAQ_ITEMS))
+        faq_items = seo_faq_tuples("/faq")
+        if faq_items:
+            blocks.append(_faq_page(site_url, faq_items))
         blocks.extend(_breadcrumb(site_url, context))
         return blocks
 
