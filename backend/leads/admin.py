@@ -20,6 +20,7 @@ from datetime import timedelta
 from typing import cast
 
 from django.contrib import admin, messages
+from django.contrib.admin import helpers
 from django.core.exceptions import PermissionDenied
 from django.db.models import (
     Case,
@@ -66,15 +67,24 @@ from leads.services import (
 
 _LEAD_EDIT_QUERY = "edit"
 
-# Changelist sort UI: (label, list_display column name). ``None`` = default status order.
+# Changelist sort UI: (label, list_display column name).
 _LEAD_SORT_COLUMNS: tuple[tuple[str, str | None], ...] = (
-    ("По статусу", None),
-    ("Дата", "created_at"),
     ("Имя", "name"),
     ("Компания", "company"),
     ("Email", "email_id"),
     ("Статус", "status_badge"),
 )
+
+
+class LeadItemInlineFormSet(helpers.InlineAdminFormSet):
+    """Tabular inline add-row label with correct Russian grammar."""
+
+    def inline_formset_data(self) -> str:
+        payload = json.loads(super().inline_formset_data())
+        add_text = getattr(self.opts, "add_button_text", None)
+        if add_text:
+            payload["options"]["addText"] = str(add_text)
+        return json.dumps(payload, ensure_ascii=False)
 
 
 class LeadItemInline(TabularInline):
@@ -85,6 +95,7 @@ class LeadItemInline(TabularInline):
     autocomplete_fields = ("sku",)
     fields = ("sku", "sku_code", "quantity", "sort_order")
     ordering = ("sort_order", "id")
+    add_button_text = _("Добавить ещё одну позицию к заявке")
 
 
 @admin.register(Lead)
@@ -207,6 +218,47 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             },
         ),
     )
+
+    def get_inline_formsets(
+        self,
+        request: HttpRequest,
+        formsets: list,
+        inline_instances: list,
+        obj: Lead | None = None,
+    ) -> list[helpers.InlineAdminFormSet]:
+        """Use custom add-row copy for lead line items."""
+        can_edit_parent = self.has_change_permission(request, obj) if obj else self.has_add_permission(request)
+        inline_admin_formsets: list[helpers.InlineAdminFormSet] = []
+        for inline, formset in zip(inline_instances, formsets, strict=True):
+            fieldsets = list(inline.get_fieldsets(request, obj))
+            readonly = list(inline.get_readonly_fields(request, obj))
+            if can_edit_parent:
+                has_add_permission = inline.has_add_permission(request, obj)
+                has_change_permission = inline.has_change_permission(request, obj)
+                has_delete_permission = inline.has_delete_permission(request, obj)
+            else:
+                has_add_permission = has_change_permission = has_delete_permission = False
+                formset.extra = formset.max_num = 0
+            has_view_permission = inline.has_view_permission(request, obj)
+            prepopulated = dict(inline.get_prepopulated_fields(request, obj))
+            formset_class = (
+                LeadItemInlineFormSet if getattr(inline, "add_button_text", None) else helpers.InlineAdminFormSet
+            )
+            inline_admin_formsets.append(
+                formset_class(
+                    inline,
+                    formset,
+                    fieldsets,
+                    prepopulated,
+                    readonly,
+                    model_admin=self,
+                    has_add_permission=has_add_permission,
+                    has_change_permission=has_change_permission,
+                    has_delete_permission=has_delete_permission,
+                    has_view_permission=has_view_permission,
+                )
+            )
+        return inline_admin_formsets
 
     @admin.display(description="ID", ordering="email")
     def email_id(self, obj: Lead) -> str:
@@ -600,7 +652,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         return scope_leads_for_manager(qs, request.user)
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
-        """New-first only on Lead changelist (needs ``_status_rank`` annotate).
+        """Lead changelist: newest first; optional status grouping via ``lead_sort``.
 
         Other admins (e.g. EmailMessage FK widgets) call this without the
         annotation — return model fields only in that case.
@@ -614,7 +666,9 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         match = getattr(request, "resolver_match", None)
         url_name = getattr(match, "url_name", "") or ""
         if url_name.startswith("leads_lead_changelist"):
-            return ("_status_rank", "-created_at", "-pk")
+            if request.GET.get("lead_sort") == "status":
+                return ("_status_rank", "-created_at", "-pk")
+            return ("-created_at", "-pk")
         return ("-created_at", "-pk")
 
     def _lead_changelist_sort_options(
@@ -653,15 +707,38 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             encoded = merged.urlencode()
             return f"?{encoded}" if encoded else "?"
 
+        lead_sort = (params.get("lead_sort") if hasattr(params, "get") else "") or ""
+        lead_sort = str(lead_sort).strip()
+        default_date_desc = not current_o and lead_sort != "status"
+
+        options.append(
+            {
+                "label": "Дата · Я→А",
+                "url": _url({"o": None, "lead_sort": None}),
+                "selected": default_date_desc,
+            }
+        )
         options.append(
             {
                 "label": "По статусу",
-                "url": _url({"o": None}),
-                "selected": not current_o,
+                "url": _url({"o": None, "lead_sort": "status"}),
+                "selected": not current_o and lead_sort == "status",
             }
         )
 
-        for field_label, column in _LEAD_SORT_COLUMNS[1:]:
+        try:
+            date_index = list_display.index("created_at")
+            options.append(
+                {
+                    "label": "Дата · А→Я",
+                    "url": _url({"o": str(date_index), "lead_sort": None}),
+                    "selected": current_o == str(date_index),
+                },
+            )
+        except ValueError:
+            pass
+
+        for field_label, column in _LEAD_SORT_COLUMNS:
             if not column:
                 continue
             try:
@@ -673,7 +750,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 options.append(
                     {
                         "label": f"{field_label} · {suffix}",
-                        "url": _url({"o": o_val}),
+                        "url": _url({"o": o_val, "lead_sort": None}),
                         "selected": current_o == o_val,
                     }
                 )
