@@ -8,9 +8,9 @@ from crm.email_body import is_html_email_body
 
 _ASSISTANT_EMAIL = "assistant@hoocon.ru"
 
-_LUDMILA_SIGNATURE = (
-    'С уважением, Людмила\nООО "ХОГОН"\n+7(995)780-70-18 (tel:+7(995)780-70-18)\nmailto:assistant@hoocon.ru'
-)
+_LUDMILA_SIGNATURE = 'С уважением, Людмила\nООО "ХОГОН"\n+7(995)780-70-18\nassistant@hoocon.ru'
+
+_EMAIL_LINE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _MANAGER_SIGNATURES: dict[str, str] = {
     _ASSISTANT_EMAIL: _LUDMILA_SIGNATURE,
@@ -42,6 +42,13 @@ def manager_reply_signature_html(manager_email: str) -> str:
             label = tel_match.group("label").strip()
             href = tel_match.group("href").strip()
             lines.append(f'<a href="tel:{href}">{label}</a>')
+            continue
+        if _EMAIL_LINE.fullmatch(stripped):
+            lines.append(f'<a href="mailto:{stripped}">{stripped}</a>')
+            continue
+        if stripped.startswith("+") and any(ch.isdigit() for ch in stripped):
+            tel_href = "+" + re.sub(r"\D", "", stripped)
+            lines.append(f'<a href="tel:{tel_href}">{stripped}</a>')
             continue
         lines.append(stripped)
     return "<br>".join(lines)
