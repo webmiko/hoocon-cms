@@ -27,8 +27,18 @@ from django.urls import reverse
 from django.utils import timezone
 
 from leads.models import Lead
+from leads.rfq_bundle import normalize_rfq_company
 
 User = get_user_model()
+
+# Fixed assignee for ООО Атерна (overrides round-robin).
+_ATERNA_ASSIGNEE_EMAIL = "assistant@hoocon.ru"
+_ATERNA_COMPANY_LABELS = frozenset(
+    {
+        "ооо атерна",
+        "атерна",
+    },
+)
 
 
 def parse_notify_emails(raw: str) -> list[str]:
@@ -52,6 +62,60 @@ def parse_notify_emails(raw: str) -> list[str]:
         seen.add(key)
         result.append(addr)
     return result
+
+
+def normalize_company_label(raw: str) -> str:
+    """Collapse spaces, casefold, strip quotes for company routing rules."""
+    text = normalize_rfq_company(raw)
+    for ch in "«»\"'":
+        text = text.replace(ch, "")
+    return " ".join(text.split())
+
+
+def is_aterna_company(company: str) -> bool:
+    """Whether the lead belongs to ООО Атерна (flexible spelling)."""
+    return normalize_company_label(company) in _ATERNA_COMPANY_LABELS
+
+
+def lookup_aterna_assignee() -> Any | None:
+    """Active staff user for Aterna leads (Людмила, assistant@hoocon.ru)."""
+    return (
+        User.objects.filter(
+            email__iexact=_ATERNA_ASSIGNEE_EMAIL,
+            is_staff=True,
+            is_active=True,
+        )
+        .order_by("pk")
+        .first()
+    )
+
+
+def _assign_lead_to_user(lead: Lead, pick: Any) -> Any:
+    """Persist assignee on lead and linked CRM client (when empty)."""
+    with transaction.atomic():
+        locked = Lead.objects.select_for_update().get(pk=lead.pk)
+        locked.assignee = pick
+        locked.save(update_fields=["assignee", "updated_at"])
+
+        if locked.client_id:
+            from crm.models import Client as CrmClient
+
+            client = CrmClient.objects.select_for_update().get(pk=locked.client_id)
+            if client.assignee_id is None:
+                client.assignee = pick
+                client.save(update_fields=["assignee", "updated_at"])
+
+    lead.refresh_from_db()
+    return pick
+
+
+def assign_lead_on_create(lead: Lead) -> Any | None:
+    """Assign manager on a new lead: Aterna rule first, else round-robin."""
+    if is_aterna_company(lead.company):
+        pick = lookup_aterna_assignee()
+        if pick is not None:
+            return _assign_lead_to_user(lead, pick)
+    return assign_lead_round_robin(lead)
 
 
 def manager_rotation_queryset() -> QuerySet[Any]:
@@ -119,20 +183,7 @@ def assign_lead_round_robin(lead: Lead) -> Any | None:
         site.lead_rr_last_user = pick
         site.save(update_fields=["lead_rr_last_user", "updated_at"])
 
-        locked = Lead.objects.select_for_update().get(pk=lead.pk)
-        locked.assignee = pick
-        locked.save(update_fields=["assignee", "updated_at"])
-
-        if locked.client_id:
-            from crm.models import Client as CrmClient
-
-            client = CrmClient.objects.select_for_update().get(pk=locked.client_id)
-            if client.assignee_id is None:
-                client.assignee = pick
-                client.save(update_fields=["assignee", "updated_at"])
-
-        lead.refresh_from_db()
-        return pick
+        return _assign_lead_to_user(lead, pick)
 
 
 def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
@@ -151,7 +202,7 @@ def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
 
     sales = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
     site = SiteSettings.load()
-    if site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
+    if is_aterna_company(lead.company) or site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
         assignee = getattr(lead, "assignee", None)
         if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
             addr = (getattr(assignee, "email", "") or "").strip()

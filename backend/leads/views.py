@@ -24,9 +24,8 @@ from rest_framework.throttling import ScopedRateThrottle
 from config.logging_utils import setup_logger
 from leads.models import Lead
 from leads.serializers import LeadSerializer
-from leads.services import assign_lead_round_robin
+from leads.services import assign_lead_on_create
 from leads.tasks import send_lead_notification
-from sitesettings.models import SiteSettings
 
 logger = setup_logger("hoocon.leads")
 
@@ -41,7 +40,7 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     - ScopedRateThrottle on `lead_create` (10/hour per IP).
     - Honeypot silent drop: if `website` field is filled, returns 201
       but does NOT create a Lead or send email.
-    - Optional round-robin assignee from SiteSettings lead_routing_mode.
+    - Assignee: ООО Атерна → assistant@hoocon.ru; else round-robin when enabled.
     - Celery task `send_lead_notification` fires via transaction.on_commit
       after successful creation.
     """
@@ -78,9 +77,7 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
 
-        site = SiteSettings.load()
-        if site.lead_routing_mode != SiteSettings.LeadRoutingMode.OFF:
-            assign_lead_round_robin(lead)
+        assign_lead_on_create(lead)
 
         # Schedule email via on_commit — task fires only after DB commit
         # (avoids running if the transaction rolls back).

@@ -12,7 +12,10 @@ from accounts.roles import GROUP_MANAGER
 from accounts.services import ensure_staff_groups
 from leads.models import Lead
 from leads.services import (
+    assign_lead_on_create,
     assign_lead_round_robin,
+    is_aterna_company,
+    lookup_aterna_assignee,
     manager_rotation_queryset,
     resolve_lead_notify_recipients,
     scope_leads_for_manager,
@@ -44,6 +47,127 @@ def _set_mode(mode: str) -> SiteSettings:
     site.lead_rr_last_user = None
     site.save(update_fields=["lead_routing_mode", "lead_rr_last_user", "updated_at"])
     return site
+
+
+@pytest.mark.django_db
+def test_is_aterna_company_matches_common_spellings() -> None:
+    """ООО Атерна is recognized with optional quotes and spacing."""
+    assert is_aterna_company("ООО Атерна")
+    assert is_aterna_company("  ооо   «Атерна»  ")
+    assert is_aterna_company("Атерна")
+    assert not is_aterna_company("ООО Не Атерна")
+    assert not is_aterna_company("ООО RoundRobin")
+
+
+@pytest.mark.django_db
+def test_aterna_lead_assigns_assistant_even_when_routing_off() -> None:
+    """Aterna leads always go to assistant@hoocon.ru, even with routing off."""
+    _make_manager(username="rr-off-other", email="other-mgr@hoocon.ru")
+    lyudmila = User.objects.create_user(
+        username="assistant",
+        email="assistant@hoocon.ru",
+        password="password12",
+        first_name="Людмила",
+        is_staff=True,
+        is_active=True,
+    )
+    _set_mode(SiteSettings.LeadRoutingMode.OFF)
+    lead = Lead.objects.create(
+        name="Атерна",
+        email="aterna@example.com",
+        company="ООО Атерна",
+        message="x" * 20,
+    )
+    picked = assign_lead_on_create(lead)
+    assert picked is not None
+    assert picked.pk == lyudmila.pk
+    lead.refresh_from_db()
+    assert lead.assignee_id == lyudmila.pk
+    assert lookup_aterna_assignee().pk == lyudmila.pk
+
+
+@pytest.mark.django_db
+@override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru")
+def test_aterna_notify_uses_assignee_email_when_routing_off() -> None:
+    """Aterna notification goes to assistant@ even when RR mode is off."""
+    User.objects.create_user(
+        username="assistant-notify",
+        email="assistant@hoocon.ru",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    )
+    _set_mode(SiteSettings.LeadRoutingMode.OFF)
+    lead = Lead.objects.create(
+        name="Notify",
+        email="notify-aterna@example.com",
+        company="ООО «Атерна»",
+        message="x" * 20,
+    )
+    assign_lead_on_create(lead)
+    lead.refresh_from_db()
+    assert resolve_lead_notify_recipients(lead) == ["assistant@hoocon.ru"]
+
+
+@pytest.mark.django_db
+def test_aterna_skips_round_robin_among_managers() -> None:
+    """Aterna company bypasses rotation and keeps RR cursor unchanged."""
+    a = _make_manager(username="rr-aterna-a", email="a-aterna@hoocon.ru")
+    _make_manager(username="rr-aterna-b", email="b-aterna@hoocon.ru")
+    lyudmila = User.objects.create_user(
+        username="assistant-rr",
+        email="assistant@hoocon.ru",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    )
+    site = _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
+    site.lead_rr_last_user = a
+    site.save(update_fields=["lead_rr_last_user", "updated_at"])
+
+    lead = Lead.objects.create(
+        name="Aterna RR",
+        email="aterna-rr@example.com",
+        company="ООО Атерна",
+        message="x" * 20,
+    )
+    picked = assign_lead_on_create(lead)
+    assert picked.pk == lyudmila.pk
+    site.refresh_from_db()
+    assert site.lead_rr_last_user_id == a.pk
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru")
+def test_api_aterna_assigns_assistant(client) -> None:
+    """POST /api/leads/ from ООО Атерна sets assignee assistant@hoocon.ru."""
+    from unittest.mock import patch
+
+    _make_manager(username="api-aterna-mgr", email="api-mgr@hoocon.ru")
+    lyudmila = User.objects.create_user(
+        username="api-assistant",
+        email="assistant@hoocon.ru",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    )
+    _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
+    payload = {
+        "name": "API Aterna",
+        "email": "api-aterna-client@example.com",
+        "company": "ООО Атерна",
+        "message": "Заявка от Атерны через API.",
+    }
+    with patch("leads.views.send_lead_notification") as mock_task:
+        response = client.post(
+            "/api/leads/",
+            data=payload,
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+    lead = Lead.objects.get(pk=response.json()["id"])
+    assert lead.assignee_id == lyudmila.pk
+    mock_task.delay.assert_called_once_with(lead.pk)
 
 
 @pytest.mark.django_db
