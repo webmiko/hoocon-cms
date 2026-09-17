@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 _YANDEX_COMPOSE_RU = "https://mail.yandex.ru/compose"
 _YANDEX_COMPOSE_COM = "https://mail.yandex.com/compose"
 _YANDEX_MAIL_ANDROID_PACKAGE = "ru.yandex.mail"
-_YANDEX_MAIL_APP_SCHEME = "yandexmail"
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,9 +19,8 @@ class LeadReplyEmailUrls:
     """URLs to open Yandex Mail app, with web compose as fallback."""
 
     web: str
-    yandex_app: str
-    yandex_android: str
     mailto: str
+    yandex_android: str
 
 
 def yandex_compose_web_base_url(manager_email: str = "") -> str:
@@ -68,14 +66,24 @@ def format_lead_reply_body(lead: Lead) -> str:
     return "\n".join(parts)
 
 
-def _compose_body(body: str = "", manager_email: str = "") -> str:
-    """Optional body with manager mailbox hint (mailto has no reliable From)."""
-    text = (body or "").strip()
-    sender = (manager_email or "").strip()
-    if sender:
-        hint = f"Отправитель: {sender}"
-        text = f"{hint}\n\n{text}" if text else hint
-    return text
+def build_mailto_compose_url(
+    *,
+    to: str,
+    subject: str,
+    body: str = "",
+) -> str:
+    """mailto: opens Yandex Mail / other MUAs with to, subject and body prefilled."""
+    recipient = (to or "").strip()
+    if not recipient:
+        return ""
+    params: list[tuple[str, str]] = []
+    if (subject or "").strip():
+        params.append(("subject", subject.strip()))
+    if (body or "").strip():
+        params.append(("body", body.strip()))
+    if not params:
+        return f"mailto:{recipient}"
+    return f"mailto:{recipient}?{urlencode(params, quote_via=quote)}"
 
 
 def build_yandex_compose_web_url(
@@ -89,14 +97,19 @@ def build_yandex_compose_web_url(
     recipient = (to or "").strip()
     if not recipient:
         return ""
-    # Yandex web compose reads recipient from ``mailto=``, not ``to=``.
+    # Yandex mailto handler passes the full mailto:…?subject&body link in ``mailto=``.
+    inner_mailto = build_mailto_compose_url(
+        to=recipient,
+        subject=subject,
+        body=body,
+    )
     params: dict[str, str] = {
-        "mailto": recipient,
-        "subject": (subject or "").strip(),
+        "mailto": inner_mailto,
     }
-    full_body = (body or "").strip()
-    if full_body:
-        params["body"] = full_body
+    if (subject or "").strip():
+        params["subject"] = subject.strip()
+    if (body or "").strip():
+        params["body"] = body.strip()
     sender = (from_email or "").strip()
     if sender:
         params["from"] = sender
@@ -104,55 +117,17 @@ def build_yandex_compose_web_url(
     return f"{base}?{urlencode(params, quote_via=quote)}"
 
 
-def build_mailto_compose_url(
-    *,
-    to: str,
-    subject: str,
-    body: str = "",
-    manager_email: str = "",
-) -> str:
-    """mailto: for Android intent payload (ru.yandex.mail package)."""
-    recipient = (to or "").strip()
-    if not recipient:
-        return ""
-    params: list[tuple[str, str]] = []
-    if (subject or "").strip():
-        params.append(("subject", subject.strip()))
-    full_body = _compose_body(body, manager_email)
-    if full_body:
-        params.append(("body", full_body))
-    if not params:
-        return f"mailto:{recipient}"
-    return f"mailto:{recipient}?{urlencode(params, quote_via=quote)}"
-
-
-def build_yandex_mail_app_url(
-    *,
-    to: str,
-    subject: str,
-    body: str = "",
-    manager_email: str = "",
-) -> str:
-    """yandexmail:// deep link for the installed Yandex Mail app."""
-    recipient = (to or "").strip()
-    if not recipient:
-        return ""
-    params: dict[str, str] = {
-        "to": recipient,
-        "subject": (subject or "").strip(),
-    }
-    full_body = _compose_body(body, manager_email)
-    if full_body:
-        params["body"] = full_body
-    return f"{_YANDEX_MAIL_APP_SCHEME}://compose?{urlencode(params, quote_via=quote)}"
-
-
 def build_yandex_mail_android_intent_url(mailto_url: str) -> str:
-    """Android intent opens ru.yandex.mail even when it is not the default MUA."""
+    """Android intent opens ru.yandex.mail with a prefilled mailto compose."""
     mailto = (mailto_url or "").strip()
     if not mailto.startswith("mailto:"):
         return ""
-    return f"intent:{mailto}#Intent;scheme=mailto;package={_YANDEX_MAIL_ANDROID_PACKAGE};end"
+    return (
+        f"intent:{mailto}#Intent;"
+        f"action=android.intent.action.SENDTO;"
+        f"scheme=mailto;"
+        f"package={_YANDEX_MAIL_ANDROID_PACKAGE};end"
+    )
 
 
 def build_lead_reply_email_urls(
@@ -162,12 +137,11 @@ def build_lead_reply_email_urls(
     manager_email: str = "",
     body: str = "",
 ) -> LeadReplyEmailUrls:
-    """Reply to an RFQ/lead: native Yandex Mail app, else web compose."""
+    """Reply to an RFQ/lead: mailto for Yandex Mail app, else web compose."""
     mailto = build_mailto_compose_url(
         to=lead_email,
         subject=subject,
         body=body,
-        manager_email=manager_email,
     )
     return LeadReplyEmailUrls(
         web=build_yandex_compose_web_url(
@@ -176,14 +150,8 @@ def build_lead_reply_email_urls(
             body=body,
             from_email=manager_email,
         ),
-        yandex_app=build_yandex_mail_app_url(
-            to=lead_email,
-            subject=subject,
-            body=body,
-            manager_email=manager_email,
-        ),
-        yandex_android=build_yandex_mail_android_intent_url(mailto),
         mailto=mailto,
+        yandex_android=build_yandex_mail_android_intent_url(mailto),
     )
 
 
