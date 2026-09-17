@@ -54,6 +54,20 @@ def lead_reply_footer(manager_email: str) -> str:
     return f"\n\n--\nОтветьте на это письмо — ваш ответ придёт на {email}."
 
 
+def lead_reply_footer_html(manager_email: str) -> str:
+    """HTML hint appended to rich-text KP replies."""
+    plain = lead_reply_footer(manager_email).strip()
+    if not plain:
+        return ""
+    if plain.startswith("--"):
+        hint = plain.removeprefix("--").strip()
+        return (
+            '<br><br><hr style="border:0;border-top:1px solid #d1d1d6;margin:1rem 0">'
+            f'<p style="margin:0;color:#6e6e73;font-size:0.85em;line-height:1.45">{hint}</p>'
+        )
+    return f"<br><br><p>{plain}</p>"
+
+
 def format_lead_reply_body(lead: Lead) -> str:
     """Plain-text KP reply body: client comment + SKU lines from the lead."""
     parts: list[str] = []
