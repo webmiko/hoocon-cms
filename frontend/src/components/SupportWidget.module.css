@@ -554,7 +554,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  max-width: 100%;
+  width: fit-content;
+  max-width: 50%;
   min-width: 0;
 }
 
@@ -570,7 +571,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  max-width: 100%;
+  width: fit-content;
+  max-width: 50%;
   min-width: 0;
   align-items: flex-start;
 }
@@ -586,38 +588,34 @@
 }
 
 .bubbleIn,
-.bubbleOut {
-  max-width: min(85%, 18rem);
-  padding: 0.65rem 0.8rem;
+.bubbleOut,
+.bubbleBot {
+  padding: 0.4rem;
   font-size: var(--font-size-sm);
   line-height: 1.45;
-  white-space: pre-wrap;
+  text-align: left;
+  white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
   box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 1.125rem;
 }
 
 .bubbleIn {
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: 16px 16px 16px 6px;
+  border-bottom-left-radius: 0.25rem;
   box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
 }
 
 .bubbleBot {
-  max-width: min(85%, 18rem);
-  padding: 0.65rem 0.8rem;
-  font-size: var(--font-size-sm);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  box-sizing: border-box;
   background: color-mix(in srgb, var(--color-brand-soft) 72%, var(--color-surface));
   color: var(--color-text);
   border: 1px dashed color-mix(in srgb, var(--color-brand) 24%, var(--color-border));
-  border-radius: 16px 16px 16px 6px;
+  border-bottom-left-radius: 0.25rem;
 }
 
 .faqLink {
@@ -630,7 +628,7 @@
 .bubbleOut {
   background: var(--color-brand);
   color: var(--color-on-brand);
-  border-radius: 16px 16px 6px 16px;
+  border-bottom-right-radius: 0.25rem;
   box-shadow: 0 6px 16px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
 
@@ -852,23 +850,43 @@
 
 .composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "input"
+    "hint";
+  gap: 0.35rem;
   padding: 0.65rem 0.9rem 0.9rem;
   background: var(--color-surface);
   min-width: 0;
   flex-shrink: 0;
 }
 
-.composerMain {
+.composerField {
+  --composer-radius: 1.125rem;
+  --composer-inset: 0.2rem;
+  grid-area: input;
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 0.15rem;
   min-width: 0;
+  padding: var(--composer-inset) var(--composer-inset) var(--composer-inset) 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--composer-radius);
+  background: var(--color-subtle);
+  transition:
+    border-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    background 160ms var(--ease-out);
+}
+
+.composerField:focus-within {
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border));
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 14%, transparent);
 }
 
 .composerHint {
+  grid-area: hint;
   margin: 0;
   padding: 0 0.35rem;
   font-size: 0.68rem;
@@ -876,42 +894,67 @@
   color: var(--color-text-muted);
 }
 
-.composer textarea {
+.composerField textarea {
+  flex: 1 1 auto;
   font: inherit;
   font-size: var(--font-size-base);
   resize: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 18px);
-  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: calc(var(--composer-radius) - var(--composer-inset)) 0 0
+    calc(var(--composer-radius) - var(--composer-inset));
+  padding: 0.45rem 0.35rem 0.45rem 0;
   color: var(--color-text);
-  background: var(--color-subtle);
+  background: transparent;
   min-width: 0;
   width: 100%;
+  min-height: 2.6rem;
   max-height: 7rem;
   box-sizing: border-box;
   field-sizing: content;
   line-height: 1.4;
+  -webkit-mask-image: radial-gradient(
+    circle 0.62rem at 100% 50%,
+    transparent 99%,
+    #000 100%
+  );
+  mask-image: radial-gradient(
+    circle 0.62rem at 100% 50%,
+    transparent 99%,
+    #000 100%
+  );
 }
 
-.composer textarea:focus {
+.composerField textarea:placeholder-shown {
+  padding-block: 0;
+  line-height: calc(2.6rem - 2px);
+}
+
+.composerField textarea::placeholder {
+  line-height: inherit;
+}
+
+.composerField textarea:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-border));
-  background: var(--color-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 14%, transparent);
+}
+
+.composerField .send {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 2.6rem;
+  min-height: 2.6rem;
+  height: auto;
+  padding: 0 0.85rem;
+  border-radius: calc(var(--composer-radius) - var(--composer-inset));
 }
 
 .send {
   appearance: none;
   border: none;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--color-brand);
   color: var(--color-on-brand);
   cursor: pointer;
-  flex-shrink: 0;
   transition:
     background 160ms var(--ease-out),
     opacity 160ms var(--ease-out),
@@ -1030,9 +1073,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .bubbleIn,
-  .bubbleOut {
-    max-width: min(92%, 100%);
+  .rowIn,
+  .rowOut,
+  .rowBot {
+    max-width: 50%;
   }
 }
 

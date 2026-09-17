@@ -971,34 +971,34 @@ export function SupportWidget() {
 
           {!showPicker ? (
           <form className={styles.composer} onSubmit={(e) => void onSubmit(e)}>
-            <div className={styles.composerMain}>
-              <label className={styles.srOnly} htmlFor={`${titleId}-draft`}>
-                Сообщение
-              </label>
+            <label className={styles.srOnly} htmlFor={`${titleId}-draft`}>
+              Сообщение
+            </label>
+            <div className={styles.composerField}>
               <textarea
                 id={`${titleId}-draft`}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onDraftKeyDown}
-                rows={2}
+                rows={1}
                 maxLength={4000}
                 placeholder="Сообщение…"
                 enterKeyHint="enter"
                 aria-describedby={`${titleId}-composer-hint`}
                 required
               />
-              <p className={styles.composerHint} id={`${titleId}-composer-hint`}>
-                Enter — отправить · Shift+Enter — новая строка
-              </p>
+              <button
+                type="submit"
+                className={styles.send}
+                disabled={busy || !draft.trim()}
+                aria-label="Отправить"
+              >
+                <SendIcon className={styles.sendIcon} />
+              </button>
             </div>
-            <button
-              type="submit"
-              className={styles.send}
-              disabled={busy || !draft.trim()}
-              aria-label="Отправить"
-            >
-              <SendIcon className={styles.sendIcon} />
-            </button>
+            <p className={styles.composerHint} id={`${titleId}-composer-hint`}>
+              Enter — отправить · Shift+Enter — новая строка
+            </p>
           </form>
           ) : null}
           {error ? <p className={styles.error}>{error}</p> : null}
