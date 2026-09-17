@@ -244,20 +244,6 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-function SendIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d={
-          "M3.4 11.2 19.1 3.7a1 1 0 0 1 1.4 1.1l-2.9 14.6a1 1 0 0 1-1.6.6l-4.7-3.5-2.4 " +
-          "2.3a.75.75 0 0 1-1.3-.5v-3.7l11-8.4-13.2 5.9Z"
-        }
-      />
-    </svg>
-  );
-}
-
 /**
  * Floating support chat (web channel) with Telegram deep link.
  * Polls for staff replies; respects outside-hours banner from API.
@@ -991,9 +977,8 @@ export function SupportWidget() {
                 type="submit"
                 className={styles.send}
                 disabled={busy || !draft.trim()}
-                aria-label="Отправить"
               >
-                <SendIcon className={styles.sendIcon} />
+                <span className={styles.sendLabel}>Отправить</span>
               </button>
             </div>
             <p className={styles.composerHint} id={`${titleId}-composer-hint`}>
