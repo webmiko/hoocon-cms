@@ -1398,14 +1398,15 @@ html.dark .hoocon-phone-more__sheet,
   }
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__bubble-wrap {
-    max-width: min(78%, 22rem);
+    width: fit-content;
+    max-width: 50%;
   }
 
   body.hoocon-phone-ready.hoocon-support-thread
     .hoocon-messenger__row--inbound
     .hoocon-messenger__bubble {
     border-radius: var(--hoocon-radius-bubble);
-    border-bottom-left-radius: var(--hoocon-radius-xs);
+    border-bottom-left-radius: var(--hm-bubble-tail, 0.25rem);
     border: none;
     background: var(--hm-surface, #fff);
     box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06);
@@ -1413,9 +1414,12 @@ html.dark .hoocon-phone-more__sheet,
 
   body.hoocon-phone-ready.hoocon-support-thread
     .hoocon-messenger__row--outbound
+    .hoocon-messenger__bubble,
+  body.hoocon-phone-ready.hoocon-support-thread
+    .hoocon-messenger__row--system
     .hoocon-messenger__bubble {
     border-radius: var(--hoocon-radius-bubble);
-    border-bottom-right-radius: var(--hoocon-radius-xs);
+    border-bottom-right-radius: var(--hm-bubble-tail, 0.25rem);
     box-shadow: none;
   }
 
@@ -1432,28 +1436,48 @@ html.dark .hoocon-phone-more__sheet,
     -webkit-backdrop-filter: blur(14px);
   }
 
-  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer textarea {
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field {
+    --hm-composer-radius: var(--hoocon-radius-sheet);
+    --hm-composer-inset: 0.15rem;
+    border-radius: var(--hm-composer-radius);
+    padding: var(--hm-composer-inset) var(--hm-composer-inset) var(--hm-composer-inset) 0.55rem;
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field textarea {
     height: var(--hoocon-phone-tap);
     min-height: var(--hoocon-phone-tap);
-    border-radius: var(--hoocon-radius-sheet);
-    padding: 0 0.9rem;
+    border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset)) 0 0
+      calc(var(--hm-composer-radius) - var(--hm-composer-inset));
+    padding: 0 0.25rem 0 0;
     line-height: 1.25;
     resize: none;
     overflow-y: auto;
+    -webkit-mask-image: radial-gradient(
+      circle 0.62rem at 100% 50%,
+      transparent 99%,
+      #000 100%
+    );
+    mask-image: radial-gradient(
+      circle 0.62rem at 100% 50%,
+      transparent 99%,
+      #000 100%
+    );
   }
 
-  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send {
-    min-width: var(--hoocon-phone-tap);
+  body.hoocon-phone-ready.hoocon-support-thread
+    .hoocon-messenger__composer-field
+    textarea:placeholder-shown {
+    line-height: calc(var(--hoocon-phone-tap) - 2px);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field .hoocon-messenger__send {
     min-height: var(--hoocon-phone-tap);
-    width: var(--hoocon-phone-tap);
-    padding: 0;
-    border-radius: 50%;
+    width: auto;
+    min-width: auto;
+    padding: 0 1rem;
+    border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset));
     background: var(--hm-brand, var(--hoocon-primary, #dc1313));
     box-shadow: none;
-  }
-
-  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send-label {
-    display: none;
   }
 
   /* ── iOS 27 Settings hub (account + grouped drill-down) ─────────── */

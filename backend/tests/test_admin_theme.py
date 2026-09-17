@@ -364,19 +364,24 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "background: var(--hm-brand" in messenger_css
     send_rule = messenger_css.split(".hoocon-messenger__send {\n  appearance")[1].split("}")[0]
     assert "box-shadow: none" in send_rule
+    composer_send_rule = messenger_css.split(".hoocon-messenger__composer-field .hoocon-messenger__send {")[1].split(
+        "}"
+    )[0]
+    assert "border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset))" in composer_send_rule
     who_rule = messenger_css.split(".hoocon-messenger__who {")[1].split("}")[0]
     assert "flex: 1 1 0" in who_rule
     title_rule = messenger_css.split(".hoocon-messenger__title {")[1].split("}")[0]
     assert "overflow-wrap: break-word" in title_rule
     assert "word-break: normal" in title_rule
     assert "hoocon-messenger__back" in messenger_css
-    assert ".hoocon-messenger__composer textarea::placeholder" in messenger_css
+    assert ".hoocon-messenger__composer-field textarea::placeholder" in messenger_css
+    assert "mask-image: radial-gradient" in messenger_css
     assert (
         "font-size: 0.8125rem"
-        in messenger_css.split(".hoocon-messenger__composer textarea::placeholder")[1].split("}")[0]
+        in messenger_css.split(".hoocon-messenger__composer-field textarea::placeholder")[1].split("}")[0]
     )
     phone_textarea_rule = phone_css.split(
-        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer textarea"
+        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field textarea"
     )[1].split("}")[0]
     assert "height: var(--hoocon-phone-tap)" in phone_textarea_rule
     assert "min-height: var(--hoocon-phone-tap)" in phone_textarea_rule
@@ -386,9 +391,10 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "width: var(--hoocon-phone-tap)" in phone_avatar_rule
     assert "background: var(--hm-brand" in phone_avatar_rule
     phone_send_rule = phone_css.split(
-        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__send {\n"
-        "    min-width: var(--hoocon-phone-tap)"
+        "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field .hoocon-messenger__send {\n"
+        "    min-height: var(--hoocon-phone-tap)"
     )[1].split("}")[0]
+    assert "border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset))" in phone_send_rule
     assert "box-shadow: none" in phone_send_rule
     assert "background: var(--hm-brand" in phone_send_rule
 

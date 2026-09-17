@@ -28,6 +28,7 @@ html.dark .hoocon-messenger {
   --hm-quiet: var(--hoocon-quiet, #6f6f6f);
   --hm-radius: var(--hoocon-radius-lg);
   --hm-shadow: var(--hoocon-shadow-soft, 0 4px 20px rgba(20, 20, 30, 0.04));
+  --hm-bubble-tail: 0.25rem;
 
   display: flex;
   flex-direction: column;
@@ -370,7 +371,8 @@ html.dark .hoocon-messenger {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  max-width: min(78%, 28rem);
+  width: fit-content;
+  max-width: 50%;
   min-width: 0;
 }
 
@@ -388,33 +390,37 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__bubble {
-  padding: 0.65rem 0.85rem;
-  border-radius: var(--hoocon-radius-lg);
+  padding: 0.4rem;
+  border-radius: var(--hoocon-radius-bubble, 1.125rem);
   font-size: 0.9rem;
   line-height: 1.45;
-  white-space: pre-wrap;
+  text-align: left;
+  white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
   box-sizing: border-box;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .hoocon-messenger__row--inbound .hoocon-messenger__bubble {
   background: var(--hm-surface);
   border: 1px solid var(--hm-border);
-  border-bottom-left-radius: 5px;
+  border-bottom-left-radius: var(--hm-bubble-tail);
   color: inherit;
 }
 
 .hoocon-messenger__row--outbound .hoocon-messenger__bubble {
   background: var(--hm-brand);
   color: #fff;
-  border-bottom-right-radius: 5px;
+  border-bottom-right-radius: var(--hm-bubble-tail);
   box-shadow: 0 6px 16px color-mix(in srgb, var(--hm-brand) 22%, transparent);
 }
 
 .hoocon-messenger__row--system .hoocon-messenger__bubble {
   background: color-mix(in srgb, var(--hm-brand) 8%, var(--hm-surface));
   border: 1px dashed var(--hm-border);
+  border-bottom-right-radius: var(--hm-bubble-tail);
   color: inherit;
   font-size: 0.82rem;
 }
@@ -427,11 +433,10 @@ html.dark .hoocon-messenger {
 
 .hoocon-messenger__composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "input send"
-    "hint hint";
-  align-items: end;
+    "input"
+    "hint";
   gap: 0.55rem;
   padding: 0.75rem 0.9rem;
   border-top: 1px solid var(--hm-border);
@@ -439,12 +444,25 @@ html.dark .hoocon-messenger {
   flex-shrink: 0;
 }
 
-.hoocon-messenger__composer textarea {
+.hoocon-messenger__composer-field {
+  --hm-composer-radius: 1.125rem;
+  --hm-composer-inset: 0.2rem;
   grid-area: input;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: var(--hm-composer-inset) var(--hm-composer-inset) var(--hm-composer-inset) 0.65rem;
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-composer-radius);
+  background: var(--hm-muted);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
-.hoocon-messenger__composer .hoocon-messenger__send {
-  grid-area: send;
+.hoocon-messenger__composer-field:focus-within {
+  border-color: color-mix(in srgb, var(--hm-brand) 45%, var(--hm-border));
+  background: var(--hm-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hm-brand) 14%, transparent);
 }
 
 .hoocon-messenger__composer-hint {
@@ -455,35 +473,55 @@ html.dark .hoocon-messenger {
   color: var(--hm-quiet);
 }
 
-.hoocon-messenger__composer textarea {
+.hoocon-messenger__composer-field textarea {
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 2.6rem;
   max-height: 9rem;
   resize: vertical;
   box-sizing: border-box;
-  border: 1px solid var(--hm-border);
-  border-radius: var(--hoocon-radius-lg);
-  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset)) 0 0
+    calc(var(--hm-composer-radius) - var(--hm-composer-inset));
+  padding: 0.45rem 0.35rem 0.45rem 0;
   font: inherit;
   font-size: 0.95rem;
   line-height: 1.4;
-  background: var(--hm-muted);
+  background: transparent;
   color: inherit;
+  -webkit-mask-image: radial-gradient(
+    circle 0.62rem at 100% 50%,
+    transparent 99%,
+    #000 100%
+  );
+  mask-image: radial-gradient(
+    circle 0.62rem at 100% 50%,
+    transparent 99%,
+    #000 100%
+  );
 }
 
-.hoocon-messenger__composer textarea::placeholder {
+.hoocon-messenger__composer-field textarea:placeholder-shown {
+  padding-block: 0;
+  line-height: calc(2.6rem - 2px);
+}
+
+.hoocon-messenger__composer-field textarea::placeholder {
   font-size: 0.8125rem;
-  line-height: 1.35;
+  line-height: inherit;
   color: var(--hm-quiet);
   opacity: 0.9;
 }
 
-.hoocon-messenger__composer textarea:focus {
+.hoocon-messenger__composer-field textarea:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--hm-brand) 45%, var(--hm-border));
-  background: var(--hm-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hm-brand) 14%, transparent);
+}
+
+.hoocon-messenger__composer-field .hoocon-messenger__send {
+  flex-shrink: 0;
+  min-height: 2.6rem;
+  border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset));
 }
 
 .hoocon-messenger__send {
@@ -496,7 +534,6 @@ html.dark .hoocon-messenger {
   gap: 0.4rem;
   min-height: 2.75rem;
   padding: 0 1rem;
-  border-radius: 999px;
   background: var(--hm-brand);
   color: #fff;
   font-weight: 700;
@@ -512,12 +549,6 @@ html.dark .hoocon-messenger {
 .hoocon-messenger__send:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.hoocon-messenger__send-icon {
-  width: 1.05rem;
-  height: 1.05rem;
-  flex-shrink: 0;
 }
 
 .hoocon-messenger__sr-only {
@@ -616,17 +647,8 @@ html.dark .hoocon-messenger {
     border-radius: var(--hoocon-radius);
   }
 
-  .hoocon-messenger__send-label {
-    display: none;
-  }
-
-  .hoocon-messenger__send {
-    width: 2.75rem;
-    padding: 0;
-  }
-
   .hoocon-messenger__bubble-wrap {
-    max-width: min(92%, 100%);
+    max-width: 50%;
   }
 }
 
