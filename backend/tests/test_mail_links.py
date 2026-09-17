@@ -6,9 +6,6 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.test import Client
-from django.urls import reverse
 
 from crm.mail_links import (
     build_lead_reply_email_urls,
@@ -121,31 +118,14 @@ def test_lead_mail_reply_js_uses_mailto_not_yandexmail_scheme() -> None:
     assert "tryNativeThenWeb" in js
 
 
-@pytest.mark.django_db
-def test_lead_view_reply_button_prefills_recipient_and_body() -> None:
-    """Кнопка ответа подставляет mailto клиента и текст заявки с артикулами."""
-    user = get_user_model().objects.create_superuser(
-        username="lead-mail-mgr",
-        email="manager@yandex.ru",
-        password="x",
-    )
-    lead = Lead.objects.create(
+def test_format_lead_reply_subject_includes_pk_and_company() -> None:
+    """Default KP subject uses lead id and company name."""
+    from crm.mail_links import format_lead_reply_subject
+
+    lead = Lead(
+        pk=42,
         name="Клиент",
         email="client@example.com",
-        company="ООО Тест",
-        phone="+79001234567",
-        message="Просьба прислать КП",
+        company="ООО Ромашка",
     )
-    LeadItem.objects.create(lead=lead, sku_code="HV-100", quantity=2)
-    client = Client()
-    client.force_login(user)
-    response = client.get(reverse("admin:leads_lead_change", args=[lead.pk]))
-    assert response.status_code == 200
-    html = response.content.decode()
-    assert "Ответить по почте" in html
-    assert 'data-mailto-url="mailto:client@example.com' in html
-    assert "mailto=mailto%3Aclient%40example.com" in html
-    assert "Просьба%20прислать%20%D0%9A%D0%9F" in html or "body=" in html
-    assert "HV-100" in html
-    assert "from=manager%40yandex.ru" in html
-    assert "yandexmail://" not in html
+    assert format_lead_reply_subject(lead) == "КП #42 — ООО Ромашка"

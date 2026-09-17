@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote, urlencode
 
 if TYPE_CHECKING:
+    from django.contrib.auth.base_user import AbstractBaseUser
+
     from leads.models import Lead
 
 _YANDEX_COMPOSE_RU = "https://mail.yandex.ru/compose"
@@ -29,6 +31,27 @@ def yandex_compose_web_base_url(manager_email: str = "") -> str:
     if normalized.endswith("@yandex.com"):
         return _YANDEX_COMPOSE_COM
     return _YANDEX_COMPOSE_RU
+
+
+def format_lead_reply_subject(lead: Lead) -> str:
+    """Default KP reply subject for a lead."""
+    company = (lead.company or "").strip() or "клиент"
+    return f"КП #{lead.pk} — {company}"
+
+
+def staff_reply_to_email(user: AbstractBaseUser | None) -> str:
+    """Manager mailbox for Reply-To from an authenticated staff user."""
+    if user is None or getattr(user, "is_anonymous", True):
+        return ""
+    return (getattr(user, "email", "") or "").strip()
+
+
+def lead_reply_footer(manager_email: str) -> str:
+    """Plain-text hint appended to outbound KP replies."""
+    email = (manager_email or "").strip()
+    if not email:
+        return "\n\n--\nОтветьте на это письмо — ответ придёт менеджеру, который отправил КП."
+    return f"\n\n--\nОтветьте на это письмо — ваш ответ придёт на {email}."
 
 
 def format_lead_reply_body(lead: Lead) -> str:

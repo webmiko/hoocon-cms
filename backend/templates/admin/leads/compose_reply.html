@@ -1,0 +1,57 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:leads_lead_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{{ lead_change_url }}">Заявка #{{ original.pk }}</a>
+  <span aria-hidden="true">›</span>
+  <span>Ответ клиенту</span>
+</nav>
+
+<h1>{{ title }}</h1>
+
+{% if manager_reply_to_email %}
+  <p class="help">
+    Клиенту уйдёт письмо с сайта; при ответе «Ответить» в почте ответ придёт на
+    <strong>{{ manager_reply_to_email }}</strong>.
+  </p>
+{% else %}
+  <p class="help">
+    Укажите email в профиле пользователя Admin — иначе Reply-To не будет задан,
+    и ответ клиента может не дойти до вас.
+  </p>
+{% endif %}
+
+{% if manager_signature_preview %}
+  <fieldset class="module aligned">
+    <h2>Подпись в письме</h2>
+    <pre class="help" style="white-space: pre-wrap; margin: 0;">{{ manager_signature_preview }}</pre>
+  </fieldset>
+{% endif %}
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    {% for field in form %}
+      <div class="form-row">
+        {{ field.errors }}
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <div class="help">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </fieldset>
+  <div class="submit-row">
+    <input type="submit" value="{% trans 'Отправить' %}" class="default">
+    <a href="{{ lead_change_url }}" class="button cancel-link">
+      {% trans "Отмена" %}
+    </a>
+  </div>
+</form>
+{% endblock %}

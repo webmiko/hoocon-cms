@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from celery import shared_task
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage as DjangoEmailMessage
 
 from config.logging_utils import setup_logger
 from crm.models import EmailMessage, EmailStatus
@@ -32,13 +32,16 @@ def send_crm_email(self: object, email_id: int) -> None:
         return
 
     try:
-        send_mail(
+        django_msg = DjangoEmailMessage(
             subject=msg.subject,
-            message=msg.body,
+            body=msg.body,
             from_email=msg.from_email,
-            recipient_list=[msg.to_email],
-            fail_silently=False,
+            to=[msg.to_email],
         )
+        reply_to = (msg.reply_to_email or "").strip()
+        if reply_to:
+            django_msg.reply_to = [reply_to]
+        django_msg.send(fail_silently=False)
     except Exception as exc:
         logger.exception("crm_email_send_failed id=%s", email_id)
         msg.mark_failed(f"{type(exc).__name__}")

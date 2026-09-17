@@ -402,6 +402,7 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "status",
                     "to_email",
                     "from_email",
+                    "reply_to_email",
                     "subject",
                     "body",
                 ),

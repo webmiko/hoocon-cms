@@ -197,6 +197,12 @@ class EmailMessage(models.Model):
         blank=True,
         default="",
     )
+    reply_to_email: models.EmailField = models.EmailField(
+        "адрес для ответа",
+        blank=True,
+        default="",
+        max_length=254,
+    )
     subject: models.CharField = models.CharField("тема", max_length=300)
     body: models.TextField = models.TextField(
         "текст письма",
