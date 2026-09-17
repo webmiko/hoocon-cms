@@ -51,9 +51,7 @@ def test_manager_reply_signature_html_supports_legacy_mailto_and_tel_lines() -> 
     """Legacy signature lines with mailto:/tel: suffixes still linkify in HTML."""
     from crm.manager_signatures import _MANAGER_SIGNATURES
 
-    _MANAGER_SIGNATURES["legacy@hoocon.ru"] = (
-        "Legacy\n+7(900)000-00-00 (tel:+79000000000)\nmailto:legacy@hoocon.ru"
-    )
+    _MANAGER_SIGNATURES["legacy@hoocon.ru"] = "Legacy\n+7(900)000-00-00 (tel:+79000000000)\nmailto:legacy@hoocon.ru"
     html = manager_reply_signature_html("legacy@hoocon.ru")
     assert 'href="tel:+79000000000"' in html
     assert 'href="mailto:legacy@hoocon.ru"' in html
