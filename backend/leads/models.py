@@ -18,6 +18,8 @@ PII: name/email/phone — контактные данные; не логируе
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.conf import settings
 from django.db import models
 
@@ -212,3 +214,65 @@ class LeadItem(models.Model):
         else:
             code = "?"
         return f"{code} × {self.quantity}"
+
+
+class CompanyManagerRule(models.Model):
+    """Pinned company → manager routing rule (editable in Admin).
+
+    Match is by normalized company label (``leads.services.normalize_company_label``:
+    casefold, collapsed spaces, quotes stripped) — the same normalization as the
+    code-level ООО Атерна rule, so «ООО "Ромашка"» and «ооо ромашка» hit one rule.
+
+    ``exclusive=True`` removes the manager from the shared round-robin pool:
+    they only receive leads for their pinned companies.
+    """
+
+    company_label: models.CharField = models.CharField(
+        "компания",
+        max_length=200,
+        help_text="Название как в заявке; регистр, кавычки и лишние пробелы не важны.",
+    )
+    company_key: models.CharField = models.CharField(
+        "ключ компании",
+        max_length=200,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text="Нормализованный ключ совпадения (заполняется автоматически).",
+    )
+    assignee: models.ForeignKey = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lead_company_rules",
+        verbose_name="менеджер",
+        limit_choices_to={"is_staff": True},
+    )
+    exclusive: models.BooleanField = models.BooleanField(
+        "только закреплённые компании",
+        default=False,
+        help_text="Убрать менеджера из общей очереди: он получает заявки только по своим компаниям.",
+    )
+    is_active: models.BooleanField = models.BooleanField("активно", default=True)
+    comment: models.CharField = models.CharField(
+        "комментарий",
+        max_length=200,
+        blank=True,
+        default="",
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "закреплённая компания"
+        verbose_name_plural = "закреплённые компании"
+        ordering = ("company_label",)
+
+    def __str__(self) -> str:
+        return f"{self.company_label} → {self.assignee_id}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Normalize ``company_key`` from the label on every save."""
+        from leads.services import normalize_company_label
+
+        self.company_key = normalize_company_label(self.company_label)
+        super().save(*args, **kwargs)

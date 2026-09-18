@@ -52,7 +52,7 @@ from crm.mail_links import (
 from crm.manager_signatures import manager_reply_signature
 from crm.models import EmailStatus
 from crm.services import create_lead_reply_email
-from leads.models import Lead, LeadItem
+from leads.models import CompanyManagerRule, Lead, LeadItem
 from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
     apply_lead_manager_on_save,
@@ -1089,3 +1089,28 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             "changelist_url": reverse("admin:leads_lead_changelist"),
         }
         return render(request, "admin/leads/stats.html", context)
+
+
+@admin.register(CompanyManagerRule)
+class CompanyManagerRuleAdmin(ModelAdmin):
+    """Pinned company → manager rules for lead routing.
+
+    Заявка от закреплённой компании назначается выбранному менеджеру
+    в обход общей очереди (и даже при выключенной ротации). Флаг
+    «только закреплённые компании» убирает менеджера из общей очереди.
+    """
+
+    list_display = ("company_label", "assignee", "exclusive", "is_active", "updated_at")
+    list_filter = ("is_active", "exclusive")
+    search_fields = ("company_label", "company_key", "assignee__username", "assignee__email")
+    readonly_fields = ("company_key", "created_at", "updated_at")
+    fields = (
+        "company_label",
+        "company_key",
+        "assignee",
+        "exclusive",
+        "is_active",
+        "comment",
+        "created_at",
+        "updated_at",
+    )
