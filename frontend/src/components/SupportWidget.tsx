@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useSupportChannels } from "../hooks/useSupportChannels";
 import { api } from "../api/client";
 import { faqAnswerNodes } from "../utils/faqAnswer";
 import {
@@ -284,7 +285,7 @@ export function SupportWidget() {
   const [contactsLocked, setContactsLocked] = useState(false);
   const [isOpenNow, setIsOpenNow] = useState(true);
   const [outsideHint, setOutsideHint] = useState("");
-  const [channels, setChannels] = useState<MessengerChannel[]>([]);
+  const channels = useSupportChannels();
   const [chatSurface, setChatSurface] = useState<SupportSurface>("web");
   const [faqItems, setFaqItems] = useState<SupportFaqItem[]>([]);
   const [activeFaq, setActiveFaq] = useState<SupportFaqItem | null>(null);
@@ -346,14 +347,10 @@ export function SupportWidget() {
     let cancelled = false;
     void (async () => {
       try {
-        const [schedule, ch] = await Promise.all([
-          api.supportSchedule(),
-          api.supportChannels(),
-        ]);
+        const schedule = await api.supportSchedule();
         if (cancelled) return;
         setIsOpenNow(schedule.is_open_now);
         setOutsideHint(schedule.auto_reply_outside_hours || "");
-        setChannels(ch.channels);
       } catch {
         /* widget stays usable; schedule optional */
       }

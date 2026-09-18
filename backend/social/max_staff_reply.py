@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.core.cache import cache
 from django.db.models import Q
 
 from accounts.roles import GROUP_MANAGER
@@ -13,6 +15,8 @@ from social.publishers import PublishResult, publish_max
 
 User = get_user_model()
 
+_STAFF_REPLY_CALLBACK_PREFIX = "staff_reply:"
+_PENDING_REPLY_CACHE_TTL = 30 * 60
 _STAFF_REPLY_HASH_RE = re.compile(r"^#(\d+)\s+(.+)$", re.DOTALL)
 _STAFF_REPLY_CMD_RE = re.compile(
     r"^/reply(?:\s+(\d+)\s+(.+))?\s*$",
@@ -52,13 +56,93 @@ def staff_user_for_max_user_id(max_user_id: str) -> AbstractBaseUser | None:
     )
 
 
+def staff_reply_callback_payload(conversation_id: int) -> str:
+    """Inline callback payload for the «Ответить» button on staff alerts."""
+    return f"{_STAFF_REPLY_CALLBACK_PREFIX}{conversation_id}"
+
+
+def parse_staff_reply_callback_payload(payload: str) -> int | None:
+    """Return conversation id from callback payload or None."""
+    raw = (payload or "").strip()
+    if not raw.startswith(_STAFF_REPLY_CALLBACK_PREFIX):
+        return None
+    suffix = raw[len(_STAFF_REPLY_CALLBACK_PREFIX) :].strip()
+    if not suffix.isdigit():
+        return None
+    return int(suffix)
+
+
+def _pending_reply_cache_key(max_user_id: str) -> str:
+    return f"max_staff_reply_pending:{(max_user_id or '').strip()}"
+
+
+def set_pending_staff_reply(max_user_id: str, conversation_id: int) -> None:
+    """Remember which support dialog the manager is replying to from MAX."""
+    uid = (max_user_id or "").strip()
+    if not uid:
+        return
+    cache.set(_pending_reply_cache_key(uid), conversation_id, timeout=_PENDING_REPLY_CACHE_TTL)
+
+
+def get_pending_staff_reply(max_user_id: str) -> int | None:
+    """Return pending conversation id for this staff MAX user, if any."""
+    uid = (max_user_id or "").strip()
+    if not uid:
+        return None
+    value = cache.get(_pending_reply_cache_key(uid))
+    if value is None:
+        return None
+    return int(value)
+
+
+def clear_pending_staff_reply(max_user_id: str) -> None:
+    """Drop pending reply mode (menu command or explicit #ID reply)."""
+    uid = (max_user_id or "").strip()
+    if uid:
+        cache.delete(_pending_reply_cache_key(uid))
+
+
+def compose_staff_reply_prompt(conversation_id: int) -> str:
+    """Prompt after the manager taps «Ответить» on a staff alert."""
+    return f"Диалог #{conversation_id} — напишите ответ одним сообщением.\nНомер подставлять не нужно."
+
+
+def staff_support_alert_attachments(conversation_id: int) -> list[dict[str, Any]]:
+    """Inline keyboard under staff support alerts: reply + Admin link."""
+    from django.conf import settings
+
+    site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+    admin_url = f"{site}/admin/supportchat/conversation/{conversation_id}/change/"
+    return [
+        {
+            "type": "inline_keyboard",
+            "payload": {
+                "buttons": [
+                    [
+                        {
+                            "type": "callback",
+                            "text": "Ответить",
+                            "payload": staff_reply_callback_payload(conversation_id),
+                        },
+                        {
+                            "type": "link",
+                            "text": "Admin",
+                            "url": admin_url,
+                        },
+                    ],
+                ],
+            },
+        },
+    ]
+
+
 def compose_staff_reply_help() -> str:
     """Hint for managers replying to clients from personal MAX."""
     return (
         "Ответ клиенту из MAX:\n"
+        "• кнопка «Ответить» под уведомлением — затем текст ответа\n"
         "• #42 ваш текст — ответ в диалог №42\n"
         "• /reply 42 ваш текст — то же\n\n"
-        "Номер диалога — в уведомлении о новом сообщении.\n"
         "/chatid — ваш user_id для Admin."
     )
 
@@ -75,7 +159,7 @@ def compose_staff_account_notice() -> str:
 
 def staff_reply_hint(conversation_id: int) -> str:
     """One-line instruction appended to staff support alerts."""
-    return f"Ответить из MAX: #{conversation_id} ваш текст"
+    return f"Ответить: кнопка ниже или #{conversation_id} ваш текст"
 
 
 def submit_staff_reply_from_max(

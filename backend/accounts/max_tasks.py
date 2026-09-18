@@ -74,7 +74,10 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
         body=body,
         url=f"/admin/supportchat/conversation/{conv.pk}/change/",
     )
+    from social.max_staff_reply import staff_support_alert_attachments
+
+    attachments = staff_support_alert_attachments(conv.pk)
     users = list(staff_max_recipients_managers()) + list(staff_max_recipients_superusers())
-    sent = send_max_to_users(users, text)
+    sent = send_max_to_users(users, text, attachments=attachments)
     logger.info("max_staff_support conv_id=%s sent=%s", conversation_id, sent)
     return sent

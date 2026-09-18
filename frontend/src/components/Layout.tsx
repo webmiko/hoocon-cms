@@ -11,12 +11,12 @@ import { ScrollProgress } from "./ScrollProgress";
 import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
-import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
+import { MessengerLinks } from "./MessengerLinks";
 import { ThemeToggle } from "./ThemeToggle";
+import { useSupportChannels } from "../hooks/useSupportChannels";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { emptyDockCtaForPath } from "../utils/emptyDockCta";
 import { releaseLabel } from "../release";
-import { api } from "../api/client";
 import { getSupportChatState } from "../utils/supportChatControl";
 import { lazyWithChunkReload } from "../utils/lazyWithChunkReload";
 import styles from "./Layout.module.css";
@@ -67,22 +67,7 @@ export function Layout() {
   /** True while the page's primary inline CTA intersects the viewport (sticky waits). */
   const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
   const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
-  const [messengerLinks, setMessengerLinks] = useState<MessengerChannel[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await api.supportChannels();
-        if (!cancelled) setMessengerLinks(data.channels);
-      } catch {
-        /* footer stays without TG links */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const messengerLinks = useSupportChannels();
 
   // Reset visibility when entering home or /zavod.
   if ((isHome || isZavod) !== inlineTrack) {

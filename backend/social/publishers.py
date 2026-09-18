@@ -471,3 +471,43 @@ def publish_max(
     if not mid:
         mid = str(data.get("message_id") or data.get("id") or "")
     return PublishResult(ok=True, external_id=mid)
+
+
+def answer_max_callback(
+    callback_id: str,
+    *,
+    notification: str = "",
+    message: dict[str, Any] | None = None,
+) -> PublishResult:
+    """Acknowledge an inline button press (POST /answers).
+
+    Args:
+        callback_id: From ``message_callback`` update.
+        notification: Optional one-time toast for the user.
+        message: Optional updated message body for the alert.
+    """
+    token = max_bot_token()
+    cid = (callback_id or "").strip()
+    if not token or not cid:
+        return PublishResult(ok=False, skipped=True, error="MAX не настроен")
+    url = f"https://platform-api2.max.ru/answers?callback_id={cid}"
+    payload: dict[str, Any] = {}
+    note = (notification or "").strip()
+    if note:
+        payload["notification"] = note
+    if message:
+        payload["message"] = message
+    try:
+        status, data = _post_json(
+            url,
+            payload=payload,
+            headers={"Authorization": token},
+            open_fn=max_urlopen,
+        )
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("max_callback_answer_failed error=%s", type(exc).__name__)
+        return PublishResult(ok=False, error=f"MAX: {type(exc).__name__}")
+    if status >= 400:
+        err = str(data.get("message") or data.get("error") or status)[:300]
+        return PublishResult(ok=False, error=f"MAX HTTP {status}: {err}")
+    return PublishResult(ok=True)

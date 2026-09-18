@@ -33,19 +33,17 @@ function iconClass(
 function MessengerIcon({
   provider,
   className,
-  withMaxWordmark = false,
-  decorative = false,
+  withWordmark = false,
 }: {
   provider: "max" | "telegram";
   className?: string;
-  withMaxWordmark?: boolean;
-  decorative?: boolean;
+  withWordmark?: boolean;
 }) {
-  const title = decorative ? "" : provider === "max" ? "MAX" : "Telegram";
+  const title = provider === "max" ? "MAX" : "Telegram";
   if (provider === "max") {
-    return <MaxLogo className={className} withWordmark={withMaxWordmark} title={title} />;
+    return <MaxLogo className={className} withWordmark={withWordmark} title={title} />;
   }
-  return <TelegramLogo className={className} title={title} />;
+  return <TelegramLogo className={className} withWordmark={withWordmark} title={title} />;
 }
 
 type MessengerLinksProps = {
@@ -75,9 +73,7 @@ export function MessengerLinks({
     <ul className={rootClass} role="list" aria-label="Мессенджеры">
       {items.map((ch) => {
         const provider = providerFor(ch);
-        const shortLabel = provider === "max" ? "MAX" : "Telegram";
-        const withMaxWordmark = provider === "max";
-        const showTextLabel = provider !== "max";
+        const withWordmark = provider === "max" || provider === "telegram";
         return (
           <li key={ch.channel}>
             <a
@@ -93,12 +89,8 @@ export function MessengerLinks({
                 <MessengerIcon
                   provider={provider}
                   className={iconClass(provider, variant)}
-                  withMaxWordmark={withMaxWordmark}
-                  decorative={showTextLabel}
+                  withWordmark={withWordmark}
                 />
-              ) : null}
-              {showTextLabel ? (
-                <span className={styles.linkLabel}>{shortLabel}</span>
               ) : null}
             </a>
           </li>

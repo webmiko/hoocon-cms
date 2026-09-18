@@ -182,7 +182,7 @@ def test_free_text_triggers_max_staff_alert_with_body(settings) -> None:
     assert staff_calls
     alert = staff_calls[-1].kwargs["text"]
     assert "DA10" in alert
-    assert "Ответить из MAX" in alert
+    assert "Ответить" in alert
 
 
 @pytest.mark.django_db

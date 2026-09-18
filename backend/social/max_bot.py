@@ -363,8 +363,11 @@ def _send_reply_for_action(user_key: str, action: str) -> PublishResult:
 def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     """Handle manager reply (#ID text) or help; None → treat as client message."""
     from social.max_staff_reply import (
+        clear_pending_staff_reply,
         compose_staff_account_notice,
         compose_staff_reply_help,
+        compose_staff_reply_prompt,
+        get_pending_staff_reply,
         parse_staff_reply_text,
         staff_user_for_max_user_id,
         submit_staff_reply_from_max,
@@ -376,6 +379,16 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
 
     parsed = parse_staff_reply_text(text)
     if parsed is not None:
+        clear_pending_staff_reply(user_key)
+    elif resolve_menu_action(text) is None:
+        pending_id = get_pending_staff_reply(user_key)
+        body = (text or "").strip()
+        raw = body.casefold()
+        if pending_id is not None and body and not raw.startswith("/reply"):
+            parsed = (pending_id, body)
+            clear_pending_staff_reply(user_key)
+
+    if parsed is not None:
         conv_id, reply_body = parsed
         ok, status = submit_staff_reply_from_max(staff_user, conv_id, reply_body)
         return _send_to_user(user_key, status if ok else f"Не отправлено: {status}")
@@ -385,7 +398,12 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
         return _send_to_user(user_key, compose_staff_reply_help())
 
     if resolve_menu_action(text) is not None:
+        clear_pending_staff_reply(user_key)
         return None
+
+    pending_id = get_pending_staff_reply(user_key)
+    if pending_id is not None:
+        return _send_to_user(user_key, compose_staff_reply_prompt(pending_id))
 
     return _send_to_user(user_key, compose_staff_account_notice())
 
@@ -534,6 +552,42 @@ def _handle_message_created(update: dict[str, Any]) -> PublishResult | None:
     )
 
 
+def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
+    """Staff taps «Ответить» on a support alert — enter reply mode for that dialog."""
+    callback = update.get("callback")
+    if not isinstance(callback, dict):
+        return None
+    user = callback.get("user")
+    if not isinstance(user, dict) or user.get("user_id") is None:
+        return None
+    user_key = str(user["user_id"])
+    payload = str(callback.get("payload") or "").strip()
+    callback_id = str(callback.get("callback_id") or "").strip()
+
+    from social.max_staff_reply import (
+        compose_staff_reply_prompt,
+        parse_staff_reply_callback_payload,
+        set_pending_staff_reply,
+        staff_user_for_max_user_id,
+    )
+    from social.publishers import answer_max_callback
+
+    conv_id = parse_staff_reply_callback_payload(payload)
+    if conv_id is None:
+        return None
+
+    staff_user = staff_user_for_max_user_id(user_key)
+    if staff_user is None:
+        if callback_id:
+            answer_max_callback(callback_id, notification="Недоступно")
+        return None
+
+    set_pending_staff_reply(user_key, conv_id)
+    if callback_id:
+        answer_max_callback(callback_id, notification=f"Диалог #{conv_id}")
+    return _send_to_user(user_key, compose_staff_reply_prompt(conv_id))
+
+
 def handle_max_update(update: dict[str, Any]) -> PublishResult | None:
     """Process one MAX Update object; send a reply when applicable."""
     if not isinstance(update, dict):
@@ -543,6 +597,8 @@ def handle_max_update(update: dict[str, Any]) -> PublishResult | None:
         return _handle_bot_started(update)
     if update_type == "dialog_cleared":
         return _handle_dialog_cleared(update)
+    if update_type == "message_callback":
+        return _handle_message_callback(update)
     if update_type == "message_created":
         return _handle_message_created(update)
     return None
