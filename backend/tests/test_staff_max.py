@@ -95,8 +95,14 @@ def test_support_max_alert() -> None:
     alert = pub.call_args.kwargs["text"]
     assert "DA10N" in alert
     assert f"#{conv.pk}" in alert
-    assert "Ответить из MAX" in alert
+    assert "Ответить" in alert
     assert "«Нужен привод DA10N»" in alert
+    attachments = pub.call_args.kwargs.get("attachments") or []
+    assert attachments
+    buttons = attachments[0]["payload"]["buttons"][0]
+    reply_btn = next(btn for btn in buttons if btn.get("type") == "callback")
+    assert reply_btn["text"] == "Ответить"
+    assert f"staff_reply:{conv.pk}" in reply_btn["payload"]
 
 
 @pytest.mark.django_db

@@ -56,7 +56,12 @@ def max_user_id_for(user: AbstractBaseUser) -> str:
     return (getattr(profile, "max_user_id", "") or "").strip()
 
 
-def send_max_to_users(users: QuerySet[Any] | list[Any], text: str) -> int:
+def send_max_to_users(
+    users: QuerySet[Any] | list[Any],
+    text: str,
+    *,
+    attachments: list[dict[str, Any]] | None = None,
+) -> int:
     """Send plain text to each staff user's MAX dialog; return success count."""
     body = (text or "").strip()
     if not body:
@@ -68,7 +73,11 @@ def send_max_to_users(users: QuerySet[Any] | list[Any], text: str) -> int:
         if not uid or uid in seen:
             continue
         seen.add(uid)
-        result: PublishResult = publish_max(user_id=uid, text=body)
+        result: PublishResult = publish_max(
+            user_id=uid,
+            text=body,
+            attachments=attachments,
+        )
         if result.ok:
             sent += 1
     return sent
