@@ -6,6 +6,7 @@ Manager ownership: assignee (в работе) / processed_by (завершил).
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from email.utils import parseaddr
 from typing import Any
@@ -30,6 +31,13 @@ from leads.models import Lead
 from leads.rfq_bundle import normalize_rfq_company
 
 User = get_user_model()
+
+# Client confirmation email copy (public site contacts, see frontend Layout).
+_SITE_BRAND = "Hoocon"
+_SITE_COMPANY = 'ООО "ХОГОН"'
+_SITE_PHONE = "8 800 350-58-98"
+_SITE_PHONE_TEL = "+78003505898"
+_CLIENT_RESPONSE_TIME = "2 рабочих часов"
 
 # Fixed assignee for ООО Атерна (overrides round-robin).
 _ATERNA_ASSIGNEE_EMAIL = "assistant@hoocon.ru"
@@ -598,6 +606,8 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     Returns:
         Tuple of (subject, text_body, html_body).
     """
+    from crm.mail_links import build_yandex_compose_web_url, format_lead_reply_subject
+
     site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
     admin_url = build_lead_admin_url(lead.pk)
     inbox_url = site_url + new_leads_changelist_url()
@@ -606,6 +616,11 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
     is_continuation = lead.rfq_bundle_root_id is not None
     root = lead.rfq_bundle_root
+    reply_url = build_yandex_compose_web_url(
+        to=lead.email,
+        subject=f"Re: {format_lead_reply_subject(lead)}",
+        from_email=(getattr(assignee, "email", "") or "").strip(),
+    )
     context = {
         "lead": lead,
         "site_url": site_url,
@@ -616,6 +631,7 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         "lead_items": items,
         "is_continuation": is_continuation,
         "bundle_root": root,
+        "reply_url": reply_url,
     }
     if is_continuation and root is not None:
         subject = f"Продолжение КП #{root.pk} → заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
@@ -623,4 +639,95 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
     text_body = render_to_string("leads/email/new_lead.txt", context).strip()
     html_body = render_to_string("leads/email/new_lead.html", context).strip()
+    return subject, text_body, html_body
+
+
+def resolve_lead_reply_to(lead: Lead) -> str:
+    """Reply-To mailbox for the client confirmation email.
+
+    Active staff assignee → their email; otherwise the first address from
+    ``LEAD_NOTIFY_EMAIL`` (sales list). Empty string = no Reply-To header.
+
+    Args:
+        lead: Lead (use ``select_related("assignee")`` when possible).
+
+    Returns:
+        Email address or empty string.
+    """
+    assignee = getattr(lead, "assignee", None)
+    if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
+        addr = (getattr(assignee, "email", "") or "").strip()
+        if addr:
+            return addr
+    sales = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+    return sales[0] if sales else ""
+
+
+def _client_signature(lead: Lead, assignee: Any | None) -> dict[str, str]:
+    """Signature block for the client confirmation — personal manager contacts.
+
+    Format: ``С уважением, {name}`` / ``{company}`` / ``{phone} | {email}``.
+    Contacts come from ``crm.manager_signatures`` (per-mailbox profile);
+    without an assignee — generic sales signature (site phone + Reply-To).
+
+    Args:
+        lead: Lead (for the Reply-To fallback).
+        assignee: staff user or None.
+
+    Returns:
+        Dict with name/company/phone/tel_href/email display values.
+    """
+    from crm.manager_signatures import manager_signature_contacts
+
+    reply_to = resolve_lead_reply_to(lead)
+    if assignee is not None:
+        email = (getattr(assignee, "email", "") or "").strip()
+        contacts = manager_signature_contacts(email) or {}
+        phone = (contacts.get("phone") or "").strip()
+        return {
+            "name": contacts.get("name") or manager_display_name(assignee),
+            "company": contacts.get("company") or _SITE_COMPANY,
+            "phone": phone,
+            "tel_href": "+" + re.sub(r"\D", "", phone) if phone else "",
+            "email": email or reply_to,
+        }
+    return {
+        "name": f"Команда продаж {_SITE_BRAND}",
+        "company": _SITE_COMPANY,
+        "phone": _SITE_PHONE,
+        "tel_href": _SITE_PHONE_TEL,
+        "email": reply_to,
+    }
+
+
+def render_lead_client_confirmation(lead: Lead) -> tuple[str, str, str]:
+    """Build subject, plain text, and HTML bodies for the client confirmation.
+
+    «Заявка принята в работу» — номер, тема, дата, позиции и ведущий менеджер.
+
+    Args:
+        lead: saved Lead instance (with optional assignee / items).
+
+    Returns:
+        Tuple of (subject, text_body, html_body).
+    """
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
+    assignee = getattr(lead, "assignee", None)
+    assignee_display = manager_display_name(assignee) if assignee is not None else ""
+    items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
+    signature = _client_signature(lead, assignee)
+    context = {
+        "lead": lead,
+        "site_url": site_url,
+        "site_phone": _SITE_PHONE,
+        "brand_name": _SITE_BRAND,
+        "lead_type_display": lead.get_lead_type_display(),
+        "assignee_display": assignee_display,
+        "lead_items": items,
+        "response_time": _CLIENT_RESPONSE_TIME,
+        "signature": signature,
+    }
+    subject = f"Мы получили вашу заявку №{lead.pk}"
+    text_body = render_to_string("leads/email/lead_client_confirm.txt", context).strip()
+    html_body = render_to_string("leads/email/lead_client_confirm.html", context).strip()
     return subject, text_body, html_body

@@ -7,8 +7,9 @@ docs/security-baseline.md §3 (PII не в логах; honeypot silent drop; 429
 - POST /api/leads/ — публичный (AllowAny); throttle scope `lead_create` (10/hour).
 - Honeypot: поле `website` заполнено → 201 silent drop (заявка не создаётся,
   email не отправляется). Боты думают, что форма отправлена.
-- После успешного создания — Celery-таска send_lead_notification через
-  transaction.on_commit (стартует только после коммита БД).
+- После успешного создания — Celery-таски send_lead_notification (менеджеру)
+  и send_lead_client_confirmation (клиенту) через transaction.on_commit
+  (стартуют только после коммита БД).
 - PII-safe: email/phone — write-only в сериализаторе (нет в ответе).
 """
 
@@ -25,7 +26,7 @@ from config.logging_utils import setup_logger
 from leads.models import Lead
 from leads.serializers import LeadSerializer
 from leads.services import assign_lead_on_create
-from leads.tasks import send_lead_notification
+from leads.tasks import send_lead_client_confirmation, send_lead_notification
 
 logger = setup_logger("hoocon.leads")
 
@@ -79,10 +80,11 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
         assign_lead_on_create(lead)
 
-        # Schedule email via on_commit — task fires only after DB commit
+        # Schedule emails via on_commit — tasks fire only after DB commit
         # (avoids running if the transaction rolls back).
         lead_id = lead.pk
         transaction.on_commit(lambda: send_lead_notification.delay(lead_id))
+        transaction.on_commit(lambda: send_lead_client_confirmation.delay(lead_id))
 
         def _staff_push() -> None:
             try:
