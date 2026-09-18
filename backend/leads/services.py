@@ -6,6 +6,7 @@ Manager ownership: assignee (в работе) / processed_by (завершил).
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from email.utils import parseaddr
 from typing import Any
@@ -30,6 +31,13 @@ from leads.models import Lead
 from leads.rfq_bundle import normalize_rfq_company
 
 User = get_user_model()
+
+# Client confirmation email copy (public site contacts, see frontend Layout).
+_SITE_BRAND = "Hoocon"
+_SITE_COMPANY = 'ООО "ХОГОН"'
+_SITE_PHONE = "8 800 350-58-98"
+_SITE_PHONE_TEL = "+78003505898"
+_CLIENT_RESPONSE_TIME = "2 рабочих часов"
 
 # Fixed assignee for ООО Атерна (overrides round-robin).
 _ATERNA_ASSIGNEE_EMAIL = "assistant@hoocon.ru"
@@ -77,6 +85,56 @@ def is_aterna_company(company: str) -> bool:
     return normalize_company_label(company) in _ATERNA_COMPANY_LABELS
 
 
+def pinned_rule_for_company(company: str) -> Any | None:
+    """Active Admin-editable pinned rule for a company label, or None.
+
+    Match is by the same normalized key as the Aterna rule, so spelling
+    variations («ООО "Ромашка"» vs «ооо ромашка») hit the same rule.
+    """
+    from leads.models import CompanyManagerRule
+
+    key = normalize_company_label(company)
+    if not key:
+        return None
+    return CompanyManagerRule.objects.filter(company_key=key, is_active=True).select_related("assignee").first()
+
+
+def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | None:
+    """CRM owner of a company: assignee of an existing Client card.
+
+    Sticky ownership: once a contact card is pinned to a manager (by lead
+    assignment or manually in Admin), later leads from the same company go
+    to that manager. The lead's own ``client`` card wins over other cards
+    of the same company; among other cards the earliest claim wins.
+    """
+    from crm.models import Client as CrmClient
+
+    key = normalize_company_label(company)
+    if not key:
+        return None
+
+    if client is not None:
+        pick = getattr(client, "assignee", None)
+        if pick is not None and pick.is_active and pick.is_staff:
+            return pick
+
+    for other in (
+        CrmClient.objects.filter(assignee__isnull=False)
+        .exclude(company="")
+        .select_related("assignee")
+        .order_by("created_at", "pk")
+        .iterator()
+    ):
+        if client is not None and other.pk == client.pk:
+            continue
+        if normalize_company_label(other.company) != key:
+            continue
+        pick = getattr(other, "assignee", None)
+        if pick is not None and pick.is_active and pick.is_staff:
+            return pick
+    return None
+
+
 def lookup_aterna_assignee() -> Any | None:
     """Active staff user for Aterna leads (Людмила, assistant@hoocon.ru)."""
     return (
@@ -110,11 +168,26 @@ def _assign_lead_to_user(lead: Lead, pick: Any) -> Any:
 
 
 def assign_lead_on_create(lead: Lead) -> Any | None:
-    """Assign manager on a new lead: Aterna rule first, else round-robin."""
+    """Assign manager on a new lead: pinned rule → Aterna → CRM owner → round-robin.
+
+    Pinned company rules (Admin), the code-level Aterna rule and an
+    existing CRM owner of the company run before rotation and keep the
+    RR cursor untouched. A rule/owner whose assignee is inactive or
+    non-staff is skipped — the lead falls through to the next step
+    rather than staying unassigned by accident.
+    """
+    rule = pinned_rule_for_company(lead.company)
+    if rule is not None:
+        pick = rule.assignee
+        if pick is not None and pick.is_active and pick.is_staff:
+            return _assign_lead_to_user(lead, pick)
     if is_aterna_company(lead.company):
         pick = lookup_aterna_assignee()
         if pick is not None:
             return _assign_lead_to_user(lead, pick)
+    owner = company_owner_assignee(lead.company, client=getattr(lead, "client", None))
+    if owner is not None:
+        return _assign_lead_to_user(lead, owner)
     return assign_lead_round_robin(lead)
 
 
@@ -125,11 +198,23 @@ def manager_rotation_queryset() -> QuerySet[Any]:
     non-empty login email. Inactive users never receive new round-robin
     assignments (and should not get ``assign_manager`` notify).
 
+    Excluded from the pool:
+    - ``assistant@hoocon.ru`` — she handles ООО Атерна only (invariant,
+      enforced in code so she stays out of rotation even without an
+      Admin rule);
+    - holders of active ``exclusive`` pinned rules — they only receive
+      leads for their pinned companies.
+
     Returns:
         User queryset ordered by primary key (stable round-robin order).
     """
     from accounts.roles import GROUP_MANAGER
+    from leads.models import CompanyManagerRule
 
+    exclusive = CompanyManagerRule.objects.filter(
+        is_active=True,
+        exclusive=True,
+    ).values("assignee_id")
     return (
         User.objects.filter(
             is_active=True,
@@ -137,6 +222,8 @@ def manager_rotation_queryset() -> QuerySet[Any]:
             groups__name=GROUP_MANAGER,
         )
         .exclude(email="")
+        .exclude(email__iexact=_ATERNA_ASSIGNEE_EMAIL)
+        .exclude(pk__in=exclusive)
         .order_by("pk")
         .distinct()
     )
@@ -189,8 +276,10 @@ def assign_lead_round_robin(lead: Lead) -> Any | None:
 def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
     """Pick notification To: addresses for a new lead.
 
-    ``assign_manager`` + **active** assignee with email → that User.email.
-    Inactive / missing assignee → ``LEAD_NOTIFY_EMAIL`` (sales@ list).
+    Company pinned to a manager (Aterna code rule, Admin
+    ``CompanyManagerRule``, or an existing CRM owner) or
+    ``assign_manager`` mode + **active** assignee with email → that
+    User.email. Otherwise ``LEAD_NOTIFY_EMAIL`` (sales@ list).
 
     Args:
         lead: Lead (use ``select_related("assignee")`` when possible).
@@ -202,7 +291,10 @@ def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
 
     sales = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
     site = SiteSettings.load()
-    if is_aterna_company(lead.company) or site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
+    pinned = is_aterna_company(lead.company) or pinned_rule_for_company(lead.company) is not None
+    if not pinned:
+        pinned = company_owner_assignee(lead.company, client=getattr(lead, "client", None)) is not None
+    if pinned or site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
         assignee = getattr(lead, "assignee", None)
         if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
             addr = (getattr(assignee, "email", "") or "").strip()
@@ -598,6 +690,8 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     Returns:
         Tuple of (subject, text_body, html_body).
     """
+    from crm.mail_links import build_yandex_compose_web_url, format_lead_reply_subject
+
     site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
     admin_url = build_lead_admin_url(lead.pk)
     inbox_url = site_url + new_leads_changelist_url()
@@ -606,6 +700,11 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
     items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
     is_continuation = lead.rfq_bundle_root_id is not None
     root = lead.rfq_bundle_root
+    reply_url = build_yandex_compose_web_url(
+        to=lead.email,
+        subject=f"Re: {format_lead_reply_subject(lead)}",
+        from_email=(getattr(assignee, "email", "") or "").strip(),
+    )
     context = {
         "lead": lead,
         "site_url": site_url,
@@ -616,6 +715,7 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         "lead_items": items,
         "is_continuation": is_continuation,
         "bundle_root": root,
+        "reply_url": reply_url,
     }
     if is_continuation and root is not None:
         subject = f"Продолжение КП #{root.pk} → заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
@@ -623,4 +723,95 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
     text_body = render_to_string("leads/email/new_lead.txt", context).strip()
     html_body = render_to_string("leads/email/new_lead.html", context).strip()
+    return subject, text_body, html_body
+
+
+def resolve_lead_reply_to(lead: Lead) -> str:
+    """Reply-To mailbox for the client confirmation email.
+
+    Active staff assignee → their email; otherwise the first address from
+    ``LEAD_NOTIFY_EMAIL`` (sales list). Empty string = no Reply-To header.
+
+    Args:
+        lead: Lead (use ``select_related("assignee")`` when possible).
+
+    Returns:
+        Email address or empty string.
+    """
+    assignee = getattr(lead, "assignee", None)
+    if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):
+        addr = (getattr(assignee, "email", "") or "").strip()
+        if addr:
+            return addr
+    sales = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+    return sales[0] if sales else ""
+
+
+def _client_signature(lead: Lead, assignee: Any | None) -> dict[str, str]:
+    """Signature block for the client confirmation — personal manager contacts.
+
+    Format: ``С уважением, {name}`` / ``{company}`` / ``{phone} | {email}``.
+    Contacts come from ``crm.manager_signatures`` (per-mailbox profile);
+    without an assignee — generic sales signature (site phone + Reply-To).
+
+    Args:
+        lead: Lead (for the Reply-To fallback).
+        assignee: staff user or None.
+
+    Returns:
+        Dict with name/company/phone/tel_href/email display values.
+    """
+    from crm.manager_signatures import manager_signature_contacts
+
+    reply_to = resolve_lead_reply_to(lead)
+    if assignee is not None:
+        email = (getattr(assignee, "email", "") or "").strip()
+        contacts = manager_signature_contacts(email) or {}
+        phone = (contacts.get("phone") or "").strip()
+        return {
+            "name": contacts.get("name") or manager_display_name(assignee),
+            "company": contacts.get("company") or _SITE_COMPANY,
+            "phone": phone,
+            "tel_href": "+" + re.sub(r"\D", "", phone) if phone else "",
+            "email": email or reply_to,
+        }
+    return {
+        "name": f"Команда продаж {_SITE_BRAND}",
+        "company": _SITE_COMPANY,
+        "phone": _SITE_PHONE,
+        "tel_href": _SITE_PHONE_TEL,
+        "email": reply_to,
+    }
+
+
+def render_lead_client_confirmation(lead: Lead) -> tuple[str, str, str]:
+    """Build subject, plain text, and HTML bodies for the client confirmation.
+
+    «Заявка принята в работу» — номер, тема, дата, позиции и ведущий менеджер.
+
+    Args:
+        lead: saved Lead instance (with optional assignee / items).
+
+    Returns:
+        Tuple of (subject, text_body, html_body).
+    """
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
+    assignee = getattr(lead, "assignee", None)
+    assignee_display = manager_display_name(assignee) if assignee is not None else ""
+    items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
+    signature = _client_signature(lead, assignee)
+    context = {
+        "lead": lead,
+        "site_url": site_url,
+        "site_phone": _SITE_PHONE,
+        "brand_name": _SITE_BRAND,
+        "lead_type_display": lead.get_lead_type_display(),
+        "assignee_display": assignee_display,
+        "lead_items": items,
+        "response_time": _CLIENT_RESPONSE_TIME,
+        "signature": signature,
+    }
+    subject = f"Мы получили вашу заявку №{lead.pk}"
+    text_body = render_to_string("leads/email/lead_client_confirm.txt", context).strip()
+    html_body = render_to_string("leads/email/lead_client_confirm.html", context).strip()
     return subject, text_body, html_body

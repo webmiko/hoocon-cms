@@ -1,0 +1,24 @@
+Здравствуйте, {{ lead.name }}!
+
+Спасибо за обращение в {{ brand_name }}. Мы получили вашу заявку и уже начали её обработку.
+
+Детали вашей заявки:
+Номер: №{{ lead.pk }}
+Тема: {{ lead_type_display }}
+Дата: {{ lead.created_at|date:"d.m.Y, H:i" }}
+{% if lead_items %}Позиции:
+{% for item in lead_items %}- {{ item.sku_code|default:"?" }} × {{ item.quantity }}
+{% endfor %}{% elif lead.sku %}Артикул: {{ lead.sku.sku_code }}{% if lead.quantity %} × {{ lead.quantity }}{% endif %}
+{% endif %}
+Ваше сообщение:
+{{ lead.message }}
+
+{% if assignee_display %}Вашу заявку ведёт менеджер: {{ assignee_display }}
+{% endif %}
+Наш специалист свяжется с вами в течение {{ response_time }} по указанным контактам.
+
+Если у вас появились дополнительные вопросы, просто ответьте на это письмо.
+
+С уважением, {{ signature.name }}
+{{ signature.company|safe }}
+{{ signature.phone }}{% if signature.phone and signature.email %} | {% endif %}{{ signature.email }}

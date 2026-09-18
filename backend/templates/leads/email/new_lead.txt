@@ -19,5 +19,6 @@ Email: {{ lead.email }}
 {% endif %}
 —
 Заявка создана: {{ lead.created_at|date:"Y-m-d H:i" }}
-Открыть в Admin: {{ admin_url }}
+{% if reply_url %}Ответить клиенту: {{ reply_url }}
+{% endif %}Открыть в Admin: {{ admin_url }}
 Все новые заявки: {{ inbox_url }}

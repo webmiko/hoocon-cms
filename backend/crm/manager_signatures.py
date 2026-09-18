@@ -8,12 +8,20 @@ from crm.email_body import is_html_email_body
 
 _ASSISTANT_EMAIL = "assistant@hoocon.ru"
 
-_LUDMILA_SIGNATURE = 'С уважением, Людмила\nООО "ХОГОН"\n+7(995)780-70-18\nassistant@hoocon.ru'
-
 _EMAIL_LINE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Персональные контакты менеджеров по служебной почте — «профиль» подписи
+# (staff User не хранит телефон; каноничный источник — этот словарь).
+_MANAGER_CONTACTS: dict[str, dict[str, str]] = {
+    _ASSISTANT_EMAIL: {
+        "name": "Людмила",
+        "company": 'ООО "ХОГОН"',
+        "phone": "+7(995)780-70-18",
+    },
+}
+
 _MANAGER_SIGNATURES: dict[str, str] = {
-    _ASSISTANT_EMAIL: _LUDMILA_SIGNATURE,
+    email: f"С уважением, {c['name']}\n{c['company']}\n{c['phone']}\n{email}" for email, c in _MANAGER_CONTACTS.items()
 }
 
 
@@ -23,6 +31,22 @@ def manager_reply_signature(manager_email: str) -> str:
     if not key:
         return ""
     return _MANAGER_SIGNATURES.get(key, "")
+
+
+def manager_signature_contacts(manager_email: str) -> dict[str, str] | None:
+    """Structured signature contacts (name/company/phone/email) for a manager.
+
+    Args:
+        manager_email: manager mailbox (login email on the staff user).
+
+    Returns:
+        Dict with ``name``/``company``/``phone``/``email``, or None when the
+        mailbox is not configured in ``_MANAGER_CONTACTS``.
+    """
+    key = (manager_email or "").strip().casefold()
+    if not key or key not in _MANAGER_CONTACTS:
+        return None
+    return {**_MANAGER_CONTACTS[key], "email": key}
 
 
 def manager_reply_signature_html(manager_email: str) -> str:
