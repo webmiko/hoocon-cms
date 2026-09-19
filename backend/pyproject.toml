@@ -8,8 +8,8 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "django (>=6.0.6,<7)",
     "djangorestframework (>=3.18.1,<4)",
-    "python-dotenv (>=1.0,<2)",
-    "psycopg[binary] (>=3.2,<4)",
+    "python-dotenv (>=1.2.3,<2)",
+    "psycopg[binary] (>=3.3.6,<4)",
     "pillow (>=12.2,<13)",
     "django-filter (>=24.0,<26)",
     "django-cors-headers (>=4.6,<5)",
@@ -22,9 +22,9 @@ dependencies = [
     "gunicorn (>=23.0,<24)",
     "django-axes (>=8.3.1,<9.0.0)",
     "django-unfold (>=0.101.0,<0.107.0)",
-    "pypdfium2 (>=5.12.1,<6.0.0)",
+    "pypdfium2 (>=5.13.0,<6.0.0)",
     "openpyxl (>=3.1,<4)",
-    "pywebpush (>=2.0,<3)",
+    "pywebpush (>=2.5.0,<3)",
     "webauthn (>=2.0,<3)",
 ]
 
@@ -40,9 +40,9 @@ dev = [
     "ruff (>=0.15.0,<0.16.0)",
     "mypy (>=1.19.0,<1.20.0)",
     "pytest (>=9.0.0,<10.0.0)",
-    "pytest-django (>=4.12.0,<5.0.0)",
-    "django-stubs (>=6.1.0,<7.0.0)",
-    "djangorestframework-stubs (>=3.15.0,<4.0.0)",
+    "pytest-django (>=4.14.0,<5.0.0)",
+    "django-stubs (>=6.1.1,<7.0.0)",
+    "djangorestframework-stubs (>=3.18.1,<4.0.0)",
     "pytest-cov (>=6.0,<7)",
     "pip-audit (>=2.7,<3)",
 ]
