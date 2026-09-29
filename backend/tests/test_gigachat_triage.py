@@ -81,7 +81,7 @@ def test_parse_triage_escalation_note_extracts_summary() -> None:
 
 @pytest.mark.django_db
 def test_triage_product_question_asks_without_api(gigachat_on) -> None:
-    """Вопрос о продукции → статическое уточнение без GigaChat API."""
+    """Вопрос о продукции → оффер in-chat квиза без GigaChat API."""
     conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="triage-1")
     Message.objects.create(
         conversation=conv,
@@ -95,7 +95,9 @@ def test_triage_product_question_asks_without_api(gigachat_on) -> None:
 
     assert reply.escalate is False
     assert reply.product_clarify is True
-    assert "напряжение" in reply.text.lower()
+    assert "подобрать" in reply.text.lower()
+    actions = reply.payload_extra.get("chat_actions") or []
+    assert [a["id"] for a in actions] == ["quiz:start", "call_manager"]
 
 
 @pytest.mark.django_db
@@ -227,7 +229,8 @@ def test_triage_task_continues_after_clarification_without_escalation(gigachat_o
     assert followup is not None
     assert "позовите менеджера" in followup.body.lower()
     payload = followup.raw_payload if isinstance(followup.raw_payload, dict) else {}
-    assert not payload.get("chat_actions")
+    # Кнопка «Позвать менеджера» — быстрый путь к эскалации.
+    assert [a["id"] for a in payload.get("chat_actions") or []] == ["call_manager"]
 
 
 @pytest.mark.django_db

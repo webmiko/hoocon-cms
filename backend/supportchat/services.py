@@ -189,6 +189,26 @@ def add_inbound_message(
     return inbound, auto
 
 
+def staff_push_debounce_seconds() -> int:
+    """Delay before staff push so a burst of client messages = one alert."""
+    from django.conf import settings as dj_settings
+
+    raw = getattr(dj_settings, "SUPPORT_STAFF_PUSH_DEBOUNCE_SECONDS", 20)
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return 20
+
+
+def inbound_superseded(conversation_id: int, inbound_message_id: int) -> bool:
+    """Newer inbound exists → a later debounced push task will fire instead."""
+    return Message.objects.filter(
+        conversation_id=conversation_id,
+        direction=MessageDirection.INBOUND,
+        id__gt=inbound_message_id,
+    ).exists()
+
+
 def _schedule_ai_reply(conversation_id: int, inbound_message_id: int) -> None:
     """Enqueue GigaChat assistant reply after commit."""
     from django.db import transaction
@@ -219,13 +239,28 @@ def _schedule_staff_support_push(
         from accounts.tasks import notify_staff_max_support, notify_staff_telegram_support
         from webpush.tasks import notify_staff_support_inbound
 
-        notify_staff_support_inbound.delay(conversation_id)
-        notify_staff_telegram_support.delay(conversation_id)
-        notify_staff_max_support.delay(conversation_id, message_id)
+        # Дебаунс: задачи с message_id ждут и пропускают себя, если пришло
+        # более новое inbound — бёрст клиента даёт один пуш, а не серию.
+        countdown = staff_push_debounce_seconds() if message_id else 0
+        notify_staff_support_inbound.apply_async(
+            args=[conversation_id, message_id],
+            countdown=countdown,
+        )
+        notify_staff_telegram_support.apply_async(
+            args=[conversation_id, message_id],
+            countdown=countdown,
+        )
+        notify_staff_max_support.apply_async(
+            args=[conversation_id, message_id],
+            countdown=countdown,
+        )
         try:
             from staff_api.tasks import notify_staff_fcm_support
 
-            notify_staff_fcm_support.delay(conversation_id)
+            notify_staff_fcm_support.apply_async(
+                args=[conversation_id, message_id],
+                countdown=countdown,
+            )
         except Exception:  # noqa: BLE001 — FCM optional / app may be absent
             logger.exception("fcm_support_enqueue_failed conversation_id=%s", conversation_id)
         if first_inbound and message_id is not None:

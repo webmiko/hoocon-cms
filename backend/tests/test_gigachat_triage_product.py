@@ -122,7 +122,7 @@ def test_product_followup_keeps_bot_without_manager_button(settings) -> None:
 
     assert reply.escalate is False
     assert "позовите менеджера" in reply.text.lower()
-    assert not reply.payload_extra.get("chat_actions")
+    assert [a["id"] for a in reply.payload_extra.get("chat_actions") or []] == ["call_manager"]
 
 
 @pytest.mark.django_db

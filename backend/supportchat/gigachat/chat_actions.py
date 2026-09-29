@@ -24,6 +24,11 @@ def call_manager_only_actions() -> list[dict[str, str]]:
     return [{"id": CALL_MANAGER_ACTION, "label": CALL_MANAGER_LABEL}]
 
 
+def continue_with_bot_actions() -> list[dict[str, str]]:
+    """Way back to the bot on escalated/handoff messages."""
+    return [{"id": CONTINUE_BOT_ACTION, "label": CONTINUE_BOT_LABEL}]
+
+
 def actions_payload(actions: list[dict[str, str]]) -> dict[str, object]:
     return {"chat_actions": actions}
 

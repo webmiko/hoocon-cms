@@ -49,7 +49,10 @@ def notify_staff_telegram_new_lead(lead_id: int) -> int:
 
 
 @shared_task
-def notify_staff_telegram_support(conversation_id: int) -> int:
+def notify_staff_telegram_support(
+    conversation_id: int,
+    inbound_message_id: int | None = None,
+) -> int:
     """Telegram fallback for inbound support when the recipient has no Web Push."""
     from accounts.telegram_alerts import (
         format_staff_telegram_message,
@@ -61,7 +64,13 @@ def notify_staff_telegram_support(conversation_id: int) -> int:
     from sitesettings.models import SiteSettings
     from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
+    from supportchat.services import inbound_superseded
 
+    if inbound_message_id is not None and inbound_superseded(
+        conversation_id,
+        inbound_message_id,
+    ):
+        return 0
     site = SiteSettings.load()
     if not site.staff_telegram_support_enabled:
         return 0

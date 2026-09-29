@@ -12,6 +12,7 @@ _CATALOG_DAMPERS = "/catalog/elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
 _CATALOG_FIRE = "/catalog/elektroprivody-protivopozharnye-i-dymovye"
 _CATALOG_FAST = "/catalog/elektroprivody-uskorennye-bez-pruzhinnogo-vozvrata"
 _CATALOG_BALL = "/catalog/sharovye-krany"
+_CATALOG_KIT = "/catalog/komplekty"
 _QUIZ_PATH = "/#podbor"
 _RFQ_PATH = "/rfq"
 
@@ -40,7 +41,20 @@ _AREA_RE = re.compile(
     r"(?i)(\d+(?:[.,]\d+)?)\s*(?:кв\.?\s*м|м2|м²|квадрат)",
 )
 _FIRE_RE = re.compile(r"(?i)\b(?:противопожар|дымо|пожар)")
-_BALL_RE = re.compile(r"(?i)\b(?:шаровой\s+кран|кран\b)")
+_BALL_RE = re.compile(r"(?i)\b(?:шаров\w*\s+кран\w*|кран\w*\b)")
+_ACTUATOR_RE = re.compile(r"(?i)\b(?:электро)?привод\w*")
+_KIT_RE = re.compile(r"(?i)\bкомплект\w*")
+
+
+def _product_kind(body: str) -> str:
+    """Что уточняем: «kit» привод+кран, «ball» шаровой кран, «actuator» привод."""
+    has_valve = bool(_BALL_RE.search(body))
+    has_actuator = bool(_ACTUATOR_RE.search(body))
+    if (has_valve and has_actuator) or (_KIT_RE.search(body) and (has_valve or has_actuator)):
+        return "kit"
+    if has_valve:
+        return "ball"
+    return "actuator"
 
 
 def triage_response_violates_policy(text: str) -> bool:
@@ -84,7 +98,10 @@ def build_product_handoff_note(history: list[dict[str, str]]) -> str:
 def _catalog_hint(text: str) -> str:
     if _FIRE_RE.search(text):
         return _CATALOG_FIRE
-    if _BALL_RE.search(text):
+    kind = _product_kind(text)
+    if kind == "kit":
+        return _CATALOG_KIT
+    if kind == "ball":
         return _CATALOG_BALL
     return _CATALOG_DAMPERS
 
@@ -134,31 +151,64 @@ def triage_multi_series_catalog_reply(text: str) -> str:
     return "\n".join(lines)
 
 
-def triage_product_clarification_reply(text: str) -> str:
-    """First response to a product/sizing question — questions only, no models."""
-    body = (text or "").strip()
-    if mentioned_series_codes(body):
-        return triage_multi_series_catalog_reply(body)
-    catalog = _catalog_hint(body)
+def _actuator_clarify_lines(body: str) -> list[str]:
+    """Привод для заслонки/клапана — площадь, перепад, напряжение, fail-safe."""
+    lines = ["Чтобы менеджер подобрал привод точно, уточните, пожалуйста:"]
     area_match = _AREA_RE.search(body)
-    lines = [
-        "Чтобы менеджер подобрал привод точно, уточните, пожалуйста:",
-    ]
     if area_match:
         lines.append(
             f"— для заслонки ~{area_match.group(1)} м²: перепад давления (Па) или расход воздуха;",
         )
     else:
-        lines.append("— тип арматуры (заслонка, клапан, шаровой кран) и размер/площадь;")
+        lines.append("— тип арматуры (заслонка, клапан) и размер/площадь;")
     lines.extend(
         [
             "— напряжение: 24 В или 230 В;",
+            "— управление: 2-/3-точечное или пропорциональное (0–10 В);",
             "— нужен ли пружинный возврат (fail-safe), если применимо.",
-            (
-                f"Пока я не умею подбирать модели сам — можете заглянуть в категорию {catalog} "
-                f"или в квиз на главной {_QUIZ_PATH}."
-            ),
         ],
+    )
+    return lines
+
+
+def _ball_valve_clarify_lines() -> list[str]:
+    """Шаровой кран без привода — DN, среда, присоединение."""
+    return [
+        "Чтобы менеджер подобрал шаровой кран, уточните, пожалуйста:",
+        "— условный диаметр DN и тип: 2-ходовой или 3-ходовой;",
+        "— рабочая среда, температура и давление (PN);",
+        "— присоединение: муфтовое или фланцевое;",
+        "— нужен ли электропривод в комплекте.",
+    ]
+
+
+def _kit_clarify_lines() -> list[str]:
+    """Комплект привод+кран — DN крана + параметры привода."""
+    return [
+        "Чтобы менеджер подобрал комплект «кран + привод», уточните, пожалуйста:",
+        "— условный диаметр крана (DN) и тип: 2-ходовой или 3-ходовой;",
+        "— напряжение привода: 24 В или 230 В;",
+        "— управление: 2-/3-точечное или пропорциональное (0–10 В);",
+        "— нужен ли пружинный возврат (fail-safe).",
+    ]
+
+
+def triage_product_clarification_reply(text: str) -> str:
+    """First response to a product/sizing question — questions only, no models."""
+    body = (text or "").strip()
+    if mentioned_series_codes(body):
+        return triage_multi_series_catalog_reply(body)
+    kind = _product_kind(body)
+    catalog = _catalog_hint(body)
+    if kind == "kit":
+        lines = _kit_clarify_lines()
+    elif kind == "ball":
+        lines = _ball_valve_clarify_lines()
+    else:
+        lines = _actuator_clarify_lines(body)
+    lines.append(
+        f"Пока я не умею подбирать модели сам — можете заглянуть в категорию {catalog} "
+        f"или в квиз на главной {_QUIZ_PATH}.",
     )
     return "\n".join(lines)
 
