@@ -83,13 +83,25 @@ describe("supportChatControl", () => {
     const mod = await import("./supportChatControl");
     mod.installSupportChatControl();
     expect(win.hooconChat).toBeDefined();
-    expect(mod.getSupportChatState()).toEqual({ visible: true, open: false });
+    expect(mod.getSupportChatState()).toEqual({
+      visible: true,
+      open: false,
+      unread: 0,
+    });
 
     (win.hooconChat as { open: () => void }).open();
-    expect(mod.getSupportChatState()).toEqual({ visible: true, open: true });
+    expect(mod.getSupportChatState()).toEqual({
+      visible: true,
+      open: true,
+      unread: 0,
+    });
 
     (win.hooconChat as { hide: () => void }).hide();
-    expect(mod.getSupportChatState()).toEqual({ visible: false, open: false });
+    expect(mod.getSupportChatState()).toEqual({
+      visible: false,
+      open: false,
+      unread: 0,
+    });
     expect(localStorage.getItem(mod.SUPPORT_CHAT_VISIBLE_KEY)).toBe("0");
 
     (win.hooconChat as { show: () => void }).show();
@@ -104,7 +116,11 @@ describe("supportChatControl", () => {
     const win = installBrowserGlobals("/catalog/?chat=1");
     const mod = await import("./supportChatControl");
     mod.installSupportChatControl();
-    expect(mod.getSupportChatState()).toEqual({ visible: true, open: true });
+    expect(mod.getSupportChatState()).toEqual({
+      visible: true,
+      open: true,
+      unread: 0,
+    });
     expect(win.location.search).not.toContain("chat=");
   });
 
@@ -112,6 +128,33 @@ describe("supportChatControl", () => {
     installBrowserGlobals("/?chat=0");
     const mod = await import("./supportChatControl");
     mod.installSupportChatControl();
-    expect(mod.getSupportChatState()).toEqual({ visible: false, open: false });
+    expect(mod.getSupportChatState()).toEqual({
+      visible: false,
+      open: false,
+      unread: 0,
+    });
+  });
+
+  it("shares unread badge and clears it when the panel opens", async () => {
+    installBrowserGlobals("/");
+    const mod = await import("./supportChatControl");
+    mod.installSupportChatControl();
+
+    mod.setSupportChatUnread(3);
+    expect(mod.getSupportChatState().unread).toBe(3);
+
+    const seen: number[] = [];
+    const unsubscribe = mod.subscribeSupportChat((s) => seen.push(s.unread));
+    mod.setSupportChatUnread(5);
+    expect(seen.at(-1)).toBe(5);
+    unsubscribe();
+
+    /* Opening the panel marks replies read — dock/FAB badge must clear. */
+    mod.openSupportChat();
+    expect(mod.getSupportChatState().unread).toBe(0);
+
+    mod.setSupportChatUnread(Number.NaN);
+    mod.setSupportChatUnread(-2);
+    expect(mod.getSupportChatState().unread).toBe(0);
   });
 });

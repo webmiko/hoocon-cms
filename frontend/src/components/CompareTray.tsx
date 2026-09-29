@@ -7,7 +7,11 @@ import { buildCompareSearch } from "../compare/storage";
 import { ProtectedProductImage } from "./ProtectedProductImage";
 import { softBreak } from "../utils/softBreak";
 import { protectedContentHandlers } from "../utils/contentProtection";
-import { setSupportChatOpen } from "../utils/supportChatControl";
+import {
+  getSupportChatState,
+  setSupportChatOpen,
+  subscribeSupportChat,
+} from "../utils/supportChatControl";
 import styles from "./CompareTray.module.css";
 
 function ChatIcon({ className }: { className?: string }) {
@@ -66,7 +70,16 @@ export function CompareTray({
   const prevCount = useRef(count);
   const [pulse, setPulse] = useState(false);
   const [open, setOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(
+    () => getSupportChatState().unread,
+  );
   const panelId = useId();
+
+  /* FAB hides behind this dock on mobile — mirror its unread badge here. */
+  useEffect(
+    () => subscribeSupportChat((next) => setChatUnread(next.unread)),
+    [],
+  );
 
   useEffect(() => {
     if (count > prevCount.current && count > 0) {
@@ -185,11 +198,20 @@ export function CompareTray({
         <button
           type="button"
           className={styles.chat}
-          aria-label="Открыть чат поддержки"
+          aria-label={
+            chatUnread > 0
+              ? `Открыть чат поддержки, ${chatUnread} новых сообщений`
+              : "Открыть чат поддержки"
+          }
           onClick={() => setSupportChatOpen(true)}
         >
           <ChatIcon className={styles.chatIcon} />
           <span className={styles.chatLabel}>Чат</span>
+          {chatUnread > 0 ? (
+            <span className={styles.chatBadge} aria-hidden="true">
+              {chatUnread > 9 ? "9+" : chatUnread}
+            </span>
+          ) : null}
         </button>
 
         {hasSelection ? (

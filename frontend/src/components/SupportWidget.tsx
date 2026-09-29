@@ -18,6 +18,7 @@ import {
   getSupportChatState,
   hideSupportChat,
   setSupportChatOpen,
+  setSupportChatUnread,
   subscribeSupportChat,
 } from "../utils/supportChatControl";
 import {
@@ -297,6 +298,7 @@ export function SupportWidget() {
   const [extrasExpanded, setExtrasExpanded] = useState(false);
   const [fabNudge, setFabNudge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const lastIdRef = useRef(0);
@@ -491,10 +493,16 @@ export function SupportWidget() {
     setActiveFaq((prev) => (prev?.id === item.id ? null : item));
   }
 
+  // Publish unread to the shared store — mobile dock «Чат» shows the badge
+  // while the FAB is hidden behind [data-mobile-dock].
+  useEffect(() => {
+    setSupportChatUnread(unreadCount);
+  }, [unreadCount]);
+
   // Mobile fullscreen chat: lock page scroll; track viewport changes.
   useEffect(() => {
     if (!open) return;
-    const mq = window.matchMedia("(max-width: 720px)");
+    const mq = window.matchMedia("(max-width: 768px)");
     const root = document.documentElement;
     let prevOverflow = root.style.overflow;
 
@@ -511,6 +519,64 @@ export function SupportWidget() {
     return () => {
       mq.removeEventListener("change", apply);
       root.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  /*
+   * Fullscreen sheet is position:fixed inset:0 — attached to the *layout*
+   * viewport. On-screen keyboard pans the visual viewport (iOS/Android), so
+   * the header would slide off-screen and the composer sink under the keys.
+   * Pin the root to window.visualViewport while the sheet is open.
+   */
+  useEffect(() => {
+    const el = rootRef.current;
+    const vv = window.visualViewport;
+    if (!open || !el || !vv) return;
+    const mq = window.matchMedia("(max-width: 768px)");
+
+    const clearPin = () => {
+      el.style.boxSizing = "";
+      el.style.top = "";
+      el.style.right = "";
+      el.style.bottom = "";
+      el.style.left = "";
+      el.style.width = "";
+      el.style.height = "";
+      el.style.maxHeight = "";
+    };
+
+    const pin = () => {
+      if (!mq.matches) {
+        clearPin();
+        return;
+      }
+      el.style.boxSizing = "border-box";
+      el.style.top = `${vv.offsetTop}px`;
+      el.style.left = `${vv.offsetLeft}px`;
+      el.style.width = `${vv.width}px`;
+      el.style.height = `${vv.height}px`;
+      el.style.maxHeight = `${vv.height}px`;
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+    };
+
+    const onResize = () => {
+      pin();
+      /* Keyboard opened while typing — keep the latest message visible. */
+      const list = listRef.current;
+      const active = document.activeElement;
+      if (list && active && panelRef.current?.contains(active)) {
+        list.scrollTop = list.scrollHeight;
+      }
+    };
+
+    pin();
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", pin);
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", pin);
+      clearPin();
     };
   }, [open]);
 
@@ -746,7 +812,10 @@ export function SupportWidget() {
   if (!visible) return null;
 
   return (
-    <div className={open ? `${styles.root} ${styles.rootOpen}` : styles.root}>
+    <div
+      ref={rootRef}
+      className={open ? `${styles.root} ${styles.rootOpen}` : styles.root}
+    >
       {open ? (
         <section
           ref={panelRef}
@@ -1034,7 +1103,7 @@ export function SupportWidget() {
                 rows={1}
                 maxLength={4000}
                 placeholder="Сообщение…"
-                enterKeyHint="enter"
+                enterKeyHint="send"
                 aria-describedby={`${titleId}-composer-hint`}
                 required
               />
