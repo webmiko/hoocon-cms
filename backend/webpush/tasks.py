@@ -10,13 +10,22 @@ logger = setup_logger("hoocon.webpush")
 
 
 @shared_task
-def notify_staff_support_inbound(conversation_id: int) -> int:
+def notify_staff_support_inbound(
+    conversation_id: int,
+    inbound_message_id: int | None = None,
+) -> int:
     """Push staff: new inbound support message (if enabled in SiteSettings)."""
     from sitesettings.models import SiteSettings
     from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
+    from supportchat.services import inbound_superseded
     from webpush.services import queryset_staff_alerts, send_push_to_subscription
 
+    if inbound_message_id is not None and inbound_superseded(
+        conversation_id,
+        inbound_message_id,
+    ):
+        return 0
     if not SiteSettings.load().staff_push_support_enabled:
         return 0
     try:

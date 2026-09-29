@@ -6,12 +6,21 @@ import re
 from dataclasses import dataclass, field
 
 from supportchat.gigachat.chat_actions import (
+    actions_payload,
+    call_manager_only_actions,
+    continue_with_bot_actions,
     inbound_continue_with_bot,
     inbound_requests_manager_handoff,
+    manager_branch_actions,
 )
 from supportchat.gigachat.client import GigachatError, chat_completion
 from supportchat.gigachat.policy import resolve_gigachat_model
 from supportchat.gigachat.prompts import build_system_prompt
+from supportchat.gigachat.quiz_bot import (
+    quiz_offer_actions,
+    quiz_offer_text,
+    triage_quiz_reply,
+)
 from supportchat.gigachat.triage import (
     is_product_intent,
     is_triage_mode,
@@ -27,12 +36,16 @@ from supportchat.gigachat.triage_guard import (
 )
 from supportchat.gigachat.triage_product import (
     build_product_handoff_note,
+    mentioned_series_codes,
     product_clarification_already_sent,
     thread_has_product_topic,
     triage_product_clarification_reply,
     triage_product_followup_reply,
 )
-from supportchat.gigachat.triage_scope import triage_out_of_scope_reply
+from supportchat.gigachat.triage_scope import (
+    triage_chitchat_reply,
+    triage_out_of_scope_reply,
+)
 from supportchat.models import Conversation, Message, MessageDirection
 
 ESCALATE_MARKER = "[ESCALATE]"
@@ -62,7 +75,12 @@ class AiReply:
 
 def turn_limit_reply() -> AiReply:
     """Bot turn cap — suggest typed manager request, no auto handoff."""
-    return AiReply(text=_TURN_LIMIT_TEXT, escalate=False, escalation_note="")
+    return AiReply(
+        text=_TURN_LIMIT_TEXT,
+        escalate=False,
+        escalation_note="",
+        payload_extra=actions_payload(manager_branch_actions()),
+    )
 
 
 def _strip_escalate_marker(text: str) -> str:
@@ -143,15 +161,37 @@ def generate_ai_reply(
     if inbound_requests_manager_handoff(user_query, payload):
         text, _default_note = triage_handoff_reply(user_query)
         note = _manager_escalation_note(user_query, history, inbound_payload=payload)
-        return AiReply(text=text, escalate=True, escalation_note=note)
+        return AiReply(
+            text=text,
+            escalate=True,
+            escalation_note=note,
+            payload_extra=actions_payload(continue_with_bot_actions()),
+        )
+
+    quiz_reply = triage_quiz_reply(conversation, user_query, payload, inbound_message=inbound_message)
+    if quiz_reply is not None:
+        return quiz_reply
 
     docs_text = triage_docs_reply(user_query)
     if docs_text:
         return AiReply(text=docs_text, escalate=False, escalation_note="")
     if is_triage_mode():
+        chitchat_text = triage_chitchat_reply(user_query)
+        if chitchat_text:
+            return AiReply(
+                text=chitchat_text,
+                escalate=False,
+                escalation_note="",
+                payload_extra=actions_payload(call_manager_only_actions()),
+            )
         scope_text = triage_out_of_scope_reply(user_query)
         if scope_text:
-            return AiReply(text=scope_text, escalate=False, escalation_note="")
+            return AiReply(
+                text=scope_text,
+                escalate=False,
+                escalation_note="",
+                payload_extra=actions_payload(call_manager_only_actions()),
+            )
         nav_text = triage_site_nav_reply(user_query)
         if nav_text:
             return AiReply(text=nav_text, escalate=False, escalation_note="")
@@ -164,18 +204,37 @@ def generate_ai_reply(
                 text=triage_product_followup_reply(history),
                 escalate=False,
                 escalation_note="",
+                payload_extra=actions_payload(call_manager_only_actions()),
             )
         if is_product_intent(user_query) and not product_clarification_already_sent(conversation):
+            if mentioned_series_codes(user_query):
+                # B2B-запрос по нескольким сериям → ссылки на категории, не квиз.
+                return AiReply(
+                    text=triage_product_clarification_reply(user_query),
+                    escalate=False,
+                    escalation_note="",
+                    product_clarify=True,
+                    payload_extra=actions_payload(call_manager_only_actions()),
+                )
             return AiReply(
-                text=triage_product_clarification_reply(user_query),
+                text=quiz_offer_text(),
                 escalate=False,
                 escalation_note="",
                 product_clarify=True,
+                payload_extra={
+                    **actions_payload(quiz_offer_actions()),
+                    "quiz_offer": True,
+                },
             )
         greeting_text = triage_greeting_reply(user_query)
         if greeting_text:
             return AiReply(text=greeting_text, escalate=False, escalation_note="")
-        return AiReply(text=uncertain_branch_reply(), escalate=False, escalation_note="")
+        return AiReply(
+            text=uncertain_branch_reply(),
+            escalate=False,
+            escalation_note="",
+            payload_extra=actions_payload(manager_branch_actions()),
+        )
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": build_system_prompt(user_query=user_query)},
@@ -199,6 +258,7 @@ def generate_ai_reply(
                 text=triage_product_followup_reply(history),
                 escalate=False,
                 escalation_note="",
+                payload_extra=actions_payload(call_manager_only_actions()),
             )
         if is_product_intent(user_query):
             return AiReply(
@@ -206,14 +266,21 @@ def generate_ai_reply(
                 escalate=False,
                 escalation_note="",
                 product_clarify=True,
+                payload_extra=actions_payload(call_manager_only_actions()),
             )
-        return AiReply(text=uncertain_branch_reply(), escalate=False, escalation_note="")
+        return AiReply(
+            text=uncertain_branch_reply(),
+            escalate=False,
+            escalation_note="",
+            payload_extra=actions_payload(manager_branch_actions()),
+        )
     if model_escalate and not inbound_requests_manager_handoff(user_query, payload):
         cleaned = text.strip() or "Могу подключить менеджера для точного ответа."
         return AiReply(
             text=f"{cleaned} Напишите «позовите менеджера», когда будете готовы.",
             escalate=False,
             escalation_note="",
+            payload_extra=actions_payload(call_manager_only_actions()),
         )
     note = ""
     if model_escalate:

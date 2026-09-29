@@ -20,10 +20,11 @@ class MessageCreateSerializer(serializers.Serializer):
     """Client inbound message (+ honeypot)."""
 
     body = serializers.CharField(max_length=4000)
-    chat_action = serializers.ChoiceField(
-        choices=("call_manager", "continue_bot"),
+    chat_action = serializers.RegexField(
+        r"^(call_manager|continue_bot|quiz:[a-z0-9_:]{1,60})$",
         required=False,
         allow_blank=True,
+        max_length=80,
     )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
 

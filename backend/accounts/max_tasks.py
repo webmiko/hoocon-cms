@@ -57,7 +57,13 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
     )
     from sitesettings.models import SiteSettings
     from supportchat.models import Conversation
+    from supportchat.services import inbound_superseded
 
+    if inbound_message_id is not None and inbound_superseded(
+        conversation_id,
+        inbound_message_id,
+    ):
+        return 0
     site = SiteSettings.load()
     if not site.staff_max_support_enabled:
         return 0

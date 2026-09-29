@@ -63,7 +63,7 @@ def test_unclear_question_offers_manager_branch_without_api(settings) -> None:
     Message.objects.create(
         conversation=conv,
         direction=MessageDirection.INBOUND,
-        body="Расскажите анекдот про вентиляцию",
+        body="qwerty невнятный набор слов",
     )
 
     with patch("supportchat.gigachat.reply.chat_completion") as api:
@@ -72,7 +72,10 @@ def test_unclear_question_offers_manager_branch_without_api(settings) -> None:
 
     assert reply.escalate is False
     assert reply.text == uncertain_branch_reply()
-    assert not reply.payload_extra.get("chat_actions")
+    assert [a["id"] for a in reply.payload_extra.get("chat_actions") or []] == [
+        "call_manager",
+        "continue_bot",
+    ]
 
 
 @pytest.mark.django_db

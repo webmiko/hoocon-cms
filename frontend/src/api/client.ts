@@ -495,7 +495,7 @@ export const api = {
 
   supportSendMessage(
     body: string,
-    chatAction?: "call_manager" | "continue_bot",
+    chatAction?: string,
   ): Promise<{
     message: {
       id: number;

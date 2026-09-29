@@ -50,12 +50,20 @@ def _send_fcm(*, token: str, title: str, body: str, data: dict[str, str]) -> boo
 
 
 @shared_task
-def notify_staff_fcm_support(conversation_id: int) -> int:
+def notify_staff_fcm_support(
+    conversation_id: int,
+    inbound_message_id: int | None = None,
+) -> int:
     """FCM: new inbound support message."""
     from staff_api.models import StaffDevice
     from supportchat.models import Conversation
-    from supportchat.services import conversation_party_label
+    from supportchat.services import conversation_party_label, inbound_superseded
 
+    if inbound_message_id is not None and inbound_superseded(
+        conversation_id,
+        inbound_message_id,
+    ):
+        return 0
     try:
         conv = Conversation.objects.select_related("client", "lead").get(pk=conversation_id)
     except Conversation.DoesNotExist:

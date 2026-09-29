@@ -36,4 +36,13 @@ describe("SupportWidget mobile chat", () => {
     /* Dock «Чат» button needs the badge while the FAB is hidden. */
     expect(tsx).toContain("setSupportChatUnread");
   });
+
+  it("keeps «Продолжить с ботом» visible on escalated chats", () => {
+    /*
+     * Escalated threads hid ALL branch buttons — including continue_bot,
+     * the only way back to the bot. Now actions are filtered, not dropped.
+     */
+    expect(tsx).toContain('a.id === "continue_bot"');
+    expect(tsx).toContain("messageActionsFor");
+  });
 });

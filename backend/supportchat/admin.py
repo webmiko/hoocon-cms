@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from django.contrib import admin, messages
-from django.db.models import QuerySet
+from django.contrib.admin import SimpleListFilter
+from django.db.models import Exists, F, OuterRef, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
@@ -71,6 +72,50 @@ def _chat_messages_for_admin(
     return _serialize_admin_messages(qs)
 
 
+class AwaitingManagerFilter(SimpleListFilter):
+    """Эскалированные диалоги без единого ответа менеджера."""
+
+    title = "ожидание менеджера"
+    parameter_name = "awaiting_manager"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        return [("yes", "Ждут ответа менеджера")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Conversation]) -> QuerySet[Conversation]:
+        from supportchat.models import MessageDirection
+
+        if self.value() != "yes":
+            return queryset
+        manager_replied = Message.objects.filter(
+            conversation=OuterRef("pk"),
+            direction=MessageDirection.OUTBOUND,
+            author__isnull=False,
+            created_at__gte=OuterRef("ai_escalated_at"),
+        )
+        return queryset.filter(
+            status=ConversationStatus.OPEN,
+            ai_escalated_at__isnull=False,
+        ).exclude(Exists(manager_replied))
+
+
+class HasMessagesFilter(SimpleListFilter):
+    """Скрывает/показывает сессии без единого сообщения."""
+
+    title = "сообщения"
+    parameter_name = "has_messages"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        return [("yes", "С сообщениями"), ("no", "Пустые")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Conversation]) -> QuerySet[Conversation]:
+        has_messages = Exists(Message.objects.filter(conversation=OuterRef("pk")))
+        if self.value() == "yes":
+            return queryset.filter(has_messages)
+        if self.value() == "no":
+            return queryset.exclude(has_messages)
+        return queryset
+
+
 @admin.register(Conversation)
 class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Unified support inbox with messenger change view."""
@@ -86,7 +131,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "last_preview",
     )
     list_display_links = ("party_label", "contact_email")
-    list_filter = ("channel", "status", "assignee")
+    list_filter = ("channel", "status", "assignee", AwaitingManagerFilter, HasMessagesFilter)
     search_fields = (
         "display_name",
         "contact_email",
@@ -109,7 +154,9 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     autocomplete_fields = ("assignee", "client", "lead")
     # Messages render in the messenger template (not a tabular inline).
     inlines = ()
-    ordering = ("-last_message_at", "-id")
+    # NULL last_message_at (сессии без сообщений) — внизу списка,
+    # иначе Postgres DESC ставит их выше живых диалогов.
+    ordering = (F("last_message_at").desc(nulls_last=True), "-id")
     change_form_template = "admin/supportchat/conversation/change_form.html"
     change_list_template = "admin/supportchat/conversation/change_list.html"
     actions = ("action_mark_read", "action_close", "action_delete_unlinked")

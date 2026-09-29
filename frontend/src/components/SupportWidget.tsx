@@ -127,13 +127,24 @@ function ChatBranchActions({
   );
 }
 
+function messageActionsFor(
+  message: ChatMessage,
+  escalated: boolean,
+): ChatAction[] {
+  const actions = message.actions ?? [];
+  // На эскалированном диалоге живёт только «Продолжить с ботом» —
+  // именно она возвращает AI в тред.
+  if (escalated) return actions.filter((a) => a.id === "continue_bot");
+  return actions;
+}
+
 function shouldShowMessageActions(
   message: ChatMessage,
   messageIndex: number,
   messages: ChatMessage[],
   escalated: boolean,
 ): boolean {
-  if (escalated || !message.actions?.length) return false;
+  if (!messageActionsFor(message, escalated).length) return false;
   return !messages
     .slice(messageIndex + 1)
     .some((row) => row.direction === "inbound");
@@ -736,7 +747,7 @@ export function SupportWidget() {
 
   async function sendChatMessage(
     body: string,
-    chatAction?: "call_manager" | "continue_bot",
+    chatAction?: string,
   ) {
     if (!body.trim() || busy) return;
     setBusy(true);
@@ -775,11 +786,7 @@ export function SupportWidget() {
   }
 
   async function onChatAction(action: ChatAction) {
-    const chatAction =
-      action.id === "call_manager" || action.id === "continue_bot"
-        ? action.id
-        : undefined;
-    await sendChatMessage(action.label, chatAction);
+    await sendChatMessage(action.label, action.id);
   }
 
   async function onSaveContacts(event: FormEvent) {
@@ -981,7 +988,7 @@ export function SupportWidget() {
                     </SupportChatBubble>
                     {showActions ? (
                       <ChatBranchActions
-                        actions={m.actions ?? []}
+                        actions={messageActionsFor(m, Boolean(conversation?.ai_escalated))}
                         disabled={busy}
                         onPick={(action) => void onChatAction(action)}
                       />
