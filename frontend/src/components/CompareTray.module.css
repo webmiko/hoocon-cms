@@ -183,6 +183,7 @@
 
 /* Desktop: chat stays as floating FAB. Mobile dock embeds it (left thumb). */
 .chat {
+  position: relative;
   display: none;
   appearance: none;
   flex: 0 0 auto;
@@ -231,6 +232,25 @@
 
 .chatLabel {
   line-height: 1;
+}
+
+/* Unread badge mirrors the FAB counter while the dock replaces it. */
+.chatBadge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--color-danger, #c53030);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.15rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-surface, #fff);
+  pointer-events: none;
 }
 
 .summary {

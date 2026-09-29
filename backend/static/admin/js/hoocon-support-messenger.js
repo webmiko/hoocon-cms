@@ -16,6 +16,51 @@
     if (thread) thread.scrollTop = thread.scrollHeight;
   }
 
+  /**
+   * Phone thread is position:fixed inset:0 — attached to the *layout* viewport.
+   * When the on-screen keyboard opens, iOS/Android pan the visual viewport so
+   * the header slides off-screen top and the composer sinks under the keyboard.
+   * Pin the sheet to window.visualViewport so header + composer stay visible.
+   */
+  function setupViewportPin(root, thread, textarea) {
+    var vv = window.visualViewport;
+    if (!root || !vv) return;
+
+    function isFixedLayout() {
+      return window.getComputedStyle(root).position === "fixed";
+    }
+
+    function pin() {
+      if (!isFixedLayout()) {
+        root.style.boxSizing = "";
+        root.style.top = "";
+        root.style.right = "";
+        root.style.bottom = "";
+        root.style.left = "";
+        root.style.width = "";
+        root.style.height = "";
+        return;
+      }
+      root.style.boxSizing = "border-box";
+      root.style.top = vv.offsetTop + "px";
+      root.style.left = vv.offsetLeft + "px";
+      root.style.width = vv.width + "px";
+      root.style.height = vv.height + "px";
+      root.style.right = "auto";
+      root.style.bottom = "auto";
+    }
+
+    vv.addEventListener("resize", function () {
+      pin();
+      /* Keyboard opened while replying — keep the latest message in view. */
+      if (textarea && document.activeElement === textarea) {
+        scrollThread(thread);
+      }
+    });
+    vv.addEventListener("scroll", pin);
+    pin();
+  }
+
   function buildRow(msg) {
     var article = document.createElement("article");
     article.className =
@@ -111,6 +156,7 @@
 
     var form = document.getElementById("hoocon-messenger-reply");
     var textarea = document.getElementById("hoocon-reply-body");
+    setupViewportPin(root, thread, textarea);
     if (!form || !textarea) return;
 
     textarea.addEventListener("keydown", function (event) {

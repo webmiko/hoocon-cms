@@ -21,6 +21,8 @@ export type SupportChatState = {
   visible: boolean;
   /** Conversation panel open. */
   open: boolean;
+  /** Staff/bot replies not yet seen — badge on FAB and dock «Чат». */
+  unread: number;
 };
 
 type SupportChatListener = (state: SupportChatState) => void;
@@ -28,6 +30,7 @@ type SupportChatListener = (state: SupportChatState) => void;
 let state: SupportChatState = {
   visible: true,
   open: false,
+  unread: 0,
 };
 
 const listeners = new Set<SupportChatListener>();
@@ -65,9 +68,17 @@ function setState(patch: Partial<SupportChatState>): SupportChatState {
   const next: SupportChatState = {
     visible: patch.visible ?? state.visible,
     open: patch.open ?? state.open,
+    unread: patch.unread ?? state.unread,
   };
   if (!next.visible) next.open = false;
-  if (next.visible === state.visible && next.open === state.open) return state;
+  if (next.open) next.unread = 0;
+  if (
+    next.visible === state.visible &&
+    next.open === state.open &&
+    next.unread === state.unread
+  ) {
+    return state;
+  }
   state = next;
   if (patch.visible !== undefined) persistVisible(next.visible);
   emit();
@@ -119,6 +130,12 @@ export function setSupportChatOpen(open: boolean): SupportChatState {
   return setState({ open });
 }
 
+/** Sync the unread badge from the widget (FAB + mobile dock «Чат»). */
+export function setSupportChatUnread(unread: number): SupportChatState {
+  const safe = Number.isFinite(unread) && unread > 0 ? Math.floor(unread) : 0;
+  return setState({ unread: safe });
+}
+
 export type HooconChatApi = {
   show: () => SupportChatState;
   hide: () => SupportChatState;
@@ -159,7 +176,7 @@ function applyChatQueryOnce(): void {
 
 /** Call once from the SPA entry (after DOM is available). */
 export function installSupportChatControl(): void {
-  state = { visible: readStoredVisible(), open: false };
+  state = { visible: readStoredVisible(), open: false, unread: 0 };
   window.hooconChat = {
     show: showSupportChat,
     hide: hideSupportChat,

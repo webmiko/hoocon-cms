@@ -401,6 +401,26 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "background: var(--hm-brand" in phone_send_rule
 
 
+def test_admin_phone_messenger_pins_sheet_to_visual_viewport() -> None:
+    """On-screen keyboard must not push the fixed chat header off-screen.
+
+    The phone thread is position:fixed inset:0 — it tracks the *layout*
+    viewport. iOS/Android pan the visual viewport when the keyboard opens,
+    so the JS pins the sheet to window.visualViewport (offsetTop + height).
+    """
+    messenger_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-support-messenger.js").read_text(
+        encoding="utf-8"
+    )
+    assert "setupViewportPin" in messenger_js
+    assert "window.visualViewport" in messenger_js
+    assert 'getComputedStyle(root).position === "fixed"' in messenger_js
+    assert 'root.style.top = vv.offsetTop + "px"' in messenger_js
+    assert 'root.style.height = vv.height + "px"' in messenger_js
+    assert 'vv.addEventListener("resize"' in messenger_js
+    assert 'vv.addEventListener("scroll"' in messenger_js
+    assert "scrollThread(thread)" in messenger_js
+
+
 @pytest.mark.django_db
 def test_admin_phone_shell_hidden_without_staff_perms() -> None:
     """Staff without lead/chat/crm perms still get «Ещё» tab only."""
