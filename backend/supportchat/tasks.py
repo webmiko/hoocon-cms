@@ -6,7 +6,7 @@ import html
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from supportchat.models import Conversation
+    from supportchat.models import Conversation, Message
 
 from celery import shared_task
 from django.conf import settings
@@ -180,6 +180,82 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
 
 _HANDOFF_TEXT = "Чат передан менеджеру — дальше ответит человек. Ожидайте, пожалуйста."
 _MANAGER_ENGAGED_TEXT = "Менеджер уже ведёт этот диалог — напишите здесь, он увидит сообщение."
+_AI_RESUMED_TEXT = (
+    "Менеджер пока не успел ответить — продолжу помогать сам. Если понадобится человек, напишите «позовите менеджера»."
+)
+
+
+def ai_resume_stale_escalation_minutes() -> int:
+    """Manager silence on an escalated chat before the bot takes it back."""
+    raw = getattr(settings, "SUPPORT_AI_RESUME_STALE_MINUTES", 30)
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 30
+
+
+def ai_resume_manager_silence_hours() -> int:
+    """Silence after a manager reply before the bot picks the thread back up."""
+    raw = getattr(settings, "SUPPORT_AI_RESUME_MANAGER_HOURS", 24)
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 24
+
+
+def _resume_stale_ai(conversation: Conversation, inbound: Message) -> bool:
+    """Re-enable the bot on stale threads; returns True when it resumed.
+
+    - Escalated but manager never replied → resume after
+      SUPPORT_AI_RESUME_STALE_MINUTES (fresh escalations stay with staff).
+    - Manager engaged earlier (assignee / outbound reply) → resume after
+      SUPPORT_AI_RESUME_MANAGER_HOURS of silence before this inbound.
+    """
+    from datetime import timedelta
+
+    from django.db import transaction
+    from django.utils import timezone
+
+    from supportchat.gigachat.busy_followup import manager_replied_after_escalation
+    from supportchat.gigachat.policy import conversation_ai_eligible
+    from supportchat.models import Conversation, Message
+
+    with transaction.atomic():
+        conv = Conversation.objects.select_for_update().get(pk=conversation.pk)
+        if conversation_ai_eligible(conv):
+            return False
+        now = timezone.now()
+        manager_engaged = conv.assignee_id is not None or manager_replied_after_escalation(conv)
+        escalated_at = conv.ai_escalated_at
+        if escalated_at is not None and not manager_engaged:
+            if now < escalated_at + timedelta(minutes=ai_resume_stale_escalation_minutes()):
+                return False
+        else:
+            # Silence measured from the last message BEFORE this inbound —
+            # the inbound itself already bumped last_message_at.
+            previous = (
+                Message.objects.filter(conversation=conv, id__lt=inbound.pk)
+                .order_by("-id")
+                .values_list("created_at", flat=True)
+                .first()
+            )
+            reference = previous or conv.created_at
+            if now < reference + timedelta(hours=ai_resume_manager_silence_hours()):
+                return False
+        conv.ai_active = True
+        conv.ai_escalated_at = None
+        conv.ai_turn_count = 0
+        conv.assignee = None
+        conv.save(
+            update_fields=[
+                "ai_active",
+                "ai_escalated_at",
+                "ai_turn_count",
+                "assignee",
+                "updated_at",
+            ],
+        )
+        return True
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=15)
@@ -234,10 +310,15 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
             )
 
     if not conversation_ai_eligible(conversation):
-        if continue_bot:
+        if _resume_stale_ai(conversation, inbound):
+            # Эскалация протухла или давно тихо — бот подхватывает вопрос.
+            _post_system_notice(conversation, _AI_RESUMED_TEXT)
+            conversation.refresh_from_db()
+        elif continue_bot:
             # Диалог уже у менеджера — объясняем, что кнопка не вернёт бота.
             return _post_system_notice(conversation, _MANAGER_ENGAGED_TEXT)
-        return "not_eligible"
+        else:
+            return "not_eligible"
 
     from supportchat.gigachat.quiz_bot import QUIZ_ACTION_PREFIX, latest_quiz_message
 

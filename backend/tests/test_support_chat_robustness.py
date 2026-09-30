@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from datetime import timedelta
 
 import pytest
@@ -39,11 +40,9 @@ _session_seq = 0
 def _conversation(**kwargs) -> Conversation:
     global _session_seq  # noqa: PLW0603 — уникальный id сессии на каждый диалог
     _session_seq += 1
-    return Conversation.objects.create(
-        channel=Channel.WEB,
-        external_user_id=f"sess-{_session_seq}",
-        **kwargs,
-    )
+    kwargs.setdefault("channel", Channel.WEB)
+    kwargs.setdefault("external_user_id", f"sess-{_session_seq}")
+    return Conversation.objects.create(**kwargs)
 
 
 def _inbound(conv: Conversation, body: str, **kwargs) -> Message:
@@ -362,3 +361,129 @@ def test_empty_conversations_sort_last() -> None:
 
     assert ordered[0].pk == with_messages.pk
     assert ordered[-1].pk == empty_new.pk
+
+
+@pytest.mark.django_db
+def test_reopen_closed_conversation_revives_bot(gigachat_on, django_user_model) -> None:
+    """Клиент пишет в закрытый диалог → бот снова отвечает, assignee сброшен."""
+    from unittest.mock import patch
+
+    from supportchat.gigachat.reply import generate_ai_reply
+
+    manager = django_user_model.objects.create_user(username="mgr-reopen", email="m@e.co", password="x", is_staff=True)
+    conv = _conversation(
+        status=ConversationStatus.CLOSED,
+        ai_active=False,
+        ai_escalated_at=timezone.now() - timedelta(days=2),
+        assignee=manager,
+        ai_turn_count=9,
+    )
+    inbound, _ = add_inbound_message(conv, "расскажи анекдот")
+
+    conv.refresh_from_db()
+    assert conv.status == ConversationStatus.OPEN
+    assert conv.ai_active is True and conv.ai_escalated_at is None
+    assert conv.assignee is None and conv.ai_turn_count == 0
+
+    with patch("supportchat.gigachat.reply.chat_completion"):
+        reply = generate_ai_reply(conv, inbound_message=inbound)
+    assert reply.escalate is False
+
+
+@pytest.mark.django_db
+def test_stale_escalation_resumes_bot(gigachat_on) -> None:
+    """Менеджер не ответил за окно протухания — бот подхватывает новый вопрос."""
+    old = timezone.now() - timedelta(minutes=45)
+    conv = _conversation()
+    _inbound(conv, "позовите менеджера")
+    Conversation.objects.filter(pk=conv.pk).update(
+        ai_active=False,
+        ai_escalated_at=old,
+    )
+    inbound = _inbound(conv, "а что с доставкой вообще zxqwv")
+
+    result = gigachat_reply(conv.pk, inbound.pk)
+
+    assert result == "ok"
+    conv.refresh_from_db()
+    assert conv.ai_active is True and conv.ai_escalated_at is None
+    bodies = list(
+        Message.objects.filter(conversation=conv, direction=MessageDirection.SYSTEM).values_list("body", flat=True)
+    )
+    assert any("продолжу помогать" in body for body in bodies)
+
+
+@pytest.mark.django_db
+def test_fresh_escalation_stays_silent(gigachat_on) -> None:
+    """Эскалация 10 минут назад без ответа менеджера — бот ещё ждёт."""
+    conv = _conversation()
+    _inbound(conv, "позовите менеджера")
+    Conversation.objects.filter(pk=conv.pk).update(
+        ai_active=False,
+        ai_escalated_at=timezone.now() - timedelta(minutes=10),
+    )
+    inbound = _inbound(conv, "ну и долго ждать?")
+
+    assert gigachat_reply(conv.pk, inbound.pk) == "not_eligible"
+
+
+@pytest.mark.django_db
+def test_manager_thread_resumes_after_long_silence(gigachat_on, django_user_model) -> None:
+    """Менеджер ответил и пропал — после долгой тишины бот возвращается."""
+    manager = django_user_model.objects.create_user(username="mgr-stale", email="s@e.co", password="x", is_staff=True)
+    conv = _conversation()
+    old_inbound = _inbound(conv, "вопрос")
+    Message.objects.filter(pk=old_inbound.pk).update(created_at=timezone.now() - timedelta(hours=30))
+    add_staff_reply(conv, "Ответил тогда", author=manager)
+    Message.objects.filter(conversation=conv, direction=MessageDirection.OUTBOUND).update(
+        created_at=timezone.now() - timedelta(hours=29)
+    )
+    inbound = _inbound(conv, "zxqwv новый вопрос")
+
+    assert gigachat_reply(conv.pk, inbound.pk) == "ok"
+    conv.refresh_from_db()
+    assert conv.ai_active is True and conv.assignee_id is None
+
+
+@pytest.mark.django_db
+def test_manager_thread_recent_stays_silent(gigachat_on, django_user_model) -> None:
+    """Менеджер в живом диалоге — бот не лезет."""
+    manager = django_user_model.objects.create_user(username="mgr-live", email="l@e.co", password="x", is_staff=True)
+    conv = _conversation()
+    _inbound(conv, "вопрос")
+    add_staff_reply(conv, "Сейчас отвечу", author=manager)
+    inbound = _inbound(conv, "хорошо жду")
+
+    assert gigachat_reply(conv.pk, inbound.pk) == "not_eligible"
+    conv.refresh_from_db()
+    assert conv.assignee_id == manager.pk
+
+
+@pytest.mark.django_db
+def test_stale_resume_works_on_telegram_channel(gigachat_on, monkeypatch) -> None:
+    """Та же логика для Telegram: бот возвращается и ответ уходит в TG."""
+    sent: list[str] = []
+    monkeypatch.setattr(
+        "social.publishers.publish_telegram",
+        lambda chat_id, text, **kw: sent.append(text) or _PubOk(),
+    )
+
+    conv = _conversation(channel=Channel.TELEGRAM, external_user_id="tg-77")
+    _inbound(conv, "позовите менеджера")
+    Conversation.objects.filter(pk=conv.pk).update(
+        ai_active=False,
+        ai_escalated_at=timezone.now() - timedelta(minutes=60),
+    )
+    inbound = _inbound(conv, "zxqwv вопрос")
+
+    assert gigachat_reply(conv.pk, inbound.pk) == "ok"
+    conv.refresh_from_db()
+    assert conv.ai_active is True
+    assert sent, "ответы должны уходить в Telegram"
+    assert any("продолжу помогать" in html.unescape(t) for t in sent)
+
+
+class _PubOk:
+    ok = True
+    error = None
+    skipped = False

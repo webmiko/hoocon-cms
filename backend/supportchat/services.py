@@ -30,6 +30,25 @@ class SupportChatError(Exception):
     """Domain error for support chat operations."""
 
 
+def _reopen_conversation(conversation: Conversation) -> None:
+    """CLOSED → OPEN + fresh bot session (AI state and assignee reset)."""
+    conversation.status = ConversationStatus.OPEN
+    conversation.ai_active = True
+    conversation.ai_escalated_at = None
+    conversation.ai_turn_count = 0
+    conversation.assignee = None
+    conversation.save(
+        update_fields=[
+            "status",
+            "ai_active",
+            "ai_escalated_at",
+            "ai_turn_count",
+            "assignee",
+            "updated_at",
+        ],
+    )
+
+
 logger = logging.getLogger("hoocon.supportchat")
 
 
@@ -87,8 +106,7 @@ def start_or_resume_web_conversation(
                 conv.contact_email = email
                 updates.append("contact_email")
             if conv.status == ConversationStatus.CLOSED:
-                conv.status = ConversationStatus.OPEN
-                updates.append("status")
+                _reopen_conversation(conv)
             if updates:
                 updates.append("updated_at")
                 conv.save(update_fields=updates)
@@ -138,10 +156,10 @@ def add_inbound_message(
         conversation=conversation,
         direction=MessageDirection.INBOUND,
     ).exists()
-    # Web inbound on a closed thread must reopen (same as messenger).
+    # Web inbound on a closed thread must reopen (same as messenger);
+    # reopened thread = fresh session for the bot.
     if conversation.status == ConversationStatus.CLOSED:
-        conversation.status = ConversationStatus.OPEN
-        conversation.save(update_fields=["status", "updated_at"])
+        _reopen_conversation(conversation)
     inbound = Message.objects.create(
         conversation=conversation,
         direction=MessageDirection.INBOUND,
@@ -564,8 +582,7 @@ def get_or_create_messenger_conversation(
             conv.display_name = display_name.strip()[:200]
             conv.save(update_fields=["display_name", "updated_at"])
         if conv.status == ConversationStatus.CLOSED:
-            conv.status = ConversationStatus.OPEN
-            conv.save(update_fields=["status", "updated_at"])
+            _reopen_conversation(conv)
     return conv
 
 
