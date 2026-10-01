@@ -86,8 +86,18 @@ def without_staff_webpush(users: QuerySet[Any] | list[Any]) -> list[Any]:
     return [user for user in users if not user_has_staff_webpush(user)]
 
 
-def send_telegram_to_users(users: QuerySet[Any] | list[Any], text: str) -> int:
-    """Send HTML text to each user's Telegram chat; return success count."""
+def send_telegram_to_users(
+    users: QuerySet[Any] | list[Any],
+    text: str,
+    *,
+    reply_markup: dict[str, Any] | None = None,
+    mids_out: dict[str, str] | None = None,
+) -> int:
+    """Send HTML text to each user's Telegram chat; return success count.
+
+    When ``mids_out`` is provided it is filled with ``chat_id -> message_id``
+    so callers can edit the message later (e.g. retire a reply button).
+    """
     body = (text or "").strip()
     if not body:
         return 0
@@ -98,9 +108,15 @@ def send_telegram_to_users(users: QuerySet[Any] | list[Any], text: str) -> int:
         if not chat_id or chat_id in seen:
             continue
         seen.add(chat_id)
-        result: PublishResult = publish_telegram(chat_id=chat_id, text=body)
+        result: PublishResult = publish_telegram(
+            chat_id=chat_id,
+            text=body,
+            reply_markup=reply_markup,
+        )
         if result.ok:
             sent += 1
+            if mids_out is not None:
+                mids_out[chat_id] = result.external_id
     return sent
 
 

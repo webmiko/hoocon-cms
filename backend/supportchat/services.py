@@ -372,7 +372,24 @@ def add_staff_reply(
     _schedule_visitor_support_push(conversation.pk)
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
     _schedule_retire_max_support_alert(conversation.pk, author_user)
+    _schedule_retire_telegram_support_alert(conversation.pk, author_user)
     return msg
+
+
+def _schedule_retire_telegram_support_alert(
+    conversation_id: int,
+    author: AbstractBaseUser | None,
+) -> None:
+    """After a staff reply, retire «Ответить» buttons on Telegram alerts."""
+
+    author_id = getattr(author, "pk", None)
+
+    def _enqueue() -> None:
+        from accounts.telegram_tasks import retire_telegram_support_alert
+
+        retire_telegram_support_alert.delay(conversation_id, author_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def add_staff_note(
