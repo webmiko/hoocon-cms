@@ -11,6 +11,7 @@ const FAQ_PATH_LABELS: Record<string, string> = {
   "/zavod": "OEM · завод",
   "/company": "о компании",
   "/rfq": "запрос цены",
+  "/replacement": "подбор аналога Belimo",
 };
 
 const FAQ_PATH_RE =
