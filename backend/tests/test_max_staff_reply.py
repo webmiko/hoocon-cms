@@ -18,6 +18,7 @@ from social.max_staff_reply import (
     staff_reply_callback_payload,
     staff_reply_hint,
     staff_support_alert_attachments,
+    staff_user_for_max_user_id,
 )
 from social.publishers import PublishResult
 from supportchat.models import Channel, Conversation, Message, MessageDirection
@@ -197,3 +198,50 @@ def test_staff_hash_reply_delivers_to_client_max() -> None:
     ).get()
     assert outbound.body == "Есть в наличии"
     assert "Ответ отправлен" in staff_pub.call_args.kwargs["text"]
+
+
+@pytest.mark.django_db
+def test_staff_lookup_prefers_account_with_reply_permission() -> None:
+    """Duplicate max_user_id binding: pick the account that can actually reply.
+
+    Regression: `.first()` could resolve a stale/test account without
+    supportchat.change_conversation even when the real manager account has it.
+    """
+    conv_ct = ContentType.objects.get_for_model(Conversation)
+    reply_perm = Permission.objects.get(
+        content_type=conv_ct,
+        codename="change_conversation",
+    )
+    group = Group.objects.get(name=GROUP_MANAGER)
+    group.permissions.remove(reply_perm)
+
+    stale = get_user_model().objects.create_user(
+        username="mgr-stale@hoocon.ru",
+        email="mgr-stale@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Stale",
+    )
+    stale.groups.add(group)
+    StaffMaxProfile.objects.create(
+        user=stale,
+        max_user_id="900",
+        max_alerts_enabled=True,
+    )
+
+    real = get_user_model().objects.create_user(
+        username="mgr-real@hoocon.ru",
+        email="mgr-real@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Real",
+    )
+    real.groups.add(group)
+    real.user_permissions.add(reply_perm)
+    StaffMaxProfile.objects.create(
+        user=real,
+        max_user_id="900",
+        max_alerts_enabled=True,
+    )
+
+    assert staff_user_for_max_user_id("900") == real

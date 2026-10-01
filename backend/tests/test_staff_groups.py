@@ -108,3 +108,26 @@ def test_sync_staff_groups_management_command() -> None:
     group = Group.objects.get(name=GROUP_MANAGER)
     got = {(p.content_type.app_label, p.codename) for p in group.permissions.select_related("content_type")}
     assert got == expected
+
+
+def test_post_migrate_self_heals_drifted_staff_group() -> None:
+    """post_migrate resyncs group perms — deploys can't ship stale matrices.
+
+    Regression: prod «Менеджер» lacked supportchat.change_conversation, so
+    managers got «Недостаточно прав» when replying from MAX.
+    """
+    from django.core.management.sql import emit_post_migrate_signal
+
+    ensure_staff_groups()
+    group = Group.objects.get(name=GROUP_MANAGER)
+    conv_ct_perms = group.permissions.filter(content_type__app_label="supportchat")
+    assert conv_ct_perms.exists()
+    group.permissions.remove(*conv_ct_perms)
+    assert not group.permissions.filter(content_type__app_label="supportchat").exists()
+
+    emit_post_migrate_signal(verbosity=0, interactive=False, db="default")
+
+    assert group.permissions.filter(
+        content_type__app_label="supportchat",
+        codename="change_conversation",
+    ).exists()

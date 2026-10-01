@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
@@ -10,10 +11,11 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.cache import cache
 from django.db.models import Q
 
-from accounts.roles import GROUP_MANAGER
+from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
 from social.publishers import PublishResult, publish_max
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 _STAFF_REPLY_CALLBACK_PREFIX = "staff_reply:"
 _PENDING_REPLY_CACHE_TTL = 30 * 60
@@ -39,21 +41,33 @@ def parse_staff_reply_text(text: str) -> tuple[int, str] | None:
 
 
 def staff_user_for_max_user_id(max_user_id: str) -> AbstractBaseUser | None:
-    """Active staff with this MAX user_id (manager or superuser, alerts on)."""
+    """Active staff with this MAX user_id (manager or superuser, alerts on).
+
+    ``max_user_id`` is not unique on StaffMaxProfile — when several accounts
+    share it, prefer the one that can actually answer in support chat.
+    """
     uid = (max_user_id or "").strip()
     if not uid:
         return None
-    return (
+    candidates = (
         User.objects.filter(
             is_active=True,
             is_staff=True,
             max_profile__max_user_id=uid,
             max_profile__max_alerts_enabled=True,
         )
-        .filter(Q(groups__name=GROUP_MANAGER) | Q(is_superuser=True))
+        .filter(
+            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
+        )
         .distinct()
-        .first()
     )
+    fallback = None
+    for candidate in candidates:
+        if fallback is None:
+            fallback = candidate
+        if candidate.has_perm("supportchat.change_conversation"):
+            return candidate
+    return fallback
 
 
 def staff_reply_callback_payload(conversation_id: int) -> str:
@@ -178,6 +192,11 @@ def submit_staff_reply_from_max(
     if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
         "supportchat.change_conversation",
     ):
+        logger.warning(
+            "max_staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
+            getattr(staff_user, "pk", None),
+            conversation_id,
+        )
         return False, "Недостаточно прав для ответа в поддержке."
 
     try:
