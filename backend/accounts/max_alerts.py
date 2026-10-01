@@ -61,8 +61,15 @@ def send_max_to_users(
     text: str,
     *,
     attachments: list[dict[str, Any]] | None = None,
+    mids_out: dict[str, str] | None = None,
 ) -> int:
-    """Send plain text to each staff user's MAX dialog; return success count."""
+    """Send plain text to each staff user's MAX dialog; return success count.
+
+    Args:
+        mids_out: Optional dict filled with ``{max_user_id: message mid}``
+            for successfully delivered alerts — used to edit them later
+            (e.g. drop the «Ответить» button once a dialog is taken).
+    """
     body = (text or "").strip()
     if not body:
         return 0
@@ -80,6 +87,8 @@ def send_max_to_users(
         )
         if result.ok:
             sent += 1
+            if mids_out is not None and result.external_id:
+                mids_out[uid] = result.external_id
     return sent
 
 

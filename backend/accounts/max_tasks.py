@@ -82,11 +82,64 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
         body=body,
         url=f"/admin/supportchat/conversation/{conv.pk}/change/",
     )
-    from social.max_staff_reply import staff_support_alert_attachments
+    from social.max_staff_reply import (
+        staff_support_alert_attachments,
+        store_support_alert_mid,
+    )
 
     attachments = staff_support_alert_attachments(conv.pk)
     users = list(staff_max_recipients_managers()) + list(staff_max_recipients_superusers())
-    sent = send_max_to_users(users, text, attachments=attachments)
+    mids: dict[str, str] = {}
+    sent = send_max_to_users(users, text, attachments=attachments, mids_out=mids)
+    for uid, mid in mids.items():
+        store_support_alert_mid(conv.pk, uid, mid, text)
     logger.info("max_staff_support conv_id=%s sent=%s", conversation_id, sent)
     return sent
 
+
+@shared_task
+def retire_max_support_alert(conversation_id: int, author_user_id: int | None = None) -> int:
+    """Edit staff MAX alerts after a reply: drop «Ответить», mark who answered."""
+    from accounts.max_alerts import (
+        max_user_id_for,
+        staff_max_recipients_managers,
+        staff_max_recipients_superusers,
+    )
+    from social.max_staff_reply import load_support_alert_mid
+    from social.publishers import edit_max_message
+    from supportchat.models import Conversation
+    from supportchat.services import staff_public_name
+
+    try:
+        conv = Conversation.objects.select_related("assignee").get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return 0
+    if author_user_id is None and conv.assignee_id is not None:
+        author_user_id = conv.assignee_id
+    author = None
+    if author_user_id is not None:
+        from django.contrib.auth import get_user_model
+
+        author = get_user_model().objects.filter(pk=author_user_id).first()
+    author_name = staff_public_name(author)
+
+    users = list(staff_max_recipients_managers()) + list(staff_max_recipients_superusers())
+    edited = 0
+    for user in users:
+        uid = max_user_id_for(user)
+        if not uid:
+            continue
+        stored = load_support_alert_mid(conv.pk, uid)
+        if not stored or not stored.get("mid"):
+            continue
+        base_text = stored.get("text") or ""
+        suffix = "✅ Вы ответили" if author is not None and user.pk == author.pk else f"✅ Ответил: {author_name}"
+        edit_max_message(
+            stored["mid"],
+            text=f"{base_text}\n\n{suffix}",
+            attachments=[],
+        )
+        edited += 1
+    if edited:
+        logger.info("max_staff_alert_retired conv_id=%s edited=%s", conversation_id, edited)
+    return edited

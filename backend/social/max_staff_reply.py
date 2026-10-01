@@ -121,6 +121,41 @@ def compose_staff_reply_prompt(conversation_id: int) -> str:
     return f"Диалог #{conversation_id} — напишите ответ одним сообщением.\nНомер подставлять не нужно."
 
 
+_SUPPORT_ALERT_MID_TTL = 7 * 24 * 60 * 60
+
+
+def _alert_mid_cache_key(conversation_id: int, max_user_id: str) -> str:
+    uid = (max_user_id or "").strip()
+    return f"max-support-alert-mid:{conversation_id}:{uid}"
+
+
+def store_support_alert_mid(
+    conversation_id: int,
+    max_user_id: str,
+    mid: str,
+    text: str,
+) -> None:
+    """Remember a staff alert's message mid so it can be edited later."""
+    uid = (max_user_id or "").strip()
+    mid = (mid or "").strip()
+    if not uid or not mid:
+        return
+    cache.set(
+        _alert_mid_cache_key(conversation_id, uid),
+        {"mid": mid, "text": text or ""},
+        timeout=_SUPPORT_ALERT_MID_TTL,
+    )
+
+
+def load_support_alert_mid(conversation_id: int, max_user_id: str) -> dict[str, str] | None:
+    """Return ``{"mid", "text"}`` of the alert sent to this staff user."""
+    uid = (max_user_id or "").strip()
+    if not uid:
+        return None
+    value = cache.get(_alert_mid_cache_key(conversation_id, uid))
+    return value if isinstance(value, dict) else None
+
+
 def staff_support_alert_attachments(conversation_id: int) -> list[dict[str, Any]]:
     """Inline keyboard under staff support alerts: reply + Admin link."""
     from django.conf import settings
