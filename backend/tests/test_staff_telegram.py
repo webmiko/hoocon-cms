@@ -170,6 +170,33 @@ def test_support_telegram_to_managers() -> None:
 
 
 @pytest.mark.django_db
+def test_support_telegram_parallel_despite_webpush() -> None:
+    """Support alerts are a parallel TG channel: webpush must not suppress them."""
+    mgr = _make_manager(email="mgr-push-support@hoocon.ru", chat_id="9090")
+    from supportchat.models import Channel, Conversation
+    from webpush.services import upsert_subscription
+
+    upsert_subscription(
+        endpoint="https://push.example/mgr-support-parallel",
+        p256dh="p",
+        auth="a",
+        topic_support=True,
+        user=mgr,
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="s-parallel",
+        display_name="Лев",
+    )
+    with patch(
+        "accounts.telegram_alerts.publish_telegram",
+        return_value=PublishResult(ok=True, external_id="mid-1"),
+    ) as pub:
+        assert notify_staff_telegram_support(conv.pk) == 1
+    assert pub.call_args.kwargs["chat_id"] == "9090"
+
+
+@pytest.mark.django_db
 def test_crm_telegram_only_superuser_not_manager() -> None:
     """CRM stream skips managers; only superusers with chat id."""
     _make_manager(email="mgr3-tg@hoocon.ru", chat_id="444")
