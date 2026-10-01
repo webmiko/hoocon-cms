@@ -454,6 +454,7 @@ export const api = {
   supportStartConversation(data: {
     display_name?: string;
     contact_email?: string;
+    page_url?: string;
   }): Promise<{
     id: number | null;
     channel: string;
@@ -485,6 +486,8 @@ export const api = {
       contact_email?: string;
       ai_active?: boolean;
       ai_escalated?: boolean;
+      status?: string;
+      rating?: number | null;
     } | null;
   }> {
     const qs = after != null ? `?after=${after}` : "";
@@ -496,6 +499,7 @@ export const api = {
   supportSendMessage(
     body: string,
     chatAction?: string,
+    pageUrl?: string,
   ): Promise<{
     message: {
       id: number;
@@ -505,6 +509,9 @@ export const api = {
       created_at: string;
       sender_name: string;
       actions?: { id: string; label: string }[];
+      attachment_url?: string;
+      attachment_name?: string;
+      attachment_is_image?: boolean;
     };
     auto_reply?: {
       id: number;
@@ -521,6 +528,7 @@ export const api = {
       body: JSON.stringify({
         body,
         ...(chatAction ? { chat_action: chatAction } : {}),
+        ...(pageUrl ? { page_url: pageUrl } : {}),
       }),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });

@@ -708,6 +708,7 @@ export function SupportWidget() {
     const conv = await api.supportStartConversation({
       display_name: displayName || undefined,
       contact_email: contactEmail || undefined,
+      page_url: window.location.pathname,
     });
     setConversation({
       id: conv.id ?? 0,
@@ -754,7 +755,11 @@ export function SupportWidget() {
     setError("");
     try {
       await ensureStarted();
-      const result = await api.supportSendMessage(body.trim(), chatAction);
+      const result = await api.supportSendMessage(
+        body.trim(),
+        chatAction,
+        window.location.pathname,
+      );
       setStarted(true);
       const next = [result.message];
       if (result.auto_reply) next.push(result.auto_reply);

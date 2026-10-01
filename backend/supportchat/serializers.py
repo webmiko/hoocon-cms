@@ -13,6 +13,12 @@ class ConversationStartSerializer(serializers.Serializer):
 
     display_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
     contact_email = serializers.EmailField(required=False, allow_blank=True)
+    page_url = serializers.RegexField(
+        r"^/\S{0,498}$",
+        required=False,
+        allow_blank=True,
+        max_length=500,
+    )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
 
 
@@ -25,6 +31,12 @@ class MessageCreateSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=80,
+    )
+    page_url = serializers.RegexField(
+        r"^/\S{0,498}$",
+        required=False,
+        allow_blank=True,
+        max_length=500,
     )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
 

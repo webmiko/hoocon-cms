@@ -62,6 +62,13 @@ class Conversation(models.Model):
         blank=True,
         default="",
     )
+    page_url: models.CharField = models.CharField(
+        "страница сайта",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Путь страницы, с которой клиент писал последний раз (/catalog/…).",
+    )
     status: models.CharField = models.CharField(
         "статус",
         max_length=16,

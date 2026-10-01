@@ -146,6 +146,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     readonly_fields = (
         "channel",
         "external_user_id",
+        "page_url",
         "last_message_at",
         "staff_unread_count",
         "created_at",
@@ -171,6 +172,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "status",
                     "display_name",
                     "contact_email",
+                    "page_url",
                     "assignee",
                 ),
             },

@@ -79,9 +79,11 @@ def start_or_resume_web_conversation(
     *,
     display_name: str = "",
     contact_email: str = "",
+    page_url: str = "",
 ) -> Conversation:
     """Create or resume the web Conversation for this browser session."""
     session_id = get_or_create_web_session_id(request)
+    page = (page_url or "").strip()[:500]
     with transaction.atomic():
         conv, created = Conversation.objects.get_or_create(
             channel=Channel.WEB,
@@ -89,6 +91,7 @@ def start_or_resume_web_conversation(
             defaults={
                 "display_name": (display_name or "").strip()[:200],
                 "contact_email": (contact_email or "").strip()[:254],
+                "page_url": page,
                 "status": ConversationStatus.OPEN,
             },
         )
@@ -105,6 +108,9 @@ def start_or_resume_web_conversation(
             if email and email != conv.contact_email:
                 conv.contact_email = email
                 updates.append("contact_email")
+            if page and page != conv.page_url:
+                conv.page_url = page
+                updates.append("page_url")
             if conv.status == ConversationStatus.CLOSED:
                 _reopen_conversation(conv)
             if updates:
@@ -130,6 +136,7 @@ def add_inbound_message(
     external_message_id: str = "",
     raw_payload: dict[str, Any] | None = None,
     display_name: str = "",
+    page_url: str = "",
 ) -> tuple[Message, Message | None]:
     """Append client message; optionally system auto-reply outside hours.
 
@@ -168,9 +175,17 @@ def add_inbound_message(
         outside_hours=not open_now,
         raw_payload=raw_payload,
     )
+    conv_updates: list[str] = []
     if display_name.strip() and not conversation.display_name:
         conversation.display_name = display_name.strip()[:200]
-        conversation.save(update_fields=["display_name", "updated_at"])
+        conv_updates.append("display_name")
+    page = (page_url or "").strip()[:500]
+    if page and page != conversation.page_url:
+        conversation.page_url = page
+        conv_updates.append("page_url")
+    if conv_updates:
+        conv_updates.append("updated_at")
+        conversation.save(update_fields=conv_updates)
     touch_conversation_message(conversation, inbound=True)
 
     auto: Message | None = None

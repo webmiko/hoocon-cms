@@ -73,6 +73,9 @@ def notify_staff_fcm_support(
     title = "Новое сообщение в поддержке"
     label = conversation_party_label(conv)
     body = f"{label}: новое обращение"
+    page = (conv.page_url or "").strip()
+    if page:
+        body = f"{body} · {page}"
     data = {
         "type": "support",
         "conversation_id": str(conv.pk),

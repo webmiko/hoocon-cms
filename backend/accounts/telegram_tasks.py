@@ -82,6 +82,9 @@ def notify_staff_telegram_support(
         return 0
     label = conv.display_name or conv.get_channel_display()
     title, body = staff_support_push_copy(label=label)
+    page = (conv.page_url or "").strip()
+    if page:
+        body = f"{body}\nСтраница: {page}"
     text = format_staff_telegram_message(
         title=title,
         body=body,

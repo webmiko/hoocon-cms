@@ -175,6 +175,49 @@ def test_web_message_roundtrip_and_idor() -> None:
 
 
 @pytest.mark.django_db
+def test_page_url_tracked_and_shown_in_staff_alert() -> None:
+    """Client's source page lands on the conversation and in the MAX alert."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Нужен DA24", "page_url": "/catalog/da24/"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+        assert conv.page_url == "/catalog/da24/"
+
+        # Later message from another page updates the tracked page.
+        send2 = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "и доставку", "page_url": "/delivery/"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send2.status_code == 201
+        conv.refresh_from_db()
+        assert conv.page_url == "/delivery/"
+
+    # Absolute URLs / junk are rejected by the serializer.
+    bad = client.post(
+        "/api/support/conversations/current/messages/",
+        data={"body": "x", "page_url": "https://evil.example/x"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert bad.status_code == 400
+
+    from accounts.max_alerts import compose_staff_max_support_alert
+
+    _title, alert_body = compose_staff_max_support_alert(conv)
+    assert "Страница: /delivery/" in alert_body
+
+
+@pytest.mark.django_db
 def test_poll_without_start_does_not_create_conversation() -> None:
     """Opening the widget must not create an empty Admin thread before the first message."""
     ensure_default_schedule()

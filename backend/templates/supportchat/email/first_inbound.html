@@ -98,6 +98,17 @@
                   </td>
                 </tr>
                 {% endif %}
+                {% if conversation.page_url %}
+                <tr>
+                  <td style="padding:10px 0;font-size:13px;color:#6f6f6f;vertical-align:top;">
+                    Страница
+                  </td>
+                  <td style="padding:10px 0;font-size:15px;vertical-align:top;">
+                    <a href="{{ site_url }}{{ conversation.page_url }}"
+                       style="color:#2a2a2a;text-decoration:none;">{{ conversation.page_url }}</a>
+                  </td>
+                </tr>
+                {% endif %}
               </table>
             </td>
           </tr>

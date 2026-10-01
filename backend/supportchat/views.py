@@ -132,6 +132,7 @@ class ConversationStartView(APIView):
             request._request,
             display_name=serializer.validated_data.get("display_name", ""),
             contact_email=serializer.validated_data.get("contact_email", ""),
+            page_url=serializer.validated_data.get("page_url", ""),
         )
         return Response(
             {
@@ -202,6 +203,7 @@ class CurrentMessagesView(APIView):
                 conv,
                 serializer.validated_data["body"],
                 raw_payload=raw_payload,
+                page_url=serializer.validated_data.get("page_url", ""),
             )
         except SupportChatError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

@@ -133,6 +133,9 @@ def compose_staff_max_support_alert(
             parts.append(f"{channel_label} · {label}:\n«{snippet}»")
     if not parts:
         parts.append(fallback_body)
+    page = (getattr(conversation, "page_url", "") or "").strip()
+    if page:
+        parts.append(f"Страница: {page}")
 
     parts.append(staff_reply_hint(conversation.pk))
     return title, "\n\n".join(parts)
