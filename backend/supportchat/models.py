@@ -144,6 +144,24 @@ class Conversation(models.Model):
         return f"{self.get_channel_display()} · {label}"
 
 
+class ReplyTemplate(models.Model):
+    """Canned reply inserted from Admin composer or via ``/t`` in MAX/Telegram."""
+
+    slug = models.SlugField("код (/t …)", max_length=64, unique=True)
+    title = models.CharField("название", max_length=120)
+    body = models.TextField("текст ответа")
+    is_active = models.BooleanField("активен", default=True)
+    order = models.PositiveIntegerField("порядок", default=100)
+
+    class Meta:
+        verbose_name = "шаблон ответа"
+        verbose_name_plural = "шаблоны ответов"
+        ordering = ("order", "id")
+
+    def __str__(self) -> str:
+        return self.title
+
+
 class Message(models.Model):
     """Single message in a support conversation."""
 

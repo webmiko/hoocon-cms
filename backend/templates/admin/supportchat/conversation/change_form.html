@@ -130,6 +130,17 @@
   >
     {% csrf_token %}
     <label class="hoocon-messenger__sr-only" for="hoocon-reply-body">Ответ клиенту</label>
+    {% if reply_templates %}
+      <div class="hoocon-messenger__templates">
+        <label class="hoocon-messenger__sr-only" for="hoocon-reply-template">Шаблон ответа</label>
+        <select id="hoocon-reply-template" class="hoocon-messenger__template-select">
+          <option value="">Шаблон…</option>
+          {% for tpl in reply_templates %}
+            <option value="{{ tpl.id }}" data-body="{{ tpl.body }}">{{ tpl.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
     <div class="hoocon-messenger__composer-field">
       <textarea
         id="hoocon-reply-body"

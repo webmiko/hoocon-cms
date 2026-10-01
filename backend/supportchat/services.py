@@ -19,6 +19,7 @@ from supportchat.models import (
     ConversationStatus,
     Message,
     MessageDirection,
+    ReplyTemplate,
     touch_conversation_message,
 )
 from supportchat.schedule import ensure_default_schedule, is_open_now
@@ -373,6 +374,7 @@ def add_staff_reply(
     _schedule_retire_max_support_alert(conversation.pk, author_user)
     return msg
 
+
 def add_staff_note(
     conversation: Conversation,
     body: str,
@@ -402,6 +404,8 @@ _STAFF_ASSIGN_RE = re.compile(
     r"^(?:@([\w.@+-]+)|/assign\s+@?([\w.@+-]+))\s*$",
     re.IGNORECASE,
 )
+_STAFF_TEMPLATE_RE = re.compile(r"^/t\s+([\w-]+)\s*$", re.IGNORECASE)
+_STAFF_TEMPLATE_LIST = {"/t", "/tpls", "/templates"}
 
 
 def _staff_user_by_handle(handle: str) -> AbstractBaseUser | None:
@@ -466,6 +470,21 @@ def submit_staff_reply(
             return False, str(exc)
         return True, f"Заметка сохранена · диалог #{conversation_id} (клиенту не видна)"
 
+    if text.lower() in _STAFF_TEMPLATE_LIST:
+        templates = active_reply_templates()
+        if not templates:
+            return False, "Шаблоны не настроены (Admin → Диалоги поддержки → Шаблоны ответов)."
+        lines = "\n".join(f"• /t {tpl.slug} — {tpl.title}" for tpl in templates)
+        return True, f"Шаблоны ответов:\n{lines}\n\nИспользование: #{conversation_id} /t код"
+
+    template_match = _STAFF_TEMPLATE_RE.match(text)
+    if template_match:
+        slug = template_match.group(1)
+        template = find_reply_template(slug)
+        if template is None:
+            return False, f"Шаблон «{slug}» не найден. Список: /t"
+        text = template.body
+
     assign_match = _STAFF_ASSIGN_RE.match(text)
     if assign_match:
         handle = assign_match.group(1) or assign_match.group(2) or ""
@@ -494,6 +513,19 @@ def submit_staff_reply(
     label = conversation.display_name or conversation.external_user_id
     channel = conversation.get_channel_display()
     return True, f"Ответ отправлен · диалог #{conversation_id} · {channel} · {label}"
+
+
+def find_reply_template(slug: str) -> ReplyTemplate | None:
+    """Active canned reply by slug (``/t dostavka`` in messengers)."""
+    key = (slug or "").strip().lower()
+    if not key:
+        return None
+    return ReplyTemplate.objects.filter(slug__iexact=key, is_active=True).first()
+
+
+def active_reply_templates() -> list[ReplyTemplate]:
+    """Canned replies for Admin composer dropdown / messenger ``/t`` list."""
+    return list(ReplyTemplate.objects.filter(is_active=True))
 
 
 def assign_conversation(

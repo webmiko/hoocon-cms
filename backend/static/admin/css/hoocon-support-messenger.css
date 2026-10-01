@@ -447,6 +447,20 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
   padding: 0 0.25rem;
 }
 
+.hoocon-messenger__templates {
+  padding: 0 0.25rem 0.35rem;
+}
+
+.hoocon-messenger__template-select {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--hm-border);
+  border-radius: 0.5rem;
+  background: var(--hm-surface);
+  color: inherit;
+  max-width: 100%;
+}
+
 .hoocon-messenger__composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

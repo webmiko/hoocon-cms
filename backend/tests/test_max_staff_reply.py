@@ -245,6 +245,39 @@ def test_staff_assign_command_reassigns_dialog() -> None:
 
 
 @pytest.mark.django_db
+def test_staff_template_command_sends_canned_reply() -> None:
+    """#ID /t slug expands the canned reply and delivers it to the client."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+    from supportchat.models import ReplyTemplate
+
+    mgr = _make_manager(email="mgr-tpl@hoocon.ru", max_user_id="913")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tpl",
+    )
+    ReplyTemplate.objects.create(
+        slug="dostavka",
+        title="Сроки доставки",
+        body="Отгрузка со склада 1–2 рабочих дня.",
+    )
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t dostavka")
+    assert ok
+    assert "Ответ отправлен" in status_text
+    outbound = Message.objects.get(conversation=conv, direction=MessageDirection.OUTBOUND)
+    assert outbound.body == "Отгрузка со склада 1–2 рабочих дня."
+    deliver.assert_called_once()
+
+    ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t")
+    assert ok
+    assert "/t dostavka" in status_text
+
+    ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t missing")
+    assert not ok
+    assert "не найден" in status_text
+
+
+@pytest.mark.django_db
 def test_staff_lookup_prefers_account_with_reply_permission() -> None:
     """Duplicate max_user_id binding: pick the account that can actually reply.
 

@@ -21,12 +21,14 @@ from supportchat.models import (
     FaqItem,
     Message,
     MessageDirection,
+    ReplyTemplate,
     SupportSchedule,
     SupportScheduleDay,
     SupportScheduleInterval,
 )
 from supportchat.services import (
     SupportChatError,
+    active_reply_templates,
     add_staff_note,
     add_staff_reply,
     assign_conversation,
@@ -417,6 +419,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["chat_party_label"] = party
         extra["chat_client_initial"] = (party[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
+        extra["reply_templates"] = active_reply_templates()
         return super().change_view(request, object_id, form_url, extra)
 
     def save_model(
@@ -577,6 +580,18 @@ class FaqItemAdmin(ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(ReplyTemplate)
+class ReplyTemplateAdmin(ModelAdmin):
+    """Canned replies for the Admin composer and ``/t`` messenger command."""
+
+    list_display = ("slug", "title", "order", "is_active")
+    list_display_links = ("slug", "title")
+    list_editable = ("order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("slug", "title", "body")
+    ordering = ("order", "id")
 
 
 @admin.register(Message)

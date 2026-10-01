@@ -157,6 +157,19 @@
     var form = document.getElementById("hoocon-messenger-reply");
     var textarea = document.getElementById("hoocon-reply-body");
     setupViewportPin(root, thread, textarea);
+
+    var tplSelect = document.getElementById("hoocon-reply-template");
+    if (tplSelect && textarea) {
+      tplSelect.addEventListener("change", function () {
+        var opt = tplSelect.options[tplSelect.selectedIndex];
+        var body = opt ? opt.getAttribute("data-body") : "";
+        if (body) {
+          textarea.value = body;
+          textarea.focus();
+        }
+        tplSelect.value = "";
+      });
+    }
     if (!form || !textarea) return;
 
     textarea.addEventListener("keydown", function (event) {
