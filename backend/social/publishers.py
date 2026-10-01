@@ -373,6 +373,69 @@ def _publish_telegram_photo_file(
     return _telegram_api_result(status, data)
 
 
+_MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
+
+
+def telegram_download_file(file_id: str) -> tuple[bytes, str] | None:
+    """``getFile`` → raw bytes + filename for an inbound Telegram attachment."""
+    token = telegram_bot_token()
+    fid = (file_id or "").strip()
+    if not token or not fid:
+        return None
+    url = telegram_method_url(token, "getFile")
+    try:
+        status, data = _post_json(
+            url,
+            payload={"file_id": fid},
+            open_fn=_telegram_urlopen,
+            timeout=_TELEGRAM_TIMEOUT_SEC,
+        )
+    except (HTTPError, URLError, TimeoutError, OSError, TypeError, ValueError) as exc:
+        logger.warning("telegram_getfile_failed error=%s", type(exc).__name__)
+        return None
+    if status >= 400 or not isinstance(data, dict) or not data.get("ok"):
+        return None
+    raw_result = data.get("result")
+    result = raw_result if isinstance(raw_result, dict) else {}
+    file_path = str(result.get("file_path") or "")
+    if not file_path:
+        return None
+    file_url = f"{telegram_api_base()}/file/bot{token}/{file_path}"
+    request = Request(file_url, headers={"User-Agent": _TELEGRAM_USER_AGENT})
+    try:
+        with _telegram_urlopen(request, timeout=_TELEGRAM_UPLOAD_TIMEOUT_SEC) as response:
+            payload = response.read(_MAX_ATTACHMENT_BYTES + 1)
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("telegram_file_download_failed error=%s", type(exc).__name__)
+        return None
+    if len(payload) > _MAX_ATTACHMENT_BYTES:
+        return None
+    return payload, Path(file_path).name or "file"
+
+
+def max_download_attachment(url: str) -> tuple[bytes, str] | None:
+    """Download a MAX attachment payload URL → raw bytes + filename.
+
+    Attachment URLs point at public CDN hosts — no bot token is sent.
+    """
+    src = (url or "").strip()
+    if not src.startswith("https://"):
+        return None
+    from social.max_http import public_urlopen
+
+    request = Request(src)
+    try:
+        with public_urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:
+            payload = response.read(_MAX_ATTACHMENT_BYTES + 1)
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("max_attachment_download_failed error=%s", type(exc).__name__)
+        return None
+    if len(payload) > _MAX_ATTACHMENT_BYTES:
+        return None
+    name = Path(src.split("?", 1)[0].rstrip("/")).name or "file"
+    return payload, name
+
+
 def publish_vk(*, group_id: str, text: str) -> PublishResult:
     """Post to VK community wall (wall.post).
 

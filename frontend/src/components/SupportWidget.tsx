@@ -86,6 +86,9 @@ type ChatMessage = {
   created_at: string;
   sender_name: string;
   actions?: ChatAction[];
+  attachment_url?: string;
+  attachment_name?: string;
+  attachment_is_image?: boolean;
 };
 
 type SupportSurface = "pick" | "web";
@@ -310,6 +313,7 @@ export function SupportWidget() {
   const [pushBusy, setPushBusy] = useState(false);
   const [extrasExpanded, setExtrasExpanded] = useState(false);
   const [rateBusy, setRateBusy] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fabNudge, setFabNudge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -764,15 +768,16 @@ export function SupportWidget() {
     if (event.key !== "Enter" || event.shiftKey) return;
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     event.preventDefault();
-    if (busy || !draft.trim()) return;
+    if (busy || (!draft.trim() && !pendingFile)) return;
     event.currentTarget.form?.requestSubmit();
   }
 
   async function sendChatMessage(
     body: string,
     chatAction?: string,
+    file?: File | null,
   ) {
-    if (!body.trim() || busy) return;
+    if ((!body.trim() && !file) || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -781,6 +786,7 @@ export function SupportWidget() {
         body.trim(),
         chatAction,
         window.location.pathname,
+        file ?? null,
       );
       setStarted(true);
       const next = [result.message];
@@ -808,8 +814,10 @@ export function SupportWidget() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const body = draft.trim();
-    if (!body || busy) return;
-    await sendChatMessage(body);
+    const file = pendingFile;
+    if ((!body && !file) || busy) return;
+    await sendChatMessage(body, undefined, file);
+    setPendingFile(null);
   }
 
   async function onChatAction(action: ChatAction) {
@@ -1012,6 +1020,25 @@ export function SupportWidget() {
                             onNavigate: () => closeSupportChat(),
                           })
                         : m.body}
+                      {m.attachment_url ? (
+                        <a
+                          href={m.attachment_url}
+                          target="_blank"
+                          rel="noopener"
+                          className={styles.attachLink}
+                        >
+                          {m.attachment_is_image ? (
+                            <img
+                              src={m.attachment_url}
+                              alt={m.attachment_name || "вложение"}
+                              className={styles.attachImg}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <>📎 {m.attachment_name || "файл"}</>
+                          )}
+                        </a>
+                      ) : null}
                     </SupportChatBubble>
                     {showActions ? (
                       <ChatBranchActions
@@ -1153,6 +1180,15 @@ export function SupportWidget() {
               Сообщение
             </label>
             <div className={styles.composerField}>
+              <label className={styles.attachBtn} aria-label="Прикрепить файл">
+                <input
+                  type="file"
+                  className={styles.srOnly}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                  onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+                />
+                📎
+              </label>
               <textarea
                 id={`${titleId}-draft`}
                 value={draft}
@@ -1163,16 +1199,29 @@ export function SupportWidget() {
                 placeholder="Сообщение…"
                 enterKeyHint="send"
                 aria-describedby={`${titleId}-composer-hint`}
-                required
+                required={!pendingFile}
               />
               <button
                 type="submit"
                 className={styles.send}
-                disabled={busy || !draft.trim()}
+                disabled={busy || (!draft.trim() && !pendingFile)}
               >
                 <span className={styles.sendLabel}>Отправить</span>
               </button>
             </div>
+            {pendingFile ? (
+              <p className={styles.attachChip}>
+                📎 {pendingFile.name}
+                <button
+                  type="button"
+                  className={styles.attachChipRemove}
+                  aria-label="Убрать файл"
+                  onClick={() => setPendingFile(null)}
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
             <p className={styles.composerHint} id={`${titleId}-composer-hint`}>
               Enter — отправить · Shift+Enter — новая строка
             </p>

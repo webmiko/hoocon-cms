@@ -202,12 +202,16 @@ class CurrentMessagesView(APIView):
 
         chat_action = (serializer.validated_data.get("chat_action") or "").strip()
         raw_payload = {"chat_action": chat_action} if chat_action else None
+        upload = serializer.validated_data.get("attachment")
         try:
             inbound, auto = add_inbound_message(
                 conv,
-                serializer.validated_data["body"],
+                serializer.validated_data.get("body") or "",
                 raw_payload=raw_payload,
                 page_url=serializer.validated_data.get("page_url", ""),
+                attachment=upload,
+                attachment_name=getattr(upload, "name", "") if upload else "",
+                attachment_mime=getattr(upload, "content_type", "") if upload else "",
             )
         except SupportChatError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

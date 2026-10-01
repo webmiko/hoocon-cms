@@ -408,6 +408,40 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     return _send_to_user(user_key, compose_staff_account_notice())
 
 
+def _max_message_attachments(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """Raw attachment dicts from a MAX message body."""
+    body = message.get("body")
+    atts = body.get("attachments") if isinstance(body, dict) else None
+    if not isinstance(atts, list) and isinstance(message.get("attachments"), list):
+        atts = message["attachments"]
+    return [a for a in (atts or []) if isinstance(a, dict)]
+
+
+def _max_message_attachment(
+    message: dict[str, Any],
+) -> tuple[Any, str, str] | None:
+    """First photo/file/video attachment → ``(file, name, mime)`` or None."""
+    from django.core.files.base import ContentFile
+
+    from social.publishers import max_download_attachment
+
+    for att in _max_message_attachments(message):
+        kind = str(att.get("type") or "")
+        raw_payload = att.get("payload")
+        payload = raw_payload if isinstance(raw_payload, dict) else {}
+        url = str(payload.get("url") or "").strip()
+        if not url or kind not in {"photo", "file", "video"}:
+            continue
+        downloaded = max_download_attachment(url)
+        if downloaded is None:
+            continue
+        data, fallback_name = downloaded
+        name = str(payload.get("filename") or fallback_name)[:200]
+        mime = "image/jpeg" if kind == "photo" else ""
+        return ContentFile(data, name=name), name, mime
+    return None
+
+
 def _ingest_support_text(
     *,
     user_id: str,
@@ -423,6 +457,7 @@ def _ingest_support_text(
         get_or_create_messenger_conversation,
     )
 
+    attachment = _max_message_attachment(message)
     external_message_id = _message_external_id(message)
     try:
         conversation = get_or_create_messenger_conversation(
@@ -436,6 +471,9 @@ def _ingest_support_text(
             external_message_id=external_message_id,
             raw_payload={"max_mid": external_message_id},
             display_name=display_name,
+            attachment=attachment[0] if attachment else None,
+            attachment_name=attachment[1] if attachment else "",
+            attachment_mime=attachment[2] if attachment else "",
         )
     except SupportChatError as exc:
         logger.warning(
@@ -530,7 +568,9 @@ def _handle_message_created(update: dict[str, Any]) -> PublishResult | None:
         return None
     text = _message_plain_text(message)
     if text is None:
-        return None
+        if not _max_message_attachments(message):
+            return None
+        text = ""
 
     user_key = str(user_id)
     display_name = _display_name_from_user(sender)

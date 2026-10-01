@@ -139,6 +139,9 @@ def add_inbound_message(
     raw_payload: dict[str, Any] | None = None,
     display_name: str = "",
     page_url: str = "",
+    attachment: Any | None = None,
+    attachment_name: str = "",
+    attachment_mime: str = "",
 ) -> tuple[Message, Message | None]:
     """Append client message; optionally system auto-reply outside hours.
 
@@ -158,7 +161,12 @@ def add_inbound_message(
         if existing is not None:
             return existing, None
 
-    text = _sanitize_body(body)
+    if (body or "").strip():
+        text = _sanitize_body(body)
+    elif attachment is not None:
+        text = f"📎 {attachment_name or 'файл'}"
+    else:
+        text = _sanitize_body(body)  # raises «Пустое сообщение»
     open_now = is_open_now()
     # First client message in the thread → email managers (attention ping).
     is_first_inbound = not Message.objects.filter(
@@ -176,7 +184,11 @@ def add_inbound_message(
         external_message_id=ext,
         outside_hours=not open_now,
         raw_payload=raw_payload,
+        attachment_name=(attachment_name or "")[:255] if attachment is not None else "",
+        attachment_mime=(attachment_mime or "")[:100] if attachment is not None else "",
     )
+    if attachment is not None:
+        inbound.attachment.save(attachment_name or "file", attachment)
     conv_updates: list[str] = []
     if display_name.strip() and not conversation.display_name:
         conversation.display_name = display_name.strip()[:200]
@@ -768,6 +780,15 @@ def conversation_party_company(conversation: Conversation) -> str:
         if company:
             return company[:200]
     return ""
+
+
+def message_attachment_is_image(message: Message) -> bool:
+    """True when the stored attachment should render as an image preview."""
+    mime = (message.attachment_mime or "").strip().lower()
+    if mime:
+        return mime.startswith("image/")
+    name = (message.attachment_name or message.attachment.name or "").lower()
+    return name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
 
 
 def message_sender_name(message: Message, *, staff_view: bool = False) -> str:

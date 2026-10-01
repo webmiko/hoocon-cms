@@ -265,6 +265,47 @@ def _publish_photo_or_text(
     return result
 
 
+def _telegram_message_attachment(
+    message: dict[str, Any],
+) -> tuple[Any, str, str] | None:
+    """Best-effort photo/document download → ``(file, name, mime)`` or None."""
+    from django.core.files.base import ContentFile
+
+    from social.publishers import telegram_download_file
+
+    file_id = ""
+    name = ""
+    mime = ""
+    document = message.get("document")
+    photos = message.get("photo")
+    if isinstance(document, dict):
+        file_id = str(document.get("file_id") or "")
+        name = str(document.get("file_name") or "")[:200]
+        mime = str(document.get("mime_type") or "")[:100]
+    elif isinstance(photos, list):
+        sizes = [p for p in photos if isinstance(p, dict) and p.get("file_id")]
+        if sizes:
+            biggest = max(sizes, key=lambda p: int(p.get("file_size") or 0))
+            file_id = str(biggest["file_id"])
+            mime = "image/jpeg"
+    if not file_id:
+        return None
+    downloaded = telegram_download_file(file_id)
+    if downloaded is None:
+        return None
+    data, fallback_name = downloaded
+    name = name or fallback_name
+    return ContentFile(data, name=name), name, mime
+
+
+def telegram_message_has_attachment(message: dict[str, Any]) -> bool:
+    """True when the message carries a photo/document we can ingest."""
+    if isinstance(message.get("document"), dict) and message["document"].get("file_id"):
+        return True
+    photos = message.get("photo")
+    return isinstance(photos, list) and any(isinstance(p, dict) and p.get("file_id") for p in photos)
+
+
 def _ingest_support_text(
     *,
     chat_id: str,
@@ -280,6 +321,7 @@ def _ingest_support_text(
         get_or_create_messenger_conversation,
     )
 
+    attachment = _telegram_message_attachment(message)
     external_message_id = str(message.get("message_id") or "").strip()
     try:
         conversation = get_or_create_messenger_conversation(
@@ -292,6 +334,9 @@ def _ingest_support_text(
             text,
             external_message_id=external_message_id,
             raw_payload={"telegram_message_id": message.get("message_id")},
+            attachment=attachment[0] if attachment else None,
+            attachment_name=attachment[1] if attachment else "",
+            attachment_mime=attachment[2] if attachment else "",
             display_name=display_name,
         )
     except SupportChatError:
@@ -463,7 +508,9 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
         return None
     text = message_plain_text(message)
     if text is None:
-        return None
+        if not telegram_message_has_attachment(message):
+            return None
+        text = ""
 
     action = resolve_menu_action(text)
     chat_key = str(chat_id)

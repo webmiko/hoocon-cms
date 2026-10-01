@@ -78,6 +78,26 @@
     bubble.className = "hoocon-messenger__bubble";
     bubble.textContent = msg.body || "";
 
+    if (msg.attachment_url) {
+      var link = document.createElement("a");
+      link.className = "hoocon-messenger__attach";
+      link.href = msg.attachment_url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      if (msg.attachment_is_image) {
+        var img = document.createElement("img");
+        img.className = "hoocon-messenger__attach-img";
+        img.src = msg.attachment_url;
+        img.alt = msg.attachment_name || "вложение";
+        img.loading = "lazy";
+        link.appendChild(img);
+      } else {
+        link.textContent = "📎 " + (msg.attachment_name || "файл");
+      }
+      bubble.appendChild(document.createTextNode(" "));
+      bubble.appendChild(link);
+    }
+
     var time = document.createElement("time");
     time.className = "hoocon-messenger__time";
     if (msg.created_at_iso) time.setAttribute("datetime", msg.created_at_iso);

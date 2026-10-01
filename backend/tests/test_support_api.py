@@ -1205,3 +1205,149 @@ def test_first_inbound_skips_email_without_recipients(
         ).count()
         == 1
     )
+
+
+@pytest.mark.django_db
+def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
+    """Widget file upload: stored under media, serialized with url/name/image flag."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    png = SimpleUploadedFile(
+        "shildik.png",
+        b"\x89PNG\r\n\x1a\nfakeimg",
+        content_type="image/png",
+    )
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "фото шильдика", "attachment": png},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        msg = send.json()["message"]
+        assert msg["attachment_url"].endswith(".png")
+        assert msg["attachment_name"] == "shildik.png"
+        assert msg["attachment_is_image"] is True
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.status_code == 200
+        row = listing.json()["messages"][-1]
+        assert row["attachment_url"] == msg["attachment_url"]
+
+    stored = Message.objects.get(pk=msg["id"])
+    assert stored.attachment.name.startswith("supportchat/attachments/")
+    assert stored.attachment_mime == "image/png"
+
+
+@pytest.mark.django_db
+def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
+    """Empty body + file → message saved with 📎 placeholder body."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    doc = SimpleUploadedFile(
+        "spec.pdf",
+        b"%PDF-1.4 fake",
+        content_type="application/pdf",
+    )
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"attachment": doc},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        msg = send.json()["message"]
+        assert msg["body"].startswith("📎")
+        assert "spec.pdf" in msg["body"]
+        assert msg["attachment_is_image"] is False
+
+
+@pytest.mark.django_db
+def test_web_attachment_rejected_types_and_size(settings, tmp_path) -> None:
+    """Executable mime and oversized uploads → 400, no message stored."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        exe = client.post(
+            "/api/support/conversations/current/messages/",
+            data={
+                "attachment": SimpleUploadedFile(
+                    "evil.exe",
+                    b"MZfake",
+                    content_type="application/x-msdownload",
+                ),
+            },
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert exe.status_code == 400
+
+        with patch("supportchat.serializers._ATTACHMENT_MAX_BYTES", 4):
+            big = client.post(
+                "/api/support/conversations/current/messages/",
+                data={
+                    "attachment": SimpleUploadedFile(
+                        "big.png",
+                        b"12345",
+                        content_type="image/png",
+                    ),
+                },
+                HTTP_X_CSRFTOKEN=token,
+            )
+        assert big.status_code == 400
+    assert Message.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_attachment_only_empty_body_still_rejected_without_file() -> None:
+    """No body and no attachment → validation error (unchanged behavior)."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": ""},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+    assert send.status_code == 400
+
+
+@pytest.mark.django_db
+def test_attachment_indicated_in_staff_alerts(settings, tmp_path) -> None:
+    """MAX alert body contains the 📎 attachment link line."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-att",
+        display_name="Клиент",
+    )
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="📎 nameplate.png",
+    )
+    inbound.attachment.save(
+        "nameplate.png",
+        SimpleUploadedFile("nameplate.png", b"\x89PNG fake", content_type="image/png"),
+    )
+
+    from accounts.max_alerts import compose_staff_max_support_alert
+
+    _title, body = compose_staff_max_support_alert(conv)
+    assert "📎" in body
+    assert "nameplate.png" in body

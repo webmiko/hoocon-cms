@@ -430,23 +430,29 @@ def test_telegram_webhook_photo_caption_goes_to_support_inbox(settings) -> None:
     from supportchat.schedule import ensure_default_schedule
 
     ensure_default_schedule()
-    with patch("social.publishers.urlopen") as mocked:
-        with patch("supportchat.services.is_open_now", return_value=True):
-            response = APIClient().post(
-                reverse("telegram-webhook"),
-                data={
-                    "update_id": 40,
-                    "message": {
-                        "message_id": 88,
-                        "chat": {"id": 555, "type": "private"},
-                        "from": {"first_name": "Anna"},
-                        "caption": "фото с вопросом",
-                        "photo": [{"file_id": "x"}],
-                    },
+    with (
+        patch("social.publishers.urlopen") as mocked,
+        patch(
+            "social.publishers.telegram_download_file",
+            return_value=None,
+        ),
+        patch("supportchat.services.is_open_now", return_value=True),
+    ):
+        response = APIClient().post(
+            reverse("telegram-webhook"),
+            data={
+                "update_id": 40,
+                "message": {
+                    "message_id": 88,
+                    "chat": {"id": 555, "type": "private"},
+                    "from": {"first_name": "Anna"},
+                    "caption": "фото с вопросом",
+                    "photo": [{"file_id": "x"}],
                 },
-                format="json",
-                HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
-            )
+            },
+            format="json",
+            HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
+        )
     assert response.status_code == 200
     mocked.assert_not_called()
     conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="555")
@@ -516,3 +522,99 @@ def test_staff_reply_skips_when_already_delivered(settings) -> None:
     with patch("social.publishers.urlopen") as mocked:
         assert deliver_outbound_message(msg.pk) == "already_delivered"
     mocked.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_telegram_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> None:
+    """Inbound photo (no caption) is downloaded and stored on the Message."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from supportchat.models import Channel, Conversation, Message
+    from supportchat.schedule import ensure_default_schedule
+
+    ensure_default_schedule()
+    update = {
+        "update_id": 90,
+        "message": {
+            "message_id": 900,
+            "chat": {"id": 777, "type": "private"},
+            "from": {"first_name": "Anna"},
+            "photo": [
+                {"file_id": "small", "file_size": 100},
+                {"file_id": "big", "file_size": 900},
+            ],
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.telegram_download_file",
+            return_value=(b"\x89PNG\x00fake", "file_1.jpg"),
+        ) as dl,
+    ):
+        from social.telegram_bot import handle_telegram_update
+
+        handle_telegram_update(update)
+    dl.assert_called_once_with("big")  # largest photo size picked
+    conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="777")
+    msg = Message.objects.get(conversation=conv)
+    assert msg.attachment
+    assert msg.attachment_name == "file_1.jpg"
+    assert msg.attachment_mime == "image/jpeg"
+    assert msg.body.startswith("📎")
+
+    # Idempotency: same telegram message_id must not create a second row.
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.telegram_download_file",
+            return_value=(b"\x89PNG\x00fake", "file_1.jpg"),
+        ),
+    ):
+        from social.telegram_bot import handle_telegram_update
+
+        handle_telegram_update(update)
+    assert Message.objects.filter(conversation=conv).count() == 1
+
+
+@pytest.mark.django_db
+def test_telegram_document_caption_and_file_stored(settings, tmp_path) -> None:
+    """Document with caption: caption is the body, file is the attachment."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.TELEGRAM_BOT_TOKEN = "bot-token"
+    from supportchat.models import Channel, Message
+    from supportchat.schedule import ensure_default_schedule
+
+    ensure_default_schedule()
+    update = {
+        "update_id": 91,
+        "message": {
+            "message_id": 901,
+            "chat": {"id": 778, "type": "private"},
+            "from": {"first_name": "Boris"},
+            "caption": "спека на привод",
+            "document": {
+                "file_id": "doc-1",
+                "file_name": "spec.pdf",
+                "mime_type": "application/pdf",
+            },
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.telegram_download_file",
+            return_value=(b"%PDF fake", "spec.pdf"),
+        ),
+    ):
+        from social.telegram_bot import handle_telegram_update
+
+        handle_telegram_update(update)
+    msg = Message.objects.get(
+        conversation__channel=Channel.TELEGRAM,
+        conversation__external_user_id="778",
+    )
+    assert msg.body == "спека на привод"
+    assert msg.attachment
+    assert msg.attachment_name == "spec.pdf"
+    assert msg.attachment_mime == "application/pdf"

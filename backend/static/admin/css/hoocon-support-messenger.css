@@ -441,6 +441,23 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
   border-color: #8a7433;
 }
 
+.hoocon-messenger__attach {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-messenger__attach-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
 .hoocon-messenger__time {
   font-size: 0.65rem;
   color: var(--hm-quiet);

@@ -85,6 +85,30 @@ def notify_staff_telegram_support(
     page = (conv.page_url or "").strip()
     if page:
         body = f"{body}\nСтраница: {page}"
+    from supportchat.models import Message, MessageDirection
+
+    inbound = None
+    if inbound_message_id is not None:
+        inbound = Message.objects.filter(
+            pk=inbound_message_id,
+            conversation_id=conv.pk,
+            direction=MessageDirection.INBOUND,
+        ).first()
+    if inbound is None:
+        inbound = (
+            Message.objects.filter(
+                conversation_id=conv.pk,
+                direction=MessageDirection.INBOUND,
+            )
+            .order_by("-id")
+            .first()
+        )
+    if inbound is not None and inbound.attachment:
+        from django.conf import settings
+
+        site_url = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+        name = inbound.attachment_name or "файл"
+        body = f"{body}\n📎 {name}: {site_url}{inbound.attachment.url}"
     text = format_staff_telegram_message(
         title=title,
         body=body,

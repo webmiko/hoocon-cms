@@ -124,6 +124,12 @@ def compose_staff_max_support_alert(
         )
 
     parts: list[str] = []
+    if inbound is not None and inbound.attachment:
+        from django.conf import settings
+
+        site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+        name = inbound.attachment_name or "файл"
+        parts.append(f"📎 {name}: {site}{inbound.attachment.url}")
     if inbound is not None:
         snippet = (inbound.body or "").strip().replace("\n", " ")
         if len(snippet) > 400:

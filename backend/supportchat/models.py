@@ -210,6 +210,23 @@ class Message(models.Model):
         "вне рабочих часов",
         default=False,
     )
+    attachment = models.FileField(
+        "вложение",
+        upload_to="supportchat/attachments/%Y/%m",
+        blank=True,
+    )
+    attachment_name: models.CharField = models.CharField(
+        "имя файла",
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    attachment_mime: models.CharField = models.CharField(
+        "формат вложения",
+        max_length=100,
+        blank=True,
+        default="",
+    )
     raw_payload = models.JSONField(
         "сырые данные",
         null=True,

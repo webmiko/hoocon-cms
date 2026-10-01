@@ -448,3 +448,79 @@ def test_reply_button_on_taken_dialog_is_rejected() -> None:
     answer.assert_called_once()
     assert "уже взял" in answer.call_args.kwargs["notification"]
     send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_max_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> None:
+    """MAX photo attachment url is downloaded and stored on the Message."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    update = {
+        "update_type": "message_created",
+        "message": {
+            "sender": {"user_id": 4321, "first_name": "Клиент", "is_bot": False},
+            "recipient": {"chat_type": "dialog"},
+            "body": {
+                "mid": "mid.att1",
+                "text": "",
+                "attachments": [
+                    {"type": "photo", "payload": {"url": "https://cdn.max.ru/x/pic.jpg"}},
+                ],
+            },
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.max_download_attachment",
+            return_value=(b"\xff\xd8\xff fake jpeg", "pic.jpg"),
+        ) as dl,
+    ):
+        handle_max_update(update)
+    dl.assert_called_once_with("https://cdn.max.ru/x/pic.jpg")
+    conv = Conversation.objects.get(channel=Channel.MAX, external_user_id="4321")
+    msg = Message.objects.get(conversation=conv)
+    assert msg.attachment
+    assert msg.attachment_name == "pic.jpg"
+    assert msg.attachment_mime == "image/jpeg"
+    assert msg.body.startswith("📎")
+
+    # Idempotent by mid: second delivery of same update → no duplicate row.
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.max_download_attachment",
+            return_value=(b"\xff\xd8\xff fake jpeg", "pic.jpg"),
+        ),
+    ):
+        handle_max_update(update)
+    assert Message.objects.filter(conversation=conv).count() == 1
+
+
+@pytest.mark.django_db
+def test_max_attachment_download_failure_still_ingests_text() -> None:
+    """If CDN download fails, the message text is still ingested (safe fallback)."""
+    update = {
+        "update_type": "message_created",
+        "message": {
+            "sender": {"user_id": 4322, "first_name": "Клиент", "is_bot": False},
+            "recipient": {"chat_type": "dialog"},
+            "body": {
+                "mid": "mid.att2",
+                "text": "вот файл",
+                "attachments": [
+                    {"type": "file", "payload": {"url": "https://cdn.max.ru/x/doc.pdf", "filename": "doc.pdf"}},
+                ],
+            },
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch("social.publishers.max_download_attachment", return_value=None),
+    ):
+        handle_max_update(update)
+    msg = Message.objects.get(
+        conversation__channel=Channel.MAX,
+        conversation__external_user_id="4322",
+    )
+    assert msg.body == "вот файл"
+    assert not msg.attachment

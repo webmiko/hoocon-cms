@@ -107,7 +107,21 @@
         >
           <div class="hoocon-messenger__bubble-wrap">
             <span class="hoocon-messenger__sender">{{ m.sender_name }}</span>
-            <div class="hoocon-messenger__bubble">{{ m.body }}</div>
+            <div class="hoocon-messenger__bubble">
+              {{ m.body }}
+              {% if m.attachment_url %}
+                {% if m.attachment_is_image %}
+                  <a href="{{ m.attachment_url }}" target="_blank" rel="noopener"
+                     class="hoocon-messenger__attach">
+                    <img src="{{ m.attachment_url }}" alt="{{ m.attachment_name|default:'вложение' }}"
+                         class="hoocon-messenger__attach-img" loading="lazy">
+                  </a>
+                {% else %}
+                  <a href="{{ m.attachment_url }}" target="_blank" rel="noopener"
+                     class="hoocon-messenger__attach">📎 {{ m.attachment_name|default:"файл" }}</a>
+                {% endif %}
+              {% endif %}
+            </div>
             <time class="hoocon-messenger__time" datetime="{{ m.created_at_iso }}">
               {{ m.created_at_label }}
               {% if m.outside_hours %} · вне часов{% endif %}

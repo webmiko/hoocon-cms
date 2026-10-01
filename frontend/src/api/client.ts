@@ -481,6 +481,9 @@ export const api = {
       created_at: string;
       sender_name: string;
       actions?: { id: string; label: string }[];
+      attachment_url?: string;
+      attachment_name?: string;
+      attachment_is_image?: boolean;
     }>;
     conversation?: {
       id: number;
@@ -502,6 +505,7 @@ export const api = {
     body: string,
     chatAction?: string,
     pageUrl?: string,
+    file?: File | null,
   ): Promise<{
     message: {
       id: number;
@@ -525,6 +529,18 @@ export const api = {
       actions?: { id: string; label: string }[];
     };
   }> {
+    if (file) {
+      const fd = new FormData();
+      fd.append("body", body);
+      if (chatAction) fd.append("chat_action", chatAction);
+      if (pageUrl) fd.append("page_url", pageUrl);
+      fd.append("attachment", file, file.name);
+      return apiFetch("/api/support/conversations/current/messages/", {
+        method: "POST",
+        body: fd,
+        headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+      });
+    }
     return apiFetch("/api/support/conversations/current/messages/", {
       method: "POST",
       body: JSON.stringify({

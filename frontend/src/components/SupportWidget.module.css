@@ -969,6 +969,65 @@
   color: var(--color-text-muted);
 }
 
+.attachBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: calc(var(--composer-radius) - var(--composer-inset)) 0 0
+    calc(var(--composer-radius) - var(--composer-inset));
+  color: var(--color-text-muted);
+}
+
+.attachBtn:hover {
+  color: var(--color-link);
+}
+
+.attachChip {
+  grid-area: hint;
+  margin: 0;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.attachChipRemove {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+
+.attachChipRemove:hover {
+  color: var(--color-text);
+}
+
+.attachLink {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.attachImg {
+  display: block;
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
 .composerHint {
   grid-area: hint;
   margin: 0;
