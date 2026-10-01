@@ -5,6 +5,7 @@
 {% if company %}Компания: {{ company }}
 {% endif %}{% if phone %}Телефон: {{ phone }}
 {% endif %}{% if contact_email %}Email: {{ contact_email }}
+{% endif %}{% if conversation.page_url %}Страница: {{ conversation.page_url }}
 {% endif %}
 Сообщение:
 {{ preview }}

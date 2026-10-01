@@ -34,6 +34,7 @@ class MessageDirection(models.TextChoices):
     INBOUND = "inbound", "Клиент"
     OUTBOUND = "outbound", "Менеджер"
     SYSTEM = "system", "Система"
+    NOTE = "note", "Заметка"
 
 
 class Conversation(models.Model):
@@ -61,6 +62,13 @@ class Conversation(models.Model):
         "электронная почта",
         blank=True,
         default="",
+    )
+    page_url: models.CharField = models.CharField(
+        "страница сайта",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Путь страницы, с которой клиент писал последний раз (/catalog/…).",
     )
     status: models.CharField = models.CharField(
         "статус",
@@ -117,6 +125,18 @@ class Conversation(models.Model):
         "ходов ассистента",
         default=0,
     )
+    rating: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "оценка клиента",
+        null=True,
+        blank=True,
+        choices=[(i, str(i)) for i in range(1, 6)],
+        help_text="Оценка диалога 1–5, которую поставил клиент.",
+    )
+    rated_at = models.DateTimeField(
+        "оценено",
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField("создан", auto_now_add=True)
     updated_at = models.DateTimeField("обновлён", auto_now=True)
 
@@ -134,6 +154,24 @@ class Conversation(models.Model):
     def __str__(self) -> str:
         label = self.display_name or self.external_user_id
         return f"{self.get_channel_display()} · {label}"
+
+
+class ReplyTemplate(models.Model):
+    """Canned reply inserted from Admin composer or via ``/t`` in MAX/Telegram."""
+
+    slug = models.SlugField("код (/t …)", max_length=64, unique=True)
+    title = models.CharField("название", max_length=120)
+    body = models.TextField("текст ответа")
+    is_active = models.BooleanField("активен", default=True)
+    order = models.PositiveIntegerField("порядок", default=100)
+
+    class Meta:
+        verbose_name = "шаблон ответа"
+        verbose_name_plural = "шаблоны ответов"
+        ordering = ("order", "id")
+
+    def __str__(self) -> str:
+        return self.title
 
 
 class Message(models.Model):
@@ -171,6 +209,23 @@ class Message(models.Model):
     outside_hours: models.BooleanField = models.BooleanField(
         "вне рабочих часов",
         default=False,
+    )
+    attachment = models.FileField(
+        "вложение",
+        upload_to="supportchat/attachments/%Y/%m",
+        blank=True,
+    )
+    attachment_name: models.CharField = models.CharField(
+        "имя файла",
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    attachment_mime: models.CharField = models.CharField(
+        "формат вложения",
+        max_length=100,
+        blank=True,
+        default="",
     )
     raw_payload = models.JSONField(
         "сырые данные",

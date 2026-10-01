@@ -20,17 +20,24 @@ from supportchat.models import (
     ConversationStatus,
     FaqItem,
     Message,
+    MessageDirection,
+    ReplyTemplate,
     SupportSchedule,
     SupportScheduleDay,
     SupportScheduleInterval,
 )
 from supportchat.services import (
     SupportChatError,
+    active_reply_templates,
+    add_staff_note,
     add_staff_reply,
+    assign_conversation,
     conversation_party_label,
     count_staff_unread,
     delete_unlinked_conversation,
+    message_attachment_is_image,
     message_sender_name,
+    request_client_rating,
     staff_public_name,
 )
 
@@ -40,12 +47,18 @@ def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for msg in qs:
         local = timezone.localtime(msg.created_at)
+        sender = message_sender_name(msg, staff_view=True)
+        if msg.direction == MessageDirection.NOTE:
+            sender = f"Заметка · {sender}"
         rows.append(
             {
                 "id": msg.pk,
                 "direction": msg.direction,
                 "body": msg.body,
-                "sender_name": message_sender_name(msg, staff_view=True),
+                "sender_name": sender,
+                "attachment_url": msg.attachment.url if msg.attachment else "",
+                "attachment_name": msg.attachment_name,
+                "attachment_is_image": message_attachment_is_image(msg),
                 "outside_hours": msg.outside_hours,
                 "created_at_iso": msg.created_at.isoformat(),
                 "created_at_label": local.strftime("%d.%m.%Y %H:%M"),
@@ -127,6 +140,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "contact_email",
         "status",
         "assignee",
+        "rating",
         "last_message_at",
         "last_preview",
     )
@@ -146,6 +160,9 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
     readonly_fields = (
         "channel",
         "external_user_id",
+        "page_url",
+        "rating",
+        "rated_at",
         "last_message_at",
         "staff_unread_count",
         "created_at",
@@ -171,6 +188,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "status",
                     "display_name",
                     "contact_email",
+                    "page_url",
                     "assignee",
                 ),
             },
@@ -187,6 +205,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             {
                 "fields": (
                     "staff_unread_count",
+                    "rating",
+                    "rated_at",
                     "last_message_at",
                     "created_at",
                     "updated_at",
@@ -332,7 +352,12 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         if not user.is_authenticated:
             messages.error(request, "Недостаточно прав для ответа.")
             return HttpResponseRedirect(change_url)
+        is_note = bool(request.POST.get("is_note"))
         try:
+            if is_note:
+                add_staff_note(conversation, body, author=user)
+                messages.success(request, "Заметка сохранена (клиенту не видна).")
+                return HttpResponseRedirect(change_url)
             msg = add_staff_reply(conversation, body, author=user)
         except SupportChatError as exc:
             messages.error(request, str(exc))
@@ -404,7 +429,40 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["chat_party_label"] = party
         extra["chat_client_initial"] = (party[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
+        extra["reply_templates"] = active_reply_templates()
         return super().change_view(request, object_id, form_url, extra)
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        from django.db.models import Avg, Count
+
+        extra = dict(extra_context or {})
+        stats = Conversation.objects.filter(rating__isnull=False).aggregate(
+            avg=Avg("rating"),
+            count=Count("id"),
+        )
+        if stats["count"]:
+            extra["rating_stats"] = {
+                "count": stats["count"],
+                "avg": round(float(stats["avg"]), 1),
+            }
+        return super().changelist_view(request, extra)
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Conversation,
+        form: Any,
+        change: bool,
+    ) -> None:
+        super().save_model(request, obj, form, change)
+        if change and "assignee" in (form.changed_data or []):
+            assign_conversation(obj, obj.assignee, actor=request.user)
+        if change and "status" in (form.changed_data or []) and obj.status == ConversationStatus.CLOSED:
+            request_client_rating(obj)
 
     @admin.action(description="Отметить прочитанными")
     def action_mark_read(
@@ -443,6 +501,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         queryset: QuerySet[Conversation],
     ) -> None:
         updated = queryset.update(status=ConversationStatus.CLOSED)
+        for conv in queryset:
+            request_client_rating(conv)
         self.message_user(request, f"Закрыто: {updated}")
 
     @admin.action(description="Удалить (без CRM)")
@@ -553,6 +613,18 @@ class FaqItemAdmin(ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(ReplyTemplate)
+class ReplyTemplateAdmin(ModelAdmin):
+    """Canned replies for the Admin composer and ``/t`` messenger command."""
+
+    list_display = ("slug", "title", "order", "is_active")
+    list_display_links = ("slug", "title")
+    list_editable = ("order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("slug", "title", "body")
+    ordering = ("order", "id")
 
 
 @admin.register(Message)

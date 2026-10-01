@@ -265,6 +265,47 @@ def _publish_photo_or_text(
     return result
 
 
+def _telegram_message_attachment(
+    message: dict[str, Any],
+) -> tuple[Any, str, str] | None:
+    """Best-effort photo/document download → ``(file, name, mime)`` or None."""
+    from django.core.files.base import ContentFile
+
+    from social.publishers import telegram_download_file
+
+    file_id = ""
+    name = ""
+    mime = ""
+    document = message.get("document")
+    photos = message.get("photo")
+    if isinstance(document, dict):
+        file_id = str(document.get("file_id") or "")
+        name = str(document.get("file_name") or "")[:200]
+        mime = str(document.get("mime_type") or "")[:100]
+    elif isinstance(photos, list):
+        sizes = [p for p in photos if isinstance(p, dict) and p.get("file_id")]
+        if sizes:
+            biggest = max(sizes, key=lambda p: int(p.get("file_size") or 0))
+            file_id = str(biggest["file_id"])
+            mime = "image/jpeg"
+    if not file_id:
+        return None
+    downloaded = telegram_download_file(file_id)
+    if downloaded is None:
+        return None
+    data, fallback_name = downloaded
+    name = name or fallback_name
+    return ContentFile(data, name=name), name, mime
+
+
+def telegram_message_has_attachment(message: dict[str, Any]) -> bool:
+    """True when the message carries a photo/document we can ingest."""
+    if isinstance(message.get("document"), dict) and message["document"].get("file_id"):
+        return True
+    photos = message.get("photo")
+    return isinstance(photos, list) and any(isinstance(p, dict) and p.get("file_id") for p in photos)
+
+
 def _ingest_support_text(
     *,
     chat_id: str,
@@ -280,6 +321,7 @@ def _ingest_support_text(
         get_or_create_messenger_conversation,
     )
 
+    attachment = _telegram_message_attachment(message)
     external_message_id = str(message.get("message_id") or "").strip()
     try:
         conversation = get_or_create_messenger_conversation(
@@ -292,6 +334,9 @@ def _ingest_support_text(
             text,
             external_message_id=external_message_id,
             raw_payload={"telegram_message_id": message.get("message_id")},
+            attachment=attachment[0] if attachment else None,
+            attachment_name=attachment[1] if attachment else "",
+            attachment_mime=attachment[2] if attachment else "",
             display_name=display_name,
         )
     except SupportChatError:
@@ -307,8 +352,149 @@ def _ingest_support_text(
     return None
 
 
+def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult | None:
+    """Manager taps «Ответить» on a staff alert — enter reply mode."""
+    from social.telegram_staff_reply import (
+        compose_staff_reply_prompt,
+        parse_staff_reply_callback_data,
+        set_pending_staff_reply,
+        staff_user_for_telegram_chat_id,
+    )
+    from supportchat.models import Conversation
+    from supportchat.services import staff_public_name
+
+    conv_id = parse_staff_reply_callback_data(str(query.get("data") or ""))
+    if conv_id is None:
+        return None
+    query_id = str(query.get("id") or "").strip()
+    raw_from = query.get("from")
+    from_user = raw_from if isinstance(raw_from, dict) else {}
+    user_key = str(from_user.get("id") or "")
+    staff_user = staff_user_for_telegram_chat_id(user_key)
+    if staff_user is None:
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": "Недоступно"},
+            )
+        return None
+
+    conv = Conversation.objects.filter(pk=conv_id).select_related("assignee").first()
+    if conv is not None and conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {
+                    "callback_query_id": query_id,
+                    "text": f"Диалог уже взял {staff_public_name(conv.assignee)}",
+                },
+            )
+        return None
+
+    set_pending_staff_reply(user_key, conv_id)
+    if query_id:
+        telegram_api_call(
+            "answerCallbackQuery",
+            {"callback_query_id": query_id, "text": f"Диалог #{conv_id}"},
+        )
+    return publish_telegram(
+        chat_id=user_key,
+        text=html.escape(compose_staff_reply_prompt(conv_id)),
+    )
+
+
+def _handle_rating_callback_query(query: dict[str, Any]) -> PublishResult | None:
+    """Client taps ⭐ on a rating request — verify the presser owns the dialog."""
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import (
+        SupportChatError,
+        parse_support_rating_callback,
+        rate_conversation,
+    )
+
+    data = str(query.get("data") or "")
+    parsed = parse_support_rating_callback(data)
+    if parsed is None:
+        return _handle_staff_reply_callback_query(query)
+    conv_id, score = parsed
+    query_id = str(query.get("id") or "").strip()
+    raw_from = query.get("from")
+    from_user = raw_from if isinstance(raw_from, dict) else {}
+    user_key = str(from_user.get("id") or "")
+    conv = Conversation.objects.filter(pk=conv_id, channel=Channel.TELEGRAM).first()
+    ok = conv is not None and conv.external_user_id == user_key
+    if ok and conv is not None:
+        try:
+            rate_conversation(conv, score)
+        except SupportChatError:
+            ok = False
+    if query_id:
+        telegram_api_call(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": query_id,
+                "text": "Спасибо за оценку!" if ok else "Не удалось сохранить оценку",
+            },
+        )
+    return None
+
+
+def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
+    """Handle manager reply (#ID text) or help; None → treat as client message."""
+    from social.max_staff_reply import parse_staff_reply_text
+    from social.telegram_staff_reply import (
+        clear_pending_staff_reply,
+        compose_staff_account_notice,
+        compose_staff_reply_help,
+        compose_staff_reply_prompt,
+        get_pending_staff_reply,
+        staff_user_for_telegram_chat_id,
+        submit_staff_reply_from_telegram,
+    )
+
+    def _send(body: str) -> PublishResult:
+        return publish_telegram(chat_id=chat_key, text=html.escape(body))
+
+    staff_user = staff_user_for_telegram_chat_id(chat_key)
+    if staff_user is None:
+        return None
+
+    parsed = parse_staff_reply_text(text)
+    if parsed is not None:
+        clear_pending_staff_reply(chat_key)
+    elif resolve_menu_action(text) is None:
+        pending_id = get_pending_staff_reply(chat_key)
+        body = (text or "").strip()
+        raw = body.casefold()
+        if pending_id is not None and body and not raw.startswith("/reply"):
+            parsed = (pending_id, body)
+            clear_pending_staff_reply(chat_key)
+
+    if parsed is not None:
+        conv_id, reply_body = parsed
+        ok, status = submit_staff_reply_from_telegram(staff_user, conv_id, reply_body)
+        return _send(status if ok else f"Не отправлено: {status}")
+
+    raw = (text or "").strip().casefold()
+    if raw.startswith("/reply"):
+        return _send(compose_staff_reply_help())
+
+    if resolve_menu_action(text) is not None:
+        clear_pending_staff_reply(chat_key)
+        return None
+
+    pending_id = get_pending_staff_reply(chat_key)
+    if pending_id is not None:
+        return _send(compose_staff_reply_prompt(pending_id))
+
+    return _send(compose_staff_account_notice())
+
+
 def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     """Process one Bot API update; send a reply when applicable."""
+    callback_query = update.get("callback_query")
+    if isinstance(callback_query, dict):
+        return _handle_rating_callback_query(callback_query)
     message = update.get("message")
     if not isinstance(message, dict):
         return None
@@ -322,7 +508,9 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
         return None
     text = message_plain_text(message)
     if text is None:
-        return None
+        if not telegram_message_has_attachment(message):
+            return None
+        text = ""
 
     action = resolve_menu_action(text)
     chat_key = str(chat_id)
@@ -376,6 +564,10 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
             text=compose_fallback_reply(),
             reply_markup=keyboard,
         )
+
+    staff_handled = _try_staff_telegram_reply(chat_key, text)
+    if staff_handled is not None:
+        return staff_handled
 
     return _ingest_support_text(
         chat_id=chat_key,

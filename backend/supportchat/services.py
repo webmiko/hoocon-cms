@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -18,6 +19,7 @@ from supportchat.models import (
     ConversationStatus,
     Message,
     MessageDirection,
+    ReplyTemplate,
     touch_conversation_message,
 )
 from supportchat.schedule import ensure_default_schedule, is_open_now
@@ -79,9 +81,11 @@ def start_or_resume_web_conversation(
     *,
     display_name: str = "",
     contact_email: str = "",
+    page_url: str = "",
 ) -> Conversation:
     """Create or resume the web Conversation for this browser session."""
     session_id = get_or_create_web_session_id(request)
+    page = (page_url or "").strip()[:500]
     with transaction.atomic():
         conv, created = Conversation.objects.get_or_create(
             channel=Channel.WEB,
@@ -89,6 +93,7 @@ def start_or_resume_web_conversation(
             defaults={
                 "display_name": (display_name or "").strip()[:200],
                 "contact_email": (contact_email or "").strip()[:254],
+                "page_url": page,
                 "status": ConversationStatus.OPEN,
             },
         )
@@ -105,6 +110,9 @@ def start_or_resume_web_conversation(
             if email and email != conv.contact_email:
                 conv.contact_email = email
                 updates.append("contact_email")
+            if page and page != conv.page_url:
+                conv.page_url = page
+                updates.append("page_url")
             if conv.status == ConversationStatus.CLOSED:
                 _reopen_conversation(conv)
             if updates:
@@ -130,6 +138,10 @@ def add_inbound_message(
     external_message_id: str = "",
     raw_payload: dict[str, Any] | None = None,
     display_name: str = "",
+    page_url: str = "",
+    attachment: Any | None = None,
+    attachment_name: str = "",
+    attachment_mime: str = "",
 ) -> tuple[Message, Message | None]:
     """Append client message; optionally system auto-reply outside hours.
 
@@ -149,7 +161,12 @@ def add_inbound_message(
         if existing is not None:
             return existing, None
 
-    text = _sanitize_body(body)
+    if (body or "").strip():
+        text = _sanitize_body(body)
+    elif attachment is not None:
+        text = f"📎 {attachment_name or 'файл'}"
+    else:
+        text = _sanitize_body(body)  # raises «Пустое сообщение»
     open_now = is_open_now()
     # First client message in the thread → email managers (attention ping).
     is_first_inbound = not Message.objects.filter(
@@ -167,10 +184,22 @@ def add_inbound_message(
         external_message_id=ext,
         outside_hours=not open_now,
         raw_payload=raw_payload,
+        attachment_name=(attachment_name or "")[:255] if attachment is not None else "",
+        attachment_mime=(attachment_mime or "")[:100] if attachment is not None else "",
     )
+    if attachment is not None:
+        inbound.attachment.save(attachment_name or "file", attachment)
+    conv_updates: list[str] = []
     if display_name.strip() and not conversation.display_name:
         conversation.display_name = display_name.strip()[:200]
-        conversation.save(update_fields=["display_name", "updated_at"])
+        conv_updates.append("display_name")
+    page = (page_url or "").strip()[:500]
+    if page and page != conversation.page_url:
+        conversation.page_url = page
+        conv_updates.append("page_url")
+    if conv_updates:
+        conv_updates.append("updated_at")
+        conversation.save(update_fields=conv_updates)
     touch_conversation_message(conversation, inbound=True)
 
     auto: Message | None = None
@@ -355,7 +384,277 @@ def add_staff_reply(
     _schedule_visitor_support_push(conversation.pk)
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
     _schedule_retire_max_support_alert(conversation.pk, author_user)
+    _schedule_retire_telegram_support_alert(conversation.pk, author_user)
     return msg
+
+
+def _schedule_retire_telegram_support_alert(
+    conversation_id: int,
+    author: AbstractBaseUser | None,
+) -> None:
+    """After a staff reply, retire «Ответить» buttons on Telegram alerts."""
+
+    author_id = getattr(author, "pk", None)
+
+    def _enqueue() -> None:
+        from accounts.telegram_tasks import retire_telegram_support_alert
+
+        retire_telegram_support_alert.delay(conversation_id, author_id)
+
+    transaction.on_commit(_enqueue)
+
+
+def add_staff_note(
+    conversation: Conversation,
+    body: str,
+    *,
+    author: AbstractBaseUser | None,
+) -> Message:
+    """Internal staff-only note: never delivered to the client channel."""
+    text = _sanitize_body(body)
+    if not text:
+        raise SupportChatError("Пустая заметка.")
+    author_user = author if author is not None and getattr(author, "pk", None) else None
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+    msg = Message.objects.create(
+        conversation=conversation,
+        direction=MessageDirection.NOTE,
+        body=text,
+        author=author_user,  # type: ignore[misc]
+        outside_hours=False,
+    )
+    conversation.staff_unread_count = 0
+    conversation.last_message_at = timezone.now()
+    conversation.save(update_fields=["staff_unread_count", "last_message_at", "updated_at"])
+    return msg
+
+
+def rate_conversation(conversation: Conversation, score: int) -> None:
+    """Persist client rating 1–5; requires at least one assistant/staff reply."""
+    if not isinstance(score, int) or not 1 <= score <= 5:
+        raise SupportChatError("Оценка должна быть от 1 до 5.")
+    has_reply = conversation.messages.filter(
+        direction__in=(MessageDirection.OUTBOUND, MessageDirection.SYSTEM),
+    ).exists()
+    if not has_reply:
+        raise SupportChatError("Пока нечего оценивать — дождитесь ответа.")
+    conversation.rating = score
+    conversation.rated_at = timezone.now()
+    conversation.save(update_fields=["rating", "rated_at", "updated_at"])
+    Message.objects.create(
+        conversation=conversation,
+        direction=MessageDirection.SYSTEM,
+        body=f"Клиент оценил диалог: {score}/5",
+        raw_payload={"rating": score},
+    )
+
+
+RATING_CALLBACK_PREFIX = "support_rate:"
+
+
+def support_rating_callback_payload(conversation_id: int, score: int) -> str:
+    """Inline-button payload ``support_rate:<conv>:<1..5>`` (TG/MAX)."""
+    return f"{RATING_CALLBACK_PREFIX}{conversation_id}:{score}"
+
+
+def parse_support_rating_callback(payload: str) -> tuple[int, int] | None:
+    """Parse ``support_rate:<conv>:<score>`` → ``(conv_id, score)`` or None."""
+    raw = (payload or "").strip()
+    if not raw.startswith(RATING_CALLBACK_PREFIX):
+        return None
+    parts = raw[len(RATING_CALLBACK_PREFIX) :].split(":")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return None
+    conv_id, score = int(parts[0]), int(parts[1])
+    if not 1 <= score <= 5:
+        return None
+    return conv_id, score
+
+
+def support_rating_reply_markup_tg(conversation_id: int) -> dict[str, Any]:
+    """Telegram inline keyboard: ⭐1…⭐5 under the rating request."""
+    buttons = [
+        {
+            "text": f"{n} ⭐",
+            "callback_data": support_rating_callback_payload(conversation_id, n),
+        }
+        for n in range(1, 6)
+    ]
+    return {"inline_keyboard": [buttons]}
+
+
+def support_rating_attachments_max(conversation_id: int) -> list[dict[str, Any]]:
+    """MAX inline keyboard: ⭐1…⭐5 under the rating request."""
+    buttons = [
+        {
+            "type": "callback",
+            "text": f"{n} ⭐",
+            "payload": support_rating_callback_payload(conversation_id, n),
+        }
+        for n in range(1, 6)
+    ]
+    return [{"type": "inline_keyboard", "payload": {"buttons": [buttons]}}]
+
+
+def request_client_rating(conversation: Conversation) -> None:
+    """Enqueue a rating request when a closed dialog has staff replies."""
+    if conversation.status != ConversationStatus.CLOSED or conversation.rating is not None:
+        return
+    conversation_id = conversation.pk
+
+    def _enqueue() -> None:
+        from supportchat.tasks import send_rating_request
+
+        send_rating_request.delay(conversation_id)
+
+    transaction.on_commit(_enqueue)
+
+
+_STAFF_ASSIGN_RE = re.compile(
+    r"^(?:@([\w.@+-]+)|/assign\s+@?([\w.@+-]+))\s*$",
+    re.IGNORECASE,
+)
+_STAFF_TEMPLATE_RE = re.compile(r"^/t\s+([\w-]+)\s*$", re.IGNORECASE)
+_STAFF_TEMPLATE_LIST = {"/t", "/tpls", "/templates"}
+
+
+def _staff_user_by_handle(handle: str) -> AbstractBaseUser | None:
+    """Active staff user for an ``@handle`` (username, email or first name)."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
+
+    h = (handle or "").lstrip("@").strip()
+    if not h:
+        return None
+    return (
+        get_user_model()
+        .objects.filter(is_active=True, is_staff=True)
+        .filter(
+            Q(username__iexact=h) | Q(email__iexact=h) | Q(first_name__iexact=h),
+        )
+        .filter(
+            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
+        )
+        .distinct()
+        .first()
+    )
+
+
+def submit_staff_reply(
+    staff_user: AbstractBaseUser,
+    conversation_id: int,
+    body: str,
+) -> tuple[bool, str]:
+    """Staff reply/note/assign/template from any messenger (shared core).
+
+    Commands inside the text: ``/note …`` internal note, ``@handle`` or
+    ``/assign …`` reassign, ``/t slug`` canned reply (``/t`` lists slugs).
+
+    Returns:
+        (ok, plain-text status for the staff chat).
+    """
+    from django.contrib.auth.models import PermissionsMixin
+
+    if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
+        "supportchat.change_conversation",
+    ):
+        logger.warning(
+            "staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
+            getattr(staff_user, "pk", None),
+            conversation_id,
+        )
+        return False, "Недостаточно прав для ответа в поддержке."
+
+    try:
+        conversation = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return False, f"Диалог #{conversation_id} не найден."
+
+    text = body.strip()
+    if text.lower().startswith("/note"):
+        try:
+            add_staff_note(conversation, text[5:].strip(), author=staff_user)
+        except SupportChatError as exc:
+            return False, str(exc)
+        return True, f"Заметка сохранена · диалог #{conversation_id} (клиенту не видна)"
+
+    if text.lower() in _STAFF_TEMPLATE_LIST:
+        templates = active_reply_templates()
+        if not templates:
+            return False, "Шаблоны не настроены (Admin → Диалоги поддержки → Шаблоны ответов)."
+        lines = "\n".join(f"• /t {tpl.slug} — {tpl.title}" for tpl in templates)
+        return True, f"Шаблоны ответов:\n{lines}\n\nИспользование: #{conversation_id} /t код"
+
+    template_match = _STAFF_TEMPLATE_RE.match(text)
+    if template_match:
+        slug = template_match.group(1)
+        template = find_reply_template(slug)
+        if template is None:
+            return False, f"Шаблон «{slug}» не найден. Список: /t"
+        text = template.body
+
+    assign_match = _STAFF_ASSIGN_RE.match(text)
+    if assign_match:
+        handle = assign_match.group(1) or assign_match.group(2) or ""
+        target = _staff_user_by_handle(handle)
+        if target is None:
+            return False, f"Сотрудник «{handle}» не найден (username/email/имя)."
+        assign_conversation(conversation, target, actor=staff_user)
+        return True, f"Диалог #{conversation_id} передан: {staff_public_name(target)}"
+
+    try:
+        message = add_staff_reply(conversation, text, author=staff_user)
+    except SupportChatError as exc:
+        return False, str(exc)
+
+    from supportchat.tasks import deliver_outbound_message
+
+    try:
+        deliver_outbound_message.delay(message.pk)
+    except Exception as exc:
+        logger.warning(
+            "staff_reply_deliver_enqueue_failed error=%s",
+            type(exc).__name__,
+        )
+        deliver_outbound_message(message.pk)
+
+    label = conversation.display_name or conversation.external_user_id
+    channel = conversation.get_channel_display()
+    return True, f"Ответ отправлен · диалог #{conversation_id} · {channel} · {label}"
+
+
+def find_reply_template(slug: str) -> ReplyTemplate | None:
+    """Active canned reply by slug (``/t dostavka`` in messengers)."""
+    key = (slug or "").strip().lower()
+    if not key:
+        return None
+    return ReplyTemplate.objects.filter(slug__iexact=key, is_active=True).first()
+
+
+def active_reply_templates() -> list[ReplyTemplate]:
+    """Canned replies for Admin composer dropdown / messenger ``/t`` list."""
+    return list(ReplyTemplate.objects.filter(is_active=True))
+
+
+def assign_conversation(
+    conversation: Conversation,
+    target: AbstractBaseUser | None,
+    *,
+    actor: AbstractBaseUser | None,
+) -> Message:
+    """Reassign the dialog to another staff member and log an internal note."""
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+    conversation.assignee = target  # type: ignore[assignment]
+    conversation.save(update_fields=["assignee", "updated_at"])
+    target_label = staff_public_name(target) if target is not None else "—"
+    actor_label = staff_public_name(actor)
+    return add_staff_note(
+        conversation,
+        f"{actor_label}: диалог передан → {target_label}",
+        author=actor,
+    )
 
 
 def _schedule_retire_max_support_alert(
@@ -481,6 +780,15 @@ def conversation_party_company(conversation: Conversation) -> str:
         if company:
             return company[:200]
     return ""
+
+
+def message_attachment_is_image(message: Message) -> bool:
+    """True when the stored attachment should render as an image preview."""
+    mime = (message.attachment_mime or "").strip().lower()
+    if mime:
+        return mime.startswith("image/")
+    name = (message.attachment_name or message.attachment.name or "").lower()
+    return name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
 
 
 def message_sender_name(message: Message, *, staff_view: bool = False) -> str:

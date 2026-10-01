@@ -6,10 +6,12 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 
-from supportchat.models import Channel, Conversation, FaqItem, Message
+from supportchat.models import Channel, Conversation, FaqItem, Message, MessageDirection
 from supportchat.schedule import ensure_default_schedule
+from supportchat.services import add_staff_note
 
 MSK = ZoneInfo("Europe/Moscow")
 
@@ -172,6 +174,236 @@ def test_web_message_roundtrip_and_idor() -> None:
     other = c2.get("/api/support/conversations/current/messages/")
     assert other.status_code == 200
     assert other.json()["messages"] == []
+
+
+@pytest.mark.django_db
+def test_page_url_tracked_and_shown_in_staff_alert() -> None:
+    """Client's source page lands on the conversation and in the MAX alert."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Нужен DA24", "page_url": "/catalog/da24/"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+        assert conv.page_url == "/catalog/da24/"
+
+        # Later message from another page updates the tracked page.
+        send2 = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "и доставку", "page_url": "/delivery/"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send2.status_code == 201
+        conv.refresh_from_db()
+        assert conv.page_url == "/delivery/"
+
+    # Absolute URLs / junk are rejected by the serializer.
+    bad = client.post(
+        "/api/support/conversations/current/messages/",
+        data={"body": "x", "page_url": "https://evil.example/x"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert bad.status_code == 400
+
+    from accounts.max_alerts import compose_staff_max_support_alert
+
+    _title, alert_body = compose_staff_max_support_alert(conv)
+    assert "Страница: /delivery/" in alert_body
+
+
+@pytest.mark.django_db
+def test_internal_notes_hidden_from_public_poll() -> None:
+    """Staff notes (direction=note) must never leak to the widget API."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Вопрос по SA24"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+
+        staff = get_user_model().objects.create_user(
+            username="note-staff@hoocon.ru",
+            email="note-staff@hoocon.ru",
+            password="x",
+            is_staff=True,
+        )
+        add_staff_note(conv, "проверить остатки на складе", author=staff)
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.status_code == 200
+        bodies = [m["body"] for m in listing.json()["messages"]]
+        assert "Вопрос по SA24" in bodies
+        assert all("проверить остатки" not in b for b in bodies)
+
+
+@pytest.mark.django_db
+def test_admin_reply_view_note_checkbox_skips_delivery() -> None:
+    """Admin composer checkbox stores an internal note, not a client reply."""
+    ensure_default_schedule()
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="sess-note")
+    staff = get_user_model().objects.create_user(
+        username="note-admin@hoocon.ru",
+        email="note-admin@hoocon.ru",
+        password="x",
+        is_staff=True,
+        is_superuser=True,
+    )
+    admin_client = Client()
+    admin_client.force_login(staff)
+    url = f"/admin/supportchat/conversation/{conv.pk}/reply/"
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        resp = admin_client.post(url, {"reply_body": "внутренняя", "is_note": "1"})
+    assert resp.status_code == 302
+    note = Message.objects.get(conversation=conv)
+    assert note.direction == MessageDirection.NOTE
+    assert note.author_id == staff.pk
+    deliver.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_admin_assignee_change_writes_note() -> None:
+    """Reassigning a dialog in Admin leaves an audit note in the thread."""
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="sess-rea")
+    boss = get_user_model().objects.create_user(
+        username="boss@hoocon.ru",
+        email="boss@hoocon.ru",
+        password="x",
+        is_staff=True,
+        is_superuser=True,
+    )
+    target = get_user_model().objects.create_user(
+        username="target@hoocon.ru",
+        email="target@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Target",
+    )
+    admin_client = Client()
+    admin_client.force_login(boss)
+    conv_url = f"/admin/supportchat/conversation/{conv.pk}/change/"
+    resp = admin_client.get(conv_url)
+    assert resp.status_code == 200
+    resp2 = admin_client.post(
+        conv_url,
+        {
+            "channel": Channel.WEB,
+            "external_user_id": "sess-rea",
+            "display_name": "",
+            "status": "open",
+            "ai_mode": "faq",
+            "assignee": str(target.pk),
+            "_save": "Сохранить",
+        },
+    )
+    assert resp2.status_code == 302, resp2.content[:300]
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    assert Message.objects.filter(conversation=conv, direction=MessageDirection.NOTE).exists()
+
+
+@pytest.mark.django_db
+def test_rate_conversation_api() -> None:
+    """POST /rate/ stores 1–5 after a reply; rejects junk and empty dialogs."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Есть NM230A?"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+
+        rate_url = "/api/support/conversations/current/rate/"
+        too_early = client.post(
+            rate_url,
+            data={"rating": 5},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert too_early.status_code == 400
+
+        Message.objects.create(
+            conversation=conv,
+            direction=MessageDirection.OUTBOUND,
+            body="Да, на складе",
+        )
+        bad = client.post(
+            rate_url,
+            data={"rating": 9},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert bad.status_code == 400
+
+        good = client.post(
+            rate_url,
+            data={"rating": 4},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert good.status_code == 200
+        assert good.json()["rating"] == 4
+        conv.refresh_from_db()
+        assert conv.rating == 4
+        assert conv.rated_at is not None
+        # Audit trail visible to staff in the thread.
+        assert Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.SYSTEM,
+            raw_payload__rating=4,
+        ).exists()
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.json()["conversation"]["rating"] == 4
+
+
+@pytest.mark.django_db
+def test_send_rating_request_telegram_keyboard() -> None:
+    """Closing a TG dialog enqueues a ⭐1–5 inline keyboard to the client."""
+    from supportchat.tasks import send_rating_request
+
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="tg-77",
+    )
+    assert send_rating_request(conv.pk) == "no_reply"
+
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+        body="Готово",
+    )
+    with patch("social.publishers.publish_telegram") as pub:
+        from social.publishers import PublishResult
+
+        pub.return_value = PublishResult(ok=True)
+        assert send_rating_request(conv.pk) == "telegram_ok"
+    markup = pub.call_args.kwargs["reply_markup"]
+    buttons = markup["inline_keyboard"][0]
+    assert len(buttons) == 5
+    assert buttons[4]["callback_data"] == f"support_rate:{conv.pk}:5"
+
+    conv.rating = 3
+    conv.save(update_fields=["rating"])
+    assert send_rating_request(conv.pk) == "already_rated"
 
 
 @pytest.mark.django_db
@@ -973,3 +1205,149 @@ def test_first_inbound_skips_email_without_recipients(
         ).count()
         == 1
     )
+
+
+@pytest.mark.django_db
+def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
+    """Widget file upload: stored under media, serialized with url/name/image flag."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    png = SimpleUploadedFile(
+        "shildik.png",
+        b"\x89PNG\r\n\x1a\nfakeimg",
+        content_type="image/png",
+    )
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "фото шильдика", "attachment": png},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        msg = send.json()["message"]
+        assert msg["attachment_url"].endswith(".png")
+        assert msg["attachment_name"] == "shildik.png"
+        assert msg["attachment_is_image"] is True
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.status_code == 200
+        row = listing.json()["messages"][-1]
+        assert row["attachment_url"] == msg["attachment_url"]
+
+    stored = Message.objects.get(pk=msg["id"])
+    assert stored.attachment.name.startswith("supportchat/attachments/")
+    assert stored.attachment_mime == "image/png"
+
+
+@pytest.mark.django_db
+def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
+    """Empty body + file → message saved with 📎 placeholder body."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    doc = SimpleUploadedFile(
+        "spec.pdf",
+        b"%PDF-1.4 fake",
+        content_type="application/pdf",
+    )
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"attachment": doc},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        msg = send.json()["message"]
+        assert msg["body"].startswith("📎")
+        assert "spec.pdf" in msg["body"]
+        assert msg["attachment_is_image"] is False
+
+
+@pytest.mark.django_db
+def test_web_attachment_rejected_types_and_size(settings, tmp_path) -> None:
+    """Executable mime and oversized uploads → 400, no message stored."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        exe = client.post(
+            "/api/support/conversations/current/messages/",
+            data={
+                "attachment": SimpleUploadedFile(
+                    "evil.exe",
+                    b"MZfake",
+                    content_type="application/x-msdownload",
+                ),
+            },
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert exe.status_code == 400
+
+        with patch("supportchat.serializers._ATTACHMENT_MAX_BYTES", 4):
+            big = client.post(
+                "/api/support/conversations/current/messages/",
+                data={
+                    "attachment": SimpleUploadedFile(
+                        "big.png",
+                        b"12345",
+                        content_type="image/png",
+                    ),
+                },
+                HTTP_X_CSRFTOKEN=token,
+            )
+        assert big.status_code == 400
+    assert Message.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_attachment_only_empty_body_still_rejected_without_file() -> None:
+    """No body and no attachment → validation error (unchanged behavior)."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": ""},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+    assert send.status_code == 400
+
+
+@pytest.mark.django_db
+def test_attachment_indicated_in_staff_alerts(settings, tmp_path) -> None:
+    """MAX alert body contains the 📎 attachment link line."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-att",
+        display_name="Клиент",
+    )
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="📎 nameplate.png",
+    )
+    inbound.attachment.save(
+        "nameplate.png",
+        SimpleUploadedFile("nameplate.png", b"\x89PNG fake", content_type="image/png"),
+    )
+
+    from accounts.max_alerts import compose_staff_max_support_alert
+
+    _title, body = compose_staff_max_support_alert(conv)
+    assert "📎" in body
+    assert "nameplate.png" in body

@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser
 from django.core.cache import cache
 from django.db.models import Q
 
@@ -192,6 +192,9 @@ def compose_staff_reply_help() -> str:
         "• кнопка «Ответить» под уведомлением — затем текст ответа\n"
         "• #42 ваш текст — ответ в диалог №42\n"
         "• /reply 42 ваш текст — то же\n\n"
+        "• #42 /note текст — внутренняя заметка (клиенту не видна)\n"
+        "• #42 @username — передать диалог коллеге\n"
+        "• #42 /t код — шаблонный ответ (список: #42 /t)\n\n"
         "/chatid — ваш user_id для Admin."
     )
 
@@ -221,39 +224,9 @@ def submit_staff_reply_from_max(
     Returns:
         (ok, plain-text status for the staff MAX chat).
     """
-    from supportchat.models import Conversation
-    from supportchat.services import SupportChatError, add_staff_reply
+    from supportchat.services import submit_staff_reply
 
-    if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
-        "supportchat.change_conversation",
-    ):
-        logger.warning(
-            "max_staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
-            getattr(staff_user, "pk", None),
-            conversation_id,
-        )
-        return False, "Недостаточно прав для ответа в поддержке."
-
-    try:
-        conversation = Conversation.objects.get(pk=conversation_id)
-    except Conversation.DoesNotExist:
-        return False, f"Диалог #{conversation_id} не найден."
-
-    try:
-        message = add_staff_reply(conversation, body, author=staff_user)
-    except SupportChatError as exc:
-        return False, str(exc)
-
-    from supportchat.tasks import deliver_outbound_message
-
-    try:
-        deliver_outbound_message.delay(message.pk)
-    except Exception:
-        deliver_outbound_message(message.pk)
-
-    label = conversation.display_name or conversation.external_user_id
-    channel = conversation.get_channel_display()
-    return True, f"Ответ отправлен · диалог #{conversation_id} · {channel} · {label}"
+    return submit_staff_reply(staff_user, conversation_id, body)
 
 
 def publish_staff_max_text(user_id: str, text: str) -> PublishResult:

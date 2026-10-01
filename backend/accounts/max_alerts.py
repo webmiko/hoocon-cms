@@ -124,6 +124,12 @@ def compose_staff_max_support_alert(
         )
 
     parts: list[str] = []
+    if inbound is not None and inbound.attachment:
+        from django.conf import settings
+
+        site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+        name = inbound.attachment_name or "файл"
+        parts.append(f"📎 {name}: {site}{inbound.attachment.url}")
     if inbound is not None:
         snippet = (inbound.body or "").strip().replace("\n", " ")
         if len(snippet) > 400:
@@ -133,6 +139,9 @@ def compose_staff_max_support_alert(
             parts.append(f"{channel_label} · {label}:\n«{snippet}»")
     if not parts:
         parts.append(fallback_body)
+    page = (getattr(conversation, "page_url", "") or "").strip()
+    if page:
+        parts.append(f"Страница: {page}")
 
     parts.append(staff_reply_hint(conversation.pk))
     return title, "\n\n".join(parts)

@@ -454,6 +454,7 @@ export const api = {
   supportStartConversation(data: {
     display_name?: string;
     contact_email?: string;
+    page_url?: string;
   }): Promise<{
     id: number | null;
     channel: string;
@@ -461,6 +462,8 @@ export const api = {
     contact_email?: string;
     ai_active?: boolean;
     ai_escalated?: boolean;
+    status?: string;
+    rating?: number | null;
   }> {
     return apiFetch("/api/support/conversations/", {
       method: "POST",
@@ -478,6 +481,9 @@ export const api = {
       created_at: string;
       sender_name: string;
       actions?: { id: string; label: string }[];
+      attachment_url?: string;
+      attachment_name?: string;
+      attachment_is_image?: boolean;
     }>;
     conversation?: {
       id: number;
@@ -485,6 +491,8 @@ export const api = {
       contact_email?: string;
       ai_active?: boolean;
       ai_escalated?: boolean;
+      status?: string;
+      rating?: number | null;
     } | null;
   }> {
     const qs = after != null ? `?after=${after}` : "";
@@ -496,6 +504,8 @@ export const api = {
   supportSendMessage(
     body: string,
     chatAction?: string,
+    pageUrl?: string,
+    file?: File | null,
   ): Promise<{
     message: {
       id: number;
@@ -505,6 +515,9 @@ export const api = {
       created_at: string;
       sender_name: string;
       actions?: { id: string; label: string }[];
+      attachment_url?: string;
+      attachment_name?: string;
+      attachment_is_image?: boolean;
     };
     auto_reply?: {
       id: number;
@@ -516,12 +529,33 @@ export const api = {
       actions?: { id: string; label: string }[];
     };
   }> {
+    if (file) {
+      const fd = new FormData();
+      fd.append("body", body);
+      if (chatAction) fd.append("chat_action", chatAction);
+      if (pageUrl) fd.append("page_url", pageUrl);
+      fd.append("attachment", file, file.name);
+      return apiFetch("/api/support/conversations/current/messages/", {
+        method: "POST",
+        body: fd,
+        headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+      });
+    }
     return apiFetch("/api/support/conversations/current/messages/", {
       method: "POST",
       body: JSON.stringify({
         body,
         ...(chatAction ? { chat_action: chatAction } : {}),
+        ...(pageUrl ? { page_url: pageUrl } : {}),
       }),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
+
+  supportRate(rating: number): Promise<{ rating: number }> {
+    return apiFetch("/api/support/conversations/current/rate/", {
+      method: "POST",
+      body: JSON.stringify({ rating }),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },

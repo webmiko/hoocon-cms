@@ -201,6 +201,128 @@ def test_staff_hash_reply_delivers_to_client_max() -> None:
 
 
 @pytest.mark.django_db
+def test_staff_note_command_creates_internal_note() -> None:
+    """#ID /note … stores a staff-only note, no client delivery."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+
+    mgr = _make_manager(email="mgr-note@hoocon.ru", max_user_id="910")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-note",
+    )
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/note позвонить завтра")
+    assert ok
+    assert "Заметка" in status_text
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert note.body == "позвонить завтра"
+    assert note.author_id == mgr.pk
+    deliver.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_staff_assign_command_reassigns_dialog() -> None:
+    """#ID @handle transfers the dialog and logs an internal note."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+
+    sender = _make_manager(email="mgr-x@hoocon.ru", max_user_id="911")
+    target = _make_manager(email="valeriya@hoocon.ru", max_user_id="912")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-assign",
+    )
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "@valeriya@hoocon.ru")
+    assert ok
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    assert "передан" in status_text
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert "передан" in note.body
+
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "@ghost")
+    assert not ok
+    assert "не найден" in status_text
+
+
+@pytest.mark.django_db
+def test_staff_template_command_sends_canned_reply() -> None:
+    """#ID /t slug expands the canned reply and delivers it to the client."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+    from supportchat.models import ReplyTemplate
+
+    mgr = _make_manager(email="mgr-tpl@hoocon.ru", max_user_id="913")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tpl",
+    )
+    ReplyTemplate.objects.create(
+        slug="dostavka",
+        title="Сроки доставки",
+        body="Отгрузка со склада 1–2 рабочих дня.",
+    )
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t dostavka")
+    assert ok
+    assert "Ответ отправлен" in status_text
+    outbound = Message.objects.get(conversation=conv, direction=MessageDirection.OUTBOUND)
+    assert outbound.body == "Отгрузка со склада 1–2 рабочих дня."
+    deliver.assert_called_once()
+
+    ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t")
+    assert ok
+    assert "/t dostavka" in status_text
+
+    ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/t missing")
+    assert not ok
+    assert "не найден" in status_text
+
+
+@pytest.mark.django_db
+def test_max_rating_callback_saves_score_for_dialog_owner() -> None:
+    """⭐ tap on a rating request stores the score only for the dialog owner."""
+    from supportchat.services import support_rating_callback_payload
+
+    conv = Conversation.objects.create(
+        channel=Channel.MAX,
+        external_user_id="42",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+        body="Ответ",
+    )
+    update = {
+        "update_type": "message_callback",
+        "callback": {
+            "callback_id": "cb.rate",
+            "payload": support_rating_callback_payload(conv.pk, 5),
+            "user": {"user_id": 42, "first_name": "Client", "is_bot": False},
+        },
+    }
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ) as answer:
+        handle_max_update(update)
+    conv.refresh_from_db()
+    assert conv.rating == 5
+    assert "Спасибо" in answer.call_args.kwargs["notification"]
+
+    # Stranger's press on the same payload must not rate the dialog.
+    conv.rating = None
+    conv.save(update_fields=["rating"])
+    update["callback"]["user"]["user_id"] = 999
+    update["callback"]["callback_id"] = "cb.rate2"
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ):
+        handle_max_update(update)
+    conv.refresh_from_db()
+    assert conv.rating is None
+
+
+@pytest.mark.django_db
 def test_staff_lookup_prefers_account_with_reply_permission() -> None:
     """Duplicate max_user_id binding: pick the account that can actually reply.
 
@@ -326,3 +448,79 @@ def test_reply_button_on_taken_dialog_is_rejected() -> None:
     answer.assert_called_once()
     assert "уже взял" in answer.call_args.kwargs["notification"]
     send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_max_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> None:
+    """MAX photo attachment url is downloaded and stored on the Message."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    update = {
+        "update_type": "message_created",
+        "message": {
+            "sender": {"user_id": 4321, "first_name": "Клиент", "is_bot": False},
+            "recipient": {"chat_type": "dialog"},
+            "body": {
+                "mid": "mid.att1",
+                "text": "",
+                "attachments": [
+                    {"type": "photo", "payload": {"url": "https://cdn.max.ru/x/pic.jpg"}},
+                ],
+            },
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.max_download_attachment",
+            return_value=(b"\xff\xd8\xff fake jpeg", "pic.jpg"),
+        ) as dl,
+    ):
+        handle_max_update(update)
+    dl.assert_called_once_with("https://cdn.max.ru/x/pic.jpg")
+    conv = Conversation.objects.get(channel=Channel.MAX, external_user_id="4321")
+    msg = Message.objects.get(conversation=conv)
+    assert msg.attachment
+    assert msg.attachment_name == "pic.jpg"
+    assert msg.attachment_mime == "image/jpeg"
+    assert msg.body.startswith("📎")
+
+    # Idempotent by mid: second delivery of same update → no duplicate row.
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch(
+            "social.publishers.max_download_attachment",
+            return_value=(b"\xff\xd8\xff fake jpeg", "pic.jpg"),
+        ),
+    ):
+        handle_max_update(update)
+    assert Message.objects.filter(conversation=conv).count() == 1
+
+
+@pytest.mark.django_db
+def test_max_attachment_download_failure_still_ingests_text() -> None:
+    """If CDN download fails, the message text is still ingested (safe fallback)."""
+    update = {
+        "update_type": "message_created",
+        "message": {
+            "sender": {"user_id": 4322, "first_name": "Клиент", "is_bot": False},
+            "recipient": {"chat_type": "dialog"},
+            "body": {
+                "mid": "mid.att2",
+                "text": "вот файл",
+                "attachments": [
+                    {"type": "file", "payload": {"url": "https://cdn.max.ru/x/doc.pdf", "filename": "doc.pdf"}},
+                ],
+            },
+        },
+    }
+    with (
+        patch("supportchat.services.is_open_now", return_value=True),
+        patch("social.publishers.max_download_attachment", return_value=None),
+    ):
+        handle_max_update(update)
+    msg = Message.objects.get(
+        conversation__channel=Channel.MAX,
+        conversation__external_user_id="4322",
+    )
+    assert msg.body == "вот файл"
+    assert not msg.attachment

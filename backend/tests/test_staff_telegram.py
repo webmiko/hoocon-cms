@@ -222,6 +222,173 @@ def test_user_admin_shows_telegram_inline(client) -> None:
 
 
 @pytest.mark.django_db
+def test_staff_hash_reply_from_telegram_delivers_to_client() -> None:
+    """#ID text from a manager's Telegram reaches the client's channel."""
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    _make_manager(email="mgr-reply-tg@hoocon.ru", chat_id="4141")
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="client-9",
+        display_name="Клиент",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Нужен DA10",
+    )
+    with (
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+        patch("supportchat.tasks.deliver_outbound_message.delay") as deliver,
+    ):
+        handle_telegram_update(
+            {
+                "message": {
+                    "message_id": 10,
+                    "chat": {"id": 4141, "type": "private"},
+                    "text": f"#{conv.pk} Есть в наличии",
+                    "from": {"id": 4141, "first_name": "Mgr"},
+                },
+            },
+        )
+    deliver.assert_called_once()
+    outbound = Message.objects.get(conversation=conv, direction=MessageDirection.OUTBOUND)
+    assert outbound.body == "Есть в наличии"
+    assert "Ответ отправлен" in pub.call_args.kwargs["text"]
+
+
+@pytest.mark.django_db
+def test_staff_reply_button_then_text_from_telegram() -> None:
+    """Callback «Ответить» sets pending dialog; next free text is the reply."""
+    from django.core.cache import cache
+
+    from social.telegram_staff_reply import staff_reply_callback_data
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    cache.clear()
+    _make_manager(email="mgr-cb-tg@hoocon.ru", chat_id="5151")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tg-cb",
+    )
+    with (
+        patch("social.telegram_bot.telegram_api_call") as api,
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+    ):
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-1",
+                    "data": staff_reply_callback_data(conv.pk),
+                    "from": {"id": 5151, "first_name": "Mgr"},
+                },
+            },
+        )
+    answer_call = api.call_args_list[0]
+    assert answer_call.args[0] == "answerCallbackQuery"
+    assert "Диалог #" in pub.call_args.kwargs["text"]
+
+    with (
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ),
+        patch("supportchat.tasks.deliver_outbound_message.delay") as deliver,
+    ):
+        handle_telegram_update(
+            {
+                "message": {
+                    "message_id": 11,
+                    "chat": {"id": 5151, "type": "private"},
+                    "text": "Ответ из Telegram",
+                    "from": {"id": 5151, "first_name": "Mgr"},
+                },
+            },
+        )
+    deliver.assert_called_once()
+    outbound = Message.objects.get(conversation=conv, direction=MessageDirection.OUTBOUND)
+    assert outbound.body == "Ответ из Telegram"
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_staff_free_text_in_telegram_does_not_open_client_thread() -> None:
+    """Manager free text gets the staff notice, not a client conversation."""
+    from supportchat.models import Channel, Conversation
+
+    _make_manager(email="mgr-plain-tg@hoocon.ru", chat_id="6161")
+    with patch(
+        "social.telegram_bot.publish_telegram",
+        return_value=PublishResult(ok=True),
+    ) as pub:
+        handle_telegram_update(
+            {
+                "message": {
+                    "message_id": 12,
+                    "chat": {"id": 6161, "type": "private"},
+                    "text": "привет",
+                    "from": {"id": 6161, "first_name": "Mgr"},
+                },
+            },
+        )
+    assert "не попадают в поддержку" in pub.call_args.kwargs["text"]
+    assert not Conversation.objects.filter(
+        channel=Channel.TELEGRAM,
+        external_user_id="6161",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_telegram_alert_button_retires_after_staff_reply() -> None:
+    """Alert carries «Ответить»; after a reply all alerts lose the keyboard."""
+    from accounts.telegram_tasks import retire_telegram_support_alert
+    from social.telegram_staff_reply import load_support_alert_message_id
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    replier = _make_manager(email="mgr-a-tg@hoocon.ru", chat_id="7001")
+    _make_manager(email="mgr-b-tg@hoocon.ru", chat_id="7002")
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tg-retire",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Сколько стоит DA10?",
+    )
+    site = SiteSettings.load()
+    site.staff_telegram_support_enabled = True
+    site.save(update_fields=["staff_telegram_support_enabled"])
+
+    def _pub(*, chat_id: str, text: str, reply_markup=None, **kw) -> PublishResult:
+        return PublishResult(ok=True, external_id=f"mid-{chat_id}")
+
+    with patch("accounts.telegram_alerts.publish_telegram", side_effect=_pub) as pub:
+        assert notify_staff_telegram_support(conv.pk) == 2
+    markup = pub.call_args_list[0].kwargs["reply_markup"]
+    assert markup["inline_keyboard"][0][0]["text"] == "Ответить"
+    assert load_support_alert_message_id(conv.pk, "7001")["message_id"] == "mid-7001"
+
+    with patch(
+        "social.publishers.telegram_api_call",
+        return_value=PublishResult(ok=True),
+    ) as api:
+        edited = retire_telegram_support_alert(conv.pk, replier.pk)
+    calls = api.call_args_list
+    texts = {c.args[1]["chat_id"]: c.args[1]["text"] for c in calls}
+    assert edited == 2
+    assert "Вы ответили" in texts["7001"]
+    assert "Ответил: Mgr" in texts["7002"]
+
+
+@pytest.mark.django_db
 def test_activity_with_author_schedules_superuser_crm(
     django_capture_on_commit_callbacks,
 ) -> None:

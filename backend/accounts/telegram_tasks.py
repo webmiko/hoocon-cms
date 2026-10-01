@@ -82,6 +82,33 @@ def notify_staff_telegram_support(
         return 0
     label = conv.display_name or conv.get_channel_display()
     title, body = staff_support_push_copy(label=label)
+    page = (conv.page_url or "").strip()
+    if page:
+        body = f"{body}\nСтраница: {page}"
+    from supportchat.models import Message, MessageDirection
+
+    inbound = None
+    if inbound_message_id is not None:
+        inbound = Message.objects.filter(
+            pk=inbound_message_id,
+            conversation_id=conv.pk,
+            direction=MessageDirection.INBOUND,
+        ).first()
+    if inbound is None:
+        inbound = (
+            Message.objects.filter(
+                conversation_id=conv.pk,
+                direction=MessageDirection.INBOUND,
+            )
+            .order_by("-id")
+            .first()
+        )
+    if inbound is not None and inbound.attachment:
+        from django.conf import settings
+
+        site_url = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+        name = inbound.attachment_name or "файл"
+        body = f"{body}\n📎 {name}: {site_url}{inbound.attachment.url}"
     text = format_staff_telegram_message(
         title=title,
         body=body,
@@ -90,9 +117,70 @@ def notify_staff_telegram_support(
     users = without_staff_webpush(
         list(staff_telegram_recipients_managers()) + list(staff_telegram_recipients_superusers()),
     )
-    sent = send_telegram_to_users(users, text)
+    from social.telegram_staff_reply import (
+        staff_support_alert_reply_markup,
+        store_support_alert_message_id,
+    )
+
+    mids: dict[str, str] = {}
+    sent = send_telegram_to_users(
+        users,
+        text,
+        reply_markup=staff_support_alert_reply_markup(conv.pk),
+        mids_out=mids,
+    )
+    for chat_id, message_id in mids.items():
+        store_support_alert_message_id(conv.pk, chat_id, message_id, text)
     logger.info("telegram_staff_support conv_id=%s sent=%s", conversation_id, sent)
     return sent
+
+
+@shared_task
+def retire_telegram_support_alert(conversation_id: int, author_user_id: int | None) -> int:
+    """After a staff reply, remove «Ответить» and mark who answered."""
+    from django.contrib.auth import get_user_model
+
+    from accounts.telegram_alerts import (
+        staff_telegram_recipients_managers,
+        staff_telegram_recipients_superusers,
+        telegram_chat_id_for,
+    )
+    from social.publishers import telegram_api_call
+    from social.telegram_staff_reply import load_support_alert_message_id
+    from supportchat.services import staff_public_name
+
+    author = get_user_model().objects.filter(pk=author_user_id).first() if author_user_id else None
+    author_label = staff_public_name(author)
+    recipients = list(staff_telegram_recipients_managers()) + list(staff_telegram_recipients_superusers())
+    edited = 0
+    for user in recipients:
+        chat_id = telegram_chat_id_for(user)
+        if not chat_id:
+            continue
+        stored = load_support_alert_message_id(conversation_id, chat_id)
+        if not stored:
+            continue
+        is_author = author is not None and user.pk == author.pk
+        suffix = "\n\n✅ Вы ответили" if is_author else f"\n\n✅ Ответил: {author_label}"
+        mid = stored["message_id"]
+        result = telegram_api_call(
+            "editMessageText",
+            {
+                "chat_id": chat_id,
+                "message_id": int(mid) if mid.isdigit() else mid,
+                "text": stored["text"] + suffix,
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": []},
+            },
+        )
+        if result.ok:
+            edited += 1
+    logger.info(
+        "telegram_staff_alert_retired conv_id=%s edited=%s",
+        conversation_id,
+        edited,
+    )
+    return edited
 
 
 @shared_task

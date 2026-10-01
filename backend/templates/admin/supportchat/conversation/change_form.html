@@ -107,7 +107,21 @@
         >
           <div class="hoocon-messenger__bubble-wrap">
             <span class="hoocon-messenger__sender">{{ m.sender_name }}</span>
-            <div class="hoocon-messenger__bubble">{{ m.body }}</div>
+            <div class="hoocon-messenger__bubble">
+              {{ m.body }}
+              {% if m.attachment_url %}
+                {% if m.attachment_is_image %}
+                  <a href="{{ m.attachment_url }}" target="_blank" rel="noopener"
+                     class="hoocon-messenger__attach">
+                    <img src="{{ m.attachment_url }}" alt="{{ m.attachment_name|default:'вложение' }}"
+                         class="hoocon-messenger__attach-img" loading="lazy">
+                  </a>
+                {% else %}
+                  <a href="{{ m.attachment_url }}" target="_blank" rel="noopener"
+                     class="hoocon-messenger__attach">📎 {{ m.attachment_name|default:"файл" }}</a>
+                {% endif %}
+              {% endif %}
+            </div>
             <time class="hoocon-messenger__time" datetime="{{ m.created_at_iso }}">
               {{ m.created_at_label }}
               {% if m.outside_hours %} · вне часов{% endif %}
@@ -130,6 +144,17 @@
   >
     {% csrf_token %}
     <label class="hoocon-messenger__sr-only" for="hoocon-reply-body">Ответ клиенту</label>
+    {% if reply_templates %}
+      <div class="hoocon-messenger__templates">
+        <label class="hoocon-messenger__sr-only" for="hoocon-reply-template">Шаблон ответа</label>
+        <select id="hoocon-reply-template" class="hoocon-messenger__template-select">
+          <option value="">Шаблон…</option>
+          {% for tpl in reply_templates %}
+            <option value="{{ tpl.id }}" data-body="{{ tpl.body }}">{{ tpl.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
     <div class="hoocon-messenger__composer-field">
       <textarea
         id="hoocon-reply-body"
@@ -146,7 +171,11 @@
       </button>
     </div>
     <p class="hoocon-messenger__composer-hint" id="hoocon-reply-hint">
-      Enter — отправить · Shift+Enter — новая строка
+      <label class="hoocon-messenger__note-toggle">
+        <input type="checkbox" name="is_note" value="1">
+        Заметка (клиенту не видна)
+      </label>
+      · Enter — отправить · Shift+Enter — новая строка
     </p>
   </form>
 </section>

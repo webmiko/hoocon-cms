@@ -363,7 +363,8 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__row--outbound,
-.hoocon-messenger__row--system {
+.hoocon-messenger__row--system,
+.hoocon-messenger__row--note {
   justify-content: flex-end;
 }
 
@@ -377,7 +378,8 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__row--outbound .hoocon-messenger__bubble-wrap,
-.hoocon-messenger__row--system .hoocon-messenger__bubble-wrap {
+.hoocon-messenger__row--system .hoocon-messenger__bubble-wrap,
+.hoocon-messenger__row--note .hoocon-messenger__bubble-wrap {
   align-items: flex-end;
 }
 
@@ -425,10 +427,55 @@ html.dark .hoocon-messenger {
   font-size: 0.82rem;
 }
 
+.hoocon-messenger__row--note .hoocon-messenger__bubble {
+  background: #fff8e1;
+  border: 1px dashed #e0b952;
+  border-bottom-right-radius: var(--hm-bubble-tail);
+  color: inherit;
+  font-size: 0.85rem;
+}
+
+.dark .hoocon-messenger__row--note .hoocon-messenger__bubble,
+html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
+  background: color-mix(in srgb, #e0b952 14%, var(--hm-surface));
+  border-color: #8a7433;
+}
+
+.hoocon-messenger__attach {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-messenger__attach-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 0.5rem;
+  object-fit: cover;
+}
+
 .hoocon-messenger__time {
   font-size: 0.65rem;
   color: var(--hm-quiet);
   padding: 0 0.25rem;
+}
+
+.hoocon-messenger__templates {
+  padding: 0 0.25rem 0.35rem;
+}
+
+.hoocon-messenger__template-select {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--hm-border);
+  border-radius: 0.5rem;
+  background: var(--hm-surface);
+  color: inherit;
+  max-width: 100%;
 }
 
 .hoocon-messenger__composer {

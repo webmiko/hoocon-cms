@@ -36,6 +36,15 @@ def notify_staff_support_inbound(
         return 0
     label = conv.display_name or conv.get_channel_display()
     title, body = staff_support_push_copy(label=label)
+    page = (conv.page_url or "").strip()
+    if page:
+        body = f"{body}\nСтраница: {page}"
+    if inbound_message_id is not None:
+        from supportchat.models import Message
+
+        inbound = Message.objects.filter(pk=inbound_message_id).only("attachment").first()
+        if inbound is not None and inbound.attachment:
+            body = f"{body}\n📎 Вложение: {inbound.attachment_name or 'файл'}"
     url = f"/admin/supportchat/conversation/{conv.pk}/change/"
     sent = 0
     for sub in queryset_staff_alerts().iterator():

@@ -10,6 +10,15 @@
   {{ block.super }}
 {% endblock %}
 
+{% block content_title %}
+  {{ block.super }}
+  {% if rating_stats %}
+    <p class="hoocon-messenger__rating-stats">
+      ★ Средняя оценка диалогов: <b>{{ rating_stats.avg }}/5</b> · оценок: {{ rating_stats.count }}
+    </p>
+  {% endif %}
+{% endblock %}
+
 {% block extrahead %}
   {{ block.super }}
   <link rel="stylesheet"

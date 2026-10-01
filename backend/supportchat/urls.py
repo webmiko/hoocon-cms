@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.urls import path
 
 from supportchat.views import (
+    ConversationRateView,
     ConversationStartView,
     CurrentMessagesView,
     SupportChannelsView,
@@ -25,5 +26,10 @@ urlpatterns = [
         "conversations/current/messages/",
         CurrentMessagesView.as_view(),
         name="support-current-messages",
+    ),
+    path(
+        "conversations/current/rate/",
+        ConversationRateView.as_view(),
+        name="support-current-rate",
     ),
 ]

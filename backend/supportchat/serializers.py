@@ -5,7 +5,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from supportchat.models import Message
-from supportchat.services import message_sender_name
+from supportchat.services import message_attachment_is_image, message_sender_name
 
 
 class ConversationStartSerializer(serializers.Serializer):
@@ -13,20 +13,67 @@ class ConversationStartSerializer(serializers.Serializer):
 
     display_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
     contact_email = serializers.EmailField(required=False, allow_blank=True)
+    page_url = serializers.RegexField(
+        r"^/\S{0,498}$",
+        required=False,
+        allow_blank=True,
+        max_length=500,
+    )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
 
 
-class MessageCreateSerializer(serializers.Serializer):
-    """Client inbound message (+ honeypot)."""
+_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+_ATTACHMENT_MIME_PREFIXES = ("image/", "text/plain")
+_ATTACHMENT_MIME_TYPES = {
+    "application/pdf",
+    "application/zip",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "application/octet-stream",
+}
 
-    body = serializers.CharField(max_length=4000)
+
+class MessageCreateSerializer(serializers.Serializer):
+    """Client inbound message (+ honeypot, optional file)."""
+
+    body = serializers.CharField(required=False, allow_blank=True, max_length=4000)
+    attachment = serializers.FileField(required=False)
     chat_action = serializers.RegexField(
         r"^(call_manager|continue_bot|quiz:[a-z0-9_:]{1,60})$",
         required=False,
         allow_blank=True,
         max_length=80,
     )
+    page_url = serializers.RegexField(
+        r"^/\S{0,498}$",
+        required=False,
+        allow_blank=True,
+        max_length=500,
+    )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
+    def validate_attachment(self, file):
+        """Size + mime allowlist for widget uploads."""
+        if file is None:
+            return file
+        if file.size > _ATTACHMENT_MAX_BYTES:
+            raise serializers.ValidationError("Файл больше 10 МБ.")
+        mime = (getattr(file, "content_type", "") or "").split(";")[0].strip().lower()
+        allowed = mime in _ATTACHMENT_MIME_TYPES or any(
+            mime.startswith(prefix) for prefix in _ATTACHMENT_MIME_PREFIXES
+        )
+        if not allowed:
+            raise serializers.ValidationError("Этот тип файла не поддерживается.")
+        return file
+
+    def validate(self, attrs):
+        """Either a non-empty body or an attachment is required."""
+        body = (attrs.get("body") or "").strip()
+        if not body and attrs.get("attachment") is None:
+            raise serializers.ValidationError({"body": "Введите сообщение."})
+        return attrs
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -34,6 +81,9 @@ class MessageSerializer(serializers.ModelSerializer):
 
     sender_name = serializers.SerializerMethodField()
     actions = serializers.SerializerMethodField()
+    attachment_url = serializers.SerializerMethodField()
+    attachment_name = serializers.SerializerMethodField()
+    attachment_is_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -45,11 +95,23 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
             "sender_name",
             "actions",
+            "attachment_url",
+            "attachment_name",
+            "attachment_is_image",
         )
         read_only_fields = fields
 
     def get_sender_name(self, obj: Message) -> str:
         return message_sender_name(obj)
+
+    def get_attachment_url(self, obj: Message) -> str:
+        return obj.attachment.url if obj.attachment else ""
+
+    def get_attachment_name(self, obj: Message) -> str:
+        return obj.attachment_name
+
+    def get_attachment_is_image(self, obj: Message) -> bool:
+        return bool(obj.attachment) and message_attachment_is_image(obj)
 
     def get_actions(self, obj: Message) -> list[dict[str, str]]:
         from supportchat.gigachat.chat_actions import normalize_chat_actions
