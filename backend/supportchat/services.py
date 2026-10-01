@@ -227,6 +227,38 @@ def inbound_superseded(conversation_id: int, inbound_message_id: int) -> bool:
     ).exists()
 
 
+_STAFF_PUSH_DEDUP_TTL = 6 * 3600
+
+
+def claim_staff_support_push(
+    channel: str,
+    conversation_id: int,
+    inbound_message_id: int | None = None,
+) -> bool:
+    """Claim the staff alert for an inbound on this channel (atomic).
+
+    One inbound message must produce at most one staff push per channel.
+    Without it the debounced inbound task and the immediate escalation
+    task (``message_id=None``) both deliver the same alert.
+    """
+    from django.core.cache import cache
+
+    if inbound_message_id is None:
+        inbound_message_id = (
+            Message.objects.filter(
+                conversation_id=conversation_id,
+                direction=MessageDirection.INBOUND,
+            )
+            .order_by("-id")
+            .values_list("id", flat=True)
+            .first()
+        )
+    if inbound_message_id is None:
+        return True
+    key = f"support-staff-push:{channel}:{conversation_id}:{inbound_message_id}"
+    return bool(cache.add(key, 1, timeout=_STAFF_PUSH_DEDUP_TTL))
+
+
 def _schedule_ai_reply(conversation_id: int, inbound_message_id: int) -> None:
     """Enqueue GigaChat assistant reply after commit."""
     from django.db import transaction
@@ -322,7 +354,25 @@ def add_staff_reply(
     conversation.save(update_fields=update_fields)
     _schedule_visitor_support_push(conversation.pk)
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
+    _schedule_retire_max_support_alert(conversation.pk, author_user)
     return msg
+
+
+def _schedule_retire_max_support_alert(
+    conversation_id: int,
+    author: AbstractBaseUser | None,
+) -> None:
+    """After a staff reply, retire «Ответить» buttons on other staff alerts."""
+    from django.db import transaction
+
+    author_id = getattr(author, "pk", None)
+
+    def _enqueue() -> None:
+        from accounts.max_tasks import retire_max_support_alert
+
+        retire_max_support_alert.delay(conversation_id, author_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def _schedule_superuser_staff_reply_telegram(

@@ -66,7 +66,7 @@ def test_build_phone_settings_nav_scoped_for_manager() -> None:
     manager_group, _ = Group.objects.get_or_create(name="Менеджер")
     lead_ct = ContentType.objects.get(app_label="leads", model="lead")
     view_lead = Permission.objects.get(content_type=lead_ct, codename="view_lead")
-    manager_group.permissions.add(view_lead)
+    manager_group.permissions.set([view_lead])
     manager = User.objects.create_user(
         username="settings-nav-mgr",
         email="settings-nav-mgr@example.com",

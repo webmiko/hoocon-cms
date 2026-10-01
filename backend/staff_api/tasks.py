@@ -57,7 +57,7 @@ def notify_staff_fcm_support(
     """FCM: new inbound support message."""
     from staff_api.models import StaffDevice
     from supportchat.models import Conversation
-    from supportchat.services import conversation_party_label, inbound_superseded
+    from supportchat.services import claim_staff_support_push, conversation_party_label, inbound_superseded
 
     if inbound_message_id is not None and inbound_superseded(
         conversation_id,
@@ -67,6 +67,8 @@ def notify_staff_fcm_support(
     try:
         conv = Conversation.objects.select_related("client", "lead").get(pk=conversation_id)
     except Conversation.DoesNotExist:
+        return 0
+    if not claim_staff_support_push("fcm", conv.pk, inbound_message_id):
         return 0
     title = "Новое сообщение в поддержке"
     label = conversation_party_label(conv)

@@ -18,6 +18,7 @@ from social.max_staff_reply import (
     staff_reply_callback_payload,
     staff_reply_hint,
     staff_support_alert_attachments,
+    staff_user_for_max_user_id,
 )
 from social.publishers import PublishResult
 from supportchat.models import Channel, Conversation, Message, MessageDirection
@@ -197,3 +198,131 @@ def test_staff_hash_reply_delivers_to_client_max() -> None:
     ).get()
     assert outbound.body == "Есть в наличии"
     assert "Ответ отправлен" in staff_pub.call_args.kwargs["text"]
+
+
+@pytest.mark.django_db
+def test_staff_lookup_prefers_account_with_reply_permission() -> None:
+    """Duplicate max_user_id binding: pick the account that can actually reply.
+
+    Regression: `.first()` could resolve a stale/test account without
+    supportchat.change_conversation even when the real manager account has it.
+    """
+    conv_ct = ContentType.objects.get_for_model(Conversation)
+    reply_perm = Permission.objects.get(
+        content_type=conv_ct,
+        codename="change_conversation",
+    )
+    group = Group.objects.get(name=GROUP_MANAGER)
+    group.permissions.remove(reply_perm)
+
+    stale = get_user_model().objects.create_user(
+        username="mgr-stale@hoocon.ru",
+        email="mgr-stale@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Stale",
+    )
+    stale.groups.add(group)
+    StaffMaxProfile.objects.create(
+        user=stale,
+        max_user_id="900",
+        max_alerts_enabled=True,
+    )
+
+    real = get_user_model().objects.create_user(
+        username="mgr-real@hoocon.ru",
+        email="mgr-real@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Real",
+    )
+    real.groups.add(group)
+    real.user_permissions.add(reply_perm)
+    StaffMaxProfile.objects.create(
+        user=real,
+        max_user_id="900",
+        max_alerts_enabled=True,
+    )
+
+    assert staff_user_for_max_user_id("900") == real
+
+
+@pytest.mark.django_db
+def test_answered_alert_retires_reply_button_for_other_staff() -> None:
+    """When one manager replies, others' alerts lose «Ответить» + get a mark."""
+    from accounts.max_tasks import notify_staff_max_support, retire_max_support_alert
+    from sitesettings.models import SiteSettings
+    from social.max_staff_reply import load_support_alert_mid
+
+    replier = _make_manager(email="mgr-a@hoocon.ru", max_user_id="501")
+    other = _make_manager(email="mgr-b@hoocon.ru", max_user_id="502")
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-retire",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Сколько стоит DA10?",
+    )
+    site = SiteSettings.load()
+    site.staff_max_support_enabled = True
+    site.save(update_fields=["staff_max_support_enabled"])
+
+    def _pub(*, user_id: str, text: str, attachments=None) -> PublishResult:
+        return PublishResult(ok=True, external_id=f"mid-{user_id}")
+
+    with patch("accounts.max_alerts.publish_max", side_effect=_pub):
+        assert notify_staff_max_support(conv.pk) == 2
+
+    assert load_support_alert_mid(conv.pk, "501")["mid"] == "mid-501"
+    assert load_support_alert_mid(conv.pk, "502")["mid"] == "mid-502"
+
+    with patch("social.publishers.edit_max_message") as edit:
+        edited = retire_max_support_alert(conv.pk, replier.pk)
+    assert edited == 2
+    calls = {c.args[0]: c.kwargs["text"] for c in edit.call_args_list}
+    replier_mid = load_support_alert_mid(conv.pk, replier.max_profile.max_user_id)["mid"]
+    other_mid = load_support_alert_mid(conv.pk, other.max_profile.max_user_id)["mid"]
+    assert replier_mid != other_mid
+    assert "Вы ответили" in calls[replier_mid]
+    assert "Ответил: Mgr" in calls[other_mid]
+    for c in edit.call_args_list:
+        assert c.kwargs["attachments"] == []
+
+
+@pytest.mark.django_db
+def test_reply_button_on_taken_dialog_is_rejected() -> None:
+    """Second manager tapping «Ответить» on an assigned dialog gets a notice."""
+    from social.max_staff_reply import staff_reply_callback_payload
+
+    owner = _make_manager(email="mgr-owner@hoocon.ru", max_user_id="601")
+    late = _make_manager(email="mgr-late@hoocon.ru", max_user_id="602")
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-taken",
+        assignee=owner,
+    )
+
+    with (
+        patch(
+            "social.publishers.answer_max_callback",
+            return_value=PublishResult(ok=True),
+        ) as answer,
+        patch("social.max_bot._send_to_user") as send,
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "user": {"user_id": int(late.max_profile.max_user_id)},
+                    "payload": staff_reply_callback_payload(conv.pk),
+                    "callback_id": "cb-1",
+                },
+            },
+        )
+    answer.assert_called_once()
+    assert "уже взял" in answer.call_args.kwargs["notification"]
+    send.assert_not_called()

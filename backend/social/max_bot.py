@@ -582,6 +582,18 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
             answer_max_callback(callback_id, notification="Недоступно")
         return None
 
+    from supportchat.models import Conversation
+    from supportchat.services import staff_public_name
+
+    conv = Conversation.objects.filter(pk=conv_id).select_related("assignee").first()
+    if conv is not None and conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
+        if callback_id:
+            answer_max_callback(
+                callback_id,
+                notification=f"Диалог уже взял {staff_public_name(conv.assignee)}",
+            )
+        return None
+
     set_pending_staff_reply(user_key, conv_id)
     if callback_id:
         answer_max_callback(callback_id, notification=f"Диалог #{conv_id}")

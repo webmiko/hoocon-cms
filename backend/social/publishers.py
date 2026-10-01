@@ -473,6 +473,51 @@ def publish_max(
     return PublishResult(ok=True, external_id=mid)
 
 
+def edit_max_message(
+    message_id: str,
+    *,
+    text: str | None = None,
+    attachments: list[dict[str, Any]] | None = None,
+) -> PublishResult:
+    """PUT /messages?message_id — edit a bot message (text and/or attachments).
+
+    Inline-keyboard messages can be edited regardless of age; used to retire
+    the «Ответить» button on staff support alerts once a dialog is answered.
+
+    Args:
+        message_id: Message mid returned by publish_max (external_id).
+        text: Replacement text; ``None`` leaves the current text.
+        attachments: Replacement attachments; ``[]`` removes the keyboard,
+            ``None`` leaves current attachments.
+    """
+    token = max_bot_token()
+    mid = (message_id or "").strip()
+    if not token or not mid:
+        return PublishResult(ok=False, skipped=True, error="MAX не настроен")
+    from social.max_http import max_json_request
+
+    payload: dict[str, Any] = {"notify": False}
+    if text is not None:
+        payload["text"] = text
+    if attachments is not None:
+        payload["attachments"] = attachments
+    try:
+        status, data = max_json_request(
+            "PUT",
+            "/messages",
+            token,
+            payload=payload,
+            query=f"message_id={mid}",
+        )
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("max_edit_failed error=%s", type(exc).__name__)
+        return PublishResult(ok=False, error=f"MAX: {type(exc).__name__}")
+    if status >= 400:
+        err = str(data.get("message") or data.get("error") or status)[:300]
+        return PublishResult(ok=False, error=f"MAX HTTP {status}: {err}")
+    return PublishResult(ok=True, external_id=mid)
+
+
 def answer_max_callback(
     callback_id: str,
     *,
