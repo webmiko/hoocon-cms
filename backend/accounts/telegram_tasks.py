@@ -53,13 +53,12 @@ def notify_staff_telegram_support(
     conversation_id: int,
     inbound_message_id: int | None = None,
 ) -> int:
-    """Telegram fallback for inbound support when the recipient has no Web Push."""
+    """Telegram alert for inbound support — parallel channel (reply button lives here)."""
     from accounts.telegram_alerts import (
         format_staff_telegram_message,
         send_telegram_to_users,
         staff_telegram_recipients_managers,
         staff_telegram_recipients_superusers,
-        without_staff_webpush,
     )
     from sitesettings.models import SiteSettings
     from sitesettings.staff_push import staff_support_push_copy
@@ -114,9 +113,7 @@ def notify_staff_telegram_support(
         body=body,
         url=f"/admin/supportchat/conversation/{conv.pk}/change/",
     )
-    users = without_staff_webpush(
-        list(staff_telegram_recipients_managers()) + list(staff_telegram_recipients_superusers()),
-    )
+    users = list(staff_telegram_recipients_managers()) + list(staff_telegram_recipients_superusers())
     from social.telegram_staff_reply import (
         staff_support_alert_reply_markup,
         store_support_alert_message_id,
