@@ -125,6 +125,18 @@ class Conversation(models.Model):
         "ходов ассистента",
         default=0,
     )
+    rating: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "оценка клиента",
+        null=True,
+        blank=True,
+        choices=[(i, str(i)) for i in range(1, 6)],
+        help_text="Оценка диалога 1–5, которую поставил клиент.",
+    )
+    rated_at = models.DateTimeField(
+        "оценено",
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField("создан", auto_now_add=True)
     updated_at = models.DateTimeField("обновлён", auto_now=True)
 

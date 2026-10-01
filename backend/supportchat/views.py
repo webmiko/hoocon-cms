@@ -24,6 +24,7 @@ from supportchat.services import (
     add_inbound_message,
     chat_faq_items,
     get_web_conversation,
+    rate_conversation,
     start_or_resume_web_conversation,
 )
 
@@ -41,6 +42,8 @@ def _conversation_public_payload(conversation) -> dict[str, object]:
         "contact_email": conversation.contact_email,
         "ai_active": bool(conversation.ai_active and conversation.ai_escalated_at is None),
         "ai_escalated": conversation.ai_escalated_at is not None,
+        "status": conversation.status,
+        "rating": conversation.rating,
     }
 
 
@@ -215,6 +218,30 @@ class CurrentMessagesView(APIView):
         if auto is not None:
             payload["auto_reply"] = MessageSerializer(auto).data
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class ConversationRateView(APIView):
+    """POST /api/support/conversations/current/rate/ — client rating 1–5."""
+
+    permission_classes = (AllowAny,)
+    authentication_classes: list = []
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = _MSG_THROTTLE
+
+    def post(self, request: Request) -> Response:
+        conv = get_web_conversation(request._request)
+        if conv is None:
+            return Response({"detail": "Диалог не найден."}, status=status.HTTP_404_NOT_FOUND)
+        raw = request.data.get("rating")
+        try:
+            score = int(raw)
+        except (TypeError, ValueError):
+            return Response({"detail": "Оценка должна быть от 1 до 5."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            rate_conversation(conv, score)
+        except SupportChatError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"rating": conv.rating}, status=status.HTTP_200_OK)
 
 
 class SupportFaqView(APIView):

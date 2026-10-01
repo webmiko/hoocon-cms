@@ -926,6 +926,49 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 14%, transparent);
 }
 
+.rateRow {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0.9rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.rateStar {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.1rem 0.15rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--color-border);
+  cursor: pointer;
+  transition: color 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.rateStar:hover,
+.rateStar:focus-visible,
+.rateStarActive {
+  color: #f5a623;
+}
+
+.rateStar:hover {
+  transform: scale(1.15);
+}
+
+.rateStar:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.rateThanks {
+  margin: 0;
+  padding: 0.25rem 0.9rem 0.35rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .composerHint {
   grid-area: hint;
   margin: 0;

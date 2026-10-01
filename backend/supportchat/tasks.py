@@ -178,6 +178,54 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
     return "pending_channel"
 
 
+@shared_task
+def send_rating_request(conversation_id: int) -> str:
+    """Ask the client to rate the closed dialog (TG/MAX inline keyboard)."""
+    from supportchat.models import Channel, Conversation, MessageDirection
+    from supportchat.services import (
+        support_rating_attachments_max,
+        support_rating_reply_markup_tg,
+    )
+
+    try:
+        conv = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return "missing"
+    if conv.rating is not None:
+        return "already_rated"
+    has_reply = conv.messages.filter(
+        direction__in=(MessageDirection.OUTBOUND, MessageDirection.SYSTEM),
+    ).exists()
+    if not has_reply:
+        return "no_reply"
+    text = "Оцените работу поддержки:"
+    if conv.channel == Channel.TELEGRAM:
+        from social.publishers import publish_telegram
+
+        result = publish_telegram(
+            chat_id=conv.external_user_id,
+            text=text,
+            reply_markup=support_rating_reply_markup_tg(conv.pk),
+        )
+        if result.ok:
+            return "telegram_ok"
+        logger.warning("support_rating_request_failed channel=telegram conv=%s", conversation_id)
+        return "telegram_failed"
+    if conv.channel == Channel.MAX:
+        from social.publishers import publish_max
+
+        result = publish_max(
+            user_id=conv.external_user_id,
+            text=text,
+            attachments=support_rating_attachments_max(conv.pk),
+        )
+        if result.ok:
+            return "max_ok"
+        logger.warning("support_rating_request_failed channel=max conv=%s", conversation_id)
+        return "max_failed"
+    return "web_widget"
+
+
 _HANDOFF_TEXT = "Чат передан менеджеру — дальше ответит человек. Ожидайте, пожалуйста."
 _MANAGER_ENGAGED_TEXT = "Менеджер уже ведёт этот диалог — напишите здесь, он увидит сообщение."
 _AI_RESUMED_TEXT = (

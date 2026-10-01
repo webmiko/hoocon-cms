@@ -462,6 +462,8 @@ export const api = {
     contact_email?: string;
     ai_active?: boolean;
     ai_escalated?: boolean;
+    status?: string;
+    rating?: number | null;
   }> {
     return apiFetch("/api/support/conversations/", {
       method: "POST",
@@ -530,6 +532,14 @@ export const api = {
         ...(chatAction ? { chat_action: chatAction } : {}),
         ...(pageUrl ? { page_url: pageUrl } : {}),
       }),
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
+    });
+  },
+
+  supportRate(rating: number): Promise<{ rating: number }> {
+    return apiFetch("/api/support/conversations/current/rate/", {
+      method: "POST",
+      body: JSON.stringify({ rating }),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },

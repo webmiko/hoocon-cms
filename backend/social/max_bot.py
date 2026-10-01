@@ -571,6 +571,12 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         staff_user_for_max_user_id,
     )
     from social.publishers import answer_max_callback
+    from supportchat.services import parse_support_rating_callback
+
+    rating = parse_support_rating_callback(payload)
+    if rating is not None:
+        _handle_rating_callback(user_key, callback_id, *rating)
+        return None
 
     conv_id = parse_staff_reply_callback_payload(payload)
     if conv_id is None:
@@ -598,6 +604,31 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
     if callback_id:
         answer_max_callback(callback_id, notification=f"Диалог #{conv_id}")
     return _send_to_user(user_key, compose_staff_reply_prompt(conv_id))
+
+
+def _handle_rating_callback(
+    user_key: str,
+    callback_id: str,
+    conv_id: int,
+    score: int,
+) -> None:
+    """Client taps ⭐ on a rating request — verify the presser owns the dialog."""
+    from social.publishers import answer_max_callback
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import SupportChatError, rate_conversation
+
+    conv = Conversation.objects.filter(pk=conv_id, channel=Channel.MAX).first()
+    ok = conv is not None and conv.external_user_id == user_key
+    if ok and conv is not None:
+        try:
+            rate_conversation(conv, score)
+        except SupportChatError:
+            ok = False
+    if callback_id:
+        answer_max_callback(
+            callback_id,
+            notification="Спасибо за оценку!" if ok else "Не удалось сохранить оценку",
+        )
 
 
 def handle_max_update(update: dict[str, Any]) -> PublishResult | None:

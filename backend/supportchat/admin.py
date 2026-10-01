@@ -36,6 +36,7 @@ from supportchat.services import (
     count_staff_unread,
     delete_unlinked_conversation,
     message_sender_name,
+    request_client_rating,
     staff_public_name,
 )
 
@@ -135,6 +136,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "contact_email",
         "status",
         "assignee",
+        "rating",
         "last_message_at",
         "last_preview",
     )
@@ -155,6 +157,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "channel",
         "external_user_id",
         "page_url",
+        "rating",
+        "rated_at",
         "last_message_at",
         "staff_unread_count",
         "created_at",
@@ -197,6 +201,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
             {
                 "fields": (
                     "staff_unread_count",
+                    "rating",
+                    "rated_at",
                     "last_message_at",
                     "created_at",
                     "updated_at",
@@ -422,6 +428,25 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["reply_templates"] = active_reply_templates()
         return super().change_view(request, object_id, form_url, extra)
 
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        from django.db.models import Avg, Count
+
+        extra = dict(extra_context or {})
+        stats = Conversation.objects.filter(rating__isnull=False).aggregate(
+            avg=Avg("rating"),
+            count=Count("id"),
+        )
+        if stats["count"]:
+            extra["rating_stats"] = {
+                "count": stats["count"],
+                "avg": round(float(stats["avg"]), 1),
+            }
+        return super().changelist_view(request, extra)
+
     def save_model(
         self,
         request: HttpRequest,
@@ -432,6 +457,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         super().save_model(request, obj, form, change)
         if change and "assignee" in (form.changed_data or []):
             assign_conversation(obj, obj.assignee, actor=request.user)
+        if change and "status" in (form.changed_data or []) and obj.status == ConversationStatus.CLOSED:
+            request_client_rating(obj)
 
     @admin.action(description="Отметить прочитанными")
     def action_mark_read(
@@ -470,6 +497,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         queryset: QuerySet[Conversation],
     ) -> None:
         updated = queryset.update(status=ConversationStatus.CLOSED)
+        for conv in queryset:
+            request_client_rating(conv)
         self.message_user(request, f"Закрыто: {updated}")
 
     @admin.action(description="Удалить (без CRM)")

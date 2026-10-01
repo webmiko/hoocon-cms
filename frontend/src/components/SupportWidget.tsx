@@ -98,6 +98,8 @@ type SupportConversationState = {
   contact_email?: string;
   ai_active?: boolean;
   ai_escalated?: boolean;
+  status?: string;
+  rating?: number | null;
 };
 
 function ChatBranchActions({
@@ -307,6 +309,7 @@ export function SupportWidget() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [extrasExpanded, setExtrasExpanded] = useState(false);
+  const [rateBusy, setRateBusy] = useState(false);
   const [fabNudge, setFabNudge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -716,6 +719,8 @@ export function SupportWidget() {
       contact_email: conv.contact_email,
       ai_active: conv.ai_active,
       ai_escalated: conv.ai_escalated,
+      status: conv.status,
+      rating: conv.rating,
     });
     setStarted(true);
     if (conv.display_name) setName(conv.display_name);
@@ -736,6 +741,23 @@ export function SupportWidget() {
   async function ensureStarted() {
     if (started && contactsLocked) return;
     await syncContacts();
+  }
+
+  async function onRate(score: number) {
+    if (rateBusy || !conversation) return;
+    setRateBusy(true);
+    setError("");
+    try {
+      await api.fetchCsrfToken();
+      const result = await api.supportRate(score);
+      setConversation((prev) =>
+        prev ? { ...prev, rating: result.rating } : prev,
+      );
+    } catch {
+      setError("Не удалось сохранить оценку");
+    } finally {
+      setRateBusy(false);
+    }
   }
 
   function onDraftKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -1099,6 +1121,30 @@ export function SupportWidget() {
               Скрыть чат
             </button>
           </div>
+          ) : null}
+
+          {!showPicker && chatEngaged && conversation && messages.some((m) => m.direction !== "inbound") ? (
+            conversation.rating ? (
+              <p className={styles.rateThanks}>
+                Спасибо! Ваша оценка: {conversation.rating}/5
+              </p>
+            ) : (
+              <div className={styles.rateRow} role="group" aria-label="Оценить диалог">
+                <span>Оцените ответ:</span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={styles.rateStar}
+                    aria-label={`Оценка ${n} из 5`}
+                    disabled={rateBusy}
+                    onClick={() => void onRate(n)}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            )
           ) : null}
 
           {!showPicker ? (

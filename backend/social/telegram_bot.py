@@ -358,6 +358,42 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
     )
 
 
+def _handle_rating_callback_query(query: dict[str, Any]) -> PublishResult | None:
+    """Client taps ⭐ on a rating request — verify the presser owns the dialog."""
+    from supportchat.models import Channel, Conversation
+    from supportchat.services import (
+        SupportChatError,
+        parse_support_rating_callback,
+        rate_conversation,
+    )
+
+    data = str(query.get("data") or "")
+    parsed = parse_support_rating_callback(data)
+    if parsed is None:
+        return _handle_staff_reply_callback_query(query)
+    conv_id, score = parsed
+    query_id = str(query.get("id") or "").strip()
+    raw_from = query.get("from")
+    from_user = raw_from if isinstance(raw_from, dict) else {}
+    user_key = str(from_user.get("id") or "")
+    conv = Conversation.objects.filter(pk=conv_id, channel=Channel.TELEGRAM).first()
+    ok = conv is not None and conv.external_user_id == user_key
+    if ok and conv is not None:
+        try:
+            rate_conversation(conv, score)
+        except SupportChatError:
+            ok = False
+    if query_id:
+        telegram_api_call(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": query_id,
+                "text": "Спасибо за оценку!" if ok else "Не удалось сохранить оценку",
+            },
+        )
+    return None
+
+
 def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
     """Handle manager reply (#ID text) or help; None → treat as client message."""
     from social.max_staff_reply import parse_staff_reply_text
@@ -413,7 +449,7 @@ def handle_telegram_update(update: dict[str, Any]) -> PublishResult | None:
     """Process one Bot API update; send a reply when applicable."""
     callback_query = update.get("callback_query")
     if isinstance(callback_query, dict):
-        return _handle_staff_reply_callback_query(callback_query)
+        return _handle_rating_callback_query(callback_query)
     message = update.get("message")
     if not isinstance(message, dict):
         return None

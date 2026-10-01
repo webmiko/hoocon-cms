@@ -316,6 +316,97 @@ def test_admin_assignee_change_writes_note() -> None:
 
 
 @pytest.mark.django_db
+def test_rate_conversation_api() -> None:
+    """POST /rate/ stores 1–5 after a reply; rejects junk and empty dialogs."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Есть NM230A?"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+
+        rate_url = "/api/support/conversations/current/rate/"
+        too_early = client.post(
+            rate_url,
+            data={"rating": 5},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert too_early.status_code == 400
+
+        Message.objects.create(
+            conversation=conv,
+            direction=MessageDirection.OUTBOUND,
+            body="Да, на складе",
+        )
+        bad = client.post(
+            rate_url,
+            data={"rating": 9},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert bad.status_code == 400
+
+        good = client.post(
+            rate_url,
+            data={"rating": 4},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert good.status_code == 200
+        assert good.json()["rating"] == 4
+        conv.refresh_from_db()
+        assert conv.rating == 4
+        assert conv.rated_at is not None
+        # Audit trail visible to staff in the thread.
+        assert Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.SYSTEM,
+            raw_payload__rating=4,
+        ).exists()
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.json()["conversation"]["rating"] == 4
+
+
+@pytest.mark.django_db
+def test_send_rating_request_telegram_keyboard() -> None:
+    """Closing a TG dialog enqueues a ⭐1–5 inline keyboard to the client."""
+    from supportchat.tasks import send_rating_request
+
+    conv = Conversation.objects.create(
+        channel=Channel.TELEGRAM,
+        external_user_id="tg-77",
+    )
+    assert send_rating_request(conv.pk) == "no_reply"
+
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+        body="Готово",
+    )
+    with patch("social.publishers.publish_telegram") as pub:
+        from social.publishers import PublishResult
+
+        pub.return_value = PublishResult(ok=True)
+        assert send_rating_request(conv.pk) == "telegram_ok"
+    markup = pub.call_args.kwargs["reply_markup"]
+    buttons = markup["inline_keyboard"][0]
+    assert len(buttons) == 5
+    assert buttons[4]["callback_data"] == f"support_rate:{conv.pk}:5"
+
+    conv.rating = 3
+    conv.save(update_fields=["rating"])
+    assert send_rating_request(conv.pk) == "already_rated"
+
+
+@pytest.mark.django_db
 def test_poll_without_start_does_not_create_conversation() -> None:
     """Opening the widget must not create an empty Admin thread before the first message."""
     ensure_default_schedule()

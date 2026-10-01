@@ -278,6 +278,51 @@ def test_staff_template_command_sends_canned_reply() -> None:
 
 
 @pytest.mark.django_db
+def test_max_rating_callback_saves_score_for_dialog_owner() -> None:
+    """⭐ tap on a rating request stores the score only for the dialog owner."""
+    from supportchat.services import support_rating_callback_payload
+
+    conv = Conversation.objects.create(
+        channel=Channel.MAX,
+        external_user_id="42",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+        body="Ответ",
+    )
+    update = {
+        "update_type": "message_callback",
+        "callback": {
+            "callback_id": "cb.rate",
+            "payload": support_rating_callback_payload(conv.pk, 5),
+            "user": {"user_id": 42, "first_name": "Client", "is_bot": False},
+        },
+    }
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ) as answer:
+        handle_max_update(update)
+    conv.refresh_from_db()
+    assert conv.rating == 5
+    assert "Спасибо" in answer.call_args.kwargs["notification"]
+
+    # Stranger's press on the same payload must not rate the dialog.
+    conv.rating = None
+    conv.save(update_fields=["rating"])
+    update["callback"]["user"]["user_id"] = 999
+    update["callback"]["callback_id"] = "cb.rate2"
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ):
+        handle_max_update(update)
+    conv.refresh_from_db()
+    assert conv.rating is None
+
+
+@pytest.mark.django_db
 def test_staff_lookup_prefers_account_with_reply_permission() -> None:
     """Duplicate max_user_id binding: pick the account that can actually reply.
 
