@@ -64,7 +64,7 @@ def notify_staff_telegram_support(
     from sitesettings.models import SiteSettings
     from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
-    from supportchat.services import inbound_superseded
+    from supportchat.services import claim_staff_support_push, inbound_superseded
 
     if inbound_message_id is not None and inbound_superseded(
         conversation_id,
@@ -77,6 +77,8 @@ def notify_staff_telegram_support(
     try:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
+        return 0
+    if not claim_staff_support_push("telegram", conv.pk, inbound_message_id):
         return 0
     label = conv.display_name or conv.get_channel_display()
     title, body = staff_support_push_copy(label=label)

@@ -106,6 +106,41 @@ def test_support_max_alert() -> None:
 
 
 @pytest.mark.django_db
+def test_support_max_alert_dedupes_escalation_vs_debounced() -> None:
+    """Escalation push (message_id=None) + debounced inbound push = one MAX alert.
+
+    Regression: web inbound scheduled a debounced alert, then GigaChat
+    escalation enqueued a second one — staff got the same message twice.
+    """
+    _make_manager(email="mgr-max5@hoocon.ru", user_id="444")
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-1",
+        display_name="Клиент",
+    )
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Нужен КП на DA10",
+    )
+    with patch(
+        "accounts.max_alerts.publish_max",
+        return_value=PublishResult(ok=True),
+    ) as pub:
+        assert notify_staff_max_support(conv.pk) == 1
+        assert notify_staff_max_support(conv.pk, inbound_message_id=inbound.pk) == 0
+        second = Message.objects.create(
+            conversation=conv,
+            direction=MessageDirection.INBOUND,
+            body="И ещё SA10FU",
+        )
+        assert notify_staff_max_support(conv.pk, inbound_message_id=second.pk) == 1
+    assert pub.call_count == 2
+
+
+@pytest.mark.django_db
 def test_support_max_alert_uses_inbound_message_id() -> None:
     """Alert quotes the triggering inbound message, not a later one in the thread."""
     _make_manager(email="mgr-max4@hoocon.ru", user_id="333")

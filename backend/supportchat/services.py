@@ -227,6 +227,38 @@ def inbound_superseded(conversation_id: int, inbound_message_id: int) -> bool:
     ).exists()
 
 
+_STAFF_PUSH_DEDUP_TTL = 6 * 3600
+
+
+def claim_staff_support_push(
+    channel: str,
+    conversation_id: int,
+    inbound_message_id: int | None = None,
+) -> bool:
+    """Claim the staff alert for an inbound on this channel (atomic).
+
+    One inbound message must produce at most one staff push per channel.
+    Without it the debounced inbound task and the immediate escalation
+    task (``message_id=None``) both deliver the same alert.
+    """
+    from django.core.cache import cache
+
+    if inbound_message_id is None:
+        inbound_message_id = (
+            Message.objects.filter(
+                conversation_id=conversation_id,
+                direction=MessageDirection.INBOUND,
+            )
+            .order_by("-id")
+            .values_list("id", flat=True)
+            .first()
+        )
+    if inbound_message_id is None:
+        return True
+    key = f"support-staff-push:{channel}:{conversation_id}:{inbound_message_id}"
+    return bool(cache.add(key, 1, timeout=_STAFF_PUSH_DEDUP_TTL))
+
+
 def _schedule_ai_reply(conversation_id: int, inbound_message_id: int) -> None:
     """Enqueue GigaChat assistant reply after commit."""
     from django.db import transaction

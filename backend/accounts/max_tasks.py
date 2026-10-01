@@ -57,7 +57,7 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
     )
     from sitesettings.models import SiteSettings
     from supportchat.models import Conversation
-    from supportchat.services import inbound_superseded
+    from supportchat.services import claim_staff_support_push, inbound_superseded
 
     if inbound_message_id is not None and inbound_superseded(
         conversation_id,
@@ -70,6 +70,8 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
     try:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
+        return 0
+    if not claim_staff_support_push("max", conv.pk, inbound_message_id):
         return 0
     title, body = compose_staff_max_support_alert(
         conv,
@@ -87,3 +89,4 @@ def notify_staff_max_support(conversation_id: int, inbound_message_id: int | Non
     sent = send_max_to_users(users, text, attachments=attachments)
     logger.info("max_staff_support conv_id=%s sent=%s", conversation_id, sent)
     return sent
+

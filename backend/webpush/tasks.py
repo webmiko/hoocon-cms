@@ -18,7 +18,7 @@ def notify_staff_support_inbound(
     from sitesettings.models import SiteSettings
     from sitesettings.staff_push import staff_support_push_copy
     from supportchat.models import Conversation
-    from supportchat.services import inbound_superseded
+    from supportchat.services import claim_staff_support_push, inbound_superseded
     from webpush.services import queryset_staff_alerts, send_push_to_subscription
 
     if inbound_message_id is not None and inbound_superseded(
@@ -31,6 +31,8 @@ def notify_staff_support_inbound(
     try:
         conv = Conversation.objects.get(pk=conversation_id)
     except Conversation.DoesNotExist:
+        return 0
+    if not claim_staff_support_push("webpush", conv.pk, inbound_message_id):
         return 0
     label = conv.display_name or conv.get_channel_display()
     title, body = staff_support_push_copy(label=label)
