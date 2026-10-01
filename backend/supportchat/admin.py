@@ -20,13 +20,16 @@ from supportchat.models import (
     ConversationStatus,
     FaqItem,
     Message,
+    MessageDirection,
     SupportSchedule,
     SupportScheduleDay,
     SupportScheduleInterval,
 )
 from supportchat.services import (
     SupportChatError,
+    add_staff_note,
     add_staff_reply,
+    assign_conversation,
     conversation_party_label,
     count_staff_unread,
     delete_unlinked_conversation,
@@ -40,12 +43,15 @@ def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for msg in qs:
         local = timezone.localtime(msg.created_at)
+        sender = message_sender_name(msg, staff_view=True)
+        if msg.direction == MessageDirection.NOTE:
+            sender = f"Заметка · {sender}"
         rows.append(
             {
                 "id": msg.pk,
                 "direction": msg.direction,
                 "body": msg.body,
-                "sender_name": message_sender_name(msg, staff_view=True),
+                "sender_name": sender,
                 "outside_hours": msg.outside_hours,
                 "created_at_iso": msg.created_at.isoformat(),
                 "created_at_label": local.strftime("%d.%m.%Y %H:%M"),
@@ -334,7 +340,12 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         if not user.is_authenticated:
             messages.error(request, "Недостаточно прав для ответа.")
             return HttpResponseRedirect(change_url)
+        is_note = bool(request.POST.get("is_note"))
         try:
+            if is_note:
+                add_staff_note(conversation, body, author=user)
+                messages.success(request, "Заметка сохранена (клиенту не видна).")
+                return HttpResponseRedirect(change_url)
             msg = add_staff_reply(conversation, body, author=user)
         except SupportChatError as exc:
             messages.error(request, str(exc))
@@ -407,6 +418,17 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra["chat_client_initial"] = (party[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
         return super().change_view(request, object_id, form_url, extra)
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Conversation,
+        form: Any,
+        change: bool,
+    ) -> None:
+        super().save_model(request, obj, form, change)
+        if change and "assignee" in (form.changed_data or []):
+            assign_conversation(obj, obj.assignee, actor=request.user)
 
     @admin.action(description="Отметить прочитанными")
     def action_mark_read(

@@ -201,6 +201,50 @@ def test_staff_hash_reply_delivers_to_client_max() -> None:
 
 
 @pytest.mark.django_db
+def test_staff_note_command_creates_internal_note() -> None:
+    """#ID /note … stores a staff-only note, no client delivery."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+
+    mgr = _make_manager(email="mgr-note@hoocon.ru", max_user_id="910")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-note",
+    )
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        ok, status_text = submit_staff_reply_from_max(mgr, conv.pk, "/note позвонить завтра")
+    assert ok
+    assert "Заметка" in status_text
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert note.body == "позвонить завтра"
+    assert note.author_id == mgr.pk
+    deliver.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_staff_assign_command_reassigns_dialog() -> None:
+    """#ID @handle transfers the dialog and logs an internal note."""
+    from social.max_staff_reply import submit_staff_reply_from_max
+
+    sender = _make_manager(email="mgr-x@hoocon.ru", max_user_id="911")
+    target = _make_manager(email="valeriya@hoocon.ru", max_user_id="912")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-assign",
+    )
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "@valeriya@hoocon.ru")
+    assert ok
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    assert "передан" in status_text
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert "передан" in note.body
+
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "@ghost")
+    assert not ok
+    assert "не найден" in status_text
+
+
+@pytest.mark.django_db
 def test_staff_lookup_prefers_account_with_reply_permission() -> None:
     """Duplicate max_user_id binding: pick the account that can actually reply.
 

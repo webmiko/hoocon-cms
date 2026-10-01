@@ -6,10 +6,12 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client, override_settings
 
-from supportchat.models import Channel, Conversation, FaqItem, Message
+from supportchat.models import Channel, Conversation, FaqItem, Message, MessageDirection
 from supportchat.schedule import ensure_default_schedule
+from supportchat.services import add_staff_note
 
 MSK = ZoneInfo("Europe/Moscow")
 
@@ -215,6 +217,102 @@ def test_page_url_tracked_and_shown_in_staff_alert() -> None:
 
     _title, alert_body = compose_staff_max_support_alert(conv)
     assert "Страница: /delivery/" in alert_body
+
+
+@pytest.mark.django_db
+def test_internal_notes_hidden_from_public_poll() -> None:
+    """Staff notes (direction=note) must never leak to the widget API."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Вопрос по SA24"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert send.status_code == 201
+        conv = Conversation.objects.get(channel=Channel.WEB)
+
+        staff = get_user_model().objects.create_user(
+            username="note-staff@hoocon.ru",
+            email="note-staff@hoocon.ru",
+            password="x",
+            is_staff=True,
+        )
+        add_staff_note(conv, "проверить остатки на складе", author=staff)
+
+        listing = client.get("/api/support/conversations/current/messages/")
+        assert listing.status_code == 200
+        bodies = [m["body"] for m in listing.json()["messages"]]
+        assert "Вопрос по SA24" in bodies
+        assert all("проверить остатки" not in b for b in bodies)
+
+
+@pytest.mark.django_db
+def test_admin_reply_view_note_checkbox_skips_delivery() -> None:
+    """Admin composer checkbox stores an internal note, not a client reply."""
+    ensure_default_schedule()
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="sess-note")
+    staff = get_user_model().objects.create_user(
+        username="note-admin@hoocon.ru",
+        email="note-admin@hoocon.ru",
+        password="x",
+        is_staff=True,
+        is_superuser=True,
+    )
+    admin_client = Client()
+    admin_client.force_login(staff)
+    url = f"/admin/supportchat/conversation/{conv.pk}/reply/"
+    with patch("supportchat.tasks.deliver_outbound_message.delay") as deliver:
+        resp = admin_client.post(url, {"reply_body": "внутренняя", "is_note": "1"})
+    assert resp.status_code == 302
+    note = Message.objects.get(conversation=conv)
+    assert note.direction == MessageDirection.NOTE
+    assert note.author_id == staff.pk
+    deliver.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_admin_assignee_change_writes_note() -> None:
+    """Reassigning a dialog in Admin leaves an audit note in the thread."""
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="sess-rea")
+    boss = get_user_model().objects.create_user(
+        username="boss@hoocon.ru",
+        email="boss@hoocon.ru",
+        password="x",
+        is_staff=True,
+        is_superuser=True,
+    )
+    target = get_user_model().objects.create_user(
+        username="target@hoocon.ru",
+        email="target@hoocon.ru",
+        password="x",
+        is_staff=True,
+        first_name="Target",
+    )
+    admin_client = Client()
+    admin_client.force_login(boss)
+    conv_url = f"/admin/supportchat/conversation/{conv.pk}/change/"
+    resp = admin_client.get(conv_url)
+    assert resp.status_code == 200
+    resp2 = admin_client.post(
+        conv_url,
+        {
+            "channel": Channel.WEB,
+            "external_user_id": "sess-rea",
+            "display_name": "",
+            "status": "open",
+            "ai_mode": "faq",
+            "assignee": str(target.pk),
+            "_save": "Сохранить",
+        },
+    )
+    assert resp2.status_code == 302, resp2.content[:300]
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    assert Message.objects.filter(conversation=conv, direction=MessageDirection.NOTE).exists()
 
 
 @pytest.mark.django_db

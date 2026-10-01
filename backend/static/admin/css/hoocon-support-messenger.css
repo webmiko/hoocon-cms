@@ -363,7 +363,8 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__row--outbound,
-.hoocon-messenger__row--system {
+.hoocon-messenger__row--system,
+.hoocon-messenger__row--note {
   justify-content: flex-end;
 }
 
@@ -377,7 +378,8 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__row--outbound .hoocon-messenger__bubble-wrap,
-.hoocon-messenger__row--system .hoocon-messenger__bubble-wrap {
+.hoocon-messenger__row--system .hoocon-messenger__bubble-wrap,
+.hoocon-messenger__row--note .hoocon-messenger__bubble-wrap {
   align-items: flex-end;
 }
 
@@ -423,6 +425,20 @@ html.dark .hoocon-messenger {
   border-bottom-right-radius: var(--hm-bubble-tail);
   color: inherit;
   font-size: 0.82rem;
+}
+
+.hoocon-messenger__row--note .hoocon-messenger__bubble {
+  background: #fff8e1;
+  border: 1px dashed #e0b952;
+  border-bottom-right-radius: var(--hm-bubble-tail);
+  color: inherit;
+  font-size: 0.85rem;
+}
+
+.dark .hoocon-messenger__row--note .hoocon-messenger__bubble,
+html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
+  background: color-mix(in srgb, #e0b952 14%, var(--hm-surface));
+  border-color: #8a7433;
 }
 
 .hoocon-messenger__time {

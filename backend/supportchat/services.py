@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -371,6 +372,147 @@ def add_staff_reply(
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
     _schedule_retire_max_support_alert(conversation.pk, author_user)
     return msg
+
+def add_staff_note(
+    conversation: Conversation,
+    body: str,
+    *,
+    author: AbstractBaseUser | None,
+) -> Message:
+    """Internal staff-only note: never delivered to the client channel."""
+    text = _sanitize_body(body)
+    if not text:
+        raise SupportChatError("Пустая заметка.")
+    author_user = author if author is not None and getattr(author, "pk", None) else None
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+    msg = Message.objects.create(
+        conversation=conversation,
+        direction=MessageDirection.NOTE,
+        body=text,
+        author=author_user,  # type: ignore[misc]
+        outside_hours=False,
+    )
+    conversation.staff_unread_count = 0
+    conversation.last_message_at = timezone.now()
+    conversation.save(update_fields=["staff_unread_count", "last_message_at", "updated_at"])
+    return msg
+
+
+_STAFF_ASSIGN_RE = re.compile(
+    r"^(?:@([\w.@+-]+)|/assign\s+@?([\w.@+-]+))\s*$",
+    re.IGNORECASE,
+)
+
+
+def _staff_user_by_handle(handle: str) -> AbstractBaseUser | None:
+    """Active staff user for an ``@handle`` (username, email or first name)."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
+
+    h = (handle or "").lstrip("@").strip()
+    if not h:
+        return None
+    return (
+        get_user_model()
+        .objects.filter(is_active=True, is_staff=True)
+        .filter(
+            Q(username__iexact=h) | Q(email__iexact=h) | Q(first_name__iexact=h),
+        )
+        .filter(
+            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
+        )
+        .distinct()
+        .first()
+    )
+
+
+def submit_staff_reply(
+    staff_user: AbstractBaseUser,
+    conversation_id: int,
+    body: str,
+) -> tuple[bool, str]:
+    """Staff reply/note/assign/template from any messenger (shared core).
+
+    Commands inside the text: ``/note …`` internal note, ``@handle`` or
+    ``/assign …`` reassign, ``/t slug`` canned reply (``/t`` lists slugs).
+
+    Returns:
+        (ok, plain-text status for the staff chat).
+    """
+    from django.contrib.auth.models import PermissionsMixin
+
+    if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
+        "supportchat.change_conversation",
+    ):
+        logger.warning(
+            "staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
+            getattr(staff_user, "pk", None),
+            conversation_id,
+        )
+        return False, "Недостаточно прав для ответа в поддержке."
+
+    try:
+        conversation = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return False, f"Диалог #{conversation_id} не найден."
+
+    text = body.strip()
+    if text.lower().startswith("/note"):
+        try:
+            add_staff_note(conversation, text[5:].strip(), author=staff_user)
+        except SupportChatError as exc:
+            return False, str(exc)
+        return True, f"Заметка сохранена · диалог #{conversation_id} (клиенту не видна)"
+
+    assign_match = _STAFF_ASSIGN_RE.match(text)
+    if assign_match:
+        handle = assign_match.group(1) or assign_match.group(2) or ""
+        target = _staff_user_by_handle(handle)
+        if target is None:
+            return False, f"Сотрудник «{handle}» не найден (username/email/имя)."
+        assign_conversation(conversation, target, actor=staff_user)
+        return True, f"Диалог #{conversation_id} передан: {staff_public_name(target)}"
+
+    try:
+        message = add_staff_reply(conversation, text, author=staff_user)
+    except SupportChatError as exc:
+        return False, str(exc)
+
+    from supportchat.tasks import deliver_outbound_message
+
+    try:
+        deliver_outbound_message.delay(message.pk)
+    except Exception as exc:
+        logger.warning(
+            "staff_reply_deliver_enqueue_failed error=%s",
+            type(exc).__name__,
+        )
+        deliver_outbound_message(message.pk)
+
+    label = conversation.display_name or conversation.external_user_id
+    channel = conversation.get_channel_display()
+    return True, f"Ответ отправлен · диалог #{conversation_id} · {channel} · {label}"
+
+
+def assign_conversation(
+    conversation: Conversation,
+    target: AbstractBaseUser | None,
+    *,
+    actor: AbstractBaseUser | None,
+) -> Message:
+    """Reassign the dialog to another staff member and log an internal note."""
+    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
+    conversation.assignee = target  # type: ignore[assignment]
+    conversation.save(update_fields=["assignee", "updated_at"])
+    target_label = staff_public_name(target) if target is not None else "—"
+    actor_label = staff_public_name(actor)
+    return add_staff_note(
+        conversation,
+        f"{actor_label}: диалог передан → {target_label}",
+        author=actor,
+    )
 
 
 def _schedule_retire_max_support_alert(

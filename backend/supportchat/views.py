@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from config.logging_utils import setup_logger
 from sitesettings.models import SiteSettings
+from supportchat.models import MessageDirection
 from supportchat.schedule import schedule_public_payload
 from supportchat.serializers import (
     ConversationStartSerializer,
@@ -170,7 +171,7 @@ class CurrentMessagesView(APIView):
         after = request.query_params.get("after")
         qs = (
             conv.messages.select_related("author", "conversation", "conversation__assignee")
-            .all()
+            .exclude(direction=MessageDirection.NOTE)
             .order_by("created_at", "id")
         )
         if after and str(after).isdigit():

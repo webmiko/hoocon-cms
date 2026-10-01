@@ -34,6 +34,7 @@ class MessageDirection(models.TextChoices):
     INBOUND = "inbound", "Клиент"
     OUTBOUND = "outbound", "Менеджер"
     SYSTEM = "system", "Система"
+    NOTE = "note", "Заметка"
 
 
 class Conversation(models.Model):
