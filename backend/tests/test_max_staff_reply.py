@@ -560,7 +560,8 @@ def test_staff_alert_keyboard_has_note_and_assign_buttons() -> None:
     )
 
     attachments = staff_support_alert_attachments(7)
-    buttons = attachments[0]["payload"]["buttons"][0]
+    rows = attachments[0]["payload"]["buttons"]
+    buttons = [btn for row in rows for btn in row]
     texts = [btn["text"] for btn in buttons if btn["type"] == "callback"]
     assert "Ответить" in texts
     assert "📝 Заметка" in texts
@@ -568,6 +569,8 @@ def test_staff_alert_keyboard_has_note_and_assign_buttons() -> None:
     payloads = {btn["text"]: btn["payload"] for btn in buttons if btn["type"] == "callback"}
     assert payloads["📝 Заметка"] == staff_note_callback_payload(7)
     assert payloads["🔀 Передать"] == staff_assign_callback_payload(7)
+    # MAX API rejects wide rows — keep ≤2 buttons per row.
+    assert all(len(row) <= 2 for row in rows)
 
 
 @pytest.mark.django_db
