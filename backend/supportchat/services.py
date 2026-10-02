@@ -404,6 +404,7 @@ def _schedule_retire_telegram_support_alert(
     transaction.on_commit(_enqueue)
 
 
+@transaction.atomic
 def add_staff_note(
     conversation: Conversation,
     body: str,
@@ -532,7 +533,10 @@ def _staff_user_by_handle(handle: str) -> AbstractBaseUser | None:
         get_user_model()
         .objects.filter(is_active=True, is_staff=True)
         .filter(
-            Q(username__iexact=h) | Q(email__iexact=h) | Q(first_name__iexact=h),
+            Q(username__iexact=h)
+            | Q(email__iexact=h)
+            | Q(first_name__iexact=h)
+            | Q(username__iregex=rf"^{re.escape(h)}@"),
         )
         .filter(
             Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
@@ -638,6 +642,7 @@ def active_reply_templates() -> list[ReplyTemplate]:
     return list(ReplyTemplate.objects.filter(is_active=True))
 
 
+@transaction.atomic
 def assign_conversation(
     conversation: Conversation,
     target: AbstractBaseUser | None,

@@ -244,6 +244,31 @@ def test_staff_assign_command_reassigns_dialog() -> None:
     assert "не найден" in status_text
 
 
+@pytest.mark.django_db(transaction=True)
+def test_staff_assign_command_reassigns_dialog_autocommit() -> None:
+    """Prod runs autocommit: /note and @handle must not crash on select_for_update.
+
+    Plain ``django_db`` wraps tests in a transaction, hiding the missing
+    ``transaction.atomic`` around the locked read — this one uses real commits.
+    """
+    from social.max_staff_reply import submit_staff_reply_from_max
+
+    sender = _make_manager(email="mgr-autocommit@hoocon.ru", max_user_id="913")
+    target = _make_manager(email="target-ac@hoocon.ru", max_user_id="914")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-assign-ac",
+    )
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "/note внутренняя проверка")
+    assert ok, status_text
+    assert Message.objects.filter(conversation=conv, direction=MessageDirection.NOTE).exists()
+
+    ok, status_text = submit_staff_reply_from_max(sender, conv.pk, "@target-ac")
+    assert ok, status_text
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+
+
 @pytest.mark.django_db
 def test_staff_template_command_sends_canned_reply() -> None:
     """#ID /t slug expands the canned reply and delivers it to the client."""
