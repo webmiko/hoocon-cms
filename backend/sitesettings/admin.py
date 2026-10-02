@@ -236,6 +236,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "gigachat_credentials",
                     "gigachat_token_status",
                     "gigachat_model",
+                    "ai_mode",
                     "ai_max_turns",
                 ),
                 "description": (

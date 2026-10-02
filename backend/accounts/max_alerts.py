@@ -98,53 +98,14 @@ def compose_staff_max_support_alert(
     inbound_message_id: int | None = None,
 ) -> tuple[str, str]:
     """Title/body for MAX staff alert on inbound support message."""
-    from sitesettings.staff_push import staff_support_push_copy
     from social.max_staff_reply import staff_reply_hint
-    from supportchat.models import Message, MessageDirection
+    from supportchat.services import compose_staff_support_alert
 
-    label = conversation.display_name or conversation.get_channel_display()
-    title, fallback_body = staff_support_push_copy(label=label)
-    title = f"{title} · #{conversation.pk}"
-
-    inbound: Message | None = None
-    if inbound_message_id is not None:
-        inbound = Message.objects.filter(
-            pk=inbound_message_id,
-            conversation_id=conversation.pk,
-            direction=MessageDirection.INBOUND,
-        ).first()
-    if inbound is None:
-        inbound = (
-            Message.objects.filter(
-                conversation_id=conversation.pk,
-                direction=MessageDirection.INBOUND,
-            )
-            .order_by("-id")
-            .first()
-        )
-
-    parts: list[str] = []
-    if inbound is not None and inbound.attachment:
-        from django.conf import settings
-
-        site = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-        name = inbound.attachment_name or "файл"
-        parts.append(f"📎 {name}: {site}{inbound.attachment.url}")
-    if inbound is not None:
-        snippet = (inbound.body or "").strip().replace("\n", " ")
-        if len(snippet) > 400:
-            snippet = snippet[:399].rstrip() + "…"
-        if snippet:
-            channel_label = conversation.get_channel_display()
-            parts.append(f"{channel_label} · {label}:\n«{snippet}»")
-    if not parts:
-        parts.append(fallback_body)
-    page = (getattr(conversation, "page_url", "") or "").strip()
-    if page:
-        parts.append(f"Страница: {page}")
-
-    parts.append(staff_reply_hint(conversation.pk))
-    return title, "\n\n".join(parts)
+    return compose_staff_support_alert(
+        conversation,
+        inbound_message_id=inbound_message_id,
+        reply_hint=staff_reply_hint(conversation.pk),
+    )
 
 
 def format_staff_max_message(*, title: str, body: str, url: str = "") -> str:

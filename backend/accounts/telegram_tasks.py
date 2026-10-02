@@ -61,9 +61,13 @@ def notify_staff_telegram_support(
         staff_telegram_recipients_superusers,
     )
     from sitesettings.models import SiteSettings
-    from sitesettings.staff_push import staff_support_push_copy
+    from social.max_staff_reply import staff_reply_hint
     from supportchat.models import Conversation
-    from supportchat.services import claim_staff_support_push, inbound_superseded
+    from supportchat.services import (
+        claim_staff_support_push,
+        compose_staff_support_alert,
+        inbound_superseded,
+    )
 
     if inbound_message_id is not None and inbound_superseded(
         conversation_id,
@@ -79,35 +83,11 @@ def notify_staff_telegram_support(
         return 0
     if not claim_staff_support_push("telegram", conv.pk, inbound_message_id):
         return 0
-    label = conv.display_name or conv.get_channel_display()
-    title, body = staff_support_push_copy(label=label)
-    page = (conv.page_url or "").strip()
-    if page:
-        body = f"{body}\nСтраница: {page}"
-    from supportchat.models import Message, MessageDirection
-
-    inbound = None
-    if inbound_message_id is not None:
-        inbound = Message.objects.filter(
-            pk=inbound_message_id,
-            conversation_id=conv.pk,
-            direction=MessageDirection.INBOUND,
-        ).first()
-    if inbound is None:
-        inbound = (
-            Message.objects.filter(
-                conversation_id=conv.pk,
-                direction=MessageDirection.INBOUND,
-            )
-            .order_by("-id")
-            .first()
-        )
-    if inbound is not None and inbound.attachment:
-        from django.conf import settings
-
-        site_url = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
-        name = inbound.attachment_name or "файл"
-        body = f"{body}\n📎 {name}: {site_url}{inbound.attachment.url}"
+    title, body = compose_staff_support_alert(
+        conv,
+        inbound_message_id=inbound_message_id,
+        reply_hint=staff_reply_hint(conv.pk),
+    )
     text = format_staff_telegram_message(
         title=title,
         body=body,
