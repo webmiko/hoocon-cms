@@ -75,6 +75,21 @@ def staff_reply_callback_payload(conversation_id: int) -> str:
     return f"{_STAFF_REPLY_CALLBACK_PREFIX}{conversation_id}"
 
 
+def staff_note_callback_payload(conversation_id: int) -> str:
+    """Inline callback payload for the «📝 Заметка» button."""
+    return f"staff_note:{conversation_id}"
+
+
+def staff_assign_callback_payload(conversation_id: int) -> str:
+    """Inline callback payload for the «🔀 Передать» button (opens picker)."""
+    return f"staff_assign:{conversation_id}"
+
+
+def staff_assign_to_callback_payload(conversation_id: int, user_id: int) -> str:
+    """Picker button payload: transfer the dialog to this staff user."""
+    return f"staff_assign_to:{conversation_id}:{user_id}"
+
+
 def parse_staff_reply_callback_payload(payload: str) -> int | None:
     """Return conversation id from callback payload or None."""
     raw = (payload or "").strip()
@@ -86,27 +101,62 @@ def parse_staff_reply_callback_payload(payload: str) -> int | None:
     return int(suffix)
 
 
+def parse_staff_alert_callback(payload: str) -> tuple[str, int, int | None] | None:
+    """Parse staff alert payload → ``(action, conv_id, target_user_id)``.
+
+    ``assign_to`` must be tried before ``assign`` (shared prefix).
+    """
+    raw = (payload or "").strip()
+    for action, prefix in (
+        ("assign_to", "staff_assign_to:"),
+        ("reply", _STAFF_REPLY_CALLBACK_PREFIX),
+        ("note", "staff_note:"),
+        ("assign", "staff_assign:"),
+    ):
+        if not raw.startswith(prefix):
+            continue
+        rest = raw[len(prefix) :]
+        if action == "assign_to":
+            conv_part, _, user_part = rest.partition(":")
+            if conv_part.strip().isdigit() and user_part.strip().isdigit():
+                return action, int(conv_part), int(user_part)
+            return None
+        if rest.strip().isdigit():
+            return action, int(rest), None
+        return None
+    return None
+
+
 def _pending_reply_cache_key(max_user_id: str) -> str:
     return f"max_staff_reply_pending:{(max_user_id or '').strip()}"
 
 
-def set_pending_staff_reply(max_user_id: str, conversation_id: int) -> None:
-    """Remember which support dialog the manager is replying to from MAX."""
+def set_pending_staff_reply(max_user_id: str, conversation_id: int, mode: str = "reply") -> None:
+    """Remember which support dialog the manager is replying to from MAX.
+
+    ``mode`` is ``reply`` (default) or ``note`` — next text becomes a note.
+    """
     uid = (max_user_id or "").strip()
     if not uid:
         return
-    cache.set(_pending_reply_cache_key(uid), conversation_id, timeout=_PENDING_REPLY_CACHE_TTL)
+    cache.set(
+        _pending_reply_cache_key(uid),
+        {"conv": conversation_id, "mode": mode},
+        timeout=_PENDING_REPLY_CACHE_TTL,
+    )
 
 
-def get_pending_staff_reply(max_user_id: str) -> int | None:
-    """Return pending conversation id for this staff MAX user, if any."""
+def get_pending_staff_reply(max_user_id: str) -> tuple[int, str] | None:
+    """Return ``(conversation_id, mode)`` pending for this staff MAX user, if any."""
     uid = (max_user_id or "").strip()
     if not uid:
         return None
     value = cache.get(_pending_reply_cache_key(uid))
-    if value is None:
-        return None
-    return int(value)
+    if isinstance(value, dict):
+        return int(value["conv"]), str(value.get("mode") or "reply")
+    if value is not None:  # legacy int payload
+        return int(value), "reply"
+    return None
 
 
 def clear_pending_staff_reply(max_user_id: str) -> None:
@@ -119,6 +169,11 @@ def clear_pending_staff_reply(max_user_id: str) -> None:
 def compose_staff_reply_prompt(conversation_id: int) -> str:
     """Prompt after the manager taps «Ответить» on a staff alert."""
     return f"Диалог #{conversation_id} — напишите ответ одним сообщением.\nНомер подставлять не нужно."
+
+
+def compose_staff_note_prompt(conversation_id: int) -> str:
+    """Prompt after the manager taps «📝 Заметка» on a staff alert."""
+    return f"Диалог #{conversation_id} — следующее сообщение станет внутренней заметкой.\nКлиент её не увидит."
 
 
 _SUPPORT_ALERT_MID_TTL = 7 * 24 * 60 * 60
@@ -174,6 +229,16 @@ def staff_support_alert_attachments(conversation_id: int) -> list[dict[str, Any]
                             "payload": staff_reply_callback_payload(conversation_id),
                         },
                         {
+                            "type": "callback",
+                            "text": "📝 Заметка",
+                            "payload": staff_note_callback_payload(conversation_id),
+                        },
+                        {
+                            "type": "callback",
+                            "text": "🔀 Передать",
+                            "payload": staff_assign_callback_payload(conversation_id),
+                        },
+                        {
                             "type": "link",
                             "text": "Admin",
                             "url": admin_url,
@@ -183,6 +248,27 @@ def staff_support_alert_attachments(conversation_id: int) -> list[dict[str, Any]
             },
         },
     ]
+
+
+def staff_transfer_keyboard_attachments(
+    conversation_id: int,
+    *,
+    exclude_pk: int | None = None,
+) -> list[dict[str, Any]]:
+    """Inline keyboard message attachment listing colleagues for transfer."""
+    from supportchat.services import staff_public_name, staff_transfer_candidates
+
+    buttons = [
+        [
+            {
+                "type": "callback",
+                "text": staff_public_name(user),
+                "payload": staff_assign_to_callback_payload(conversation_id, user.pk),
+            },
+        ]
+        for user in staff_transfer_candidates(exclude_pk=exclude_pk)
+    ]
+    return [{"type": "inline_keyboard", "payload": {"buttons": buttons}}]
 
 
 def compose_staff_reply_help() -> str:

@@ -24,6 +24,21 @@ def staff_reply_callback_data(conversation_id: int) -> str:
     return f"staff_reply:{conversation_id}"
 
 
+def staff_note_callback_data(conversation_id: int) -> str:
+    """Inline callback_data for the «📝 Заметка» button."""
+    return f"staff_note:{conversation_id}"
+
+
+def staff_assign_callback_data(conversation_id: int) -> str:
+    """Inline callback_data for the «🔀 Передать» button (opens picker)."""
+    return f"staff_assign:{conversation_id}"
+
+
+def staff_assign_to_callback_data(conversation_id: int, user_id: int) -> str:
+    """Picker button: transfer the dialog to this staff user."""
+    return f"staff_assign_to:{conversation_id}:{user_id}"
+
+
 def parse_staff_reply_callback_data(data: str) -> int | None:
     """Return conversation id from callback_data or None."""
     raw = (data or "").strip()
@@ -33,6 +48,32 @@ def parse_staff_reply_callback_data(data: str) -> int | None:
     if not suffix.isdigit():
         return None
     return int(suffix)
+
+
+def parse_staff_alert_callback(data: str) -> tuple[str, int, int | None] | None:
+    """Parse staff alert callback_data → ``(action, conv_id, target_user_id)``.
+
+    ``assign_to`` must be tried before ``assign`` (shared prefix).
+    """
+    raw = (data or "").strip()
+    for action, prefix in (
+        ("assign_to", "staff_assign_to:"),
+        ("reply", "staff_reply:"),
+        ("note", "staff_note:"),
+        ("assign", "staff_assign:"),
+    ):
+        if not raw.startswith(prefix):
+            continue
+        rest = raw[len(prefix) :]
+        if action == "assign_to":
+            conv_part, _, user_part = rest.partition(":")
+            if conv_part.strip().isdigit() and user_part.strip().isdigit():
+                return action, int(conv_part), int(user_part)
+            return None
+        if rest.strip().isdigit():
+            return action, int(rest), None
+        return None
+    return None
 
 
 def staff_user_for_telegram_chat_id(chat_id: str) -> AbstractBaseUser | None:
@@ -69,23 +110,32 @@ def _pending_reply_cache_key(chat_id: str) -> str:
     return f"tg_staff_reply_pending:{(chat_id or '').strip()}"
 
 
-def set_pending_staff_reply(chat_id: str, conversation_id: int) -> None:
-    """Remember which support dialog the manager is replying to from Telegram."""
+def set_pending_staff_reply(chat_id: str, conversation_id: int, mode: str = "reply") -> None:
+    """Remember which support dialog the manager is replying to from Telegram.
+
+    ``mode`` is ``reply`` (default) or ``note`` — next text becomes a note.
+    """
     cid = (chat_id or "").strip()
     if not cid:
         return
-    cache.set(_pending_reply_cache_key(cid), conversation_id, timeout=_PENDING_REPLY_CACHE_TTL)
+    cache.set(
+        _pending_reply_cache_key(cid),
+        {"conv": conversation_id, "mode": mode},
+        timeout=_PENDING_REPLY_CACHE_TTL,
+    )
 
 
-def get_pending_staff_reply(chat_id: str) -> int | None:
-    """Return pending conversation id for this staff Telegram chat, if any."""
+def get_pending_staff_reply(chat_id: str) -> tuple[int, str] | None:
+    """Return ``(conversation_id, mode)`` pending for this staff chat, if any."""
     cid = (chat_id or "").strip()
     if not cid:
         return None
     value = cache.get(_pending_reply_cache_key(cid))
-    if value is None:
-        return None
-    return int(value)
+    if isinstance(value, dict):
+        return int(value["conv"]), str(value.get("mode") or "reply")
+    if value is not None:  # legacy int payload
+        return int(value), "reply"
+    return None
 
 
 def clear_pending_staff_reply(chat_id: str) -> None:
@@ -143,15 +193,48 @@ def staff_support_alert_reply_markup(conversation_id: int) -> dict[str, Any]:
                     "text": "Ответить",
                     "callback_data": staff_reply_callback_data(conversation_id),
                 },
+                {
+                    "text": "📝 Заметка",
+                    "callback_data": staff_note_callback_data(conversation_id),
+                },
+                {
+                    "text": "🔀 Передать",
+                    "callback_data": staff_assign_callback_data(conversation_id),
+                },
                 {"text": "Admin", "url": admin_url},
             ],
         ],
     }
 
 
+def staff_transfer_keyboard_markup(
+    conversation_id: int,
+    *,
+    exclude_pk: int | None = None,
+) -> dict[str, Any]:
+    """Inline keyboard listing colleagues the dialog can be handed to."""
+    from supportchat.services import staff_public_name, staff_transfer_candidates
+
+    buttons = [
+        [
+            {
+                "text": staff_public_name(user),
+                "callback_data": staff_assign_to_callback_data(conversation_id, user.pk),
+            },
+        ]
+        for user in staff_transfer_candidates(exclude_pk=exclude_pk)
+    ]
+    return {"inline_keyboard": buttons}
+
+
 def compose_staff_reply_prompt(conversation_id: int) -> str:
     """Prompt after the manager taps «Ответить» on a staff alert."""
     return f"Диалог #{conversation_id} — напишите ответ одним сообщением.\nНомер подставлять не нужно."
+
+
+def compose_staff_note_prompt(conversation_id: int) -> str:
+    """Prompt after the manager taps «📝 Заметка» on a staff alert."""
+    return f"Диалог #{conversation_id} — следующее сообщение станет внутренней заметкой.\nКлиент её не увидит."
 
 
 def compose_staff_reply_help() -> str:
