@@ -774,6 +774,65 @@ def _schedule_superuser_staff_reply_telegram(
     transaction.on_commit(_enqueue)
 
 
+def compose_staff_support_alert(
+    conversation: Conversation,
+    *,
+    inbound_message_id: int | None = None,
+    reply_hint: str = "",
+) -> tuple[str, str]:
+    """Title/body for a staff alert on inbound support message (TG + MAX).
+
+    Includes the client text itself so the manager sees the question
+    without opening Admin.
+    """
+    from sitesettings.staff_push import staff_support_push_copy
+
+    label = conversation.display_name or conversation.get_channel_display()
+    title, fallback_body = staff_support_push_copy(label=label)
+    title = f"{title} · #{conversation.pk}"
+
+    inbound: Message | None = None
+    if inbound_message_id is not None:
+        inbound = Message.objects.filter(
+            pk=inbound_message_id,
+            conversation_id=conversation.pk,
+            direction=MessageDirection.INBOUND,
+        ).first()
+    if inbound is None:
+        inbound = (
+            Message.objects.filter(
+                conversation_id=conversation.pk,
+                direction=MessageDirection.INBOUND,
+            )
+            .order_by("-id")
+            .first()
+        )
+
+    parts: list[str] = []
+    if inbound is not None and inbound.attachment:
+        from django.conf import settings
+
+        site_url = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
+        name = inbound.attachment_name or "файл"
+        parts.append(f"📎 {name}: {site_url}{inbound.attachment.url}")
+    if inbound is not None:
+        snippet = (inbound.body or "").strip().replace("\n", " ")
+        if len(snippet) > 400:
+            snippet = snippet[:399].rstrip() + "…"
+        if snippet:
+            channel_label = conversation.get_channel_display()
+            parts.append(f"{channel_label} · {label}:\n«{snippet}»")
+    if not parts:
+        parts.append(fallback_body)
+    page = (getattr(conversation, "page_url", "") or "").strip()
+    if page:
+        parts.append(f"Страница: {page}")
+    hint = (reply_hint or "").strip()
+    if hint:
+        parts.append(hint)
+    return title, "\n\n".join(parts)
+
+
 def staff_public_name(user: AbstractBaseUser | None) -> str:
     """Public label for a staff user (first_name; never email/username)."""
     if user is None:

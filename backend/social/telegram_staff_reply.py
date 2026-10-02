@@ -197,6 +197,8 @@ def staff_support_alert_reply_markup(conversation_id: int) -> dict[str, Any]:
                     "text": "📝 Заметка",
                     "callback_data": staff_note_callback_data(conversation_id),
                 },
+            ],
+            [
                 {
                     "text": "🔀 Передать",
                     "callback_data": staff_assign_callback_data(conversation_id),

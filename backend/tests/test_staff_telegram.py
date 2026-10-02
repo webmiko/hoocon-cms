@@ -170,6 +170,34 @@ def test_support_telegram_to_managers() -> None:
 
 
 @pytest.mark.django_db
+def test_support_telegram_alert_contains_client_text() -> None:
+    """TG-алерт несёт само сообщение клиента, как MAX — не только «новое обращение»."""
+    _make_manager(email="mgr-text@hoocon.ru", chat_id="777")
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="s-text",
+        display_name="Олег",
+    )
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Нужен привод на дымовой клапан 230В",
+    )
+    with patch(
+        "accounts.telegram_alerts.publish_telegram",
+        return_value=PublishResult(ok=True, external_id="mid-9"),
+    ) as pub:
+        assert notify_staff_telegram_support(conv.pk, inbound.pk) == 1
+    sent_text = pub.call_args.kwargs["text"]
+    assert "Нужен привод на дымовой клапан 230В" in sent_text
+    assert f"#{conv.pk}" in sent_text
+    assert "Олег" in sent_text
+    assert "кнопка" in sent_text.casefold()
+
+
+@pytest.mark.django_db
 def test_support_telegram_parallel_despite_webpush() -> None:
     """Support alerts are a parallel TG channel: webpush must not suppress them."""
     mgr = _make_manager(email="mgr-push-support@hoocon.ru", chat_id="9090")
@@ -447,7 +475,10 @@ def test_telegram_alert_keyboard_has_note_and_assign_buttons() -> None:
         staff_support_alert_reply_markup,
     )
 
-    buttons = staff_support_alert_reply_markup(7)["inline_keyboard"][0]
+    rows = staff_support_alert_reply_markup(7)["inline_keyboard"]
+    for row in rows:
+        assert len(row) <= 2
+    buttons = [button for row in rows for button in row]
     texts = [b["text"] for b in buttons]
     assert "Ответить" in texts
     assert "📝 Заметка" in texts
