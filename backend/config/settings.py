@@ -481,6 +481,10 @@ GIGACHAT_MODE = os.getenv("GIGACHAT_MODE", "triage").strip().casefold()
 SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = int(
     os.getenv("SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS", "300"),
 )
+# Если менеджер не ответил на сообщение клиента за N секунд — бот подхватывает диалог.
+SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS = int(
+    os.getenv("SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS", "45"),
+)
 
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()

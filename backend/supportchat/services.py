@@ -228,11 +228,17 @@ def add_inbound_message(
     )
     _schedule_ai_reply(conversation.pk, inbound.pk)
     from supportchat.gigachat.busy_followup import staff_acknowledgement_pending
+    from supportchat.gigachat.policy import conversation_ai_eligible
 
     if staff_acknowledgement_pending(conversation):
         from supportchat.tasks import _schedule_escalation_busy_followup
 
         _schedule_escalation_busy_followup(conversation.pk)
+    if not conversation_ai_eligible(conversation):
+        # Диалог у человека — бот подхватит его, если менеджер не ответит вовремя.
+        from supportchat.tasks import _schedule_manager_silence_watchdog
+
+        _schedule_manager_silence_watchdog(conversation.pk, inbound.pk)
     return inbound, auto
 
 

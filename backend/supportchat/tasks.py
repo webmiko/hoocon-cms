@@ -231,6 +231,9 @@ _MANAGER_ENGAGED_TEXT = "Менеджер уже ведёт этот диало�
 _AI_RESUMED_TEXT = (
     "Менеджер пока не успел ответить — продолжу помогать сам. Если понадобится человек, напишите «позовите менеджера»."
 )
+_AI_UNAVAILABLE_TEXT = (
+    "Не получилось подготовить ответ — передал диалог менеджеру. Он увидит сообщение и ответит здесь."
+)
 
 
 def ai_resume_stale_escalation_minutes() -> int:
@@ -387,6 +390,15 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
                 conversation_id,
                 str(exc)[:200],
             )
+            if self.request.retries >= self.max_retries:
+                # Не оставляем клиента в тишине: статус + эскалация на людей.
+                _post_system_notice(conversation, _AI_UNAVAILABLE_TEXT)
+                return _escalate_conversation(
+                    conversation,
+                    reason="gigachat_error",
+                    note=f"GigaChat недоступен: {str(exc)[:200]}",
+                    post_handoff=False,
+                )
             raise self.retry(exc=exc)
 
     with transaction.atomic():
@@ -485,6 +497,18 @@ def _escalate_conversation(
         deliver_ai_message(conversation, handoff)
     _schedule_staff_support_push(conversation.pk)
     _schedule_escalation_busy_followup(conversation.pk)
+    # Бот подхватит эскалацию, если менеджер не ответит вовремя —
+    # даже когда клиент больше ничего не пишет.
+    latest_inbound = (
+        Message.objects.filter(
+            conversation_id=conversation.pk,
+            direction=MessageDirection.INBOUND,
+        )
+        .order_by("-id")
+        .first()
+    )
+    if latest_inbound is not None:
+        _schedule_manager_silence_watchdog(conversation.pk, latest_inbound.pk)
     logger.info(
         "gigachat_escalated conversation_id=%s reason=%s",
         conversation.pk,
@@ -558,6 +582,105 @@ def support_escalation_busy_followup(self: Any, conversation_id: int) -> str:
         conversation_id,
     )
     return "sent"
+
+
+def _schedule_manager_silence_watchdog(conversation_id: int, inbound_message_id: int) -> None:
+    """Enqueue takeover watchdog: bot answers if the manager stays silent."""
+    from django.db import transaction
+
+    from supportchat.gigachat.manager_silence import manager_reply_timeout_seconds
+    from supportchat.gigachat.policy import ai_assistant_enabled
+
+    if not ai_assistant_enabled():
+        return
+    delay = manager_reply_timeout_seconds()
+
+    def _enqueue() -> None:
+        support_manager_silence_watchdog.apply_async(
+            args=[conversation_id, inbound_message_id],
+            countdown=delay,
+        )
+
+    transaction.on_commit(_enqueue)
+
+
+@shared_task
+def support_manager_silence_watchdog(conversation_id: int, inbound_message_id: int) -> str:
+    """Take the dialog back when no manager replied within the timeout.
+
+    Fires ~manager_reply_timeout_seconds() after an inbound on a thread
+    owned by a human (escalated / assigned / AI paused by a staff reply).
+    Manager replies cancel the takeover; a burst of client messages is
+    answered once via the latest inbound.
+    """
+    from django.db import transaction
+
+    from supportchat.gigachat.manager_silence import manager_engaged_since
+    from supportchat.gigachat.policy import ai_assistant_enabled, conversation_ai_eligible
+    from supportchat.models import (
+        Conversation,
+        ConversationStatus,
+        Message,
+        MessageDirection,
+    )
+
+    if not ai_assistant_enabled():
+        return "disabled"
+    try:
+        conversation = Conversation.objects.get(pk=conversation_id)
+    except Conversation.DoesNotExist:
+        return "missing_conversation"
+    if conversation.status != ConversationStatus.OPEN:
+        return "closed"
+    if conversation_ai_eligible(conversation):
+        return "already_ai"
+    if manager_engaged_since(conversation, message_id=inbound_message_id):
+        return "manager_replied"
+
+    with transaction.atomic():
+        conv = Conversation.objects.select_for_update().get(pk=conversation_id)
+        if conv.status != ConversationStatus.OPEN:
+            return "closed_race"
+        if conversation_ai_eligible(conv):
+            return "already_ai_race"
+        if manager_engaged_since(conv, message_id=inbound_message_id):
+            return "manager_replied_race"
+        # Turn count intentionally NOT reset: a bot that already hit the cap
+        # must not ping-pong escalate→takeover→escalate every timeout.
+        conv.ai_active = True
+        conv.ai_escalated_at = None
+        conv.assignee = None
+        conv.save(update_fields=["ai_active", "ai_escalated_at", "assignee", "updated_at"])
+
+    latest_inbound = (
+        Message.objects.filter(
+            conversation=conv,
+            direction=MessageDirection.INBOUND,
+        )
+        .order_by("-id")
+        .first()
+    )
+    needs_reply = latest_inbound is not None and not _ai_answered_after(conv, latest_inbound)
+    _post_system_notice(conv, _AI_RESUMED_TEXT)
+    if needs_reply and latest_inbound is not None:
+        gigachat_reply.delay(conv.pk, latest_inbound.pk)
+    logger.info(
+        "ai_takeover conversation_id=%s inbound_id=%s",
+        conversation_id,
+        inbound_message_id,
+    )
+    return "resumed"
+
+
+def _ai_answered_after(conversation: Conversation, inbound: Message) -> bool:
+    """An AI message already answered everything up to this inbound."""
+    from supportchat.models import Message
+
+    return Message.objects.filter(
+        conversation=conversation,
+        raw_payload__ai=True,
+        id__gt=inbound.pk,
+    ).exists()
 
 
 _AUTO_CLOSED_TEXT = "Диалог закрыт по неактивности. Напишите здесь — продолжим с того же места."
