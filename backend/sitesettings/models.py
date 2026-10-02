@@ -275,9 +275,24 @@ class SiteSettings(models.Model):
         blank=True,
         default="GigaChat-2",
     )
+    ai_mode: models.CharField = models.CharField(
+        "режим ассистента",
+        max_length=16,
+        blank=True,
+        default="",
+        choices=(
+            ("", "по умолчанию (GIGACHAT_MODE из .env)"),
+            ("triage", "Первичный приём — без консультаций по продукции"),
+            ("full", "Полный — ответы по базе знаний сайта и мануалам"),
+        ),
+        help_text=(
+            "«Первичный приём»: бот только приветствует, уточняет и передаёт менеджеру. "
+            "«Полный»: бот отвечает по мануалам и контенту сайта. Пусто — GIGACHAT_MODE из .env."
+        ),
+    )
     ai_max_turns: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
         "лимит ответов ассистента",
-        default=5,
+        default=10,
         help_text="После N ответов бота диалог передаётся менеджеру.",
     )
 

@@ -135,7 +135,20 @@ SITE_NAV_SECTIONS: tuple[SiteNavSection, ...] = (
 
 
 def gigachat_mode() -> str:
-    """``triage`` (cold chat) or ``full`` (KB answers)."""
+    """``triage`` (cold chat) or ``full`` (KB answers).
+
+    SiteSettings.ai_mode overrides the GIGACHAT_MODE env default at runtime;
+    when the DB is unavailable the env value is used.
+    """
+    override = ""
+    try:
+        from sitesettings.models import SiteSettings
+
+        override = (SiteSettings.load().ai_mode or "").strip().casefold()
+    except Exception:  # noqa: BLE001 — env fallback при недоступной БД
+        override = ""
+    if override in {_MODE_TRIAGE, _MODE_FULL}:
+        return override
     raw = getattr(dj_settings, "GIGACHAT_MODE", _MODE_TRIAGE).strip().casefold()
     if raw == _MODE_FULL:
         return _MODE_FULL

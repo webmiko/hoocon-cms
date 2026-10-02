@@ -258,6 +258,26 @@ def test_full_output_guard(reply: str, user_texts: list[str], blocked: bool) -> 
 
 
 @pytest.mark.django_db
+def test_ai_mode_site_settings_override(settings) -> None:
+    """SiteSettings.ai_mode переопределяет GIGACHAT_MODE из env."""
+    settings.GIGACHAT_MODE = "triage"
+    site = SiteSettings.load()
+
+    site.ai_mode = "full"
+    site.save(update_fields=["ai_mode"])
+    assert gigachat_mode() == "full"
+    assert is_triage_mode() is False
+
+    site.ai_mode = "triage"
+    site.save(update_fields=["ai_mode"])
+    assert gigachat_mode() == "triage"
+
+    site.ai_mode = ""
+    site.save(update_fields=["ai_mode"])
+    assert gigachat_mode() == "triage"
+
+
+@pytest.mark.django_db
 def test_gigachat_failure_escalates_after_retries(gigachat_on) -> None:
     """GigaChat недоступен после ретраев → статус клиенту + эскалация на людей."""
 
