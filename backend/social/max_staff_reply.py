@@ -233,6 +233,8 @@ def staff_support_alert_attachments(conversation_id: int) -> list[dict[str, Any]
                             "text": "📝 Заметка",
                             "payload": staff_note_callback_payload(conversation_id),
                         },
+                    ],
+                    [
                         {
                             "type": "callback",
                             "text": "🔀 Передать",
