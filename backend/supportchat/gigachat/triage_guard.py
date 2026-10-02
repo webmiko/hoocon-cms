@@ -30,6 +30,10 @@ _ANY_SITE_PATH_RE = re.compile(
     re.IGNORECASE,
 )
 _FOREIGN_URL_RE = re.compile(r"https?://(?!(?:www\.)?hoocon\.ru)[^\s]+", re.IGNORECASE)
+# Внутренние пути репозитория — не публичные URL сайта.
+_INTERNAL_PATH_RE = re.compile(
+    r"(?i)/(?:_manuals-ru|_инструкции-pdf|_pack|_docs|_универсальная)\b",
+)
 _UNCERTAIN_RE = re.compile(
     r"(?i)\b(?:"
     r"не\s+уверен|не\s+знаю|возможно|вероятно|скорее\s+всего|"
@@ -106,6 +110,8 @@ def _path_allowed(path: str) -> bool:
 
 def response_has_disallowed_site_paths(text: str) -> bool:
     """Bot mentioned a site path outside the public whitelist."""
+    if _INTERNAL_PATH_RE.search(text or ""):
+        return True
     for match in _ANY_SITE_PATH_RE.finditer(text or ""):
         if not _path_allowed(match.group(1)):
             return True
@@ -146,5 +152,77 @@ def triage_output_blocked(text: str, *, user_query: str = "") -> bool:
     if response_suggests_uncertainty(body):
         return True
     if response_misroutes_docs_to_catalog(body, user_query=user_query):
+        return True
+    return False
+
+
+# ── Full-mode output guard ──
+
+_SPRING_RETURN_RE = re.compile(
+    r"(?i)\b(?:пружин\w*|fail[-\s]?safe|фейл[-\s]?сейф|аварийн\w*\s+возврат)",
+)
+_SKU_RE = re.compile(
+    r"\b(?:da|sa|hv[ad]?)-?\d+(?:mu|fu|mqu)(?:24|230)?(?:-[a-z0-9/]+)?",
+    re.IGNORECASE,
+)
+_MU_SKU_RE = re.compile(r"\b(?:da|sa|hv[ad]?)-?\d+mu", re.IGNORECASE)
+_FU_SKU_RE = re.compile(r"\b(?:da|sa|hv[ad]?)-?\d+fu", re.IGNORECASE)
+_SKU_SUFFIX_24_RE = re.compile(r"\b(?:da|sa|hv[ad]?)-?\d+(?:mu|fu)24\b", re.IGNORECASE)
+_SKU_SUFFIX_230_RE = re.compile(r"\b(?:da|sa|hv[ad]?)-?\d+(?:mu|fu)230\b", re.IGNORECASE)
+_WANTS_24_RE = re.compile(r"(?i)\b(?:на\s+)?24\s*(?:в\b|v\b|volt|вольт)")
+_WANTS_230_RE = re.compile(r"(?i)\b(?:на\s+)?(?:230|220)\s*(?:в\b|v\b|volt|вольт)")
+
+
+def reply_violates_requested_specs(text: str, *, user_texts: list[str]) -> bool:
+    """Model SKU contradicts a requirement the client stated in the thread."""
+    body = (text or "").strip()
+    joined = " ".join(user_texts)
+    if _SPRING_RETURN_RE.search(joined):
+        # Просят пружинный возврат → MU (без пружины) без FU-варианта = нарушение.
+        if _MU_SKU_RE.search(body) and not _FU_SKU_RE.search(body):
+            return True
+    if _WANTS_24_RE.search(joined):
+        if _SKU_SUFFIX_230_RE.search(body) and not _SKU_SUFFIX_24_RE.search(body):
+            return True
+    if _WANTS_230_RE.search(joined):
+        if _SKU_SUFFIX_24_RE.search(body) and not _SKU_SUFFIX_230_RE.search(body):
+            return True
+    return False
+
+
+def reply_mentions_unknown_sku(text: str) -> bool:
+    """Reply names a SKU that does not exist in the packaged KB."""
+    from supportchat.gigachat.kb_text import load_kb_text
+
+    body = (text or "").strip()
+    if not body:
+        return False
+    try:
+        kb = load_kb_text().upper()
+    except Exception:  # noqa: BLE001 — без базы не блокируем ответ
+        return False
+    for match in _SKU_RE.finditer(body):
+        sku = match.group(0).upper()
+        # Вариант суффикса (-D/DS, -S/ST…) отсекаем с конца, не от серии:
+        # «HVD-6MU230-S/ST» → «HVD-6MU230», «DA6MU230-D/DS» → «DA6MU230».
+        base = re.sub(r"-[A-Z0-9/]+$", "", sku)
+        candidates = {sku, base, sku.replace("-", ""), base.replace("-", "")}
+        if not any(candidate in kb for candidate in candidates):
+            return True
+    return False
+
+
+def full_output_blocked(text: str, *, user_texts: list[str]) -> bool:
+    """Full-mode reply must not reach the client (KB grounding violated)."""
+    body = (text or "").strip()
+    if not body:
+        return True
+    if response_has_disallowed_site_paths(body):
+        return True
+    if response_has_foreign_urls(body):
+        return True
+    if reply_violates_requested_specs(body, user_texts=user_texts):
+        return True
+    if reply_mentions_unknown_sku(body):
         return True
     return False

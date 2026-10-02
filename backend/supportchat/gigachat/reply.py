@@ -30,6 +30,7 @@ from supportchat.gigachat.triage import (
 )
 from supportchat.gigachat.triage_docs import is_document_intent, triage_docs_reply
 from supportchat.gigachat.triage_guard import (
+    full_output_blocked,
     triage_greeting_reply,
     triage_output_blocked,
     uncertain_branch_reply,
@@ -59,6 +60,11 @@ _CONTINUE_BOT_REPLY = "Хорошо, продолжаем. Задайте воп
 _TURN_LIMIT_TEXT = (
     "Могу ещё подсказать раздел сайта или документацию. Для подбора привода "
     "напишите «позовите менеджера», когда будете готовы."
+)
+_SPEC_GUARD_TEXT = (
+    "Чтобы не ошибиться с точным артикулом под ваши требования, подтвердить "
+    "подбор лучше у менеджера — напишите «позовите менеджера». Или посмотрите "
+    "подходящие серии в /catalog и квиз /#podbor."
 )
 
 
@@ -236,8 +242,11 @@ def generate_ai_reply(
             payload_extra=actions_payload(manager_branch_actions()),
         )
 
+    # Ветки базы подбираем по всей переписке клиента: требования из ранних
+    # сообщений (пружинный возврат, напряжение, серия) не должны теряться.
+    retrieval_query = " ".join(m["content"] for m in history if m["role"] == "user")[-800:]
     messages: list[dict[str, str]] = [
-        {"role": "system", "content": build_system_prompt(user_query=user_query)},
+        {"role": "system", "content": build_system_prompt(user_query=retrieval_query or user_query)},
     ]
     messages.extend(history)
 
@@ -248,6 +257,17 @@ def generate_ai_reply(
             return AiReply(text=docs_fallback, escalate=False, escalation_note="")
     model_escalate = any(pattern.search(raw) for pattern in _ESCALATE_PATTERNS)
     text = _strip_escalate_marker(raw)
+    if not is_triage_mode():
+        user_texts = [m["content"] for m in history if m["role"] == "user"]
+        if full_output_blocked(text, user_texts=user_texts):
+            # Назван несуществующий/противоречивый артикул или внешняя ссылка —
+            # лучше безопасный фолбэк, чем неверный факт клиенту.
+            return AiReply(
+                text=_SPEC_GUARD_TEXT,
+                escalate=False,
+                escalation_note="",
+                payload_extra=actions_payload(call_manager_only_actions()),
+            )
     if is_triage_mode() and triage_output_blocked(text, user_query=user_query):
         if (
             product_clarification_already_sent(conversation)

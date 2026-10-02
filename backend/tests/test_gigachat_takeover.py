@@ -229,6 +229,35 @@ def test_manager_reply_timeout_default_under_minute(settings) -> None:
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("reply", "user_texts", "blocked"),
+    [
+        # Просят пружинный возврат — артикул MU (без пружины) запрещён.
+        ("Подойдёт DA6MU230-D/DS.", ["нужен привод с пружинным возвратом"], True),
+        ("Подойдёт HVD-6MU230-S/ST.", ["нужен привод с пружинным возвратом"], True),
+        ("Подойдёт DA10FU230-D/DS.", ["нужен привод с пружинным возвратом"], False),
+        # Легитимный ответ с обоими вариантами не блокируем.
+        ("Без пружины DA6MU230, с пружиной DA10FU230.", ["нужен пружинный возврат"], False),
+        # Напряжение из суффикса: 230 при запросе 24 и наоборот.
+        ("Ставьте DA10FU230-D/DS.", ["питание 24 вольта"], True),
+        ("Ставьте DA10FU24-A/AS.", ["питание 230 В"], True),
+        # Артикул, которого нет в базе знаний — галлюцинация.
+        ("Подойдёт DA99FU999-X.", ["нужна заслонка"], True),
+        # Внутренние пути репозитория и внешние ссылки.
+        ("См. /_manuals-ru/DA/fu.html", ["паспорт"], True),
+        ("См. https://belimo.com/x", ["аналог"], True),
+        # Нормальный ответ по базе.
+        ("Документация: /dokumentaciya?q=DA10FU230. Каталог /catalog.", ["нужна заслонка"], False),
+    ],
+)
+def test_full_output_guard(reply: str, user_texts: list[str], blocked: bool) -> None:
+    """Гвард full-режима: артикул из базы и соответствует требованиям клиента."""
+    from supportchat.gigachat.triage_guard import full_output_blocked
+
+    assert full_output_blocked(reply, user_texts=user_texts) is blocked
+
+
+@pytest.mark.django_db
 def test_gigachat_failure_escalates_after_retries(gigachat_on) -> None:
     """GigaChat недоступен после ретраев → статус клиенту + эскалация на людей."""
 
