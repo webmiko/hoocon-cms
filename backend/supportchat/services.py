@@ -642,6 +642,74 @@ def active_reply_templates() -> list[ReplyTemplate]:
     return list(ReplyTemplate.objects.filter(is_active=True))
 
 
+def staff_transfer_candidates(*, exclude_pk: int | None = None) -> list[AbstractBaseUser]:
+    """Active managers/admins/superusers for the «Передать» picker."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
+
+    qs = (
+        get_user_model()
+        .objects.filter(is_active=True, is_staff=True)
+        .filter(
+            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
+        )
+        .distinct()
+        .order_by("first_name", "username")
+    )
+    if exclude_pk:
+        qs = qs.exclude(pk=exclude_pk)
+    return list(qs)
+
+
+def notify_conversation_assigned(
+    conversation: Conversation,
+    target: AbstractBaseUser,
+    actor: AbstractBaseUser | None,
+) -> None:
+    """Ping the new assignee in bound messengers; the notice carries reply buttons."""
+    from social.publishers import publish_max, publish_telegram
+
+    actor_label = staff_public_name(actor)
+    label = conversation.display_name or conversation.external_user_id
+    channel_label = conversation.get_channel_display()
+    text = f"🔀 {actor_label} передал вам диалог #{conversation.pk} · {channel_label} · {label}"
+
+    from accounts.telegram_alerts import telegram_chat_id_for
+
+    chat_id = telegram_chat_id_for(target)
+    if chat_id:
+        from social.telegram_staff_reply import (
+            staff_support_alert_reply_markup,
+            store_support_alert_message_id,
+        )
+
+        result = publish_telegram(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=staff_support_alert_reply_markup(conversation.pk),
+        )
+        if result.ok and result.external_id:
+            store_support_alert_message_id(conversation.pk, chat_id, result.external_id, text)
+
+    profile = getattr(target, "max_profile", None)
+    max_user_id = (getattr(profile, "max_user_id", "") or "").strip() if profile else ""
+    if max_user_id and getattr(profile, "max_alerts_enabled", False):
+        from social.max_staff_reply import (
+            staff_support_alert_attachments,
+            store_support_alert_mid,
+        )
+
+        result = publish_max(
+            user_id=max_user_id,
+            text=text,
+            attachments=staff_support_alert_attachments(conversation.pk),
+        )
+        if result.ok and result.external_id:
+            store_support_alert_mid(conversation.pk, max_user_id, result.external_id, text)
+
+
 @transaction.atomic
 def assign_conversation(
     conversation: Conversation,

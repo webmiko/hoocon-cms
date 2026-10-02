@@ -353,19 +353,26 @@ def _ingest_support_text(
 
 
 def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult | None:
-    """Manager taps «Ответить» on a staff alert — enter reply mode."""
+    """Manager taps a staff alert button — reply / note / transfer picker."""
     from social.telegram_staff_reply import (
+        compose_staff_note_prompt,
         compose_staff_reply_prompt,
-        parse_staff_reply_callback_data,
+        parse_staff_alert_callback,
         set_pending_staff_reply,
+        staff_transfer_keyboard_markup,
         staff_user_for_telegram_chat_id,
     )
     from supportchat.models import Conversation
-    from supportchat.services import staff_public_name
+    from supportchat.services import (
+        assign_conversation,
+        notify_conversation_assigned,
+        staff_public_name,
+    )
 
-    conv_id = parse_staff_reply_callback_data(str(query.get("data") or ""))
-    if conv_id is None:
+    parsed = parse_staff_alert_callback(str(query.get("data") or ""))
+    if parsed is None:
         return None
+    action, conv_id, target_uid = parsed
     query_id = str(query.get("id") or "").strip()
     raw_from = query.get("from")
     from_user = raw_from if isinstance(raw_from, dict) else {}
@@ -380,7 +387,14 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
         return None
 
     conv = Conversation.objects.filter(pk=conv_id).select_related("assignee").first()
-    if conv is not None and conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
+    if conv is None:
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": f"Диалог #{conv_id} не найден"},
+            )
+        return None
+    if conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
         if query_id:
             telegram_api_call(
                 "answerCallbackQuery",
@@ -390,6 +404,57 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
                 },
             )
         return None
+
+    if action == "assign_to":
+        from django.contrib.auth import get_user_model
+
+        target = get_user_model().objects.filter(pk=target_uid or 0, is_active=True, is_staff=True).first()
+        if target is None:
+            if query_id:
+                telegram_api_call(
+                    "answerCallbackQuery",
+                    {"callback_query_id": query_id, "text": "Сотрудник не найден"},
+                )
+            return None
+        assign_conversation(conv, target, actor=staff_user)
+        notify_conversation_assigned(conv, target, staff_user)
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": f"Передан: {staff_public_name(target)}"},
+            )
+        message = query.get("message")
+        mid = message.get("message_id") if isinstance(message, dict) else None
+        if mid:
+            telegram_api_call(
+                "editMessageReplyMarkup",
+                {"chat_id": user_key, "message_id": mid, "reply_markup": {"inline_keyboard": []}},
+            )
+        return None
+
+    if action == "assign":
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": f"Диалог #{conv_id}"},
+            )
+        return publish_telegram(
+            chat_id=user_key,
+            text=html.escape(f"Кому передать диалог #{conv_id}?"),
+            reply_markup=staff_transfer_keyboard_markup(conv_id, exclude_pk=staff_user.pk),
+        )
+
+    if action == "note":
+        set_pending_staff_reply(user_key, conv_id, mode="note")
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": f"Диалог #{conv_id}"},
+            )
+        return publish_telegram(
+            chat_id=user_key,
+            text=html.escape(compose_staff_note_prompt(conv_id)),
+        )
 
     set_pending_staff_reply(user_key, conv_id)
     if query_id:
@@ -445,6 +510,7 @@ def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
     from social.telegram_staff_reply import (
         clear_pending_staff_reply,
         compose_staff_account_notice,
+        compose_staff_note_prompt,
         compose_staff_reply_help,
         compose_staff_reply_prompt,
         get_pending_staff_reply,
@@ -463,11 +529,12 @@ def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
     if parsed is not None:
         clear_pending_staff_reply(chat_key)
     elif resolve_menu_action(text) is None:
-        pending_id = get_pending_staff_reply(chat_key)
+        pending = get_pending_staff_reply(chat_key)
         body = (text or "").strip()
         raw = body.casefold()
-        if pending_id is not None and body and not raw.startswith("/reply"):
-            parsed = (pending_id, body)
+        if pending is not None and body and not raw.startswith("/reply"):
+            conv_id, mode = pending
+            parsed = (conv_id, f"/note {body}" if mode == "note" else body)
             clear_pending_staff_reply(chat_key)
 
     if parsed is not None:
@@ -483,9 +550,12 @@ def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
         clear_pending_staff_reply(chat_key)
         return None
 
-    pending_id = get_pending_staff_reply(chat_key)
-    if pending_id is not None:
-        return _send(compose_staff_reply_prompt(pending_id))
+    pending = get_pending_staff_reply(chat_key)
+    if pending is not None:
+        pending_conv, pending_mode = pending
+        if pending_mode == "note":
+            return _send(compose_staff_note_prompt(pending_conv))
+        return _send(compose_staff_reply_prompt(pending_conv))
 
     return _send(compose_staff_account_notice())
 

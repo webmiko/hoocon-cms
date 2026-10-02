@@ -436,3 +436,183 @@ def test_activity_with_author_schedules_superuser_crm(
     args = task.delay.call_args.args
     assert "CRM" in args[0]
     assert "Звонок" in args[1]
+
+
+@pytest.mark.django_db
+def test_telegram_alert_keyboard_has_note_and_assign_buttons() -> None:
+    """Staff alert exposes «📝 Заметка» and «🔀 Передать» next to «Ответить»."""
+    from social.telegram_staff_reply import (
+        staff_assign_callback_data,
+        staff_note_callback_data,
+        staff_support_alert_reply_markup,
+    )
+
+    buttons = staff_support_alert_reply_markup(7)["inline_keyboard"][0]
+    texts = [b["text"] for b in buttons]
+    assert "Ответить" in texts
+    assert "📝 Заметка" in texts
+    assert "🔀 Передать" in texts
+    data = {b["text"]: b.get("callback_data") for b in buttons}
+    assert data["📝 Заметка"] == staff_note_callback_data(7)
+    assert data["🔀 Передать"] == staff_assign_callback_data(7)
+
+
+@pytest.mark.django_db
+def test_staff_note_button_then_text_stores_internal_note_telegram() -> None:
+    """TG «📝 Заметка» puts the manager in note mode; next text is staff-only."""
+    from django.core.cache import cache
+
+    from social.telegram_staff_reply import staff_note_callback_data
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    cache.clear()
+    _make_manager(email="mgr-note-tg@hoocon.ru", chat_id="8101")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tg-note",
+    )
+    with (
+        patch("social.telegram_bot.telegram_api_call") as api,
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+    ):
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-note",
+                    "data": staff_note_callback_data(conv.pk),
+                    "from": {"id": 8101, "first_name": "Mgr"},
+                },
+            },
+        )
+    assert api.call_args_list[0].args[0] == "answerCallbackQuery"
+    assert "заметкой" in pub.call_args.kwargs["text"]
+
+    with (
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ),
+        patch("supportchat.tasks.deliver_outbound_message.delay") as deliver,
+    ):
+        handle_telegram_update(
+            {
+                "message": {
+                    "message_id": 21,
+                    "chat": {"id": 8101, "type": "private"},
+                    "text": "уточнить у клиента бюджет",
+                    "from": {"id": 8101, "first_name": "Mgr"},
+                },
+            },
+        )
+    deliver.assert_not_called()
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert note.body == "уточнить у клиента бюджет"
+    assert not Message.objects.filter(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+    ).exists()
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_staff_assign_to_button_reassigns_dialog_telegram() -> None:
+    """TG picker tap assigns the dialog, strips picker keyboard, pings assignee."""
+    from django.core.cache import cache
+
+    from social.telegram_staff_reply import (
+        staff_assign_callback_data,
+        staff_assign_to_callback_data,
+    )
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    cache.clear()
+    _make_manager(email="mgr-send-tg@hoocon.ru", chat_id="8201")
+    target = _make_manager(email="mgr-get-tg@hoocon.ru", chat_id="8202")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tg-assign",
+    )
+
+    # Step 1: «🔀 Передать» → colleague picker keyboard.
+    with (
+        patch("social.telegram_bot.telegram_api_call"),
+        patch(
+            "social.telegram_bot.publish_telegram",
+            return_value=PublishResult(ok=True),
+        ) as pub,
+    ):
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-pick",
+                    "data": staff_assign_callback_data(conv.pk),
+                    "from": {"id": 8201, "first_name": "Mgr"},
+                },
+            },
+        )
+    buttons = pub.call_args.kwargs["reply_markup"]["inline_keyboard"]
+    payloads = [row[0]["callback_data"] for row in buttons]
+    assert staff_assign_to_callback_data(conv.pk, target.pk) in payloads
+
+    # Step 2: tap on the colleague → assigned + picker keyboard removed.
+    with (
+        patch("social.telegram_bot.telegram_api_call") as api,
+        patch(
+            "social.publishers.publish_telegram",
+            return_value=PublishResult(ok=True, external_id="mid-8202"),
+        ) as notify,
+    ):
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-pick2",
+                    "data": staff_assign_to_callback_data(conv.pk, target.pk),
+                    "from": {"id": 8201, "first_name": "Mgr"},
+                    "message": {"message_id": 555},
+                },
+            },
+        )
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    methods = [c.args[0] for c in api.call_args_list]
+    assert "answerCallbackQuery" in methods
+    assert "editMessageReplyMarkup" in methods
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert "передан" in note.body
+    assert notify.call_args.kwargs["chat_id"] == "8202"
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_note_button_on_taken_dialog_is_rejected_telegram() -> None:
+    """TG «📝 Заметка» on a dialog taken by someone else is refused."""
+    from social.telegram_staff_reply import staff_note_callback_data
+    from supportchat.models import Channel, Conversation
+
+    owner = _make_manager(email="mgr-own-tg@hoocon.ru", chat_id="8301")
+    _make_manager(email="mgr-late-tg@hoocon.ru", chat_id="8302")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-tg-taken-note",
+        assignee=owner,
+    )
+    with (
+        patch("social.telegram_bot.telegram_api_call") as api,
+        patch("social.telegram_bot.publish_telegram") as pub,
+    ):
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-taken",
+                    "data": staff_note_callback_data(conv.pk),
+                    "from": {"id": 8302, "first_name": "Mgr"},
+                },
+            },
+        )
+    answer = api.call_args_list[0]
+    assert answer.args[0] == "answerCallbackQuery"
+    assert "уже взял" in answer.args[1]["text"]
+    pub.assert_not_called()

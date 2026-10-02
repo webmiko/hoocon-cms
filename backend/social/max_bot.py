@@ -365,6 +365,7 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     from social.max_staff_reply import (
         clear_pending_staff_reply,
         compose_staff_account_notice,
+        compose_staff_note_prompt,
         compose_staff_reply_help,
         compose_staff_reply_prompt,
         get_pending_staff_reply,
@@ -381,11 +382,12 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
     if parsed is not None:
         clear_pending_staff_reply(user_key)
     elif resolve_menu_action(text) is None:
-        pending_id = get_pending_staff_reply(user_key)
+        pending = get_pending_staff_reply(user_key)
         body = (text or "").strip()
         raw = body.casefold()
-        if pending_id is not None and body and not raw.startswith("/reply"):
-            parsed = (pending_id, body)
+        if pending is not None and body and not raw.startswith("/reply"):
+            conv_id, mode = pending
+            parsed = (conv_id, f"/note {body}" if mode == "note" else body)
             clear_pending_staff_reply(user_key)
 
     if parsed is not None:
@@ -401,9 +403,12 @@ def _try_staff_max_reply(user_key: str, text: str) -> PublishResult | None:
         clear_pending_staff_reply(user_key)
         return None
 
-    pending_id = get_pending_staff_reply(user_key)
-    if pending_id is not None:
-        return _send_to_user(user_key, compose_staff_reply_prompt(pending_id))
+    pending = get_pending_staff_reply(user_key)
+    if pending is not None:
+        pending_conv, pending_mode = pending
+        if pending_mode == "note":
+            return _send_to_user(user_key, compose_staff_note_prompt(pending_conv))
+        return _send_to_user(user_key, compose_staff_reply_prompt(pending_conv))
 
     return _send_to_user(user_key, compose_staff_account_notice())
 
@@ -605,9 +610,11 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
     callback_id = str(callback.get("callback_id") or "").strip()
 
     from social.max_staff_reply import (
+        compose_staff_note_prompt,
         compose_staff_reply_prompt,
-        parse_staff_reply_callback_payload,
+        parse_staff_alert_callback,
         set_pending_staff_reply,
+        staff_transfer_keyboard_attachments,
         staff_user_for_max_user_id,
     )
     from social.publishers import answer_max_callback
@@ -618,9 +625,10 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         _handle_rating_callback(user_key, callback_id, *rating)
         return None
 
-    conv_id = parse_staff_reply_callback_payload(payload)
-    if conv_id is None:
+    parsed = parse_staff_alert_callback(payload)
+    if parsed is None:
         return None
+    action, conv_id, target_uid = parsed
 
     staff_user = staff_user_for_max_user_id(user_key)
     if staff_user is None:
@@ -629,16 +637,62 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         return None
 
     from supportchat.models import Conversation
-    from supportchat.services import staff_public_name
+    from supportchat.services import (
+        assign_conversation,
+        notify_conversation_assigned,
+        staff_public_name,
+    )
 
     conv = Conversation.objects.filter(pk=conv_id).select_related("assignee").first()
-    if conv is not None and conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
+    if conv is None:
+        if callback_id:
+            answer_max_callback(callback_id, notification=f"Диалог #{conv_id} не найден")
+        return None
+    if conv.assignee_id is not None and conv.assignee_id != staff_user.pk:
         if callback_id:
             answer_max_callback(
                 callback_id,
                 notification=f"Диалог уже взял {staff_public_name(conv.assignee)}",
             )
         return None
+
+    if action == "assign_to":
+        from django.contrib.auth import get_user_model
+
+        target = get_user_model().objects.filter(pk=target_uid or 0, is_active=True, is_staff=True).first()
+        if target is None:
+            if callback_id:
+                answer_max_callback(callback_id, notification="Сотрудник не найден")
+            return None
+        assign_conversation(conv, target, actor=staff_user)
+        notify_conversation_assigned(conv, target, staff_user)
+        if callback_id:
+            answer_max_callback(
+                callback_id,
+                notification=f"Передан: {staff_public_name(target)}",
+            )
+        return _send_to_user(
+            user_key,
+            f"Диалог #{conv_id} передан: {staff_public_name(target)}",
+        )
+
+    if action == "assign":
+        if callback_id:
+            answer_max_callback(callback_id, notification=f"Диалог #{conv_id}")
+        return _send_to_user(
+            user_key,
+            f"Кому передать диалог #{conv_id}?",
+            attachments=staff_transfer_keyboard_attachments(
+                conv_id,
+                exclude_pk=staff_user.pk,
+            ),
+        )
+
+    if action == "note":
+        set_pending_staff_reply(user_key, conv_id, mode="note")
+        if callback_id:
+            answer_max_callback(callback_id, notification=f"Диалог #{conv_id}")
+        return _send_to_user(user_key, compose_staff_note_prompt(conv_id))
 
     set_pending_staff_reply(user_key, conv_id)
     if callback_id:

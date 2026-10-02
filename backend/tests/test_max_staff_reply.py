@@ -549,3 +549,246 @@ def test_max_attachment_download_failure_still_ingests_text() -> None:
     )
     assert msg.body == "вот файл"
     assert not msg.attachment
+
+
+@pytest.mark.django_db
+def test_staff_alert_keyboard_has_note_and_assign_buttons() -> None:
+    """Staff alert exposes «📝 Заметка» and «🔀 Передать» next to «Ответить»."""
+    from social.max_staff_reply import (
+        staff_assign_callback_payload,
+        staff_note_callback_payload,
+    )
+
+    attachments = staff_support_alert_attachments(7)
+    buttons = attachments[0]["payload"]["buttons"][0]
+    texts = [btn["text"] for btn in buttons if btn["type"] == "callback"]
+    assert "Ответить" in texts
+    assert "📝 Заметка" in texts
+    assert "🔀 Передать" in texts
+    payloads = {btn["text"]: btn["payload"] for btn in buttons if btn["type"] == "callback"}
+    assert payloads["📝 Заметка"] == staff_note_callback_payload(7)
+    assert payloads["🔀 Передать"] == staff_assign_callback_payload(7)
+
+
+@pytest.mark.django_db
+def test_staff_note_button_then_text_stores_internal_note() -> None:
+    """«📝 Заметка» puts the manager in note mode; next text is staff-only."""
+    from django.core.cache import cache
+
+    from social.max_staff_reply import staff_note_callback_payload
+
+    cache.clear()
+    _make_manager(email="mgr-note-btn@hoocon.ru", max_user_id="920")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-note-btn",
+    )
+    with (
+        patch(
+            "social.max_bot.publish_max",
+            return_value=PublishResult(ok=True),
+        ) as staff_pub,
+        patch(
+            "social.publishers.answer_max_callback",
+            return_value=PublishResult(ok=True),
+        ),
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "callback_id": "cb.note",
+                    "payload": staff_note_callback_payload(conv.pk),
+                    "user": {"user_id": 920, "first_name": "Mgr", "is_bot": False},
+                },
+            },
+        )
+    assert "заметкой" in staff_pub.call_args.kwargs["text"]
+
+    with (
+        patch(
+            "social.max_bot.publish_max",
+            return_value=PublishResult(ok=True),
+        ),
+        patch("supportchat.tasks.deliver_outbound_message.delay") as deliver,
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_created",
+                "message": {
+                    "sender": {"user_id": 920, "first_name": "Mgr", "is_bot": False},
+                    "recipient": {"chat_type": "dialog"},
+                    "body": {"mid": "mid.note-btn", "text": "перезвонить после обеда"},
+                },
+            },
+        )
+    deliver.assert_not_called()
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert note.body == "перезвонить после обеда"
+    assert not Message.objects.filter(
+        conversation=conv,
+        direction=MessageDirection.OUTBOUND,
+    ).exists()
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_staff_assign_button_shows_colleague_picker() -> None:
+    """«🔀 Передать» sends a colleague picker keyboard to the manager."""
+    from django.core.cache import cache
+
+    from social.max_staff_reply import (
+        parse_staff_alert_callback,
+        staff_assign_callback_payload,
+    )
+
+    cache.clear()
+    _make_manager(email="mgr-pick@hoocon.ru", max_user_id="930")
+    colleague = _make_manager(email="colleague@hoocon.ru", max_user_id="931")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-pick",
+    )
+    with (
+        patch(
+            "social.max_bot.publish_max",
+            return_value=PublishResult(ok=True),
+        ) as staff_pub,
+        patch(
+            "social.publishers.answer_max_callback",
+            return_value=PublishResult(ok=True),
+        ),
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "callback_id": "cb.assign",
+                    "payload": staff_assign_callback_payload(conv.pk),
+                    "user": {"user_id": 930, "first_name": "Mgr", "is_bot": False},
+                },
+            },
+        )
+    call = staff_pub.call_args.kwargs
+    assert f"#{conv.pk}" in call["text"]
+    buttons = call["attachments"][0]["payload"]["buttons"]
+    payloads = [row[0]["payload"] for row in buttons]
+    parsed = [parse_staff_alert_callback(p) for p in payloads]
+    assert ("assign_to", conv.pk, colleague.pk) in parsed
+    assert all(p[2] != 930 for p in parsed if p)  # presser excluded
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_staff_assign_to_button_reassigns_dialog() -> None:
+    """Picking a colleague assigns the dialog and notifies the assignee."""
+    from django.core.cache import cache
+
+    from social.max_staff_reply import staff_assign_to_callback_payload
+
+    cache.clear()
+    _make_manager(email="mgr-send@hoocon.ru", max_user_id="940")
+    target = _make_manager(email="mgr-get@hoocon.ru", max_user_id="941")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-assign-to",
+    )
+    with (
+        patch(
+            "social.publishers.publish_max",
+            return_value=PublishResult(ok=True, external_id="mid-941"),
+        ) as notify,
+        patch(
+            "social.max_bot.publish_max",
+            return_value=PublishResult(ok=True),
+        ) as staff_pub,
+        patch(
+            "social.publishers.answer_max_callback",
+            return_value=PublishResult(ok=True),
+        ) as answer,
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "callback_id": "cb.assign-to",
+                    "payload": staff_assign_to_callback_payload(conv.pk, target.pk),
+                    "user": {"user_id": 940, "first_name": "Mgr", "is_bot": False},
+                },
+            },
+        )
+    conv.refresh_from_db()
+    assert conv.assignee_id == target.pk
+    assert "Передан" in answer.call_args.kwargs["notification"]
+    assert "передан" in staff_pub.call_args.kwargs["text"]
+    note = Message.objects.get(conversation=conv, direction=MessageDirection.NOTE)
+    assert "передан" in note.body
+    # Assignee ping went to their MAX with reply buttons.
+    assert notify.call_args.kwargs["user_id"] == "941"
+    assert notify.call_args.kwargs["attachments"]
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_note_button_on_taken_dialog_is_rejected() -> None:
+    """«📝 Заметка» on a dialog taken by someone else is refused."""
+    from social.max_staff_reply import staff_note_callback_payload
+
+    owner = _make_manager(email="mgr-own2@hoocon.ru", max_user_id="950")
+    _make_manager(email="mgr-late2@hoocon.ru", max_user_id="951")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-taken-note",
+        assignee=owner,
+    )
+    with (
+        patch(
+            "social.publishers.answer_max_callback",
+            return_value=PublishResult(ok=True),
+        ) as answer,
+        patch("social.max_bot._send_to_user") as send,
+    ):
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "user": {"user_id": 951},
+                    "payload": staff_note_callback_payload(conv.pk),
+                    "callback_id": "cb-taken-note",
+                },
+            },
+        )
+    assert "уже взял" in answer.call_args.kwargs["notification"]
+    send.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_assign_to_button_on_taken_dialog_is_rejected() -> None:
+    """Stale transfer picker tap after the dialog was taken is refused."""
+    from social.max_staff_reply import staff_assign_to_callback_payload
+
+    owner = _make_manager(email="mgr-own3@hoocon.ru", max_user_id="960")
+    _make_manager(email="mgr-late3@hoocon.ru", max_user_id="961")
+    third = _make_manager(email="mgr-third@hoocon.ru", max_user_id="962")
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="web-taken-assign",
+        assignee=owner,
+    )
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ) as answer:
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "user": {"user_id": 961},
+                    "payload": staff_assign_to_callback_payload(conv.pk, third.pk),
+                    "callback_id": "cb-taken-assign",
+                },
+            },
+        )
+    assert "уже взял" in answer.call_args.kwargs["notification"]
+    conv.refresh_from_db()
+    assert conv.assignee_id == owner.pk
