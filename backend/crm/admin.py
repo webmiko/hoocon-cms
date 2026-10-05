@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.db.models import F, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
@@ -24,6 +24,7 @@ from crm.services import (
 )
 from leads.models import Lead
 from leads.services import lead_visible_to_manager, scope_leads_for_manager
+from supportchat.models import Conversation
 
 
 def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
@@ -82,6 +83,10 @@ class ActivityInline(TabularInline):
             kwargs["queryset"] = _scoped_lead_queryset(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Activity]:
+        """Prefetch lead/author on the client card timeline."""
+        return super().get_queryset(request).select_related("lead", "author")
+
 
 class EmailMessageInline(TabularInline):
     """Recent emails on a Client card (read-mostly)."""
@@ -104,6 +109,41 @@ class EmailMessageInline(TabularInline):
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         """Compose via «Написать письмо», not inline add."""
         return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EmailMessage]:
+        """Prefetch lead link on the client card inline."""
+        return super().get_queryset(request).select_related("lead")
+
+
+class ConversationInline(TabularInline):
+    """Support chat dialogs linked to this client (read-mostly)."""
+
+    model = Conversation
+    extra = 0
+    fields = (
+        "channel",
+        "status",
+        "display_name",
+        "contact_email",
+        "staff_unread_count",
+        "assignee",
+        "last_message_at",
+    )
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    max_num = 20
+    ordering = (F("last_message_at").desc(nulls_last=True), "-id")
+    verbose_name = "диалог поддержки"
+    verbose_name_plural = "диалоги поддержки"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Conversations come from the widget/messengers, not manual add."""
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Conversation]:
+        """Prefetch assignee for the inline rows."""
+        return super().get_queryset(request).select_related("assignee")
 
 
 @admin.register(Client)
@@ -129,7 +169,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     search_fields = ("email", "name", "company", "phone", "notes")
     autocomplete_fields = ("assignee",)
     readonly_fields = ("created_at", "updated_at", "leads_count", "company_key")
-    inlines = (LeadInline, ActivityInline, EmailMessageInline)
+    inlines = (LeadInline, ActivityInline, EmailMessageInline, ConversationInline)
     ordering = ("email", "name", "company")
     fieldsets = (
         (
