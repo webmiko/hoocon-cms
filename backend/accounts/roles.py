@@ -49,7 +49,12 @@ _CATALOG_MODELS: Final[tuple[str, ...]] = (
     "productimage",
 )
 _CONTENT_MODELS: Final[tuple[str, ...]] = ("page", "article", "news")
-_CRM_MODELS: Final[tuple[str, ...]] = ("client", "activity", "emailmessage")
+_CRM_MODELS: Final[tuple[str, ...]] = (
+    "client",
+    "activity",
+    "emailmessage",
+    "emailtemplate",
+)
 
 
 def _perms(

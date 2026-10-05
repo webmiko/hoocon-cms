@@ -14,6 +14,7 @@ from leads.models import Lead
 from leads.services import (
     assign_lead_on_create,
     assign_lead_round_robin,
+    company_owner_assignee,
     is_aterna_company,
     lookup_aterna_assignee,
     manager_rotation_queryset,
@@ -414,3 +415,95 @@ def test_api_assign_sales_sets_assignee(client) -> None:
     lead = Lead.objects.get(pk=response.json()["id"])
     assert lead.assignee_id == mgr.pk
     mock_task.delay.assert_called_once_with(lead.pk)
+
+
+@pytest.mark.django_db
+def test_company_owner_matches_spelling_variants() -> None:
+    """Client.company_key makes «ООО "Ромашка"» and «ооо  ромашка» one match."""
+    from crm.models import Client as CrmClient
+
+    mgr = _make_manager(username="owner-var", email="owner-var@hoocon.ru")
+    CrmClient.objects.create(
+        name="Иван",
+        email="ivan@romashka.example.com",
+        company="ООО «Ромашка»",
+        assignee=mgr,
+    )
+    pick = company_owner_assignee('  ооо  "ромашка" ')
+    assert pick is not None
+    assert pick.pk == mgr.pk
+
+
+@pytest.mark.django_db
+def test_company_owner_prefers_lead_own_client_card() -> None:
+    """Lead's linked client assignee wins over earlier claims of the company."""
+    from crm.models import Client as CrmClient
+
+    mgr_old = _make_manager(username="owner-old", email="owner-old@hoocon.ru")
+    mgr_new = _make_manager(username="owner-new", email="owner-new@hoocon.ru")
+    CrmClient.objects.create(
+        name="Ранняя карточка",
+        email="first@vector.example.com",
+        company="ООО Вектор",
+        assignee=mgr_old,
+    )
+    lead = Lead.objects.create(
+        name="Пётр",
+        email="p@vector.example.com",
+        company="ООО Вектор",
+        message="x" * 20,
+    )
+    lead.refresh_from_db()
+    own_client = lead.client
+    assert own_client is not None
+    own_client.assignee = mgr_new
+    own_client.save()
+    pick = company_owner_assignee("ооо вектор", client=own_client)
+    assert pick is not None
+    assert pick.pk == mgr_new.pk
+    # Without the own-card hint the earliest claim still wins.
+    pick_default = company_owner_assignee("ооо вектор")
+    assert pick_default is not None
+    assert pick_default.pk == mgr_old.pk
+
+
+@pytest.mark.django_db
+def test_company_owner_skips_inactive_assignee() -> None:
+    """Card pinned to an inactive manager does not claim the company."""
+    from crm.models import Client as CrmClient
+
+    mgr = _make_manager(username="owner-off", email="owner-off@hoocon.ru")
+    mgr.is_active = False
+    mgr.save(update_fields=["is_active"])
+    CrmClient.objects.create(
+        name="Неактивный",
+        email="inactive-owner@example.com",
+        company="ООО Неактив",
+        assignee=mgr,
+    )
+    assert company_owner_assignee("ООО Неактив") is None
+
+
+@pytest.mark.django_db
+def test_company_owner_assignee_is_single_query(django_assert_num_queries) -> None:
+    """Indexed company_key lookup — no Python scan over all assigned cards."""
+    from crm.models import Client as CrmClient
+
+    mgr = _make_manager(username="owner-perf", email="owner-perf@hoocon.ru")
+    for i in range(30):
+        CrmClient.objects.create(
+            name=f"Сторонняя {i}",
+            email=f"perf{i}@example.com",
+            company=f"Сторонняя {i}",
+            assignee=mgr,
+        )
+    CrmClient.objects.create(
+        name="Цель",
+        email="target@example.com",
+        company="ООО Цель",
+        assignee=mgr,
+    )
+    with django_assert_num_queries(1):
+        pick = company_owner_assignee("ООО «Цель»")
+    assert pick is not None
+    assert pick.pk == mgr.pk

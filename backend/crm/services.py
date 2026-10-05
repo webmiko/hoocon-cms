@@ -17,6 +17,7 @@ from crm.models import (
     EmailDirection,
     EmailMessage,
     EmailStatus,
+    EmailTemplate,
 )
 from leads.models import Lead
 
@@ -372,3 +373,63 @@ def scope_emails_for_manager(
 
     client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
     return queryset.filter(client_id__in=client_ids)
+
+
+def get_active_email_template(template_id: str | int | None) -> EmailTemplate | None:
+    """Active EmailTemplate picked in a compose form (``?template=<pk>``).
+
+    Args:
+        template_id: raw GET/POST value (str/int/None).
+
+    Returns:
+        EmailTemplate instance or None when missing/inactive/malformed.
+    """
+    raw = str(template_id or "").strip()
+    if not raw.isdigit():
+        return None
+    return EmailTemplate.objects.filter(pk=int(raw), is_active=True).first()
+
+
+def email_template_context_for_client(client: Client) -> dict[str, str]:
+    """Placeholder values for template substitution from a Client card."""
+    return {
+        "имя": client.name or "",
+        "компания": client.company or "",
+        "почта": client.email or "",
+        "телефон": client.phone or "",
+    }
+
+
+def email_template_context_for_lead(lead: Lead) -> dict[str, str]:
+    """Placeholder values for template substitution from a Lead contact."""
+    return {
+        "имя": lead.name or "",
+        "компания": lead.company or "",
+        "почта": lead.email or "",
+        "телефон": lead.phone or "",
+    }
+
+
+def render_email_template(
+    template: EmailTemplate,
+    *,
+    context: dict[str, str],
+) -> tuple[str, str]:
+    """Substitute ``{имя}``/``{компания}``/``{почта}``/``{телефон}`` placeholders.
+
+    Plain ``str.replace`` — unknown placeholders and stray braces are kept
+    as-is (no ``format()`` crash on user-edited text).
+
+    Args:
+        template: EmailTemplate with subject/body.
+        context: placeholder → value mapping (see ``email_template_context_*``).
+
+    Returns:
+        ``(subject, body)`` with placeholders substituted.
+    """
+    subject, body = template.subject, template.body
+    for key, value in context.items():
+        token = "{" + key + "}"
+        subject = subject.replace(token, value)
+        body = body.replace(token, value)
+    return subject.strip(), body.strip()

@@ -36,6 +36,18 @@ class Client(models.Model):
         default="",
         db_index=True,
     )
+    company_key: models.CharField = models.CharField(
+        "ключ компании",
+        max_length=200,
+        blank=True,
+        default="",
+        editable=False,
+        db_index=True,
+        help_text=(
+            "Нормализованный ключ совпадения компании (как у закреплённых "
+            "правил менеджеров). Заполняется автоматически."
+        ),
+    )
     notes: models.TextField = models.TextField(
         "заметки",
         blank=True,
@@ -68,8 +80,11 @@ class Client(models.Model):
         ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Normalize email before save (unique key is lowercase)."""
+        """Normalize email (unique key) and company_key (routing match)."""
+        from leads.services import normalize_company_label
+
         self.email = (self.email or "").strip().lower()
+        self.company_key = normalize_company_label(self.company)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -250,3 +265,50 @@ class EmailMessage(models.Model):
         self.status = EmailStatus.FAILED
         self.error_message = error[:2000]
         self.save(update_fields=["status", "error_message"])
+
+
+class EmailTemplate(models.Model):
+    """Reusable subject/body preset for CRM compose forms.
+
+    Placeholders ``{имя}``, ``{компания}``, ``{почта}``, ``{телефон}`` are
+    substituted from the client card / lead contact when the template is
+    applied (see ``crm.services.render_email_template``).
+    """
+
+    name: models.CharField = models.CharField(
+        "название",
+        max_length=200,
+        help_text="Например: «Запрос реквизитов», «Напоминание о КП».",
+    )
+    subject: models.CharField = models.CharField(
+        "тема",
+        max_length=300,
+        blank=True,
+        default="",
+        help_text="Плейсхолдеры {имя}, {компания}, {почта}, {телефон} подставляются автоматически.",
+    )
+    body: models.TextField = models.TextField(
+        "текст письма",
+        max_length=20000,
+        help_text="Плейсхолдеры {имя}, {компания}, {почта}, {телефон} подставляются автоматически.",
+    )
+    is_active: models.BooleanField = models.BooleanField(
+        "активен",
+        default=True,
+        db_index=True,
+    )
+    sort_order: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
+        "порядок",
+        default=0,
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "шаблон письма"
+        verbose_name_plural = "шаблоны писем"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        """Template name for Admin lists."""
+        return self.name

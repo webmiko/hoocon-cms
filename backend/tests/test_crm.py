@@ -350,6 +350,45 @@ def test_client_email_unique_normalized() -> None:
         Client.objects.create(name="B", email="unique@example.com")
 
 
+@pytest.mark.django_db
+def test_client_company_key_normalized_on_save() -> None:
+    """company_key mirrors normalize_company_label («ООО "Ромашка"» → «ооо ромашка»)."""
+    client_obj = Client.objects.create(
+        name="Иван",
+        email="company-key@example.com",
+        company="  ООО «Ромашка» ",
+    )
+    assert client_obj.company_key == "ооо ромашка"
+    client_obj.company = 'ООО   "Лютик"'
+    client_obj.save()
+    assert client_obj.company_key == "ооо лютик"
+
+
+@pytest.mark.django_db
+def test_client_change_form_lists_support_conversations(client, django_user_model) -> None:
+    """Linked supportchat dialogs render on the client card (read-only inline)."""
+    from supportchat.models import Conversation
+
+    user = django_user_model.objects.create_user(
+        username="crm-conv-inline",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Пётр", email="conv@example.com")
+    Conversation.objects.create(
+        channel="web",
+        external_user_id="sess-conv-inline-1",
+        display_name="Пётр с сайта",
+        client=crm_client,
+    )
+    client.force_login(user)
+    url = reverse("admin:crm_client_change", args=[crm_client.pk])
+    html = client.get(url).content.decode()
+    assert "диалоги поддержки" in html.lower()
+    assert "Пётр с сайта" in html
+
+
 @pytest.mark.django_db(transaction=True)
 def test_email_admin_queue_send_skips_already_queued(
     client,

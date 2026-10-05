@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from typing import cast
+from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
@@ -50,8 +50,13 @@ from crm.mail_links import (
     staff_reply_to_email,
 )
 from crm.manager_signatures import manager_reply_signature
-from crm.models import EmailStatus
-from crm.services import create_lead_reply_email
+from crm.models import EmailStatus, EmailTemplate
+from crm.services import (
+    create_lead_reply_email,
+    email_template_context_for_lead,
+    get_active_email_template,
+    render_email_template,
+)
 from leads.models import CompanyManagerRule, Lead, LeadItem
 from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
@@ -85,6 +90,26 @@ class LeadItemInlineFormSet(helpers.InlineAdminFormSet):
         if add_text:
             payload["options"]["addText"] = str(add_text)
         return json.dumps(payload, ensure_ascii=False)
+
+
+class OverdueLeadFilter(admin.SimpleListFilter):
+    """New leads past the first-response SLA (working hours)."""
+
+    title = _("SLA первого ответа")
+    parameter_name = "sla_overdue"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """Single «Просрочено» option (empty value = filter off)."""
+        return [("yes", "Просрочено")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Lead]) -> QuerySet[Lead]:
+        """Keep only overdue new leads when the filter is on."""
+        if self.value() != "yes":
+            return queryset
+        from leads.sla import overdue_new_leads
+
+        ids = [lead.pk for lead in overdue_new_leads(queryset)]
+        return queryset.filter(pk__in=ids)
 
 
 class LeadItemInline(TabularInline):
@@ -129,6 +154,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "company",
         ("rfq_bundle_root", admin.EmptyFieldListFilter),
         ("seen_at", admin.EmptyFieldListFilter),
+        OverdueLeadFilter,
         "created_at",
     )
     search_fields = (
@@ -548,6 +574,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         change_url = reverse("admin:leads_lead_change", args=[lead.pk])
         author = request.user if request.user.is_authenticated else None
         manager_email = staff_reply_to_email(author)
+        template = get_active_email_template(request.GET.get("template"))
 
         if request.method == "POST":
             form = ComposeEmailForm(request.POST)
@@ -575,14 +602,22 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                     )
                 return HttpResponseRedirect(change_url)
         else:
-            form = ComposeEmailForm(
-                initial={
-                    "to_email": lead.email,
-                    "subject": format_lead_reply_subject(lead),
-                    "body": format_lead_reply_body(lead),
-                    "send_now": True,
-                },
-            )
+            initial = {
+                "to_email": lead.email,
+                "subject": format_lead_reply_subject(lead),
+                "body": format_lead_reply_body(lead),
+                "send_now": True,
+            }
+            if template is not None:
+                tpl_subject, tpl_body = render_email_template(
+                    template,
+                    context=email_template_context_for_lead(lead),
+                )
+                if tpl_subject:
+                    initial["subject"] = tpl_subject
+                if tpl_body:
+                    initial["body"] = tpl_body
+            form = ComposeEmailForm(initial=initial)
 
         context = {
             **self.admin_site.each_context(request),
@@ -594,6 +629,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             "manager_reply_to_email": manager_email,
             "manager_signature_preview": manager_reply_signature(manager_email),
             "lead_change_url": change_url,
+            "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
+            "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/leads/compose_reply.html", context)
 

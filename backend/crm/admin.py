@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.db.models import F, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
@@ -15,15 +15,19 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin
 from crm.forms import ComposeEmailForm
-from crm.models import Activity, Client, EmailMessage, EmailStatus
+from crm.models import Activity, Client, EmailMessage, EmailStatus, EmailTemplate
 from crm.services import (
     create_outbound_email,
+    email_template_context_for_client,
+    get_active_email_template,
+    render_email_template,
     scope_activities_for_manager,
     scope_clients_for_manager,
     scope_emails_for_manager,
 )
 from leads.models import Lead
 from leads.services import lead_visible_to_manager, scope_leads_for_manager
+from supportchat.models import Conversation
 
 
 def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
@@ -82,6 +86,10 @@ class ActivityInline(TabularInline):
             kwargs["queryset"] = _scoped_lead_queryset(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Activity]:
+        """Prefetch lead/author on the client card timeline."""
+        return super().get_queryset(request).select_related("lead", "author")
+
 
 class EmailMessageInline(TabularInline):
     """Recent emails on a Client card (read-mostly)."""
@@ -104,6 +112,41 @@ class EmailMessageInline(TabularInline):
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         """Compose via «Написать письмо», not inline add."""
         return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EmailMessage]:
+        """Prefetch lead link on the client card inline."""
+        return super().get_queryset(request).select_related("lead")
+
+
+class ConversationInline(TabularInline):
+    """Support chat dialogs linked to this client (read-mostly)."""
+
+    model = Conversation
+    extra = 0
+    fields = (
+        "channel",
+        "status",
+        "display_name",
+        "contact_email",
+        "staff_unread_count",
+        "assignee",
+        "last_message_at",
+    )
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    max_num = 20
+    ordering = (F("last_message_at").desc(nulls_last=True), "-id")
+    verbose_name = "диалог поддержки"
+    verbose_name_plural = "диалоги поддержки"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Conversations come from the widget/messengers, not manual add."""
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Conversation]:
+        """Prefetch assignee for the inline rows."""
+        return super().get_queryset(request).select_related("assignee")
 
 
 @admin.register(Client)
@@ -128,8 +171,8 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_filter = ("is_active", "assignee", "company", "updated_at")
     search_fields = ("email", "name", "company", "phone", "notes")
     autocomplete_fields = ("assignee",)
-    readonly_fields = ("created_at", "updated_at", "leads_count")
-    inlines = (LeadInline, ActivityInline, EmailMessageInline)
+    readonly_fields = ("created_at", "updated_at", "leads_count", "company_key")
+    inlines = (LeadInline, ActivityInline, EmailMessageInline, ConversationInline)
     ordering = ("email", "name", "company")
     fieldsets = (
         (
@@ -149,7 +192,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Метаданные",
             {
-                "fields": ("leads_count", "created_at", "updated_at"),
+                "fields": ("leads_count", "company_key", "created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),
@@ -249,6 +292,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         if not self.has_change_permission(request, client):
             raise PermissionDenied
         change_url = reverse("admin:crm_client_change", args=[client.pk])
+        template = get_active_email_template(request.GET.get("template"))
 
         if request.method == "POST":
             form = ComposeEmailForm(request.POST)
@@ -276,14 +320,18 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                     )
                 return HttpResponseRedirect(change_url)
         else:
-            form = ComposeEmailForm(
-                initial={
-                    "to_email": client.email,
-                    "subject": "",
-                    "body": "",
-                    "send_now": True,
-                },
-            )
+            initial: dict[str, Any] = {
+                "to_email": client.email,
+                "subject": "",
+                "body": "",
+                "send_now": True,
+            }
+            if template is not None:
+                initial["subject"], initial["body"] = render_email_template(
+                    template,
+                    context=email_template_context_for_client(client),
+                )
+            form = ComposeEmailForm(initial=initial)
 
         context = {
             **self.admin_site.each_context(request),
@@ -292,6 +340,8 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": _("Написать письмо: %(name)s") % {"name": client.name},
             "form": form,
             "media": self.media,
+            "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
+            "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/crm/compose_email.html", context)
 
@@ -495,3 +545,33 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
         became_queued = obj.status == EmailStatus.QUEUED and (not change or previous_status != EmailStatus.QUEUED)
         if became_queued:
             enqueue_crm_email(obj.pk)
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(ModelAdmin):
+    """Reusable email presets: picked via «Шаблон» on compose forms."""
+
+    list_display = ("name", "subject", "is_active", "sort_order", "updated_at")
+    list_editable = ("is_active", "sort_order")
+    list_filter = ("is_active",)
+    search_fields = ("name", "subject", "body")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("sort_order", "name")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("name", "is_active", "sort_order", "subject", "body"),
+                "description": (
+                    "Плейсхолдеры {имя}, {компания}, {почта}, {телефон} подставляются из карточки клиента или заявки."
+                ),
+            },
+        ),
+        (
+            "Метаданные",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
