@@ -37,10 +37,17 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
     can_analytics = user.has_perm("analytics.view_pagedailystat")
     since = timezone.now() - timedelta(days=_STATS_DAYS)
 
+    overdue_sla = 0
+    if can_leads:
+        from leads.sla import overdue_new_leads
+
+        overdue_sla = len(overdue_new_leads(_scoped_leads(user)))
+
     notifications = _build_notifications(
         user=user,
         can_leads=can_leads,
         can_crm=can_crm,
+        overdue_sla=overdue_sla,
     )
     cards = _build_stat_cards(
         user=user,
@@ -48,6 +55,7 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
         can_crm=can_crm,
         can_analytics=can_analytics,
         since=since,
+        overdue_sla=overdue_sla,
     )
     chart = _build_status_chart(user=user) if can_leads else []
 
@@ -101,14 +109,26 @@ def _build_notifications(
     user: Any,
     can_leads: bool,
     can_crm: bool,
+    overdue_sla: int,
 ) -> list[dict[str, Any]]:
     """Unread / attention items for the alerts strip (scoped KPIs)."""
     items: list[dict[str, Any]] = []
     if can_leads:
         from leads.models import Lead
         from leads.services import count_new_leads, new_leads_changelist_url
+        from leads.sla import LEAD_RESPONSE_SLA
 
         scoped = _scoped_leads(user)
+        if overdue_sla:
+            sla_hours = int(LEAD_RESPONSE_SLA.total_seconds() // 3600)
+            items.append(
+                {
+                    "level": "danger",
+                    "title": f"Просрочен первый ответ: {overdue_sla}",
+                    "hint": (f"Новые заявки ждут дольше {sla_hours} рабочих часов — сайт обещает ответ быстрее."),
+                    "url": reverse("admin:leads_lead_changelist") + "?status__exact=new&sla_overdue=yes",
+                },
+            )
         unread = count_new_leads(user=user)
         if unread:
             items.append(
@@ -184,6 +204,7 @@ def _build_stat_cards(
     can_crm: bool,
     can_analytics: bool,
     since: Any,
+    overdue_sla: int,
 ) -> list[dict[str, Any]]:
     """KPI tiles for the dashboard grid (scoped for managers)."""
     cards: list[dict[str, Any]] = []
@@ -199,6 +220,12 @@ def _build_stat_cards(
                     "value": count_new_leads(user=user),
                     "accent": True,
                     "url": reverse("admin:leads_lead_changelist"),
+                },
+                {
+                    "label": "Просрочено SLA",
+                    "value": overdue_sla,
+                    "accent": overdue_sla > 0,
+                    "url": reverse("admin:leads_lead_changelist") + "?status__exact=new&sla_overdue=yes",
                 },
                 {
                     "label": "Новые",

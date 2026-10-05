@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from typing import cast
+from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
@@ -87,6 +87,26 @@ class LeadItemInlineFormSet(helpers.InlineAdminFormSet):
         return json.dumps(payload, ensure_ascii=False)
 
 
+class OverdueLeadFilter(admin.SimpleListFilter):
+    """New leads past the first-response SLA (working hours)."""
+
+    title = _("SLA первого ответа")
+    parameter_name = "sla_overdue"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """Single «Просрочено» option (empty value = filter off)."""
+        return [("yes", "Просрочено")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Lead]) -> QuerySet[Lead]:
+        """Keep only overdue new leads when the filter is on."""
+        if self.value() != "yes":
+            return queryset
+        from leads.sla import overdue_new_leads
+
+        ids = [lead.pk for lead in overdue_new_leads(queryset)]
+        return queryset.filter(pk__in=ids)
+
+
 class LeadItemInline(TabularInline):
     """SKU lines on a lead (multi-RFQ)."""
 
@@ -129,6 +149,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "company",
         ("rfq_bundle_root", admin.EmptyFieldListFilter),
         ("seen_at", admin.EmptyFieldListFilter),
+        OverdueLeadFilter,
         "created_at",
     )
     search_fields = (
