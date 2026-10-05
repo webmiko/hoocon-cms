@@ -362,6 +362,26 @@ UNFOLD = {
         "config.unfold_callbacks.admin_desktop_settings_js",
     ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
+    # Ctrl+K / Cmd+K command palette: record search via each admin's
+    # search_fields (permission-scoped) + recently visited pages history.
+    # Whitelist keeps heavy/technical models (axes logs, messages) out.
+    "COMMAND": {
+        "search_models": [
+            "leads.lead",
+            "supportchat.conversation",
+            "crm.client",
+            "crm.activity",
+            "crm.emailmessage",
+            "catalog.sku",
+            "catalog.product",
+            "catalog.category",
+            "content.article",
+            "content.news",
+            "content.page",
+            "content.wikidocument",
+        ],
+        "show_history": True,
+    },
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": True,

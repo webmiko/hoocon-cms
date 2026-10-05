@@ -22,7 +22,7 @@ _PHONE_JS = Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-
 
 @pytest.mark.django_db
 def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
-    """Superuser hub lists dashboard row plus grouped app sections with model links."""
+    """Superuser hub lists dashboard row plus grouped sections with flat links."""
     admin_user = User.objects.create_superuser(
         username="settings-nav-su",
         email="settings-nav-su@example.com",
@@ -43,21 +43,76 @@ def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
     assert home["url"].endswith("?hoocon_view=dashboard")
     assert home["icon_bg"] == "#007aff"
     app_ids = {group["id"] for group in nav["groups"]}
-    assert "leads" in app_ids
     assert "supportchat-messages" in app_ids
+    # Daily sections are flat link rows — no drill-down to reach them.
     messages = next(group for group in nav["groups"] if group["id"] == "supportchat-messages")
     assert messages["action"] == "link"
     assert messages["title"] == "Сообщения"
     assert messages["url"].endswith("/admin/supportchat/conversation/")
-    support = next(group for group in nav["groups"] if group["id"] == "supportchat")
-    support_urls = {item["url"] for item in support["items"]}
-    assert not any("/conversation/" in url for url in support_urls)
-    assert not any("/message/" in url for url in support_urls)
-    leads = next(group for group in nav["groups"] if group["id"] == "leads")
-    assert leads["url"].endswith("?hoocon_app=leads")
-    assert any(item["url"].endswith("/admin/leads/lead/") for item in leads["items"])
+    leads = next(group for group in nav["groups"] if group["id"] == "leads-lead")
+    assert leads["action"] == "link"
+    assert leads["url"].endswith("/admin/leads/lead/")
+    assert leads["title"] == "Заявки"
     section_ids = {section["id"] for section in nav["sections"]}
     assert "work" in section_ids
+    assert "catalog" in section_ids
+    assert "support" in section_ids
+    assert "system" in section_ids
+
+
+@pytest.mark.django_db
+def test_build_phone_settings_nav_flattened_daily_rows() -> None:
+    """Daily sections expose direct links; leftover models stay in drill-downs."""
+    admin_user = User.objects.create_superuser(
+        username="settings-nav-flat",
+        email="settings-nav-flat@example.com",
+        password="password12",
+    )
+    request = RequestFactory().get("/admin/")
+    request.user = admin_user
+    nav = build_phone_settings_nav(request)
+    assert nav is not None
+    groups = {group["id"]: group for group in nav["groups"]}
+
+    # «Работа» — one tap to every daily section, in fixed order.
+    work = next(section for section in nav["sections"] if section["id"] == "work")
+    work_ids = [row["id"] for row in work["rows"]]
+    assert work_ids[:5] == [
+        "leads-lead",
+        "supportchat-messages",
+        "crm-client",
+        "crm-emailmessage",
+        "crm-activity",
+    ]
+    assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
+    assert groups["crm-emailmessage"]["url"].endswith("/admin/crm/emailmessage/")
+
+    # Single leftover model (шаблоны писем / правила компаний) — flat link,
+    # no one-item drill-down.
+    assert groups["crm-emailtemplate"]["action"] == "link"
+    assert groups["crm-emailtemplate"]["url"].endswith("/admin/crm/emailtemplate/")
+    assert "crm" not in groups
+    assert "leads" not in groups
+
+    # «Каталог» — top models flat, справочники remain inside the drill row.
+    assert groups["catalog-sku"]["url"].endswith("/admin/catalog/sku/")
+    catalog_items = {item["url"] for item in groups["catalog"]["items"]}
+    assert not any("/sku/" in url for url in catalog_items)
+    assert not any("/product/" in url or "/category/" in url for url in catalog_items)
+    assert any("/attribute/" in url for url in catalog_items)
+
+    # «Поддержка» — все разделы чата плоско; drill-строки supportchat нет.
+    assert "supportchat" not in groups
+    assert groups["supportchat-faqitem"]["action"] == "link"
+    assert groups["supportchat-faqitem"]["url"].endswith("/admin/supportchat/faqitem/")
+
+    # Контент — плоские ссылки; Вики ведёт на browse-страницу, не changelist.
+    assert groups["content-wikidocument"]["url"].endswith("/admin/content/wikidocument/browse/")
+    assert "content" not in groups
+
+    # «Система» остаётся drill-down для технических приложений.
+    assert groups["axes"]["action"] == "drill"
+    assert groups["auth"]["action"] == "drill"
 
 
 @pytest.mark.django_db
@@ -79,8 +134,9 @@ def test_build_phone_settings_nav_scoped_for_manager() -> None:
     nav = build_phone_settings_nav(request)
     assert nav is not None
     app_ids = {group["id"] for group in nav["groups"]}
-    assert "leads" in app_ids
+    assert "leads-lead" in app_ids
     assert "catalog" not in app_ids
+    assert "catalog-sku" not in app_ids
 
 
 @pytest.mark.django_db
@@ -96,14 +152,20 @@ def test_admin_index_includes_phone_settings_hub_markup() -> None:
     client.force_login(admin_user)
     html = client.get("/admin/").content.decode()
     assert "data-hoocon-phone-settings" in html
-    assert 'data-hoocon-settings-open="leads"' in html
+    # Каталог остаётся drill-down для справочников; заявки — плоская ссылка.
+    assert 'data-hoocon-settings-open="catalog"' in html
+    assert 'id="hoocon-settings-group-catalog"' in html
+    assert "hoocon_app=catalog" in html
+    assert 'data-hoocon-desktop-settings-select="leads-lead"' in html
+    assert 'href="/admin/leads/lead/"' in html
     assert "data-hoocon-settings-dashboard" in html
-    assert 'id="hoocon-settings-group-leads"' in html
-    assert 'href="/admin/?hoocon_app=leads"' in html or "hoocon_app=leads" in html
     assert "hoocon-admin-phone-settings.js" in html
     assert "hoocon-admin-desktop-settings.js" in html
     assert 'data-hoocon-desktop-settings-select="supportchat-messages"' in html
     assert "Сообщения" in html
+    # Блок «Разделы» на дашборде — плитки групп из той же навигационной спеки.
+    assert "hoocon-nav-sections" in html
+    assert "Разделы" in html
     assert "data-hoocon-settings-header-back" in html
     assert 'id="hoocon-desktop-settings-account"' in html
     assert "hoocon_view=account" in html
@@ -188,12 +250,11 @@ def test_desktop_sidebar_links_match_nav_on_index_and_changelists() -> None:
         for row_id, url in expected.items():
             assert sidebar.get(row_id) == url, f"{path}: {row_id}"
 
-    leads = next(group for group in nav["groups"] if group["id"] == "leads")
-    assert any(item["url"].endswith("/admin/leads/lead/") for item in leads["items"])
+    leads = next(group for group in nav["groups"] if group["id"] == "leads-lead")
+    assert leads["action"] == "link"
+    assert leads["url"].endswith("/admin/leads/lead/")
     messages = next(group for group in nav["groups"] if group["id"] == "supportchat-messages")
     assert messages["url"] == reverse("admin:supportchat_conversation_changelist")
-    support = next(group for group in nav["groups"] if group["id"] == "supportchat")
-    assert not any("/conversation/" in item["url"] for item in support["items"])
 
 
 def test_phone_settings_loaded_surface_css_and_js() -> None:
@@ -271,3 +332,155 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
     assert "hoocon-desktop-settings-account" in desktop_js
     assert "hoocon_view=account" not in desktop_js
     assert 'VIEW_QUERY = "hoocon_view"' in desktop_js
+
+
+@pytest.mark.django_db
+def test_command_palette_configured_for_manager_models() -> None:
+    """Ctrl+K palette searches manager-facing records, not technical tables."""
+    from django.conf import settings
+
+    command = settings.UNFOLD.get("COMMAND") or {}
+    models = command.get("search_models") or []
+    assert command.get("show_history") is True
+    for expected in (
+        "leads.lead",
+        "supportchat.conversation",
+        "crm.client",
+        "catalog.sku",
+    ):
+        assert expected in models
+    # Технические модели вне whitelist.
+    assert "axes.accesslog" not in models
+    assert "supportchat.message" not in models
+
+
+@pytest.mark.django_db
+@override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+def test_command_search_endpoint_finds_lead_record() -> None:
+    """/admin/search/ returns a direct link to a matching lead for staff."""
+    from leads.models import Lead
+
+    admin_user = User.objects.create_superuser(
+        username="settings-nav-search",
+        email="settings-nav-search@example.com",
+        password="password12",
+    )
+    lead = Lead.objects.create(name="Палитра Поисков", company="Hoocon")
+    client = Client()
+    client.force_login(admin_user)
+    response = client.get("/admin/search/", {"s": "Палитра Поисков"})
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Палитра Поисков" in html
+    assert f"/admin/leads/lead/{lead.pk}/" in html
+
+
+def test_nav_sections_tiles_css_loaded_surface() -> None:
+    """«Разделы» tiles styles live in the loaded os27 stylesheet."""
+    os27_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-os27.css").read_text(encoding="utf-8")
+    assert ".hoocon-nav-sections__grid" in os27_css
+    grid_rule = os27_css.split(".hoocon-nav-sections__grid")[1].split("}")[0]
+    assert "display: grid" in grid_rule
+    link_rule = os27_css.split(".hoocon-nav-sections__link {")[1].split("}")[0]
+    assert "display: flex" in link_rule
+
+
+def _nav_for_group(username: str, group_name: str) -> dict:
+    """Build nav for a staff user belonging to a named staff group."""
+    from accounts.services import ensure_staff_groups
+
+    ensure_staff_groups()
+    group = Group.objects.get(name=group_name)
+    user = User.objects.create_user(
+        username=username,
+        email=f"{username}@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    user.groups.add(group)
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    nav = build_phone_settings_nav(request)
+    assert nav is not None
+    return nav
+
+
+@pytest.mark.django_db
+def test_manager_nav_shows_only_permitted_sections() -> None:
+    """«Менеджер»: плоские ссылки только по его пермишенам, «Система» скрыта."""
+    nav = _nav_for_group("nav-mgr", "Менеджер")
+    ids = {row["id"] for row in nav["groups"]}
+    # Ежедневные ссылки менеджера.
+    assert {
+        "leads-lead",
+        "supportchat-messages",
+        "crm-client",
+        "crm-emailmessage",
+        "crm-activity",
+        "crm-emailtemplate",
+    } <= ids
+    # Каталог — view-only по матрице, но ссылки видны.
+    assert {"catalog-sku", "catalog-product", "catalog-category", "catalog"} <= ids
+    # Аналитика и веб-пуш по матрице доступны.
+    assert {"analytics", "webpush-pushsubscription"} <= ids
+    # Нет доступа — нет строки и нет пустой секции.
+    forbidden = {
+        "auth",
+        "auth-user",
+        "axes",
+        "django_celery_beat",
+        "accounts",
+        "sitesettings-sitesettings",
+        "social-socialpost",
+        "redirects-redirect",
+        "supportchat-faqitem",
+        "supportchat-replytemplate",
+        "leads-companymanagerrule",
+        "content-article",
+        "content-news",
+        "content-page",
+        "content-wikidocument",
+        "content-newscategory",
+    }
+    assert not (forbidden & ids)
+    section_ids = {section["id"] for section in nav["sections"]}
+    assert "system" not in section_ids
+    assert "content" not in section_ids
+
+
+@pytest.mark.django_db
+def test_admin_group_nav_excludes_superuser_only_apps() -> None:
+    """«Админ» видит контент/настройки, но auth/axes/celery — только суперюзеру."""
+    nav = _nav_for_group("nav-owner", "Админ")
+    ids = {row["id"] for row in nav["groups"]}
+    assert {
+        "content-article",
+        "content-news",
+        "content-page",
+        "sitesettings-sitesettings",
+        "social-socialpost",
+        "redirects-redirect",
+    } <= ids
+    # Группа «Админ» — не суперюзер: технические приложения скрыты из навигации,
+    # хотя auth.view_user есть у всех групп для подписей ответственных.
+    assert not ({"auth", "auth-user", "axes", "django_celery_beat"} & ids)
+    # FAQ/шаблоны бота и вики не входят в матрицу группы.
+    assert not ({"supportchat-faqitem", "supportchat-replytemplate", "content-wikidocument"} & ids)
+
+
+@pytest.mark.django_db
+def test_analyst_nav_matches_manager_surface() -> None:
+    """«Аналитик» — тот же набор ссылок, что у менеджера (view-only)."""
+    nav = _nav_for_group("nav-analyst", "Аналитик")
+    ids = {row["id"] for row in nav["groups"]}
+    assert {
+        "leads-lead",
+        "supportchat-messages",
+        "crm-client",
+        "catalog-sku",
+        "analytics",
+        "webpush-pushsubscription",
+    } <= ids
+    assert not ({"auth-user", "axes", "sitesettings-sitesettings"} & ids)
+    section_ids = {section["id"] for section in nav["sections"]}
+    assert "system" not in section_ids

@@ -32,6 +32,40 @@
       </nav>
     </header>
 
+    {% if hoocon_phone_settings %}
+    <nav class="hoocon-nav-sections" aria-label="Разделы">
+      <h2 class="hoocon-dash__h2">Разделы</h2>
+      <div class="hoocon-nav-sections__grid">
+        {% for section in hoocon_phone_settings.sections %}
+          {% if section.label %}
+          <section class="hoocon-nav-sections__group">
+            <h3 class="hoocon-nav-sections__title">{{ section.label }}</h3>
+            <ul class="hoocon-nav-sections__links">
+              {% for row in section.rows %}
+              <li>
+                <a href="{{ row.url }}" class="hoocon-nav-sections__link">
+                  <span
+                    class="hoocon-phone-settings__icon-tile"
+                    style="--settings-icon-bg: {{ row.icon_bg }}; --settings-icon-fg: {{ row.icon_fg }};"
+                    aria-hidden="true"
+                  >
+                    <span class="material-symbols-outlined">{{ row.icon }}</span>
+                  </span>
+                  <span class="hoocon-nav-sections__link-title">{{ row.title }}</span>
+                  {% if row.badge %}
+                    <span class="hoocon-nav-sections__badge">{{ row.badge }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </nav>
+    {% endif %}
+
     {% if hoocon_dashboard.notifications %}
     <section class="hoocon-dash__alerts" aria-label="Оповещения">
       <h2 class="hoocon-dash__h2">Оповещения</h2>

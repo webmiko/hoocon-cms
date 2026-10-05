@@ -63,29 +63,253 @@ _APP_ICONS: dict[str, str] = {
 }
 
 # Logical iOS-style section buckets for grouped inset lists.
-_SECTION_ORDER: tuple[str, ...] = ("", "work", "catalog", "site", "system")
+_SECTION_ORDER: tuple[str, ...] = ("", "work", "catalog", "content", "support", "site", "system")
 _SECTION_LABELS: dict[str, str] = {
     "": "",
     "work": "Работа",
     "catalog": "Каталог",
+    "content": "Контент",
+    "support": "Поддержка",
     "site": "Сайт",
     "system": "Система",
 }
 _APP_SECTIONS: dict[str, str] = {
     "leads": "work",
     "crm": "work",
-    "supportchat": "work",
+    "supportchat": "support",
     "supportchat-messages": "work",
     "catalog": "catalog",
-    "content": "catalog",
+    "content": "content",
     "analytics": "site",
     "sitesettings": "site",
     "redirects": "site",
     "social": "site",
-    "webpush": "system",
+    "webpush": "site",
     "axes": "system",
     "auth": "system",
     "django_celery_beat": "system",
+    "accounts": "system",
+}
+
+# Daily models lifted out of app drill-downs into flat link rows.
+# Row id is always "<app_label>-<model_name>" so desktop JS can highlight it
+# from the changelist path. "url_name" overrides the default changelist link.
+_PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
+    "leads": (
+        {
+            "model": "lead",
+            "title": "Заявки",
+            "icon": "inbox",
+            "section": "work",
+            "description": "Заявки с сайта, статусы и ответственные.",
+            "badge": "leads",
+        },
+    ),
+    "crm": (
+        {
+            "model": "client",
+            "title": "Клиенты",
+            "icon": "groups",
+            "section": "work",
+            "description": "База клиентов, карточки и контакты.",
+        },
+        {
+            "model": "emailmessage",
+            "title": "Письма",
+            "icon": "mail",
+            "section": "work",
+            "description": "Исходящие письма и статусы доставки.",
+        },
+        {
+            "model": "activity",
+            "title": "Активности",
+            "icon": "event_note",
+            "section": "work",
+            "description": "Звонки, задачи и заметки по клиентам.",
+        },
+    ),
+    "catalog": (
+        {
+            "model": "sku",
+            "title": "Артикулы",
+            "icon": "inventory_2",
+            "section": "catalog",
+            "description": "Поиск по артикулам и характеристикам.",
+        },
+        {
+            "model": "product",
+            "title": "Товары",
+            "icon": "deployed_code",
+            "section": "catalog",
+            "description": "Карточки товаров, категории и медиа.",
+        },
+        {
+            "model": "category",
+            "title": "Категории",
+            "icon": "category",
+            "section": "catalog",
+            "description": "Дерево разделов витрины.",
+        },
+    ),
+    "supportchat": (
+        {
+            "model": "faqitem",
+            "title": "FAQ чата",
+            "icon": "quiz",
+            "section": "support",
+            "description": "Частые вопросы и ответы бота.",
+        },
+        {
+            "model": "replytemplate",
+            "title": "Шаблоны ответов",
+            "icon": "quick_phrases",
+            "section": "support",
+            "description": "Готовые ответы для менеджеров.",
+        },
+        {
+            "model": "supportschedule",
+            "title": "Расписание поддержки",
+            "icon": "schedule",
+            "section": "support",
+            "description": "Часы работы операторов чата.",
+        },
+        {
+            "model": "supportscheduleday",
+            "title": "Дни расписания",
+            "icon": "date_range",
+            "section": "support",
+            "description": "Исключения и особые дни расписания.",
+        },
+    ),
+    "content": (
+        {
+            "model": "article",
+            "title": "Статьи",
+            "icon": "article",
+            "section": "content",
+            "description": "Статьи и материалы блога.",
+        },
+        {
+            "model": "news",
+            "title": "Новости",
+            "icon": "newspaper",
+            "section": "content",
+            "description": "Новости компании.",
+        },
+        {
+            "model": "page",
+            "title": "Страницы",
+            "icon": "description",
+            "section": "content",
+            "description": "Статические страницы сайта.",
+        },
+        {
+            "model": "wikidocument",
+            "title": "Вики",
+            "icon": "menu_book",
+            "section": "content",
+            "url_name": "admin:content_wikidocument_browse",
+            "description": "База знаний и инструкции для команды.",
+        },
+        {
+            "model": "newscategory",
+            "title": "Категории новостей",
+            "icon": "label",
+            "section": "content",
+            "description": "Рубрикатор новостей.",
+        },
+    ),
+    "sitesettings": (
+        {
+            "model": "sitesettings",
+            "title": "Настройки сайта",
+            "icon": "settings",
+            "section": "site",
+            "description": "Контакты, SEO и глобальные настройки витрины.",
+        },
+    ),
+    "webpush": (
+        {
+            "model": "pushsubscription",
+            "title": "Веб-уведомления",
+            "icon": "notifications",
+            "section": "site",
+            "description": "Push-подписки и рассылки.",
+        },
+    ),
+    "social": (
+        {
+            "model": "socialpost",
+            "title": "Соцсети",
+            "icon": "campaign",
+            "section": "site",
+            "description": "Анонсы и публикации в соцсетях.",
+        },
+    ),
+    "redirects": (
+        {
+            "model": "redirect",
+            "title": "Редиректы",
+            "icon": "sync_alt",
+            "section": "site",
+            "description": "Перенаправления URL и синхронизация.",
+        },
+    ),
+}
+
+# Technical apps never appear in navigation for non-superusers, even when a
+# group holds a technical perm (e.g. auth.view_user for assignee labels).
+_SUPERUSER_ONLY_APPS: frozenset[str] = frozenset(
+    {"auth", "accounts", "axes", "django_celery_beat"},
+)
+
+# Apps replaced by one custom link row (manager-facing URL ≠ model changelist).
+_CUSTOM_APP_ROWS: dict[str, dict[str, str]] = {
+    "analytics": {
+        "id": "analytics",
+        "title": "Аналитика сайта",
+        "icon": "monitoring",
+        "url_name": "admin:analytics_pagedailystat_stats",
+        "perm": "analytics.view_pagedailystat",
+        "section": "site",
+        "description": "Посещаемость и страницы сайта.",
+    },
+}
+
+# Row order inside each section; rows absent from the list sink to the end.
+_ROW_ORDER: dict[str, tuple[str, ...]] = {
+    "work": (
+        "leads-lead",
+        "supportchat-messages",
+        "crm-client",
+        "crm-emailmessage",
+        "crm-activity",
+    ),
+    "catalog": (
+        "catalog-sku",
+        "catalog-product",
+        "catalog-category",
+    ),
+    "content": (
+        "content-article",
+        "content-news",
+        "content-page",
+        "content-wikidocument",
+        "content-newscategory",
+    ),
+    "support": (
+        "supportchat-faqitem",
+        "supportchat-replytemplate",
+        "supportchat-supportschedule",
+        "supportchat-supportscheduleday",
+    ),
+    "site": (
+        "analytics",
+        "sitesettings-sitesettings",
+        "webpush-pushsubscription",
+        "social-socialpost",
+        "redirects-redirect",
+    ),
 }
 
 
@@ -180,24 +404,35 @@ def _dashboard_subtitle(request: HttpRequest) -> str:
 
 
 def _app_rows(request: HttpRequest) -> list[dict[str, Any]]:
-    """One Settings row per Django app (models listed on drill-down)."""
+    """Settings rows: promoted flat links first, app drill-downs for the rest."""
     rows: list[dict[str, Any]] = []
+    is_superuser = bool(request.user.is_superuser)
     for app in admin.site.get_app_list(request):
+        app_label = str(app.get("app_label") or "")
+        if app_label in _SUPERUSER_ONLY_APPS and not is_superuser:
+            continue
+        if app_label in _CUSTOM_APP_ROWS:
+            custom_row = _custom_app_row(request, app_label)
+            if custom_row:
+                rows.append(custom_row)
+            continue
         items: list[dict[str, str]] = []
         for model in app.get("models", []):
             admin_url = model.get("admin_url") or ""
             if not admin_url:
                 continue
+            model_cls = model.get("model")
+            model_name = str(getattr(getattr(model_cls, "_meta", None), "model_name", "") or "")
             items.append(
                 {
                     "title": str(model.get("name") or ""),
                     "url": admin_url,
                     "add_url": str(model.get("add_url") or ""),
+                    "model": model_name,
                 },
             )
         if not items:
             continue
-        app_label = str(app.get("app_label") or "")
         if app_label == "supportchat":
             messages_row = _support_messages_row(request)
             if messages_row:
@@ -205,6 +440,13 @@ def _app_rows(request: HttpRequest) -> list[dict[str, Any]]:
             items = _supportchat_settings_items(items)
             if not items:
                 continue
+        promoted, items = _promoted_rows(request, app_label, items)
+        rows.extend(promoted)
+        if not items:
+            continue
+        if len(items) == 1:
+            rows.append(_leftover_link_row(app_label, items[0]))
+            continue
         icon_bg, icon_fg = _APP_ICON_STYLES.get(app_label, ("#8e8e93", "#ffffff"))
         row_id = app_label or str(app.get("name") or "app")
         rows.append(
@@ -223,6 +465,107 @@ def _app_rows(request: HttpRequest) -> list[dict[str, Any]]:
             },
         )
     return rows
+
+
+def _promoted_rows(
+    request: HttpRequest,
+    app_label: str,
+    items: list[dict[str, str]],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Split promoted models into flat link rows; return (rows, leftovers)."""
+    spec = _PROMOTED_MODELS.get(app_label)
+    if not spec:
+        return [], items
+    rows: list[dict[str, Any]] = []
+    remaining = list(items)
+    for entry in spec:
+        item = next((it for it in remaining if it["model"] == entry["model"]), None)
+        if item is None:
+            continue
+        remaining.remove(item)
+        url = reverse(entry["url_name"]) if entry.get("url_name") else item["url"]
+        rows.append(
+            _link_row(
+                request,
+                row_id=f"{app_label}-{entry['model']}",
+                title=entry["title"],
+                icon=entry["icon"],
+                style=app_label,
+                url=url,
+                section=entry["section"],
+                description=entry.get("description", ""),
+                badge=_badge_for_app(request, entry["badge"]) if entry.get("badge") else "",
+            ),
+        )
+    return rows, remaining
+
+
+def _custom_app_row(request: HttpRequest, app_label: str) -> dict[str, Any] | None:
+    """Link row for an app whose manager-facing URL is not a changelist."""
+    entry = _CUSTOM_APP_ROWS[app_label]
+    user = request.user
+    if not user.has_perm(entry["perm"]):
+        return None
+    return _link_row(
+        request,
+        row_id=entry["id"],
+        title=entry["title"],
+        icon=entry["icon"],
+        style=app_label,
+        url=reverse(entry["url_name"]),
+        section=entry["section"],
+        description=entry.get("description", ""),
+    )
+
+
+def _leftover_link_row(app_label: str, item: dict[str, str]) -> dict[str, Any]:
+    """Single leftover model: flat link instead of a one-item drill-down."""
+    title = item["title"]
+    return {
+        "id": f"{app_label}-{item['model']}",
+        "title": title[:1].upper() + title[1:] if title else title,
+        "icon": _APP_ICONS.get(app_label, "folder"),
+        "icon_bg": _APP_ICON_STYLES.get(app_label, ("#8e8e93", "#ffffff"))[0],
+        "icon_fg": _APP_ICON_STYLES.get(app_label, ("#8e8e93", "#ffffff"))[1],
+        "action": "link",
+        "url": item["url"],
+        "subtitle": "",
+        "description": "",
+        "badge": "",
+        "items": [],
+        "section": _APP_SECTIONS.get(app_label, "system"),
+    }
+
+
+def _link_row(
+    request: HttpRequest,
+    *,
+    row_id: str,
+    title: str,
+    icon: str,
+    style: str,
+    url: str,
+    section: str,
+    description: str = "",
+    badge: str = "",
+) -> dict[str, Any]:
+    """Flat direct-link row shared by promoted and custom rows."""
+    del request
+    icon_bg, icon_fg = _APP_ICON_STYLES.get(style, ("#8e8e93", "#ffffff"))
+    return {
+        "id": row_id,
+        "title": title,
+        "icon": icon,
+        "icon_bg": icon_bg,
+        "icon_fg": icon_fg,
+        "action": "link",
+        "url": url,
+        "subtitle": "",
+        "description": description,
+        "badge": badge,
+        "items": [],
+        "section": section,
+    }
 
 
 def _support_messages_row(request: HttpRequest) -> dict[str, Any] | None:
@@ -283,8 +626,15 @@ def _build_sections(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if row["id"] == "home":
             buckets[""].append(row)
             continue
-        section_key = _APP_SECTIONS.get(str(row["id"]), "system")
-        buckets[section_key].append(row)
+        section_key = str(row.get("section") or _APP_SECTIONS.get(str(row["id"]), "system"))
+        buckets.setdefault(section_key, []).append(row)
+
+    for key, order in _ROW_ORDER.items():
+        bucket = buckets.get(key)
+        if not bucket:
+            continue
+        rank = {row_id: index for index, row_id in enumerate(order)}
+        bucket.sort(key=lambda row: rank.get(str(row["id"]), len(order)))
 
     sections: list[dict[str, Any]] = []
     for key in _SECTION_ORDER:

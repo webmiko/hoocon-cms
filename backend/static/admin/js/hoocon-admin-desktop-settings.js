@@ -75,8 +75,17 @@
     if (path.indexOf("/admin/supportchat/conversation") === 0) {
       return "supportchat-messages";
     }
-    if (path.indexOf("/admin/supportchat/") === 0) {
-      return "supportchat";
+    var parts = path.match(/^\/admin\/([^/]+)\/([^/]+)\//);
+    if (parts) {
+      var modelRow = parts[1] + "-" + parts[2];
+      if (
+        document.querySelector(
+          '[data-hoocon-desktop-settings-select="' + modelRow + '"]',
+        )
+      ) {
+        return modelRow;
+      }
+      return parts[1];
     }
     var match = path.match(/^\/admin\/([^/]+)\//);
     return match ? match[1] : "";
