@@ -106,6 +106,10 @@ def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | 
     assignment or manually in Admin), later leads from the same company go
     to that manager. The lead's own ``client`` card wins over other cards
     of the same company; among other cards the earliest claim wins.
+
+    Match runs on the indexed ``Client.company_key`` (same normalization as
+    ``CompanyManagerRule.company_key``) — a single DB lookup, not a Python
+    scan of every assigned card.
     """
     from crm.models import Client as CrmClient
 
@@ -118,21 +122,20 @@ def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | 
         if pick is not None and pick.is_active and pick.is_staff:
             return pick
 
-    for other in (
-        CrmClient.objects.filter(assignee__isnull=False)
-        .exclude(company="")
+    owners = (
+        CrmClient.objects.filter(
+            company_key=key,
+            assignee__isnull=False,
+            assignee__is_active=True,
+            assignee__is_staff=True,
+        )
         .select_related("assignee")
         .order_by("created_at", "pk")
-        .iterator()
-    ):
-        if client is not None and other.pk == client.pk:
-            continue
-        if normalize_company_label(other.company) != key:
-            continue
-        pick = getattr(other, "assignee", None)
-        if pick is not None and pick.is_active and pick.is_staff:
-            return pick
-    return None
+    )
+    if client is not None:
+        owners = owners.exclude(pk=client.pk)
+    first = owners.first()
+    return first.assignee if first is not None else None
 
 
 def lookup_aterna_assignee() -> Any | None:

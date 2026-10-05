@@ -350,6 +350,20 @@ def test_client_email_unique_normalized() -> None:
         Client.objects.create(name="B", email="unique@example.com")
 
 
+@pytest.mark.django_db
+def test_client_company_key_normalized_on_save() -> None:
+    """company_key mirrors normalize_company_label («ООО "Ромашка"» → «ооо ромашка»)."""
+    client_obj = Client.objects.create(
+        name="Иван",
+        email="company-key@example.com",
+        company="  ООО «Ромашка» ",
+    )
+    assert client_obj.company_key == "ооо ромашка"
+    client_obj.company = 'ООО   "Лютик"'
+    client_obj.save()
+    assert client_obj.company_key == "ооо лютик"
+
+
 @pytest.mark.django_db(transaction=True)
 def test_email_admin_queue_send_skips_already_queued(
     client,

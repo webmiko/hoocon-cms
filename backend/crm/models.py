@@ -36,6 +36,18 @@ class Client(models.Model):
         default="",
         db_index=True,
     )
+    company_key: models.CharField = models.CharField(
+        "ключ компании",
+        max_length=200,
+        blank=True,
+        default="",
+        editable=False,
+        db_index=True,
+        help_text=(
+            "Нормализованный ключ совпадения компании (как у закреплённых "
+            "правил менеджеров). Заполняется автоматически."
+        ),
+    )
     notes: models.TextField = models.TextField(
         "заметки",
         blank=True,
@@ -68,8 +80,11 @@ class Client(models.Model):
         ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Normalize email before save (unique key is lowercase)."""
+        """Normalize email (unique key) and company_key (routing match)."""
+        from leads.services import normalize_company_label
+
         self.email = (self.email or "").strip().lower()
+        self.company_key = normalize_company_label(self.company)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

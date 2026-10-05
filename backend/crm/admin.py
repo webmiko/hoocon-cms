@@ -128,7 +128,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_filter = ("is_active", "assignee", "company", "updated_at")
     search_fields = ("email", "name", "company", "phone", "notes")
     autocomplete_fields = ("assignee",)
-    readonly_fields = ("created_at", "updated_at", "leads_count")
+    readonly_fields = ("created_at", "updated_at", "leads_count", "company_key")
     inlines = (LeadInline, ActivityInline, EmailMessageInline)
     ordering = ("email", "name", "company")
     fieldsets = (
@@ -149,7 +149,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Метаданные",
             {
-                "fields": ("leads_count", "created_at", "updated_at"),
+                "fields": ("leads_count", "company_key", "created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),
