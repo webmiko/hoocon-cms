@@ -21,6 +21,23 @@
   <span>Ответ клиенту</span>
 </nav>
 
+{% if email_templates %}
+<form method="get" class="hoocon-mail-compose hoocon-mail-compose--picker">
+  <div class="hoocon-mail-compose__field">
+    <label for="hoocon-email-template">{% trans "Шаблон" %}</label>
+    <div>
+      <select name="template" id="hoocon-email-template">
+        <option value="">{% trans "— без шаблона —" %}</option>
+        {% for tpl in email_templates %}
+          <option value="{{ tpl.pk }}"{% if tpl.pk == selected_template_id %} selected{% endif %}>{{ tpl.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button">{% trans "Подставить" %}</button>
+    </div>
+  </div>
+</form>
+{% endif %}
+
 <form method="post" novalidate class="hoocon-mail-compose" id="hoocon-mail-compose-form">
   {% csrf_token %}
 

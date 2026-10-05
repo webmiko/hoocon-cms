@@ -15,9 +15,12 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin
 from crm.forms import ComposeEmailForm
-from crm.models import Activity, Client, EmailMessage, EmailStatus
+from crm.models import Activity, Client, EmailMessage, EmailStatus, EmailTemplate
 from crm.services import (
     create_outbound_email,
+    email_template_context_for_client,
+    get_active_email_template,
+    render_email_template,
     scope_activities_for_manager,
     scope_clients_for_manager,
     scope_emails_for_manager,
@@ -289,6 +292,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         if not self.has_change_permission(request, client):
             raise PermissionDenied
         change_url = reverse("admin:crm_client_change", args=[client.pk])
+        template = get_active_email_template(request.GET.get("template"))
 
         if request.method == "POST":
             form = ComposeEmailForm(request.POST)
@@ -316,14 +320,18 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                     )
                 return HttpResponseRedirect(change_url)
         else:
-            form = ComposeEmailForm(
-                initial={
-                    "to_email": client.email,
-                    "subject": "",
-                    "body": "",
-                    "send_now": True,
-                },
-            )
+            initial: dict[str, Any] = {
+                "to_email": client.email,
+                "subject": "",
+                "body": "",
+                "send_now": True,
+            }
+            if template is not None:
+                initial["subject"], initial["body"] = render_email_template(
+                    template,
+                    context=email_template_context_for_client(client),
+                )
+            form = ComposeEmailForm(initial=initial)
 
         context = {
             **self.admin_site.each_context(request),
@@ -332,6 +340,8 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": _("Написать письмо: %(name)s") % {"name": client.name},
             "form": form,
             "media": self.media,
+            "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
+            "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/crm/compose_email.html", context)
 
@@ -535,3 +545,33 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
         became_queued = obj.status == EmailStatus.QUEUED and (not change or previous_status != EmailStatus.QUEUED)
         if became_queued:
             enqueue_crm_email(obj.pk)
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(ModelAdmin):
+    """Reusable email presets: picked via «Шаблон» on compose forms."""
+
+    list_display = ("name", "subject", "is_active", "sort_order", "updated_at")
+    list_editable = ("is_active", "sort_order")
+    list_filter = ("is_active",)
+    search_fields = ("name", "subject", "body")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("sort_order", "name")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("name", "is_active", "sort_order", "subject", "body"),
+                "description": (
+                    "Плейсхолдеры {имя}, {компания}, {почта}, {телефон} подставляются из карточки клиента или заявки."
+                ),
+            },
+        ),
+        (
+            "Метаданные",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
