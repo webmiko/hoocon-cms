@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import Any
 
 import pytest
+from django.core.files.storage import FileSystemStorage
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
@@ -116,3 +118,53 @@ def test_command_purge_removes_batch(tmp_path: Path) -> None:
     assert not (tmp_path / "_quarantine" / batch).exists()
     with pytest.raises(CommandError):
         call_command("prune_dead_media", purge="../gone", yes=True, media_root=str(tmp_path))
+
+
+def _tmp_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field_name: str) -> None:
+    """Point an Article file field at a tmp storage so deletes stay sandboxed."""
+    field = Article._meta.get_field(field_name)
+    monkeypatch.setattr(field, "storage", FileSystemStorage(location=str(tmp_path)))
+
+
+@pytest.mark.django_db
+def test_row_delete_removes_file_from_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """post_delete frees the file — this is what stops orphans accumulating."""
+    _tmp_storage(tmp_path, monkeypatch, "cover")
+    path = _touch(tmp_path, "article_covers/t/gone.webp")
+    article = Article.objects.create(title="a", slug="a", cover="article_covers/t/gone.webp")
+
+    article.delete()
+
+    assert not path.exists()
+
+
+@pytest.mark.django_db
+def test_row_delete_keeps_file_shared_by_other_row(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A file referenced by a second row survives until that row is gone too."""
+    _tmp_storage(tmp_path, monkeypatch, "cover")
+    path = _touch(tmp_path, "article_covers/t/shared.webp")
+    a = Article.objects.create(title="a", slug="a", cover="article_covers/t/shared.webp")
+    b = Article.objects.create(title="b", slug="b", cover="article_covers/t/shared.webp")
+
+    a.delete()
+    assert path.exists()
+    b.delete()
+    assert not path.exists()
+
+
+@pytest.mark.django_db
+def test_file_replace_deletes_old_after_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    django_capture_on_commit_callbacks: Any,
+) -> None:
+    """pre_save + on_commit: re-uploading a field drops the replaced file."""
+    _tmp_storage(tmp_path, monkeypatch, "cover")
+    old_path = _touch(tmp_path, "article_covers/t/old.webp")
+    article = Article.objects.create(title="a", slug="a", cover="article_covers/t/old.webp")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        article.cover = "article_covers/t/new.webp"
+        article.save()
+
+    assert not old_path.exists()

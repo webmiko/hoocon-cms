@@ -12,6 +12,7 @@ in place); a separate purge step removes a quarantine batch for good.
 
 from __future__ import annotations
 
+import functools
 import re
 import shutil
 from datetime import UTC, datetime
@@ -19,7 +20,10 @@ from pathlib import Path
 from typing import Any
 
 from django.apps import apps
-from django.db import models
+from django.core.exceptions import ObjectDoesNotExist, SuspiciousFileOperation
+from django.core.files.storage import FileSystemStorage
+from django.db import models, transaction
+from django.db.models.signals import post_delete, pre_save
 
 MEDIA_URL_RE = re.compile(r"/media/([^\s\"'<>)\\]+)")
 # Never treated as live content: ``_pack`` is ETL staging (opt-in via
@@ -189,3 +193,100 @@ def _prune_empty_dirs(root: Path, *, skip: set[str]) -> None:
             path.rmdir()
         except OSError:
             continue
+
+
+def _file_fields(model: type[models.Model]) -> list[models.FileField]:
+    """All FileField/ImageField declared on ``model``."""
+    return [f for f in model._meta.fields if isinstance(f, models.FileField)]
+
+
+def _prune_empty_parents(storage: Any, file_name: str) -> None:
+    """Rmdir now-empty parent dirs of a deleted file (filesystem storages)."""
+    if not isinstance(storage, FileSystemStorage):
+        return
+    try:
+        root = Path(storage.location).resolve()
+        parent = Path(storage.path(file_name)).resolve().parent
+    except (OSError, SuspiciousFileOperation):
+        return
+    while parent != root and root in parent.parents:
+        try:
+            parent.rmdir()
+        except OSError:
+            return
+        parent = parent.parent
+
+
+def _delete_field_file(
+    model: type[models.Model],
+    field_name: str,
+    file_name: str,
+    *,
+    exclude_pk: Any = None,
+) -> bool:
+    """Delete ``file_name`` unless another row of ``model`` still references it."""
+    if not file_name:
+        return False
+    shared = model._default_manager.filter(**{field_name: file_name})
+    if exclude_pk is not None:
+        shared = shared.exclude(pk=exclude_pk)
+    if shared.exists():
+        return False
+    field = model._meta.get_field(field_name)
+    if not isinstance(field, models.FileField):
+        return False
+    if not field.storage.exists(file_name):
+        return False
+    field.storage.delete(file_name)
+    _prune_empty_parents(field.storage, file_name)
+    return True
+
+
+def cleanup_media_on_delete(sender: type[models.Model], instance: models.Model, **kwargs: Any) -> None:
+    """post_delete: remove field files of the deleted row (unshared only)."""
+    for field in _file_fields(sender):
+        _delete_field_file(sender, field.name, str(getattr(instance, field.attname) or ""))
+
+
+def cleanup_media_on_save(sender: type[models.Model], instance: models.Model, **kwargs: Any) -> None:
+    """pre_save: after commit, drop files replaced by a new upload on the row."""
+    if instance.pk is None or instance._state.adding:
+        return
+    fields = _file_fields(sender)
+    try:
+        old = sender._default_manager.only(*(f.name for f in fields)).get(pk=instance.pk)
+    except ObjectDoesNotExist:
+        return
+    for field in fields:
+        old_name = str(getattr(old, field.attname) or "")
+        new_name = str(getattr(instance, field.attname) or "")
+        if old_name and old_name != new_name:
+            transaction.on_commit(
+                functools.partial(
+                    _delete_field_file,
+                    sender,
+                    field.name,
+                    old_name,
+                    exclude_pk=instance.pk,
+                ),
+            )
+
+
+def register_file_cleanup(*models_: type[models.Model]) -> None:
+    """Wire file cleanup signals for models with FileField/ImageField.
+
+    Called from ``apps.py ready()`` so every row delete or file replace
+    frees storage instead of leaving an orphan.
+    """
+    for model in models_:
+        label = model._meta.label_lower
+        post_delete.connect(
+            cleanup_media_on_delete,
+            sender=model,
+            dispatch_uid=f"media_hygiene.delete.{label}",
+        )
+        pre_save.connect(
+            cleanup_media_on_save,
+            sender=model,
+            dispatch_uid=f"media_hygiene.save.{label}",
+        )

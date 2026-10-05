@@ -22,3 +22,8 @@ class CatalogConfig(AppConfig):
             sender=SiteSettings,
             dispatch_uid="catalog.invalidate_http_cache_on_sitesettings",
         )
+
+        from catalog.media_hygiene import register_file_cleanup
+        from catalog.models import ProductFile, ProductImage
+
+        register_file_cleanup(ProductFile, ProductImage)
