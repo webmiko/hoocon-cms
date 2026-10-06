@@ -897,6 +897,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 1rem;
+  align-items: start;
   margin-bottom: 1.75rem;
 }
 

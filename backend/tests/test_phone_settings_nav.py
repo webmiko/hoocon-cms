@@ -387,7 +387,10 @@ def test_nav_sections_tiles_css_loaded_surface() -> None:
     os27_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-os27.css").read_text(encoding="utf-8")
     assert ".hoocon-nav-sections__grid" in os27_css
     grid_rule = os27_css.split(".hoocon-nav-sections__grid")[1].split("}")[0]
-    assert "display: grid" in grid_rule
+    # Masonry: CSS columns, group height follows content (no stretched rows).
+    assert "columns: 15rem" in grid_rule
+    group_rule = os27_css.split(".hoocon-nav-sections__group {")[1].split("}")[0]
+    assert "break-inside: avoid" in group_rule
     link_rule = os27_css.split(".hoocon-nav-sections__link {")[1].split("}")[0]
     assert "display: flex" in link_rule
 
