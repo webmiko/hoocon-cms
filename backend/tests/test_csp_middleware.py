@@ -162,6 +162,32 @@ def test_csp_admin_allows_unsafe_eval_for_alpine() -> None:
 
 
 @pytest.mark.django_db
+def test_csp_admin_allows_inline_scripts_without_nonce() -> None:
+    """Unfold admin ships inline scripts without nonce attrs — they must run.
+
+    A nonce directive would make browsers ignore 'unsafe-inline', so admin
+    responses must omit the nonce entirely.
+    """
+    client = Client()
+    response = client.get("/admin/login/")
+    csp = _csp_value(response)
+    script_src = next(part.strip() for part in csp.split(";") if part.strip().startswith("script-src"))
+    assert "'unsafe-inline'" in script_src
+    assert "nonce-" not in script_src
+
+
+@pytest.mark.django_db
+def test_csp_public_html_keeps_nonce_no_unsafe_inline() -> None:
+    """Public SPA CSP keeps the nonce and forbids unsafe-inline scripts."""
+    client = Client()
+    response = client.get("/")
+    csp = _csp_value(response)
+    script_src = next(part.strip() for part in csp.split(";") if part.strip().startswith("script-src"))
+    assert "nonce-" in script_src
+    assert "'unsafe-inline'" not in script_src
+
+
+@pytest.mark.django_db
 def test_csp_public_html_forbids_unsafe_eval() -> None:
     """Public SPA CSP stays without unsafe-eval."""
     client = Client()
