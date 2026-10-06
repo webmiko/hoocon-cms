@@ -22,6 +22,7 @@ from catalog.etl.stock_import import (
 from catalog.forms import StockUploadForm
 from catalog.models import (
     SKU,
+    AnalogMap,
     Attribute,
     AttributeValue,
     Category,
@@ -362,3 +363,15 @@ class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> Any:
         return super().get_queryset(request).select_related("sku")
+
+
+@admin.register(AnalogMap)
+class AnalogMapAdmin(ModelAdmin):
+    """Карта аналогов (ЛК-10): сторонний артикул → Hoocon SKU + параметры."""
+
+    list_display = ("brand", "foreign_code", "sku", "torque_nm", "spring_return", "is_active")
+    list_filter = ("brand", "spring_return", "is_active")
+    search_fields = ("brand", "foreign_code", "sku__sku_code", "note")
+    autocomplete_fields = ("sku",)
+    readonly_fields = ("foreign_code_key", "created_at", "updated_at")
+    list_select_related = ("sku",)

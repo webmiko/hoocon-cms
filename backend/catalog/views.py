@@ -352,6 +352,51 @@ class QuizAnalogView(APIView):
         )
 
 
+class AnalogLookupView(APIView):
+    """GET /api/catalog/analogs/?brand=&code= — подбор аналога (ЛК-10).
+
+    Public, read-only: форма «подобрать аналог» и Excel-импорт спек дергают
+    один сервис ``catalog.services.analogs_find``. Ответ — краткая карточка
+    найденного SKU (цены и остатки не отдаём — только идентификацию).
+    """
+
+    permission_classes = (AllowAny,)
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request: Request) -> Response:
+        from catalog.services import analogs_find
+
+        brand = (request.query_params.get("brand") or "").strip()
+        code = (request.query_params.get("code") or "").strip()
+        if not code:
+            return Response(
+                {"detail": "Передайте параметр code (артикул аналога)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        rows = list(analogs_find(brand, code)[:10])
+        return Response(
+            {
+                "query": {"brand": brand, "code": code},
+                "count": len(rows),
+                "matches": [
+                    {
+                        "brand": row.brand,
+                        "foreign_code": row.foreign_code,
+                        "sku_code": row.sku.sku_code,
+                        "sku_slug": row.sku.slug,
+                        "name": row.sku.name,
+                        "torque_nm": row.torque_nm,
+                        "voltage": row.voltage,
+                        "control": row.control,
+                        "spring_return": row.spring_return,
+                        "note": row.note,
+                    }
+                    for row in rows
+                ],
+            }
+        )
+
+
 class ProductFileViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
