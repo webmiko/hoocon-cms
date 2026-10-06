@@ -235,3 +235,17 @@ def test_tables_js_overrides_prefilled_select_record_label() -> None:
     checkbox_block = js[js.find("function applyRowLabels") : js.find("function markBlankCells")]
     assert 'cell.classList.contains("action-checkbox")' in checkbox_block
     assert 'getAttribute("data-label")' in checkbox_block
+
+
+def test_unfold_empty_results_strings_russian() -> None:
+    """Unfold's empty-changelist strings resolve to Russian via project locale."""
+    from django.utils import translation
+    from django.utils.translation import gettext
+
+    with translation.override("ru"):
+        assert gettext("No results found") == "Ничего не найдено"
+        assert gettext("Reset filters") == "Сбросить фильтры"
+        assert (
+            gettext("This page yielded into no results. Create a new item or reset your filters.")
+            == "На этой странице нет результатов. Создайте запись или сбросьте фильтры."
+        )
