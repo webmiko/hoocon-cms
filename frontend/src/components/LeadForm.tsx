@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { CabinetOffer } from "../account/CabinetOffer";
 import { api, ApiError } from "../api/client";
 import { useCompare } from "../compare/useCompare";
 import { BallValveKitFields } from "./BallValveKitFields";
@@ -133,6 +134,8 @@ export function LeadForm({
   const [pdnConsent, setPdnConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  // Email captured before the form resets — feeds the cabinet upsell.
+  const [leadEmail, setLeadEmail] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // CSRF only when the form is mounted — not on every page (home Lighthouse).
@@ -284,6 +287,7 @@ export function LeadForm({
     try {
       await api.createLead(payload);
       trackLeadSubmit(leadType);
+      setLeadEmail(form.email.trim());
       setSuccess(true);
       setForm(INITIAL_STATE);
       setLines(initialLines(skuSlug, skuCodes, skuName));
@@ -309,20 +313,24 @@ export function LeadForm({
 
   if (success) {
     return (
-      <div className={styles.success}>
-        <h3>Заявка отправлена</h3>
-        <p>
-          Ответим до 2 рабочих часов — на email или телефон из заявки. Если нужны
-          уточнения по характеристикам или объёму, напишем в том же ответе.
-        </p>
-        <button
-          type="button"
-          className={styles.resetButton}
-          onClick={() => setSuccess(false)}
-        >
-          Отправить ещё одну заявку
-        </button>
-      </div>
+      <>
+        <div className={styles.success}>
+          <h3>Заявка отправлена</h3>
+          <p>
+            Ответим до 2 рабочих часов — на email или телефон из заявки. Если
+            нужны уточнения по характеристикам или объёму, напишем в том же
+            ответе.
+          </p>
+          <button
+            type="button"
+            className={styles.resetButton}
+            onClick={() => setSuccess(false)}
+          >
+            Отправить ещё одну заявку
+          </button>
+        </div>
+        <CabinetOffer email={leadEmail} />
+      </>
     );
   }
 
