@@ -20,16 +20,16 @@ def static_version(_request: HttpRequest) -> dict[str, str]:
     version = getattr(settings, "BUILD_SHA", "").strip()
     if not version and settings.DEBUG:
         base = settings.BASE_DIR / "static/admin"
-        mtimes: list[int] = []
-        for rel in (
-            "css/hoocon-unfold-extras.css",
-            "js/hoocon-admin-leads-sticker.js",
-        ):
-            path = base / rel
-            if path.is_file():
-                mtimes.append(int(path.stat().st_mtime))
-        if mtimes:
-            version = str(max(mtimes))
+        if base.is_dir():
+            # Any admin asset edit must change ?v= — a hardcoded file list
+            # silently misses new CSS/JS and browsers keep serving stale code.
+            mtimes = [
+                int(path.stat().st_mtime)
+                for path in base.rglob("*")
+                if path.is_file() and not path.name.startswith(".")
+            ]
+            if mtimes:
+                version = str(max(mtimes))
     return {"STATIC_VERSION": version or "dev"}
 
 
