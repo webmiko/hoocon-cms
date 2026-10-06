@@ -72,6 +72,20 @@
       </div>
     </div>
     <div class="hoocon-messenger__header-actions">
+      <button
+        type="button"
+        class="hoocon-messenger__info"
+        id="hoocon-messenger-info"
+        aria-label="Карточка диалога"
+        title="Карточка диалога"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2v6Zm0-8h-2V7h2v2Z"
+          />
+        </svg>
+      </button>
       {% if chat_deletable and delete_chat_url %}
         <form
           class="hoocon-messenger__delete"
@@ -169,13 +183,26 @@
       <button type="submit" class="hoocon-messenger__send">
         <span class="hoocon-messenger__send-label">Отправить</span>
       </button>
+      <button
+        type="submit"
+        name="is_note"
+        value="1"
+        class="hoocon-messenger__note-send"
+        title="Сохранить как заметку — клиенту не видно"
+        aria-label="Сохранить как заметку (клиенту не видно)"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Zm17.7-10.2a1 1 0 0 0
+               0-1.42l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.82Z"
+          />
+        </svg>
+        <span class="hoocon-messenger__note-send-label">Заметка</span>
+      </button>
     </div>
     <p class="hoocon-messenger__composer-hint" id="hoocon-reply-hint">
-      <label class="hoocon-messenger__note-toggle">
-        <input type="checkbox" name="is_note" value="1">
-        Заметка (клиенту не видна)
-      </label>
-      · Enter — отправить · Shift+Enter — новая строка
+      Enter — отправить · Shift+Enter — новая строка · «Заметка» — клиенту не видна
     </p>
   </form>
 </section>

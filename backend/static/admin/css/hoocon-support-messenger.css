@@ -494,10 +494,12 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__composer-field {
   --hm-composer-radius: 1.125rem;
   --hm-composer-inset: 0.2rem;
+  --hm-composer-gap: 0.15rem;
+  --hm-composer-corner: calc(var(--hm-composer-radius) - var(--hm-composer-inset));
   grid-area: input;
   display: flex;
   align-items: center;
-  gap: 0.15rem;
+  gap: var(--hm-composer-gap);
   min-width: 0;
   padding: var(--hm-composer-inset) var(--hm-composer-inset) var(--hm-composer-inset) 0.65rem;
   border: 1px solid var(--hm-border);
@@ -568,7 +570,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__composer-field .hoocon-messenger__send {
   flex-shrink: 0;
   min-height: 2.6rem;
-  border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset));
+  border-radius: var(--hm-composer-corner);
 }
 
 .hoocon-messenger__send {
@@ -596,6 +598,174 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__send:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Note send — secondary action; placed after «Отправить» in DOM so implicit
+   Enter submits a normal reply, ordered left of it visually. */
+.hoocon-messenger__note-send {
+  order: 1;
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  position: relative;
+  min-height: 2.6rem;
+  padding: 0 0.6rem;
+  border-radius: var(--hm-composer-corner, 0.925rem);
+  background: transparent;
+  color: var(--hm-quiet);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease,
+    transform 140ms ease,
+    margin-right 140ms ease;
+}
+
+/* On hover the note action merges into «Отправить»: the right edge goes
+   flush (negative margin eats the flex gap) and the corners turn into
+   concave notches hugging the send button's rounding. */
+.hoocon-messenger__note-send:hover:not(:disabled),
+.hoocon-messenger__note-send:focus-visible {
+  --hm-note-bg: color-mix(in srgb, var(--hm-brand) 10%, transparent);
+  color: var(--hm-brand);
+  background: var(--hm-note-bg);
+  transform: none;
+  margin-right: calc(-1 * var(--hm-composer-gap, 0.15rem));
+  border-radius: var(--hm-composer-corner, 0.925rem) 0 0
+    var(--hm-composer-corner, 0.925rem);
+}
+
+.hoocon-messenger__note-send:hover:not(:disabled)::before,
+.hoocon-messenger__note-send:hover:not(:disabled)::after,
+.hoocon-messenger__note-send:focus-visible::before,
+.hoocon-messenger__note-send:focus-visible::after {
+  content: "";
+  position: absolute;
+  right: calc(0px - var(--hm-composer-corner, 0.925rem));
+  width: var(--hm-composer-corner, 0.925rem);
+  height: var(--hm-composer-corner, 0.925rem);
+  background: var(--hm-note-bg);
+  pointer-events: none;
+}
+
+.hoocon-messenger__note-send:hover:not(:disabled)::before,
+.hoocon-messenger__note-send:focus-visible::before {
+  top: 0;
+  -webkit-mask-image: radial-gradient(
+    circle at bottom right,
+    transparent var(--hm-composer-corner, 0.925rem),
+    #000 var(--hm-composer-corner, 0.925rem)
+  );
+  mask-image: radial-gradient(
+    circle at bottom right,
+    transparent var(--hm-composer-corner, 0.925rem),
+    #000 var(--hm-composer-corner, 0.925rem)
+  );
+}
+
+.hoocon-messenger__note-send:hover:not(:disabled)::after,
+.hoocon-messenger__note-send:focus-visible::after {
+  bottom: 0;
+  -webkit-mask-image: radial-gradient(
+    circle at top right,
+    transparent var(--hm-composer-corner, 0.925rem),
+    #000 var(--hm-composer-corner, 0.925rem)
+  );
+  mask-image: radial-gradient(
+    circle at top right,
+    transparent var(--hm-composer-corner, 0.925rem),
+    #000 var(--hm-composer-corner, 0.925rem)
+  );
+}
+
+.hoocon-messenger__note-send:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.hoocon-messenger__note-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hoocon-messenger__composer-field .hoocon-messenger__send {
+  order: 2;
+}
+
+/* Info button — phone-only affordance to open the chat card sheet. */
+.hoocon-messenger__info {
+  display: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--hm-quiet);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 140ms ease;
+}
+
+.hoocon-messenger__info:hover {
+  color: var(--hm-brand);
+  background: color-mix(in srgb, var(--hm-brand) 10%, transparent);
+  transform: scale(1.12);
+}
+
+.hoocon-messenger__info:active {
+  transform: scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hoocon-messenger__note-send,
+  .hoocon-messenger__info {
+    transition: color 160ms ease, background 160ms ease, opacity 160ms ease;
+  }
+
+  .hoocon-messenger__note-send:hover:not(:disabled),
+  .hoocon-messenger__note-send:active:not(:disabled),
+  .hoocon-messenger__info:hover,
+  .hoocon-messenger__info:active {
+    transform: none;
+  }
+}
+
+/* Close chip for the phone info sheet (JS-appended to body). */
+.hoocon-chat-info-close {
+  display: none;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 0.6rem);
+  right: 0.75rem;
+  z-index: 96;
+  appearance: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--hm-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hm-surface, #fff) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--hm-quiet);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body.hoocon-chat-info-open .hoocon-chat-info-close {
+  display: inline-flex;
 }
 
 .hoocon-messenger__sr-only {

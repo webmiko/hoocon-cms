@@ -17,15 +17,15 @@ from config.context_processors import (
 
 @override_settings(DEBUG=True, BUILD_SHA="")
 def test_static_version_uses_mtime_in_debug() -> None:
-    """Without BUILD_SHA, DEBUG uses max mtime of theme CSS/JS when present."""
+    """Without BUILD_SHA, DEBUG uses max mtime across ALL admin assets."""
     base = Path(__file__).resolve().parents[1] / "static/admin"
     css = base / "css/hoocon-unfold-extras.css"
-    assert css.is_file()
+    messenger_js = base / "js/hoocon-support-messenger.js"
+    assert css.is_file() and messenger_js.is_file()
     ctx = static_version(RequestFactory().get("/"))
     assert ctx["STATIC_VERSION"].isdigit()
-    assert int(ctx["STATIC_VERSION"]) == int(css.stat().st_mtime) or int(
-        ctx["STATIC_VERSION"],
-    ) >= int(css.stat().st_mtime)
+    # Any file under static/admin must bust the cache — not only a fixed list.
+    assert int(ctx["STATIC_VERSION"]) >= int(messenger_js.stat().st_mtime)
 
 
 @override_settings(DEBUG=False, BUILD_SHA="")

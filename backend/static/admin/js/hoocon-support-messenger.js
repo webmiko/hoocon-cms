@@ -168,11 +168,56 @@
     });
   }
 
+  /**
+   * Phone thread is a full-screen sheet — the Django change form (client,
+   * status, assignee…) sits behind it. The ⓘ header button toggles
+   * ``body.hoocon-chat-info-open``; CSS then lifts the form into a fixed
+   * overlay with a floating close chip.
+   */
+  function setupInfoSheet() {
+    var infoBtn = document.getElementById("hoocon-messenger-info");
+    if (!infoBtn) return;
+
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "hoocon-chat-info-close";
+    closeBtn.textContent = "Закрыть";
+    closeBtn.setAttribute("aria-label", "Закрыть карточку диалога");
+    document.body.appendChild(closeBtn);
+
+    function setOpen(open) {
+      document.body.classList.toggle("hoocon-chat-info-open", open);
+      if (open) {
+        var formEl = document.querySelector("#content-main > form");
+        if (formEl) formEl.scrollTop = 0;
+        closeBtn.focus();
+      } else {
+        infoBtn.focus();
+      }
+    }
+
+    infoBtn.addEventListener("click", function () {
+      setOpen(true);
+    });
+    closeBtn.addEventListener("click", function () {
+      setOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (
+        event.key === "Escape" &&
+        document.body.classList.contains("hoocon-chat-info-open")
+      ) {
+        setOpen(false);
+      }
+    });
+  }
+
   ready(function () {
     var root = document.getElementById("hoocon-messenger");
     var thread = document.getElementById("hoocon-messenger-thread");
     if (thread) scrollThread(thread);
     if (root && thread) startPoll(root, thread);
+    setupInfoSheet();
 
     var form = document.getElementById("hoocon-messenger-reply");
     var textarea = document.getElementById("hoocon-reply-body");
@@ -205,8 +250,10 @@
     });
 
     form.addEventListener("submit", function () {
-      var btn = form.querySelector(".hoocon-messenger__send");
-      if (btn) btn.disabled = true;
+      var buttons = form.querySelectorAll('button[type="submit"]');
+      for (var i = 0; i < buttons.length; i += 1) {
+        buttons[i].disabled = true;
+      }
     });
   });
 })();

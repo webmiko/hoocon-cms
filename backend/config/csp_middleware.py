@@ -147,12 +147,15 @@ class CspMiddleware:
         # Nonce only for HTML SPA shells — API JSON does not need it.
         content_type = response.get("Content-Type", "")
         is_wiki_read = request.path.startswith("/admin/content/wikidocument/read/")
-        # Wiki dashboards are stored HTML with inline bootstrap scripts and no nonce
-        # attributes. If script-src includes a nonce, browsers ignore 'unsafe-inline'.
-        use_nonce = None if is_wiki_read else (nonce if "text/html" in content_type else None)
-        # Unfold Admin (Alpine) needs eval; keep the public SPA strict.
-        allow_unsafe_eval = request.path.startswith("/admin/")
-        allow_inline_scripts = is_wiki_read
+        is_admin = request.path.startswith("/admin/")
+        # Wiki dashboards and the Unfold admin ship inline scripts with no nonce
+        # attributes. If script-src includes a nonce, browsers ignore
+        # 'unsafe-inline' and block them, so these pages get no nonce at all.
+        use_nonce = None if is_wiki_read or is_admin else (nonce if "text/html" in content_type else None)
+        # Unfold Admin (Alpine) needs eval and inline bootstraps;
+        # keep the public SPA strict.
+        allow_unsafe_eval = is_admin
+        allow_inline_scripts = is_wiki_read or is_admin
         value = build_csp(
             nonce=use_nonce,
             allow_unsafe_eval=allow_unsafe_eval,

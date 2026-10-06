@@ -1480,6 +1480,40 @@ html.dark .hoocon-phone-more__sheet,
     box-shadow: none;
   }
 
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__note-send {
+    min-height: var(--hoocon-phone-tap);
+    padding: 0 0.5rem;
+  }
+
+  /* Header ⓘ opens the hidden change form (chat card) as a fixed sheet. */
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__info {
+    display: inline-flex;
+    width: var(--hoocon-phone-tap);
+    height: var(--hoocon-phone-tap);
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread.hoocon-chat-info-open
+    #content-main > form {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: calc(3.6rem + env(safe-area-inset-top, 0px)) 0.75rem
+      calc(1rem + env(safe-area-inset-bottom, 0px));
+    background: var(--hm-surface, var(--hoocon-surface, #fff));
+  }
+
+  body.hoocon-phone-ready.hoocon-support-thread.hoocon-chat-info-open
+    #content-main > form .submit-row {
+    display: flex !important;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+
   /* ── iOS 27 Settings hub (account + grouped drill-down) ─────────── */
   .hoocon-phone-settings-back {
     display: none;
