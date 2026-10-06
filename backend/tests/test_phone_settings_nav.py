@@ -77,21 +77,28 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     # «Работа» — one tap to every daily section, in fixed order.
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:5] == [
+    assert work_ids[:7] == [
         "leads-lead",
+        "leads-stats",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",
         "crm-activity",
+        "crm-quote",
     ]
+    assert groups["leads-stats"]["action"] == "link"
+    assert groups["leads-stats"]["url"].endswith("/admin/leads/lead/stats/")
     assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
     assert groups["crm-emailmessage"]["url"].endswith("/admin/crm/emailmessage/")
+    assert groups["crm-quote"]["url"].endswith("/admin/crm/quote/")
 
-    # Single leftover model (шаблоны писем / правила компаний) — flat link,
-    # no one-item drill-down.
-    assert groups["crm-emailtemplate"]["action"] == "link"
-    assert groups["crm-emailtemplate"]["url"].endswith("/admin/crm/emailtemplate/")
-    assert "crm" not in groups
+    # Остальные модели crm (шаблоны писем, вложения, состояние ящика) —
+    # в drill-строке «crm», не плоско.
+    assert groups["crm"]["action"] == "drill"
+    crm_items = {item["url"] for item in groups["crm"]["items"]}
+    assert any("/emailtemplate/" in url for url in crm_items)
+    assert any("/emailattachment/" in url for url in crm_items)
+    assert any("/inboundmailboxstate/" in url for url in crm_items)
     assert "leads" not in groups
 
     # «Каталог» — top models flat, справочники remain inside the drill row.
@@ -417,8 +424,17 @@ def test_manager_nav_shows_only_permitted_sections() -> None:
         "crm-client",
         "crm-emailmessage",
         "crm-activity",
-        "crm-emailtemplate",
+        "crm-quote",
+        "crm-clientdocument",
+        "crm-company",
+        "cabinet-order",
+        "cabinet-rmacase",
+        "cabinet-speclist",
     } <= ids
+    # Шаблоны писем — единственный непиннед остаток CRM у менеджера:
+    # рендерится плоской строкой, а не drill-разделом.
+    assert "crm-emailtemplate" in ids
+    assert "crm" not in ids
     # Каталог — view-only по матрице, но ссылки видны.
     assert {"catalog-sku", "catalog-product", "catalog-category", "catalog"} <= ids
     # Аналитика и веб-пуш по матрице доступны.

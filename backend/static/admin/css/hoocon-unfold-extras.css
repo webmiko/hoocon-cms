@@ -169,7 +169,6 @@ body.hoocon-os27 :is(
 }
 
 body.hoocon-os27 :is(
-  .hoocon-dash__quick a,
   .hoocon-lead-stats__periods a,
   .hoocon-phone-more__close,
   .hoocon-phone-select-toggle,
@@ -758,30 +757,6 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   max-width: 40rem;
 }
 
-.hoocon-dash__quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.hoocon-dash__quick a {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.4rem 0.85rem;
-  border-radius: var(--hoocon-radius-btn-sm);
-  border: 1px solid var(--hoocon-glass-border);
-  background: var(--hoocon-surface-muted);
-  color: var(--hoocon-quiet);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.hoocon-dash__quick a:hover {
-  color: var(--hoocon-primary);
-  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
-}
-
 .hoocon-dash__h2 {
   margin: 0;
   font-size: 0.95rem;
@@ -953,7 +928,6 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   color: var(--hoocon-primary-on-dark);
 }
 
-.dark .hoocon-dash__quick a:hover,
 .dark .hoocon-dash__cards .hoocon-lead-stats__value a:hover,
 .dark .hoocon-admin-lead-sticker:hover {
   color: var(--hoocon-primary-on-dark) !important;
@@ -3444,4 +3418,66 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     border: none !important;
     position: relative;
   }
+}
+
+/* Toggle switch — native checkbox restyled as an OS-style on/off control
+   (same pill track + sliding knob as .hoocon-admin-push-toggle). */
+input[type="checkbox"].hoocon-toggle {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 2.6rem !important;
+  height: 1.5rem !important;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #c8cad0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s ease;
+}
+
+input[type="checkbox"].hoocon-toggle::after {
+  content: "";
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 20, 30, 0.25);
+  transition: transform 0.15s ease;
+}
+
+input[type="checkbox"].hoocon-toggle:checked {
+  background: var(--os27-accent, var(--hoocon-primary, #dc1313)) !important;
+}
+
+input[type="checkbox"].hoocon-toggle:checked::after {
+  transform: translateX(1.1rem);
+}
+
+input[type="checkbox"].hoocon-toggle:focus-visible {
+  outline: 2px solid var(--os27-accent, var(--hoocon-primary, #dc1313));
+  outline-offset: 2px;
+}
+
+input[type="checkbox"].hoocon-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dark input[type="checkbox"].hoocon-toggle,
+html.dark input[type="checkbox"].hoocon-toggle {
+  background: #4b4b4b !important;
+}
+
+.dark input[type="checkbox"].hoocon-toggle:checked,
+html.dark input[type="checkbox"].hoocon-toggle:checked {
+  background: var(--os27-accent, #f87171) !important;
 }

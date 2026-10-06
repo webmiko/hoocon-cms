@@ -63,6 +63,8 @@ urlpatterns = [
     path("api/webpush/", include("webpush.urls")),
     path("api/analytics/", include("analytics.urls")),
     path("api/staff/", include("staff_api.urls")),
+    path("api/auth/", include("cabinet.urls_auth")),
+    path("api/account/", include("cabinet.urls")),
     path("api/settings/", include("sitesettings.urls")),
     path("api/integrations/", include("social.urls")),
     path("api/", include("search.urls")),

@@ -49,6 +49,11 @@ def test_manager_group_can_work_leads_without_delete_or_settings() -> None:
     assert "delete_lead" not in codenames
     assert "change_client" in codenames
     assert "add_emailmessage" in codenames
+    # КП — рабочий инструмент менеджера (кнопка «Создать КП» на заявке).
+    assert "add_quote" in codenames
+    assert "change_quote" in codenames
+    assert "add_quoteitem" in codenames
+    assert "delete_quote" not in codenames
     assert "view_sku" in codenames
     assert "change_sku" not in codenames
     assert "view_page" not in codenames

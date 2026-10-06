@@ -537,7 +537,7 @@ def test_os27_css_covers_settings_layout() -> None:
         "overflow: visible"
         in css.split("body.hoocon-os27.hoocon-phone-ready.change-form fieldset.module")[1].split("}")[0]
     )
-    assert "body.hoocon-os27 .hoocon-dash__quick" in css
+    assert "hoocon-dash__quick" not in css
     assert "hoocon-os27-sidebar-panel" in css
     assert "hoocon-glass-search-chip" in css
     assert "blur(80px)" in css

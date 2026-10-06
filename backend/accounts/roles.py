@@ -54,6 +54,20 @@ _CRM_MODELS: Final[tuple[str, ...]] = (
     "activity",
     "emailmessage",
     "emailtemplate",
+    "quote",
+    "quoteitem",
+    "clientdocument",
+    "company",
+    "companymember",
+)
+
+# Кабинет клиента: заказы/спеки/рекламации (аккаунты — только «Админ»/сервисы).
+_ACCOUNT_MODELS: Final[tuple[str, ...]] = (
+    "speclist",
+    "speclistitem",
+    "order",
+    "orderitem",
+    "rmacase",
 )
 
 
@@ -108,10 +122,12 @@ _WEBPUSH_MODELS: Final[tuple[str, ...]] = ("pushsubscription",)
 _ANALYTICS_MODELS: Final[tuple[str, ...]] = ("pagedailystat", "sitedailystat")
 
 _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
-    _crud("catalog", _CATALOG_MODELS)
+    _crud("catalog", _CATALOG_MODELS + ("analogmap",))
     | _crud("content", _CONTENT_MODELS)
     | _crud("leads", ("lead",))
     | _crud("crm", _CRM_MODELS)
+    | _crud("cabinet", _ACCOUNT_MODELS)
+    | _view_only("accounts", ("clientaccount", "socialaccount"))
     | _crud("redirects", ("redirect",))
     | _crud("sitesettings", ("sitesettings",))
     | _crud("social", ("socialpost",))
@@ -125,6 +141,9 @@ _ADMIN_PERMS: Final[frozenset[tuple[str, str]]] = (
 _MANAGER_PERMS: Final[frozenset[tuple[str, str]]] = (
     _write_no_delete("leads", ("lead",))
     | _write_no_delete("crm", _CRM_MODELS)
+    | _write_no_delete("cabinet", ("order", "orderitem", "rmacase"))
+    | _view_only("cabinet", ("speclist", "speclistitem"))
+    | _write_no_delete("catalog", ("analogmap",))
     | _write_no_delete("supportchat", _SUPPORTCHAT_MODELS)
     | _write_no_delete("webpush", _WEBPUSH_MODELS)
     | _view_only("catalog", _CATALOG_MODELS)
@@ -136,7 +155,8 @@ _MANAGER_PERMS: Final[frozenset[tuple[str, str]]] = (
 _ANALYST_PERMS: Final[frozenset[tuple[str, str]]] = (
     _view_only("leads", ("lead",))
     | _view_only("crm", _CRM_MODELS)
-    | _view_only("catalog", _CATALOG_MODELS)
+    | _view_only("cabinet", _ACCOUNT_MODELS)
+    | _view_only("catalog", _CATALOG_MODELS + ("analogmap",))
     | _view_only("supportchat", _SUPPORTCHAT_MODELS)
     | _view_only("webpush", _WEBPUSH_MODELS)
     | _view_only("analytics", _ANALYTICS_MODELS)

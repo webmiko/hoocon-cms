@@ -133,6 +133,7 @@ INSTALLED_APPS = [
     "axes",
     # Project apps (с итерации 1)
     "accounts.apps.AccountsConfig",
+    "cabinet.apps.CabinetConfig",
     "redirects.apps.RedirectsConfig",
     "sitesettings",
     "catalog.apps.CatalogConfig",
@@ -275,6 +276,9 @@ WHITENOISE_USE_FINDERS = DEBUG
 WHITENOISE_AUTOREFRESH = DEBUG
 MEDIA_URL = "/media/"
 MEDIA_ROOT = str(BASE_DIR / "media")
+# Staff-only files (вложения писем CRM и др.): не отдаётся nginx /media/,
+# скачивание только через Admin-вьюхи с проверкой скоупа.
+PRIVATE_MEDIA_ROOT = str(BASE_DIR / "private_media")
 
 # Optional deploy SHA for admin CSS/JS cache-bust (?v=); empty → mtime in DEBUG.
 BUILD_SHA = os.getenv("BUILD_SHA", "").strip()
@@ -575,6 +579,9 @@ REST_FRAMEWORK = {
         "telegram_webhook": "120/min",
         "max_webhook": "120/min",
         "staff_otp": "30/hour",
+        # Client cabinet: register/login/OTP (per IP) and RFQ-repeat (per session).
+        "client_auth": "30/hour",
+        "client_repeat": "10/min",
     },
 }
 
@@ -645,6 +652,17 @@ EMAIL_BACKEND = os.getenv(
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
 
+# Inbound CRM mail (IMAP poll by beat task ``crm.fetch_inbound_email``).
+# Яндекс 360: пароль приложения ящика (webhook у них нет — только IMAP).
+IMAP_ENABLED = _env_bool("IMAP_ENABLED", default=False)
+IMAP_HOST = os.getenv("IMAP_HOST", "imap.yandex.ru").strip()
+IMAP_PORT = int(os.getenv("IMAP_PORT", "993"))
+IMAP_USER = os.getenv("IMAP_USER", "").strip()
+IMAP_PASSWORD = os.getenv("IMAP_PASSWORD", "")
+IMAP_FOLDER = os.getenv("IMAP_FOLDER", "INBOX").strip() or "INBOX"
+IMAP_USE_SSL = _env_bool("IMAP_USE_SSL", default=True)
+IMAP_FETCH_LIMIT = int(os.getenv("IMAP_FETCH_LIMIT", "50"))
+
 # Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
 # Prod: ADMIN_EMAIL_OTP_ENABLED=true + ALLOWED_EMAILS (SMTP required).
 # ALLOWED_EMAILS: comma list of addresses and/or domains (@hoocon.ru / *@hoocon.ru).
@@ -673,6 +691,21 @@ ADMIN_PASSKEY_ORIGIN = os.getenv("ADMIN_PASSKEY_ORIGIN", SITE_URL).strip().rstri
 ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS = int(
     os.getenv("ADMIN_PASSKEY_CHALLENGE_TTL_SECONDS", "300"),
 )
+
+# Client cabinet auth (ЛК-0): session login by password or email OTP.
+# OTP scope uses the shared helpers with CLIENT_OTP_* prefix (prod-tunable).
+CLIENT_OTP_TTL_SECONDS = int(os.getenv("CLIENT_OTP_TTL_SECONDS", "300"))
+CLIENT_OTP_MAX_ATTEMPTS = int(os.getenv("CLIENT_OTP_MAX_ATTEMPTS", "5"))
+CLIENT_OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("CLIENT_OTP_RESEND_COOLDOWN_SECONDS", "60"))
+CLIENT_OTP_REQUEST_LIMIT = int(os.getenv("CLIENT_OTP_REQUEST_LIMIT", "20"))
+CLIENT_OTP_REQUEST_WINDOW_SECONDS = int(os.getenv("CLIENT_OTP_REQUEST_WINDOW_SECONDS", "3600"))
+# Yandex ID OAuth (ЛК-0 mode C) — отдельная итерация, модель SocialAccount готова.
+YANDEX_OAUTH_ENABLED = _env_bool("YANDEX_OAUTH_ENABLED", default=False)
+YANDEX_OAUTH_CLIENT_ID = os.getenv("YANDEX_OAUTH_CLIENT_ID", "").strip()
+YANDEX_OAUTH_CLIENT_SECRET = os.getenv("YANDEX_OAUTH_CLIENT_SECRET", "")
+YANDEX_OAUTH_REDIRECT_URI = os.getenv("YANDEX_OAUTH_REDIRECT_URI", "").strip()
+# CABINET_SHOW_PRICES=false → цены/суммы не отдаются в /api/account/* (решение 2026-10).
+CABINET_SHOW_PRICES = _env_bool("CABINET_SHOW_PRICES", default=False)
 
 # Staff mobile API (Flutter manager app). Internal distribution only.
 STAFF_API_ENABLED = _env_bool("STAFF_API_ENABLED", default=False)
