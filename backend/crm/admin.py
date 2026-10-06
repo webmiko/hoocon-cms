@@ -2,20 +2,37 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import F, QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
+from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin
-from crm.forms import ComposeEmailForm
-from crm.models import Activity, Client, EmailMessage, EmailStatus, EmailTemplate
+from crm.forms import ComposeEmailForm, SpecImportForm
+from crm.models import (
+    Activity,
+    Client,
+    ClientDocument,
+    Company,
+    CompanyMember,
+    EmailAttachment,
+    EmailMessage,
+    EmailStatus,
+    EmailTemplate,
+    InboundMailboxState,
+    Quote,
+    QuoteItem,
+    QuoteStatus,
+)
 from crm.services import (
     create_outbound_email,
     email_template_context_for_client,
@@ -28,6 +45,8 @@ from crm.services import (
 from leads.models import Lead
 from leads.services import lead_visible_to_manager, scope_leads_for_manager
 from supportchat.models import Conversation
+
+logger = logging.getLogger(__name__)
 
 
 def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
@@ -99,6 +118,7 @@ class EmailMessageInline(TabularInline):
     fields = (
         "direction",
         "status",
+        "lead_link",
         "to_email",
         "subject",
         "created_at",
@@ -108,6 +128,14 @@ class EmailMessageInline(TabularInline):
     can_delete = False
     show_change_link = True
     max_num = 20
+
+    @admin.display(description="заявка")
+    def lead_link(self, obj: EmailMessage) -> str:
+        """Linked обращение — видно, к какой заявке относится письмо."""
+        if obj.lead_id is None:
+            return "—"
+        url = reverse("admin:leads_lead_change", args=[obj.lead_id])
+        return format_html('<a href="{}">#{}</a>', url, obj.lead_id)
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         """Compose via «Написать письмо», not inline add."""
@@ -149,6 +177,53 @@ class ConversationInline(TabularInline):
         return super().get_queryset(request).select_related("assignee")
 
 
+class QuoteItemInline(TabularInline):
+    """SKU lines of a quote (manager-editable)."""
+
+    model = QuoteItem
+    extra = 1
+    fields = ("sku", "sku_code", "quantity", "unit_price", "sort_order")
+    autocomplete_fields = ("sku",)
+
+
+class QuoteInline(TabularInline):
+    """Quotes issued from this client card (read-mostly)."""
+
+    model = Quote
+    extra = 0
+    fields = ("number", "status", "lead", "sent_at", "created_at")
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    ordering = ("-created_at",)
+    verbose_name = "коммерческое предложение"
+    verbose_name_plural = "коммерческие предложения"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """КП создаётся кнопкой «Создать КП» на заявке, не вручную здесь."""
+        return False
+
+
+class ClientDocumentInline(TabularInline):
+    """Документы карточки (ЛК-3/14): КП-счёта-УПД, private download."""
+
+    model = ClientDocument
+    extra = 1
+    fields = ("title", "kind", "file", "edo_status", "download_link", "created_at")
+    readonly_fields = ("download_link", "created_at")
+    ordering = ("-created_at",)
+    verbose_name = "документ"
+    verbose_name_plural = "документы"
+
+    @admin.display(description="файл")
+    def download_link(self, obj: ClientDocument) -> str:
+        """Staff download link through the scoped admin view."""
+        if not obj.pk:
+            return "—"
+        url = reverse("admin:crm_clientdocument_download", args=[obj.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.title or "файл")
+
+
 @admin.register(Client)
 class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     """CRM client card: contacts, assignee, leads, timeline, send email.
@@ -172,8 +247,16 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     search_fields = ("email", "name", "company", "phone", "notes")
     autocomplete_fields = ("assignee",)
     readonly_fields = ("created_at", "updated_at", "leads_count", "company_key")
-    inlines = (LeadInline, ActivityInline, EmailMessageInline, ConversationInline)
+    inlines = (
+        LeadInline,
+        ActivityInline,
+        EmailMessageInline,
+        ConversationInline,
+        QuoteInline,
+        ClientDocumentInline,
+    )
     ordering = ("email", "name", "company")
+    actions = ("merge_clients_action",)
     fieldsets = (
         (
             "Контакт (ID = эл. почта)",
@@ -203,6 +286,53 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     def email_id(self, obj: Client) -> str:
         """Client ID is the email address (unique card key)."""
         return obj.email
+
+    @admin.action(
+        description="Объединить карточки (связи перейдут на основную)",
+    )
+    def merge_clients_action(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[Client],
+    ) -> None:
+        """Merge selected duplicate cards (same company_key or ручной выбор).
+
+        Целевая карточка — та, что с аккаунтом ЛК, иначе самая ранняя по
+        дате создания. Связи источников переносятся; источники
+        деактивируются, а не удаляются (email-ы остаются уникальными).
+        """
+        clients = list(queryset.order_by("created_at", "pk"))
+        if len(clients) < 2:
+            self.message_user(
+                request,
+                _("Выберите хотя бы две карточки для объединения."),
+                messages.WARNING,
+            )
+            return
+        with_account = [c for c in clients if c.account_id]
+        target = with_account[0] if with_account else clients[0]
+        sources = [c for c in clients if c.pk != target.pk]
+        from crm.services import merge_clients
+
+        moved = merge_clients(target, sources, actor=request.user)
+        total = sum(moved.values())
+        self.message_user(
+            request,
+            _(
+                "Карточки объединены в %(target)s: перенесено %(total)s связей "
+                "(заявки %(leads)s, письма %(emails)s, КП %(quotes)s, "
+                "заказы %(orders)s). Источники деактивированы."
+            )
+            % {
+                "target": target.email,
+                "total": total,
+                "leads": moved["leads"],
+                "emails": moved["emails"],
+                "quotes": moved["quotes"],
+                "orders": moved["orders"],
+            },
+            messages.SUCCESS,
+        )
 
     @admin.display(description="Заявок", ordering="_leads_count")
     def leads_count(self, obj: Client) -> int:
@@ -257,6 +387,11 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                 self.admin_site.admin_view(self.compose_email_view),
                 name=f"{info[0]}_{info[1]}_compose_email",
             ),
+            path(
+                "<path:object_id>/import-spec/",
+                self.admin_site.admin_view(self.import_spec_view),
+                name=f"{info[0]}_{info[1]}_import_spec",
+            ),
         ]
         return custom + urls
 
@@ -271,6 +406,10 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         extra_context = extra_context or {}
         extra_context["compose_email_url"] = reverse(
             "admin:crm_client_compose_email",
+            args=[object_id],
+        )
+        extra_context["import_spec_url"] = reverse(
+            "admin:crm_client_import_spec",
             args=[object_id],
         )
         return super().change_view(
@@ -345,6 +484,73 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         }
         return render(request, "admin/crm/compose_email.html", context)
 
+    def import_spec_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Upload .xlsx spec → draft RFQ lead with resolved positions (ЛК-9)."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        client = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, client):
+            raise PermissionDenied
+        if not request.user.has_perm("leads.add_lead"):
+            raise PermissionDenied
+        change_url = reverse("admin:crm_client_change", args=[client.pk])
+
+        if request.method == "POST":
+            form = SpecImportForm(request.POST, request.FILES)
+            if form.is_valid():
+                from cabinet.spec_import import (
+                    SpecParseError,
+                    create_lead_from_spec_rows,
+                    parse_spec_xlsx,
+                )
+
+                uploaded = form.cleaned_data["file"]
+                try:
+                    rows = parse_spec_xlsx(uploaded)
+                except SpecParseError as exc:
+                    self.message_user(request, str(exc), messages.ERROR)
+                    return HttpResponseRedirect(change_url)
+                lead = create_lead_from_spec_rows(
+                    rows,
+                    client=client,
+                    source_name=uploaded.name,
+                )
+                resolved = sum(1 for r in rows if r.sku is not None)
+                analogs = sum(1 for r in rows if r.via_analog)
+                self.message_user(
+                    request,
+                    _(
+                        "Создана заявка #%(id)s: %(total)s позиций "
+                        "(нашлось %(resolved)s, из них по аналогам %(analogs)s)."
+                    )
+                    % {
+                        "id": lead.pk,
+                        "total": len(rows),
+                        "resolved": resolved,
+                        "analogs": analogs,
+                    },
+                    messages.SUCCESS,
+                )
+                return HttpResponseRedirect(
+                    reverse("admin:leads_lead_change", args=[lead.pk]),
+                )
+        else:
+            form = SpecImportForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": client,
+            "title": _("Импорт спецификации: %(name)s") % {"name": client.name},
+            "form": form,
+            "media": self.media,
+        }
+        return render(request, "admin/crm/import_spec.html", context)
+
 
 @admin.register(Activity)
 class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
@@ -410,12 +616,40 @@ class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
+class EmailAttachmentInline(TabularInline):
+    """Read-only attachments of an inbound message (private download)."""
+
+    model = EmailAttachment
+    extra = 0
+    max_num = 0
+    can_delete = False
+    show_change_link = False
+    fields = ("download_link", "content_type", "size")
+    readonly_fields = fields
+    verbose_name = "вложение"
+    verbose_name_plural = "вложения"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Attachments arrive via IMAP only — no manual add."""
+        return False
+
+    @admin.display(description="файл")
+    def download_link(self, obj: EmailAttachment) -> str:
+        """Staff download link through the scoped admin view."""
+        if not obj or not obj.pk:
+            return "—"
+        url = reverse("admin:crm_emailattachment_download", args=[obj.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.filename)
+
+
 @admin.register(EmailMessage)
 class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Outbound/inbound email log; staff can resend failed/draft.
 
     ID = email клиента (или to_email); одинаковые ID группируются.
     """
+
+    inlines = (EmailAttachmentInline,)
 
     list_display = (
         "client_email_id",
@@ -438,6 +672,11 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
         "created_at",
         "sent_at",
         "created_by",
+        "message_id",
+        "in_reply_to",
+        "imap_uid",
+        "mailbox",
+        "received_at",
     )
     ordering = ("client__email", "-created_at")
     actions = ("queue_send",)
@@ -462,6 +701,12 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
             "Доставка",
             {
                 "fields": ("error_message", "created_by", "created_at", "sent_at"),
+            },
+        ),
+        (
+            "Технические",
+            {
+                "fields": ("message_id", "in_reply_to", "imap_uid", "mailbox", "received_at"),
             },
         ),
     )
@@ -575,3 +820,266 @@ class EmailTemplateAdmin(ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(EmailAttachment)
+class EmailAttachmentAdmin(ModelAdmin):
+    """Attachment registry; files live in PRIVATE_MEDIA_ROOT (no public URL)."""
+
+    list_display = ("email", "filename", "content_type", "size", "created_at")
+    list_filter = ("content_type", "created_at")
+    search_fields = ("filename", "email__subject", "email__from_email")
+    readonly_fields = ("email", "filename", "content_type", "size", "file", "created_at")
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Attachments arrive via IMAP only."""
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EmailAttachment]:
+        """Scope attachments to messages visible to the manager."""
+        qs = super().get_queryset(request).select_related("email", "email__client")
+        visible = scope_emails_for_manager(
+            EmailMessage.objects.all(),
+            request.user,
+        ).values("pk")
+        return qs.filter(email_id__in=visible)
+
+    def get_urls(self) -> list[Any]:
+        """Add scoped staff download endpoint."""
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:pk>/download/",
+                self.admin_site.admin_view(self.download_view),
+                name="crm_emailattachment_download",
+            ),
+        ]
+        return custom + urls
+
+    def download_view(self, request: HttpRequest, pk: int) -> FileResponse:
+        """Serve the file only when the parent email is in manager scope."""
+        obj = get_object_or_404(EmailAttachment, pk=pk)
+        visible = scope_emails_for_manager(
+            EmailMessage.objects.filter(pk=obj.email_id),
+            request.user,
+        ).exists()
+        if not visible:
+            raise PermissionDenied(_("Нет доступа к вложению этого письма."))
+        return FileResponse(
+            open(obj.file.path, "rb"),
+            as_attachment=True,
+            filename=obj.filename,
+        )
+
+
+@admin.register(InboundMailboxState)
+class InboundMailboxStateAdmin(ModelAdmin):
+    """IMAP cursor + fetch health (singleton; read-only for staff)."""
+
+    list_display = ("folder", "last_uid", "last_run_at", "last_error")
+    readonly_fields = ("folder", "last_uid", "last_run_at", "last_error")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Singleton row is created by the fetch task."""
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Cursor row must not be removed."""
+        return False
+
+
+@admin.register(Quote)
+class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
+    """Коммерческие предложения: позиции, статус, связь с заявкой."""
+
+    list_display = ("number", "client", "lead", "status", "created_at", "sent_at")
+    list_display_links = ("number", "client")
+    list_filter = ("status", "created_at")
+    search_fields = (
+        "number",
+        "client__email",
+        "client__name",
+        "client__company",
+        "items__sku_code",
+    )
+    autocomplete_fields = ("client", "lead", "created_by")
+    readonly_fields = ("number", "sent_at", "created_at", "updated_at")
+    inlines = (QuoteItemInline,)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "number",
+                    "status",
+                    "client",
+                    "lead",
+                    "created_by",
+                    "comment",
+                ),
+            },
+        ),
+        (
+            "Метаданные",
+            {
+                "fields": ("sent_at", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Quote,
+        form: Any,
+        change: bool,
+    ) -> None:
+        """Status SENT stamps sent_at, issues the PDF doc and closes the lead."""
+        super().save_model(request, obj, form, change)
+        if obj.status == QuoteStatus.SENT:
+            first_issue = obj.sent_at is None
+            if first_issue:
+                obj.sent_at = timezone.now()
+                obj.save(update_fields=["sent_at", "updated_at"])
+            self._issue_quote_document(request, obj, notify=first_issue)
+            self._close_source_lead(request, obj)
+        elif obj.sent_at is not None:
+            obj.sent_at = None
+            obj.save(update_fields=["sent_at", "updated_at"])
+
+    def _issue_quote_document(
+        self,
+        request: HttpRequest,
+        obj: Quote,
+        *,
+        notify: bool,
+    ) -> None:
+        """PDF → ClientDocument (private); клиенту — письмо-уведомление.
+
+        Notification fires only on the first SENT transition (re-saves of
+        an already-issued quote refresh the PDF but do not re-mail).
+        """
+        from crm.quote_docs import ensure_quote_pdf_document, notify_quote_issued
+
+        try:
+            document = ensure_quote_pdf_document(obj)
+        except Exception as exc:  # PDF failure must not block the save
+            logger.exception("quote_pdf_failed quote_id=%s", obj.pk)
+            self.message_user(
+                request,
+                f"КП выдано, но PDF не сформирован: {type(exc).__name__}",
+                messages.WARNING,
+            )
+            return
+        client = cast(Client, obj.client)
+        if notify and client.email:
+            author = request.user if request.user.is_authenticated else None
+            notify_quote_issued(obj, author=author, document=document)
+
+    def _close_source_lead(self, request: HttpRequest, obj: Quote) -> None:
+        """Выданное КП закрывает заявку результатом (не «просто done»)."""
+        lead = cast(Lead | None, obj.lead)
+        if lead is None or lead.status == Lead.LeadStatus.DONE:
+            return
+        from leads.services import set_lead_status
+
+        updated, error = set_lead_status(
+            lead,
+            status=Lead.LeadStatus.DONE,
+            actor=request.user,
+        )
+        if error:
+            self.message_user(
+                request,
+                f"КП выдано, но заявку #{lead.pk} закрыть не удалось: {error}",
+                messages.WARNING,
+            )
+        else:
+            self.message_user(
+                request,
+                f"Заявка #{updated.pk} закрыта результатом «{obj.number}».",
+                messages.SUCCESS,
+            )
+
+
+@admin.register(ClientDocument)
+class ClientDocumentAdmin(ModelAdmin):
+    """Документы клиента: upload в карточке или здесь; private download."""
+
+    list_display = ("title", "client", "kind", "edo_status", "created_at")
+    list_filter = ("kind", "edo_status", "created_at")
+    search_fields = ("title", "client__email", "client__company")
+    autocomplete_fields = ("client", "quote", "order")
+    list_select_related = ("client",)
+    readonly_fields = ("created_at",)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ClientDocument]:
+        """Scope documents to clients visible to the manager."""
+        qs = super().get_queryset(request)
+        visible = scope_clients_for_manager(
+            Client.objects.all(),
+            request.user,
+        ).values("pk")
+        return qs.filter(client_id__in=visible)
+
+    def save_model(self, request: HttpRequest, obj: ClientDocument, form: Any, change: bool) -> None:
+        """Stamp uploader on first save."""
+        if not change and not obj.uploaded_by_id:
+            obj.uploaded_by = request.user  # type: ignore[misc]
+        super().save_model(request, obj, form, change)
+
+    def get_urls(self) -> list[Any]:
+        """Scoped staff download endpoint."""
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:pk>/download/",
+                self.admin_site.admin_view(self.download_view),
+                name="crm_clientdocument_download",
+            ),
+        ]
+        return custom + urls
+
+    def download_view(self, request: HttpRequest, pk: int) -> FileResponse:
+        """Serve the file only when the client is in manager scope."""
+        obj = get_object_or_404(ClientDocument, pk=pk)
+        visible = scope_clients_for_manager(
+            Client.objects.filter(pk=obj.client_id),
+            request.user,
+        ).exists()
+        if not visible:
+            raise PermissionDenied(_("Нет доступа к документу этого клиента."))
+        return FileResponse(
+            obj.file.open("rb"),
+            as_attachment=True,
+            filename=obj.title or str(obj.file.name or "document"),
+        )
+
+
+class CompanyMemberInline(TabularInline):
+    """Members of a company card (CRM-x)."""
+
+    model = CompanyMember
+    extra = 1
+    fields = ("client", "account", "role")
+    autocomplete_fields = ("client",)
+
+
+@admin.register(Company)
+class CompanyAdmin(ModelAdmin):
+    """Карточка юрлица: реквизиты + члены (целевая схема CRM-x)."""
+
+    list_display = ("name", "inn", "members_count", "clients_count", "updated_at")
+    search_fields = ("name", "inn")
+    readonly_fields = ("company_key", "created_at", "updated_at")
+    inlines = (CompanyMemberInline,)
+
+    @admin.display(description="сотрудников")
+    def members_count(self, obj: Company) -> int:
+        return obj.members.count()
+
+    @admin.display(description="карточек")
+    def clients_count(self, obj: Company) -> int:
+        return obj.clients.count()

@@ -10,4 +10,11 @@
       </a>
     </li>
   {% endif %}
+  {% if import_spec_url %}
+    <li>
+      <a href="{{ import_spec_url }}" class="historylink">
+        {% trans "Импорт спецификации" %}
+      </a>
+    </li>
+  {% endif %}
 {% endblock %}

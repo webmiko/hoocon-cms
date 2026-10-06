@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
+  <span aria-hidden="true">›</span>
+  <span>{% trans "Импорт спецификации" %}</span>
+</nav>
+
+<h1>{{ title }}</h1>
+
+<p class="help">
+  {% trans "Загрузите .xlsx: на первом листе нужны колонки «артикул» и «количество». Сторонние артикулы подбираются по карте аналогов; неопознанные попадут в заявку как есть." %}
+</p>
+
+<form method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    {% for field in form %}
+      <div class="form-row">
+        {{ field.errors }}
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <div class="help">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </fieldset>
+  <div class="submit-row">
+    <input type="submit" value="{% trans 'Импортировать' %}" class="default">
+    <a href="{% url 'admin:crm_client_change' original.pk %}" class="button cancel-link">
+      {% trans "Отмена" %}
+    </a>
+  </div>
+</form>
+{% endblock %}

@@ -113,14 +113,16 @@ def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | 
     """
     from crm.models import Client as CrmClient
 
-    key = normalize_company_label(company)
-    if not key:
-        return None
-
+    # Карточка клиента с закреплённым менеджером побеждает даже при
+    # пустом lead.company — связь «клиент → его менеджер» прямая.
     if client is not None:
         pick = getattr(client, "assignee", None)
         if pick is not None and pick.is_active and pick.is_staff:
             return pick
+
+    key = normalize_company_label(company)
+    if not key:
+        return None
 
     owners = (
         CrmClient.objects.filter(
@@ -168,6 +170,16 @@ def _assign_lead_to_user(lead: Lead, pick: Any) -> Any:
 
     lead.refresh_from_db()
     return pick
+
+
+def assign_lead_to_user(lead: Lead, user: Any) -> Any:
+    """Explicitly pin ``lead`` to ``user`` and claim the CRM client if free.
+
+    Same persistence as the pipeline steps (select_for_update + client
+    backfill) — for channel-specific owners, e.g. an inbound letter in a
+    manager's personal mailbox assigns to that manager directly.
+    """
+    return _assign_lead_to_user(lead, user)
 
 
 def assign_lead_on_create(lead: Lead) -> Any | None:
@@ -296,7 +308,12 @@ def resolve_lead_notify_recipients(lead: Lead) -> list[str]:
     site = SiteSettings.load()
     pinned = is_aterna_company(lead.company) or pinned_rule_for_company(lead.company) is not None
     if not pinned:
-        pinned = company_owner_assignee(lead.company, client=getattr(lead, "client", None)) is not None
+        # Прямой owner-check по lead.client пропускаем: RR/наследование
+        # проставило карточке assignee этой же заявки — это не заранее
+        # закреплённый владелец. Owner ищем по company_label (company_key
+        # любых карточек, включая эту — там пин ставится до lead и он
+        # значит уже «заведомо закреплённую» компанию).
+        pinned = company_owner_assignee(lead.company) is not None
     if pinned or site.lead_routing_mode == SiteSettings.LeadRoutingMode.ASSIGN_MANAGER:
         assignee = getattr(lead, "assignee", None)
         if assignee is not None and getattr(assignee, "is_active", False) and getattr(assignee, "is_staff", False):

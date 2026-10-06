@@ -341,6 +341,22 @@ def test_anon_cannot_compose_email(client) -> None:
 
 
 @pytest.mark.django_db
+def test_compose_email_send_now_renders_as_toggle(client, django_user_model) -> None:
+    """CRM compose uses the same hoocon-toggle switch skin for send_now."""
+    user = django_user_model.objects.create_superuser(
+        username="crm-toggle",
+        email="mgr@hoocon.ru",
+        password="x",
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_compose_email", args=[crm_client.pk])
+    html = client.get(url).content.decode()
+    assert 'type="checkbox"' in html
+    assert 'class="hoocon-toggle"' in html
+
+
+@pytest.mark.django_db
 def test_client_email_unique_normalized() -> None:
     """Client.email is unique after lowercase normalization on save."""
     from django.db import IntegrityError

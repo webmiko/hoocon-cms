@@ -316,3 +316,69 @@ def test_company_owner_notify_goes_to_manager_email() -> None:
     assign_lead_on_create(second)
     second.refresh_from_db()
     assert resolve_lead_notify_recipients(second) == ["own6-a@hoocon.ru"]
+
+
+@pytest.mark.django_db
+def test_new_lead_inherits_pinned_client_assignee() -> None:
+    """Заявка на закреплённую карточку → assignee её владельца (любой канал).
+
+    Регресс правила §14.8.4: связь «клиент → его менеджер» работает и без
+    company (почтовая карточка до заполнения юрлица), и вне режима
+    round-robin — это владение, не распределение.
+    """
+    mgr = _make_manager(username="inh-a", email="inh-a@hoocon.ru")
+    _make_manager(username="inh-b", email="inh-b@hoocon.ru")
+    _set_mode(SiteSettings.LeadRoutingMode.OFF)  # ротация выключена
+    CrmClient.objects.create(
+        name="Иван",
+        email="ivan@corp-inh.ru",
+        company="",
+        assignee=mgr,
+    )
+
+    lead = _make_lead(company="", email="ivan@corp-inh.ru")
+
+    lead.refresh_from_db()
+    assert lead.client is not None
+    assert lead.assignee_id == mgr.pk
+
+
+@pytest.mark.django_db
+def test_inactive_client_owner_not_inherited() -> None:
+    """Неактивный владелец карточки → заявка остаётся в общем пуле."""
+    mgr = _make_manager(username="inh-c", email="inh-c@hoocon.ru")
+    mgr.is_active = False
+    mgr.save(update_fields=["is_active"])
+    _set_mode(SiteSettings.LeadRoutingMode.OFF)
+    CrmClient.objects.create(
+        name="Иван",
+        email="ivan@corp-inh2.ru",
+        company="",
+        assignee=mgr,
+    )
+
+    lead = _make_lead(company="", email="ivan@corp-inh2.ru")
+
+    lead.refresh_from_db()
+    assert lead.assignee_id is None
+
+
+@pytest.mark.django_db
+def test_pipeline_honors_client_owner_without_company() -> None:
+    """assign_lead_on_create: владелец карточки идёт до ротации даже при
+    пустом lead.company — RR-курсор не тратится на чужого клиента."""
+    owner = _make_manager(username="inh-d", email="inh-d@hoocon.ru")
+    _make_manager(username="inh-e", email="inh-e@hoocon.ru")
+    _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
+    CrmClient.objects.create(
+        name="Иван",
+        email="ivan@corp-inh3.ru",
+        company="",
+        assignee=owner,
+    )
+
+    lead = _make_lead(company="", email="ivan@corp-inh3.ru")
+    picked = assign_lead_on_create(lead)
+
+    assert picked is not None
+    assert picked.pk == owner.pk
