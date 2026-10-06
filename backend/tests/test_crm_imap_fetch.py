@@ -705,3 +705,133 @@ def test_create_outbound_uses_author_mailbox() -> None:
     assert own.from_email == "ivan2@hoocon.ru"
     assert shared.mailbox_id is None
     assert "@hoocon.ru" in shared.from_email  # общий DEFAULT_FROM_EMAIL
+
+
+@pytest.mark.django_db
+def test_lead_reply_via_own_mailbox_no_bcc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ответ из личного ящика менеджера → без BCC себе.
+
+    Копия и так лежит в «Отправленных» этого ящика; BCC создал бы
+    дубль во «Входящих».
+    """
+    from accounts.models import StaffMailbox
+    from crm.tasks import send_crm_email
+
+    owner = _staff_user("bcc-own")
+    mailbox = StaffMailbox.objects.create(
+        user=owner,
+        imap_user="bcc-own@hoocon.ru",
+        imap_password="x-not-secret",
+        smtp_host="smtp.test",
+        smtp_port=587,
+        smtp_use_ssl=False,
+    )
+    client = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="B",
+        email="buyer@example.test",
+        message="RFQ",
+    )
+    row = EmailMessage.objects.create(
+        client=client,
+        lead=lead,
+        mailbox=mailbox,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.QUEUED,
+        to_email="buyer@example.test",
+        from_email="noreply@hoocon.ru",
+        reply_to_email="bcc-own@hoocon.ru",
+        subject="Ответ",
+        body="…",
+    )
+    conn = _FakeConnection()
+    monkeypatch.setattr("crm.tasks.get_connection", lambda **kw: conn)
+
+    send_crm_email.run(row.pk)
+
+    assert len(conn.sent) == 1
+    sent = conn.sent[0]
+    assert sent.from_email == "bcc-own@hoocon.ru"
+    assert sent.reply_to == ["bcc-own@hoocon.ru"]
+    assert not sent.bcc  # менеджеру дубля в «Входящие» не уходит
+
+
+@pytest.mark.django_db
+def test_lead_reply_via_shared_mailbox_bcc_manager(
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Any,
+) -> None:
+    """Ответ через общий ящик → ровно один BCC менеджеру.
+
+    Тред стартует в его ящике одной копией; повторная выборка IMAP
+    отсекается дедупом по message_id.
+    """
+    from django.core import mail as dj_mail
+
+    from crm.tasks import send_crm_email
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    client = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="B",
+        email="buyer@example.test",
+        message="RFQ",
+    )
+    row = EmailMessage.objects.create(
+        client=client,
+        lead=lead,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.QUEUED,
+        to_email="buyer@example.test",
+        from_email="noreply@hoocon.ru",
+        reply_to_email="mgr@hoocon.ru",
+        subject="Ответ",
+        body="…",
+    )
+
+    send_crm_email.run(row.pk)
+
+    assert len(dj_mail.outbox) == 1
+    sent = dj_mail.outbox[0]
+    assert sent.bcc == ["mgr@hoocon.ru"]  # одна копия, не массив дублей
+    assert sent.reply_to == ["mgr@hoocon.ru"]
+
+
+@pytest.mark.django_db
+def test_lead_reply_no_bcc_when_reply_to_is_client(
+    monkeypatch: pytest.MonkeyPatch,
+    settings: Any,
+) -> None:
+    """reply_to == адресу клиента → BCC не ставится (не дублируем клиенту)."""
+    from django.core import mail as dj_mail
+
+    from crm.tasks import send_crm_email
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    client = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="B",
+        email="buyer@example.test",
+        message="RFQ",
+    )
+    row = EmailMessage.objects.create(
+        client=client,
+        lead=lead,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.QUEUED,
+        to_email="buyer@example.test",
+        from_email="noreply@hoocon.ru",
+        reply_to_email="buyer@example.test",
+        subject="Ответ",
+        body="…",
+    )
+
+    send_crm_email.run(row.pk)
+
+    assert len(dj_mail.outbox) == 1
+    assert not dj_mail.outbox[0].bcc
