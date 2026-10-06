@@ -630,6 +630,11 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
     assert f"/admin/supportchat/conversation/{conv.pk}/messages/" in html
     assert "hoocon-messenger__delete" in html
     assert f"/admin/supportchat/conversation/{conv.pk}/delete-chat/" in html
+    # Note is an inline submit button (not a checkbox); ⓘ opens the info sheet.
+    assert 'class="hoocon-messenger__note-send"' in html
+    assert 'name="is_note"' in html
+    assert 'type="checkbox" name="is_note"' not in html
+    assert 'id="hoocon-messenger-info"' in html
 
 
 @pytest.mark.django_db

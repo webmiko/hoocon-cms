@@ -356,6 +356,11 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
         )[1].split("}")[0]
     )
     assert "#content-main > form" in phone_css
+    # ⓘ opens the hidden change form as a fixed overlay sheet on phone.
+    info_overlay = phone_css.split("hoocon-chat-info-open\n    #content-main > form")[1].split("}")[0]
+    assert "display: block !important" in info_overlay
+    assert "position: fixed" in info_overlay
+    assert "body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__info" in phone_css
 
     messenger_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-support-messenger.css").read_text(
         encoding="utf-8"
@@ -366,10 +371,26 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "background: var(--hm-brand" in messenger_css
     send_rule = messenger_css.split(".hoocon-messenger__send {\n  appearance")[1].split("}")[0]
     assert "box-shadow: none" in send_rule
+    # Note button is a secondary submit ordered left of «Отправить».
+    note_rule = messenger_css.split(".hoocon-messenger__note-send {")[1].split("}")[0]
+    assert "order: 1" in note_rule
+    assert "body.hoocon-chat-info-open .hoocon-chat-info-close" in messenger_css
+    # Hover merges «Заметка» into «Отправить»: flush joint + concave notches.
+    note_hover = messenger_css.split(".hoocon-messenger__note-send:hover:not(:disabled),")[1]
+    assert "margin-right: calc(-1 * var(--hm-composer-gap" in note_hover
+    assert "circle at bottom right" in messenger_css
+    assert "circle at top right" in messenger_css
+    # Press feedback on note + info buttons (scale bounce, hand cursor).
+    assert ".hoocon-messenger__info:active" in messenger_css
+    assert "prefers-reduced-motion" in messenger_css
     composer_send_rule = messenger_css.split(".hoocon-messenger__composer-field .hoocon-messenger__send {")[1].split(
         "}"
     )[0]
-    assert "border-radius: calc(var(--hm-composer-radius) - var(--hm-composer-inset))" in composer_send_rule
+    assert "border-radius: var(--hm-composer-corner)" in composer_send_rule
+    # Corner var = pill radius minus inset — shared by send radius and the
+    # note-merge concave notches so the joint always matches.
+    field_rule = messenger_css.split(".hoocon-messenger__composer-field {")[1].split("}")[0]
+    assert "--hm-composer-corner: calc(var(--hm-composer-radius) - var(--hm-composer-inset))" in field_rule
     who_rule = messenger_css.split(".hoocon-messenger__who {")[1].split("}")[0]
     assert "flex: 1 1 0" in who_rule
     title_rule = messenger_css.split(".hoocon-messenger__title {")[1].split("}")[0]
