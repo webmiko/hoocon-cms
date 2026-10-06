@@ -12,6 +12,17 @@ _FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "wiki"
 
 WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
     {
+        "slug": "admin-3-0-manager-guide",
+        "title": "Панель управления 3.0 · инструкция для менеджеров",
+        "category": "Инструкции",
+        "summary": (
+            "Релиз «Админка 3.0»: кабинет клиента, КП+PDF, документы, заказы, "
+            "спецификации, RMA, личные ящики, аналоги — что нового и как работать."
+        ),
+        "fixture": "admin-3-0-manager-guide.html",
+        "sort_order": 1,
+    },
+    {
         "slug": "ostatki-prodazhi-god-2025-09-2026-08",
         "title": "Анализ остатков и продаж · сен 2025 — авг 2026",
         "category": "Аналитика склада",
