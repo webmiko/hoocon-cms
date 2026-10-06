@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 
 from accounts.models import ClientAccount
 from cabinet.auth import IsClientAccount, load_client_account, login_client, logout_client
+from cabinet.authentication import ClientSessionAuthentication
 from cabinet.models import SpecList
 from cabinet.serializers import (
     DocumentSerializer,
@@ -46,6 +47,7 @@ from cabinet.services import (
     ClientAuthError,
     authenticate_password,
     check_honeypot,
+    link_client_account,
     register_client,
     resend_client_otp,
     start_client_otp,
@@ -59,19 +61,19 @@ logger = logging.getLogger(__name__)
 _REPEAT_WINDOW_SECONDS = 300
 
 
-def _client_for(request: Request) -> Client:
-    """Resolve the CRM card of the session account (404-safe)."""
-    account = load_client_account(request)
+def _session_account(request: Request) -> ClientAccount:
+    """The authenticated client account (IsClientAccount guarantees it)."""
+    account = request.user
+    if not isinstance(account, ClientAccount):
+        account = load_client_account(request)
     if account is None:
         raise Http404
-    client, _ = Client.objects.get_or_create(
-        email=account.email,
-        defaults={"name": account.name or account.email, "phone": account.phone},
-    )
-    if client.account_id is None:
-        client.account = account
-        client.save(update_fields=["account", "updated_at"])
-    return client
+    return account
+
+
+def _client_for(request: Request) -> Client:
+    """Resolve the CRM card of the session account (404-safe)."""
+    return link_client_account(_session_account(request))
 
 
 def _account_payload(account: ClientAccount) -> dict[str, Any]:
@@ -235,18 +237,27 @@ class AuthMeView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class AccountMeView(APIView):
+class ClientApiView(APIView):
+    """Base for /api/account/* endpoints: session auth + CSRF + owner scope.
+
+    ``ClientSessionAuthentication`` resolves the ``ClientAccount`` into
+    ``request.user`` and enforces CSRF on mutating methods — the same
+    rule DRF applies to staff sessions.
+    """
+
+    authentication_classes = (ClientSessionAuthentication,)
+    permission_classes = (IsClientAccount,)
+
+
+class AccountMeView(ClientApiView):
     """GET/PATCH /api/account/me/ — cabinet profile."""
 
-    permission_classes = (IsClientAccount,)
-    authentication_classes = ()  # session already resolved via load_client_account
-
     def get(self, request: Request) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         return Response(_account_payload(account))  # type: ignore[arg-type]
 
     def patch(self, request: Request) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         serializer = ProfilePatchSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -263,10 +274,8 @@ class AccountMeView(APIView):
         return Response(_account_payload(account))  # type: ignore[arg-type]
 
 
-class AccountSummaryView(APIView):
+class AccountSummaryView(ClientApiView):
     """GET /api/account/summary/ — dashboard counters."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -312,10 +321,9 @@ def _lead_payload(lead: Lead) -> dict[str, Any]:
     }
 
 
-class AccountLeadsView(APIView):
+class AccountLeadsView(ClientApiView):
     """GET /api/account/leads/ — own leads only."""
 
-    permission_classes = (IsClientAccount,)
     pagination_class = PageNumberPagination
 
     def get(self, request: Request) -> Response:
@@ -329,10 +337,8 @@ class AccountLeadsView(APIView):
         return paginator.get_paginated_response([_lead_payload(lead) for lead in page] if page else [])
 
 
-class AccountLeadDetailView(APIView):
+class AccountLeadDetailView(ClientApiView):
     """GET /api/account/leads/<id>/ — own lead detail (404 on foreign)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> Response:
         client = _client_for(request)
@@ -342,14 +348,13 @@ class AccountLeadDetailView(APIView):
         return Response(payload)
 
 
-class AccountLeadRepeatView(APIView):
+class AccountLeadRepeatView(ClientApiView):
     """POST /api/account/leads/<id>/repeat/ — clone positions into a new RFQ.
 
     Idempotent within a 5-minute window (§9): a repeat of the same source
     lead returns the already-created copy instead of spawning duplicates.
     """
 
-    permission_classes = (IsClientAccount,)
     throttle_classes = (ScopedRateThrottle,)
     throttle_scope = "client_repeat"
 
@@ -375,6 +380,7 @@ class AccountLeadRepeatView(APIView):
                 email=client.email,
                 phone=client.phone,
                 company=client.company,
+                client=client,
                 message=f"Повтор заявки #{source.pk}",
             )
             for item in source.items.all():
@@ -387,36 +393,32 @@ class AccountLeadRepeatView(APIView):
         return Response(_lead_payload(lead), status=status.HTTP_201_CREATED)
 
 
-class AccountSpecsView(APIView):
+class AccountSpecsView(ClientApiView):
     """GET/POST /api/account/specs/ — spec templates CRUD (owner scope)."""
 
-    permission_classes = (IsClientAccount,)
-
     def get(self, request: Request) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         specs = SpecList.objects.filter(account=account).prefetch_related("items__sku").order_by("-updated_at")
         return Response(SpecListSerializer(specs, many=True).data)
 
     def post(self, request: Request) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         serializer = SpecListWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         spec = _save_spec(account, serializer.validated_data)  # type: ignore[arg-type]
         return Response(SpecListSerializer(spec).data, status=status.HTTP_201_CREATED)
 
 
-class AccountSpecDetailView(APIView):
+class AccountSpecDetailView(ClientApiView):
     """GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope."""
 
-    permission_classes = (IsClientAccount,)
-
     def get(self, request: Request, pk: int) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         spec = get_object_or_404(SpecList.objects.filter(account=account).prefetch_related("items__sku"), pk=pk)
         return Response(SpecListSerializer(spec).data)
 
     def patch(self, request: Request, pk: int) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         spec = get_object_or_404(SpecList.objects.filter(account=account), pk=pk)
         serializer = SpecListWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -424,21 +426,20 @@ class AccountSpecDetailView(APIView):
         return Response(SpecListSerializer(spec).data)
 
     def delete(self, request: Request, pk: int) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         spec = get_object_or_404(SpecList.objects.filter(account=account), pk=pk)
         spec.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AccountSpecToLeadView(APIView):
+class AccountSpecToLeadView(ClientApiView):
     """POST /api/account/specs/<id>/to_lead/ — draft an RFQ from a spec."""
 
-    permission_classes = (IsClientAccount,)
     throttle_classes = (ScopedRateThrottle,)
     throttle_scope = "client_repeat"
 
     def post(self, request: Request, pk: int) -> Response:
-        account = load_client_account(request)
+        account = _session_account(request)
         spec = get_object_or_404(SpecList.objects.filter(account=account).prefetch_related("items"), pk=pk)
         client = _client_for(request)
         with transaction.atomic():
@@ -448,6 +449,7 @@ class AccountSpecToLeadView(APIView):
                 email=client.email,
                 phone=client.phone,
                 company=client.company,
+                client=client,
                 message=f"Заявка из спецификации «{spec.name}»",
             )
             for item in spec.items.all():
@@ -496,10 +498,8 @@ def _save_spec(account: ClientAccount, data: dict[str, Any], spec: SpecList | No
     return spec
 
 
-class AccountQuotesView(APIView):
+class AccountQuotesView(ClientApiView):
     """GET /api/account/quotes/ — issued quotes (drafts hidden)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -507,10 +507,8 @@ class AccountQuotesView(APIView):
         return Response(QuoteSerializer(quotes, many=True).data)
 
 
-class AccountQuoteDetailView(APIView):
+class AccountQuoteDetailView(ClientApiView):
     """GET /api/account/quotes/<id>/ — own quote detail."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> Response:
         client = _client_for(request)
@@ -521,10 +519,8 @@ class AccountQuoteDetailView(APIView):
         return Response(QuoteSerializer(quote).data)
 
 
-class AccountQuotePdfView(APIView):
+class AccountQuotePdfView(ClientApiView):
     """GET /api/account/quotes/<id>/pdf/ — generated PDF (ЛК-3)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> FileResponse:
         client = _client_for(request)
@@ -535,10 +531,8 @@ class AccountQuotePdfView(APIView):
         return FileResponse(pdf, content_type="application/pdf", filename=f"{quote.number}.pdf")
 
 
-class AccountDocumentsView(APIView):
+class AccountDocumentsView(ClientApiView):
     """GET /api/account/documents/ — all files of the client card."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -546,10 +540,8 @@ class AccountDocumentsView(APIView):
         return Response(DocumentSerializer(docs, many=True).data)
 
 
-class AccountDocumentDownloadView(APIView):
+class AccountDocumentDownloadView(ClientApiView):
     """GET /api/account/documents/<id>/download/ — owner-only private file."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> FileResponse:
         client = _client_for(request)
@@ -557,14 +549,12 @@ class AccountDocumentDownloadView(APIView):
         return FileResponse(doc.file.open("rb"), as_attachment=True, filename=doc.title)
 
 
-class AccountDocumentsZipView(APIView):
+class AccountDocumentsZipView(ClientApiView):
     """GET /api/account/documents/zip/ — все документы клиента одним ZIP (ЛК-8).
 
     Files come from private media only; names are sanitized against
     path traversal and de-duplicated inside the archive.
     """
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> FileResponse:
         import io
@@ -595,10 +585,8 @@ class AccountDocumentsZipView(APIView):
         return FileResponse(buf, as_attachment=True, filename=filename)
 
 
-class AccountOrdersView(APIView):
+class AccountOrdersView(ClientApiView):
     """GET /api/account/orders/ — own orders (ЛК-6)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -606,10 +594,8 @@ class AccountOrdersView(APIView):
         return Response(OrderSerializer(orders, many=True).data)
 
 
-class AccountOrderDetailView(APIView):
+class AccountOrderDetailView(ClientApiView):
     """GET /api/account/orders/<id>/ — own order detail."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> Response:
         client = _client_for(request)
@@ -617,10 +603,8 @@ class AccountOrderDetailView(APIView):
         return Response(OrderSerializer(order).data)
 
 
-class AccountConversationsView(APIView):
+class AccountConversationsView(ClientApiView):
     """GET /api/account/conversations/ — own supportchat threads (ЛК-4)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         from supportchat.models import Conversation
@@ -647,10 +631,8 @@ class AccountConversationsView(APIView):
         )
 
 
-class AccountCompanyView(APIView):
+class AccountCompanyView(ClientApiView):
     """GET /api/account/company/ — реквизиты linked Company (ЛК-5)."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -682,10 +664,9 @@ class AccountCompanyView(APIView):
         )
 
 
-class AccountRmaView(APIView):
+class AccountRmaView(ClientApiView):
     """GET/POST /api/account/rma/ — reclamations (ЛК-12)."""
 
-    permission_classes = (IsClientAccount,)
     throttle_classes = (ScopedRateThrottle,)
     throttle_scope = "client_repeat"
 
@@ -705,10 +686,8 @@ class AccountRmaView(APIView):
         return Response(RmaCaseSerializer(case).data, status=status.HTTP_201_CREATED)
 
 
-class AccountRmaPhotoView(APIView):
+class AccountRmaPhotoView(ClientApiView):
     """GET /api/account/rma/<id>/photo/ — owner-only defect photo download."""
-
-    permission_classes = (IsClientAccount,)
 
     def get(self, request: Request, pk: int) -> FileResponse:
         client = _client_for(request)

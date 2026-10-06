@@ -48,4 +48,8 @@ class IsClientAccount(BasePermission):
     """DRF permission: request must carry an active client session."""
 
     def has_permission(self, request: Request, view: Any) -> bool:
+        # ClientSessionAuthentication already resolved the account into
+        # request.user — reuse it; the session lookup is the fallback.
+        if isinstance(request.user, ClientAccount):
+            return True
         return load_client_account(request) is not None

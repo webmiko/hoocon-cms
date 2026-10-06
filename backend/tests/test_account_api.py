@@ -414,3 +414,30 @@ def test_rma_photo_upload_and_owner_download() -> None:
     other = APIClient()
     _register(other, "rma-photo2@acme.test")
     assert other.get(f"/api/account/rma/{case_id}/photo/").status_code == 404
+
+
+@pytest.mark.django_db
+def test_session_mutation_requires_csrf() -> None:
+    """Session PATCH without X-CSRFToken → 403; with token → 200.
+
+    Regression: cabinet sessions must enforce CSRF like staff sessions —
+    ClientSessionAuthentication wires enforce_csrf into every view via
+    ClientApiView (cookie auth without it would accept cross-site POSTs).
+    """
+    api = APIClient(enforce_csrf_checks=True)
+    api.get("/api/csrf/")
+    _register(api, "csrf-check@acme.test")
+    # Без CSRF-заголовка → 403 даже с валидной сессией.
+    denied = api.patch("/api/account/me/", {"name": "X"}, format="json")
+    assert denied.status_code == 403
+    # GET (безопасный метод) без токена — ок.
+    assert api.get("/api/account/me/").status_code == 200
+    token = api.cookies.get("csrftoken")
+    assert token is not None
+    ok = api.patch(
+        "/api/account/me/",
+        {"name": "С Токеном"},
+        format="json",
+        HTTP_X_CSRFTOKEN=token.value,
+    )
+    assert ok.status_code == 200

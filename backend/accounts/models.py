@@ -323,6 +323,16 @@ class ClientAccount(models.Model):
         """True when a password hash is stored."""
         return bool(self.password_hash)
 
+    @property
+    def is_authenticated(self) -> bool:
+        """DRF duck-type: a resolved cabinet session account is authenticated."""
+        return True
+
+    @property
+    def is_anonymous(self) -> bool:
+        """DRF duck-type counterpart of ``is_authenticated``."""
+        return False
+
 
 class SocialAccount(models.Model):
     """OAuth identity linked to a ClientAccount (задел под Яндекс ID).

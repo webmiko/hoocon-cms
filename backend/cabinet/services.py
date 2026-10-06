@@ -231,7 +231,7 @@ def build_client_otp_message(email: str, code: str) -> EmailMultiAlternatives:
     return msg
 
 
-def link_client_account(account: ClientAccount) -> Client | None:
+def link_client_account(account: ClientAccount) -> Client:
     """Attach the CRM Client card to the account by email (both directions).
 
     Creating the card eagerly lets ЛК show leads issued before registration
