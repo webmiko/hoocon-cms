@@ -1,8 +1,11 @@
-"""Staff account extensions (recovery codes + WebAuthn passkeys)."""
+"""Staff account extensions (recovery codes + WebAuthn passkeys) + client cabinet auth."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -166,3 +169,187 @@ class StaffMaxProfile(models.Model):
     def __str__(self) -> str:
         uid = (self.max_user_id or "").strip() or "—"
         return f"MAX({self.user_id}, {uid})"
+
+
+class StaffMailbox(models.Model):
+    """Personal mailbox of a staff user — IMAP fetch + SMTP send.
+
+    Как Telegram/MAX-профили: менеджер заполняет ящик на своей странице
+    пользователя. Пароль — пароль приложения Яндекс 360 (один и тот же
+    работает и для IMAP, и для SMTP); хранится в БД открытым текстом,
+    в форме не отображается (PasswordInput).
+    Поля last_* — курсор и здоровье фетчера по этому ящику.
+    Пустой ``smtp_host`` — исходящие уходят через общий env-SMTP.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="mailbox",
+        verbose_name=_("Пользователь"),
+    )
+    imap_user = models.EmailField(
+        _("адрес ящика"),
+        blank=True,
+        default="",
+        help_text=_("Например ivan@hoocon.ru — совпадает с IMAP-логином."),
+    )
+    imap_password = models.CharField(
+        _("пароль приложения IMAP"),
+        max_length=200,
+        blank=True,
+        default="",
+        help_text=_("Яндекс 360: Пароль → Пароли приложений → Почта. Оставьте пустым — старый пароль сохранится."),
+    )
+    folder = models.CharField(
+        _("папка"),
+        max_length=100,
+        default="INBOX",
+    )
+    smtp_host = models.CharField(
+        _("SMTP-сервер"),
+        max_length=200,
+        blank=True,
+        default="smtp.yandex.ru",
+        help_text=_("Пусто — исходящие уходят через общий ящик. Логин и пароль те же, что у IMAP."),
+    )
+    smtp_port = models.PositiveSmallIntegerField(
+        _("SMTP-порт"),
+        default=465,
+    )
+    smtp_use_ssl = models.BooleanField(
+        _("SMTP по SSL"),
+        default=True,
+        help_text=_("Вкл — SSL (порт 465), выкл — STARTTLS (порт 587)."),
+    )
+    is_enabled = models.BooleanField(
+        _("включён"),
+        default=True,
+        help_text=_("Выкл — ящик не опрашивается фетчером и не используется для отправки."),
+    )
+    last_uid = models.PositiveBigIntegerField(
+        _("последний обработанный UID"),
+        default=0,
+    )
+    last_run_at = models.DateTimeField(
+        _("последний запуск"),
+        null=True,
+        blank=True,
+    )
+    last_error = models.CharField(
+        _("последняя ошибка"),
+        max_length=300,
+        blank=True,
+        default="",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Создан"))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Обновлён"))
+
+    class Meta:
+        verbose_name = _("Почта сотрудника (IMAP)")
+        verbose_name_plural = _("Почта сотрудников (IMAP)")
+
+    def __str__(self) -> str:
+        addr = (self.imap_user or "").strip() or "—"
+        return f"IMAP({self.user_id}, {addr})"
+
+
+class ClientAuthMode(models.TextChoices):
+    """How a client signs in (A/B modes from plan-client-auth)."""
+
+    PASSWORD = "password", "пароль"
+    OTP_EMAIL = "otp_email", "код на почту"
+    YANDEX = "yandex", "Яндекс ID"
+
+
+class ClientAccount(models.Model):
+    """Client cabinet login — separate from staff ``auth.User``.
+
+    Session-based: after login the account id is stored in the Django
+    session (``config.client_auth``). Password accounts keep a Django
+    hash; OTP-only and Yandex-linked accounts use unusable password.
+    """
+
+    email = models.EmailField(_("эл. почта"), unique=True, db_index=True)
+    password_hash = models.CharField(
+        _("хеш пароля"),
+        max_length=200,
+        blank=True,
+        default="",
+        help_text=_("Пусто — вход только по коду на почту или Яндекс ID."),
+    )
+    auth_mode = models.CharField(
+        _("способ входа"),
+        max_length=20,
+        choices=ClientAuthMode.choices,
+        default=ClientAuthMode.PASSWORD,
+    )
+    name = models.CharField(_("имя / контакт"), max_length=200, blank=True, default="")
+    phone = models.CharField(_("телефон"), max_length=50, blank=True, default="")
+    is_active = models.BooleanField(_("активен"), default=True, db_index=True)
+    email_verified_at = models.DateTimeField(
+        _("почта подтверждена"),
+        null=True,
+        blank=True,
+        help_text=_("OTP-вход или письмо-подтверждение; Яндекс ID подтверждает сам."),
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Создан"))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Обновлён"))
+
+    class Meta:
+        verbose_name = _("аккаунт клиента")
+        verbose_name_plural = _("аккаунты клиентов")
+        ordering = ("email",)
+
+    def __str__(self) -> str:
+        return self.email
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Normalize email to lowercase (identity key)."""
+        self.email = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)
+
+    def set_password(self, raw: str) -> None:
+        """Hash and store a password (Django hasher)."""
+        self.password_hash = make_password(raw)
+
+    def check_password(self, raw: str) -> bool:
+        """True when ``raw`` matches the stored hash."""
+        if not self.password_hash:
+            return False
+        return check_password(raw, self.password_hash)
+
+    def has_usable_password(self) -> bool:
+        """True when a password hash is stored."""
+        return bool(self.password_hash)
+
+
+class SocialAccount(models.Model):
+    """OAuth identity linked to a ClientAccount (задел под Яндекс ID).
+
+    Table exists from auth MVP so mode C does not need a schema migration:
+    rows appear when ``YANDEX_OAUTH_ENABLED`` turns on.
+    """
+
+    account = models.ForeignKey(
+        ClientAccount,
+        on_delete=models.CASCADE,
+        related_name="social_accounts",
+        verbose_name=_("аккаунт"),
+    )
+    provider = models.CharField(_("провайдер"), max_length=30, db_index=True)
+    provider_user_id = models.CharField(_("id у провайдера"), max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Создан"))
+
+    class Meta:
+        verbose_name = _("соцпривязка клиента")
+        verbose_name_plural = _("соцпривязки клиентов")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("provider", "provider_user_id"),
+                name="accounts_social_provider_uid_uniq",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.provider}:{self.provider_user_id}"

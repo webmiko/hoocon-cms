@@ -40,9 +40,18 @@ def format_lead_reply_subject(lead: Lead) -> str:
 
 
 def staff_reply_to_email(user: AbstractBaseUser | None) -> str:
-    """Manager mailbox for Reply-To from an authenticated staff user."""
+    """Manager mailbox for Reply-To from an authenticated staff user.
+
+    Адрес личного ящика (``StaffMailbox.imap_user``) в приоритете —
+    туда же приходят ответы клиентов и идёт IMAP-фетч; иначе email
+    учётки как раньше.
+    """
     if user is None or getattr(user, "is_anonymous", True):
         return ""
+    mailbox = getattr(user, "mailbox", None)
+    mailbox_addr = (getattr(mailbox, "imap_user", "") or "").strip()
+    if mailbox_addr:
+        return mailbox_addr
     return (getattr(user, "email", "") or "").strip()
 
 

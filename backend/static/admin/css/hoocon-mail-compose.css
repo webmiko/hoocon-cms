@@ -55,12 +55,7 @@ body.hoocon-mail-compose-page .hoocon-admin-breadcrumbs {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.25;
-  color: var(--os27-surface, #1c1c1e);
-}
-
-.dark .hoocon-mail-compose__headline,
-html.dark .hoocon-mail-compose__headline {
-  color: #f2f2f7;
+  color: inherit;
 }
 
 .hoocon-mail-compose__subtitle {
@@ -329,12 +324,6 @@ html.dark .hoocon-mail-compose__toolbar {
   font-size: 0.875rem;
   color: inherit;
   cursor: pointer;
-}
-
-.hoocon-mail-compose__send-now input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--os27-accent, var(--hoocon-primary, #007aff));
 }
 
 .hoocon-mail-compose__help {
