@@ -8,9 +8,9 @@
   align-items: center;
   gap: 0.2rem;
   font-weight: 700;
-  font-size: 0.7rem;
+  font-size: var(--hoocon-chip-font);
   line-height: 1.2;
-  padding: 0.15rem 0.5rem;
+  padding: var(--hoocon-chip-pad);
   border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
   border: 1px solid rgba(30, 30, 40, 0.12);
   white-space: nowrap;
@@ -98,14 +98,14 @@
 
 .hoocon-push-broadcast__title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--os27-title-size, 1.35rem);
   font-weight: 700;
   line-height: 1.3;
 }
 
 .hoocon-push-broadcast__lead {
   margin: 0.4rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--hoocon-subtitle-size);
   color: var(--hp-quiet);
   line-height: 1.45;
 }
@@ -200,13 +200,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  min-height: 2.75rem;
+  min-height: var(--hoocon-control-h);
   padding: 0 1.15rem;
   border-radius: var(--hoocon-radius-btn, var(--hoocon-radius));
   background: var(--hp-brand);
   color: #fff;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: var(--hoocon-control-font);
   box-shadow: 0 6px 16px color-mix(in srgb, var(--hp-brand) 25%, transparent);
   transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
@@ -311,7 +311,7 @@
   display: inline-block;
   width: 2rem;
   height: 1.15rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: #c8cad0;
   flex-shrink: 0;
   transition: background 0.15s ease;
@@ -323,7 +323,7 @@
   left: 0.15rem;
   width: 0.85rem;
   height: 0.85rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: #fff;
   box-shadow: 0 1px 2px rgba(20, 20, 30, 0.25);
   transition: transform 0.15s ease;

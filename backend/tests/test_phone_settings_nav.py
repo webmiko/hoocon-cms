@@ -297,7 +297,12 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
         ".hoocon-phone-settings__account-links .hoocon-phone-settings__row--link"
     )
     assert desktop_account_link in os27_css
-    assert "padding: 0.7rem 1rem" in os27_css
+    account_link_rule = os27_css.split(desktop_account_link)[1].split("}")[0]
+    assert "padding: var(--hoocon-row-pad)" in account_link_rule
+    extras = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8"
+    )
+    assert "--hoocon-row-pad: 0.7rem 1rem" in extras
     assert "hoocon-phone-settings__account-page" in css
     assert "hoocon-phone-settings__account-links" in css
     assert "hoocon-phone-settings-account" in css
@@ -306,7 +311,7 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
     ].split("}")[0]
     assert "border-radius: var(--hoocon-radius)" in account_page_rule
     assert (
-        "padding: 0.7rem 1rem"
+        "padding: var(--hoocon-row-pad)"
         in css.split(
             ".hoocon-phone-settings__account-page .hoocon-phone-settings__account-links "
             ".hoocon-phone-settings__row--link"

@@ -4,8 +4,6 @@
  */
 
 :root {
-  --hoocon-phone-edge-inset: 0.5rem;
-  /* Sticky/fixed admin header (h-16 + border). */
   --hoocon-phone-header-h: 4.25rem;
   /* LMS-style float: pill (~3.85rem) + gap from bottom (1rem). */
   --hoocon-phone-chrome-h: 5.25rem;
@@ -623,7 +621,7 @@ html.dark .hoocon-phone-tabs,
 }
 
 .hoocon-phone-tab--active {
-  color: var(--hoocon-primary, #dc1313);
+  color: var(--os27-accent, var(--hoocon-primary, #dc1313));
   background: rgba(26, 44, 62, 0.1);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -653,10 +651,10 @@ html.dark .hoocon-phone-tab--active:active,
   top: 0.15rem;
   right: 50%;
   translate: calc(0.85rem) 0;
-  min-width: 1rem;
-  height: 1rem;
+  min-width: calc(var(--hoocon-count-size) * 0.75);
+  height: calc(var(--hoocon-count-size) * 0.75);
   padding: 0 0.25rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: #e5484d;
   color: #fff;
   font-size: 0.625rem;
@@ -723,7 +721,7 @@ html.dark .hoocon-phone-more__sheet,
   width: 2.5rem;
   height: 0.25rem;
   margin: 0.35rem auto 0.75rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: var(--hoocon-glass-border, rgba(30, 30, 40, 0.1));
 }
 
@@ -1657,8 +1655,8 @@ html.dark .hoocon-phone-more__sheet,
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    min-height: var(--os27-row-min-h, 2.75rem);
-    padding: 0.7rem 1rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-row-pad);
     padding-right: 2.5rem;
   }
 
@@ -1695,8 +1693,8 @@ html.dark .hoocon-phone-more__sheet,
     align-items: center;
     gap: 0.65rem;
     width: 100%;
-    min-height: var(--os27-row-min-h, 2.75rem);
-    padding: 0.7rem 1rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-row-pad);
     border: 0;
     background: transparent;
     color: var(--os27-accent, #dc1313);
@@ -1766,7 +1764,7 @@ html.dark .hoocon-phone-more__sheet,
   }
 
   .hoocon-phone-settings__section-label {
-    margin: 0 0 0.4rem 0.2rem;
+    margin: 0 0 var(--hoocon-section-gap) 0.2rem;
     font-size: var(--os27-section-size, 0.8125rem);
     font-weight: 400;
     letter-spacing: -0.01em;
@@ -1786,8 +1784,8 @@ html.dark .hoocon-phone-more__sheet,
     align-items: center;
     gap: 0.75rem;
     width: 100%;
-    min-height: var(--os27-row-min-h, 2.75rem);
-    padding: 0.7rem 1rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-row-pad);
     border: 0;
     background: transparent;
     color: inherit;
@@ -1817,8 +1815,8 @@ html.dark .hoocon-phone-more__sheet,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.85rem;
-    height: 1.85rem;
+    width: var(--hoocon-icon-tile);
+    height: var(--hoocon-icon-tile);
     border-radius: var(--hoocon-radius-xs);
     background: var(--settings-icon-bg, var(--os27-accent, #dc1313));
     color: var(--settings-icon-fg, #fff);
@@ -1826,7 +1824,7 @@ html.dark .hoocon-phone-more__sheet,
   }
 
   .hoocon-phone-settings__icon-tile .material-symbols-outlined {
-    font-size: 1.15rem;
+    font-size: var(--hoocon-icon-glyph);
     line-height: 1;
   }
 
@@ -1839,12 +1837,12 @@ html.dark .hoocon-phone-more__sheet,
   }
 
   .hoocon-phone-settings__row-label {
-    font-size: 1rem;
+    font-size: var(--hoocon-row-label);
     line-height: 1.25;
   }
 
   .hoocon-phone-settings__row-sub {
-    font-size: 0.8125rem;
+    font-size: var(--hoocon-row-sub);
     line-height: 1.25;
     color: var(--os27-quiet, #6e6e73);
     overflow: hidden;
@@ -1856,13 +1854,13 @@ html.dark .hoocon-phone-more__sheet,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.35rem;
-    height: 1.35rem;
-    padding: 0 0.35rem;
-    border-radius: 999px;
+    min-width: var(--hoocon-count-size);
+    height: var(--hoocon-count-size);
+    padding: var(--hoocon-count-pad);
+    border-radius: var(--hoocon-radius-pill);
     background: var(--os27-accent, #dc1313);
     color: #fff;
-    font-size: 0.75rem;
+    font-size: var(--hoocon-count-font);
     font-weight: 600;
     line-height: 1;
     flex-shrink: 0;
