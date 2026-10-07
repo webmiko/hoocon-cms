@@ -47,6 +47,16 @@ class SiteSettings(models.Model):
         help_text=("Показывать цены в публичном API и на сайте. По умолчанию выкл. — цены скрыты (политика RFQ)."),
     )
 
+    cabinet_enabled: models.BooleanField = models.BooleanField(
+        "личный кабинет клиента",
+        default=False,
+        help_text=(
+            "Выкл — API кабинета (/api/auth/*, /api/account/*) отдаёт 404 и "
+            "предложение создать кабинет после заявки не показывается. "
+            "Включить после выкатки, когда кабинет готов к клиентам."
+        ),
+    )
+
     # ── Lead routing (Admin only; not in public settings API) ──
     lead_routing_mode: models.CharField = models.CharField(
         "распределение заявок",

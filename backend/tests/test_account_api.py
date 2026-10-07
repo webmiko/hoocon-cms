@@ -25,6 +25,17 @@ from leads.models import Lead
 _PASSWORD = "sup3r-secret!"
 
 
+@pytest.fixture(autouse=True)
+def _cabinet_flag_on(db: None) -> None:
+    """Кабинет тестируется при включённом флаге (SiteSettings.cabinet_enabled)."""
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    if not site.cabinet_enabled:
+        site.cabinet_enabled = True
+        site.save()
+
+
 def _register(client: APIClient, email: str = "buyer@acme.test") -> APIClient:
     """Register a client account via the API; returns the session client."""
     response = client.post(
@@ -40,6 +51,27 @@ def _register(client: APIClient, email: str = "buyer@acme.test") -> APIClient:
     )
     assert response.status_code == 201, response.content
     return client
+
+
+@pytest.mark.django_db
+def test_cabinet_flag_off_404s_entire_surface() -> None:
+    """cabinet_enabled=False глушит /api/auth/* + /api/account/* одним 404."""
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.cabinet_enabled = False
+    site.save()
+
+    api = APIClient()
+    login = api.post(
+        "/api/auth/login/",
+        {"email": "buyer@acme.test", "password": _PASSWORD},
+        format="json",
+    )
+    assert login.status_code == 404
+    assert api.get("/api/auth/me/").status_code == 404
+    assert api.get("/api/account/me/").status_code == 404
+    assert api.get("/api/account/leads/").status_code == 404
 
 
 @pytest.mark.django_db

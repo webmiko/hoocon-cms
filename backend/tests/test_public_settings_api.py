@@ -47,6 +47,7 @@ def test_public_settings_api_returns_analytics_ids_only() -> None:
     assert data == {
         "yandex_metrika_id": "12345678",
         "ga4_measurement_id": "G-TEST123",
+        "cabinet_enabled": False,
     }
     body = response.content.decode()
     assert "secret-tg-token" not in body

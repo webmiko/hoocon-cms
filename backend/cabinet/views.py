@@ -17,6 +17,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -103,7 +104,24 @@ def _account_payload(account: ClientAccount) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-class RegisterView(APIView):
+class _CabinetGatedView(APIView):
+    """404 the whole cabinet API while the feature flag is off.
+
+    ``SiteSettings.cabinet_enabled=False`` глушит весь контур
+    (/api/auth/* + /api/account/*) одним ответом 404 — кабинет
+    не подхватывается, пока его не включат в Admin → Интеграции.
+    """
+
+    def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
+        """Run the feature-flag check inside DRF's exception boundary."""
+        from sitesettings.models import SiteSettings
+
+        if not SiteSettings.load().cabinet_enabled:
+            raise NotFound()
+        super().initial(request, *args, **kwargs)
+
+
+class RegisterView(_CabinetGatedView):
     """POST /api/auth/register/ — mode A (email + password), honeypot-gated."""
 
     permission_classes = (AllowAny,)
@@ -129,7 +147,7 @@ class RegisterView(APIView):
         return Response(_account_payload(account), status=status.HTTP_201_CREATED)
 
 
-class LoginView(APIView):
+class LoginView(_CabinetGatedView):
     """POST /api/auth/login/ — mode A password check."""
 
     permission_classes = (AllowAny,)
@@ -150,7 +168,7 @@ class LoginView(APIView):
         return Response(_account_payload(account))
 
 
-class OtpStartView(APIView):
+class OtpStartView(_CabinetGatedView):
     """POST /api/auth/otp/start/ — mode B: send a fresh 6-digit code."""
 
     permission_classes = (AllowAny,)
@@ -169,7 +187,7 @@ class OtpStartView(APIView):
         return Response(result)
 
 
-class OtpVerifyView(APIView):
+class OtpVerifyView(_CabinetGatedView):
     """POST /api/auth/otp/verify/ — mode B: verify the code → session."""
 
     permission_classes = (AllowAny,)
@@ -190,7 +208,7 @@ class OtpVerifyView(APIView):
         return Response(_account_payload(account))
 
 
-class OtpResendView(APIView):
+class OtpResendView(_CabinetGatedView):
     """POST /api/auth/otp/resend/ — cooldown-gated resend."""
 
     permission_classes = (AllowAny,)
@@ -210,7 +228,7 @@ class OtpResendView(APIView):
         return Response(result)
 
 
-class LogoutView(APIView):
+class LogoutView(_CabinetGatedView):
     """POST /api/auth/logout/ — drop the client session."""
 
     permission_classes = (AllowAny,)
@@ -220,7 +238,7 @@ class LogoutView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AuthMeView(APIView):
+class AuthMeView(_CabinetGatedView):
     """GET /api/auth/me/ — current session account or 401."""
 
     permission_classes = (AllowAny,)
@@ -237,7 +255,7 @@ class AuthMeView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class ClientApiView(APIView):
+class ClientApiView(_CabinetGatedView):
     """Base for /api/account/* endpoints: session auth + CSRF + owner scope.
 
     ``ClientSessionAuthentication`` resolves the ``ClientAccount`` into
