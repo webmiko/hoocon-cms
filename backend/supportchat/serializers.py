@@ -105,7 +105,13 @@ class MessageSerializer(serializers.ModelSerializer):
         return message_sender_name(obj)
 
     def get_attachment_url(self, obj: Message) -> str:
-        return obj.attachment.url if obj.attachment else ""
+        from supportchat.attachments import message_attachment_url
+
+        path = message_attachment_url(obj)
+        request = self.context.get("request")
+        if path and request is not None:
+            return request.build_absolute_uri(path)
+        return path
 
     def get_attachment_name(self, obj: Message) -> str:
         return obj.attachment_name

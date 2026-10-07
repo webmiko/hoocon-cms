@@ -76,6 +76,29 @@ def get_web_conversation(request: HttpRequest) -> Conversation | None:
     ).first()
 
 
+def _auto_link_client(conversation: Conversation) -> None:
+    """Attach the CRM client card by ``contact_email`` (create it if absent).
+
+    Same dossier rule as leads: every contact channel lands on the client
+    card. Runs only while ``conversation.client`` is unset — a manual staff
+    link always wins. Updates the row in place and the instance's
+    ``client_id`` for callers that keep it.
+    """
+    email = (conversation.contact_email or "").strip()
+    if conversation.client_id is not None or not email:
+        return
+    from crm.services import get_or_create_client_by_email
+
+    client = get_or_create_client_by_email(
+        email=email,
+        name=conversation.display_name,
+    )
+    Conversation.objects.filter(pk=conversation.pk, client__isnull=True).update(
+        client_id=client.pk,
+    )
+    conversation.client_id = client.pk
+
+
 def start_or_resume_web_conversation(
     request: HttpRequest,
     *,
@@ -118,6 +141,7 @@ def start_or_resume_web_conversation(
             if updates:
                 updates.append("updated_at")
                 conv.save(update_fields=updates)
+    _auto_link_client(conv)
     return conv
 
 
@@ -810,11 +834,9 @@ def compose_staff_support_alert(
 
     parts: list[str] = []
     if inbound is not None and inbound.attachment:
-        from django.conf import settings
-
-        site_url = getattr(settings, "SITE_URL", "https://hoocon.ru").rstrip("/")
         name = inbound.attachment_name or "файл"
-        parts.append(f"📎 {name}: {site_url}{inbound.attachment.url}")
+        admin_url = build_conversation_admin_url(conversation.pk)
+        parts.append(f"📎 {name}: {admin_url}")
     if inbound is not None:
         snippet = (inbound.body or "").strip().replace("\n", " ")
         if len(snippet) > 400:

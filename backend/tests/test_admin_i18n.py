@@ -9,6 +9,7 @@ from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.urls import reverse
 
 from config.ru_ui_lint import (
     PROJECT_APP_LABELS,
@@ -180,14 +181,13 @@ def test_faqitem_changelist_has_no_english_ui_strings() -> None:
     ):
         assert english not in changelist_html
 
-    assert 'class="field-answer' in changelist_html
-    assert 'name="form-0-answer"' in changelist_html
+    assert "form-0-answer" not in changelist_html
     assert "Серия SA — для регулирования" in changelist_html
 
 
 @pytest.mark.django_db
-def test_faqitem_changelist_saves_answer_inline() -> None:
-    """FAQ answer can be edited on the changelist without opening change form."""
+def test_faqitem_changelist_does_not_inline_edit_answer() -> None:
+    """Long FAQ answers are edited on the change form, not the stacked list."""
     admin_user = User.objects.create_superuser(
         username="admin-faq-inline",
         email="admin-faq-inline@example.com",
@@ -203,22 +203,18 @@ def test_faqitem_changelist_saves_answer_inline() -> None:
     client = Client()
     client.force_login(admin_user)
     html = client.get("/admin/supportchat/faqitem/").content.decode()
-    assert 'name="form-0-answer"' in html
+    assert "form-0-answer" not in html
 
     response = client.post(
-        "/admin/supportchat/faqitem/",
+        reverse("admin:supportchat_faqitem_change", args=[item.pk]),
         {
-            "form-TOTAL_FORMS": "1",
-            "form-INITIAL_FORMS": "1",
-            "form-MIN_NUM_FORMS": "0",
-            "form-MAX_NUM_FORMS": "1000",
-            "form-0-id": str(item.pk),
-            "form-0-order": "1",
-            "form-0-question": "SA вместо DA?",
-            "form-0-answer": "Новый ответ в карточке",
-            "form-0-is_active": "on",
-            "form-0-show_in_chat": "on",
-            "_save": "Сохранить",
+            "question": "SA вместо DA?",
+            "question_short": "",
+            "answer": "Новый ответ в карточке",
+            "order": "1",
+            "is_active": "on",
+            "show_in_chat": "on",
+            "show_on_home": "on",
         },
         follow=True,
     )
