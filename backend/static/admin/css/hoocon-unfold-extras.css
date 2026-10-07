@@ -3188,8 +3188,11 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
   max-width: 100%;
 }
 
-/* Unfold tabular inlines on phones — vertical cards; do not use changelist card-stack JS. */
-@media (max-width: 767px) {
+/* Unfold tabular inlines below lg — vertical labeled cards.
+   Unfold hides thead under 1024px (hidden lg:table-header-group), so raw
+   inputs would be unlabeled on phones AND on 768–1023px panes/windows.
+   Do not use changelist card-stack JS here. */
+@media (max-width: 1023px) {
   body.change-form .formset-wrapper.overflow-x-auto {
     overflow-x: clip !important;
     max-width: 100%;
@@ -3230,15 +3233,16 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     box-sizing: border-box;
   }
 
-  /* Unfold .empty-form{display:none} — do not override on the clone-source tbody. */
+  /*
+   * Hide only the clone-source tbody (.empty-form). Do NOT hide .template:
+   * every unsaved row carries that class and Unfold's addInlineTemplateHandler
+   * removes only .empty-form from clones — hiding .template made every added
+   * row invisible.
+   */
   body.change-form
     [data-inline-type="tabular"]
     table.formset
-    tbody.form-group.empty-form,
-  body.change-form
-    [data-inline-type="tabular"]
-    table.formset
-    tbody.form-group.template {
+    tbody.form-group.empty-form {
     display: none !important;
   }
 
@@ -3311,6 +3315,17 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     > * {
     grid-column: 2;
     min-width: 0;
+  }
+
+  /* Title / error rows span the whole card (no label gutter). */
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td[colspan]
+    > * {
+    grid-column: 1 / -1;
   }
 
   body.change-form

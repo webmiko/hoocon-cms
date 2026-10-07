@@ -798,18 +798,27 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "isUnfoldTabularInline" in js
     assert "processTabularInlineLabels" in js
     assert "observeTabularInlineRows" in js
+    # Inline delete cell label (Unfold's delete <th> is empty → unlabeled icon).
+    assert "DELETE_LABEL" in js
+    assert '"Удалить"' in js
+    assert 'classList.contains("delete")' in js
     assert "material-symbols «help» tooltip icon" in js
     assert "span.flex-row > span:first-child" in js
     assert "[data-inline-type='tabular'] table.formset" not in js.split("CARD_TABLE_SELECTORS")[1].split("];")[0]
-    tabular_phone_block = css.split("/* Unfold tabular inlines on phones")[1].split(
+    tabular_phone_block = css.split("/* Unfold tabular inlines below lg")[1].split(
         "@keyframes hoocon-lead-sticker-pulse"
     )[0]
+    # Unfold hides tabular thead below lg (1024px) — labeled cards must cover
+    # the whole unlabeled range, incl. 768–1023px panes, not only phones.
+    assert "@media (max-width: 1023px)" in tabular_phone_block
     assert "content: attr(data-label)" in tabular_phone_block
     assert "> td::before" in tabular_phone_block
     assert "grid-template-columns: minmax(5.5rem, 34%)" in tabular_phone_block
     assert "tbody.form-group.empty-form" in tabular_phone_block
-    assert "tbody.form-group.template" in tabular_phone_block
+    # Unfold keeps .template on cloned rows — hiding it made added rows invisible.
+    assert "tbody.form-group.template" not in tabular_phone_block
     assert "tbody.form-group:not(.empty-form)" in tabular_phone_block
+    assert "> td[colspan]" in tabular_phone_block
     assert "> td\n    .select2-container" in tabular_phone_block
     assert 'table.closest("#changelist")' in js
     assert "hoocon-lead-kanban__cards" in js
