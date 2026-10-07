@@ -247,4 +247,21 @@ def link_client_account(account: ClientAccount) -> Client:
     if client.account_id != account.pk:
         client.account = account
         client.save(update_fields=["account", "updated_at"])
+    _backfill_conversations(client)
     return client
+
+
+def _backfill_conversations(client: Client) -> None:
+    """Attach orphan support threads with the client's contact email.
+
+    Web dialogs link at start via ``_auto_link_client``; this sweep heals
+    conversations created before that rule (and messenger threads where
+    staff filled ``contact_email`` manually) whenever the client account
+    is used.
+    """
+    from supportchat.models import Conversation
+
+    Conversation.objects.filter(
+        client__isnull=True,
+        contact_email__iexact=client.email,
+    ).update(client=client)

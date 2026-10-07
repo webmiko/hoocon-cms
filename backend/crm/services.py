@@ -254,7 +254,7 @@ def _personal_smtp_mailbox(user: Any) -> Any | None:
         and mailbox.is_enabled
         and (mailbox.smtp_host or "").strip()
         and (mailbox.imap_user or "").strip()
-        and (mailbox.imap_password or "")
+        and (getattr(mailbox, "imap_password_plain", None) or mailbox.imap_password or "")
     ):
         return mailbox
     return None
@@ -453,6 +453,55 @@ def scope_emails_for_manager(
     return queryset.filter(
         Q(client_id__in=client_ids) | Q(mailbox__user=user),
     ).distinct()
+
+
+def _scoped_or_none(queryset: QuerySet[Any], user: Any) -> QuerySet[Any] | None:
+    """Return unfiltered qs for unscoped staff, empty qs for anon, else None."""
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+    return None
+
+
+def scope_quotes_for_manager(queryset: QuerySet[Quote], user: Any) -> QuerySet[Quote]:
+    """Limit quotes to CRM clients visible to the manager."""
+    fast = _scoped_or_none(queryset, user)
+    if fast is not None:
+        return fast
+    client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
+    return queryset.filter(client_id__in=client_ids)
+
+
+def scope_orders_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]:
+    """Limit cabinet orders to CRM clients visible to the manager."""
+    fast = _scoped_or_none(queryset, user)
+    if fast is not None:
+        return fast
+    client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
+    return queryset.filter(client_id__in=client_ids)
+
+
+def scope_calls_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]:
+    """Limit call journal: unlinked rows stay shared; linked rows follow client scope."""
+    fast = _scoped_or_none(queryset, user)
+    if fast is not None:
+        return fast
+    client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
+    return queryset.filter(
+        Q(client_id__isnull=True) | Q(client_id__in=client_ids) | Q(manager_id=user.pk),
+    ).distinct()
+
+
+def scope_spec_lists_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]:
+    """Limit cabinet spec templates to accounts linked to visible CRM cards."""
+    fast = _scoped_or_none(queryset, user)
+    if fast is not None:
+        return fast
+    account_ids = scope_clients_for_manager(Client.objects.all(), user).exclude(account_id=None).values("account_id")
+    return queryset.filter(account_id__in=account_ids)
 
 
 def get_active_email_template(template_id: str | int | None) -> EmailTemplate | None:

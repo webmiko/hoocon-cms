@@ -77,9 +77,10 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     # «Работа» — one tap to every daily section, in fixed order.
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:8] == [
+    assert work_ids[:9] == [
         "leads-lead",
         "leads-stats",
+        "crm-sales-report",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",
@@ -89,6 +90,8 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     ]
     assert groups["leads-stats"]["action"] == "link"
     assert groups["leads-stats"]["url"].endswith("/admin/leads/lead/stats/")
+    assert groups["crm-sales-report"]["action"] == "link"
+    assert groups["crm-sales-report"]["url"].endswith("/admin/crm/client/sales-report/")
     assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
     assert groups["crm-emailmessage"]["url"].endswith("/admin/crm/emailmessage/")
     assert groups["crm-quote"]["url"].endswith("/admin/crm/quote/")
@@ -360,6 +363,8 @@ def test_command_palette_configured_for_manager_models() -> None:
         "supportchat.conversation",
         "crm.client",
         "catalog.sku",
+        "crm.quote",
+        "cabinet.order",
     ):
         assert expected in models
     # Технические модели вне whitelist.

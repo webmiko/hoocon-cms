@@ -319,3 +319,116 @@ def test_analyst_stats_page_includes_other_managers_leads() -> None:
     client.force_login(analyst)
     response = client.get(reverse("admin:leads_lead_stats"))
     assert response.status_code == 200
+
+
+def _foreign_client_pair() -> tuple[User, User, CrmClient, CrmClient]:
+    """Manager A, manager B, and a CRM card owned by each."""
+    mgr = _staff_with_perms(
+        username="scope-row-mgr",
+        codenames=(
+            "view_client",
+            "view_quote",
+            "view_order",
+            "view_call",
+            "view_speclist",
+        ),
+    )
+    other = User.objects.create_user(
+        username="scope-row-other",
+        email="scope-row-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    mine = CrmClient.objects.create(
+        name="Mine Co",
+        email="scope-mine@example.com",
+        assignee=mgr,
+    )
+    foreign = CrmClient.objects.create(
+        name="Foreign Co",
+        email="scope-foreign@example.com",
+        assignee=other,
+    )
+    Lead.objects.create(
+        name="Theirs",
+        email="scope-foreign@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+        client=foreign,
+    )
+    return mgr, other, mine, foreign
+
+
+@pytest.mark.django_db
+def test_manager_cannot_open_foreign_quote() -> None:
+    """Quote changelist/change are scoped — foreign КП are hidden."""
+    from crm.models import Quote
+
+    mgr, _other, _mine, foreign = _foreign_client_pair()
+    quote = Quote.objects.create(client=foreign)
+    page = Client()
+    page.force_login(mgr)
+    response = page.get(reverse("admin:crm_quote_change", args=[quote.pk]))
+    assert response.status_code in (302, 403, 404)
+    list_html = page.get(reverse("admin:crm_quote_changelist")).content.decode()
+    assert quote.number not in list_html
+    assert "scope-foreign@example.com" not in list_html
+
+
+@pytest.mark.django_db
+def test_manager_cannot_open_foreign_order() -> None:
+    """Order changelist/change are scoped — foreign заказы are hidden."""
+    from cabinet.models import Order
+
+    mgr, _other, _mine, foreign = _foreign_client_pair()
+    order = Order.objects.create(client=foreign, number="ORD-FOREIGN-1")
+    page = Client()
+    page.force_login(mgr)
+    response = page.get(reverse("admin:cabinet_order_change", args=[order.pk]))
+    assert response.status_code in (302, 403, 404)
+    list_html = page.get(reverse("admin:cabinet_order_changelist")).content.decode()
+    assert "ORD-FOREIGN-1" not in list_html
+
+
+@pytest.mark.django_db
+def test_manager_cannot_see_foreign_linked_call() -> None:
+    """Call journal hides other managers' client-linked rows (PII)."""
+    from crm.models import Call, CallDirection
+
+    mgr, _other, _mine, foreign = _foreign_client_pair()
+    Call.objects.create(
+        entry_id="scope-call-foreign",
+        direction=CallDirection.INBOUND,
+        from_number="79151110000",
+        client=foreign,
+    )
+    Call.objects.create(
+        entry_id="scope-call-orphan",
+        direction=CallDirection.INBOUND,
+        from_number="79152220000",
+    )
+    page = Client()
+    page.force_login(mgr)
+    list_html = page.get(reverse("admin:crm_call_changelist")).content.decode()
+    assert "79151110000" not in list_html
+    assert "79152220000" in list_html
+
+
+@pytest.mark.django_db
+def test_manager_cannot_open_foreign_spec_list() -> None:
+    """Cabinet spec templates follow CRM client visibility."""
+    from accounts.models import ClientAccount
+    from cabinet.models import SpecList
+
+    mgr, _other, _mine, foreign = _foreign_client_pair()
+    account = ClientAccount.objects.create(email=foreign.email, name="Foreign Acc")
+    foreign.account = account
+    foreign.save(update_fields=["account"])
+    spec = SpecList.objects.create(account=account, name="Чужая спецификация")
+    page = Client()
+    page.force_login(mgr)
+    response = page.get(reverse("admin:cabinet_speclist_change", args=[spec.pk]))
+    assert response.status_code in (302, 403, 404)
+    list_html = page.get(reverse("admin:cabinet_speclist_changelist")).content.decode()
+    assert "Чужая спецификация" not in list_html

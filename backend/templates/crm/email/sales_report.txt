@@ -1,0 +1,25 @@
+Отчёт по работе менеджеров за {{ days }} дн.
+
+Сводка:
+- новых заявок: {{ report.totals.leads_new }}
+- закрыто заявок: {{ report.totals.leads_done }}
+- КП создано: {{ report.totals.quotes_created }}
+- КП выдано: {{ report.totals.quotes_sent }}
+- КП согласовано: {{ report.totals.quotes_accepted }}
+- открытых КП: {{ report.totals.open_quotes }}
+- заказов: {{ report.totals.orders_created }}
+- писем отправлено: {{ report.totals.emails_sent }}
+- звонков с разговором: {{ report.totals.calls_talked }}
+- активностей: {{ report.totals.activities }}
+- просрочен следующий контакт: {{ report.totals.overdue_next_contact }}
+
+По менеджерам:
+{% for row in report.managers %}
+{{ row.display_name }}
+  заявки: +{{ row.leads_new }} / закрыто {{ row.leads_done }}
+  КП: +{{ row.quotes_created }} / выдано {{ row.quotes_sent }} / согласовано {{ row.quotes_accepted }} / открыто {{ row.open_quotes }}
+  заказы {{ row.orders_created }} · письма {{ row.emails_sent }} · звонки {{ row.calls_talked }} · активности {{ row.activities }}
+  просрочен контакт: {{ row.overdue_next_contact }}
+{% empty %}
+Нет строк за период.
+{% endfor %}

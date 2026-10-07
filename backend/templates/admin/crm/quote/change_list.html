@@ -1,0 +1,40 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block bodyclass %}{{ block.super }} hoocon-lead-board hoocon-quote-board{% endblock %}
+
+{% block object-tools-items %}
+  <li class="hoocon-lead-view-tool">
+    <span
+      class="hoocon-lead-view-toggle"
+      role="group"
+      aria-label="Вид списка КП"
+      data-hoocon-lead-view="{{ hoocon_quote_view|default:'wall' }}"
+    >
+      <a
+        href="{{ hoocon_quote_view_wall_url }}"
+        class="{% if hoocon_quote_view == 'wall' %}is-active{% endif %}"
+        {% if hoocon_quote_view == 'wall' %}aria-current="page"{% endif %}
+      >Стена</a>
+      <a
+        href="{{ hoocon_quote_view_kanban_url }}"
+        class="{% if hoocon_quote_view == 'kanban' %}is-active{% endif %}"
+        {% if hoocon_quote_view == 'kanban' %}aria-current="page"{% endif %}
+      >Канбан</a>
+    </span>
+  </li>
+  {% if hoocon_sales_report_url %}
+  <li>
+    <a href="{{ hoocon_sales_report_url }}" class="hoocon-leads-stats-link">Отчёт РОП</a>
+  </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script>
+    document.documentElement.dataset.hooconLeadView =
+      "{{ hoocon_quote_view|default:'wall'|escapejs }}";
+  </script>
+{% endblock %}

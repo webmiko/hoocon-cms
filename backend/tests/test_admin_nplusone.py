@@ -121,3 +121,44 @@ def test_lead_admin_rfq_thread_badge_query_count_flat(admin_client: Client) -> N
         )
 
     assert count_queries() <= one + 1
+
+
+@pytest.mark.django_db
+def test_quote_admin_list_queries_do_not_scale_with_rows(admin_client: Client) -> None:
+    """Quote changelist select_related keeps query count flat."""
+    from crm.models import Client, Quote
+
+    buyer = Client.objects.create(name="Q0", email="q0-np@example.com")
+    Quote.objects.create(client=buyer)
+
+    def count_queries() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            response = admin_client.get(reverse("admin:crm_quote_changelist"))
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    one = count_queries()
+    for index in range(1, 5):
+        Quote.objects.create(
+            client=Client.objects.create(name=f"Q{index}", email=f"q{index}-np@example.com"),
+        )
+    assert count_queries() <= one + 1
+
+
+@pytest.mark.django_db
+def test_company_admin_list_queries_do_not_scale_with_rows(admin_client: Client) -> None:
+    """Company changelist annotates member/client counts (no per-row count)."""
+    from crm.models import Company
+
+    Company.objects.create(name="Nplus Co 0")
+
+    def count_queries() -> int:
+        with CaptureQueriesContext(connection) as ctx:
+            response = admin_client.get(reverse("admin:crm_company_changelist"))
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    one = count_queries()
+    for index in range(1, 5):
+        Company.objects.create(name=f"Nplus Co {index}")
+    assert count_queries() <= one + 1

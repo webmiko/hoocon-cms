@@ -39,9 +39,9 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
 
     overdue_sla = 0
     if can_leads:
-        from leads.sla import overdue_new_leads
+        from leads.sla import overdue_new_lead_pks
 
-        overdue_sla = len(overdue_new_leads(_scoped_leads(user)))
+        overdue_sla = len(overdue_new_lead_pks(_scoped_leads(user)))
 
     notifications = _build_notifications(
         user=user,
@@ -165,8 +165,28 @@ def _build_notifications(
                 )
 
     if can_crm:
-        from crm.models import EmailMessage, EmailStatus
-        from crm.services import scope_emails_for_manager
+        from django.utils import timezone
+
+        from crm.models import Client, EmailMessage, EmailStatus
+        from crm.services import scope_clients_for_manager, scope_emails_for_manager
+
+        overdue_contact = scope_clients_for_manager(
+            Client.objects.filter(
+                is_active=True,
+                next_contact_at__isnull=False,
+                next_contact_at__lt=timezone.now(),
+            ),
+            user,
+        ).count()
+        if overdue_contact:
+            items.append(
+                {
+                    "level": "warning",
+                    "title": f"Просрочен следующий контакт: {overdue_contact}",
+                    "hint": "Обновите дату в карточке клиента после звонка или письма.",
+                    "url": reverse("admin:crm_client_changelist") + "?next_contact_overdue=yes",
+                },
+            )
 
         failed = scope_emails_for_manager(
             EmailMessage.objects.filter(status=EmailStatus.FAILED),

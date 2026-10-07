@@ -196,3 +196,41 @@ def fetch_mango_recording(self: object, entry_id: str) -> str:
     call.recording.save(f"{recording_id[:60]}.mp3", ContentFile(payload), save=True)
     logger.info("mango_recording_saved entry=%s bytes=%d", entry_id, len(payload))
     return "saved"
+
+
+@shared_task(name="crm.send_weekly_sales_report")
+def send_weekly_sales_report() -> str:
+    """Monday digest: manager funnel for the previous 7 days → РОП inbox."""
+    from datetime import timedelta
+
+    from django.conf import settings as django_settings
+    from django.core.mail import send_mail
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+
+    from crm.reports import build_sales_report, sales_report_recipients
+
+    recipients = sales_report_recipients()
+    if not recipients:
+        logger.info("sales_report_skip_no_recipients")
+        return "no-recipients"
+    until = timezone.now()
+    since = until - timedelta(days=7)
+    report = build_sales_report(since=since, until=until, user=None)
+    body = render_to_string(
+        "crm/email/sales_report.txt",
+        {"report": report, "days": 7},
+    )
+    send_mail(
+        subject="Отчёт по менеджерам за 7 дней",
+        message=body,
+        from_email=getattr(django_settings, "DEFAULT_FROM_EMAIL", "") or None,
+        recipient_list=recipients,
+        fail_silently=False,
+    )
+    logger.info(
+        "sales_report_sent recipients=%s managers=%s",
+        len(recipients),
+        len(report["managers"]),
+    )
+    return f"sent={len(recipients)}"

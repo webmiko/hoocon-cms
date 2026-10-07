@@ -74,6 +74,8 @@ def render_quote_pdf(quote: Quote) -> io.BytesIO:
     pdf.drawString(x_margin, y, f"Дата: {quote.created_at:%d.%m.%Y}")
     if quote.sent_at:
         pdf.drawString(x_margin + 60 * mm, y, f"Выдано: {quote.sent_at:%d.%m.%Y}")
+    if quote.valid_until:
+        pdf.drawString(x_margin + 110 * mm, y, f"Действует до: {quote.valid_until:%d.%m.%Y}")
     y -= 6 * mm
     pdf.drawString(x_margin, y, f"Клиент: {client.company or client.name or client.email}")
     y -= 6 * mm
@@ -128,8 +130,18 @@ def render_quote_pdf(quote: Quote) -> io.BytesIO:
         y -= 2 * mm
         pdf.line(x_margin, y, width - x_margin, y)
         y -= 6 * mm
-        pdf.setFont(font_bold, 10)
-        pdf.drawRightString(width - x_margin, y, f"Итого: {total:.2f} ₽")
+        vat_rate = quote.vat_rate
+        if vat_rate:
+            vat_amount = total * vat_rate / 100
+            grand = total + vat_amount
+            pdf.setFont(font, 9)
+            pdf.drawRightString(width - x_margin, y, f"НДС {vat_rate:g}%: {vat_amount:.2f} ₽")
+            y -= 6 * mm
+            pdf.setFont(font_bold, 10)
+            pdf.drawRightString(width - x_margin, y, f"Итого с НДС: {grand:.2f} ₽")
+        else:
+            pdf.setFont(font_bold, 10)
+            pdf.drawRightString(width - x_margin, y, f"Итого: {total:.2f} ₽")
 
     if quote.comment:
         y -= 10 * mm

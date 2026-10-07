@@ -1,0 +1,109 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{{ changelist_url }}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <span>Отчёт РОП</span>
+</nav>
+
+<div class="hoocon-lead-stats">
+  <div class="hoocon-lead-stats__toolbar">
+    <h1>Отчёт по менеджерам</h1>
+    <nav class="hoocon-lead-stats__periods" aria-label="Период">
+      <a href="?days=7" class="{% if days == 7 %}is-active{% endif %}">7 дней</a>
+      <a href="?days=30" class="{% if days == 30 %}is-active{% endif %}">30 дней</a>
+      <a href="?days=0" class="{% if days == 0 %}is-active{% endif %}">Всё время</a>
+      <a href="{{ changelist_url }}">← К клиентам</a>
+    </nav>
+  </div>
+
+  {% if report.scoped %}
+  <p class="hoocon-lead-stats__hint">Показаны только ваши цифры. Полный отчёт отдела видят Админ и Аналитик.</p>
+  {% endif %}
+
+  <section class="hoocon-lead-stats__cards" aria-label="Сводка">
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Заявки новые</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.leads_new }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Заявки закрыты</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.leads_done }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">КП создано</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.quotes_created }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">КП выдано</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.quotes_sent }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card hoocon-lead-stats__card--accent">
+      <p class="hoocon-lead-stats__label">КП согласовано</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.quotes_accepted }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Заказы</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.orders_created }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Письма</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.emails_sent }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Звонки с разговором</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.calls_talked }}</p>
+    </article>
+    <article class="hoocon-lead-stats__card">
+      <p class="hoocon-lead-stats__label">Просрочен контакт</p>
+      <p class="hoocon-lead-stats__value">{{ report.totals.overdue_next_contact }}</p>
+    </article>
+  </section>
+
+  <section class="module hoocon-lead-stats__table-wrap">
+    <h2>По менеджерам</h2>
+    {% if report.managers %}
+    <table class="hoocon-lead-stats__table">
+      <thead>
+        <tr>
+          <th scope="col">Менеджер</th>
+          <th scope="col">Заявки +</th>
+          <th scope="col">Закрыто</th>
+          <th scope="col">КП +</th>
+          <th scope="col">Выдано</th>
+          <th scope="col">Согласовано</th>
+          <th scope="col">Открытые КП</th>
+          <th scope="col">Заказы</th>
+          <th scope="col">Письма</th>
+          <th scope="col">Звонки</th>
+          <th scope="col">Контакт просрочен</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.managers %}
+        <tr>
+          <th scope="row">{{ row.display_name }}</th>
+          <td>{{ row.leads_new }}</td>
+          <td>{{ row.leads_done }}</td>
+          <td>{{ row.quotes_created }}</td>
+          <td>{{ row.quotes_sent }}</td>
+          <td>{{ row.quotes_accepted }}</td>
+          <td>{{ row.open_quotes }}</td>
+          <td>{{ row.orders_created }}</td>
+          <td>{{ row.emails_sent }}</td>
+          <td>{{ row.calls_talked }}</td>
+          <td>{{ row.overdue_next_contact }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Нет данных за период.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

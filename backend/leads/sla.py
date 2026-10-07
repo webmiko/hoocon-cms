@@ -81,6 +81,26 @@ def lead_response_deadline(
     return None
 
 
+def overdue_new_lead_pks(
+    queryset: QuerySet[Lead],
+    *,
+    now: datetime | None = None,
+) -> list[int]:
+    """Primary keys of overdue NEW leads (Admin filter / dashboard count).
+
+    Uses ``values_list`` so Admin querysets with ``select_related`` stay valid.
+    """
+    now = now or timezone.now()
+    ctx = _schedule_index()
+    rows = queryset.filter(status=Lead.LeadStatus.NEW).order_by("created_at", "pk").values_list("pk", "created_at")
+    overdue: list[int] = []
+    for pk, created_at in rows.iterator(chunk_size=200):
+        deadline = lead_response_deadline(created_at, schedule_ctx=ctx)
+        if deadline is not None and deadline <= now:
+            overdue.append(pk)
+    return overdue
+
+
 def overdue_new_leads(
     queryset: QuerySet[Lead],
     *,
@@ -95,12 +115,8 @@ def overdue_new_leads(
     Returns:
         List of overdue leads, oldest first.
     """
-    now = now or timezone.now()
-    ctx = _schedule_index()
-    overdue: list[Lead] = []
-    qs = queryset.filter(status=Lead.LeadStatus.NEW).order_by("created_at", "pk")
-    for lead in qs.iterator(chunk_size=200):
-        deadline = lead_response_deadline(lead.created_at, schedule_ctx=ctx)
-        if deadline is not None and deadline <= now:
-            overdue.append(lead)
-    return overdue
+    pks = overdue_new_lead_pks(queryset, now=now)
+    if not pks:
+        return []
+    by_id = {lead.pk: lead for lead in queryset.filter(pk__in=pks)}
+    return [by_id[pk] for pk in pks if pk in by_id]

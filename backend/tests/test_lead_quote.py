@@ -67,7 +67,7 @@ def test_create_quote_copies_lead_items_and_links() -> None:
     page = DjClient()
     page.force_login(admin)
 
-    response = page.get(reverse("admin:leads_lead_create_quote", args=[lead.pk]))
+    response = page.post(reverse("admin:leads_lead_create_quote", args=[lead.pk]))
 
     quote = Quote.objects.get(lead=lead)
     assert response.status_code == 302
@@ -92,10 +92,26 @@ def test_create_quote_twice_reuses_open_quote() -> None:
     page.force_login(admin)
     url = reverse("admin:leads_lead_create_quote", args=[lead.pk])
 
-    page.get(url)
-    page.get(url)
+    page.post(url)
+    page.post(url)
 
     assert Quote.objects.filter(lead=lead).count() == 1
+
+
+@pytest.mark.django_db
+def test_create_quote_get_does_not_mutate() -> None:
+    """GET на «Создать КП» не пишет в БД (кнопка шлёт POST)."""
+    admin = _superuser()
+    lead = _make_lead()
+    page = DjClient()
+    page.force_login(admin)
+    url = reverse("admin:leads_lead_create_quote", args=[lead.pk])
+
+    response = page.get(url)
+
+    assert response.status_code == 302
+    assert Quote.objects.count() == 0
+    assert response.url == reverse("admin:leads_lead_change", args=[lead.pk])
 
 
 @pytest.mark.django_db
@@ -115,6 +131,8 @@ def test_quote_sent_closes_source_lead() -> None:
             "lead": str(lead.pk),
             "created_by": "",
             "comment": "",
+            "vat_rate": "22.00",
+            "valid_until": "",
             "items-TOTAL_FORMS": "0",
             "items-INITIAL_FORMS": "0",
             "items-MIN_NUM_FORMS": "0",
@@ -231,6 +249,7 @@ def test_quote_form_rejects_lead_of_other_client() -> None:
             "lead": str(lead.pk),
             "status": QuoteStatus.DRAFT,
             "comment": "",
+            "vat_rate": "22.00",
         },
     )
     own = QuoteAdminForm(
@@ -239,6 +258,7 @@ def test_quote_form_rejects_lead_of_other_client() -> None:
             "lead": str(lead.pk),
             "status": QuoteStatus.DRAFT,
             "comment": "",
+            "vat_rate": "22.00",
         },
     )
 

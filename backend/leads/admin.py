@@ -30,6 +30,7 @@ from django.db.models import (
     Q,
     QuerySet,
     Subquery,
+    Value,
     When,
 )
 from django.db.models.functions import Coalesce
@@ -107,10 +108,9 @@ class OverdueLeadFilter(admin.SimpleListFilter):
         """Keep only overdue new leads when the filter is on."""
         if self.value() != "yes":
             return queryset
-        from leads.sla import overdue_new_leads
+        from leads.sla import overdue_new_lead_pks
 
-        ids = [lead.pk for lead in overdue_new_leads(queryset)]
-        return queryset.filter(pk__in=ids)
+        return queryset.filter(pk__in=overdue_new_lead_pks(queryset))
 
 
 class LeadItemInline(TabularInline):
@@ -614,6 +614,10 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             and request.GET.get(_LEAD_EDIT_QUERY) != "1"
             and request.POST.get("_lead_edit") != "1"
         ):
+            messages.warning(
+                request,
+                _("Заявка открыта на просмотр. Нажмите «Редактировать», чтобы сохранить изменения."),
+            )
             return HttpResponseRedirect(
                 reverse("admin:leads_lead_change", args=[object_id]),
             )
@@ -638,15 +642,16 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         lead = get_object_or_404(self.get_queryset(request), pk=object_id)
         if not self.has_change_permission(request, lead):
             raise PermissionDenied
+        change_url = reverse("admin:leads_lead_change", args=[lead.pk])
+        if request.method != "POST":
+            return HttpResponseRedirect(change_url)
         if not (lead.email or "").strip():
             self.message_user(
                 request,
                 _("У заявки нет email — КП привязать не к кому."),
                 messages.ERROR,
             )
-            return HttpResponseRedirect(
-                reverse("admin:leads_lead_change", args=[lead.pk]),
-            )
+            return HttpResponseRedirect(change_url)
         from crm.services import create_quote_from_lead
 
         quote, created = create_quote_from_lead(lead, author=request.user)
@@ -661,6 +666,17 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 request,
                 _(f"У заявки уже есть открытое {quote.number}."),
                 messages.INFO,
+            )
+        from crm.quote_ops import sibling_open_quotes
+
+        client = cast("CrmClient | None", quote.client)
+        siblings = sibling_open_quotes(client) if client is not None else []
+        if siblings:
+            labels = ", ".join(f"{row.number} ({cast('CrmClient', row.client).email})" for row in siblings)
+            self.message_user(
+                request,
+                _(f"У коллег по компании уже есть открытые КП: {labels}."),
+                messages.WARNING,
             )
         return HttpResponseRedirect(
             reverse("admin:crm_quote_change", args=[quote.pk]),
@@ -781,9 +797,12 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             Lead queryset with ``_status_rank`` and default ordering.
         """
         bundle_root_id = Coalesce("rfq_bundle_root_id", "pk")
+        # Group all matching rows into one bucket — grouping by
+        # rfq_bundle_root_id splits root (NULL) from siblings.
         bundle_size = (
             Lead.objects.filter(Q(pk=OuterRef("_bundle_root")) | Q(rfq_bundle_root_id=OuterRef("_bundle_root")))
-            .values("rfq_bundle_root_id")
+            .order_by()
+            .values(bucket=Value(1, output_field=IntegerField()))
             .annotate(cnt=Count("pk"))
             .values("cnt")
         )
