@@ -1,12 +1,41 @@
 .row {
   display: grid;
-  grid-template-columns: minmax(8.5rem, auto) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.5rem;
   align-items: stretch;
 }
 
 .control {
   min-width: 0;
+}
+
+/*
+ * Country select shows only "+dial" when collapsed — full country names
+ * stay in the dropdown options. Without this the longest option
+ * («Кыргызстан +996») stretches the select wider than the phone input.
+ */
+.selectWrap {
+  position: relative;
+  width: 5.25rem;
+}
+
+.selectWrap .country {
+  width: 100%;
+  height: 100%;
+  color: transparent;
+}
+
+.dial {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-inline: 1rem 1.75rem;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .country {
@@ -33,5 +62,18 @@
 @media (max-width: 480px) {
   .row {
     grid-template-columns: 1fr;
+  }
+
+  /* Stacked layout has room for the full country label. */
+  .selectWrap {
+    width: auto;
+  }
+
+  .selectWrap .country {
+    color: var(--color-text);
+  }
+
+  .dial {
+    display: none;
   }
 }

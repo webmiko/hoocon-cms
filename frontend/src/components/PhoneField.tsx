@@ -107,20 +107,25 @@ export function PhoneField({
       <label className={styles.srOnly} htmlFor={`${id}-country`}>
         Код страны
       </label>
-      <select
-        id={`${id}-country`}
-        className={`${controlClass} ${styles.country}`}
-        value={countryId}
-        disabled={disabled}
-        aria-label="Код страны"
-        onChange={(e) => setCountry(e.target.value as PhoneCountryId)}
-      >
-        {PHONE_COUNTRIES.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.label}
-          </option>
-        ))}
-      </select>
+      <div className={styles.selectWrap}>
+        <select
+          id={`${id}-country`}
+          className={`${controlClass} ${styles.country}`}
+          value={countryId}
+          disabled={disabled}
+          aria-label="Код страны"
+          onChange={(e) => setCountry(e.target.value as PhoneCountryId)}
+        >
+          {PHONE_COUNTRIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <span className={styles.dial} aria-hidden="true">
+          +{country.dial}
+        </span>
+      </div>
       <input
         type="tel"
         id={id}
