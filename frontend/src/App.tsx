@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
+import { CabinetGate } from "./account/CabinetGate";
 import { ChunkLoadErrorBoundary } from "./components/ChunkLoadErrorBoundary";
 import { Layout } from "./components/Layout";
 import { PageFallback } from "./components/PageFallback";
@@ -143,9 +144,30 @@ export default function App() {
             <Route path="search" element={<SearchPage />} />
             <Route path="consultation" element={<LeadPage leadType="consultation" />} />
             <Route path="rfq" element={<LeadPage leadType="rfq" />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="register" element={<RegisterPage />} />
-            <Route path="account" element={<AccountShell />}>
+            <Route
+              path="login"
+              element={
+                <CabinetGate>
+                  <LoginPage />
+                </CabinetGate>
+              }
+            />
+            <Route
+              path="register"
+              element={
+                <CabinetGate>
+                  <RegisterPage />
+                </CabinetGate>
+              }
+            />
+            <Route
+              path="account"
+              element={
+                <CabinetGate>
+                  <AccountShell />
+                </CabinetGate>
+              }
+            >
               <Route index element={<AccountDashboardPage />} />
               <Route path="leads" element={<AccountLeadsPage />} />
               <Route path="quotes" element={<AccountQuotesPage />} />

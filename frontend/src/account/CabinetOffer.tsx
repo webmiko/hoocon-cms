@@ -13,6 +13,7 @@ import { Link, useNavigate } from "react-router-dom";
 import account from "./Account.module.css";
 import { accountApi, AccountApiError } from "./api";
 import { useAccountAuth } from "./AuthContext";
+import { useCabinetEnabled } from "./cabinetEnabled";
 import styles from "./CabinetOffer.module.css";
 
 interface CabinetOfferProps {
@@ -33,8 +34,9 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
   useEffect(() => {
     formStartTs.current = Date.now() / 1000;
   }, []);
+  const cabinetEnabled = useCabinetEnabled();
 
-  if (loading || dismissed || !email) {
+  if (loading || dismissed || !email || cabinetEnabled !== true) {
     return null;
   }
 
@@ -42,9 +44,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
     return (
       <section className={styles.offer}>
         <h3 className={styles.title}>Заявка уже в вашем кабинете</h3>
-        <p className={styles.hint}>
-          Статус обработки, КП и документы — в разделе «Заявки».
-        </p>
+        <p className={styles.hint}>Статус обработки, КП и документы — в разделе «Заявки».</p>
         <Link className={account.button} to="/account/leads">
           Открыть кабинет
         </Link>
@@ -60,9 +60,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
       const res = await accountApi.otpStart(email, formStartTs.current);
       setChallengeId(res.challenge_id);
     } catch (err) {
-      setError(
-        err instanceof AccountApiError ? err.detail : "Не удалось отправить код.",
-      );
+      setError(err instanceof AccountApiError ? err.detail : "Не удалось отправить код.");
     } finally {
       setBusy(false);
     }
@@ -119,11 +117,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
               try {
                 await accountApi.otpResend(challengeId);
               } catch (err) {
-                setError(
-                  err instanceof AccountApiError
-                    ? err.detail
-                    : "Повторите позже.",
-                );
+                setError(err instanceof AccountApiError ? err.detail : "Повторите позже.");
               }
             }}
           >
@@ -154,11 +148,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
         <button className={account.button} type="submit" disabled={busy}>
           Создать кабинет
         </button>
-        <button
-          type="button"
-          className={styles.dismiss}
-          onClick={() => setDismissed(true)}
-        >
+        <button type="button" className={styles.dismiss} onClick={() => setDismissed(true)}>
           Не сейчас
         </button>
       </div>
