@@ -355,7 +355,7 @@ class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Admin for ProductImage (WebP gallery)."""
 
     list_display = ("sku", "alt", "sort_order", "is_published", "updated_at")
-    list_display_links = ("alt",)
+    list_display_links = ("sku",)
     list_filter = ("is_published",)
     search_fields = ("alt", "sku__sku_code", "source_url")
     autocomplete_fields = ("sku",)
@@ -366,10 +366,11 @@ class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(AnalogMap)
-class AnalogMapAdmin(ModelAdmin):
+class AnalogMapAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Карта аналогов (ЛК-10): сторонний артикул → Hoocon SKU + параметры."""
 
     list_display = ("brand", "foreign_code", "sku", "torque_nm", "spring_return", "is_active")
+    list_display_links = ("brand", "foreign_code")
     list_filter = ("brand", "spring_return", "is_active")
     search_fields = ("brand", "foreign_code", "sku__sku_code", "note")
     autocomplete_fields = ("sku",)
