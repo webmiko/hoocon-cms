@@ -672,10 +672,12 @@ def test_outbound_without_mailbox_uses_default_backend(
 
 
 @pytest.mark.django_db
-def test_create_outbound_uses_author_mailbox() -> None:
+def test_create_outbound_uses_author_mailbox(settings) -> None:
     """create_outbound_email: у автора с ящиком From = его адрес + mailbox."""
     from accounts.models import StaffMailbox
     from crm.services import create_outbound_email
+
+    settings.DEFAULT_FROM_EMAIL = "sales@hoocon.ru"
 
     owner = _staff_user("ivan2")
     mailbox = StaffMailbox.objects.create(
@@ -704,7 +706,7 @@ def test_create_outbound_uses_author_mailbox() -> None:
     assert own.mailbox_id == mailbox.pk
     assert own.from_email == "ivan2@hoocon.ru"
     assert shared.mailbox_id is None
-    assert "@hoocon.ru" in shared.from_email  # общий DEFAULT_FROM_EMAIL
+    assert shared.from_email == "sales@hoocon.ru"  # общий DEFAULT_FROM_EMAIL
 
 
 @pytest.mark.django_db
