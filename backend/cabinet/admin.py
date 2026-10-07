@@ -13,6 +13,7 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
 from cabinet.models import Order, OrderItem, RmaCase, SpecList, SpecListItem
+from config.admin_mixins import filter_autocomplete_by_client
 from crm.models import Client
 from crm.services import scope_clients_for_manager
 
@@ -82,6 +83,10 @@ class OrderAdmin(ModelAdmin):
             {"fields": ("external_id", "comment")},
         ),
     )
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        """Autocomplete поля «Заказ» (документ) — только заказы клиента."""
+        return filter_autocomplete_by_client(request, super().get_queryset(request))
 
 
 @admin.register(RmaCase)

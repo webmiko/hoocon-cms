@@ -6,9 +6,39 @@ from typing import Any
 
 from django.contrib import admin
 from django.db import models
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.html import format_html
+
+
+def filter_autocomplete_by_client(
+    request: HttpRequest,
+    qs: QuerySet[Any],
+) -> QuerySet[Any]:
+    """On ``/admin/autocomplete/`` narrow the queryset to ``?client=<id>``.
+
+    Paired with ``hoocon-admin-chained-autocomplete.js``: autocomplete
+    widgets chained to a «клиент» field (lead/quote/order) send the
+    selected client id; the *target* model's admin applies it here.
+    Outside the autocomplete endpoint (changelist, widgets) the
+    queryset is returned untouched.
+
+    Args:
+        request: current admin request.
+        qs: target-model queryset already built by ``get_queryset``.
+
+    Returns:
+        Queryset filtered by ``client_id`` when the param is a digit.
+    """
+    match = getattr(request, "resolver_match", None)
+    url_name = getattr(match, "url_name", "") or ""
+    if url_name != "autocomplete":
+        return qs
+    client_id = request.GET.get("client", "")
+    if client_id.isdigit():
+        return qs.filter(client_id=int(client_id))
+    return qs
 
 
 class OpenChangeLinkMixin:

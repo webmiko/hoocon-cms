@@ -42,7 +42,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import SKU
-from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -802,7 +802,10 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 _bundle_size=Subquery(bundle_size),
             )
         )
-        return scope_leads_for_manager(qs, request.user)
+        qs = scope_leads_for_manager(qs, request.user)
+        # Chained «заявка» autocompletes (quote/activity/email/call forms)
+        # send ?client=<id>; keep only that client's leads.
+        return filter_autocomplete_by_client(request, qs)
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
         """Lead changelist: newest first; optional status grouping via ``lead_sort``.

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -14,7 +15,7 @@ from django.contrib.auth.models import Permission
 from django.test import Client as DjClient
 from django.urls import reverse
 
-from crm.models import Quote, QuoteStatus
+from crm.models import Client, Quote, QuoteStatus
 from leads.models import Lead, LeadItem
 
 User = get_user_model()
@@ -145,3 +146,120 @@ def test_create_quote_requires_add_quote_perm() -> None:
 
     assert response.status_code == 403
     assert Quote.objects.count() == 0
+
+
+def _autocomplete(page: DjClient, **params: str) -> Any:
+    """Hit /admin/autocomplete/ with the given params."""
+    return page.get(reverse("admin:autocomplete"), params)
+
+
+@pytest.mark.django_db
+def test_quote_lead_autocomplete_filters_by_client() -> None:
+    """?client=<id> отсекает чужие заявки на /admin/autocomplete/.
+
+    Регресс: поле «Заявка» в КП показывало все заявки — теперь
+    chained-autocomplete JS шлёт client=…, а LeadAdmin режет выдачу.
+    """
+    admin = _superuser()
+    lead_a = _make_lead(email="lead-a@example.com")
+    lead_b = _make_lead(email="lead-b@example.com")
+    assert lead_a.client_id != lead_b.client_id
+    page = DjClient()
+    page.force_login(admin)
+
+    response = _autocomplete(
+        page,
+        app_label="crm",
+        model_name="quote",
+        field_name="lead",
+        term="",
+        client=str(lead_a.client_id),
+    )
+
+    assert response.status_code == 200
+    ids = {row["id"] for row in response.json()["results"]}
+    assert str(lead_a.pk) in ids
+    assert str(lead_b.pk) not in ids
+
+
+@pytest.mark.django_db
+def test_quote_lead_autocomplete_without_client_lists_all() -> None:
+    """Без ?client= выдача не фильтруется (поведение прежнее)."""
+    admin = _superuser()
+    lead_a = _make_lead(email="lead-a@example.com")
+    lead_b = _make_lead(email="lead-b@example.com")
+    page = DjClient()
+    page.force_login(admin)
+
+    response = _autocomplete(
+        page,
+        app_label="crm",
+        model_name="quote",
+        field_name="lead",
+        term="",
+    )
+
+    ids = {row["id"] for row in response.json()["results"]}
+    assert str(lead_a.pk) in ids
+    assert str(lead_b.pk) in ids
+
+
+@pytest.mark.django_db
+def test_quote_add_page_loads_chained_autocomplete_js() -> None:
+    """Add-форма КП подключает hoocon-admin-chained-autocomplete.js (Media)."""
+    admin = _superuser()
+    page = DjClient()
+    page.force_login(admin)
+
+    response = page.get(reverse("admin:crm_quote_add"))
+
+    assert response.status_code == 200
+    assert "hoocon-admin-chained-autocomplete.js" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_quote_form_rejects_lead_of_other_client() -> None:
+    """Заявка чужого клиента отклоняется на валидации формы (не только в UI)."""
+    from crm.admin import QuoteAdminForm
+
+    lead = _make_lead()
+    other_client = Client.objects.create(email="other-client@example.com")
+
+    foreign = QuoteAdminForm(
+        data={
+            "client": str(other_client.pk),
+            "lead": str(lead.pk),
+            "status": QuoteStatus.DRAFT,
+            "comment": "",
+        },
+    )
+    own = QuoteAdminForm(
+        data={
+            "client": str(lead.client_id),
+            "lead": str(lead.pk),
+            "status": QuoteStatus.DRAFT,
+            "comment": "",
+        },
+    )
+
+    assert not foreign.is_valid()
+    assert "lead" in foreign.errors
+    assert own.is_valid()
+
+
+def test_chained_autocomplete_js_contract() -> None:
+    """JS патчит select2 ajax (?client=…) и чистит заявку при смене клиента.
+
+    Регресс: ajaxOptions надо патчить на dataAdapter — AjaxAdapter копирует
+    ajax-конфиг при init ($.extend), правка options.options.ajax молча
+    игнорируется, и client= не уходит на сервер.
+    """
+    js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-chained-autocomplete.js").read_text(
+        encoding="utf-8"
+    )
+    assert "id_client" in js
+    assert "id_lead" in js
+    assert 'data("select2")' in js
+    assert "dataAdapter.ajaxOptions" in js
+    assert "client:" in js
+    assert 'trigger("change")' in js

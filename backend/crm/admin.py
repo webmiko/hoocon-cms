@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
+from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import F, QuerySet
 from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -16,10 +17,14 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
-from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
+from config.unfold_callbacks import _versioned_static
 from crm.forms import ComposeEmailForm, SpecImportForm
+from crm.mail_links import staff_reply_to_email
+from crm.manager_signatures import manager_reply_signature
 from crm.models import (
     Activity,
+    Call,
     Client,
     ClientDocument,
     Company,
@@ -575,6 +580,11 @@ class ActivityAdmin(OpenChangeLinkMixin, ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("client__email", "-created_at")
 
+    class Media:
+        """«Заявка» autocomplete фильтруется по выбранному клиенту."""
+
+        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
+
     @admin.display(description="ID", ordering="client__email")
     def client_email_id(self, obj: Activity) -> str:
         """Group key: client email (same ID → same client card)."""
@@ -665,6 +675,12 @@ class EmailMessageAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_filter = ("direction", "status", "created_at")
     search_fields = ("subject", "to_email", "from_email", "client__name", "client__email", "body")
     autocomplete_fields = ("client", "lead", "created_by")
+
+    class Media:
+        """«Заявка» autocomplete фильтруется по выбранному клиенту."""
+
+        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
+
     readonly_fields = (
         "direction",
         "from_email",
@@ -889,10 +905,32 @@ class InboundMailboxStateAdmin(ModelAdmin):
         return False
 
 
+class QuoteAdminForm(forms.ModelForm):
+    """«Заявка» КП должна принадлежать выбранному клиенту."""
+
+    class Meta:
+        model = Quote
+        fields = "__all__"
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean() or {}
+        lead = cast(Lead | None, cleaned.get("lead"))
+        client = cast(Client | None, cleaned.get("client"))
+        if lead and client and lead.client_id and lead.client_id != client.pk:
+            self.add_error(
+                "lead",
+                ValidationError(
+                    _("Заявка #%s привязана к другому клиенту.") % lead.pk,
+                ),
+            )
+        return cleaned
+
+
 @admin.register(Quote)
 class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Коммерческие предложения: позиции, статус, связь с заявкой."""
 
+    form = QuoteAdminForm
     list_display = ("number", "client", "lead", "status", "created_at", "sent_at")
     list_display_links = ("number", "client")
     list_filter = ("status", "created_at")
@@ -906,6 +944,16 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
     autocomplete_fields = ("client", "lead", "created_by")
     readonly_fields = ("number", "sent_at", "created_at", "updated_at")
     inlines = (QuoteItemInline,)
+
+    class Media:
+        """«Заявка» autocomplete фильтруется по выбранному клиенту."""
+
+        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Quote]:
+        """Autocomplete поля «КП» (документ/заказ) — только КП клиента."""
+        return filter_autocomplete_by_client(request, super().get_queryset(request))
+
     fieldsets = (
         (
             None,
@@ -1014,6 +1062,11 @@ class ClientDocumentAdmin(ModelAdmin):
     autocomplete_fields = ("client", "quote", "order")
     list_select_related = ("client",)
     readonly_fields = ("created_at",)
+
+    class Media:
+        """«КП»/«Заказ» autocomplete фильтруются по выбранному клиенту."""
+
+        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ClientDocument]:
         """Scope documents to clients visible to the manager."""
