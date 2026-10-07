@@ -23,6 +23,17 @@ WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
         "sort_order": 1,
     },
     {
+        "slug": "mango-telephony-guide",
+        "title": "Телефония Mango · звонки из CRM",
+        "category": "Инструкции",
+        "summary": (
+            "Click-to-call из карточки клиента, журнал звонков, записи "
+            "разговоров, добавочный менеджера — как пользоваться и что чинить."
+        ),
+        "fixture": "mango-telephony-guide.html",
+        "sort_order": 2,
+    },
+    {
         "slug": "ostatki-prodazhi-god-2025-09-2026-08",
         "title": "Анализ остатков и продаж · сен 2025 — авг 2026",
         "category": "Аналитика склада",

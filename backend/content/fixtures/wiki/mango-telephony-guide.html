@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoocon — Телефония Mango · Инструкция для менеджеров</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --surface: #1a2332;
+    --surface2: #243044;
+    --border: #2d3a4f;
+    --text: #e8edf4;
+    --muted: #8b9cb3;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --violet: #a78bfa;
+    --radius: 12px;
+    --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+  .header {
+    background: linear-gradient(135deg, #123b2e 0%, #0f1419 65%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+  }
+  .header-inner { max-width: 1100px; margin: 0 auto; }
+  .badge-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  .badge {
+    display: inline-block; padding: .18rem .65rem; border-radius: 999px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .badge-ver { background: var(--green); color: #062b16; }
+  .badge-cat { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.02em; overflow-wrap: break-word; }
+  .header .sub { color: var(--muted); margin-top: .5rem; font-size: 1rem; max-width: 60ch; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
+
+  nav.toc { margin: 1.5rem 0 2.5rem; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+  .toc a {
+    display: block; padding: .8rem 1rem; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); text-decoration: none; font-size: .92rem;
+    transition: border-color .15s;
+  }
+  .toc a:hover { border-color: var(--accent); }
+  .toc a small { display: block; color: var(--muted); font-size: .78rem; margin-top: .2rem; }
+
+  section { margin-bottom: 3rem; }
+  h2 {
+    font-size: 1.4rem; margin-bottom: .35rem; letter-spacing: -.01em;
+    padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+  h2 .num { color: var(--accent); font-weight: 700; margin-right: .5rem; }
+  h3 { font-size: 1.08rem; margin: 1.4rem 0 .5rem; color: var(--accent2); }
+  h2 + p.lead, .lead { color: var(--muted); font-size: .95rem; margin-bottom: 1.1rem; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem;
+  }
+  .card h4 { font-size: 1rem; margin-bottom: .45rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .card p, .card li { font-size: .9rem; color: var(--muted); }
+  .card ul, .card ol { padding-left: 1.2rem; margin-top: .35rem; }
+  .card li { margin-bottom: .3rem; }
+  .card p + ul, .card p + ol { margin-top: .5rem; }
+  .card p { margin-bottom: .4rem; }
+
+  .flow {
+    display: flex; align-items: stretch; gap: .6rem; flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+  .flow .step {
+    flex: 1 1 150px; min-width: 140px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: .8rem .9rem; text-align: center;
+  }
+  .flow .step .ico { font-size: 1.3rem; display: block; margin-bottom: .3rem; }
+  .flow .step b { font-size: .85rem; display: block; }
+  .flow .step small { color: var(--muted); font-size: .75rem; display: block; margin-top: .2rem; }
+  .flow .arrow { align-self: center; color: var(--accent); font-size: 1.2rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: .8rem 0; font-size: .88rem; }
+  th, td { padding: .55rem .7rem; border: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: break-word; }
+  th { background: var(--surface2); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td { background: var(--surface); }
+
+  .note {
+    border-left: 3px solid var(--accent); background: var(--surface);
+    padding: .8rem 1rem; border-radius: 0 var(--radius) var(--radius) 0;
+    margin: .9rem 0; font-size: .9rem; color: var(--muted);
+  }
+  .note.warn { border-left-color: var(--yellow); }
+  .note.ok { border-left-color: var(--green); }
+  .note b, .note strong { color: var(--text); }
+
+  code, .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .82em; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 5px; padding: .1em .4em; color: var(--accent2);
+    overflow-wrap: break-word;
+  }
+  pre {
+    background: #0b1017; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.2rem; overflow-x: auto; font-size: .82rem; line-height: 1.5;
+    margin: .8rem 0; color: var(--text);
+  }
+  pre .c { color: var(--muted); }
+
+  .tag { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .tag-new { background: var(--green); color: #062b16; }
+  .tag-info { background: var(--accent); color: #fff; }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: .8rem 0; }
+  ol.steps li {
+    counter-increment: s; position: relative;
+    padding: .7rem .9rem .7rem 3.1rem; margin-bottom: .5rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: .92rem;
+  }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: .9rem; top: .7rem;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps li b { color: var(--text); }
+  ol.steps li small { display: block; color: var(--muted); margin-top: .15rem; }
+
+  .footer { color: var(--muted); font-size: .8rem; text-align: center; padding-top: 2rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 700px) {
+    .container { padding: 1rem .9rem 3rem; }
+    .header { padding: 1.8rem 1rem 1.4rem; }
+    .header h1 { font-size: 1.45rem; }
+    .toc-grid { grid-template-columns: 1fr; }
+    table { display: block; overflow-x: auto; }
+    .flow { flex-direction: column; }
+    .flow .arrow { transform: rotate(90deg); align-self: center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="badge-row">
+      <span class="badge badge-ver">Новое</span>
+      <span class="badge badge-cat">Инструкции</span>
+      <span class="badge badge-cat">Mango Office</span>
+    </div>
+    <h1>Телефония Mango — звонки прямо из CRM</h1>
+    <p class="sub">Как позвонить клиенту в один клик из карточки, где смотреть журнал звонков и записи разговоров, как задать свой добавочный.</p>
+  </div>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <div class="toc-grid">
+    <a href="#how"><b>1. Как это работает</b><small>схема обратного звонка Mango</small></a>
+    <a href="#call"><b>2. Позвонить клиенту</b><small>кнопка в карточке клиента</small></a>
+    <a href="#journal"><b>3. Журнал звонков</b><small>раздел «Звонки» в CRM</small></a>
+    <a href="#recordings"><b>4. Записи разговоров</b><small>скачивание и доступ</small></a>
+    <a href="#extension"><b>5. Свой добавочный</b><small>настройка в профиле</small></a>
+    <a href="#trouble"><b>6. Если не работает</b><small>блокеры и разбор</small></a>
+    <a href="#faq"><b>7. FAQ</b><small>частые ситуации</small></a>
+  </div>
+</nav>
+
+<section id="how">
+  <h2><span class="num">1</span>Как это работает</h2>
+  <p class="lead">Звонок инициирует Mango как обратный вызов: сначала звонит на ваш добавочный, вы поднимаете трубку — и только потом Mango набирает клиента.</p>
+
+  <div class="flow">
+    <div class="step"><span class="ico">🖱</span><b>Вы</b><small>«Позвонить клиенту» в карточке</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">📞</span><b>Mango</b><small>звонит на ваш добавочный</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">✋</span><b>Вы берёте трубку</b><small>слышите гудок вызова</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">👤</span><b>Клиент</b><small>видит номер компании</small></div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Звонок в один клик</h4>
+      <p>Из карточки клиента — без набора номера вручную. Mango сам соединяет ваш добавочный с клиентом.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Журнал звонков</h4>
+      <p>Каждый вызов (входящий и исходящий) падает в раздел «Звонки» с номером, менеджером, клиентом и длительностью.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Записи разговоров</h4>
+      <p>Mango отдаёт запись после завершения — она скачивается в закрытое хранилище и доступна из карточки звонка.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Автопривязка</h4>
+      <p>Клиент находится по цифрам номера (формат не важен: +7, 8, скобки). Звонок попадает в ленту карточки клиента и к последней открытой заявке.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Два способа инициировать вызов.</b> Основной — через API Mango (ключи в настройках сервера). Если у тарифа нет полного API, работает запасной канал «исходящий звонок через вебхук» — для вас разницы нет, кнопка выбирает доступный способ сама.
+  </div>
+</section>
+
+<section id="call">
+  <h2><span class="num">2</span>Позвонить клиенту</h2>
+  <p class="lead">Единственное требование — у клиента заполнен телефон, а у вас задан добавочный (см. раздел 5).</p>
+
+  <ol class="steps">
+    <li><b>Откройте карточку клиента.</b><small>CRM → Клиенты → нужный клиент.</small></li>
+    <li><b>Нажмите «Позвонить клиенту».</b><small>Кнопка в верхнем ряду действий карточки, рядом со «Сменить»/историей.</small></li>
+    <li><b>Проверьте номер и подтвердите.</b><small>Показаны ваш добавочный и телефон клиента — жмите «Позвонить».</small></li>
+    <li><b>Возьмите трубку.</b><small>Mango сначала позвонит на ваш добавочный; поднимете — пойдёт вызов клиенту.</small></li>
+  </ol>
+
+  <div class="note ok"><b>Если что-то не настроено</b> — страница не даст отправить вызов и покажет список причин (нет добавочного, нет телефона у клиента, не настроена интеграция). Ошибки уровня «Mango недоступен» приходят сообщением без потери данных.</div>
+  <div class="note warn"><b>Клиент видит номер компании</b>, а не ваш добавочный — обратный вызов идёт через линию ВАТС.</div>
+</section>
+
+<section id="journal">
+  <h2><span class="num">3</span>Журнал звонков</h2>
+  <p class="lead">CRM → <b>Звонки</b> — все вызовы, которые Mango присылает по вебхуку: входящие, исходящие, пропущенные.</p>
+
+  <table>
+    <tr><th>Колонка</th><th>Что показывает</th></tr>
+    <tr><td>Начало</td><td>Дата и время звонка (кликабельный столбец дат сверху)</td></tr>
+    <tr><td>Направление</td><td>Входящий / исходящий</td></tr>
+    <tr><td>Откуда → Куда</td><td>Номера и добавочные участников</td></tr>
+    <tr><td>Менеджер</td><td>Кто говорил — определяется по добавочному из профиля</td></tr>
+    <tr><td>Клиент</td><td>Карточка CRM, найденная по цифрам номера</td></tr>
+    <tr><td>Состояние</td><td>Appeared → Connected → Disconnected (плюс OnHold/Transferred)</td></tr>
+    <tr><td>Длительность</td><td>Секунды разговора</td></tr>
+    <tr><td>Запись</td><td>Галочка — файл уже скачан и доступен</td></tr>
+  </table>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>Фильтры и поиск</h4>
+      <p>Справа — фильтры по направлению, состоянию, дате, добавочному. Поиск понимает номер телефона, имя/email клиента и email менеджера.</p>
+    </div>
+    <div class="card">
+      <h4>Звонок без клиента</h4>
+      <p>Неизвестный номер не теряется — звонок хранится в журнале без привязки. Нашли клиента позже — карточку можно назначить вручную на странице звонка.</p>
+    </div>
+    <div class="card">
+      <h4>Звонок в карточке клиента</h4>
+      <p>В карточке клиента есть инлайн «Звонки» — история по этому клиенту. Завершённый разговор дополнительно пишется в ленту активности («Входящий/Исходящий звонок, длительность, добавочный»).</p>
+    </div>
+  </div>
+
+  <div class="note"><b>Дедупликация встроена.</b> Mango может прислать событие повторно — по уникальному <code>entry_id</code> и порядковому номеру <code>seq</code> дубли и «откаты» состояния отсекаются, запись в ленте создаётся один раз.</div>
+</section>
+
+<section id="recordings">
+  <h2><span class="num">4</span>Записи разговоров</h2>
+  <p class="lead">Если в тарифе Mango включена запись — после завершения звонка приходит событие готовности, и файл автоматически скачивается в закрытое хранилище.</p>
+
+  <ol class="steps">
+    <li><b>Откройте звонок</b> в журнале (или из инлайна в карточке клиента).<small>Поле «Запись разговора».</small></li>
+    <li><b>«Скачать запись»</b> — файл отдаётся как вложение <code>.mp3</code>.<small>Имя файла содержит хвост ID вызова — легко сопоставить.</small></li>
+  </ol>
+
+  <table>
+    <tr><th>Статус</th><th>Значение</th></tr>
+    <tr><td>«Запись есть в Mango, ещё не скачана»</td><td>Событие пришло, файл в очереди на скачивание — обычно до минуты</td></tr>
+    <tr><td>«Скачать запись»</td><td>Файл сохранён у нас, можно слушать</td></tr>
+    <tr><td>«—»</td><td>Записи нет (разговора не было или запись выключена в тарифе)</td></tr>
+  </table>
+
+  <div class="note warn"><b>Записи не публичны.</b> Файл лежит вне медиа-каталога сайта; скачать может только менеджер с доступом к карточке этого клиента. Прямая ссылка без прав отдаст отказ.</div>
+</section>
+
+<section id="extension">
+  <h2><span class="num">5</span>Свой добавочный</h2>
+  <p class="lead">Менеджер определяется по добавочному: Mango сообщает внутренний номер, CRM находит по нему пользователя. Без добавочного звонок запишется «без менеджера», а кнопка звонка не сработает.</p>
+
+  <ol class="steps">
+    <li><b>Узнайте свой добавочный в Mango</b><small>ЛК Mango → Сотрудники, либо короткий номер на вашем аппарате/софтфоне.</small></li>
+    <li><b>Откройте свой профиль:</b> Пользователи → ваш пользователь.<small>Или попросите администратора — поле внизу страницы пользователя.</small></li>
+    <li><b>Заполните «Добавочный сотрудника (Mango)».</b><small>Только цифры, например <code>101</code>. Галочка «включён» должна стоять.</small></li>
+    <li><b>Сохраните.</b><small>Новые звонки с этого добавочного сразу начнут привязываться к вам.</small></li>
+  </ol>
+</section>
+
+<section id="trouble">
+  <h2><span class="num">6</span>Если не работает</h2>
+  <p class="lead">Что показывает страница вызова и что это значит.</p>
+
+  <table>
+    <tr><th>Сообщение</th><th>Причина</th><th>Что делать</th></tr>
+    <tr>
+      <td>«У вас не задан добавочный Mango»</td>
+      <td>В профиле пусто или выключено</td>
+      <td>Раздел 5 — заполнить добавочный</td>
+    </tr>
+    <tr>
+      <td>«У клиента не заполнен телефон»</td>
+      <td>Пустое поле в карточке</td>
+      <td>Заполнить телефон клиента и повторить</td>
+    </tr>
+    <tr>
+      <td>«Mango не настроен»</td>
+      <td>Нет ключей API и webhook-URL на сервере</td>
+      <td>Сообщить администратору — вопрос настроек сервера</td>
+    </tr>
+    <tr>
+      <td>«Mango API недоступен / недоступен webhook»</td>
+      <td>Сеть/сервис Mango</td>
+      <td>Повторить через минуту; если повторяется — администратору</td>
+    </tr>
+  </table>
+
+  <div class="note"><b>В журнале звонок с неизвестного номера?</b> Это нормально для новых клиентов: звонок сохраняется, а когда карточка клиента появится — следующие звонки привяжутся сами (по цифрам номера).</div>
+</section>
+
+<section id="faq">
+  <h2><span class="num">7</span>FAQ</h2>
+  <table>
+    <tr><th>Вопрос</th><th>Ответ</th></tr>
+    <tr>
+      <td>Клиенту показывается мой добавочный?</td>
+      <td>Нет — клиент видит номер компании (линию ВАТС). Добавочный участвует только внутри: Mango звонит на него вам.</td>
+    </tr>
+    <tr>
+      <td>Почему сначала звонит мой телефон?</td>
+      <td>Это обратный вызов Mango: сначала соединяется ваша сторона, потом набирается клиент — так платформа гарантирует, что вы на линии.</td>
+    </tr>
+    <tr>
+      <td>Входящие тоже видны?</td>
+      <td>Да — все события от ВАТС пишутся в «Звонки» с привязкой к клиенту по номеру и к менеджеру по добавочному.</td>
+    </tr>
+    <tr>
+      <td>Звонок привязался к заявке?</td>
+      <td>Автоматически — к последней незавершённой заявке клиента. В заявке видно звонок, в ленте активности — строка с длительностью.</td>
+    </tr>
+    <tr>
+      <td>Записи слышат все?</td>
+      <td>Только staff с доступом к карточке клиента. Звонок без клиента в журнале виден всем менеджерам (общий коммутатор), но запись скачает тот, у кого есть права на соответствующую карточку.</td>
+    </tr>
+    <tr>
+      <td>Можно ли отправить SMS?</td>
+      <td>В текущем релизе — только звонки. Канал «вебхуки» Mango поддерживает Send_SMS; если нужно — ставим задачу.</td>
+    </tr>
+  </table>
+
+  <div class="note ok"><b>Смотрите также:</b> общая инструкция по панели — «Панель управления 3.0 · инструкция для менеджеров» (там же про заявки, клиентов, личные ящики и кабинет клиента).</div>
+</section>
+
+<div class="footer">
+  Телефония Mango в CRM · журнал, click-to-call, записи · инструкция для менеджеров
+</div>
+
+</div>
+</body>
+</html>
