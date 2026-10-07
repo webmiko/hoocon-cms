@@ -31,6 +31,14 @@ class Client(models.Model):
         blank=True,
         default="",
     )
+    phone_digits: models.CharField = models.CharField(
+        "телефон (цифры)",
+        max_length=20,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Нормализованные цифры — резолв звонков/писем по номеру.",
+    )
     company: models.CharField = models.CharField(
         "компания",
         max_length=200,
@@ -100,11 +108,13 @@ class Client(models.Model):
         ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Normalize email (unique key) and company_key (routing match)."""
+        """Normalize email (unique key), company_key and phone_digits."""
+        from crm.telephony import normalize_phone_digits
         from leads.services import normalize_company_label
 
         self.email = (self.email or "").strip().lower()
         self.company_key = normalize_company_label(self.company)
+        self.phone_digits = normalize_phone_digits(self.phone)
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -793,3 +803,137 @@ class CompanyMember(models.Model):
     def __str__(self) -> str:
         label = self.client or self.account or "—"
         return f"{self.company} · {label} ({self.get_role_display()})"
+
+
+class CallDirection(models.TextChoices):
+    """Who initiated the call."""
+
+    INBOUND = "inbound", "Входящий"
+    OUTBOUND = "outbound", "Исходящий"
+
+
+class CallState(models.TextChoices):
+    """Lifecycle of a call leg reported by Mango events."""
+
+    APPEARED = "appeared", "Появился"
+    CONNECTED = "connected", "Соединён"
+    DISCONNECTED = "disconnected", "Завершён"
+    ON_HOLD = "on_hold", "На удержании"
+    TRANSFERRED = "transferred", "Переведён"
+    INITIATED = "initiated", "Инициирован"
+
+
+def call_recording_upload_to(instance: Call, filename: str) -> str:
+    """Recordings under ``call_recordings/<entry_id>_<uuid>`` (private media)."""
+    return f"call_recordings/{instance.entry_id}_{uuid.uuid4().hex}.mp3"
+
+
+class Call(models.Model):
+    """Phone call leg tracked via Mango VPBX webhooks.
+
+    ``entry_id`` is Mango's stable call identifier — repeated events for the
+    same call update this row (dedup by unique key). ``call_id`` may differ
+    per leg; kept for diagnostics and callback-command correlation.
+    """
+
+    entry_id: models.CharField = models.CharField(
+        "ID вызова Mango",
+        max_length=128,
+        unique=True,
+        db_index=True,
+    )
+    call_id: models.CharField = models.CharField(
+        "ID звонка Mango",
+        max_length=200,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    direction: models.CharField = models.CharField(
+        "направление",
+        max_length=10,
+        choices=CallDirection.choices,
+        default=CallDirection.INBOUND,
+    )
+    state: models.CharField = models.CharField(
+        "состояние",
+        max_length=15,
+        choices=CallState.choices,
+        default=CallState.APPEARED,
+    )
+    from_number: models.CharField = models.CharField("откуда", max_length=32, blank=True, default="")
+    to_number: models.CharField = models.CharField("куда", max_length=32, blank=True, default="")
+    extension: models.CharField = models.CharField(
+        "добавочный",
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Внутренний номер менеджера в АТС.",
+    )
+    client: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calls",
+        verbose_name="клиент",
+    )
+    lead: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        "leads.Lead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calls",
+        verbose_name="заявка",
+    )
+    manager = models.ForeignKey(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calls",
+        verbose_name="менеджер",
+        help_text="Определяется по добавочному (профиль АТС на странице пользователя).",
+    )
+    started_at: models.DateTimeField = models.DateTimeField("начало", null=True, blank=True)
+    connected_at: models.DateTimeField = models.DateTimeField("соединён", null=True, blank=True)
+    finished_at: models.DateTimeField = models.DateTimeField("завершён", null=True, blank=True)
+    talk_duration: models.PositiveIntegerField = models.PositiveIntegerField(
+        "длительность разговора, сек",
+        default=0,
+    )
+    recording_id: models.CharField = models.CharField(
+        "ID записи Mango",
+        max_length=200,
+        blank=True,
+        default="",
+    )
+    recording: models.FileField = models.FileField(
+        "запись разговора",
+        upload_to=call_recording_upload_to,
+        storage=_private_media_storage,
+        blank=True,
+        default="",
+    )
+    last_seq: models.PositiveIntegerField = models.PositiveIntegerField(
+        "№ последнего события",
+        default=0,
+        help_text="События Mango идут по порядку; устаревшие отбрасываем.",
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создан", auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField("обновлён", auto_now=True)
+
+    class Meta:
+        verbose_name = "звонок"
+        verbose_name_plural = "звонки"
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("from_number",)),
+            models.Index(fields=("to_number",)),
+            models.Index(fields=("extension",)),
+        ]
+
+    def __str__(self) -> str:
+        arrow = "→" if self.direction == CallDirection.OUTBOUND else "←"
+        when = self.started_at or self.created_at
+        return f"{self.from_number or '?'} {arrow} {self.to_number or '?'} · {when:%d.%m %H:%M}"

@@ -67,6 +67,7 @@ urlpatterns = [
     path("api/account/", include("cabinet.urls")),
     path("api/settings/", include("sitesettings.urls")),
     path("api/integrations/", include("social.urls")),
+    path("api/telephony/", include("crm.urls")),
     path("api/", include("search.urls")),
     path("api/health/", HealthView.as_view(), name="api-health"),
     path("api/csrf/", CsrfTokenView.as_view(), name="api-csrf"),

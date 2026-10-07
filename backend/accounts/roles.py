@@ -52,6 +52,7 @@ _CONTENT_MODELS: Final[tuple[str, ...]] = ("page", "article", "news")
 _CRM_MODELS: Final[tuple[str, ...]] = (
     "client",
     "activity",
+    "call",
     "emailmessage",
     "emailtemplate",
     "quote",

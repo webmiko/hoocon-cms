@@ -131,6 +131,13 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
             "description": "Звонки, задачи и заметки по клиентам.",
         },
         {
+            "model": "call",
+            "title": "Звонки",
+            "icon": "call",
+            "section": "work",
+            "description": "Телефония Mango: журнал вызовов и записи разговоров.",
+        },
+        {
             "model": "quote",
             "title": "КП",
             "icon": "request_quote",
@@ -340,6 +347,7 @@ _ROW_ORDER: dict[str, tuple[str, ...]] = {
         "crm-client",
         "crm-emailmessage",
         "crm-activity",
+        "crm-call",
         "crm-quote",
         "crm-clientdocument",
         "crm-company",

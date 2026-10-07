@@ -77,13 +77,14 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     # «Работа» — one tap to every daily section, in fixed order.
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:7] == [
+    assert work_ids[:8] == [
         "leads-lead",
         "leads-stats",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",
         "crm-activity",
+        "crm-call",
         "crm-quote",
     ]
     assert groups["leads-stats"]["action"] == "link"

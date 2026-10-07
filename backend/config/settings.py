@@ -578,6 +578,8 @@ REST_FRAMEWORK = {
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
         "max_webhook": "120/min",
+        # Mango шлёт серию событий на вызов (appeared→connected→disconnected).
+        "mango_webhook": "120/min",
         "staff_otp": "30/hour",
         # Client cabinet: register/login/OTP (per IP) and RFQ-repeat (per session).
         "client_auth": "30/hour",
@@ -662,6 +664,15 @@ IMAP_PASSWORD = os.getenv("IMAP_PASSWORD", "")
 IMAP_FOLDER = os.getenv("IMAP_FOLDER", "INBOX").strip() or "INBOX"
 IMAP_USE_SSL = _env_bool("IMAP_USE_SSL", default=True)
 IMAP_FETCH_LIMIT = int(os.getenv("IMAP_FETCH_LIMIT", "50"))
+
+# Mango VPBX (IP-телефония): ключи из ЛК Mango Office → события на
+# /api/telephony/mango/events/ + исходящие команды (callback, записи).
+# Пусто — webhook отвечает 403, команды не отправляются.
+MANGO_VPBX_API_KEY = os.getenv("MANGO_VPBX_API_KEY", "").strip()
+MANGO_VPBX_API_SALT = os.getenv("MANGO_VPBX_API_SALT", "").strip()
+# Альтернативный click-to-call без полного API: URL «исходящего звонка
+# через вебхук» из ЛК Mango (Интеграции → Вебхуки). Плейсхолдеры: {ext}, {num}.
+MANGO_CALLBACK_WEBHOOK_URL = os.getenv("MANGO_CALLBACK_WEBHOOK_URL", "").strip()
 
 # Admin Email OTP (passwordless staff login). Spec: docs/security-baseline.md.
 # Prod: ADMIN_EMAIL_OTP_ENABLED=true + ALLOWED_EMAILS (SMTP required).

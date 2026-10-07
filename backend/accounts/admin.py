@@ -27,6 +27,7 @@ from accounts.models import (
     StaffMailbox,
     StaffMaxProfile,
     StaffTelegramProfile,
+    StaffVpbxProfile,
 )
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
@@ -81,6 +82,18 @@ class StaffMailboxInline(admin.StackedInline):
     verbose_name_plural = "Почта менеджера (IMAP/SMTP)"
 
 
+class StaffVpbxProfileInline(admin.StackedInline):
+    """Mango VPBX extension — binds inbound/outbound calls to this manager."""
+
+    model = StaffVpbxProfile
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = ("extension", "is_enabled")
+    verbose_name = "Добавочный (Mango)"
+    verbose_name_plural = "Добавочный сотрудника (Mango)"
+
+
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Staff users — login email, display name, Unfold Add button."""
 
@@ -89,7 +102,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     show_add_link = True
     form = StaffUserChangeForm
     add_form = StaffUserCreationForm
-    inlines = (StaffTelegramProfileInline, StaffMaxProfileInline, StaffMailboxInline)
+    inlines = (
+        StaffTelegramProfileInline,
+        StaffMaxProfileInline,
+        StaffMailboxInline,
+        StaffVpbxProfileInline,
+    )
     list_display = (
         "email",
         "first_name",

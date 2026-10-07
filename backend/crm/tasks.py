@@ -160,3 +160,39 @@ def fetch_inbound_email(self: object) -> str:
     if report.get("skipped"):
         return "disabled"
     return f"seen={report['seen']} created={report['created']} dup={report['duplicates']} err={report['errors']}"
+
+
+@shared_task(name="crm.fetch_mango_recording", bind=True, max_retries=3, default_retry_delay=60)
+def fetch_mango_recording(self: object, entry_id: str) -> str:
+    """Download the Mango recording for a Call row into private media.
+
+    Вызывается из webhook при ``recording_state=Completed``. Файл
+    складывается в ``PRIVATE_MEDIA_ROOT/call_recordings/`` — скачивание
+    только из админки (карточка звонка).
+    """
+    from crm.mango import download_recording
+    from crm.models import Call
+
+    try:
+        call = Call.objects.get(entry_id=entry_id)
+    except Call.DoesNotExist:
+        logger.warning("mango_recording_no_call entry=%s", entry_id)
+        return "no-call"
+    if call.recording:
+        return "already"
+    recording_id = (call.recording_id or "").strip()
+    if not recording_id:
+        return "no-recording-id"
+
+    try:
+        payload = download_recording(recording_id)
+    except Exception as exc:
+        logger.exception("mango_recording_fetch_failed entry=%s", entry_id)
+        raise self.retry(exc=exc)  # type: ignore[attr-defined]
+    if not payload:
+        return "empty"
+    from django.core.files.base import ContentFile
+
+    call.recording.save(f"{recording_id[:60]}.mp3", ContentFile(payload), save=True)
+    logger.info("mango_recording_saved entry=%s bytes=%d", entry_id, len(payload))
+    return "saved"

@@ -254,6 +254,38 @@ class StaffMailbox(models.Model):
         return f"IMAP({self.user_id}, {addr})"
 
 
+class StaffVpbxProfile(models.Model):
+    """Mango VPBX binding of a staff user — internal extension + toggle."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vpbx_profile",
+        verbose_name=_("Пользователь"),
+    )
+    extension = models.CharField(
+        _("добавочный номер"),
+        max_length=20,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text=_("Внутренний номер в Mango АТС — по нему звонок привязывается к менеджеру."),
+    )
+    is_enabled = models.BooleanField(
+        _("включён"),
+        default=True,
+        help_text=_("Выкл — звонки на этот добавочный не привязываются к сотруднику."),
+    )
+
+    class Meta:
+        verbose_name = _("Добавочный сотрудника (Mango)")
+        verbose_name_plural = _("Добавочные сотрудников (Mango)")
+
+    def __str__(self) -> str:
+        ext = (self.extension or "").strip() or "—"
+        return f"VPBX({self.user_id}, {ext})"
+
+
 class ClientAuthMode(models.TextChoices):
     """How a client signs in (A/B modes from plan-client-auth)."""
 
