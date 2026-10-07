@@ -42,7 +42,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import SKU
-from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -50,6 +50,7 @@ from crm.mail_links import (
     staff_reply_to_email,
 )
 from crm.manager_signatures import manager_reply_signature
+from crm.models import Client as CrmClient
 from crm.models import EmailStatus, EmailTemplate
 from crm.services import (
     create_lead_reply_email,
@@ -470,6 +471,75 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             return "—"
         return mark_safe("<br>".join(rows))
 
+    def _client_dossier_html(self, request: HttpRequest, obj: Lead) -> str:
+        """Client card link + its recent leads/emails — контекст без перехода.
+
+        Заявки скоупятся как ``LeadInline`` на карточке клиента, письма —
+        из досье (та же поверхность, что ``EmailMessageInline``). Считается
+        в ``changeform_view``: display-методы не получают request, а
+        TemplateResponse рендерится после выхода из него.
+        """
+        client = cast("CrmClient | None", obj.client) if obj.pk else None
+        if client is None:
+            return ""
+        from django.utils.safestring import mark_safe
+
+        head = format_html(
+            '<p><a href="{}"><strong>Карточка клиента ({}) →</strong></a></p>',
+            reverse("admin:crm_client_change", args=[client.pk]),
+            client.email,
+        )
+        leads_qs = client.leads.exclude(pk=obj.pk).order_by("-created_at")
+        leads_qs = scope_leads_for_manager(leads_qs, request.user)
+        lead_rows = [
+            format_html(
+                '<li><a href="{}">#{} · {} · {}</a> — {}</li>',
+                reverse("admin:leads_lead_change", args=[lead.pk]),
+                lead.pk,
+                lead.get_lead_type_display(),
+                lead.get_status_display(),
+                timezone.localtime(lead.created_at).strftime("%d.%m.%Y"),
+            )
+            for lead in leads_qs[:5]
+        ]
+        lead_block = (
+            format_html(
+                "<p><strong>Заявки:</strong></p><ul>{}</ul>",
+                mark_safe("".join(str(r) for r in lead_rows)),
+            )
+            if lead_rows
+            else "<p><strong>Заявки:</strong> других нет</p>"
+        )
+        mail_rows: list[str] = []
+        for mail in client.emails.select_related("lead").order_by("-created_at")[:5]:
+            lead_ref = ""
+            if mail.lead_id:
+                lead_ref = format_html(
+                    ' (<a href="{}">заявка #{}</a>)',
+                    reverse("admin:leads_lead_change", args=[mail.lead_id]),
+                    mail.lead_id,
+                )
+            arrow = "←" if mail.direction == "inbound" else "→"
+            mail_rows.append(
+                format_html(
+                    '<li><a href="{}">{} {}</a>{} — {}</li>',
+                    reverse("admin:crm_emailmessage_change", args=[mail.pk]),
+                    arrow,
+                    mail.subject[:60],
+                    mark_safe(lead_ref),
+                    timezone.localtime(mail.created_at).strftime("%d.%m.%Y"),
+                ),
+            )
+        mail_block = (
+            format_html(
+                "<p><strong>Письма:</strong></p><ul>{}</ul>",
+                mark_safe("".join(str(r) for r in mail_rows)),
+            )
+            if mail_rows
+            else "<p><strong>Письма:</strong> нет</p>"
+        )
+        return mark_safe(f"{head}{lead_block}{mail_block}")
+
     def is_lead_edit_mode(self, request: HttpRequest, obj: Lead | None) -> bool:
         """Whether the change form allows editing (new or ``?edit=1``)."""
         if obj is None:
@@ -548,7 +618,53 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 reverse("admin:leads_lead_change", args=[object_id]),
             )
 
+        if obj is not None:
+            extra["lead_dossier_html"] = self._client_dossier_html(request, obj)
+            extra["lead_create_quote_url"] = reverse(
+                "admin:leads_lead_create_quote",
+                args=[obj.pk],
+            )
         return super().changeform_view(request, object_id, form_url, extra_context=extra)
+
+    def create_quote_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """«Создать КП»: черновик Quote из позиций заявки → карточка КП.
+
+        Открытое КП (черновик/выдано) переиспользуется — дублей нет.
+        """
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        if not request.user.has_perm("crm.add_quote"):
+            raise PermissionDenied
+        lead = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, lead):
+            raise PermissionDenied
+        if not (lead.email or "").strip():
+            self.message_user(
+                request,
+                _("У заявки нет email — КП привязать не к кому."),
+                messages.ERROR,
+            )
+            return HttpResponseRedirect(
+                reverse("admin:leads_lead_change", args=[lead.pk]),
+            )
+        from crm.services import create_quote_from_lead
+
+        quote, created = create_quote_from_lead(lead, author=request.user)
+        if created:
+            self.message_user(
+                request,
+                _(f"Черновик {quote.number} создан из заявки."),
+                messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                _(f"У заявки уже есть открытое {quote.number}."),
+                messages.INFO,
+            )
+        return HttpResponseRedirect(
+            reverse("admin:crm_quote_change", args=[quote.pk]),
+        )
 
     def compose_reply_view(
         self,
@@ -686,7 +802,10 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 _bundle_size=Subquery(bundle_size),
             )
         )
-        return scope_leads_for_manager(qs, request.user)
+        qs = scope_leads_for_manager(qs, request.user)
+        # Chained «заявка» autocompletes (quote/activity/email/call forms)
+        # send ?client=<id>; keep only that client's leads.
+        return filter_autocomplete_by_client(request, qs)
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
         """Lead changelist: newest first; optional status grouping via ``lead_sort``.
@@ -1009,6 +1128,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 "<path:object_id>/compose-reply/",
                 self.admin_site.admin_view(self.compose_reply_view),
                 name="leads_lead_compose_reply",
+            ),
+            path(
+                "<path:object_id>/create-quote/",
+                self.admin_site.admin_view(self.create_quote_view),
+                name="leads_lead_create_quote",
             ),
         ]
         return custom + super().get_urls()

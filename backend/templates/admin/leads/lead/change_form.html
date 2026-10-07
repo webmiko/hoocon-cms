@@ -3,6 +3,11 @@
 
 {% block form_top %}
   {{ block.super }}
+  {% if lead_dossier_html %}
+    <div class="hoocon-lead-dossier">
+      {{ lead_dossier_html }}
+    </div>
+  {% endif %}
   {% if not lead_view_mode and original %}
     <input type="hidden" name="_lead_edit" value="1">
   {% endif %}
@@ -24,6 +29,14 @@
           class="hoocon-admin-open hoocon-lead-view-actions__mail"
         >
           Ответить клиенту
+        </a>
+      {% endif %}
+      {% if lead_create_quote_url %}
+        <a
+          href="{{ lead_create_quote_url }}"
+          class="hoocon-admin-open hoocon-lead-view-actions__mail"
+        >
+          Создать КП
         </a>
       {% endif %}
       {% if lead_edit_url %}

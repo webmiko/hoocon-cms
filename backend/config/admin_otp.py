@@ -67,19 +67,19 @@ def admin_email_otp_enabled() -> bool:
     return bool(getattr(settings, "ADMIN_EMAIL_OTP_ENABLED", False))
 
 
-def otp_ttl_seconds() -> int:
-    """Challenge lifetime in seconds."""
-    return int(getattr(settings, "ADMIN_EMAIL_OTP_TTL_SECONDS", 300))
+def otp_ttl_seconds(prefix: str = "ADMIN_EMAIL_OTP") -> int:
+    """Challenge lifetime in seconds (prefix selects the OTP scope)."""
+    return int(getattr(settings, f"{prefix}_TTL_SECONDS", 300))
 
 
-def otp_max_attempts() -> int:
+def otp_max_attempts(prefix: str = "ADMIN_EMAIL_OTP") -> int:
     """Max wrong-code tries per challenge."""
-    return int(getattr(settings, "ADMIN_EMAIL_OTP_MAX_ATTEMPTS", 5))
+    return int(getattr(settings, f"{prefix}_MAX_ATTEMPTS", 5))
 
 
-def otp_resend_cooldown_seconds() -> int:
+def otp_resend_cooldown_seconds(prefix: str = "ADMIN_EMAIL_OTP") -> int:
     """Minimum seconds between resend requests."""
-    return int(getattr(settings, "ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60))
+    return int(getattr(settings, f"{prefix}_RESEND_COOLDOWN_SECONDS", 60))
 
 
 def otp_request_limit() -> int:
@@ -120,9 +120,9 @@ def staff_email_allowed_for_otp(email: str) -> bool:
     return f"@{domain}" in allowed or f"*@{domain}" in allowed
 
 
-def otp_ttl_human() -> str:
+def otp_ttl_human(prefix: str = "ADMIN_EMAIL_OTP") -> str:
     """Human TTL for email footer (e.g. «1 мин.» / «45 сек.»)."""
-    ttl = max(1, otp_ttl_seconds())
+    ttl = max(1, otp_ttl_seconds(prefix))
     if ttl < 60:
         return f"{ttl} сек."
     minutes = max(1, math.ceil(ttl / 60))

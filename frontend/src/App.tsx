@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
+import { CabinetGate } from "./account/CabinetGate";
 import { ChunkLoadErrorBoundary } from "./components/ChunkLoadErrorBoundary";
 import { Layout } from "./components/Layout";
 import { PageFallback } from "./components/PageFallback";
@@ -54,6 +55,18 @@ const LeadPage = lazyWithChunkReload(() =>
 const NotFoundPage = lazyWithChunkReload(() =>
   import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
 );
+const LoginPage = lazyWithChunkReload(() => import("./account/LoginPage"));
+const RegisterPage = lazyWithChunkReload(() => import("./account/RegisterPage"));
+const AccountShell = lazyWithChunkReload(() => import("./account/AccountShell"));
+const AccountDashboardPage = lazyWithChunkReload(() => import("./account/DashboardPage"));
+const AccountLeadsPage = lazyWithChunkReload(() => import("./account/LeadsPage"));
+const AccountQuotesPage = lazyWithChunkReload(() => import("./account/QuotesPage"));
+const AccountOrdersPage = lazyWithChunkReload(() => import("./account/OrdersPage"));
+const AccountDocumentsPage = lazyWithChunkReload(() => import("./account/DocumentsPage"));
+const AccountSpecsPage = lazyWithChunkReload(() => import("./account/SpecsPage"));
+const AccountConversationsPage = lazyWithChunkReload(() => import("./account/ConversationsPage"));
+const AccountRmaPage = lazyWithChunkReload(() => import("./account/RmaPage"));
+const AccountProfilePage = lazyWithChunkReload(() => import("./account/ProfilePage"));
 
 /**
  * Legacy Tilda /news/<a>/<b> → /novosti/<a>-<b>.
@@ -84,11 +97,11 @@ function SkuLegacyRedirect() {
 }
 
 function SkuLegacyRedirectResolved({ slug }: { slug: string }) {
-  const { data: sku, loading, error } = useAsync(
-    (signal) => api.skuDetail(slug, { signal }),
-    slug,
-    `catalog:sku:${slug}`,
-  );
+  const {
+    data: sku,
+    loading,
+    error,
+  } = useAsync((signal) => api.skuDetail(slug, { signal }), slug, `catalog:sku:${slug}`);
 
   if (loading) {
     return <PageFallback />;
@@ -126,21 +139,46 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="catalog" element={<CatalogPage />} />
             <Route path="catalog/:categorySlug" element={<CatalogPage />} />
-            <Route
-              path="catalog/:categorySlug/:skuSlug"
-              element={<SkuDetailPage />}
-            />
+            <Route path="catalog/:categorySlug/:skuSlug" element={<SkuDetailPage />} />
             <Route path="compare" element={<ComparePage />} />
             <Route path="search" element={<SearchPage />} />
-            <Route
-              path="consultation"
-              element={<LeadPage leadType="consultation" />}
-            />
+            <Route path="consultation" element={<LeadPage leadType="consultation" />} />
             <Route path="rfq" element={<LeadPage leadType="rfq" />} />
             <Route
-              path="replacement"
-              element={<LeadPage leadType="replacement" />}
+              path="login"
+              element={
+                <CabinetGate>
+                  <LoginPage />
+                </CabinetGate>
+              }
             />
+            <Route
+              path="register"
+              element={
+                <CabinetGate>
+                  <RegisterPage />
+                </CabinetGate>
+              }
+            />
+            <Route
+              path="account"
+              element={
+                <CabinetGate>
+                  <AccountShell />
+                </CabinetGate>
+              }
+            >
+              <Route index element={<AccountDashboardPage />} />
+              <Route path="leads" element={<AccountLeadsPage />} />
+              <Route path="quotes" element={<AccountQuotesPage />} />
+              <Route path="orders" element={<AccountOrdersPage />} />
+              <Route path="documents" element={<AccountDocumentsPage />} />
+              <Route path="specs" element={<AccountSpecsPage />} />
+              <Route path="conversations" element={<AccountConversationsPage />} />
+              <Route path="rma" element={<AccountRmaPage />} />
+              <Route path="profile" element={<AccountProfilePage />} />
+            </Route>
+            <Route path="replacement" element={<LeadPage leadType="replacement" />} />
             <Route path="statyi" element={<ArticlesListPage />} />
             <Route path="statyi/:slug" element={<ArticlePage />} />
             <Route path="novosti" element={<NewsListPage />} />
@@ -154,19 +192,10 @@ export default function App() {
             <Route path="faq" element={<PageView slug="faq" />} />
             <Route path="kontakty" element={<PageView slug="kontakty" />} />
             <Route path="oferta" element={<PageView slug="oferta" />} />
-            <Route
-              path="privacy-policy"
-              element={<PageView slug="privacy-policy" />}
-            />
+            <Route path="privacy-policy" element={<PageView slug="privacy-policy" />} />
             <Route path="terms" element={<PageView slug="terms" />} />
-            <Route
-              path="o-kompanii"
-              element={<Navigate to="/company" replace />}
-            />
-            <Route
-              path="privacy"
-              element={<Navigate to="/privacy-policy" replace />}
-            />
+            <Route path="o-kompanii" element={<Navigate to="/company" replace />} />
+            <Route path="privacy" element={<Navigate to="/privacy-policy" replace />} />
             <Route path=":slug" element={<SkuLegacyRedirect />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

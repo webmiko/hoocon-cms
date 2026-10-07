@@ -37,6 +37,7 @@ def link_new_lead_to_client(
         client_id = instance.client_id
         if not client_id:
             return
+        _inherit_client_assignee(instance)
         Activity.objects.create(
             client_id=client_id,
             lead=instance,
@@ -46,6 +47,45 @@ def link_new_lead_to_client(
         )
     except (DatabaseError, IntegrityError):
         logger.exception("crm_link_lead_failed lead_id=%s", instance.pk)
+
+
+def _inherit_client_assignee(lead: Lead) -> None:
+    """Pin a new lead to the owner of its linked CRM client card.
+
+    Закреплённая карточка → все её новые обращения идут её менеджеру,
+    любым каналом (сайт, почта, ручная заводка) и независимо от
+    ``lead_routing_mode`` — это связь владения, а не ротация.
+    Пайплайн ``assign_lead_on_create`` (pinned-правила) всё равно
+    может переопределить на сайтовых/почтовых лидах.
+
+    Args:
+        lead: just-created Lead with ``client_id`` already set.
+    """
+    if lead.assignee_id is not None or not lead.client_id:
+        return
+    from crm.models import Client
+
+    owner = Client.objects.filter(pk=lead.client_id).values_list("assignee", flat=True).first()
+    if owner is None:
+        return
+    from django.contrib.auth import get_user_model
+
+    user = (
+        get_user_model()
+        .objects.filter(
+            pk=owner,
+            is_active=True,
+            is_staff=True,
+        )
+        .first()
+    )
+    if user is None:
+        return
+    updated = Lead.objects.filter(pk=lead.pk, assignee__isnull=True).update(
+        assignee_id=user.pk,
+    )
+    if updated:
+        lead.assignee_id = user.pk
 
 
 @receiver(post_save, sender="crm.Activity")

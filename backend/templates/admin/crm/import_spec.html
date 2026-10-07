@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
+  <span aria-hidden="true">›</span>
+  <span>{% trans "Импорт спецификации" %}</span>
+</nav>
+
+<div class="mb-8 max-w-2xl">
+  <h1 class="font-semibold text-font-important-light text-xl dark:text-font-important-dark">
+    {{ title }}
+  </h1>
+  <p class="mt-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    {% trans "Загрузите .xlsx: на первом листе нужны колонки «артикул» и «количество». Сторонние артикулы подбираются по карте аналогов; неопознанные попадут в заявку как есть." %}
+  </p>
+  <p class="mt-4">
+    {% component "unfold/components/button.html" with href=spec_template_url variant="secondary" icon="download" %}
+      {% trans "Скачать шаблон (.xlsx)" %}
+    {% endcomponent %}
+  </p>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate class="max-w-2xl">
+  {% csrf_token %}
+
+  {% if form.errors %}
+    <div class="flex flex-col gap-4 mb-6 *:mb-0">
+      {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+      {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+    </div>
+  {% endif %}
+
+  {% include "unfold/helpers/field.html" with field=form.file %}
+
+  <div class="flex flex-wrap gap-3 mt-6">
+    {% component "unfold/components/button.html" with submit=1 variant="primary" icon="upload" %}
+      {% trans "Импортировать" %}
+    {% endcomponent %}
+    {% component "unfold/components/button.html" with href=client_change_url variant="secondary" %}
+      {% trans "Отмена" %}
+    {% endcomponent %}
+  </div>
+</form>
+{% endblock %}

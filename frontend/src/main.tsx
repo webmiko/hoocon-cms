@@ -4,16 +4,14 @@ import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { registerSW } from "virtual:pwa-register";
 
+import { AccountAuthProvider } from "./account/AuthContext";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { HOOCON_MAIN_CSS_ID } from "./hooconMainCss";
 import "./styles/fonts";
 import "./styles/global.css";
 import App from "./App";
-import {
-  clearChunkReloadFlag,
-  recoverFromStaleChunk,
-} from "./utils/chunkLoadRecovery";
+import { clearChunkReloadFlag, recoverFromStaleChunk } from "./utils/chunkLoadRecovery";
 import { reloadIfReleaseStale } from "./utils/reloadIfReleaseStale";
 import { installSupportChatControl } from "./utils/supportChatControl";
 
@@ -71,7 +69,9 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter useTransitions={false}>
         <ThemeProvider>
           <PullToRefresh>
-            <App />
+            <AccountAuthProvider>
+              <App />
+            </AccountAuthProvider>
           </PullToRefresh>
         </ThemeProvider>
       </BrowserRouter>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoocon — Панель управления 3.0 · Инструкция для менеджеров</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --surface: #1a2332;
+    --surface2: #243044;
+    --border: #2d3a4f;
+    --text: #e8edf4;
+    --muted: #8b9cb3;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --violet: #a78bfa;
+    --radius: 12px;
+    --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+  .header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f1419 65%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+  }
+  .header-inner { max-width: 1100px; margin: 0 auto; }
+  .badge-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  .badge {
+    display: inline-block; padding: .18rem .65rem; border-radius: 999px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .badge-ver { background: var(--accent); color: #fff; }
+  .badge-new { background: var(--green); color: #062b16; }
+  .badge-cat { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.02em; overflow-wrap: break-word; }
+  .header .sub { color: var(--muted); margin-top: .5rem; font-size: 1rem; max-width: 60ch; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
+
+  nav.toc { margin: 1.5rem 0 2.5rem; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+  .toc a {
+    display: block; padding: .8rem 1rem; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); text-decoration: none; font-size: .92rem;
+    transition: border-color .15s;
+  }
+  .toc a:hover { border-color: var(--accent); }
+  .toc a small { display: block; color: var(--muted); font-size: .78rem; margin-top: .2rem; }
+
+  section { margin-bottom: 3rem; }
+  h2 {
+    font-size: 1.4rem; margin-bottom: .35rem; letter-spacing: -.01em;
+    padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+  h2 .num { color: var(--accent); font-weight: 700; margin-right: .5rem; }
+  h3 { font-size: 1.08rem; margin: 1.4rem 0 .5rem; color: var(--accent2); }
+  h2 + p.lead, .lead { color: var(--muted); font-size: .95rem; margin-bottom: 1.1rem; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem;
+  }
+  .card h4 { font-size: 1rem; margin-bottom: .45rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .card p, .card li { color: var(--muted); font-size: .9rem; }
+  .card ul { padding-left: 1.15rem; margin-top: .35rem; }
+  .card li { margin-bottom: .2rem; }
+  .tag { font-size: .68rem; padding: .1rem .5rem; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .tag-new { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.4); }
+  .tag-upd { background: rgba(59,130,246,.15); color: var(--accent); border: 1px solid rgba(59,130,246,.4); }
+  .tag-crm { background: rgba(167,139,250,.15); color: var(--violet); border: 1px solid rgba(167,139,250,.4); }
+
+  /* Визуальная схема цепочки */
+  .flow {
+    display: flex; flex-wrap: wrap; align-items: stretch; gap: .5rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .flow .step {
+    flex: 1 1 130px; min-width: 120px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: .7rem .8rem; text-align: center; position: relative;
+  }
+  .flow .step b { display: block; font-size: .88rem; }
+  .flow .step span { font-size: .74rem; color: var(--muted); display: block; margin-top: .2rem; }
+  .flow .arrow { align-self: center; color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+  .flow .step.accent { border-color: var(--accent); }
+  .flow .step.green { border-color: var(--green); }
+
+  /* Подписи «кто где» */
+  .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: .75rem; margin: 1rem 0; }
+  .who div { border-radius: var(--radius); padding: .8rem 1rem; font-size: .88rem; }
+  .who .mgr { background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.35); }
+  .who .cli { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35); }
+  .who b { display: block; margin-bottom: .3rem; }
+
+  /* Шаги-инструкции */
+  ol.steps { list-style: none; counter-reset: st; margin: .8rem 0; }
+  ol.steps li { counter-increment: st; padding: .45rem 0 .45rem 2.4rem; position: relative; font-size: .92rem; color: var(--text); }
+  ol.steps li::before {
+    content: counter(st); position: absolute; left: 0; top: .45rem;
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps li small { display: block; color: var(--muted); font-size: .82rem; margin-top: .1rem; }
+
+  /* Таблицы */
+  table { width: 100%; border-collapse: collapse; margin: .8rem 0; font-size: .88rem; }
+  th, td { text-align: left; padding: .55rem .7rem; border: 1px solid var(--border); vertical-align: top; overflow-wrap: break-word; }
+  th { background: var(--surface2); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td { background: var(--surface); }
+  td b { color: var(--text); }
+  tbody tr:nth-child(even) td { background: #1d2839; }
+
+  /* Моки интерфейса */
+  .mock {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: #141b26; padding: 1rem; margin: 1rem 0; font-size: .85rem;
+  }
+  .mock .bar { height: .55rem; border-radius: 4px; background: var(--surface2); margin-bottom: .5rem; }
+  .mock .bar.w40 { width: 40%; } .mock .bar.w60 { width: 60%; } .mock .bar.w80 { width: 80%; }
+  .mock .pill {
+    display: inline-block; padding: .25rem .7rem; border-radius: 999px;
+    background: rgba(59,130,246,.18); border: 1px solid var(--accent);
+    font-size: .78rem; margin: .15rem .25rem .15rem 0;
+  }
+  .mock .pill.green { background: rgba(34,197,94,.15); border-color: var(--green); }
+
+  .callout {
+    border-left: 3px solid var(--accent2); background: rgba(6,182,212,.08);
+    padding: .8rem 1rem; border-radius: 0 var(--radius) var(--radius) 0;
+    margin: .8rem 0; font-size: .9rem; color: var(--text);
+  }
+  .callout.warn { border-color: var(--yellow); background: rgba(234,179,8,.08); }
+  .callout.ok { border-color: var(--green); background: rgba(34,197,94,.08); }
+  .callout b { color: var(--text); }
+
+  kbd {
+    background: var(--surface2); border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 6px; padding: .05rem .45rem; font-family: inherit; font-size: .82rem;
+  }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .75rem; margin: 1rem 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem; text-align: center; }
+  .stat .n { font-size: 1.5rem; font-weight: 700; color: var(--accent2); }
+  .stat .l { font-size: .78rem; color: var(--muted); margin-top: .15rem; }
+
+  footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem; color: var(--muted); font-size: .8rem; text-align: center; }
+
+  @media (max-width: 700px) {
+    .header { padding: 1.5rem 1rem; }
+    .container { padding: 1rem 1rem 2.5rem; }
+    .toc-grid { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow .arrow { transform: rotate(90deg); text-align: center; }
+    .flow .step { min-width: 0; }
+    /* Широкие таблицы скроллятся внутри себя, а не растягивают страницу */
+    table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    ol.steps li { padding-left: 2.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="badge-row">
+      <span class="badge badge-ver">Админка 3.0</span>
+      <span class="badge badge-new">CRM</span>
+      <span class="badge badge-cat">Инструкция для менеджеров</span>
+    </div>
+    <h1>Панель управления Hoocon — релиз 3.0</h1>
+    <p class="sub">Кабинет клиента, документы и КП в один клик — плюс рабочий CRM-контур: компания и коллеги, канбан КП, заказ из КП, следующий контакт и автоматический отчёт для начальника отдела продаж. Ниже — как этим работать каждый день.</p>
+  </div>
+</div>
+
+<div class="container">
+
+<nav class="toc">
+  <div class="toc-grid">
+    <a href="#new">Что нового в 3.0<small>Кабинет, CRM, отчёт РОП</small></a>
+    <a href="#chain">Сквозная цепочка<small>Заявка → КП → Заказ → Документы</small></a>
+    <a href="#cabinet">Кабинет клиента<small>Что видит клиент, чем это помогает</small></a>
+    <a href="#mail">Почта и ящики<small>Личный SMTP, треды, дедуп</small></a>
+    <a href="#daily">Ежедневная работа<small>Заявки, клиенты, КП, компании</small></a>
+    <a href="#rop">Отчёт РОП<small>Воронка менеджеров, еженедельное письмо</small></a>
+    <a href="#catalog">Каталог и аналоги<small>Артикулы, подбор замен</small></a>
+    <a href="#nav">Навигация<small>Разделы, Ctrl+K, дашборд</small></a>
+    <a href="#faq">Сценарии и FAQ<small>Типовые ситуации</small></a>
+  </div>
+</nav>
+
+<section id="new">
+  <h2><span class="num">1</span>Что нового в релизе 3.0</h2>
+  <p class="lead">Главная идея релиза: у клиента свой кабинет на сайте, а в админке — полный контур B2B. КП, документы и статусы больше не живут только в почте: они связаны одной цепочкой. Позже к этому контуру добавили рабочий CRM: юрлицо само цепляется к карточке, КП ведётся канбаном, заказ создаётся из КП, начальник отдела продаж получает отчёт по менеджерам.</p>
+
+  <div class="stat-row">
+    <div class="stat"><div class="n">9</div><div class="l">разделов в «Работе» + отчёт РОП</div></div>
+    <div class="stat"><div class="n">20+</div><div class="l">API-точек кабинета клиента</div></div>
+    <div class="stat"><div class="n">1 клик</div><div class="l">КП → PDF → письмо → кабинет</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">дублей писем между ящиками</div></div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>Личный кабинет клиента <span class="tag tag-new">новое</span></h4>
+      <p>На сайте появился раздел /account — клиент заходит по email и коду из письма (или паролю) и видит всё своё: заявки, КП, документы, заказы, спецификации, рекламации, реквизиты компании.</p>
+      <ul>
+        <li>Меньше звонков «а что по моей заявке?» — статус виден клиенту.</li>
+        <li>После отправки заявки сайт сам предлагает создать кабинет в один шаг.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Коммерческие предложения + PDF <span class="tag tag-upd">улучшено</span></h4>
+      <p>При переводе КП в «Выдано» генерируется PDF (кириллица, срок действия, НДС), письмо уходит клиенту, файл ложится в «Документы». Список КП — стена или канбан (черновик → выдано → согласовано → отклонено). С карточки: «Копия черновиком» и «Создать заказ».</p>
+    </div>
+    <div class="card">
+      <h4>Документы клиента <span class="tag tag-new">новое</span></h4>
+      <p>Раздел «Документы клиента»: КП, счета, спецификации, УПД — с типом и ЭДО-статусом. Файлы хранятся приватно: клиент качает только свои, в кабинете есть выгрузка всех документов одним ZIP.</p>
+    </div>
+    <div class="card">
+      <h4>Заказы и логистика <span class="tag tag-new">новое</span></h4>
+      <p>Раздел «Заказы»: позиции, статус, прогресс, перевозчик, трек-номер, плановая дата отгрузки. Клиент видит заказ в кабинете — включая трек для отслеживания.</p>
+    </div>
+    <div class="card">
+      <h4>Компании и контакты <span class="tag tag-upd">улучшено</span></h4>
+      <p>«Компании» — юрлицо с ИНН и адресом. Название компании на карточке клиента само создаёт (или находит) юрлицо. На карточке видны коллеги с тем же юрлицом и похожие дубли. Дубли компаний объединяются действием в списке «Компании».</p>
+    </div>
+    <div class="card">
+      <h4>Спецификации клиента <span class="tag tag-upd">улучшено</span></h4>
+      <p>Клиент грузит Excel в кабинете (или менеджер — на карточке клиента) → заявка. Готовый набор из кабинета можно сразу превратить в черновик КП кнопкой «В КП» на спецификации.</p>
+    </div>
+    <div class="card">
+      <h4>Рекламации (RMA) <span class="tag tag-new">новое</span></h4>
+      <p>Клиент создаёт рекламацию в кабинете с фото дефекта. Фото хранится приватно, смотрится из карточки RMA в админке.</p>
+    </div>
+    <div class="card">
+      <h4>Личные почтовые ящики <span class="tag tag-new">новое</span></h4>
+      <p>«Ящики менеджеров»: свой SMTP/IMAP у каждого менеджера. Ответ клиенту уходит <b>от вашего адреса</b>, входящие клиентские письма сами попадают в CRM и приклеиваются к заявке.</p>
+    </div>
+    <div class="card">
+      <h4>Подбор аналогов <span class="tag tag-new">новое</span></h4>
+      <p>«Подбор аналогов» (AnalogMap): таблица замен Belimo → Hoocon. На сайте работает публичный подбор; заявки «замена Belimo» приходят уже с заполненным кодом аналога.</p>
+    </div>
+    <div class="card">
+      <h4>Объединение карточек клиентов <span class="tag tag-new">новое</span></h4>
+      <p>В списке «Клиенты» — действие «Объединить карточки»: заявки, КП, заказы, документы, рекламации, контакты и аккаунт кабинета переезжают к основной карточке. Дубли больше не разводят историю.</p>
+    </div>
+    <div class="card">
+      <h4>Следующий контакт <span class="tag tag-new">новое</span></h4>
+      <p>На карточке клиента — дата «следующий контакт». Просроченные висят фильтром в списке клиентов и предупреждением на дашборде. РОП видит их в отчёте по менеджерам.</p>
+    </div>
+    <div class="card">
+      <h4>Отчёт начальника отдела продаж <span class="tag tag-new">новое</span></h4>
+      <p>Раздел «Отчёт РОП»: заявки, КП, заказы, письма, звонки с разговором и просроченные контакты — по каждому менеджеру. Админ и аналитик видят всех; менеджер — только себя. Каждый понедельник в 08:00 (Москва) уходит письмо на ящик РОП.</p>
+    </div>
+    <div class="card">
+      <h4>Интерфейс админки <span class="tag tag-upd">улучшено</span></h4>
+      <ul>
+        <li>Блок «Разделы» — мозаика: высота плитки по контенту.</li>
+        <li>Оставшиеся английские строки Unfold переведены на русский («Ничего не найдено», «Сбросить фильтры» и др.).</li>
+        <li>Кабинетные сущности — в секции «Работа» плоским списком.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="chain">
+  <h2><span class="num">2</span>Сквозная цепочка: как всё связано</h2>
+  <p class="lead">Одна линия от первого обращения до закрытых документов. Все события хранят и ссылку на клиента (досье), и на заявку (история).</p>
+
+  <div class="flow">
+    <div class="step"><b>Заявка</b><span>сайт / почта / звонок</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Клиент + Компания</b><span>карточка-досье создаётся сама</span></div>
+    <div class="arrow">→</div>
+    <div class="step accent"><b>КП</b><span>канбан · «Выдано» → PDF + письмо</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Заказ</b><span>кнопка «Создать заказ» из КП</span></div>
+    <div class="arrow">→</div>
+    <div class="step green"><b>Документы</b><span>КП/счёт/УПД в кабинете</span></div>
+  </div>
+  <p class="muted">Параллельные ветки: <b>Спецификация</b> (Excel) → заявка или сразу «В КП»; <b>Рекламация</b> — после отгрузки, с фото. Статусы КП: черновик → выдано → согласовано / отклонено. Заказ из согласованного (или любого) КП не плодит дубль, пока первый не отменён.</p>
+
+  <div class="who">
+    <div class="mgr">
+      <b>Менеджер — в админке</b>
+      Обрабатывает заявки, выставляет КП, ведёт заказ, грузит документы, отвечает на письма из карточки. Рабочий стол — дашборд + разделы «Работа».
+    </div>
+    <div class="cli">
+      <b>Клиент — в кабинете на сайте</b>
+      Видит свои заявки и статусы, скачивает КП и документы, следит за заказом и треком, повторяет заявку в один клик, создаёт рекламации, загружает спецификации.
+    </div>
+  </div>
+
+  <div class="callout ok"><b>Важно:</b> кабинет и админка смотрят в одни данные. Что вы записали в заявку/заказ/документ — то клиент видит у себя. Никакой «второй системы» и ручной синхронизации.</div>
+</section>
+
+<section id="cabinet">
+  <h2><span class="num">3</span>Кабинет клиента: что это меняет для менеджера</h2>
+  <p class="lead">Кабинет — это SPA-раздел сайта (<code>/account</code>), не админка. Клиент работает сам, вы — только наполняете связанные объекты в админке.</p>
+
+  <h3>Как клиент попадает в кабинет</h3>
+  <ol class="steps">
+    <li>Клиент оставляет заявку на сайте (КП / консультация / замена).<small>На экране успеха ему предлагают «Создать кабинет» — код приходит на email из заявки.</small></li>
+    <li>Или заходит сам на /register, /login — вход по паролю или по коду из письма.</li>
+    <li>Заявка, которую он только что отправил, уже лежит в его кабинете — привязка по email происходит автоматически.</li>
+  </ol>
+  <div class="callout"><b>Если клиент пишет «у меня другой email»:</b> карточки объединяются действием «Объединить карточки» — вся история переедет к основной записи вместе с аккаунтом кабинета.</div>
+
+  <h3>Что клиент видит — и где вы это контролируете</h3>
+  <table>
+    <thead><tr><th>В кабинете клиента</th><th>Источник в админке</th><th>Что делать менеджеру</th></tr></thead>
+    <tbody>
+      <tr><td><b>Заявки</b> со статусом и позициями</td><td>Заявки (leads)</td><td>Двигать статус — клиент видит его сразу</td></tr>
+      <tr><td><b>КП</b> с номером, суммой и PDF</td><td>Коммерческие предложения</td><td>Перевести в «Выдано» (форма или канбан) — PDF и письмо уйдут сами. Срок и НДС попадут в PDF</td></tr>
+      <tr><td><b>Документы</b> + скачать всё ZIP</td><td>Документы клиента</td><td>Загрузить файл, выбрать тип; видимость — сразу у клиента</td></tr>
+      <tr><td><b>Заказы</b>: статус, прогресс, трек</td><td>Заказы</td><td>Создать из КП кнопкой «Создать заказ», затем вести статус, перевозчика и трек</td></tr>
+      <tr><td><b>Спецификации</b> (загрузка Excel)</td><td>Спецификации</td><td>Проверить позиции → заявка; или «В КП» — черновик КП без заявки</td></tr>
+      <tr><td><b>Рекламации</b> с фото</td><td>Рекламации</td><td>Открыть кейс, смотреть фото, менять статус</td></tr>
+      <tr><td><b>Компания</b>: реквизиты</td><td>Компании / карточка клиента</td><td>Заполнить реквизиты один раз — клиент видит их у себя</td></tr>
+      <tr><td><b>Диалоги</b> по заявкам</td><td>Письма / активности</td><td>Ответ из заявки попадает в тред клиента</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Мини-превью кабинета</h3>
+  <div class="mock">
+    <div class="bar w40"></div>
+    <span class="pill">Заявки</span><span class="pill">КП</span><span class="pill">Документы</span><span class="pill">Заказы</span><span class="pill">Спецификации</span><span class="pill">Рекламации</span><span class="pill">Компания</span>
+    <div class="bar w80"></div>
+    <div class="bar w60"></div>
+    <span class="pill green">Заявка #1042 · В работе</span>
+    <span class="pill green">КП-2026-017 · PDF ↓</span>
+  </div>
+</section>
+
+<section id="mail">
+  <h2><span class="num">4</span>Почта: личные ящики и «Ответ клиенту»</h2>
+  <p class="lead">Раньше все ответы уходили от общего noreply@hoocon.ru. Теперь у каждого менеджера может быть свой ящик — письма уходят и приходят от вашего адреса, а весь тред сохраняется в карточке.</p>
+
+  <h3>Как устроено</h3>
+  <table>
+    <thead><tr><th>Ситуация</th><th>От чьего адреса уйдёт ответ</th></tr></thead>
+    <tbody>
+      <tr><td>У вас настроен личный ящик (раздел «Ящики менеджеров»)</td><td><b>Ваш адрес</b> (например ivan@hoocon.ru), через ваш SMTP</td></tr>
+      <tr><td>Личный ящик не настроен</td><td>Общий noreply@hoocon.ru, Reply-To — адрес, указанный у вас</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Настройка своего ящика (один раз)</h3>
+  <ol class="steps">
+    <li>Откройте «Ящики менеджеров» → «Добавить».<small>Пользователь — ваш логин; IMAP/SMTP — адрес ящика и пароль приложения (для Яндекса создаётся в настройках почты).</small></li>
+    <li>Укажите SMTP host/port — для отправки; IMAP — для приёма.</li>
+    <li>Сохраните. Пароль хранится в базе, в списке отображается маской.</li>
+  </ol>
+
+  <h3>Как работает приём и дедупликация</h3>
+  <ul class="steps" style="list-style:none">
+    <li style="padding-left:0">• Входящие письма забираются по IMAP в «Письма» и автоматически приклеиваются к заявке по In-Reply-To / теме «Заявка #N».</li>
+    <li style="padding-left:0">• Повторный опрос ящика не создаёт копий — дедуп по Message-ID и курсору последнего UID.</li>
+    <li style="padding-left:0">• Одно и то же письмо в двух ящиках не задвоится — Message-ID уникален глобально.</li>
+    <li style="padding-left:0">• Отправка с вашего личного ящика не кладёт дубль во «Входящие» — копия и так есть в «Отправленных».</li>
+  </ul>
+  <div class="callout warn"><b>Если входящие не приходят:</b> проверьте, что в ящике включён IMAP и используется пароль приложения, а не основной пароль почты.</div>
+</section>
+
+<section id="daily">
+  <h2><span class="num">5</span>Ежедневная работа: заявки, клиенты, КП</h2>
+  <p class="lead">Базовый контур тот же: заявка → досье клиента → КП → заказ. Ниже — как пользоваться связкой с кабинетом и новым CRM.</p>
+
+  <h3>Обработка новой заявки</h3>
+  <ol class="steps">
+    <li>Дашборд → «Заявки» или лента — новая заявка видна сразу.<small>Фильтр «Просрочено» показывает заявки за пределами SLA первого ответа.</small></li>
+    <li>Откройте заявку — внизу тред переписки, кнопка «Ответ клиенту».<small>Письмо уйдёт с вашего ящика, если он настроен; весь тред останется в карточке.</small></li>
+    <li>Выберите шаблон письма, если ответ типовой.<small>Шаблоны — «Шаблоны писем», плейсхолдеры {имя}/{компания}/{почта}/{телефон}.</small></li>
+    <li>Двигайте статус — клиент видит его в кабинете в реальном времени.</li>
+    <li>Готовность → «Создать КП» (кнопка шлёт POST). Если у коллеги по той же компании уже есть открытое КП, система предупредит — не плодите второе предложение вслепую.</li>
+    <li>В КП заполните цены, срок («действует до», по умолчанию +14 дней) и ставку НДС. Переведите в «Выдано» — PDF и письмо уйдут сами, заявка закроется.</li>
+  </ol>
+
+  <h3>Карточка клиента</h3>
+  <p class="muted">«Клиенты» — долгосрочное досье: контакты, юрлицо, все заявки, письма, КП, заказы, документы, рекламации и активности. Заявка — рабочий стол «сейчас», карточка — память «всегда». Поиск понимает цифры телефона и ИНН компании.</p>
+  <ul class="steps" style="list-style:none">
+    <li style="padding-left:0">• <b>Компания</b>: достаточно написать название — карточка юрлица создастся (или найдётся) сама. Коллеги по тому же юрлицу и похожие карточки видны в блоке сводки.</li>
+    <li style="padding-left:0">• <b>Следующий контакт</b>: поставьте дату после звонка или письма. Просрочка — фильтр в списке и жёлтое предупреждение на дашборде.</li>
+    <li style="padding-left:0">• <b>Дубликаты контактов</b>: список «Клиенты» → отметить → «Объединить карточки».</li>
+    <li style="padding-left:0">• <b>Дубликаты юрлиц</b>: список «Компании» → отметить → «Объединить компании» — карточки клиентов переедут на основную.</li>
+    <li style="padding-left:0">• <b>Импорт спецификации</b>: на карточке — Excel → заявка с позициями.</li>
+    <li style="padding-left:0">• Вкладки заказа и рекламации на карточке — те же объекты, что в разделах «Заказы» и «Рекламации».</li>
+  </ul>
+
+  <h3>КП: канбан, копия, заказ</h3>
+  <ol class="steps">
+    <li>Список «КП» — переключатель «Стена / Канбан» (на телефоне всегда стена).<small>Колонки: Черновик, Выдано, Согласовано, Отклонено. Перетаскивание меняет статус, «Выдано» в первый раз выпускает PDF.</small></li>
+    <li>«Копия черновиком» — новая нумерация, позиции и НДС копируются, срок снова +14 дней. Удобно для второй редакции без порчи выданного файла.</li>
+    <li>«Создать заказ» — позиции КП копируются в заказ (номер вида З-КП-…). Повторный клик откроет уже существующий незакрытый заказ, дубль не создастся.</li>
+  </ol>
+  <div class="callout warn"><b>Права:</b> заказ из КП требует право добавлять заказы. Спецификация в админке только для просмотра — «В КП» доступна, править набор клиент может в кабинете.</div>
+
+  <h3>Активности</h3>
+  <p class="muted">«Активности» — лента событий по клиентам и заявкам (письма, звонки, статусы). Ответ на вопрос «кто и когда обещал» — здесь.</p>
+</section>
+
+<section id="rop">
+  <h2><span class="num">6</span>Отчёт начальника отдела продаж</h2>
+  <p class="lead">Автоматическая сводка по работе менеджеров — не отдельная роль, а страница и еженедельное письмо. Полную таблицу видят суперпользователь, группа «Админ» и «Аналитик»; менеджер открывает ту же страницу и видит только свою строку.</p>
+
+  <h3>Где смотреть</h3>
+  <ol class="steps">
+    <li>Навигация «Работа» → «Отчёт РОП», или кнопка «Отчёт РОП» в списке КП, или /admin/crm/client/sales-report/.</li>
+    <li>Период: 7 дней, 30 дней или всё время — как у статистики заявок.</li>
+  </ol>
+
+  <h3>Что в цифрах</h3>
+  <table>
+    <thead><tr><th>Показатель</th><th>Смысл</th></tr></thead>
+    <tbody>
+      <tr><td>Заявки новые / закрыты</td><td>Поступило за период и закрыто (по ответственному / кто завершил)</td></tr>
+      <tr><td>КП создано / выдано / согласовано</td><td>Воронка коммерческих предложений менеджера</td></tr>
+      <tr><td>Открытые КП</td><td>Черновики и выданные, ещё не закрытые согласием или отказом</td></tr>
+      <tr><td>Заказы</td><td>Заказы, выросшие из КП этого менеджера</td></tr>
+      <tr><td>Письма / звонки с разговором / активности</td><td>Исходящие письма, звонки с длительностью &gt; 0, записи в ленте</td></tr>
+      <tr><td>Просрочен контакт</td><td>Карточки с датой «следующий контакт» в прошлом</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Письмо каждый понедельник</h3>
+  <p class="muted">В 08:00 по Москве задача <code>crm.send_weekly_sales_report</code> шлёт сводку за 7 дней. Адрес: поле «почта отчёта РОП» в настройках сайта (несколько адресов через запятую). Если пусто — общий ящик отдела <code>LEAD_NOTIFY_EMAIL</code>. Если оба пустые, письмо не уходит.</p>
+  <div class="callout ok"><b>Для РОПа:</b> не нужно заводить четвёртую группу. Смотрите отчёт с учётки Админа или Аналитика — скоуп менеджера там снимается, как в статистике заявок.</div>
+</section>
+
+<section id="catalog">
+  <h2><span class="num">7</span>Каталог и подбор аналогов</h2>
+  <p class="lead">Артикулы и товары — как раньше. Новое — таблица замен Belimo → Hoocon.</p>
+  <ol class="steps">
+    <li>«Подбор аналогов» → добавьте строку: код Belimo → наш артикул.<small>На сайте сразу работает публичный подбор — заявки «замена» приходят с уже указанным аналогом.</small></li>
+    <li>В карточке SKU проверяйте, что коды и названия заполнены — спецификации и заявки резолвят позиции по ним.</li>
+  </ol>
+</section>
+
+<section id="nav">
+  <h2><span class="num">8</span>Навигация: разделы, поиск, дашборд</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h4>Блок «Разделы»</h4>
+      <p>Плитки групп на дашборде теперь мозаикой — высота по содержимому, бейджи непрочитанного на месте.</p>
+    </div>
+    <div class="card">
+      <h4>Командная палитра <kbd>Ctrl</kbd>+<kbd>K</kbd></h4>
+      <p>Поиск по заявкам, клиентам, артикулам, диалогам и контенту + история посещённых страниц.</p>
+    </div>
+    <div class="card">
+      <h4>Разделы по правам</h4>
+      <p>Боковое меню показывает только то, что доступно вашей группе (Админ / Менеджер / Аналитик).</p>
+    </div>
+    <div class="card">
+      <h4>Дашборд</h4>
+      <p>KPI, «Просрочено SLA», «Просрочен следующий контакт», лента заявок/клиентов/активностей.</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <h2><span class="num">9</span>Типовые сценарии и FAQ</h2>
+  <table>
+    <thead><tr><th>Ситуация</th><th>Что делать</th></tr></thead>
+    <tbody>
+      <tr><td>«Клиент просит прислать КП повторно»</td><td>Не пересылайте вручную — КП уже в его кабинете (раздел «КП» + «Документы»). Если кабинета нет — попросите зайти на /login по email из заявки. Вторую редакцию делайте «Копия черновиком», не правьте выданное КП вслепую.</td></tr>
+      <tr><td>«Клиент прислал спецификацию Excel»</td><td>Карточка клиента → загрузка спецификации → заявка. Или клиент сам грузит в кабинете. Готовый набор → «В КП».</td></tr>
+      <tr><td>«Нужен заказ из согласованного КП»</td><td>Карточка КП → «Создать заказ». Позиции и цены копируются; дальше ведите статус и трек в «Заказы».</td></tr>
+      <tr><td>«У компании уже кто-то считает КП»</td><td>При «Создать КП» будет предупреждение про открытые КП коллег. Откройте их, не дублируйте.</td></tr>
+      <tr><td>«Где трек-номер по заказу?»</td><td>Заказ → поля «Перевозчик» и «Трек-номер» — клиент видит их в кабинете сразу после сохранения.</td></tr>
+      <tr><td>«Когда перезвонить?»</td><td>Карточка клиента → «следующий контакт». Просрочка видна вам на дашборде и РОПу в отчёте.</td></tr>
+      <tr><td>«РОП не получает письмо в понедельник»</td><td>Настройки сайта → «почта отчёта РОП» или LEAD_NOTIFY_EMAIL. Проверьте, что Celery beat включён (задача crm.send_weekly_sales_report).</td></tr>
+      <tr><td>«Письмо от моего адреса?»</td><td>Да, если у вас заведён личный ящик в «Ящики менеджеров». Иначе — общий noreply с вашим Reply-To.</td></tr>
+      <tr><td>«Одно письмо видно у двух менеджеров»</td><td>Так и задумано только при общей рассылке; записи в CRM не дублируются — Message-ID уникален.</td></tr>
+      <tr><td>«Клиент жалуется на дефект»</td><td>Попросите создать рекламацию в кабинете с фото — кейс появится в «Рекламации» со всеми данными.</td></tr>
+      <tr><td>«Дубль клиента с другим email»</td><td>Список «Клиенты» → отметить обе карточки → «Объединить карточки» → вся история и аккаунт уезжают к основной.</td></tr>
+      <tr><td>«Нет кнопки/раздела»</td><td>Разделы видны по правам группы. Если раздела нет — попросите администратора проверить вашу группу.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><b>Коротко:</b> обрабатывайте заявки, выставляйте КП, ведите заказы. Клиент видит то же в кабинете. Компания и коллеги собираются сами, КП двигается канбаном, заказ — из КП, РОП смотрит отчёт, а не спрашивает «кто что сделал» в чате.</div>
+</section>
+
+</div>
+
+<footer>
+  Панель управления Hoocon · Релиз «Админка 3.0» · CRM-контур · Инструкция для менеджеров · 07.10.2026
+</footer>
+
+</body>
+</html>
