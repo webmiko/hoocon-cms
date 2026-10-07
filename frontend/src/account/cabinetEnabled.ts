@@ -15,7 +15,7 @@ export function fetchCabinetEnabled(): Promise<boolean> {
   if (!cached) {
     cached = fetch("/api/settings/public/")
       .then((response) => (response.ok ? response.json() : {}))
-      .then((data) => data?.cabinet_enabled === true)
+      .then((data: { cabinet_enabled?: boolean }) => data?.cabinet_enabled === true)
       .catch(() => false);
   }
   return cached;
