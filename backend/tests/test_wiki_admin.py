@@ -126,6 +126,25 @@ def test_wiki_stock_fixture_uses_self_hosted_chart_js() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
+    """Инструкция 3.0 описывает канбан КП, заказ из КП и отчёт РОП."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "Отчёт начальника отдела продаж" in doc.body
+    assert "crm.send_weekly_sales_report" in doc.body
+    assert "Создать заказ" in doc.body
+    assert "следующий контакт" in doc.body
+    assert 'id="rop"' in doc.body
+    assert "Копия черновиком" in doc.body
+    assert "07.10.2026" in doc.body
+    assert "отчёт роп" in doc.summary.casefold()
+
+
+@pytest.mark.django_db
 def test_seed_wiki_includes_year_stock_dashboard() -> None:
     """Yearly stock dashboard seed is wired in seed_wiki."""
     from io import StringIO
