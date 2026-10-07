@@ -44,6 +44,9 @@ class _ContentViewSet(
 ):
     """Shared config for Page / Article / News viewsets (DRY)."""
 
+    # Re-annotate: drf-stubs types ``queryset`` as a Manager, whose
+    # ``__get__`` only accepts model ``Options`` — breaking self.queryset.
+    queryset: QuerySet | None = None
     permission_classes = (AllowAny,)
     lookup_field = "slug"
     http_method_names = ["get", "head", "options"]
