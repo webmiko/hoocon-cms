@@ -328,7 +328,7 @@ def test_staff_mailbox_fetched_when_env_disabled(
     mailbox = StaffMailbox.objects.create(
         user=owner,
         imap_user="ivan@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
     )
     _imap[4] = _raw_email(
         message_id="<staff@t>",
@@ -361,7 +361,7 @@ def test_same_message_in_two_boxes_deduped(
     StaffMailbox.objects.create(
         user=_staff_user(),
         imap_user="ivan@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
     )
     Client.objects.create(email="buyer@example.test", name="B")
     _imap[6] = _raw_email(message_id="<both@t>")
@@ -392,7 +392,7 @@ def test_broken_mailbox_does_not_block_others(
     good = StaffMailbox.objects.create(
         user=_staff_user("good"),
         imap_user="good@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
     )
     monkeypatch.setattr(_FakeIMAP, "fail_logins", {"bad@hoocon.ru"})
     _imap[3] = _raw_email(message_id="<ok@t>")
@@ -422,7 +422,7 @@ def test_disabled_staff_mailbox_skipped(
     StaffMailbox.objects.create(
         user=_staff_user(),
         imap_user="ivan@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
         is_enabled=False,
     )
     _imap[1] = _raw_email(message_id="<off@t>")
@@ -544,7 +544,7 @@ def test_mailbox_form_keeps_password_on_empty_input() -> None:
     mailbox = StaffMailbox.objects.create(
         user=_staff_user(),
         imap_user="ivan@hoocon.ru",
-        imap_password="old-secret",
+        imap_password="old-not-secret",
     )
     form = StaffMailboxForm(
         data={
@@ -562,7 +562,25 @@ def test_mailbox_form_keeps_password_on_empty_input() -> None:
     )
     assert form.is_valid(), form.errors
     saved = form.save()
-    assert saved.imap_password == "old-secret"
+    assert saved.imap_password_plain == "old-not-secret"
+    assert saved.imap_password != "old-not-secret"
+
+
+@pytest.mark.django_db
+def test_mailbox_password_roundtrip_survives_save() -> None:
+    """Plain app passwords are signed at rest and decrypt for IMAP."""
+    from accounts.mailbox_secrets import decrypt_mailbox_secret, encrypt_mailbox_secret
+    from accounts.models import StaffMailbox
+
+    mailbox = StaffMailbox.objects.create(
+        user=_staff_user(),
+        imap_user="roundtrip@hoocon.ru",
+        imap_password="app-not-secret-1",
+    )
+    mailbox.refresh_from_db()
+    assert mailbox.imap_password.startswith("signed1:")
+    assert decrypt_mailbox_secret(mailbox.imap_password) == "app-not-secret-1"
+    assert encrypt_mailbox_secret(mailbox.imap_password) == mailbox.imap_password
 
 
 class _FakeConnection:
@@ -592,7 +610,7 @@ def test_outbound_sends_via_personal_smtp(
     mailbox = StaffMailbox.objects.create(
         user=owner,
         imap_user="ivan@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
         smtp_host="smtp.test",
         smtp_port=587,
         smtp_use_ssl=False,
@@ -622,7 +640,7 @@ def test_outbound_sends_via_personal_smtp(
             "host": "smtp.test",
             "port": 587,
             "username": "ivan@hoocon.ru",
-            "password": "app-pass",
+            "password": "app-not-secret",
             "use_ssl": False,
             "use_tls": True,
             "fail_silently": False,
@@ -683,7 +701,7 @@ def test_create_outbound_uses_author_mailbox(settings) -> None:
     mailbox = StaffMailbox.objects.create(
         user=owner,
         imap_user="ivan2@hoocon.ru",
-        imap_password="app-pass",
+        imap_password="app-not-secret",
     )
     stranger = _staff_user("petr")  # без ящика — общий отправитель
     client = Client.objects.create(email="buyer@example.test", name="B")

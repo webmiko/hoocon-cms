@@ -28,7 +28,7 @@ def _smtp_connection_for(msg: EmailMessage) -> Any | None:
         return None
     host = (mailbox.smtp_host or "").strip()
     username = (mailbox.imap_user or "").strip()
-    password = mailbox.imap_password or ""
+    password = getattr(mailbox, "imap_password_plain", None) or mailbox.imap_password or ""
     if not (host and username and password):
         return None
     return get_connection(

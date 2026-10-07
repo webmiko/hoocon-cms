@@ -139,7 +139,7 @@ def _mailboxes() -> list[_Mailbox]:
             _Mailbox(
                 key=f"staff:{mb.pk}",
                 user=mb.imap_user,
-                password=mb.imap_password,
+                password=mb.imap_password_plain,
                 folder=mb.folder or "INBOX",
                 state=mb,
                 staff_mailbox=mb,
