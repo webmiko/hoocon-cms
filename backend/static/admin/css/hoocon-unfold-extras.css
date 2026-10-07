@@ -169,7 +169,6 @@ body.hoocon-os27 :is(
 }
 
 body.hoocon-os27 :is(
-  .hoocon-dash__quick a,
   .hoocon-lead-stats__periods a,
   .hoocon-phone-more__close,
   .hoocon-phone-select-toggle,
@@ -758,30 +757,6 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   max-width: 40rem;
 }
 
-.hoocon-dash__quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.hoocon-dash__quick a {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.4rem 0.85rem;
-  border-radius: var(--hoocon-radius-btn-sm);
-  border: 1px solid var(--hoocon-glass-border);
-  background: var(--hoocon-surface-muted);
-  color: var(--hoocon-quiet);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.hoocon-dash__quick a:hover {
-  color: var(--hoocon-primary);
-  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
-}
-
 .hoocon-dash__h2 {
   margin: 0;
   font-size: 0.95rem;
@@ -922,6 +897,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 1rem;
+  align-items: start;
   margin-bottom: 1.75rem;
 }
 
@@ -953,7 +929,6 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   color: var(--hoocon-primary-on-dark);
 }
 
-.dark .hoocon-dash__quick a:hover,
 .dark .hoocon-dash__cards .hoocon-lead-stats__value a:hover,
 .dark .hoocon-admin-lead-sticker:hover {
   color: var(--hoocon-primary-on-dark) !important;
@@ -3213,8 +3188,11 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
   max-width: 100%;
 }
 
-/* Unfold tabular inlines on phones — vertical cards; do not use changelist card-stack JS. */
-@media (max-width: 767px) {
+/* Unfold tabular inlines below lg — vertical labeled cards.
+   Unfold hides thead under 1024px (hidden lg:table-header-group), so raw
+   inputs would be unlabeled on phones AND on 768–1023px panes/windows.
+   Do not use changelist card-stack JS here. */
+@media (max-width: 1023px) {
   body.change-form .formset-wrapper.overflow-x-auto {
     overflow-x: clip !important;
     max-width: 100%;
@@ -3255,15 +3233,16 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     box-sizing: border-box;
   }
 
-  /* Unfold .empty-form{display:none} — do not override on the clone-source tbody. */
+  /*
+   * Hide only the clone-source tbody (.empty-form). Do NOT hide .template:
+   * every unsaved row carries that class and Unfold's addInlineTemplateHandler
+   * removes only .empty-form from clones — hiding .template made every added
+   * row invisible.
+   */
   body.change-form
     [data-inline-type="tabular"]
     table.formset
-    tbody.form-group.empty-form,
-  body.change-form
-    [data-inline-type="tabular"]
-    table.formset
-    tbody.form-group.template {
+    tbody.form-group.empty-form {
     display: none !important;
   }
 
@@ -3336,6 +3315,17 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     > * {
     grid-column: 2;
     min-width: 0;
+  }
+
+  /* Title / error rows span the whole card (no label gutter). */
+  body.change-form
+    [data-inline-type="tabular"]
+    table.formset
+    tbody.form-group
+    > tr
+    > td[colspan]
+    > * {
+    grid-column: 1 / -1;
   }
 
   body.change-form
@@ -3444,4 +3434,113 @@ table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td a {
     border: none !important;
     position: relative;
   }
+}
+
+/* Toggle switch — native checkbox restyled as an OS-style on/off control
+   (same pill track + sliding knob as .hoocon-admin-push-toggle). */
+input[type="checkbox"].hoocon-toggle {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 2.6rem !important;
+  height: 1.5rem !important;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #c8cad0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s ease;
+}
+
+input[type="checkbox"].hoocon-toggle::after {
+  content: "";
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 20, 30, 0.25);
+  transition: transform 0.15s ease;
+}
+
+input[type="checkbox"].hoocon-toggle:checked {
+  background: var(--os27-accent, var(--hoocon-primary, #dc1313)) !important;
+}
+
+input[type="checkbox"].hoocon-toggle:checked::after {
+  transform: translateX(1.1rem);
+}
+
+input[type="checkbox"].hoocon-toggle:focus-visible {
+  outline: 2px solid var(--os27-accent, var(--hoocon-primary, #dc1313));
+  outline-offset: 2px;
+}
+
+input[type="checkbox"].hoocon-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dark input[type="checkbox"].hoocon-toggle,
+html.dark input[type="checkbox"].hoocon-toggle {
+  background: #4b4b4b !important;
+}
+
+.dark input[type="checkbox"].hoocon-toggle:checked,
+html.dark input[type="checkbox"].hoocon-toggle:checked {
+  background: var(--os27-accent, #f87171) !important;
+}
+
+/* Client card — inline «Написать»/«Позвонить» next to email/phone inputs. */
+.hoocon-field-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hoocon-field-action > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hoocon-field-action__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-base-light, #d4d4d8);
+  border-radius: var(--hoocon-radius-btn, 8px);
+  color: var(--font-primary-light, #3f3f46);
+  background: transparent;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hoocon-field-action__btn:hover {
+  color: var(--primary-600, #2563eb);
+  border-color: var(--primary-600, #2563eb);
+  background: rgb(37 99 235 / 0.06);
+}
+
+.hoocon-field-action__btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.dark .hoocon-field-action__btn {
+  border-color: var(--border-base-dark, #52525b);
+  color: var(--font-primary-dark, #e4e4e7);
+}
+
+.dark .hoocon-field-action__btn:hover {
+  color: var(--primary-400, #60a5fa);
+  border-color: var(--primary-400, #60a5fa);
+  background: rgb(96 165 250 / 0.1);
 }

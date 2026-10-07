@@ -32,6 +32,7 @@ _APP_DESCRIPTIONS: dict[str, str] = {
     "leads": "Заявки с сайта, статусы и обработка менеджерами.",
     "catalog": "Товары, артикулы, категории и медиа каталога.",
     "crm": "Клиенты, активности и работа с базой CRM.",
+    "cabinet": "Заказы, спецификации и рекламации клиентского кабинета.",
     "supportchat": "FAQ чата, расписание и служебные настройки поддержки.",
     "supportchat-messages": "Входящие диалоги с сайта, Telegram и мессенджеров.",
     "analytics": "Посещаемость, страницы и сводки сайта.",
@@ -49,6 +50,7 @@ _APP_ICONS: dict[str, str] = {
     "leads": "inbox",
     "catalog": "inventory_2",
     "crm": "groups",
+    "cabinet": "orders",
     "supportchat": "forum",
     "supportchat-messages": "chat",
     "analytics": "monitoring",
@@ -76,6 +78,7 @@ _SECTION_LABELS: dict[str, str] = {
 _APP_SECTIONS: dict[str, str] = {
     "leads": "work",
     "crm": "work",
+    "cabinet": "work",
     "supportchat": "support",
     "supportchat-messages": "work",
     "catalog": "catalog",
@@ -126,6 +129,50 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
             "icon": "event_note",
             "section": "work",
             "description": "Звонки, задачи и заметки по клиентам.",
+        },
+        {
+            "model": "call",
+            "title": "Звонки",
+            "icon": "call",
+            "section": "work",
+            "description": "Телефония Mango: журнал вызовов и записи разговоров.",
+        },
+        {
+            "model": "quote",
+            "title": "КП",
+            "icon": "request_quote",
+            "section": "work",
+            "description": "Коммерческие предложения по заявкам.",
+        },
+        {
+            "model": "clientdocument",
+            "title": "Документы",
+            "icon": "description",
+            "section": "work",
+            "description": "Файлы клиентов: счёта, УПД, спецификации.",
+        },
+        {
+            "model": "company",
+            "title": "Компании",
+            "icon": "domain",
+            "section": "work",
+            "description": "Юрлица клиентов и их сотрудники.",
+        },
+    ),
+    "cabinet": (
+        {
+            "model": "order",
+            "title": "Заказы",
+            "icon": "orders",
+            "section": "work",
+            "description": "Заказы из согласованных КП, статусы готовности.",
+        },
+        {
+            "model": "rmacase",
+            "title": "Рекламации",
+            "icon": "report",
+            "section": "work",
+            "description": "RMA-обращения клиентов из кабинета.",
         },
     ),
     "catalog": (
@@ -276,14 +323,37 @@ _CUSTOM_APP_ROWS: dict[str, dict[str, str]] = {
     },
 }
 
+# Extra flat link rows next to promoted models (custom views, not changelists).
+_EXTRA_LINK_ROWS: dict[str, tuple[dict[str, str], ...]] = {
+    "leads": (
+        {
+            "id": "leads-stats",
+            "title": "Статистика заявок",
+            "icon": "bar_chart",
+            "url_name": "admin:leads_lead_stats",
+            "perm": "leads.view_lead",
+            "section": "work",
+            "description": "SLA, воронка и обработка заявок менеджерами.",
+        },
+    ),
+}
+
 # Row order inside each section; rows absent from the list sink to the end.
 _ROW_ORDER: dict[str, tuple[str, ...]] = {
     "work": (
         "leads-lead",
+        "leads-stats",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",
         "crm-activity",
+        "crm-call",
+        "crm-quote",
+        "crm-clientdocument",
+        "crm-company",
+        "cabinet-order",
+        "cabinet-rmacase",
+        "cabinet-speclist",
     ),
     "catalog": (
         "catalog-sku",
@@ -441,6 +511,7 @@ def _app_rows(request: HttpRequest) -> list[dict[str, Any]]:
             if not items:
                 continue
         promoted, items = _promoted_rows(request, app_label, items)
+        promoted.extend(_extra_link_rows(request, app_label))
         rows.extend(promoted)
         if not items:
             continue
@@ -498,6 +569,27 @@ def _promoted_rows(
             ),
         )
     return rows, remaining
+
+
+def _extra_link_rows(request: HttpRequest, app_label: str) -> list[dict[str, Any]]:
+    """Custom-view link rows (e.g. lead stats) alongside promoted models."""
+    rows: list[dict[str, Any]] = []
+    for entry in _EXTRA_LINK_ROWS.get(app_label, ()):
+        if not request.user.has_perm(entry["perm"]):
+            continue
+        rows.append(
+            _link_row(
+                request,
+                row_id=entry["id"],
+                title=entry["title"],
+                icon=entry["icon"],
+                style=app_label,
+                url=reverse(entry["url_name"]),
+                section=entry["section"],
+                description=entry.get("description", ""),
+            ),
+        )
+    return rows
 
 
 def _custom_app_row(request: HttpRequest, app_label: str) -> dict[str, Any] | None:

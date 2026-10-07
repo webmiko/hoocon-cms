@@ -64,6 +64,7 @@ docker-compose.local.yml
 # Загрузки (media) и collectstatic
 media/
 backend/media/
+backend/private_media/
 backend/staticfiles/
 
 # Frontend build artifacts

@@ -10,6 +10,8 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminEmailInputWidget, UnfoldAdminTextInputWidget
 
+from accounts.models import StaffMailbox
+
 
 def admin_email_otp_enabled() -> bool:
     """True when Admin login uses one-time codes emailed to staff."""
@@ -178,3 +180,21 @@ class StaffUserChangeForm(UserChangeForm):
             user.save()
             self.save_m2m()
         return user
+
+
+class StaffMailboxForm(forms.ModelForm):
+    """Mailbox inline: password masked; empty input keeps the stored one."""
+
+    class Meta:
+        model = StaffMailbox
+        fields = "__all__"
+        widgets = {
+            "imap_password": forms.PasswordInput(render_value=False),
+        }
+
+    def clean_imap_password(self) -> str:
+        """Keep the stored password when the field is submitted empty."""
+        value = (self.cleaned_data.get("imap_password") or "").strip()
+        if not value and self.instance.pk:
+            return self.instance.imap_password
+        return value

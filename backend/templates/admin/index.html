@@ -16,20 +16,6 @@
           · {{ RELEASE_LABEL }}
         </p>
       </div>
-      <nav class="hoocon-dash__quick" aria-label="Быстрые ссылки">
-        {% if hoocon_dashboard.links.leads %}
-          <a href="{{ hoocon_dashboard.links.leads }}">Заявки</a>
-        {% endif %}
-        {% if hoocon_dashboard.links.leads_stats %}
-          <a href="{{ hoocon_dashboard.links.leads_stats }}">Статистика заявок</a>
-        {% endif %}
-        {% if hoocon_dashboard.links.analytics %}
-          <a href="{{ hoocon_dashboard.links.analytics }}">Аналитика сайта</a>
-        {% endif %}
-        {% if hoocon_dashboard.links.clients %}
-          <a href="{{ hoocon_dashboard.links.clients }}">Клиенты</a>
-        {% endif %}
-      </nav>
     </header>
 
     {% if hoocon_phone_settings %}

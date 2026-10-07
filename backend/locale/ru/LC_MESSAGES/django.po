@@ -51,3 +51,255 @@ msgstr "Сбросить все фильтры"
 
 msgid "Search apps and models..."
 msgstr "Поиск приложений и моделей…"
+
+# ── django-unfold UI (нет русского каталога в пакете) ──
+
+msgid "Add"
+msgstr "Добавить"
+
+msgid "Add %(name)s"
+msgstr "Добавить %(name)s"
+
+msgid "Add another %(model)s"
+msgstr "Добавить ещё %(model)s"
+
+msgid "Add row"
+msgstr "Добавить строку"
+
+msgid "All applications"
+msgstr "Все приложения"
+
+msgid "Are you sure you want to delete the selected %(objects_name)s? All of the following objects and their related items will be deleted:"
+msgstr "Удалить выбранные %(objects_name)s? Будут удалены все перечисленные объекты и связанные с ними элементы:"
+
+msgid "Are you sure you want to delete the %(object_name)s \"%(escaped_object)s\"? All of the following related items will be deleted:"
+msgstr "Удалить %(object_name)s «%(escaped_object)s»? Будут удалены все связанные элементы:"
+
+msgid "Available shortcuts"
+msgstr "Доступные сочетания клавиш"
+
+msgid "By %(filter_title)s"
+msgstr "По «%(filter_title)s»"
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Change"
+msgstr "Изменить"
+
+msgid "Change password"
+msgstr "Сменить пароль"
+
+msgid "Change selected %(model)s"
+msgstr "Изменить выбранные %(model)s"
+
+msgid "Changelist shortcuts"
+msgstr "Сочетания клавиш списка"
+
+msgid "Clear"
+msgstr "Очистить"
+
+msgid "Click to cancel"
+msgstr "Нажмите, чтобы отменить"
+
+msgid "Click to download"
+msgstr "Нажмите, чтобы скачать"
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "Command tool shortcuts"
+msgstr "Сочетания клавиш командной панели"
+
+msgid "Create new record"
+msgstr "Создать запись"
+
+msgid "Dark"
+msgstr "Тёмная"
+
+msgid "Delete"
+msgstr "Удалить"
+
+msgid "Delete selected %(model)s"
+msgstr "Удалить выбранные %(model)s"
+
+msgid "Deleting the selected %(objects_name)s would require deleting the following protected related objects:"
+msgstr "Удаление выбранных %(objects_name)s потребует удаления следующих защищённых связанных объектов:"
+
+msgid "Deleting the selected %(objects_name)s would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Удаление выбранных %(objects_name)s приведёт к удалению связанных объектов, но у вашей учётной записи нет права удалять следующие типы объектов:"
+
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would require deleting the following protected related objects:"
+msgstr "Удаление %(object_name)s «%(escaped_object)s» потребует удаления следующих защищённых связанных объектов:"
+
+msgid "Deleting the %(object_name)s '%(escaped_object)s' would result in deleting related objects, but your account doesn't have permission to delete the following types of objects:"
+msgstr "Удаление %(object_name)s «%(escaped_object)s» приведёт к удалению связанных объектов, но у вашей учётной записи нет права удалять следующие типы объектов:"
+
+msgid "False"
+msgstr "Нет"
+
+msgid "General"
+msgstr "Общие"
+
+msgid "Global shortcuts"
+msgstr "Общие сочетания клавиш"
+
+msgid "Go back"
+msgstr "Назад"
+
+msgid "Light"
+msgstr "Светлая"
+
+msgid "Log in again"
+msgstr "Войти снова"
+
+msgid "Log out"
+msgstr "Выйти"
+
+msgid "Models in the %(name)s application"
+msgstr "Модели приложения «%(name)s»"
+
+msgid "Navigate"
+msgstr "Перейти"
+
+msgid "Next"
+msgstr "Вперёд"
+
+msgid "No data"
+msgstr "Нет данных"
+
+msgid "No results found"
+msgstr "Ничего не найдено"
+
+msgid "No, take me back"
+msgstr "Нет, вернуться"
+
+msgid "Open command tool"
+msgstr "Открыть командную панель"
+
+msgid "Open selection"
+msgstr "Открыть выбранное"
+
+msgid "Open selection in new tab"
+msgstr "Открыть выбранное в новой вкладке"
+
+msgid "Open shortcuts list"
+msgstr "Открыть список сочетаний клавиш"
+
+msgid "Previous"
+msgstr "Назад"
+
+msgid "Recent actions"
+msgstr "Последние действия"
+
+msgid "Recent searches"
+msgstr "Недавние поиски"
+
+msgid "Record picture"
+msgstr "Изображение записи"
+
+msgid "Reset filters"
+msgstr "Сбросить фильтры"
+
+msgid "Run"
+msgstr "Выполнить"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Save and add another"
+msgstr "Сохранить и добавить другой объект"
+
+msgid "Save and continue editing"
+msgstr "Сохранить и продолжить редактирование"
+
+msgid "Save and view"
+msgstr "Сохранить и просмотреть"
+
+msgid "Save as new"
+msgstr "Сохранить как новый объект"
+
+msgid "Select"
+msgstr "Выбрать"
+
+msgid "Select all %(total_count)s %(module_name)s"
+msgstr "Выбрать все %(total_count)s %(module_name)s"
+
+msgid "Sorting priority: %(priority_number)s"
+msgstr "Приоритет сортировки: %(priority_number)s"
+
+msgid "System"
+msgstr "Система"
+
+msgid "Thanks for spending some quality time with the web site today."
+msgstr "Спасибо, что уделили время работе с сайтом."
+
+msgid "This item will be deleted."
+msgstr "Запись будет удалена."
+
+msgid "This page yielded into no results. Create a new item or reset your filters."
+msgstr "На этой странице нет результатов. Создайте запись или сбросьте фильтры."
+
+msgid "Toggle dark/light mode"
+msgstr "Переключить тёмную/светлую тему"
+
+msgid "Toggle filter"
+msgstr "Показать/скрыть фильтры"
+
+msgid "Toggle password visibility"
+msgstr "Показать/скрыть пароль"
+
+msgid "Toggle sidebar"
+msgstr "Показать/скрыть боковую панель"
+
+msgid "True"
+msgstr "Да"
+
+msgid "Unknown"
+msgstr "Неизвестно"
+
+msgid "View"
+msgstr "Открыть"
+
+msgid "View selected %(model)s"
+msgstr "Открыть выбранные %(model)s"
+
+msgid "View site"
+msgstr "Открыть сайт"
+
+msgid "Yes, I’m sure"
+msgstr "Да, уверен"
+
+msgid "You have been successfully logged out from the administration"
+msgstr "Вы вышли из панели управления"
+
+msgid "%(full_result_count)s total"
+msgstr "Всего: %(full_result_count)s"
+
+msgid "entry"
+msgid_plural "entries"
+msgstr[0] "запись"
+msgstr[1] "записи"
+msgstr[2] "записей"
+msgstr[3] "записей"
+
+msgid "%(counter)s result"
+msgid_plural "%(counter)s results"
+msgstr[0] "%(counter)s результат"
+msgstr[1] "%(counter)s результата"
+msgstr[2] "%(counter)s результатов"
+msgstr[3] "%(counter)s результатов"
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Исправьте ошибку ниже."
+msgstr[1] "Исправьте ошибки ниже."
+msgstr[2] "Исправьте ошибки ниже."
+msgstr[3] "Исправьте ошибки ниже."
+
+msgid "Found <span class=\"font-medium text-important\">%(counter)s</span> result in %(time)s seconds "
+msgid_plural "Found <span class=\"font-medium text-important\">%(counter)s</span> results in %(time)s seconds"
+msgstr[0] "Найден <span class=\"font-medium text-important\">%(counter)s</span> результат за %(time)s с "
+msgstr[1] "Найдено <span class=\"font-medium text-important\">%(counter)s</span> результата за %(time)s с "
+msgstr[2] "Найдено <span class=\"font-medium text-important\">%(counter)s</span> результатов за %(time)s с "
+msgstr[3] "Найдено <span class=\"font-medium text-important\">%(counter)s</span> результатов за %(time)s с "

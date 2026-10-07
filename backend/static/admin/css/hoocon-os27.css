@@ -95,52 +95,20 @@ body.hoocon-os27 .hoocon-dash__sub {
   color: var(--os27-quiet);
 }
 
-/* iOS-style grouped quick links (dashboard). */
-body.hoocon-os27 .hoocon-dash__quick {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  min-width: min(100%, 20rem);
-  border-radius: var(--os27-group-radius);
-  border: 1px solid var(--os27-hairline);
-  background: var(--os27-surface);
-  overflow: hidden;
-}
-
-body.hoocon-os27 .hoocon-dash__quick a {
-  justify-content: space-between;
-  min-height: var(--os27-row-min-h);
-  padding: 0.65rem 1rem;
-  border: none;
-  border-radius: 0;
-  border-bottom: 1px solid var(--os27-hairline);
-  background: transparent;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 400;
-}
-
-body.hoocon-os27 .hoocon-dash__quick a:last-child {
-  border-bottom: none;
-}
-
-body.hoocon-os27 .hoocon-dash__quick a:hover {
-  background: var(--os27-surface-muted);
-  color: var(--os27-accent);
-}
-
 /* «Разделы» launcher: grouped link tiles on the dashboard. */
 body.hoocon-os27 .hoocon-nav-sections {
   margin-bottom: 1.25rem;
 }
 
 body.hoocon-os27 .hoocon-nav-sections__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1rem;
+  /* Masonry: group height follows its content, no stretched rows. */
+  columns: 15rem;
+  column-gap: 1rem;
 }
 
 body.hoocon-os27 .hoocon-nav-sections__group {
+  break-inside: avoid;
+  margin-bottom: 1rem;
   border-radius: var(--os27-group-radius);
   border: 1px solid var(--os27-hairline);
   background: var(--os27-surface);
@@ -851,10 +819,6 @@ body.hoocon-os27.change-form .selector select {
     margin-bottom: var(--os27-group-gap);
   }
 
-  body.hoocon-os27 .hoocon-dash__quick {
-    min-width: 14rem;
-  }
-
   body.hoocon-os27 .hoocon-dash__grid,
   body.hoocon-os27 .hoocon-dash__cards {
     gap: var(--os27-group-gap);
@@ -1054,11 +1018,6 @@ body.hoocon-os27.change-form .selector select {
   body.hoocon-os27.hoocon-phone-ready .hoocon-dash__sub {
     font-size: 0.9375rem;
     line-height: 1.35;
-  }
-
-  body.hoocon-os27 .hoocon-dash__quick,
-  body.hoocon-os27.hoocon-phone-ready .hoocon-dash__quick {
-    min-width: 100%;
   }
 
   body.hoocon-os27 #content-main > h1,

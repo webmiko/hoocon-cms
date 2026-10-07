@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 
 from catalog.docs_views import DocsFamilyZipView, DocsHubListView
 from catalog.views import (
+    AnalogLookupView,
     CategoryViewSet,
     CompareViewSet,
     FacetViewSet,
@@ -25,6 +26,7 @@ router.register("skus", SKUViewSet, basename="catalog-sku")
 sku_files = ProductFileViewSet.as_view({"get": "list", "post": "create"})
 
 urlpatterns = [
+    path("analogs/", AnalogLookupView.as_view(), name="catalog-analogs"),
     path("quiz-analogs/", QuizAnalogView.as_view(), name="catalog-quiz-analogs"),
     path("docs/", DocsHubListView.as_view(), name="catalog-docs"),
     path(

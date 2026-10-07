@@ -111,6 +111,16 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             {"fields": ("show_prices_on_site",)},
         ),
         (
+            "Кабинет клиента",
+            {
+                "fields": ("cabinet_enabled",),
+                "description": (
+                    "Пока выключено, кабинет полностью скрыт: API возвращает 404, "
+                    "страницы /account, /login, /register ведут на главную."
+                ),
+            },
+        ),
+        (
             "Заявки с сайта",
             {
                 "fields": ("lead_routing_mode", "lead_rr_last_user"),

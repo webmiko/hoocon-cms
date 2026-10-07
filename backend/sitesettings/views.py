@@ -32,5 +32,6 @@ class PublicSettingsView(APIView):
             {
                 "yandex_metrika_id": ym.strip(),
                 "ga4_measurement_id": ga.strip(),
+                "cabinet_enabled": site.cabinet_enabled,
             }
         )

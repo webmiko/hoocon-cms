@@ -598,3 +598,83 @@ class ProductImage(models.Model):
                 kwargs["update_fields"] = [*update_fields, "image_card"]
 
         super().save(*args, **kwargs)  # type: ignore[arg-type]
+
+
+class AnalogMap(models.Model):
+    """Карта аналогов: сторонний бренд + артикул → Hoocon SKU (ЛК-10).
+
+    Редактируется в Admin (роль «Инженер ОВК» — по групповой матрице);
+    публичный подбор идёт через ``analogs_find`` в catalog.services.
+    ``foreign_code`` нормализуется (upper, без пробелов/дефисов), чтобы
+    матчить написания вида «NM24A-SR» / «nm24a sr».
+    """
+
+    brand = models.CharField(
+        "сторонний бренд",
+        max_length=100,
+        db_index=True,
+        help_text="Напр. Belimo, Siemens, Danfoss.",
+    )
+    foreign_code = models.CharField(
+        "артикул аналога",
+        max_length=100,
+        help_text="Как у производителя-аналога (регистр не важен).",
+    )
+    foreign_code_key = models.CharField(
+        "ключ артикула",
+        max_length=100,
+        editable=False,
+        db_index=True,
+        help_text="Нормализованный ключ совпадения (верхний регистр, без пробелов/дефисов).",
+    )
+    sku = models.ForeignKey(
+        "SKU",
+        on_delete=models.CASCADE,
+        related_name="analog_maps",
+        verbose_name="наш артикул (SKU)",
+    )
+    torque_nm = models.PositiveSmallIntegerField(
+        "момент, Нм",
+        null=True,
+        blank=True,
+    )
+    voltage = models.CharField("питание", max_length=30, blank=True, default="")
+    control = models.CharField(
+        "управление",
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Напр. 3-точечное, 0-10В, 4-20мА.",
+    )
+    spring_return = models.BooleanField(
+        "пружинный возврат",
+        default=False,
+    )
+    note = models.CharField("примечание", max_length=300, blank=True, default="")
+    is_active = models.BooleanField("активна", default=True, db_index=True)
+    created_at = models.DateTimeField("создано", auto_now_add=True)
+    updated_at = models.DateTimeField("обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "аналог стороннего артикула"
+        verbose_name_plural = "карта аналогов"
+        ordering = ("brand", "foreign_code")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("brand", "foreign_code_key"),
+                name="catalog_analogmap_brand_code_uniq",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.brand} {self.foreign_code} → {self.sku_id}"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Normalize foreign_code_key from brand + foreign_code."""
+        self.foreign_code_key = normalize_analog_code(self.foreign_code)
+        super().save(*args, **kwargs)  # type: ignore[arg-type]
+
+
+def normalize_analog_code(raw: str) -> str:
+    """Normalize a foreign article code for matching (upper, alnum only)."""
+    return "".join(ch for ch in (raw or "").upper() if ch.isalnum())

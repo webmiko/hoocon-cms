@@ -40,6 +40,23 @@ def test_admin_index_shows_dashboard_for_superuser() -> None:
 
 
 @pytest.mark.django_db
+def test_admin_index_has_no_quick_links_strip() -> None:
+    """Quick-links strip removed; lead stats live in the sections menu."""
+    admin_user = User.objects.create_superuser(
+        username="dash-quick",
+        email="dash-quick@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    response = client.get(reverse("admin:index"))
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "hoocon-dash__quick" not in html
+    assert "/admin/leads/lead/stats/" in html
+
+
+@pytest.mark.django_db
 def test_build_admin_dashboard_payload_keys() -> None:
     """Service returns expected dashboard sections for staff."""
     from django.test import RequestFactory

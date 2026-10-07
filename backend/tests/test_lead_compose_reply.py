@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,49 @@ from crm.models import Client as CrmClient
 from crm.models import EmailMessage, EmailStatus
 from crm.services import create_lead_reply_email
 from leads.models import Lead, LeadItem
+
+_MAIL_COMPOSE_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-mail-compose.css"
+_EXTRAS_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
+
+
+def test_mail_compose_headline_uses_text_color_not_surface() -> None:
+    """Headline text must not use --os27-surface (white on light theme canvas)."""
+    css = _MAIL_COMPOSE_CSS.read_text(encoding="utf-8")
+    block = css.split(".hoocon-mail-compose__headline {")[1].split("}")[0]
+    assert "color: var(--os27-surface" not in block
+    assert "color: inherit" in block
+
+
+def test_hoocon_toggle_css_replaces_checkmark_with_switch() -> None:
+    """Global extras CSS restyles .hoocon-toggle checkboxes as on/off switches."""
+    css = _EXTRAS_CSS.read_text(encoding="utf-8")
+    block = css.split('input[type="checkbox"].hoocon-toggle {')[1].split("}")[0]
+    assert "appearance: none" in block
+    checked = css.split('input[type="checkbox"].hoocon-toggle:checked {')[1].split("}")[0]
+    assert "var(--os27-accent" in checked
+    assert 'input[type="checkbox"].hoocon-toggle::after' in css
+    assert "translateX" in css
+
+
+@pytest.mark.django_db
+def test_compose_reply_send_now_renders_as_toggle(django_user_model) -> None:
+    """send_now checkbox carries hoocon-toggle class for the switch skin."""
+    user = django_user_model.objects.create_superuser(
+        username="lead-toggle",
+        email="mgr@hoocon.ru",
+        password="x",
+    )
+    lead = Lead.objects.create(
+        name="Клиент",
+        email="client@example.com",
+        company="ООО Тест",
+    )
+    client = Client()
+    client.force_login(user)
+    url = reverse("admin:leads_lead_compose_reply", args=[lead.pk])
+    html = client.get(url).content.decode()
+    assert 'type="checkbox"' in html
+    assert 'class="hoocon-toggle"' in html
 
 
 @pytest.mark.django_db

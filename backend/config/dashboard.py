@@ -74,12 +74,9 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
     links: dict[str, str] = {}
     if can_leads:
         links["leads"] = reverse("admin:leads_lead_changelist")
-        links["leads_stats"] = reverse("admin:leads_lead_stats")
     if can_crm:
         links["clients"] = reverse("admin:crm_client_changelist")
         links["activities"] = reverse("admin:crm_activity_changelist")
-    if can_analytics:
-        links["analytics"] = reverse("admin:analytics_pagedailystat_stats")
 
     return {
         "hoocon_dashboard": {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from django.conf import settings
@@ -18,6 +19,9 @@ from crm.models import (
     EmailMessage,
     EmailStatus,
     EmailTemplate,
+    Quote,
+    QuoteItem,
+    QuoteStatus,
 )
 from leads.models import Lead
 
@@ -141,6 +145,41 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         return client
 
 
+def get_or_create_client_by_email(
+    *,
+    email: str,
+    name: str = "",
+    phone: str = "",
+    company: str = "",
+) -> Client:
+    """Find or create the CRM card by email (used by client auth linking).
+
+    Same normalization as the lead path; fills only empty fields.
+    """
+    email = normalize_client_email(email)
+    with transaction.atomic():
+        client, created = Client.objects.get_or_create(
+            email=email,
+            defaults={
+                "name": normalize_client_name(name) or email,
+                "phone": (phone or "").strip(),
+                "company": normalize_client_company(company),
+            },
+        )
+        client = Client.objects.select_for_update().get(pk=client.pk)
+        if not created:
+            updated = False
+            if not client.phone and phone:
+                client.phone = phone.strip()
+                updated = True
+            if not client.company and company:
+                client.company = normalize_client_company(company)
+                updated = True
+            if updated:
+                client.save()
+        return client
+
+
 def _merge_lead_contact_into_client(client: Client, lead: Lead) -> Client:
     """Attach lead contact data to an existing card without duplicating it.
 
@@ -201,6 +240,26 @@ def enqueue_crm_email(email_id: int) -> None:
     transaction.on_commit(_enqueue)
 
 
+def _personal_smtp_mailbox(user: Any) -> Any | None:
+    """Author's StaffMailbox ready for SMTP, or None → общий env-ящик.
+
+    Ящик считается готовым к отправке, когда он включён и заполнены
+    адрес, пароль приложения и SMTP-сервер.
+    """
+    if user is None:
+        return None
+    mailbox = getattr(user, "mailbox", None)
+    if (
+        mailbox is not None
+        and mailbox.is_enabled
+        and (mailbox.smtp_host or "").strip()
+        and (mailbox.imap_user or "").strip()
+        and (mailbox.imap_password or "")
+    ):
+        return mailbox
+    return None
+
+
 def create_outbound_email(
     *,
     client: Client,
@@ -211,6 +270,7 @@ def create_outbound_email(
     author: AbstractBaseUser | None = None,
     reply_to_email: str | None = None,
     send_now: bool = True,
+    attachments: Iterable[tuple[str, str, bytes]] | None = None,
 ) -> EmailMessage:
     """Create an outbound EmailMessage and optionally queue send.
 
@@ -223,12 +283,21 @@ def create_outbound_email(
         author: staff User who composed the message.
         reply_to_email: optional Reply-To header (manager mailbox).
         send_now: enqueue Celery send after commit.
+        attachments: optional ``(filename, content_type, bytes)`` rows stored
+            as ``EmailAttachment`` (private media) and sent with the email.
 
     Returns:
         Created EmailMessage (status DRAFT or QUEUED).
     """
+    from django.core.files.base import ContentFile
+
+    from crm.models import EmailAttachment
+
     from_addr = getattr(settings, "DEFAULT_FROM_EMAIL", "") or "webmaster@localhost"
     created_by = author if author is not None and author.is_authenticated else None
+    mailbox = _personal_smtp_mailbox(created_by)
+    if mailbox is not None:
+        from_addr = (mailbox.imap_user or "").strip() or from_addr
     reply_to = (reply_to_email or "").strip()
     msg = EmailMessage.objects.create(
         client=client,
@@ -238,10 +307,19 @@ def create_outbound_email(
         to_email=(to_email or client.email).strip(),
         from_email=from_addr,
         reply_to_email=reply_to,
+        mailbox=mailbox,
         subject=subject.strip(),
         body=body.strip(),
         created_by=created_by,  # type: ignore[misc]
     )
+    for filename, content_type, content in attachments or ():
+        EmailAttachment.objects.create(
+            email=msg,
+            filename=filename,
+            content_type=content_type,
+            size=len(content),
+            file=ContentFile(content, name=filename),
+        )
     Activity.objects.create(
         client=client,
         lead=lead,
@@ -372,7 +450,9 @@ def scope_emails_for_manager(
         return queryset.none()
 
     client_ids = scope_clients_for_manager(Client.objects.all(), user).values("pk")
-    return queryset.filter(client_id__in=client_ids)
+    return queryset.filter(
+        Q(client_id__in=client_ids) | Q(mailbox__user=user),
+    ).distinct()
 
 
 def get_active_email_template(template_id: str | int | None) -> EmailTemplate | None:
@@ -433,3 +513,119 @@ def render_email_template(
         subject = subject.replace(token, value)
         body = body.replace(token, value)
     return subject.strip(), body.strip()
+
+
+def create_quote_from_lead(lead: Lead, *, author: Any) -> tuple[Quote, bool]:
+    """Create a draft Quote prefilled from the lead's items.
+
+    Кнопка «Создать КП» на карточке заявки. Если у заявки уже есть
+    открытое КП (черновик/выдано) — возвращает его, дубли не создаются.
+    Без карточки клиента — привязывает по email через ``link_lead_to_client``.
+
+    Args:
+        lead: исходная заявка.
+        author: менеджер, выписывающий КП.
+
+    Returns:
+        ``(quote, created)`` — ``created`` False при переиспользовании
+        открытого КП.
+    """
+    open_quote = lead.quotes.filter(status__in=(QuoteStatus.DRAFT, QuoteStatus.SENT)).order_by("-created_at").first()
+    if open_quote is not None:
+        return open_quote, False
+    client = link_lead_to_client(lead)
+    with transaction.atomic():
+        quote = Quote.objects.create(
+            client=client,
+            lead=lead,
+            created_by=author,
+            status=QuoteStatus.DRAFT,
+        )
+        items = [
+            QuoteItem(
+                quote=quote,
+                sku=item.sku,
+                sku_code=item.sku_code,
+                quantity=item.quantity,
+                sort_order=item.sort_order,
+            )
+            for item in lead.items.all()
+        ]
+        if items:
+            QuoteItem.objects.bulk_create(items)
+    return quote, True
+
+
+def merge_clients(target: Client, sources: list[Client], *, actor: Any = None) -> dict[str, int]:
+    """Merge duplicate client cards into ``target`` (same company, diff emails).
+
+    Все связи переносятся на целевую карточку: заявки, активности, письма,
+    КП, документы, заказы, RMA, диалоги поддержки, членства в компаниях.
+    Пустые поля цели заполняются из источников; привязка аккаунта ЛК
+    сохраняется (у цели приоритет, иначе берётся первый найденный).
+    Исходные карточки деактивируются (``is_active=False``), не удаляются —
+    email уникален, а история перенесена.
+
+    Args:
+        target: целевая карточка (остаётся).
+        sources: карточки-дубли (минимум одна).
+        actor: staff-пользователь для записи в таймлайн.
+
+    Returns:
+        Счётчики перенесённых связей по типам.
+    """
+    from cabinet.models import Order, RmaCase
+    from supportchat.models import Conversation
+
+    moved = {
+        "leads": 0,
+        "activities": 0,
+        "emails": 0,
+        "quotes": 0,
+        "documents": 0,
+        "orders": 0,
+        "rma_cases": 0,
+        "conversations": 0,
+    }
+    emails_log: list[str] = []
+    with transaction.atomic():
+        for source in sources:
+            if source.pk == target.pk:
+                continue
+            moved["leads"] += source.leads.update(client=target)
+            moved["activities"] += source.activities.update(client=target)
+            moved["emails"] += source.emails.update(client=target)
+            moved["quotes"] += source.quotes.update(client=target)
+            moved["documents"] += source.documents.update(client=target)
+            moved["orders"] += Order.objects.filter(client=source).update(client=target)
+            moved["rma_cases"] += RmaCase.objects.filter(client=source).update(client=target)
+            moved["conversations"] += Conversation.objects.filter(client=source).update(
+                client=target,
+            )
+            source.company_memberships.update(client=target)
+            if source.account_id and target.account_id is None:
+                target.account_id = source.account_id
+                source.account = None
+                source.save(update_fields=["account", "updated_at"])
+            # Fill empty target fields from the richest source.
+            for field in ("name", "phone", "company"):
+                if not getattr(target, field) and getattr(source, field):
+                    setattr(target, field, getattr(source, field))
+            if source.company_ref_id and target.company_ref_id is None:
+                target.company_ref_id = source.company_ref_id
+            if source.assignee_id and target.assignee_id is None:
+                target.assignee_id = source.assignee_id
+            if source.notes:
+                target.notes = f"{target.notes}\n[{source.email}] {source.notes}".strip()
+            emails_log.append(source.email)
+            source.is_active = False
+            source.save(update_fields=["is_active", "updated_at"])
+        target.save()
+        Activity.objects.create(
+            client=target,
+            activity_type=ActivityType.OTHER,
+            subject="Объединение карточек",
+            body=f"Перенесены связи с карточек: {', '.join(emails_log)}",
+            author=actor if actor is not None and actor.is_authenticated else None,  # type: ignore[misc]
+        )
+    return moved

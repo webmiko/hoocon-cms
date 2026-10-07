@@ -14,6 +14,8 @@
   ];
 
   const CHECKBOX_LABEL = "Выберите запись";
+  /* Tabular inline delete cell — Unfold renders an empty <th> for it. */
+  const DELETE_LABEL = "Удалить";
   /* Phones always use cards; wider screens stack when the table cannot fit. */
   const STACK_MQ = "(max-width: 767px)";
   const STACKED_CLASS = "hoocon-admin-table-stacked";
@@ -77,6 +79,11 @@
     Array.from(row.cells).forEach((cell, index) => {
       if (cell.classList.contains("action-checkbox")) {
         cell.setAttribute("data-label", CHECKBOX_LABEL);
+        return;
+      }
+
+      if (cell.classList.contains("delete")) {
+        cell.setAttribute("data-label", DELETE_LABEL);
         return;
       }
 

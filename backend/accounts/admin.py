@@ -16,11 +16,19 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import ActionForm
 
-from accounts.forms import StaffUserChangeForm, StaffUserCreationForm
-from accounts.models import PasskeyCredential, StaffMaxProfile, StaffTelegramProfile
+from accounts.forms import StaffMailboxForm, StaffUserChangeForm, StaffUserCreationForm
+from accounts.models import (
+    ClientAccount,
+    PasskeyCredential,
+    SocialAccount,
+    StaffMailbox,
+    StaffMaxProfile,
+    StaffTelegramProfile,
+    StaffVpbxProfile,
+)
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
 
@@ -49,6 +57,43 @@ class StaffMaxProfileInline(admin.StackedInline):
     verbose_name_plural = "MAX сотрудника"
 
 
+class StaffMailboxInline(admin.StackedInline):
+    """Personal IMAP mailbox: CRM-mail fetch source for this manager."""
+
+    model = StaffMailbox
+    form = StaffMailboxForm
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = (
+        "imap_user",
+        "imap_password",
+        "folder",
+        "smtp_host",
+        "smtp_port",
+        "smtp_use_ssl",
+        "is_enabled",
+        "last_uid",
+        "last_run_at",
+        "last_error",
+    )
+    readonly_fields = ("last_uid", "last_run_at", "last_error")
+    verbose_name = "Почта (IMAP/SMTP)"
+    verbose_name_plural = "Почта менеджера (IMAP/SMTP)"
+
+
+class StaffVpbxProfileInline(admin.StackedInline):
+    """Mango VPBX extension — binds inbound/outbound calls to this manager."""
+
+    model = StaffVpbxProfile
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = ("extension", "is_enabled")
+    verbose_name = "Добавочный (Mango)"
+    verbose_name_plural = "Добавочный сотрудника (Mango)"
+
+
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Staff users — login email, display name, Unfold Add button."""
 
@@ -57,7 +102,12 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     show_add_link = True
     form = StaffUserChangeForm
     add_form = StaffUserCreationForm
-    inlines = (StaffTelegramProfileInline, StaffMaxProfileInline)
+    inlines = (
+        StaffTelegramProfileInline,
+        StaffMaxProfileInline,
+        StaffMailboxInline,
+        StaffVpbxProfileInline,
+    )
     list_display = (
         "email",
         "first_name",
@@ -66,6 +116,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         "is_superuser",
         "telegram_chat_short",
         "max_user_short",
+        "mailbox_short",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
     search_fields = ("email", "first_name", "username", "last_name")
@@ -220,8 +271,29 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             return f"{uid} (выкл)"
         return uid
 
+    @admin.display(description="Почта (IMAP)")
+    def mailbox_short(self, obj: User) -> str:
+        """Show configured mailbox on the user list."""
+        mailbox = getattr(obj, "mailbox", None)
+        if mailbox is None:
+            return "—"
+        addr = (mailbox.imap_user or "").strip()
+        if not addr:
+            return "—"
+        if not mailbox.is_enabled:
+            return f"{addr} (выкл)"
+        return addr
+
     def get_queryset(self, request: HttpRequest) -> Any:
-        return super().get_queryset(request).select_related("telegram_profile", "max_profile")
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "telegram_profile",
+                "max_profile",
+                "mailbox",
+            )
+        )
 
     @admin.display(description="Резервные коды")
     def recovery_codes_summary(self, obj: User) -> str:
@@ -369,3 +441,31 @@ class PasskeyCredentialAdmin(ModelAdmin):
 
     def has_module_permission(self, request: HttpRequest) -> bool:
         return admin_passkey_enabled() and super().has_module_permission(request)
+
+
+class SocialAccountInline(TabularInline):
+    """OAuth привязки аккаунта (задел под Яндекс ID)."""
+
+    model = SocialAccount
+    extra = 0
+    fields = ("provider", "provider_user_id", "created_at")
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+
+@admin.register(ClientAccount)
+class ClientAccountAdmin(ModelAdmin):
+    """Аккаунты личного кабинета клиентов (read-mostly; пароль — только хеш)."""
+
+    list_display = ("email", "name", "auth_mode", "is_active", "email_verified_at", "created_at")
+    list_filter = ("auth_mode", "is_active")
+    search_fields = ("email", "name", "phone")
+    readonly_fields = ("password_hash", "email_verified_at", "created_at", "updated_at")
+    inlines = (SocialAccountInline,)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Аккаунты создаются через публичную регистрацию."""
+        return False
