@@ -34,9 +34,12 @@ class MangoEventsView(APIView):
 
     def post(self, request: Request) -> Response:
         """Verify signature, decode ``json``, route the event."""
-        api_key = str(request.data.get("vpbx_api_key") or "")
-        sign = str(request.data.get("sign") or "")
-        raw_json = str(request.data.get("json") or "")
+        data = request.data
+        if not isinstance(data, dict):
+            return Response({"ok": False}, status=status.HTTP_400_BAD_REQUEST)
+        api_key = str(data.get("vpbx_api_key") or "")
+        sign = str(data.get("sign") or "")
+        raw_json = str(data.get("json") or "")
 
         if not verify_mango_signature(api_key, raw_json, sign):
             logger.warning("mango_event_bad_signature")
