@@ -1,0 +1,68 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block content %}
+<nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
+  <a href="{% url 'admin:index' %}">Начало</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  <span aria-hidden="true">›</span>
+  <a href="{% url 'admin:crm_client_change' original.pk %}">{{ original }}</a>
+  <span aria-hidden="true">›</span>
+  <span>{% trans "Позвонить клиенту" %}</span>
+</nav>
+
+<div class="mb-8 max-w-2xl">
+  <h1 class="font-semibold text-font-important-light text-xl dark:text-font-important-dark">
+    {{ title }}
+  </h1>
+</div>
+
+{% if blockers %}
+  <div class="max-w-2xl mb-6">
+    <div class="bg-yellow-50 border border-yellow-200 px-4 py-3 rounded-default text-sm text-yellow-800 dark:bg-yellow-500/10 dark:border-yellow-500/20 dark:text-yellow-300">
+      <p class="font-medium mb-2">{% trans "Вызов сейчас невозможен:" %}</p>
+      <ul class="list-disc pl-5 space-y-1">
+        {% for blocker in blockers %}
+          <li>{{ blocker }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    {% component "unfold/components/button.html" with href=client_change_url variant="secondary" %}
+      {% trans "Назад к карточке" %}
+    {% endcomponent %}
+  </div>
+{% else %}
+  <div class="max-w-2xl">
+    <div class="bg-white border border-base-200 px-5 py-4 rounded-default shadow-sm dark:bg-base-900 dark:border-base-700">
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm mb-4">
+        <div>
+          <dt class="text-font-subtle-light dark:text-font-subtle-dark">{% trans "Ваш добавочный" %}</dt>
+          <dd class="font-medium text-font-important-light dark:text-font-important-dark">{{ extension }}</dd>
+        </div>
+        <div>
+          <dt class="text-font-subtle-light dark:text-font-subtle-dark">{% trans "Клиенту" %}</dt>
+          <dd class="font-medium text-font-important-light dark:text-font-important-dark">{{ original.phone }}</dd>
+        </div>
+      </dl>
+      <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">
+        {% blocktrans with phone=original.phone ext=extension %}Mango сначала позвонит на ваш добавочный {{ ext }}, вы ответите — и АТС наберёт клиента {{ phone }}. Звонок и запись разговора появятся в разделе «Звонки» и на карточке клиента.{% endblocktrans %}
+      </p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="flex flex-wrap gap-3 mt-6">
+        {% component "unfold/components/button.html" with submit=1 variant="primary" icon="call" %}
+          {% trans "Позвонить" %}
+        {% endcomponent %}
+        {% component "unfold/components/button.html" with href=client_change_url variant="secondary" %}
+          {% trans "Отмена" %}
+        {% endcomponent %}
+      </div>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}

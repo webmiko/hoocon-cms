@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n unfold %}
 
 {% block content %}
 <nav class="hoocon-admin-breadcrumbs" aria-label="Навигация">
@@ -12,31 +12,39 @@
   <span>{% trans "Импорт спецификации" %}</span>
 </nav>
 
-<h1>{{ title }}</h1>
+<div class="mb-8 max-w-2xl">
+  <h1 class="font-semibold text-font-important-light text-xl dark:text-font-important-dark">
+    {{ title }}
+  </h1>
+  <p class="mt-3 text-sm text-font-subtle-light dark:text-font-subtle-dark">
+    {% trans "Загрузите .xlsx: на первом листе нужны колонки «артикул» и «количество». Сторонние артикулы подбираются по карте аналогов; неопознанные попадут в заявку как есть." %}
+  </p>
+  <p class="mt-4">
+    {% component "unfold/components/button.html" with href=spec_template_url variant="secondary" icon="download" %}
+      {% trans "Скачать шаблон (.xlsx)" %}
+    {% endcomponent %}
+  </p>
+</div>
 
-<p class="help">
-  {% trans "Загрузите .xlsx: на первом листе нужны колонки «артикул» и «количество». Сторонние артикулы подбираются по карте аналогов; неопознанные попадут в заявку как есть." %}
-</p>
-
-<form method="post" enctype="multipart/form-data" novalidate>
+<form method="post" enctype="multipart/form-data" novalidate class="max-w-2xl">
   {% csrf_token %}
-  <fieldset class="module aligned">
-    {% for field in form %}
-      <div class="form-row">
-        {{ field.errors }}
-        {{ field.label_tag }}
-        {{ field }}
-        {% if field.help_text %}
-          <div class="help">{{ field.help_text }}</div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </fieldset>
-  <div class="submit-row">
-    <input type="submit" value="{% trans 'Импортировать' %}" class="default">
-    <a href="{% url 'admin:crm_client_change' original.pk %}" class="button cancel-link">
+
+  {% if form.errors %}
+    <div class="flex flex-col gap-4 mb-6 *:mb-0">
+      {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+      {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+    </div>
+  {% endif %}
+
+  {% include "unfold/helpers/field.html" with field=form.file %}
+
+  <div class="flex flex-wrap gap-3 mt-6">
+    {% component "unfold/components/button.html" with submit=1 variant="primary" icon="upload" %}
+      {% trans "Импортировать" %}
+    {% endcomponent %}
+    {% component "unfold/components/button.html" with href=client_change_url variant="secondary" %}
       {% trans "Отмена" %}
-    </a>
+    {% endcomponent %}
   </div>
 </form>
 {% endblock %}

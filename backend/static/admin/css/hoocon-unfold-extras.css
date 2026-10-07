@@ -3482,3 +3482,50 @@ html.dark input[type="checkbox"].hoocon-toggle {
 html.dark input[type="checkbox"].hoocon-toggle:checked {
   background: var(--os27-accent, #f87171) !important;
 }
+
+/* Client card — inline «Написать»/«Позвонить» next to email/phone inputs. */
+.hoocon-field-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hoocon-field-action > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hoocon-field-action__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-base-light, #d4d4d8);
+  border-radius: var(--hoocon-radius-btn, 8px);
+  color: var(--font-primary-light, #3f3f46);
+  background: transparent;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.hoocon-field-action__btn:hover {
+  color: var(--primary-600, #2563eb);
+  border-color: var(--primary-600, #2563eb);
+  background: rgb(37 99 235 / 0.06);
+}
+
+.hoocon-field-action__btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.dark .hoocon-field-action__btn {
+  border-color: var(--border-base-dark, #52525b);
+  color: var(--font-primary-dark, #e4e4e7);
+}
+
+.dark .hoocon-field-action__btn:hover {
+  color: var(--primary-400, #60a5fa);
+  border-color: var(--primary-400, #60a5fa);
+  background: rgb(96 165 250 / 0.1);
+}

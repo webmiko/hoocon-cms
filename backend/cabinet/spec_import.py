@@ -149,3 +149,41 @@ def create_lead_from_spec_rows(
         sum(1 for r in rows if r.sku is not None),
     )
     return lead
+
+
+def build_spec_template_xlsx() -> bytes:
+    """Build a starter .xlsx spec template matching the parser's column hints.
+
+    Header «Артикул | Наименование | Количество» попадает в подсказки
+    ``_CODE_HEADER_HINTS``/``_QTY_HEADER_HINTS``; примеры берём из реальных
+    SKU каталога (или плейсхолдер), строки без артикула парсер пропустит.
+    """
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Спецификация"
+    ws.append(["Артикул", "Наименование", "Количество"])
+    for cell in ws[1]:
+        cell.font = openpyxl.styles.Font(bold=True)
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 50
+    ws.column_dimensions["C"].width = 12
+    ws.freeze_panes = "A2"
+
+    from catalog.models import SKU
+
+    samples = list(SKU.objects.order_by("sku_code").values_list("sku_code", "name")[:2])
+    if samples:
+        for code, name in samples:
+            ws.append([code, name, 1])
+    else:
+        ws.append(["HVA-5NM", "Пример позиции — замените своим артикулом", 1])
+    ws.append(["", "Строки без артикула игнорируются при импорте.", ""])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    wb.close()
+    return buf.getvalue()

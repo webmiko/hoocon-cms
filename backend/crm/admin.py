@@ -93,7 +93,7 @@ class ActivityInline(TabularInline):
     """Timeline notes on a Client card."""
 
     model = Activity
-    extra = 1
+    extra = 0
     fields = ("activity_type", "subject", "body", "lead", "author", "created_at")
     readonly_fields = ("created_at",)
     autocomplete_fields = ("lead",)
@@ -209,11 +209,37 @@ class QuoteInline(TabularInline):
         return False
 
 
+class CallInline(TabularInline):
+    """Mango telephony log on the client card (read-only)."""
+
+    model = Call
+    extra = 0
+    fields = (
+        "direction",
+        "state",
+        "from_number",
+        "to_number",
+        "extension",
+        "talk_duration",
+        "started_at",
+    )
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    ordering = ("-started_at", "-id")
+    verbose_name = "звонок"
+    verbose_name_plural = "звонки клиента"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Calls arrive via Mango webhook — not manual add on the card."""
+        return False
+
+
 class ClientDocumentInline(TabularInline):
     """Документы карточки (ЛК-3/14): КП-счёта-УПД, private download."""
 
     model = ClientDocument
-    extra = 1
+    extra = 0
     fields = ("title", "kind", "file", "edo_status", "download_link", "created_at")
     readonly_fields = ("download_link", "created_at")
     ordering = ("-created_at",)
@@ -255,6 +281,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     inlines = (
         LeadInline,
         ActivityInline,
+        CallInline,
         EmailMessageInline,
         ConversationInline,
         QuoteInline,
@@ -262,6 +289,12 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     )
     ordering = ("email", "name", "company")
     actions = ("merge_clients_action",)
+
+    class Media:
+        """Inline «Написать»/«Позвонить» buttons next to email/phone inputs."""
+
+        js = (_versioned_static("admin/js/hoocon-client-quick-actions.js"),)
+
     fieldsets = (
         (
             "Контакт (ID = эл. почта)",
@@ -397,6 +430,16 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                 self.admin_site.admin_view(self.import_spec_view),
                 name=f"{info[0]}_{info[1]}_import_spec",
             ),
+            path(
+                "<path:object_id>/import-spec/template/",
+                self.admin_site.admin_view(self.import_spec_template_view),
+                name=f"{info[0]}_{info[1]}_import_spec_template",
+            ),
+            path(
+                "<path:object_id>/call-client/",
+                self.admin_site.admin_view(self.call_client_view),
+                name=f"{info[0]}_{info[1]}_call_client",
+            ),
         ]
         return custom + urls
 
@@ -415,6 +458,10 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         )
         extra_context["import_spec_url"] = reverse(
             "admin:crm_client_import_spec",
+            args=[object_id],
+        )
+        extra_context["call_client_url"] = reverse(
+            "admin:crm_client_call_client",
             args=[object_id],
         )
         return super().change_view(
@@ -448,6 +495,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                     body=form.cleaned_data["body"],
                     to_email=form.cleaned_data["to_email"],
                     author=author if author and not author.is_anonymous else None,
+                    reply_to_email=staff_reply_to_email(author),
                     send_now=bool(form.cleaned_data.get("send_now")),
                 )
                 if msg.status == EmailStatus.QUEUED:
@@ -477,6 +525,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                 )
             form = ComposeEmailForm(initial=initial)
 
+        manager_email = staff_reply_to_email(request.user if request.user.is_authenticated else None)
         context = {
             **self.admin_site.each_context(request),
             "opts": self.opts,
@@ -484,6 +533,9 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": _("Написать письмо: %(name)s") % {"name": client.name},
             "form": form,
             "media": self.media,
+            "manager_reply_to_email": manager_email,
+            "manager_signature_preview": manager_reply_signature(manager_email),
+            "client_change_url": change_url,
             "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
             "selected_template_id": template.pk if template else None,
         }
@@ -553,8 +605,112 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": _("Импорт спецификации: %(name)s") % {"name": client.name},
             "form": form,
             "media": self.media,
+            "client_change_url": change_url,
+            "spec_template_url": reverse(
+                "admin:crm_client_import_spec_template",
+                args=[client.pk],
+            ),
         }
         return render(request, "admin/crm/import_spec.html", context)
+
+    def import_spec_template_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Download a starter .xlsx spec template (ЛК-9 helper)."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        client = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, client):
+            raise PermissionDenied
+        if not request.user.has_perm("leads.add_lead"):
+            raise PermissionDenied
+        from cabinet.spec_import import build_spec_template_xlsx
+
+        response = HttpResponse(
+            build_spec_template_xlsx(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="hoocon-spec-template.xlsx"'
+        return response
+
+    def call_client_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Click-to-call: Mango callback менеджер (добавочный) → клиент."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        client = get_object_or_404(self.get_queryset(request), pk=object_id)
+        if not self.has_change_permission(request, client):
+            raise PermissionDenied
+        change_url = reverse("admin:crm_client_change", args=[client.pk])
+
+        from crm.mango import (
+            initiate_callback,
+            initiate_callback_webhook,
+            mango_configured,
+            webhook_callback_configured,
+        )
+
+        extension = ""
+        profile = getattr(request.user, "vpbx_profile", None)
+        if profile is not None:
+            extension = profile.extension if profile.is_enabled else ""
+        blockers: list[str] = []
+        use_api = mango_configured()
+        if not use_api and not webhook_callback_configured():
+            blockers.append(
+                str(_("Mango не настроен: нет ни MANGO_VPBX_API_KEY/SALT, ни MANGO_CALLBACK_WEBHOOK_URL."))
+            )
+        if not extension:
+            blockers.append(
+                str(
+                    _(
+                        "У вас не задан добавочный Mango — укажите его в профиле "
+                        "пользователя («Добавочный сотрудника»)."
+                    )
+                )
+            )
+        if not client.phone:
+            blockers.append(str(_("У клиента не заполнен телефон.")))
+
+        if request.method == "POST" and not blockers:
+            try:
+                if use_api:
+                    result = initiate_callback(extension, client.phone)
+                else:
+                    initiate_callback_webhook(extension, client.phone)
+                    result = {}
+            except RuntimeError as exc:
+                self.message_user(request, str(exc), messages.ERROR)
+            else:
+                self.message_user(
+                    request,
+                    _("Вызов инициирован: Mango соединит ваш добавочный %(ext)s с %(phone)s.")
+                    % {"ext": extension, "phone": client.phone},
+                    messages.SUCCESS,
+                )
+                logger.info(
+                    "mango_callback_initiated user=%s client=%s result=%s",
+                    request.user.pk,
+                    client.pk,
+                    result.get("result"),
+                )
+            return HttpResponseRedirect(change_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": client,
+            "title": _("Позвонить клиенту: %(name)s") % {"name": client.name or client.email},
+            "blockers": blockers,
+            "extension": extension,
+            "client_change_url": change_url,
+        }
+        return render(request, "admin/crm/call_client.html", context)
 
 
 @admin.register(Activity)
@@ -1136,3 +1292,114 @@ class CompanyAdmin(ModelAdmin):
     @admin.display(description="карточек")
     def clients_count(self, obj: Company) -> int:
         return obj.clients.count()
+
+
+@admin.register(Call)
+class CallAdmin(ModelAdmin):
+    """Mango VPBX call journal — rows arrive via telephony webhook.
+
+    Звонки без привязанного клиента видны всем менеджерам (общий
+    коммутатор); привязанные проверяются скоупом при скачивании записи.
+    """
+
+    list_display = (
+        "started_at",
+        "direction",
+        "from_number",
+        "to_number",
+        "extension",
+        "manager",
+        "client",
+        "state",
+        "talk_duration",
+        "has_recording",
+    )
+    list_display_links = ("from_number", "to_number")
+    list_filter = ("direction", "state", "started_at", "extension")
+    search_fields = (
+        "entry_id",
+        "from_number",
+        "to_number",
+        "client__name",
+        "client__email",
+        "manager__email",
+    )
+    autocomplete_fields = ("client", "lead", "manager")
+
+    class Media:
+        """«Заявка» autocomplete фильтруется по выбранному клиенту."""
+
+        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
+
+    readonly_fields = (
+        "entry_id",
+        "call_id",
+        "direction",
+        "state",
+        "from_number",
+        "to_number",
+        "extension",
+        "started_at",
+        "connected_at",
+        "finished_at",
+        "talk_duration",
+        "recording_id",
+        "recording_link",
+        "last_seq",
+        "created_at",
+        "updated_at",
+    )
+    date_hierarchy = "started_at"
+    ordering = ("-started_at", "-id")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Calls arrive via Mango webhook only."""
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Call]:
+        return super().get_queryset(request).select_related("client", "lead", "manager")
+
+    @admin.display(description="Запись", boolean=True)
+    def has_recording(self, obj: Call) -> bool:
+        """Recording file stored in private media."""
+        return bool(obj.recording)
+
+    @admin.display(description="Запись разговора")
+    def recording_link(self, obj: Call) -> str:
+        """Scoped download link for the stored recording."""
+        if not obj.recording:
+            if obj.recording_id:
+                return str(_("Запись есть в Mango, ещё не скачана"))
+            return "—"
+        url = reverse("admin:crm_call_recording_download", args=[obj.pk])
+        return format_html('<a href="{}">Скачать запись</a>', url)
+
+    def get_urls(self) -> list[Any]:
+        """Scoped staff download endpoint for call recordings."""
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:pk>/recording/",
+                self.admin_site.admin_view(self.recording_view),
+                name="crm_call_recording_download",
+            ),
+        ]
+        return custom + urls
+
+    def recording_view(self, request: HttpRequest, pk: int) -> FileResponse:
+        """Serve the recording only if the manager sees this call's client."""
+        obj = get_object_or_404(Call, pk=pk)
+        if not obj.recording:
+            raise PermissionDenied(_("Запись для этого звонка не сохранена."))
+        if obj.client_id:
+            visible = scope_clients_for_manager(
+                Client.objects.filter(pk=obj.client_id),
+                request.user,
+            ).exists()
+            if not visible:
+                raise PermissionDenied(_("Нет доступа к звонку этого клиента."))
+        return FileResponse(
+            open(obj.recording.path, "rb"),
+            as_attachment=True,
+            filename=f"call-{obj.entry_id[-12:]}.mp3",
+        )

@@ -120,6 +120,28 @@ def test_client_change_form_lists_leads_inline(client, django_user_model) -> Non
 
 
 @pytest.mark.django_db
+def test_client_change_form_no_empty_activity_row(client, django_user_model) -> None:
+    """Activity inline: no always-visible empty row — «Добавить» clones __prefix__ form."""
+    user = django_user_model.objects.create_user(
+        username="crm-activity-extra",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_change", args=[crm_client.pk])
+    html = client.get(url).content.decode()
+    # extra=0 → нет реальной строки №0 без существующих активностей/документов.
+    assert 'name="activities-0-subject"' not in html
+    assert 'id="id_activities-0-subject"' not in html
+    assert 'name="documents-0-title"' not in html
+    # Кнопка «Добавить» остаётся рабочей — JS клонирует пустой шаблон.
+    assert "activities-__prefix__" in html
+    assert "documents-__prefix__" in html
+
+
+@pytest.mark.django_db
 def test_get_or_create_client_from_lead_dedupes() -> None:
     """Service finds existing Client by email case-insensitively."""
     existing = Client.objects.create(
@@ -328,6 +350,102 @@ def test_compose_email_view_creates_queued_message(
     assert msg.subject == "КП"
     assert msg.status == EmailStatus.QUEUED
     delay_mock.assert_called_once_with(msg.pk)
+
+
+@pytest.mark.django_db
+def test_compose_email_renders_mail_client_surface(client, django_user_model) -> None:
+    """Client compose-email uses the mail-client chrome (CSS+JS loaded surface).
+
+    Bare admin form markup rendered the composer as unstyled fields — the page
+    must carry hoocon-mail-compose chrome, editor, toolbar and its assets.
+    """
+    user = django_user_model.objects.create_user(
+        username="crm-mailer-ui",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_compose_email", args=[crm_client.pk])
+
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "hoocon-mail-compose.css" in html
+    assert "hoocon-mail-compose.js" in html
+    assert "hoocon-mail-compose__editor" in html
+    assert 'id="hoocon-mail-compose-form"' in html
+    assert "hoocon-mail-compose__toolbar" in html
+
+
+@pytest.mark.django_db
+def test_import_spec_page_renders_unfold_surface(client, django_user_model) -> None:
+    """Spec import page uses Unfold field/button helpers, not bare stock markup."""
+    user = django_user_model.objects.create_user(
+        username="crm-import-ui",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_import_spec", args=[crm_client.pk])
+
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'id="id_file"' in html
+    assert "Импортировать" in html
+    assert "submit-row" not in html
+    assert 'class="form-row"' not in html
+    # Кнопка «Скачать шаблон» — снижает ошибки в формате файла.
+    assert f"/admin/crm/client/{crm_client.pk}/import-spec/template/" in html
+    assert "Скачать шаблон" in html
+
+
+@pytest.mark.django_db
+def test_import_spec_template_download(client, django_user_model) -> None:
+    """Шаблон спеки отдаётся валидным .xlsx с колонками, которые понимает парсер."""
+    import io
+
+    import openpyxl
+
+    user = django_user_model.objects.create_user(
+        username="crm-import-tpl",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_import_spec_template", args=[crm_client.pk])
+
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response["Content-Type"] == ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    assert "hoocon-spec-template.xlsx" in response["Content-Disposition"]
+
+    wb = openpyxl.load_workbook(io.BytesIO(response.content))
+    header = [c.value for c in wb.worksheets[0][1]]
+    wb.close()
+    assert header == ["Артикул", "Наименование", "Количество"]
+
+    # Шаблон проходит через боевой парсер без правок.
+    from cabinet.spec_import import parse_spec_xlsx
+
+    rows = parse_spec_xlsx(io.BytesIO(response.content))
+    assert len(rows) >= 1
+
+
+@pytest.mark.django_db
+def test_anon_cannot_download_spec_template(client) -> None:
+    """Шаблон спеки недоступен анониму."""
+    crm_client = Client.objects.create(name="Buyer", email="buyer@example.com")
+    url = reverse("admin:crm_client_import_spec_template", args=[crm_client.pk])
+    response = client.get(url)
+    assert response.status_code == 302
+    assert "/admin/login" in response.url
 
 
 @pytest.mark.django_db
