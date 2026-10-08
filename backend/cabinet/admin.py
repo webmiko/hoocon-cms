@@ -4,18 +4,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
-from django.http import FileResponse, Http404, HttpRequest
+from django.db.models import Count
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseRedirect,
+)
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
 from cabinet.models import Order, OrderItem, RmaCase, SpecList, SpecListItem
-from config.admin_mixins import filter_autocomplete_by_client
+from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
 from crm.models import Client
-from crm.services import scope_clients_for_manager
+from crm.services import (
+    scope_clients_for_manager,
+    scope_orders_for_manager,
+    scope_spec_lists_for_manager,
+)
 
 
 class SpecListItemInline(TabularInline):
@@ -32,23 +43,69 @@ class SpecListItemInline(TabularInline):
 
 
 @admin.register(SpecList)
-class SpecListAdmin(ModelAdmin):
+class SpecListAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Spec template — read-only for managers (clients own the CRUD)."""
 
     list_display = ("name", "account", "items_count", "updated_at")
+    list_display_links = ("name",)
     search_fields = ("name", "account__email")
     readonly_fields = ("account", "name", "note", "created_at", "updated_at")
     inlines = (SpecListItemInline,)
+    change_form_template = "admin/cabinet/speclist/change_form.html"
 
-    @admin.display(description="позиций")
+    @admin.display(description="позиций", ordering="_items_count")
     def items_count(self, obj: SpecList) -> int:
+        count = getattr(obj, "_items_count", None)
+        if count is not None:
+            return int(count)
         return obj.items.count()
+
+    def get_queryset(self, request: HttpRequest) -> Any:
+        qs = super().get_queryset(request).select_related("account").annotate(_items_count=Count("items"))
+        return scope_spec_lists_for_manager(qs, request.user)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
+
+    def get_urls(self) -> list[Any]:
+        """«В КП» from a cabinet spec (managers cannot edit the spec itself)."""
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<path:object_id>/create-quote/",
+                self.admin_site.admin_view(self.create_quote_view),
+                name="cabinet_speclist_create_quote",
+            ),
+        ]
+        return custom + urls
+
+    def create_quote_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """POST: draft Quote from spec lines, attached to the CRM card."""
+        spec = get_object_or_404(self.get_queryset(request), pk=object_id)
+        list_url = reverse("admin:cabinet_speclist_change", args=[spec.pk])
+        if request.method != "POST":
+            return HttpResponseRedirect(list_url)
+        if not request.user.has_perm("crm.add_quote"):
+            raise PermissionDenied
+        from crm.quote_ops import create_quote_from_spec
+
+        quote = create_quote_from_spec(spec, author=request.user)
+        if quote is None:
+            self.message_user(
+                request,
+                "У аккаунта спецификации нет карточки клиента в CRM.",
+                messages.ERROR,
+            )
+            return HttpResponseRedirect(list_url)
+        self.message_user(
+            request,
+            f"Черновик {quote.number} создан из спецификации «{spec.name}».",
+            messages.SUCCESS,
+        )
+        return HttpResponseRedirect(reverse("admin:crm_quote_change", args=[quote.pk]))
 
 
 class OrderItemInline(TabularInline):
@@ -61,13 +118,14 @@ class OrderItemInline(TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(ModelAdmin):
+class OrderAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Client order — manual mode: менеджер ведёт статус и трек ТК."""
 
     list_display = ("number", "client", "status", "progress", "planned_ship_date", "created_at")
+    list_display_links = ("number",)
     list_filter = ("status", "carrier")
     search_fields = ("number", "client__email", "client__company", "track_number")
-    list_select_related = ("client",)
+    list_select_related = ("client", "quote")
     inlines = (OrderItemInline,)
     fieldsets = (
         (
@@ -85,12 +143,13 @@ class OrderAdmin(ModelAdmin):
     )
 
     def get_queryset(self, request: HttpRequest) -> Any:
-        """Autocomplete поля «Заказ» (документ) — только заказы клиента."""
-        return filter_autocomplete_by_client(request, super().get_queryset(request))
+        """Scope orders to visible clients; autocomplete may further filter by ?client=."""
+        qs = scope_orders_for_manager(super().get_queryset(request), request.user)
+        return filter_autocomplete_by_client(request, qs)
 
 
 @admin.register(RmaCase)
-class RmaCaseAdmin(ModelAdmin):
+class RmaCaseAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Клиентские рекламации — обработка менеджером."""
 
     list_display = ("id", "subject", "client", "status", "serial_number", "created_at")

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -12,7 +14,7 @@ from rest_framework.views import APIView
 
 from config.logging_utils import setup_logger
 from sitesettings.models import SiteSettings
-from supportchat.models import MessageDirection
+from supportchat.models import Message, MessageDirection
 from supportchat.schedule import schedule_public_payload
 from supportchat.serializers import (
     ConversationStartSerializer,
@@ -181,7 +183,7 @@ class CurrentMessagesView(APIView):
             qs = qs.filter(id__gt=int(after))
         response = Response(
             {
-                "messages": MessageSerializer(qs, many=True).data,
+                "messages": MessageSerializer(qs, many=True, context={"request": request}).data,
                 "conversation": _conversation_public_payload(conv),
             },
         )
@@ -217,11 +219,49 @@ class CurrentMessagesView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         payload: dict[str, object] = {
-            "message": MessageSerializer(inbound).data,
+            "message": MessageSerializer(inbound, context={"request": request}).data,
         }
         if auto is not None:
-            payload["auto_reply"] = MessageSerializer(auto).data
+            payload["auto_reply"] = MessageSerializer(auto, context={"request": request}).data
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class MessageAttachmentView(APIView):
+    """GET private chat file: same widget session or staff with view perm."""
+
+    permission_classes = (AllowAny,)
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = _POLL_THROTTLE
+
+    def get(self, request: Request, pk: int) -> FileResponse:
+        msg = get_object_or_404(Message.objects.select_related("conversation"), pk=pk)
+        if not msg.attachment:
+            raise Http404
+        conv = get_web_conversation(request._request)
+        staff_ok = bool(
+            getattr(request.user, "is_authenticated", False)
+            and request.user.has_perm("supportchat.view_conversation"),
+        )
+        if not staff_ok and (conv is None or conv.pk != msg.conversation_id):
+            raise Http404
+        filename = msg.attachment_name or (msg.attachment.name or "file").rsplit("/", 1)[-1]
+        try:
+            handle = msg.attachment.open("rb")
+        except FileNotFoundError:
+            from django.core.files.storage import default_storage
+
+            if not default_storage.exists(msg.attachment.name):
+                raise Http404 from None
+            handle = default_storage.open(msg.attachment.name, "rb")
+        response = FileResponse(
+            handle,
+            as_attachment=not (msg.attachment_mime or "").startswith("image/"),
+            filename=filename,
+        )
+        response["Cache-Control"] = "private, no-store"
+        if msg.attachment_mime:
+            response["Content-Type"] = msg.attachment_mime
+        return response
 
 
 class ConversationRateView(APIView):

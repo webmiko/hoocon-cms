@@ -336,6 +336,17 @@ _EXTRA_LINK_ROWS: dict[str, tuple[dict[str, str], ...]] = {
             "description": "SLA, воронка и обработка заявок менеджерами.",
         },
     ),
+    "crm": (
+        {
+            "id": "crm-sales-report",
+            "title": "Отчёт РОП",
+            "icon": "monitoring",
+            "url_name": "admin:crm_client_sales_report",
+            "perm": "crm.view_client",
+            "section": "work",
+            "description": "Воронка менеджеров: заявки, КП, заказы, звонки.",
+        },
+    ),
 }
 
 # Row order inside each section; rows absent from the list sink to the end.
@@ -343,6 +354,7 @@ _ROW_ORDER: dict[str, tuple[str, ...]] = {
     "work": (
         "leads-lead",
         "leads-stats",
+        "crm-sales-report",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",

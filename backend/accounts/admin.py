@@ -31,6 +31,7 @@ from accounts.models import (
 )
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
+from config.admin_mixins import OpenChangeLinkMixin
 
 
 class StaffTelegramProfileInline(admin.StackedInline):
@@ -457,10 +458,11 @@ class SocialAccountInline(TabularInline):
 
 
 @admin.register(ClientAccount)
-class ClientAccountAdmin(ModelAdmin):
+class ClientAccountAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Аккаунты личного кабинета клиентов (read-mostly; пароль — только хеш)."""
 
     list_display = ("email", "name", "auth_mode", "is_active", "email_verified_at", "created_at")
+    list_display_links = ("email",)
     list_filter = ("auth_mode", "is_active")
     search_fields = ("email", "name", "phone")
     readonly_fields = ("password_hash", "email_verified_at", "created_at", "updated_at")

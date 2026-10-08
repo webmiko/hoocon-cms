@@ -8,6 +8,7 @@ from supportchat.views import (
     ConversationRateView,
     ConversationStartView,
     CurrentMessagesView,
+    MessageAttachmentView,
     SupportChannelsView,
     SupportFaqView,
     SupportScheduleView,
@@ -31,5 +32,10 @@ urlpatterns = [
         "conversations/current/rate/",
         ConversationRateView.as_view(),
         name="support-current-rate",
+    ),
+    path(
+        "messages/<int:pk>/attachment/",
+        MessageAttachmentView.as_view(),
+        name="support-message-attachment",
     ),
 ]

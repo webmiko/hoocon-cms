@@ -1216,6 +1216,7 @@ def test_first_inbound_skips_email_without_recipients(
 def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
     """Widget file upload: stored under media, serialized with url/name/image flag."""
     settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
     ensure_default_schedule()
     from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -1234,7 +1235,8 @@ def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
         )
         assert send.status_code == 201
         msg = send.json()["message"]
-        assert msg["attachment_url"].endswith(".png")
+        assert "/api/support/messages/" in msg["attachment_url"]
+        assert msg["attachment_url"].rstrip("/").endswith("/attachment")
         assert msg["attachment_name"] == "shildik.png"
         assert msg["attachment_is_image"] is True
 
@@ -1247,11 +1249,17 @@ def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
     assert stored.attachment.name.startswith("supportchat/attachments/")
     assert stored.attachment_mime == "image/png"
 
+    file_resp = client.get(f"/api/support/messages/{msg['id']}/attachment/")
+    assert file_resp.status_code == 200
+    stranger = Client()
+    assert stranger.get(f"/api/support/messages/{msg['id']}/attachment/").status_code == 404
+
 
 @pytest.mark.django_db
 def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
     """Empty body + file → message saved with 📎 placeholder body."""
     settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
     ensure_default_schedule()
     from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -1279,6 +1287,7 @@ def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
 def test_web_attachment_rejected_types_and_size(settings, tmp_path) -> None:
     """Executable mime and oversized uploads → 400, no message stored."""
     settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
     ensure_default_schedule()
     from django.core.files.uploadedfile import SimpleUploadedFile
 

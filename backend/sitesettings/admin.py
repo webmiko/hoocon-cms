@@ -123,7 +123,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Заявки с сайта",
             {
-                "fields": ("lead_routing_mode", "lead_rr_last_user"),
+                "fields": ("lead_routing_mode", "lead_rr_last_user", "rop_report_email"),
                 "description": (
                     "Куда слать уведомление о новой заявке и назначать ли "
                     "ответственного менеджера. В очередь попадают только "

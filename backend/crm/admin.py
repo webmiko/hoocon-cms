@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import timedelta
 from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import F, QuerySet
-from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import (
+    FileResponse,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
+from cabinet.models import Order, RmaCase
 from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
 from config.unfold_callbacks import _versioned_static
 from crm.forms import ComposeEmailForm, SpecImportForm
@@ -44,8 +53,10 @@ from crm.services import (
     get_active_email_template,
     render_email_template,
     scope_activities_for_manager,
+    scope_calls_for_manager,
     scope_clients_for_manager,
     scope_emails_for_manager,
+    scope_quotes_for_manager,
 )
 from leads.models import Lead
 from leads.services import lead_visible_to_manager, scope_leads_for_manager
@@ -59,9 +70,70 @@ def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
     return scope_leads_for_manager(Lead.objects.all(), request.user)
 
 
+class OverdueNextContactFilter(admin.SimpleListFilter):
+    """Clients whose next-contact reminder is in the past."""
+
+    title = _("следующий контакт")
+    parameter_name = "next_contact_overdue"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """Single overdue option."""
+        del request, model_admin
+        return [("yes", "Просрочен")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Client]) -> QuerySet[Client]:
+        """Keep cards with next_contact_at in the past."""
+        del request
+        if self.value() != "yes":
+            return queryset
+        return queryset.filter(
+            next_contact_at__isnull=False,
+            next_contact_at__lt=timezone.now(),
+        )
+
+
+class OrderInline(TabularInline):
+    """Orders on the client card (cabinet.Order)."""
+
+    tab = True
+    model = Order
+    extra = 0
+    fields = ("number", "status", "progress", "planned_ship_date", "created_at")
+    readonly_fields = ("created_at",)
+    show_change_link = True
+    can_delete = False
+    ordering = ("-created_at",)
+    verbose_name = "заказ"
+    verbose_name_plural = "заказы клиента"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Заказ создаётся из КП, не вручную на карточке."""
+        return False
+
+
+class RmaCaseInline(TabularInline):
+    """RMA cases on the client card."""
+
+    tab = True
+    model = RmaCase
+    extra = 0
+    fields = ("subject", "status", "serial_number", "created_at")
+    readonly_fields = fields
+    show_change_link = True
+    can_delete = False
+    ordering = ("-created_at",)
+    verbose_name = "рекламация"
+    verbose_name_plural = "рекламации клиента"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Рекламации приходят из ЛК."""
+        return False
+
+
 class LeadInline(TabularInline):
     """RFQ / consult requests on this client card (scoped for managers)."""
 
+    tab = True
     model = Lead
     extra = 0
     fields = (
@@ -92,6 +164,7 @@ class LeadInline(TabularInline):
 class ActivityInline(TabularInline):
     """Timeline notes on a Client card."""
 
+    tab = True
     model = Activity
     extra = 0
     fields = ("activity_type", "subject", "body", "lead", "author", "created_at")
@@ -118,6 +191,7 @@ class ActivityInline(TabularInline):
 class EmailMessageInline(TabularInline):
     """Recent emails on a Client card (read-mostly)."""
 
+    tab = True
     model = EmailMessage
     extra = 0
     fields = (
@@ -154,6 +228,7 @@ class EmailMessageInline(TabularInline):
 class ConversationInline(TabularInline):
     """Support chat dialogs linked to this client (read-mostly)."""
 
+    tab = True
     model = Conversation
     extra = 0
     fields = (
@@ -186,7 +261,7 @@ class QuoteItemInline(TabularInline):
     """SKU lines of a quote (manager-editable)."""
 
     model = QuoteItem
-    extra = 1
+    extra = 0
     fields = ("sku", "sku_code", "quantity", "unit_price", "sort_order")
     autocomplete_fields = ("sku",)
 
@@ -194,6 +269,7 @@ class QuoteItemInline(TabularInline):
 class QuoteInline(TabularInline):
     """Quotes issued from this client card (read-mostly)."""
 
+    tab = True
     model = Quote
     extra = 0
     fields = ("number", "status", "lead", "sent_at", "created_at")
@@ -212,6 +288,7 @@ class QuoteInline(TabularInline):
 class CallInline(TabularInline):
     """Mango telephony log on the client card (read-only)."""
 
+    tab = True
     model = Call
     extra = 0
     fields = (
@@ -238,6 +315,7 @@ class CallInline(TabularInline):
 class ClientDocumentInline(TabularInline):
     """Документы карточки (ЛК-3/14): КП-счёта-УПД, private download."""
 
+    tab = True
     model = ClientDocument
     extra = 0
     fields = ("title", "kind", "file", "edo_status", "download_link", "created_at")
@@ -270,14 +348,28 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         "leads_count",
         "phone",
         "assignee",
+        "next_contact_at",
         "is_active",
         "updated_at",
     )
     list_display_links = ("email_id", "name")
-    list_filter = ("is_active", "assignee", "company", "updated_at")
-    search_fields = ("email", "name", "company", "phone", "notes")
-    autocomplete_fields = ("assignee",)
-    readonly_fields = ("created_at", "updated_at", "leads_count", "company_key")
+    list_filter = (
+        "is_active",
+        "assignee",
+        "company",
+        OverdueNextContactFilter,
+        "updated_at",
+    )
+    search_fields = ("email", "name", "company", "phone", "phone_digits", "notes", "company_ref__inn")
+    autocomplete_fields = ("assignee", "company_ref")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "leads_count",
+        "company_key",
+        "card_summary",
+        "colleagues_html",
+    )
     inlines = (
         LeadInline,
         ActivityInline,
@@ -285,6 +377,8 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         EmailMessageInline,
         ConversationInline,
         QuoteInline,
+        OrderInline,
+        RmaCaseInline,
         ClientDocumentInline,
     )
     ordering = ("email", "name", "company")
@@ -299,7 +393,14 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Контакт (ID = эл. почта)",
             {
-                "fields": ("email", "name", "phone", "company", "is_active"),
+                "fields": (
+                    "email",
+                    "name",
+                    "phone",
+                    "company",
+                    "company_ref",
+                    "is_active",
+                ),
                 "description": (
                     "Одинаковая эл. почта (ID) = один клиент. Заявки с тем же ID "
                     "добавляются в эту карточку, новая карточка не создаётся."
@@ -308,7 +409,11 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         ),
         (
             "Менеджер",
-            {"fields": ("assignee", "notes")},
+            {"fields": ("assignee", "next_contact_at", "notes")},
+        ),
+        (
+            "Сводка и коллеги",
+            {"fields": ("card_summary", "colleagues_html")},
         ),
         (
             "Метаданные",
@@ -372,6 +477,67 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             messages.SUCCESS,
         )
 
+    @admin.display(description="сводка")
+    def card_summary(self, obj: Client) -> str:
+        """Counts + similar-card warning for the change form."""
+        if not obj.pk:
+            return "—"
+        from crm.company import similar_clients
+        from crm.models import QuoteStatus as QStatus
+
+        quotes = obj.quotes.all()
+        open_q = quotes.filter(status__in=(QStatus.DRAFT, QStatus.SENT)).count()
+        orders_n = obj.orders.count()
+        rma_n = obj.rma_cases.count()
+        similar = list(similar_clients(obj)[:5])
+        overdue = bool(obj.next_contact_at and obj.next_contact_at < timezone.now())
+        bits = [
+            f"заявок {obj.leads.count()}",
+            f"КП {quotes.count()} (открытых {open_q})",
+            f"заказов {orders_n}",
+            f"рекламаций {rma_n}",
+        ]
+        if overdue:
+            bits.append("просрочен следующий контакт")
+        summary = format_html("{}", " · ".join(bits))
+        if not similar:
+            return summary
+        links = format_html_join(
+            ", ",
+            '<a href="{}">{}</a>',
+            (
+                (
+                    reverse("admin:crm_client_change", args=[row.pk]),
+                    row.email,
+                )
+                for row in similar
+            ),
+        )
+        return format_html("{}<br>Похожие карточки: {}", summary, links)
+
+    @admin.display(description="коллеги")
+    def colleagues_html(self, obj: Client) -> str:
+        """Other contacts of the same company."""
+        if not obj.pk:
+            return "—"
+        from crm.company import colleague_clients
+
+        rows = list(colleague_clients(obj)[:12])
+        if not rows:
+            return "—"
+        return format_html_join(
+            "<br>",
+            '<a href="{}">{}</a> — {}',
+            (
+                (
+                    reverse("admin:crm_client_change", args=[row.pk]),
+                    row.email,
+                    row.name,
+                )
+                for row in rows
+            ),
+        )
+
     @admin.display(description="Заявок", ordering="_leads_count")
     def leads_count(self, obj: Client) -> int:
         """Number of leads attached to this card."""
@@ -387,7 +553,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         qs = (
             super()
             .get_queryset(request)
-            .select_related("assignee")
+            .select_related("assignee", "company_ref")
             .annotate(_leads_count=Count("leads", distinct=True))
         )
         return scope_clients_for_manager(qs, request.user)
@@ -420,6 +586,11 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         urls = super().get_urls()
         info = self.opts.app_label, self.opts.model_name
         custom = [
+            path(
+                "sales-report/",
+                self.admin_site.admin_view(self.sales_report_view),
+                name=f"{info[0]}_{info[1]}_sales_report",
+            ),
             path(
                 "<path:object_id>/compose-email/",
                 self.admin_site.admin_view(self.compose_email_view),
@@ -464,6 +635,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "admin:crm_client_call_client",
             args=[object_id],
         )
+        extra_context["sales_report_url"] = reverse("admin:crm_client_sales_report")
         return super().change_view(
             request,
             object_id,
@@ -540,6 +712,31 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/crm/compose_email.html", context)
+
+    def sales_report_view(self, request: HttpRequest) -> HttpResponse:
+        """РОП: воронка менеджеров за 7/30 дней (менеджер видит только себя)."""
+        if not request.user.has_perm("crm.view_client"):
+            raise PermissionDenied
+        raw_days = request.GET.get("days", "7")
+        try:
+            days = int(raw_days)
+        except (TypeError, ValueError):
+            days = 7
+        if days not in {7, 30, 0}:
+            days = 7
+        since = None if days <= 0 else timezone.now() - timedelta(days=days)
+        from crm.reports import build_sales_report
+
+        report = build_sales_report(since=since, user=request.user)
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Отчёт по менеджерам",
+            "report": report,
+            "days": days,
+            "opts": self.opts,
+            "changelist_url": reverse("admin:crm_client_changelist"),
+        }
+        return render(request, "admin/crm/sales_report.html", context)
 
     def import_spec_view(
         self,
@@ -1087,9 +1284,19 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Коммерческие предложения: позиции, статус, связь с заявкой."""
 
     form = QuoteAdminForm
-    list_display = ("number", "client", "lead", "status", "created_at", "sent_at")
+    list_display = (
+        "number",
+        "client",
+        "lead",
+        "status_badge",
+        "valid_until",
+        "created_at",
+        "sent_at",
+    )
     list_display_links = ("number", "client")
     list_filter = ("status", "created_at")
+    change_list_template = "admin/crm/quote/change_list.html"
+    change_form_template = "admin/crm/quote/change_form.html"
     search_fields = (
         "number",
         "client__email",
@@ -1102,13 +1309,18 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
     inlines = (QuoteItemInline,)
 
     class Media:
-        """«Заявка» autocomplete фильтруется по выбранному клиенту."""
+        """Chained «Заявка» + канбан статусов КП."""
 
-        js = (_versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),)
+        js = (
+            _versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),
+            _versioned_static("admin/js/hoocon-admin-quotes-board.js"),
+        )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Quote]:
-        """Autocomplete поля «КП» (документ/заказ) — только КП клиента."""
-        return filter_autocomplete_by_client(request, super().get_queryset(request))
+        """Scope quotes to visible clients; autocomplete may further filter by ?client=."""
+        qs = super().get_queryset(request).select_related("client", "lead", "created_by")
+        qs = scope_quotes_for_manager(qs, request.user)
+        return filter_autocomplete_by_client(request, qs)
 
     fieldsets = (
         (
@@ -1120,6 +1332,8 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "client",
                     "lead",
                     "created_by",
+                    "valid_until",
+                    "vat_rate",
                     "comment",
                 ),
             },
@@ -1133,6 +1347,147 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
         ),
     )
 
+    @admin.display(description="Статус", ordering="status")
+    def status_badge(self, obj: Quote) -> str:
+        """Colored status tag for wall/kanban (same CSS as leads)."""
+        return format_html(
+            '<span class="hoocon-lead-status hoocon-lead-status--{}">{}</span>',
+            obj.status,
+            obj.get_status_display(),
+        )
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict | None = None,
+    ) -> HttpResponse:
+        """Wall/kanban toggle; ``view`` is session-backed like leads."""
+        extra = dict(extra_context or {})
+        extra["hoocon_sales_report_url"] = reverse("admin:crm_client_sales_report")
+        original = request.GET.copy()
+        raw_view = (original.get("view") or "").strip().lower()
+        if raw_view in {"wall", "kanban"}:
+            view = raw_view
+            request.session["hoocon_quote_view"] = view
+        else:
+            view = (request.session.get("hoocon_quote_view") or "wall").strip().lower()
+            if view not in {"wall", "kanban"}:
+                view = "wall"
+        filter_params = original.copy()
+        filter_params.pop("view", None)
+        wall_params = filter_params.copy()
+        wall_params["view"] = "wall"
+        kanban_params = filter_params.copy()
+        kanban_params["view"] = "kanban"
+        extra["hoocon_quote_view"] = view
+        extra["hoocon_quote_view_wall_url"] = f"?{wall_params.urlencode()}"
+        extra["hoocon_quote_view_kanban_url"] = f"?{kanban_params.urlencode()}"
+        request.GET = filter_params  # type: ignore[assignment]
+        return super().changelist_view(request, extra_context=extra)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Inject duplicate / create-order POST URLs."""
+        extra_context = extra_context or {}
+        extra_context["quote_duplicate_url"] = reverse(
+            "admin:crm_quote_duplicate",
+            args=[object_id],
+        )
+        extra_context["quote_create_order_url"] = reverse(
+            "admin:crm_quote_create_order",
+            args=[object_id],
+        )
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def get_urls(self) -> list:
+        """Kanban set-status + duplicate + order-from-quote."""
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:object_id>/set-status/",
+                self.admin_site.admin_view(self.set_status_view),
+                name="crm_quote_set_status",
+            ),
+            path(
+                "<path:object_id>/duplicate/",
+                self.admin_site.admin_view(self.duplicate_view),
+                name="crm_quote_duplicate",
+            ),
+            path(
+                "<path:object_id>/create-order/",
+                self.admin_site.admin_view(self.create_order_view),
+                name="crm_quote_create_order",
+            ),
+        ]
+        return custom + urls
+
+    def set_status_view(self, request: HttpRequest, object_id: int) -> JsonResponse:
+        """JSON status update for КП kanban drag-and-drop."""
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "method_not_allowed"}, status=405)
+        if not request.user.has_perm("crm.change_quote"):
+            raise PermissionDenied
+        try:
+            payload = json.loads(request.body.decode() or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+        if not isinstance(payload, dict):
+            return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+        status = str(payload.get("status") or "").strip()
+        if status not in QuoteStatus.values:
+            return JsonResponse({"ok": False, "error": "invalid_status"}, status=400)
+        quote = get_object_or_404(self.get_queryset(request), pk=object_id)
+        quote.status = status
+        quote.save(update_fields=["status", "updated_at"])
+        from crm.quote_ops import finalize_quote_status
+
+        finalize_quote_status(quote, actor=request.user)
+        return JsonResponse({"ok": True, "status": quote.status})
+
+    def duplicate_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """POST: copy КП into a new draft."""
+        change_url = reverse("admin:crm_quote_change", args=[object_id])
+        if request.method != "POST":
+            return HttpResponseRedirect(change_url)
+        if not request.user.has_perm("crm.add_quote"):
+            raise PermissionDenied
+        quote = get_object_or_404(self.get_queryset(request), pk=object_id)
+        from crm.quote_ops import duplicate_quote
+
+        copy = duplicate_quote(quote, author=request.user)
+        self.message_user(request, _(f"Создан черновик {copy.number}."), messages.SUCCESS)
+        return HttpResponseRedirect(reverse("admin:crm_quote_change", args=[copy.pk]))
+
+    def create_order_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """POST: заказ из позиций КП."""
+        change_url = reverse("admin:crm_quote_change", args=[object_id])
+        if request.method != "POST":
+            return HttpResponseRedirect(change_url)
+        if not request.user.has_perm("cabinet.add_order"):
+            raise PermissionDenied
+        quote = get_object_or_404(self.get_queryset(request), pk=object_id)
+        from crm.quote_ops import create_order_from_quote
+
+        order, created = create_order_from_quote(quote)
+        if created:
+            self.message_user(
+                request,
+                _(f"Заказ {order.number} создан из {quote.number}."),
+                messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                _(f"Заказ {order.number} уже есть у этого КП."),
+                messages.INFO,
+            )
+        return HttpResponseRedirect(reverse("admin:cabinet_order_change", args=[order.pk]))
+
     def save_model(
         self,
         request: HttpRequest,
@@ -1140,76 +1495,35 @@ class QuoteAdmin(OpenChangeLinkMixin, ModelAdmin):
         form: Any,
         change: bool,
     ) -> None:
-        """Status SENT stamps sent_at, issues the PDF doc and closes the lead."""
+        """First SENT transition stamps sent_at, issues PDF and closes the lead."""
         super().save_model(request, obj, form, change)
-        if obj.status == QuoteStatus.SENT:
-            first_issue = obj.sent_at is None
-            if first_issue:
-                obj.sent_at = timezone.now()
-                obj.save(update_fields=["sent_at", "updated_at"])
-            self._issue_quote_document(request, obj, notify=first_issue)
-            self._close_source_lead(request, obj)
-        elif obj.sent_at is not None:
-            obj.sent_at = None
-            obj.save(update_fields=["sent_at", "updated_at"])
+        from crm.quote_ops import finalize_quote_status
 
-    def _issue_quote_document(
-        self,
-        request: HttpRequest,
-        obj: Quote,
-        *,
-        notify: bool,
-    ) -> None:
-        """PDF → ClientDocument (private); клиенту — письмо-уведомление.
-
-        Notification fires only on the first SENT transition (re-saves of
-        an already-issued quote refresh the PDF but do not re-mail).
-        """
-        from crm.quote_docs import ensure_quote_pdf_document, notify_quote_issued
-
-        try:
-            document = ensure_quote_pdf_document(obj)
-        except Exception as exc:  # PDF failure must not block the save
-            logger.exception("quote_pdf_failed quote_id=%s", obj.pk)
+        result = finalize_quote_status(obj, actor=request.user)
+        if result["pdf_error"]:
             self.message_user(
                 request,
-                f"КП выдано, но PDF не сформирован: {type(exc).__name__}",
+                f"КП выдано, но PDF не сформирован: {result['pdf_error']}",
                 messages.WARNING,
             )
-            return
-        client = cast(Client, obj.client)
-        if notify and client.email:
-            author = request.user if request.user.is_authenticated else None
-            notify_quote_issued(obj, author=author, document=document)
-
-    def _close_source_lead(self, request: HttpRequest, obj: Quote) -> None:
-        """Выданное КП закрывает заявку результатом (не «просто done»)."""
-        lead = cast(Lead | None, obj.lead)
-        if lead is None or lead.status == Lead.LeadStatus.DONE:
-            return
-        from leads.services import set_lead_status
-
-        updated, error = set_lead_status(
-            lead,
-            status=Lead.LeadStatus.DONE,
-            actor=request.user,
-        )
-        if error:
+        if result["lead_error"]:
+            lead = cast("Lead | None", obj.lead)
+            pk = lead.pk if lead is not None else "?"
             self.message_user(
                 request,
-                f"КП выдано, но заявку #{lead.pk} закрыть не удалось: {error}",
+                f"КП выдано, но заявку #{pk} закрыть не удалось: {result['lead_error']}",
                 messages.WARNING,
             )
-        else:
+        elif result["lead_closed"]:
             self.message_user(
                 request,
-                f"Заявка #{updated.pk} закрыта результатом «{obj.number}».",
+                f"Заявка #{result['lead_closed']} закрыта результатом «{obj.number}».",
                 messages.SUCCESS,
             )
 
 
 @admin.register(ClientDocument)
-class ClientDocumentAdmin(ModelAdmin):
+class ClientDocumentAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Документы клиента: upload в карточке или здесь; private download."""
 
     list_display = ("title", "client", "kind", "edo_status", "created_at")
@@ -1277,21 +1591,72 @@ class CompanyMemberInline(TabularInline):
 
 
 @admin.register(Company)
-class CompanyAdmin(ModelAdmin):
+class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Карточка юрлица: реквизиты + члены (целевая схема CRM-x)."""
 
     list_display = ("name", "inn", "members_count", "clients_count", "updated_at")
+    list_display_links = ("name",)
     search_fields = ("name", "inn")
     readonly_fields = ("company_key", "created_at", "updated_at")
     inlines = (CompanyMemberInline,)
+    actions = ("merge_companies_action",)
 
-    @admin.display(description="сотрудников")
+    @admin.action(description="Объединить компании (карточки перейдут на основную)")
+    def merge_companies_action(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[Company],
+    ) -> None:
+        """Merge selected legal entities into the oldest row."""
+        companies = list(queryset.order_by("created_at", "pk"))
+        if len(companies) < 2:
+            self.message_user(
+                request,
+                _("Выберите хотя бы две компании для объединения."),
+                messages.WARNING,
+            )
+            return
+        target = companies[0]
+        sources = companies[1:]
+        from crm.company import merge_companies
+
+        moved = merge_companies(target, sources, actor=request.user)
+        self.message_user(
+            request,
+            _("Компании объединены в «%(name)s»: карточек %(clients)s, сотрудников %(members)s.")
+            % {
+                "name": target.name,
+                "clients": moved["clients"],
+                "members": moved["members"],
+            },
+            messages.SUCCESS,
+        )
+
+    @admin.display(description="сотрудников", ordering="_members_count")
     def members_count(self, obj: Company) -> int:
+        count = getattr(obj, "_members_count", None)
+        if count is not None:
+            return int(count)
         return obj.members.count()
 
-    @admin.display(description="карточек")
+    @admin.display(description="карточек", ordering="_clients_count")
     def clients_count(self, obj: Company) -> int:
+        count = getattr(obj, "_clients_count", None)
+        if count is not None:
+            return int(count)
         return obj.clients.count()
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Company]:
+        from django.db.models import Count
+
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                _members_count=Count("members", distinct=True),
+                _clients_count=Count("clients", distinct=True),
+            )
+        )
 
 
 @admin.register(Call)
@@ -1357,7 +1722,9 @@ class CallAdmin(ModelAdmin):
         return False
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Call]:
-        return super().get_queryset(request).select_related("client", "lead", "manager")
+        qs = super().get_queryset(request).select_related("client", "lead", "manager")
+        qs = scope_calls_for_manager(qs, request.user)
+        return filter_autocomplete_by_client(request, qs)
 
     @admin.display(description="Запись", boolean=True)
     def has_recording(self, obj: Call) -> bool:

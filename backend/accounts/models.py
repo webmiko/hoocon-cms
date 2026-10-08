@@ -176,8 +176,8 @@ class StaffMailbox(models.Model):
 
     Как Telegram/MAX-профили: менеджер заполняет ящик на своей странице
     пользователя. Пароль — пароль приложения Яндекс 360 (один и тот же
-    работает и для IMAP, и для SMTP); хранится в БД открытым текстом,
-    в форме не отображается (PasswordInput).
+    работает и для IMAP, и для SMTP); в БД хранится подписанным
+    (SECRET_KEY), в форме не отображается (PasswordInput).
     Поля last_* — курсор и здоровье фетчера по этому ящику.
     Пустой ``smtp_host`` — исходящие уходят через общий env-SMTP.
     """
@@ -196,7 +196,7 @@ class StaffMailbox(models.Model):
     )
     imap_password = models.CharField(
         _("пароль приложения IMAP"),
-        max_length=200,
+        max_length=512,
         blank=True,
         default="",
         help_text=_("Яндекс 360: Пароль → Пароли приложений → Почта. Оставьте пустым — старый пароль сохранится."),
@@ -252,6 +252,20 @@ class StaffMailbox(models.Model):
     def __str__(self) -> str:
         addr = (self.imap_user or "").strip() or "—"
         return f"IMAP({self.user_id}, {addr})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Sign the app password at rest before persisting."""
+        from accounts.mailbox_secrets import encrypt_mailbox_secret
+
+        self.imap_password = encrypt_mailbox_secret(self.imap_password or "")
+        super().save(*args, **kwargs)
+
+    @property
+    def imap_password_plain(self) -> str:
+        """App password for IMAP/SMTP (decrypts signed storage)."""
+        from accounts.mailbox_secrets import decrypt_mailbox_secret
+
+        return decrypt_mailbox_secret(self.imap_password or "")
 
 
 class StaffVpbxProfile(models.Model):

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -64,6 +66,13 @@ class Client(models.Model):
         default="",
         help_text="Внутренние заметки менеджера (не для клиента).",
     )
+    next_contact_at: models.DateTimeField | None = models.DateTimeField(
+        "следующий контакт",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Напоминание менеджеру: просроченные даты видны РОПу в отчёте.",
+    )
     assignee: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -116,6 +125,9 @@ class Client(models.Model):
         self.company_key = normalize_company_label(self.company)
         self.phone_digits = normalize_phone_digits(self.phone)
         super().save(*args, **kwargs)
+        from crm.company import ensure_company_ref
+
+        ensure_company_ref(self)
 
     def __str__(self) -> str:
         """Return email as ID, then name/company for Admin FK widgets."""
@@ -520,6 +532,19 @@ class Quote(models.Model):
         default="",
         help_text="Условия КП: сроки, доставка, особые договорённости.",
     )
+    valid_until: models.DateField | None = models.DateField(
+        "действует до",
+        null=True,
+        blank=True,
+        help_text="Пусто при создании — +14 дней от сегодня.",
+    )
+    vat_rate: models.DecimalField = models.DecimalField(
+        "НДС, %",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("22.00"),
+        help_text="Ставка НДС в PDF. 0 — не показывать строку НДС.",
+    )
     created_by: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -546,7 +571,9 @@ class Quote(models.Model):
         return f"{self.number or f'КП-{self.pk}'} · {self.client}"
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Assign sequential number on first save."""
+        """Assign sequential number and default validity on first save."""
+        if self._state.adding and self.valid_until is None:
+            self.valid_until = timezone.localdate() + timedelta(days=14)
         super().save(*args, **kwargs)  # type: ignore[arg-type]
         if not self.number:
             self.number = f"КП-{self.pk}"

@@ -5,9 +5,11 @@ Spec: docs/plan-support-chat-social.md.
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.utils import timezone
 
@@ -19,6 +21,20 @@ class Channel(models.TextChoices):
     TELEGRAM = "telegram", "Telegram"
     VK = "vk", "VK"
     MAX = "max", "MAX"
+
+
+def _private_media_storage() -> FileSystemStorage:
+    """Storage outside public MEDIA_ROOT (session or staff download)."""
+    return FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
+
+
+def support_attachment_upload_to(instance: Message, filename: str) -> str:
+    """Store under ``supportchat/attachments/<conv>/<uuid>_<safe>`` (private)."""
+    from catalog.validators import sanitize_upload_filename
+
+    safe = sanitize_upload_filename(filename)
+    conv = instance.conversation_id if instance.conversation_id is not None else "pending"
+    return f"supportchat/attachments/{conv}/{uuid.uuid4().hex}_{safe}"
 
 
 class ConversationStatus(models.TextChoices):
@@ -212,7 +228,8 @@ class Message(models.Model):
     )
     attachment = models.FileField(
         "вложение",
-        upload_to="supportchat/attachments/%Y/%m",
+        upload_to=support_attachment_upload_to,
+        storage=_private_media_storage,
         blank=True,
     )
     attachment_name: models.CharField = models.CharField(

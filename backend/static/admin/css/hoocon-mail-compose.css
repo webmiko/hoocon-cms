@@ -51,7 +51,7 @@ body.hoocon-mail-compose-page .hoocon-admin-breadcrumbs {
 
 .hoocon-mail-compose__headline {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--os27-title-size, 1.35rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.25;
@@ -60,7 +60,7 @@ body.hoocon-mail-compose-page .hoocon-admin-breadcrumbs {
 
 .hoocon-mail-compose__subtitle {
   margin: 0.35rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--hoocon-subtitle-size);
   line-height: 1.35;
   color: var(--os27-quiet, #6e6e73);
 }
@@ -116,11 +116,11 @@ html.dark .hoocon-mail-compose__nav--cancel {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 2.75rem;
+  min-height: var(--hoocon-control-h);
   border: 0;
   border-radius: var(--mc-radius);
-  padding: 0.65rem 1.25rem;
-  font-size: 1rem;
+  padding: 0 1.15rem;
+  font-size: var(--hoocon-control-font);
   font-weight: 600;
   line-height: 1.2;
   color: #fff;

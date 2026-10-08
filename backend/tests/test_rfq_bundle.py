@@ -267,6 +267,44 @@ def test_mark_rfq_bundle_done(django_user_model) -> None:
 
 
 @pytest.mark.django_db
+def test_lead_admin_bundle_size_counts_root_and_siblings(django_user_model) -> None:
+    """Changelist annotation must not split root (NULL fk) from siblings."""
+    from django.contrib.admin.sites import site
+    from django.test import RequestFactory
+
+    from leads.admin import LeadAdmin
+
+    admin_user = django_user_model.objects.create_superuser(
+        username="bundle-ann",
+        email="bundle-ann@example.com",
+        password="x",
+    )
+    a = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Иван",
+        email="a@example.com",
+        company="ООО Ромашка",
+        message="Корень нити КП для теста аннотации.",
+    )
+    attach_rfq_bundle(a)
+    b = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Иван",
+        email="a@example.com",
+        company="ООО Ромашка",
+        message="Дочерняя заявка нити КП для аннотации.",
+    )
+    attach_rfq_bundle(b)
+    request = RequestFactory().get("/admin/leads/lead/")
+    request.user = admin_user
+    request.resolver_match = type("M", (), {"url_name": "leads_lead_changelist"})()
+    qs = LeadAdmin(Lead, site).get_queryset(request)
+    sizes = {row.pk: row._bundle_size for row in qs.filter(pk__in=[a.pk, b.pk])}
+    assert sizes[a.pk] == 2
+    assert sizes[b.pk] == 2
+
+
+@pytest.mark.django_db
 def test_render_notification_continuation_and_items() -> None:
     """Manager email marks continuation and lists LeadItem rows."""
     from leads.models import LeadItem

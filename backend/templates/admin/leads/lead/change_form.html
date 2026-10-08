@@ -32,12 +32,12 @@
         </a>
       {% endif %}
       {% if lead_create_quote_url %}
-        <a
-          href="{{ lead_create_quote_url }}"
-          class="hoocon-admin-open hoocon-lead-view-actions__mail"
-        >
-          Создать КП
-        </a>
+        <form method="post" action="{{ lead_create_quote_url }}" class="hoocon-lead-create-quote">
+          {% csrf_token %}
+          <button type="submit" class="hoocon-admin-open hoocon-lead-view-actions__mail">
+            Создать КП
+          </button>
+        </form>
       {% endif %}
       {% if lead_edit_url %}
         <a

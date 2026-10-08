@@ -658,6 +658,23 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "background: transparent !important" in search_chip_block
     assert "#changelist-search kbd" in search_chip_block
     assert ".select2-selection--single" in input_glass_block
+    select2_single = css.split(
+        "#content-main form .select2-container .select2-selection--single {\n  height: var(--hoocon-control-h);",
+        1,
+    )[1].split("}", 1)[0]
+    assert "max-height: var(--hoocon-control-h)" in select2_single
+    rendered = css.split(
+        "#content-main form .select2-container .select2-selection--single .select2-selection__rendered {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "height: calc(var(--hoocon-control-h) - 2px)" in rendered
+    assert "padding-block: 0 !important" in rendered
+    related = css.split(
+        '#content-main form .related-widget-wrapper [x-ref^="relatedWidgetWrapper"] {',
+        1,
+    )[1].split("}", 1)[0]
+    assert "height: var(--hoocon-control-h) !important" in related
+    assert "width: var(--hoocon-control-h) !important" in related
     assert "#content-main form .form-row select," in input_glass_block
     assert "#content-main form .form-row select:focus," in input_glass_block
     assert "@supports not ((backdrop-filter: blur(1px))" in input_glass_block
@@ -939,3 +956,109 @@ def test_admin_login_css_prevents_ios_input_zoom() -> None:
     css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text()
     assert "body.login input" in css
     assert "font-size: 16px !important" in css
+
+
+def test_admin_same_roles_share_metric_tokens() -> None:
+    """Count pills, chips, text buttons, and page titles use one metric per role."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    os27 = _OS27_CSS.read_text(encoding="utf-8")
+    root = extras.split(":root {", 1)[1].split("}", 1)[0]
+    for token in (
+        "--hoocon-count-size:",
+        "--hoocon-chip-pad:",
+        "--hoocon-btn-min-h:",
+        "--hoocon-btn-pad:",
+        "--hoocon-row-pad:",
+        "--hoocon-control-h:",
+        "--hoocon-subtitle-size:",
+    ):
+        assert token in root
+
+    sticker = extras.split(".hoocon-admin-lead-sticker__count {", 1)[1].split("}", 1)[0]
+    assert "var(--hoocon-count-size)" in sticker
+    assert "var(--hoocon-radius-pill)" in sticker
+
+    status = extras.split(".hoocon-lead-status {", 1)[1].split("}", 1)[0]
+    assert "var(--hoocon-chip-pad)" in status
+    assert "var(--hoocon-chip-font)" in status
+
+    open_btn = extras.split(
+        "a.hoocon-admin-open,\na.hoocon-admin-lead-open,\nbutton.hoocon-admin-open {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "var(--hoocon-btn-min-h)" in open_btn
+    assert "var(--hoocon-btn-pad)" in open_btn
+
+    integrations = extras.split(
+        ".hoocon-integrations__actions .hoocon-admin-open,\n"
+        ".hoocon-integrations__actions .hoocon-admin-lead-open,\n"
+        ".hoocon-integrations__link {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "min-height: 2.5rem" not in integrations
+    assert "var(--hoocon-btn-min-h)" in integrations
+
+    titles = os27.split("body.hoocon-os27 .hoocon-dash__title,", 1)[1].split("{", 1)[0]
+    assert ".hoocon-integrations__title" in titles
+    assert ".hoocon-push-broadcast__title" in titles
+    assert ".hoocon-mail-compose__headline" in titles
+
+    badge = os27.split("body.hoocon-os27 .hoocon-phone-settings__badge {", 1)[1].split("}", 1)[0]
+    assert "var(--hoocon-count-size)" in badge
+    assert "1.2rem" not in badge
+    assert "0.6875rem" not in badge
+
+
+def test_desktop_sidebar_stops_above_lead_action_bar() -> None:
+    """Lead toolbar is full-bleed; the desktop sidebar must end above it."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    os27 = _OS27_CSS.read_text(encoding="utf-8")
+    assert "--hoocon-action-bar-h: 4.5rem" in extras
+    desktop = os27.split("@media (min-width: 1024px)", 1)[1]
+    rule = desktop.split("body.hoocon-os27:has(.hoocon-lead-view-actions) .hoocon-nav-panel")[1].split("}")[0]
+    assert "bottom: var(--hoocon-action-bar-h)" in rule
+
+
+def test_create_quote_button_uses_primary_open_style() -> None:
+    """«Создать КП» is a button; dark theme must not leave it on the pale mail wash."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    os27 = _OS27_CSS.read_text(encoding="utf-8")
+    open_rule = extras.split("button.hoocon-admin-open {", 1)[1].split("}", 1)[0]
+    assert "color: #fff !important" in open_rule
+    assert "background: var(--hoocon-primary)" in open_rule
+    assert "appearance: none" in open_rule
+    actions = extras.split(
+        ".hoocon-lead-view-actions__edit,\n.hoocon-lead-view-actions__back,\n.hoocon-lead-view-actions__mail {",
+        1,
+    )[1].split("}", 1)[0]
+    assert "height: var(--hoocon-btn-min-h)" in actions
+    assert "min-height: 2.5rem" not in actions
+    os27_rule = os27.split("body.hoocon-os27 button.hoocon-admin-open,", 1)[1].split("}", 1)[0]
+    assert "background: var(--os27-accent)" in os27_rule
+
+
+def test_dark_text_links_use_readable_accent() -> None:
+    """Readonly FK links use Unfold .text-link; #dc1313 fails AA on dark cards."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    block = extras.split("Unfold Tailwind primary-* and .text-link as text on dark backgrounds", 1)[1].split("}", 1)[0]
+    assert ".dark .text-link," in block
+    assert ".dark .text-link:hover," in block
+    assert "color: var(--hoocon-primary-on-dark) !important" in block
+    light = extras.split(":root {", 1)[1].split("}", 1)[0]
+    dark = extras.split(".dark {", 1)[1].split("}", 1)[0]
+    assert "--hoocon-ink: #2a2a2a" in light
+    assert "--hoocon-ink: #f5f5f7" in dark
+    assert "color: var(--hoocon-ink, #2a2a2a)" in extras
+    plain = extras.split("#content-main .readonly a:any-link,", 1)[1].split("}", 1)[0]
+    assert "#content-main .hoocon-lead-dossier a:any-link" in plain
+    assert "color: var(--os27-accent)" in plain
+
+
+def test_lead_dossier_keeps_the_fieldset_stack_gap() -> None:
+    """Dossier lines were flush with the next fieldset; match the form's gap-6."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    block = extras.split(".hoocon-lead-dossier {", 1)[1].split("}", 1)[0]
+    assert "margin: 0 0 1.5rem" in block
+    assert "gap: var(--hoocon-section-gap)" in block
+    reset = extras.split(".hoocon-lead-dossier p,\n.hoocon-lead-dossier ul {", 1)[1].split("}", 1)[0]
+    assert "margin: 0" in reset

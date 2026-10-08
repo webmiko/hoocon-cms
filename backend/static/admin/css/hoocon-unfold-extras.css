@@ -17,6 +17,7 @@
   --hoocon-search-glass-bg: color-mix(in srgb, var(--hoocon-surface-muted) 52%, transparent);
   --hoocon-search-glass-blur: blur(80px) saturate(1.75);
   --hoocon-quiet: #6f6f6f;
+  --hoocon-ink: #2a2a2a;
   /* Single admin corner scale (cards, groups, Unfold rounded-default). */
   --hoocon-radius: 0.75rem;
   --hoocon-radius-sm: 0.5rem;
@@ -41,6 +42,29 @@
   /* Grouped cards (filters, Settings lists): divider inset from card edges. */
   --hoocon-group-inset: 1rem;
   --hoocon-group-divider: var(--hoocon-hairline);
+  /* One metric per role — pages reuse these instead of a local size. */
+  --hoocon-count-size: 1.35rem;
+  --hoocon-count-pad: 0 0.35rem;
+  --hoocon-count-font: 0.75rem;
+  --hoocon-chip-pad: 0.2rem 0.55rem;
+  --hoocon-chip-font: 0.75rem;
+  --hoocon-btn-min-h: 2rem;
+  --hoocon-btn-pad: 0.35rem 0.9rem;
+  --hoocon-btn-font: 0.8125rem;
+  --hoocon-control-h: 2.75rem;
+  --hoocon-section-size: 0.8125rem;
+  --hoocon-section-gap: 0.4rem;
+  --hoocon-row-min-h: 2.75rem;
+  --hoocon-row-pad: 0.7rem 1rem;
+  --hoocon-row-label: 1rem;
+  --hoocon-row-sub: 0.8125rem;
+  --hoocon-sidebar-row-pad: 0.45rem 0.65rem;
+  --hoocon-icon-tile: 1.85rem;
+  --hoocon-icon-glyph: 1.15rem;
+  --hoocon-subtitle-size: 0.875rem;
+  --hoocon-control-font: 0.875rem;
+  /* Lead action bar height. Desktop sidebar stops above it. */
+  --hoocon-action-bar-h: 4.5rem;
 }
 
 .dark {
@@ -52,6 +76,7 @@
   --hoocon-input-glass-bg-focus: color-mix(in srgb, var(--hoocon-surface) 74%, transparent);
   --hoocon-search-glass-bg: color-mix(in srgb, var(--hoocon-surface-muted) 46%, transparent);
   --hoocon-quiet: #a3a3a3;
+  --hoocon-ink: #f5f5f7;
   --hoocon-hairline: rgba(255, 255, 255, 0.1);
   --hoocon-shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.35);
   /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1 */
@@ -160,6 +185,7 @@ body.hoocon-os27 :is(
   .hoocon-lead-view-actions__mail,
   a.hoocon-admin-open,
   a.hoocon-admin-lead-open,
+  button.hoocon-admin-open,
   .hoocon-integrations__actions .hoocon-admin-open,
   .hoocon-integrations__actions .hoocon-admin-lead-open,
   .hoocon-integrations__link,
@@ -221,7 +247,7 @@ body.hoocon-os27 :is(
 
 .hoocon-admin-lead-sticker:hover {
   border-color: color-mix(in srgb, var(--hoocon-primary) 28%, var(--hoocon-glass-border));
-  color: var(--hoocon-primary) !important;
+  color: var(--os27-accent) !important;
 }
 
 .hoocon-admin-lead-sticker__label {
@@ -232,12 +258,12 @@ body.hoocon-os27 :is(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.35rem;
-  height: 1.35rem;
-  padding: 0 0.35rem;
-  border-radius: 999px;
+  min-width: var(--hoocon-count-size);
+  height: var(--hoocon-count-size);
+  padding: var(--hoocon-count-pad);
+  border-radius: var(--hoocon-radius-pill);
   background: color-mix(in srgb, var(--hoocon-quiet) 14%, transparent);
-  font-size: 0.75rem;
+  font-size: var(--hoocon-count-font);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
@@ -297,10 +323,10 @@ body.hoocon-os27 :is(
   align-items: center;
   box-sizing: border-box;
   max-width: 100%;
-  padding: 0.2rem 0.55rem;
+  padding: var(--hoocon-chip-pad);
   border-radius: var(--hoocon-radius-btn-sm);
   border: 1px solid transparent;
-  font-size: 0.75rem;
+  font-size: var(--hoocon-chip-font);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -337,27 +363,71 @@ body.hoocon-os27 :is(
   color: #86efac;
 }
 
+.hoocon-lead-status--draft {
+  color: #57534e;
+  background: color-mix(in srgb, #78716c 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #78716c 32%, transparent);
+}
+
+.hoocon-lead-status--sent {
+  color: #1e40af;
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #2563eb 32%, transparent);
+}
+
+.hoocon-lead-status--accepted {
+  color: #166534;
+  background: color-mix(in srgb, #16a34a 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #16a34a 32%, transparent);
+}
+
+.hoocon-lead-status--rejected {
+  color: #9a3412;
+  background: color-mix(in srgb, #ea580c 16%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #ea580c 42%, transparent);
+}
+
+.dark .hoocon-lead-status--draft {
+  color: #d6d3d1;
+}
+
+.dark .hoocon-lead-status--sent {
+  color: #93c5fd;
+}
+
+.dark .hoocon-lead-status--accepted {
+  color: #86efac;
+}
+
+.dark .hoocon-lead-status--rejected {
+  color: #fdba74;
+}
+
 a.hoocon-admin-open,
-a.hoocon-admin-lead-open {
+a.hoocon-admin-lead-open,
+button.hoocon-admin-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  min-height: 2rem;
-  padding: 0.35rem 0.9rem;
+  min-height: var(--hoocon-btn-min-h);
+  padding: var(--hoocon-btn-pad);
   border-radius: var(--hoocon-radius-btn);
   border: 1px solid color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
   background: var(--hoocon-primary);
   color: #fff !important;
-  font-size: 0.8125rem;
+  font-size: var(--hoocon-btn-font);
   font-weight: 600;
   line-height: 1.2;
   text-decoration: none !important;
   white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 a.hoocon-admin-open:hover,
-a.hoocon-admin-lead-open:hover {
+a.hoocon-admin-lead-open:hover,
+button.hoocon-admin-open:hover {
   background: var(--hoocon-primary-hover);
   color: #fff !important;
 }
@@ -391,6 +461,7 @@ a.hoocon-leads-stats-link {
   gap: 0.75rem 1rem;
   box-sizing: border-box;
   margin: 0 !important;
+  min-height: var(--hoocon-action-bar-h);
   padding: 0.85rem 1.25rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--hoocon-hairline);
   background: color-mix(in srgb, var(--hoocon-surface) 92%, transparent);
@@ -406,8 +477,10 @@ a.hoocon-leads-stats-link {
   justify-content: center;
   box-sizing: border-box;
   min-width: 11rem;
-  min-height: 2.5rem;
-  padding: 0.5rem 1.25rem;
+  height: var(--hoocon-btn-min-h);
+  min-height: var(--hoocon-btn-min-h);
+  max-height: var(--hoocon-btn-min-h);
+  padding: var(--hoocon-btn-pad);
   border-radius: var(--hoocon-radius-btn);
   font-size: 0.9375rem;
   font-weight: 600;
@@ -419,11 +492,24 @@ a.hoocon-leads-stats-link {
 .hoocon-lead-view-actions__mail {
   border: 1px solid color-mix(in srgb, var(--hoocon-primary) 40%, var(--hoocon-glass-border));
   background: color-mix(in srgb, var(--hoocon-primary) 10%, var(--hoocon-surface));
-  color: var(--hoocon-primary) !important;
+  color: var(--os27-accent) !important;
 }
 
 .hoocon-lead-view-actions__mail:hover {
   background: color-mix(in srgb, var(--hoocon-primary) 18%, var(--hoocon-surface));
+}
+
+/* Above the fieldset stack (gap-6 = 1.5rem). Same gap, otherwise the last line sits on the card. */
+.hoocon-lead-dossier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hoocon-section-gap);
+  margin: 0 0 1.5rem;
+}
+
+.hoocon-lead-dossier p,
+.hoocon-lead-dossier ul {
+  margin: 0;
 }
 
 .hoocon-lead-desk {
@@ -482,7 +568,7 @@ a.hoocon-leads-stats-link {
 
 .hoocon-lead-view-actions__back:hover {
   border-color: color-mix(in srgb, var(--hoocon-primary) 35%, var(--hoocon-glass-border));
-  color: var(--hoocon-primary) !important;
+  color: var(--os27-accent) !important;
 }
 
 .hoocon-lead-view-actions--edit .hoocon-lead-view-actions__saves {
@@ -540,7 +626,7 @@ a.hoocon-leads-stats-link {
 
 .hoocon-lead-stats__periods a.is-active,
 .hoocon-lead-stats__periods a:hover {
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
 }
 
@@ -657,7 +743,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody td {
 }
 
 table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a {
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -704,7 +790,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 }
 
 .hoocon-admin-breadcrumbs a {
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -745,7 +831,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 
 .hoocon-dash__title {
   margin: 0 0 0.25rem;
-  font-size: 1.35rem;
+  font-size: var(--os27-title-size, 1.35rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -753,14 +839,16 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 .hoocon-dash__sub {
   margin: 0;
   color: var(--hoocon-quiet);
-  font-size: 0.875rem;
+  font-size: var(--hoocon-subtitle-size);
   max-width: 40rem;
 }
 
 .hoocon-dash__h2 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
+  margin: 0 0 var(--hoocon-section-gap) 0.2rem;
+  font-size: var(--hoocon-section-size);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--hoocon-quiet);
 }
 
 .hoocon-dash__alerts {
@@ -823,7 +911,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 .hoocon-dash__alert-link {
   font-weight: 700;
   font-size: 0.8125rem;
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   text-decoration: none;
 }
 
@@ -837,7 +925,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 }
 
 .hoocon-dash__cards .hoocon-lead-stats__value a:hover {
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
 }
 
 .hoocon-dash__chart {
@@ -867,7 +955,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 
 .hoocon-dash__bar-track {
   height: 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: var(--hoocon-surface-muted);
   overflow: hidden;
 }
@@ -920,7 +1008,7 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 .hoocon-dash__panel-head a {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   text-decoration: none;
 }
 
@@ -935,11 +1023,14 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 }
 
 /*
- * Unfold Tailwind primary-* as text on dark backgrounds.
+ * Unfold Tailwind primary-* and .text-link as text on dark backgrounds.
  * primary-500/600 (#dc1313 / #b01010) fail AA normal text on #171717.
+ * .text-link compiles to those colors without keeping the utility class.
  */
 .dark .text-primary-500,
 .dark .text-primary-600,
+.dark .text-link,
+.dark .text-link:hover,
 .dark .hover\:text-primary-500:hover,
 .dark .hover\:text-primary-600:hover,
 .dark .group-hover\:text-primary-500,
@@ -951,6 +1042,15 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
 .dark .dark\:group-hover\:text-primary-500,
 .dark .group:hover .dark\:group-hover\:text-primary-500 {
   color: var(--hoocon-primary-on-dark) !important;
+}
+
+/*
+ * Plain anchors in readonly HTML (desk, dossier) have no .text-link class.
+ * Without an author color, :visited keeps the UA color and disappears on dark cards.
+ */
+#content-main .readonly a:any-link,
+#content-main .hoocon-lead-dossier a:any-link {
+  color: var(--os27-accent);
 }
 
 .hoocon-dash__feed {
@@ -1287,7 +1387,7 @@ kbd.hoocon-sidebar-shortcut > span {
     height: 0.55rem;
     padding: 0;
     overflow: hidden;
-    border-radius: 999px;
+    border-radius: var(--hoocon-radius-pill);
     font-size: 0;
     line-height: 0;
     text-indent: -999px;
@@ -1374,7 +1474,7 @@ kbd.hoocon-sidebar-shortcut > span {
 
 .hoocon-integrations__title {
   margin: 0 0 0.4rem;
-  font-size: 1.35rem;
+  font-size: var(--os27-title-size, 1.35rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -1382,7 +1482,7 @@ kbd.hoocon-sidebar-shortcut > span {
 .hoocon-integrations__sub {
   margin: 0;
   color: var(--hoocon-quiet);
-  font-size: 0.875rem;
+  font-size: var(--hoocon-subtitle-size);
   line-height: 1.45;
   max-width: 28rem;
 }
@@ -1414,10 +1514,10 @@ kbd.hoocon-sidebar-shortcut > span {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  min-height: 2.5rem;
-  padding: 0.55rem 1.15rem;
+  min-height: var(--hoocon-btn-min-h);
+  padding: var(--hoocon-btn-pad);
   border-radius: var(--hoocon-radius-btn);
-  font-size: 0.875rem;
+  font-size: var(--hoocon-btn-font);
   font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
@@ -1430,7 +1530,7 @@ kbd.hoocon-sidebar-shortcut > span {
 }
 
 .hoocon-integrations__link:hover {
-  color: var(--hoocon-primary);
+  color: var(--os27-accent);
   border-color: color-mix(in srgb, var(--hoocon-primary) 35%, transparent);
 }
 
@@ -1469,9 +1569,9 @@ kbd.hoocon-sidebar-shortcut > span {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  padding: 0.15rem 0.5rem;
+  padding: var(--hoocon-chip-pad);
   border-radius: var(--hoocon-radius-btn-sm);
-  font-size: 0.6875rem;
+  font-size: var(--hoocon-chip-font);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1567,7 +1667,7 @@ body.login select,
 #content-main form .select2-container .select2-selection--single,
 #content-main form .select2-container .select2-selection--multiple {
   box-sizing: border-box;
-  min-height: 2.75rem;
+  min-height: var(--hoocon-control-h);
   width: 100%;
   max-width: 42rem;
   padding: 0.55rem 0.85rem !important;
@@ -1632,7 +1732,46 @@ body.login select,
 #content-main form .select2-container .select2-selection--multiple {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
   max-width: 42rem;
+  /* Unfold already sizes .select2-selection__rendered. Extra field padding
+     stacked on that and stretched the combobox past --hoocon-control-h. */
+  padding: 0 !important;
+}
+
+#content-main form .select2-container .select2-selection--single {
+  height: var(--hoocon-control-h);
+  min-height: var(--hoocon-control-h);
+  max-height: var(--hoocon-control-h);
+}
+
+/* Unfold related-widget «more_vert» is h-[38px]; match the Select2 control. */
+#content-main form .related-widget-wrapper [x-ref^="relatedWidgetWrapper"] {
+  box-sizing: border-box;
+  width: var(--hoocon-control-h) !important;
+  height: var(--hoocon-control-h) !important;
+  min-width: var(--hoocon-control-h);
+  min-height: var(--hoocon-control-h);
+}
+
+#content-main form .select2-container .select2-selection--single .select2-selection__rendered {
+  display: block;
+  height: calc(var(--hoocon-control-h) - 2px);
+  margin: 0;
+  padding-block: 0 !important;
+  line-height: calc(var(--hoocon-control-h) - 2px);
+}
+
+#content-main form .select2-container .select2-selection--single .select2-selection__arrow {
+  height: calc(var(--hoocon-control-h) - 2px);
+  top: 1px;
+}
+
+#content-main form .select2-container .select2-selection--multiple {
+  height: auto;
+  min-height: var(--hoocon-control-h);
+  max-height: none;
+  padding: 0.2rem 0.35rem !important;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -1701,7 +1840,7 @@ body.login select:focus,
 #id_otp_code:focus,
 #content-main form .select2-container--focus .select2-selection--single,
 #content-main form .select2-container--focus .select2-selection--multiple {
-  border-color: var(--hoocon-primary) !important;
+  border-color: var(--os27-accent) !important;
   border-width: 2px !important;
   outline: none !important;
   background: var(--hoocon-input-glass-bg-focus) !important;
@@ -1738,7 +1877,7 @@ body.login select:focus,
 .dark #content-main form .form-row:focus-within input[type="search"],
 .dark #content-main form .aligned textarea:focus,
 .dark #content-main form .aligned select:focus {
-  border-color: var(--hoocon-primary) !important;
+  border-color: var(--os27-accent) !important;
   box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
 }
 
@@ -1940,7 +2079,7 @@ body.change-form #submit-row .container.hoocon-submit-menu-active > .flex {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 2.75rem;
+    min-height: var(--hoocon-row-min-h);
     padding: 0.35rem 0.75rem 0.5rem;
     background: var(--hoocon-page-bg);
   }
@@ -2011,7 +2150,7 @@ body.change-form #submit-row .container.hoocon-submit-menu-active > .flex {
 }
 
 .hoocon-glass-search-chip:focus-within {
-  border-color: var(--hoocon-primary) !important;
+  border-color: var(--os27-accent) !important;
   border-width: 2px !important;
   outline: none !important;
   box-shadow: 0 0 0 1px var(--hoocon-primary) !important;
@@ -3449,7 +3588,7 @@ input[type="checkbox"].hoocon-toggle {
   margin: 0;
   padding: 0;
   border: 0 !important;
-  border-radius: 999px !important;
+  border-radius: var(--hoocon-radius-pill) !important;
   background: #c8cad0 !important;
   box-shadow: none !important;
   cursor: pointer;
@@ -3464,7 +3603,7 @@ input[type="checkbox"].hoocon-toggle::after {
   left: 0.1875rem;
   width: 1.125rem;
   height: 1.125rem;
-  border-radius: 999px;
+  border-radius: var(--hoocon-radius-pill);
   background: #fff;
   box-shadow: 0 1px 2px rgba(20, 20, 30, 0.25);
   transition: transform 0.15s ease;

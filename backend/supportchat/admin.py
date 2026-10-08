@@ -42,6 +42,15 @@ from supportchat.services import (
 )
 
 
+def _admin_attachment_url(msg: Message) -> str:
+    """Staff-facing attachment URL (private storage — not MEDIA)."""
+    if not msg.attachment:
+        return ""
+    from supportchat.attachments import message_attachment_url
+
+    return message_attachment_url(msg)
+
+
 def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
     """Serialize message rows for Admin messenger template / poll JSON."""
     rows: list[dict[str, Any]] = []
@@ -56,7 +65,7 @@ def _serialize_admin_messages(qs: QuerySet[Message]) -> list[dict[str, Any]]:
                 "direction": msg.direction,
                 "body": msg.body,
                 "sender_name": sender,
-                "attachment_url": msg.attachment.url if msg.attachment else "",
+                "attachment_url": _admin_attachment_url(msg),
                 "attachment_name": msg.attachment_name,
                 "attachment_is_image": message_attachment_is_image(msg),
                 "outside_hours": msg.outside_hours,
@@ -593,7 +602,7 @@ class FaqItemAdmin(ModelAdmin):
         "show_on_home",
     )
     list_display_links = ("question",)
-    list_editable = ("order", "answer", "is_active", "show_in_chat", "show_on_home")
+    list_editable = ("order", "is_active", "show_in_chat", "show_on_home")
     list_filter = ("is_active", "show_in_chat", "show_on_home")
     search_fields = ("question", "answer")
     ordering = ("order", "id")
@@ -639,6 +648,7 @@ class MessageAdmin(ModelAdmin):
         "created_at",
         "short_body",
     )
+    list_select_related = ("conversation",)
     list_filter = ("direction", "outside_hours", "conversation__channel")
     search_fields = ("body", "external_message_id")
     readonly_fields = (
@@ -658,3 +668,7 @@ class MessageAdmin(ModelAdmin):
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        """Hide raw webhook payloads from the sidebar except for superusers."""
+        return bool(request.user and request.user.is_superuser)

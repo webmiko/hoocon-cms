@@ -81,6 +81,16 @@ class SiteSettings(models.Model):
         help_text="Курсор очереди распределения (служебное; меняется автоматически).",
         limit_choices_to={"is_staff": True},
     )
+    rop_report_email: models.CharField = models.CharField(
+        "почта отчёта РОП",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Куда слать еженедельный отчёт по работе менеджеров. Несколько "
+            "адресов через запятую. Пусто — LEAD_NOTIFY_EMAIL (общий ящик отдела)."
+        ),
+    )
 
     # ── Staff browser notifications (Admin only; not in public API) ──
     staff_push_leads_enabled: models.BooleanField = models.BooleanField(

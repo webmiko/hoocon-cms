@@ -16,9 +16,9 @@
   --os27-content-max: 48rem;
   --os27-group-radius: var(--hoocon-radius);
   --os27-group-gap: 1.35rem;
-  --os27-row-min-h: 2.75rem;
+  --os27-row-min-h: var(--hoocon-row-min-h);
   --os27-title-size: 2.125rem;
-  --os27-section-size: 0.8125rem;
+  --os27-section-size: var(--hoocon-section-size);
   --os27-ease: var(--hoocon-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
 }
 
@@ -74,7 +74,7 @@ body.hoocon-os27 .hoocon-dash__alert {
 body.hoocon-os27 .hoocon-dash__h2,
 body.hoocon-os27 fieldset.module h2,
 body.hoocon-os27 #changelist-filter h2 {
-  margin: 0 0 0.45rem 0.2rem;
+  margin: 0 0 var(--hoocon-section-gap) 0.2rem;
   font-size: var(--os27-section-size);
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -84,6 +84,9 @@ body.hoocon-os27 #changelist-filter h2 {
 
 body.hoocon-os27 .hoocon-dash__title,
 body.hoocon-os27 .hoocon-os27-large-title,
+body.hoocon-os27 .hoocon-integrations__title,
+body.hoocon-os27 .hoocon-push-broadcast__title,
+body.hoocon-os27 .hoocon-mail-compose__headline,
 body.hoocon-os27 #content-main > h1 {
   font-size: var(--os27-title-size) !important;
   font-weight: 700 !important;
@@ -132,9 +135,9 @@ body.hoocon-os27 .hoocon-nav-sections__links {
 body.hoocon-os27 .hoocon-nav-sections__link {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.75rem;
   min-height: var(--os27-row-min-h);
-  padding: 0.45rem 1rem;
+  padding: var(--hoocon-row-pad);
   color: inherit;
   text-decoration: none;
   border-top: 1px solid var(--os27-hairline);
@@ -151,12 +154,13 @@ body.hoocon-os27 .hoocon-nav-sections__link-title {
 }
 
 body.hoocon-os27 .hoocon-nav-sections__badge {
-  min-width: 1.25rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
+  min-width: var(--hoocon-count-size);
+  height: var(--hoocon-count-size);
+  padding: var(--hoocon-count-pad);
+  border-radius: var(--hoocon-radius-pill);
   background: var(--os27-danger, #ff3b30);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--hoocon-count-font);
   font-weight: 600;
   text-align: center;
 }
@@ -195,7 +199,7 @@ body.hoocon-os27 .hoocon-dash__feed {
 body.hoocon-os27 .hoocon-dash__feed a,
 body.hoocon-os27 .hoocon-dash__feed > li > div {
   min-height: var(--os27-row-min-h);
-  padding: 0.7rem 1rem;
+  padding: var(--hoocon-row-pad);
   border-radius: 0;
   border: none;
   background: transparent;
@@ -213,13 +217,15 @@ body.hoocon-os27 .hoocon-dash__panel-head a {
 /* Primary actions — pill CTA in brand red. */
 body.hoocon-os27 a.hoocon-admin-open,
 body.hoocon-os27 a.hoocon-admin-lead-open,
+body.hoocon-os27 button.hoocon-admin-open,
 body.hoocon-os27 .hoocon-lead-view-toggle a.is-active {
   background: var(--os27-accent);
   border-color: color-mix(in srgb, var(--os27-accent) 35%, var(--os27-hairline));
 }
 
 body.hoocon-os27 a.hoocon-admin-open:hover,
-body.hoocon-os27 a.hoocon-admin-lead-open:hover {
+body.hoocon-os27 a.hoocon-admin-lead-open:hover,
+body.hoocon-os27 button.hoocon-admin-open:hover {
   background: var(--os27-accent-hover);
 }
 
@@ -495,7 +501,7 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27 .hoocon-phone-settings__section-label {
-    margin: 0 0 0.35rem 0.65rem;
+    margin: 0 0 var(--hoocon-section-gap) 0.65rem;
     font-size: var(--os27-section-size);
     font-weight: 400;
     letter-spacing: -0.01em;
@@ -508,8 +514,8 @@ body.hoocon-os27.change-form .selector select {
     align-items: center;
     gap: 0.65rem;
     width: 100%;
-    min-height: var(--os27-row-min-h);
-    padding: 0.45rem 0.65rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-sidebar-row-pad);
     border: 0;
     border-radius: var(--hoocon-radius-sm);
     background: transparent;
@@ -524,6 +530,13 @@ body.hoocon-os27.change-form .selector select {
     transition:
       background 0.15s var(--os27-ease),
       color 0.15s var(--os27-ease);
+  }
+
+  /* Content lists use the shared row; the sidebar column stays compact. */
+  body.hoocon-os27 .hoocon-phone-settings__row:not(.hoocon-desktop-settings-sidebar__row) {
+    gap: 0.75rem;
+    padding: var(--hoocon-row-pad);
+    border-radius: 0;
   }
 
   body.hoocon-os27 .hoocon-desktop-settings-sidebar__row:hover,
@@ -549,8 +562,8 @@ body.hoocon-os27.change-form .selector select {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.65rem;
-    height: 1.65rem;
+    width: var(--hoocon-icon-tile);
+    height: var(--hoocon-icon-tile);
     border-radius: var(--hoocon-radius-xs);
     background: var(--settings-icon-bg, var(--os27-accent));
     color: var(--settings-icon-fg, #fff);
@@ -558,7 +571,7 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27 .hoocon-phone-settings__icon-tile .material-symbols-outlined {
-    font-size: 1rem;
+    font-size: var(--hoocon-icon-glyph);
     line-height: 1;
   }
 
@@ -571,12 +584,12 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27 .hoocon-phone-settings__row-label {
-    font-size: 0.9375rem;
+    font-size: var(--hoocon-row-label);
     line-height: 1.25;
   }
 
   body.hoocon-os27 .hoocon-phone-settings__row-sub {
-    font-size: 0.75rem;
+    font-size: var(--hoocon-row-sub);
     line-height: 1.25;
     color: var(--os27-quiet);
     overflow: hidden;
@@ -588,13 +601,13 @@ body.hoocon-os27.change-form .selector select {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.2rem;
-    height: 1.2rem;
-    padding: 0 0.3rem;
-    border-radius: 999px;
+    min-width: var(--hoocon-count-size);
+    height: var(--hoocon-count-size);
+    padding: var(--hoocon-count-pad);
+    border-radius: var(--hoocon-radius-pill);
     background: var(--os27-accent);
     color: #fff;
-    font-size: 0.6875rem;
+    font-size: var(--hoocon-count-font);
     font-weight: 600;
     line-height: 1;
     flex-shrink: 0;
@@ -664,8 +677,8 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27 .hoocon-desktop-settings-detail .hoocon-phone-settings__row--link {
-    min-height: var(--os27-row-min-h);
-    padding: 0.7rem 1rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-row-pad);
     border-radius: 0;
   }
 
@@ -748,8 +761,8 @@ body.hoocon-os27.change-form .selector select {
   }
 
   body.hoocon-os27 .hoocon-desktop-settings-account__panel .hoocon-phone-settings__account-links .hoocon-phone-settings__row--link {
-    min-height: var(--os27-row-min-h);
-    padding: 0.7rem 1rem;
+    min-height: var(--hoocon-row-min-h);
+    padding: var(--hoocon-row-pad);
     border-radius: 0;
   }
 
@@ -935,6 +948,12 @@ body.hoocon-os27.change-form .selector select {
   body.hoocon-os27.change-form #main > div.grow {
     /* Extra room when RU save labels wrap to a second row. */
     padding-bottom: 7rem;
+  }
+
+  /* Lead action bar is full-bleed at the bottom. Stop the sidebar above it
+     so «Вернуться» / «Ответить» are not painted under the nav panel. */
+  body.hoocon-os27:has(.hoocon-lead-view-actions) .hoocon-nav-panel {
+    bottom: var(--hoocon-action-bar-h);
   }
 
 }

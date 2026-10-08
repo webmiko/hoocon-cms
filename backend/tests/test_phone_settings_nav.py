@@ -77,9 +77,10 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     # «Работа» — one tap to every daily section, in fixed order.
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:8] == [
+    assert work_ids[:9] == [
         "leads-lead",
         "leads-stats",
+        "crm-sales-report",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",
@@ -89,6 +90,8 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     ]
     assert groups["leads-stats"]["action"] == "link"
     assert groups["leads-stats"]["url"].endswith("/admin/leads/lead/stats/")
+    assert groups["crm-sales-report"]["action"] == "link"
+    assert groups["crm-sales-report"]["url"].endswith("/admin/crm/client/sales-report/")
     assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
     assert groups["crm-emailmessage"]["url"].endswith("/admin/crm/emailmessage/")
     assert groups["crm-quote"]["url"].endswith("/admin/crm/quote/")
@@ -297,7 +300,12 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
         ".hoocon-phone-settings__account-links .hoocon-phone-settings__row--link"
     )
     assert desktop_account_link in os27_css
-    assert "padding: 0.7rem 1rem" in os27_css
+    account_link_rule = os27_css.split(desktop_account_link)[1].split("}")[0]
+    assert "padding: var(--hoocon-row-pad)" in account_link_rule
+    extras = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8"
+    )
+    assert "--hoocon-row-pad: 0.7rem 1rem" in extras
     assert "hoocon-phone-settings__account-page" in css
     assert "hoocon-phone-settings__account-links" in css
     assert "hoocon-phone-settings-account" in css
@@ -306,7 +314,7 @@ def test_phone_settings_loaded_surface_css_and_js() -> None:
     ].split("}")[0]
     assert "border-radius: var(--hoocon-radius)" in account_page_rule
     assert (
-        "padding: 0.7rem 1rem"
+        "padding: var(--hoocon-row-pad)"
         in css.split(
             ".hoocon-phone-settings__account-page .hoocon-phone-settings__account-links "
             ".hoocon-phone-settings__row--link"
@@ -355,6 +363,8 @@ def test_command_palette_configured_for_manager_models() -> None:
         "supportchat.conversation",
         "crm.client",
         "catalog.sku",
+        "crm.quote",
+        "cabinet.order",
     ):
         assert expected in models
     # Технические модели вне whitelist.
