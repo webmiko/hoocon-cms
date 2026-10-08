@@ -1093,7 +1093,7 @@ html.dark .hoocon-phone-more__sheet,
     overflow: hidden;
     font-size: 1.05rem !important;
     font-weight: 700 !important;
-    color: #fff !important;
+    color: var(--hoocon-on-primary, #fff) !important;
     background: var(--hm-brand, var(--hoocon-primary, #dc1313)) !important;
   }
 
@@ -1102,12 +1102,12 @@ html.dark .hoocon-phone-more__sheet,
   }
 
   body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--telegram {
-    background: #2aabee !important;
+    background: var(--hoocon-telegram, #0077b5) !important;
   }
 
   body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--vk,
   body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-avatar--max {
-    background: #4c6ef5 !important;
+    background: var(--hoocon-vk, #3b5bdb) !important;
   }
 
   body.hoocon-phone-ready.hoocon-support-inbox .hoocon-inbox-name {
@@ -1294,7 +1294,7 @@ html.dark .hoocon-phone-more__sheet,
 
   body.hoocon-phone-ready.hoocon-support-thread {
     padding-bottom: calc(
-      env(safe-area-inset-bottom, 0px) + var(--hoocon-phone-viewport-inset, 0px)
+      env(safe-area-inset-bottom, 0) + var(--hoocon-phone-viewport-inset, 0)
     ) !important;
   }
 
@@ -1327,7 +1327,7 @@ html.dark .hoocon-phone-more__sheet,
     border: none;
     border-radius: 0;
     padding-bottom: calc(
-      env(safe-area-inset-bottom, 0px) + var(--hoocon-phone-viewport-inset, 0px)
+      env(safe-area-inset-bottom, 0) + var(--hoocon-phone-viewport-inset, 0)
     );
     background: var(--hm-muted, var(--hoocon-surface-muted, #f4f5f7));
   }
@@ -1338,9 +1338,9 @@ html.dark .hoocon-phone-more__sheet,
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__header {
     padding: 0.55rem 0.65rem;
-    background: color-mix(in srgb, var(--hm-surface, #fff) 92%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--hm-surface, var(--hoocon-surface, #fff)) 92%, transparent);
+    backdrop-filter: blur(0.875rem);
+    -webkit-backdrop-filter: blur(0.875rem);
   }
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__avatar {
@@ -1366,7 +1366,7 @@ html.dark .hoocon-phone-more__sheet,
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__delete-btn {
     width: var(--hoocon-phone-tap);
     height: var(--hoocon-phone-tap);
-    color: #f87171;
+    color: var(--hm-brand-ink, var(--hoocon-primary, #dc1313));
   }
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__thread {
@@ -1390,8 +1390,8 @@ html.dark .hoocon-phone-more__sheet,
     border-radius: var(--hoocon-radius-bubble);
     border-bottom-left-radius: var(--hm-bubble-tail, 0.25rem);
     border: none;
-    background: var(--hm-surface, #fff);
-    box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06);
+    background: var(--hm-surface, var(--hoocon-surface, #fff));
+    box-shadow: 0 0.0625rem 0.125rem rgba(20, 20, 30, 0.06);
   }
 
   body.hoocon-phone-ready.hoocon-support-thread
@@ -1407,15 +1407,21 @@ html.dark .hoocon-phone-more__sheet,
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__time {
     font-size: 0.62rem;
-    opacity: 0.75;
   }
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer {
     align-items: center;
-    padding: 0.45rem 0.65rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
-    background: color-mix(in srgb, var(--hm-surface, #fff) 94%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    padding: 0.45rem 0.65rem calc(0.45rem + env(safe-area-inset-bottom, 0));
+    background: color-mix(in srgb, var(--hm-surface, var(--hoocon-surface, #fff)) 94%, transparent);
+    backdrop-filter: blur(0.875rem);
+    -webkit-backdrop-filter: blur(0.875rem);
+  }
+
+  /* Hint is a full-bleed line; the field is a pill. Extra inset keeps the
+     caption off the rounded bezel (safe-area covers landscape notches). */
+  body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-hint {
+    padding-left: max(var(--hoocon-phone-edge-inset, 0.5rem), env(safe-area-inset-left, 0));
+    padding-right: max(var(--hoocon-phone-edge-inset, 0.5rem), env(safe-area-inset-right, 0));
   }
 
   body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-field {
@@ -1483,8 +1489,8 @@ html.dark .hoocon-phone-more__sheet,
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding: calc(3.6rem + env(safe-area-inset-top, 0px)) 0.75rem
-      calc(1rem + env(safe-area-inset-bottom, 0px));
+    padding: calc(3.6rem + env(safe-area-inset-top, 0)) 0.75rem
+      calc(1rem + env(safe-area-inset-bottom, 0));
     background: var(--hm-surface, var(--hoocon-surface, #fff));
   }
 

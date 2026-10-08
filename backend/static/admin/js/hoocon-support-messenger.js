@@ -76,7 +76,12 @@
 
     var bubble = document.createElement("div");
     bubble.className = "hoocon-messenger__bubble";
-    bubble.textContent = msg.body || "";
+    if (msg.body) {
+      var text = document.createElement("span");
+      text.className = "hoocon-messenger__bubble-text";
+      text.textContent = msg.body;
+      bubble.appendChild(text);
+    }
 
     if (msg.attachment_url) {
       var link = document.createElement("a");

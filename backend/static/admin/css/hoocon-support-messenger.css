@@ -3,12 +3,16 @@
  * Brand aligned with hoocon-unfold-extras.css.
  */
 
-/* One accent for inbox avatars, thread header, and send (incl. dark mode). */
+/* Fill stays --hoocon-primary in both themes (white label ≥4.5:1).
+   Ink is for text on a surface; chip is for text on a tinted brand wash.
+   --hoocon-primary-on-dark is not a button fill (white on #f87171 ≈ 2.8:1). */
 body.hoocon-support-inbox,
 body.hoocon-support-thread,
 .hoocon-messenger {
   --hm-brand: var(--hoocon-primary, #dc1313);
   --hm-brand-hover: var(--hoocon-primary-hover, #b01010);
+  --hm-brand-ink: var(--hoocon-primary, #dc1313);
+  --hm-brand-chip: var(--hoocon-primary-hover, #b01010);
 }
 
 .dark body.hoocon-support-inbox,
@@ -17,8 +21,8 @@ body.hoocon-support-thread,
 html.dark body.hoocon-support-inbox,
 html.dark body.hoocon-support-thread,
 html.dark .hoocon-messenger {
-  --hm-brand: var(--hoocon-primary-on-dark, #f87171);
-  --hm-brand-hover: #fb7185;
+  --hm-brand-ink: var(--hoocon-primary-on-dark, #f87171);
+  --hm-brand-chip: var(--hoocon-primary-on-dark, #f87171);
 }
 
 .hoocon-messenger {
@@ -27,7 +31,7 @@ html.dark .hoocon-messenger {
   --hm-border: var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
   --hm-quiet: var(--hoocon-quiet, #6f6f6f);
   --hm-radius: var(--hoocon-radius-lg);
-  --hm-shadow: var(--hoocon-shadow-soft, 0 4px 20px rgba(20, 20, 30, 0.04));
+  --hm-shadow: var(--hoocon-shadow-soft, 0 0.25rem 1.25rem rgba(20, 20, 30, 0.04));
   --hm-bubble-tail: 0.25rem;
 
   display: flex;
@@ -73,7 +77,7 @@ html.dark .hoocon-messenger {
   display: grid;
   place-items: center;
   background: var(--hm-brand);
-  color: #fff;
+  color: var(--hoocon-on-primary, #fff);
   font-weight: 700;
   font-size: 0.95rem;
 }
@@ -101,7 +105,7 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__meta a {
-  color: var(--hm-brand);
+  color: var(--hm-brand-ink);
   font-weight: 600;
   text-decoration: none;
 }
@@ -143,7 +147,7 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger--web .hoocon-messenger__channel--web {
-  color: var(--hm-client);
+  color: var(--hm-brand-chip);
   border-color: var(--hm-client-border);
   background: var(--hm-client-soft);
 }
@@ -154,14 +158,14 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger--web .hoocon-messenger__row--inbound .hoocon-messenger__sender {
-  color: var(--hm-client);
+  color: var(--hm-brand-ink);
 }
 
-/* Telegram — Telegram blue */
+/* Telegram — fill stays dark enough for a white initial in both themes. */
 .hoocon-messenger--telegram {
-  --hm-client: #2aabee;
-  --hm-client-soft: color-mix(in srgb, #2aabee 14%, transparent);
-  --hm-client-border: color-mix(in srgb, #2aabee 32%, transparent);
+  --hm-client: var(--hoocon-telegram, #0077b5);
+  --hm-client-soft: color-mix(in srgb, var(--hoocon-telegram, #0077b5) 14%, transparent);
+  --hm-client-border: color-mix(in srgb, var(--hoocon-telegram, #0077b5) 32%, transparent);
 }
 
 .hoocon-messenger--telegram .hoocon-messenger__avatar {
@@ -177,7 +181,7 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger--telegram .hoocon-messenger__channel--telegram {
-  color: #1b8fc9;
+  color: var(--hoocon-telegram-ink, #0369a1);
   border-color: var(--hm-client-border);
   background: var(--hm-client-soft);
 }
@@ -188,19 +192,19 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger--telegram .hoocon-messenger__row--inbound .hoocon-messenger__sender {
-  color: #1b8fc9;
+  color: var(--hoocon-telegram-ink, #0369a1);
 }
 
 .hoocon-messenger--telegram .hoocon-messenger__meta a {
-  color: #1b8fc9;
+  color: var(--hoocon-telegram-ink, #0369a1);
 }
 
 /* Other messengers — neutral slate (ready if VK/MAX appear) */
 .hoocon-messenger--vk,
 .hoocon-messenger--max {
-  --hm-client: #4c6ef5;
-  --hm-client-soft: color-mix(in srgb, #4c6ef5 12%, transparent);
-  --hm-client-border: color-mix(in srgb, #4c6ef5 28%, transparent);
+  --hm-client: var(--hoocon-vk, #3b5bdb);
+  --hm-client-soft: color-mix(in srgb, var(--hoocon-vk, #3b5bdb) 12%, transparent);
+  --hm-client-border: color-mix(in srgb, var(--hoocon-vk, #3b5bdb) 28%, transparent);
 }
 
 .hoocon-messenger--vk .hoocon-messenger__avatar,
@@ -224,58 +228,36 @@ html.dark .hoocon-messenger {
   margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: var(--hoocon-radius);
-  border: 1px solid color-mix(in srgb, #dc1313 28%, transparent);
-  background: color-mix(in srgb, #dc1313 10%, transparent);
-  color: #b01010;
+  border: 1px solid color-mix(in srgb, var(--hoocon-primary, #dc1313) 28%, transparent);
+  background: color-mix(in srgb, var(--hoocon-primary, #dc1313) 10%, transparent);
+  color: var(--hm-brand-chip, var(--hoocon-primary-hover, #b01010));
   font-weight: 600;
   font-size: 0.9rem;
 }
 
 .hoocon-messenger__live-banner a {
-  color: #b01010;
+  color: inherit;
   font-weight: 800;
   text-decoration: underline;
 }
 
 .hoocon-channel-badge--web {
-  color: #b01010;
-  background: color-mix(in srgb, #dc1313 10%, transparent);
-  border-color: color-mix(in srgb, #dc1313 28%, transparent);
+  color: var(--hm-brand-chip, var(--hoocon-primary-hover, #b01010));
+  background: color-mix(in srgb, var(--hoocon-primary, #dc1313) 10%, transparent);
+  border-color: color-mix(in srgb, var(--hoocon-primary, #dc1313) 28%, transparent);
 }
 
 .hoocon-channel-badge--telegram {
-  color: #1b8fc9;
-  background: color-mix(in srgb, #2aabee 14%, transparent);
-  border-color: color-mix(in srgb, #2aabee 32%, transparent);
+  color: var(--hoocon-telegram-ink, #0369a1);
+  background: color-mix(in srgb, var(--hoocon-telegram, #0077b5) 14%, transparent);
+  border-color: color-mix(in srgb, var(--hoocon-telegram, #0077b5) 32%, transparent);
 }
 
 .hoocon-channel-badge--vk,
 .hoocon-channel-badge--max {
-  color: #364fc7;
-  background: color-mix(in srgb, #4c6ef5 12%, transparent);
-  border-color: color-mix(in srgb, #4c6ef5 28%, transparent);
-}
-
-.dark .hoocon-channel-badge--web {
-  color: #f87171;
-  background: color-mix(in srgb, #f87171 14%, transparent);
-  border-color: color-mix(in srgb, #f87171 30%, transparent);
-}
-
-.dark .hoocon-channel-badge--telegram {
-  color: #7dd3fc;
-  background: color-mix(in srgb, #2aabee 18%, transparent);
-  border-color: color-mix(in srgb, #7dd3fc 28%, transparent);
-}
-
-.dark .hoocon-messenger--telegram {
-  --hm-client: #38bdf8;
-}
-
-.dark .hoocon-messenger--telegram .hoocon-messenger__channel--telegram,
-.dark .hoocon-messenger--telegram .hoocon-messenger__row--inbound .hoocon-messenger__sender,
-.dark .hoocon-messenger--telegram .hoocon-messenger__meta a {
-  color: #7dd3fc;
+  color: var(--hoocon-vk-ink, #364fc7);
+  background: color-mix(in srgb, var(--hoocon-vk, #3b5bdb) 12%, transparent);
+  border-color: color-mix(in srgb, var(--hoocon-vk, #3b5bdb) 28%, transparent);
 }
 
 .hoocon-messenger__header-actions {
@@ -307,8 +289,8 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__delete-btn:hover {
-  background: color-mix(in srgb, #b91c1c 12%, transparent);
-  color: #b91c1c;
+  background: color-mix(in srgb, var(--hoocon-primary, #dc1313) 12%, transparent);
+  color: var(--hm-brand-chip, var(--hoocon-primary-hover, #b01010));
 }
 
 .hoocon-messenger__status {
@@ -323,9 +305,9 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__status--open {
-  color: #2d6a4f;
-  border-color: color-mix(in srgb, #2d6a4f 30%, transparent);
-  background: color-mix(in srgb, #2d6a4f 10%, transparent);
+  color: var(--hoocon-success, #2d6a4f);
+  border-color: color-mix(in srgb, var(--hoocon-success, #2d6a4f) 30%, transparent);
+  background: color-mix(in srgb, var(--hoocon-success, #2d6a4f) 10%, transparent);
 }
 
 .hoocon-messenger__status--closed {
@@ -397,12 +379,17 @@ html.dark .hoocon-messenger {
   font-size: 0.9rem;
   line-height: 1.45;
   text-align: left;
-  white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
   box-sizing: border-box;
   width: fit-content;
   max-width: 100%;
+}
+
+/* pre-line lives on the text node only. Template newlines around the bubble
+   were counted as blank lines and stretched short messages. */
+.hoocon-messenger__bubble-text {
+  white-space: pre-line;
 }
 
 .hoocon-messenger__row--inbound .hoocon-messenger__bubble {
@@ -414,9 +401,9 @@ html.dark .hoocon-messenger {
 
 .hoocon-messenger__row--outbound .hoocon-messenger__bubble {
   background: var(--hm-brand);
-  color: #fff;
+  color: var(--hoocon-on-primary, #fff);
   border-bottom-right-radius: var(--hm-bubble-tail);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--hm-brand) 22%, transparent);
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--hm-brand) 22%, transparent);
 }
 
 .hoocon-messenger__row--system .hoocon-messenger__bubble {
@@ -428,17 +415,11 @@ html.dark .hoocon-messenger {
 }
 
 .hoocon-messenger__row--note .hoocon-messenger__bubble {
-  background: #fff8e1;
-  border: 1px dashed #e0b952;
+  background: var(--hoocon-note-surface, #fff8e1);
+  border: 1px dashed var(--hoocon-note-border, #8a6a12);
   border-bottom-right-radius: var(--hm-bubble-tail);
-  color: inherit;
+  color: var(--hoocon-ink, #2a2a2a);
   font-size: 0.85rem;
-}
-
-.dark .hoocon-messenger__row--note .hoocon-messenger__bubble,
-html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
-  background: color-mix(in srgb, #e0b952 14%, var(--hm-surface));
-  border-color: #8a7433;
 }
 
 .hoocon-messenger__attach {
@@ -452,8 +433,8 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 
 .hoocon-messenger__attach-img {
   display: block;
-  max-width: 220px;
-  max-height: 220px;
+  max-width: 13.75rem;
+  max-height: 13.75rem;
   border-radius: 0.5rem;
   object-fit: cover;
 }
@@ -511,7 +492,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__composer-field:focus-within {
   border-color: color-mix(in srgb, var(--hm-brand) 45%, var(--hm-border));
   background: var(--hm-surface);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hm-brand) 14%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--hm-brand) 14%, transparent);
 }
 
 .hoocon-messenger__composer-hint {
@@ -584,7 +565,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
   min-height: var(--hoocon-control-h);
   padding: 0 1.15rem;
   background: var(--hm-brand);
-  color: #fff;
+  color: var(--hoocon-on-primary, #fff);
   font-weight: 700;
   font-size: var(--hoocon-control-font);
   box-shadow: none;
@@ -634,7 +615,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__note-send:hover:not(:disabled),
 .hoocon-messenger__note-send:focus-visible {
   --hm-note-bg: color-mix(in srgb, var(--hm-brand) 10%, transparent);
-  color: var(--hm-brand);
+  color: var(--hm-brand-chip);
   background: var(--hm-note-bg);
   transform: none;
   margin-right: calc(-1 * var(--hm-composer-gap, 0.15rem));
@@ -648,7 +629,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-messenger__note-send:focus-visible::after {
   content: "";
   position: absolute;
-  right: calc(0px - var(--hm-composer-corner, 0.925rem));
+  right: calc(-1 * var(--hm-composer-corner, 0.925rem));
   width: var(--hm-composer-corner, 0.925rem);
   height: var(--hm-composer-corner, 0.925rem);
   background: var(--hm-note-bg);
@@ -717,7 +698,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 }
 
 .hoocon-messenger__info:hover {
-  color: var(--hm-brand);
+  color: var(--hm-brand-chip);
   background: color-mix(in srgb, var(--hm-brand) 10%, transparent);
   transform: scale(1.12);
 }
@@ -744,7 +725,7 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
 .hoocon-chat-info-close {
   display: none;
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 0.6rem);
+  top: calc(env(safe-area-inset-top, 0) + 0.6rem);
   right: 0.75rem;
   z-index: 96;
   appearance: none;
@@ -752,12 +733,14 @@ html.dark .hoocon-messenger__row--note .hoocon-messenger__bubble {
   justify-content: center;
   min-height: 2.4rem;
   padding: 0 0.9rem;
-  border: 1px solid var(--hm-border);
+  /* Appended to body, outside .hoocon-messenger — --hm-* do not inherit here.
+     Root tokens flip with .dark so the label stays readable on the chip. */
+  border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.12));
   border-radius: var(--hoocon-radius-pill);
-  background: color-mix(in srgb, var(--hm-surface, #fff) 92%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--hm-quiet);
+  background: color-mix(in srgb, var(--hoocon-surface, #fff) 92%, transparent);
+  backdrop-filter: blur(0.625rem);
+  -webkit-backdrop-filter: blur(0.625rem);
+  color: var(--hoocon-ink, #2a2a2a);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
@@ -789,7 +772,7 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
   margin-right: 0.45rem;
   border-radius: 50%;
   background: var(--hm-brand, var(--hoocon-primary, #dc1313));
-  color: #fff;
+  color: var(--hoocon-on-primary, #fff);
   font-weight: 700;
   font-size: 0.85rem;
   vertical-align: middle;
@@ -801,12 +784,12 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
 }
 
 .hoocon-inbox-avatar--telegram {
-  background: #2aabee;
+  background: var(--hoocon-telegram, #0077b5);
 }
 
 .hoocon-inbox-avatar--vk,
 .hoocon-inbox-avatar--max {
-  background: #4c6ef5;
+  background: var(--hoocon-vk, #3b5bdb);
 }
 
 .hoocon-inbox-name {
@@ -822,7 +805,7 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
   padding: var(--hoocon-count-pad);
   border-radius: var(--hoocon-radius-pill);
   background: var(--hm-brand, var(--hoocon-primary, #dc1313));
-  color: #fff;
+  color: var(--hoocon-on-primary, #fff);
   font-size: var(--hoocon-count-font);
   font-weight: 800;
   line-height: 1;
@@ -881,7 +864,7 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
 }
 
 .hoocon-messenger__ai-badge--bot {
-  color: var(--hm-brand);
+  color: var(--hm-brand-chip);
 }
 
 /* Phone shell (hoocon-admin-phone.css) overrides ≤767 for full-bleed + tabs. */
