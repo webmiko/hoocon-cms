@@ -233,6 +233,56 @@ def test_tables_js_overrides_prefilled_select_record_label() -> None:
     assert 'getAttribute("data-label")' in checkbox_block
 
 
+def test_every_admin_changelist_explains_empty_section() -> None:
+    """Each registered admin list has a Russian explanation of the section."""
+    from django.contrib import admin
+
+    from config.empty_state import EMPTY_STATE_HELP, empty_state_help_for
+
+    labels = {model._meta.label for model in admin.site._registry}
+    missing = [
+        model._meta.label
+        for model, model_admin in admin.site._registry.items()
+        if not empty_state_help_for(model_admin).strip()
+    ]
+    assert missing == []
+    assert set(EMPTY_STATE_HELP) == labels
+
+
+@pytest.mark.django_db
+def test_company_empty_changelist_explains_the_section() -> None:
+    """Empty «Компании» list explains the section instead of the generic stub."""
+    from crm.models import Company
+
+    Company.objects.all().delete()
+    admin_user = User.objects.create_superuser(
+        username="admin-company-empty",
+        email="admin-company-empty@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/crm/company/").content.decode()
+    assert "Юрлицо заказчика" in html
+    assert "поля «Компания»" in html
+    assert "На этой странице нет результатов" not in html
+
+
+@pytest.mark.django_db
+def test_company_search_miss_keeps_generic_empty_hint() -> None:
+    """Search with no hits keeps the reset hint, not the section explanation."""
+    admin_user = User.objects.create_superuser(
+        username="admin-company-search",
+        email="admin-company-search@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/crm/company/?q=нет-такой-компании-xyz").content.decode()
+    assert "На этой странице нет результатов" in html
+    assert "Юрлицо заказчика" not in html
+
+
 def test_unfold_empty_results_strings_russian() -> None:
     """Unfold's empty-changelist strings resolve to Russian via project locale."""
     from django.utils import translation
