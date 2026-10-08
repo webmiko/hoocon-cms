@@ -422,6 +422,107 @@ def test_admin_phone_support_messenger_signal_layout() -> None:
     assert "background: var(--hm-brand" in phone_send_rule
 
 
+def test_messenger_bubble_pre_line_is_on_text_span() -> None:
+    """pre-line on the bubble box counted template newlines as blank lines."""
+    messenger_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-support-messenger.css").read_text(
+        encoding="utf-8"
+    )
+    bubble_rule = messenger_css.split("\n.hoocon-messenger__bubble {")[1].split("}")[0]
+    text_rule = messenger_css.split(".hoocon-messenger__bubble-text {")[1].split("}")[0]
+    assert "white-space: pre-line" not in bubble_rule
+    assert "white-space: pre-line" in text_rule
+    messenger_js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-support-messenger.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'text.className = "hoocon-messenger__bubble-text"' in messenger_js
+
+
+def test_phone_composer_hint_clears_rounded_bezel() -> None:
+    """Reply hint sat on the screen edge, so rounded phone corners clipped it."""
+    phone_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(
+        encoding="utf-8"
+    )
+    hint_rule = phone_css.split("body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__composer-hint {")[
+        1
+    ].split("}")[0]
+    assert "padding-left: max(var(--hoocon-phone-edge-inset, 0.5rem), env(safe-area-inset-left, 0))" in hint_rule
+    assert "padding-right: max(var(--hoocon-phone-edge-inset, 0.5rem), env(safe-area-inset-right, 0))" in hint_rule
+
+
+def test_chat_info_close_label_uses_theme_ink() -> None:
+    """Dark theme hid «Закрыть»: the chip sits on body, so --hm-* never apply.
+
+    --hm-quiet / --hm-surface live only on .hoocon-messenger. An invalid color
+    inherited the light body text while the background fell back to white.
+    """
+    messenger_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-support-messenger.css").read_text(
+        encoding="utf-8"
+    )
+    close_rule = messenger_css.split(".hoocon-chat-info-close {")[1].split("}")[0]
+    assert "color: var(--hoocon-ink, #2a2a2a)" in close_rule
+    assert "var(--hoocon-surface, #fff)" in close_rule
+    assert "var(--hoocon-glass-border" in close_rule
+    assert "var(--hm-quiet)" not in close_rule
+    assert "var(--hm-surface" not in close_rule
+    extras = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8"
+    )
+    dark_tokens = extras.split(".dark {", 1)[1].split("}", 1)[0]
+    assert "--hoocon-ink: #f5f5f7" in dark_tokens
+    assert "--hoocon-surface: #171717" in dark_tokens
+
+
+def test_messenger_fills_keep_white_label_in_both_themes() -> None:
+    """Dark theme painted brand fills with the link red, so white labels failed AA.
+
+    --hoocon-primary-on-dark is ink on a dark surface. Button, bubble, and
+    avatar fills stay --hoocon-primary; channel colors use the same split.
+    """
+    extras = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8"
+    )
+    root_tokens = extras.split(":root {", 1)[1].split("}", 1)[0]
+    dark_tokens = extras.split(".dark {", 1)[1].split("}", 1)[0]
+    assert "--hoocon-on-primary: #ffffff" in root_tokens
+    assert "--hoocon-telegram: #0077b5" in root_tokens
+    assert "--hoocon-vk: #3b5bdb" in root_tokens
+    assert "--hoocon-primary-on-dark" not in root_tokens
+    assert "--hoocon-telegram:" not in dark_tokens
+    assert "--hoocon-vk:" not in dark_tokens
+    assert "--hoocon-telegram-ink: #7dd3fc" in dark_tokens
+    assert "--hoocon-vk-ink: #93c5fd" in dark_tokens
+    assert "--hoocon-success: #4caf7a" in dark_tokens
+
+    messenger_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-support-messenger.css").read_text(
+        encoding="utf-8"
+    )
+    dark_brand = messenger_css.split("html.dark .hoocon-messenger {", 1)[1].split("}", 1)[0]
+    assert "--hm-brand-ink: var(--hoocon-primary-on-dark" in dark_brand
+    assert "--hm-brand:" not in dark_brand
+    send_rule = messenger_css.split("\n.hoocon-messenger__send {")[1].split("}")[0]
+    assert "background: var(--hm-brand)" in send_rule
+    assert "color: var(--hoocon-on-primary, #fff)" in send_rule
+    assert "var(--hoocon-telegram" in messenger_css
+    assert "var(--hoocon-vk" in messenger_css
+    assert "var(--hoocon-success" in messenger_css
+    assert "#2aabee" not in messenger_css
+    assert "#4c6ef5" not in messenger_css
+    assert "--hm-brand: var(--hoocon-primary-on-dark" not in messenger_css
+
+    phone_css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-admin-phone.css").read_text(
+        encoding="utf-8"
+    )
+    delete_rule = phone_css.split("body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__delete-btn {")[
+        1
+    ].split("}")[0]
+    assert "var(--hm-brand-ink" in delete_rule
+    assert "#f87171" not in delete_rule
+    time_rule = phone_css.split("body.hoocon-phone-ready.hoocon-support-thread .hoocon-messenger__time {")[1].split(
+        "}"
+    )[0]
+    assert "opacity" not in time_rule
+
+
 def test_admin_phone_messenger_pins_sheet_to_visual_viewport() -> None:
     """On-screen keyboard must not push the fixed chat header off-screen.
 

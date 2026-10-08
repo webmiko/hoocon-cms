@@ -18,6 +18,16 @@
   --hoocon-search-glass-blur: blur(80px) saturate(1.75);
   --hoocon-quiet: #6f6f6f;
   --hoocon-ink: #2a2a2a;
+  /* White label on brand and channel fills — same in both themes. */
+  --hoocon-on-primary: #ffffff;
+  /* Fills stay dark enough for a white initial (≥4.5:1). Ink flips in .dark. */
+  --hoocon-telegram: #0077b5;
+  --hoocon-telegram-ink: #0369a1;
+  --hoocon-vk: #3b5bdb;
+  --hoocon-vk-ink: #364fc7;
+  --hoocon-success: #2d6a4f;
+  --hoocon-note-surface: #fff8e1;
+  --hoocon-note-border: #8a6a12;
   /* Single admin corner scale (cards, groups, Unfold rounded-default). */
   --hoocon-radius: 0.75rem;
   --hoocon-radius-sm: 0.5rem;
@@ -79,8 +89,14 @@
   --hoocon-ink: #f5f5f7;
   --hoocon-hairline: rgba(255, 255, 255, 0.1);
   --hoocon-shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.35);
-  /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1 */
+  /* Text/link red on dark: #dc1313 is ~3.5:1 (fails WCAG AA); #f87171 ≈ 6.4:1.
+     Fills stay --hoocon-primary so white labels stay ≥4.5:1. */
   --hoocon-primary-on-dark: #f87171;
+  --hoocon-telegram-ink: #7dd3fc;
+  --hoocon-vk-ink: #93c5fd;
+  --hoocon-success: #4caf7a;
+  --hoocon-note-surface: color-mix(in srgb, #e0b952 14%, var(--hoocon-surface));
+  --hoocon-note-border: #e0b952;
 }
 
 /*

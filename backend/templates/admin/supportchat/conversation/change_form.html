@@ -122,7 +122,7 @@
           <div class="hoocon-messenger__bubble-wrap">
             <span class="hoocon-messenger__sender">{{ m.sender_name }}</span>
             <div class="hoocon-messenger__bubble">
-              {{ m.body }}
+              {% if m.body %}<span class="hoocon-messenger__bubble-text">{{ m.body }}</span>{% endif %}
               {% if m.attachment_url %}
                 {% if m.attachment_is_image %}
                   <a href="{{ m.attachment_url }}" target="_blank" rel="noopener"

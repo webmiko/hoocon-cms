@@ -638,6 +638,38 @@ def test_admin_reply_form_is_outside_main_change_form() -> None:
 
 
 @pytest.mark.django_db
+def test_admin_bubble_hugs_message_text() -> None:
+    """Short bubbles were ~3 lines tall: template newlines sat inside pre-line."""
+    from django.contrib.auth import get_user_model
+    from django.test import Client
+    from django.urls import reverse
+
+    from supportchat.models import Channel, MessageDirection
+
+    staff = get_user_model().objects.create_superuser(
+        username="support-admin-bubble",
+        email="support-admin-bubble@example.com",
+        password="x",
+    )
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="bubble-height",
+        display_name="Bubble",
+        status="open",
+    )
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="привет",
+    )
+    client = Client()
+    client.force_login(staff)
+    page = client.get(reverse("admin:supportchat_conversation_change", args=[conv.pk]))
+    html = page.content.decode()
+    assert '<span class="hoocon-messenger__bubble-text">привет</span>' in html
+
+
+@pytest.mark.django_db
 def test_admin_delete_chat_removes_unlinked_keeps_crm() -> None:
     """Admin delete-chat POST: orphan gone; CRM-linked stays with error."""
     from django.contrib.auth import get_user_model
