@@ -141,7 +141,11 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert 'id="rop"' in doc.body
     assert "Копия черновиком" in doc.body
     assert "07.10.2026" in doc.body
+    assert 'id="chat"' in doc.body
+    assert 'id="changelog"' in doc.body
+    assert "Диалоги поддержки" in doc.body
     assert "отчёт роп" in doc.summary.casefold()
+    assert "диалоги" in doc.summary.casefold()
 
 
 @pytest.mark.django_db
