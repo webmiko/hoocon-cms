@@ -222,4 +222,12 @@ if [[ "${SPA_OK}" -ne 1 ]]; then
   exit 1
 fi
 
+# ── 7. Manual PDFs (_инструкции-pdf нет в git/CI — только с этой машины) ──
+if [[ "${MANUALS_SYNC:-1}" == "1" && -d "${MANUALS_DIR:-${ROOT}/_инструкции-pdf}" ]]; then
+  echo "==> sync manual PDFs"
+  if ! ./scripts/sync-manual-pdfs.sh; then
+    echo -e "${YELLOW}⚠ PDF не залиты — повтори ./scripts/sync-manual-pdfs.sh${NC}" >&2
+  fi
+fi
+
 echo -e "${GREEN}✓ Manual deploy OK (${GIT_SHA:0:12})${NC}"

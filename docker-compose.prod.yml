@@ -65,6 +65,7 @@ services:
       - /var/www/hoocon/private_media:/app/private_media
       - /var/www/hoocon/staticfiles:/app/staticfiles
       - /var/www/hoocon/frontend/dist:/app/frontend/dist:ro
+      - /var/www/hoocon/manuals-src:/app/manuals-src:ro
     depends_on:
       db:
         condition: service_healthy

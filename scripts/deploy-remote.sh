@@ -15,7 +15,7 @@
 #   DEPLOY_EXPORT_REDIRECTS=1 (default) — after health, rebuild /etc/nginx/redirects.map from DB
 #   IMAGE_KEEP=3 — max ghcr app image tags/IDs kept on VPS after deploy
 #   SSH_KNOWN_HOSTS — pinned VPS host key (scripts/ssh-trust.sh)
-#   WWW_FRONTEND / WWW_STATIC / WWW_MEDIA / WWW_PRIVATE_MEDIA
+#   WWW_FRONTEND / WWW_STATIC / WWW_MEDIA / WWW_PRIVATE_MEDIA / WWW_MANUALS
 set -euo pipefail
 
 DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH is required}"
@@ -40,6 +40,8 @@ WWW_FRONTEND="${WWW_FRONTEND:-/var/www/hoocon/frontend/dist}"
 WWW_STATIC="${WWW_STATIC:-/var/www/hoocon/staticfiles}"
 WWW_MEDIA="${WWW_MEDIA:-/var/www/hoocon/media}"
 WWW_PRIVATE_MEDIA="${WWW_PRIVATE_MEDIA:-/var/www/hoocon/private_media}"
+# Mirror of local _инструкции-pdf (scripts/sync-manual-pdfs.sh); web mounts it :ro.
+WWW_MANUALS="${WWW_MANUALS:-/var/www/hoocon/manuals-src}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -71,7 +73,7 @@ ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
 
 echo "Sync compose files to ${SSH_TARGET}:${DEPLOY_PATH}"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-  "mkdir -p '${DEPLOY_PATH}' '${WWW_FRONTEND}' '${WWW_STATIC}' '${WWW_MEDIA}' '${WWW_PRIVATE_MEDIA}' \
+  "mkdir -p '${DEPLOY_PATH}' '${WWW_FRONTEND}' '${WWW_STATIC}' '${WWW_MEDIA}' '${WWW_PRIVATE_MEDIA}' '${WWW_MANUALS}' \
    && (chown 1000:1000 '${WWW_PRIVATE_MEDIA}' 2>/dev/null || sudo -n chown 1000:1000 '${WWW_PRIVATE_MEDIA}' 2>/dev/null || true) \
    && chmod 750 '${WWW_PRIVATE_MEDIA}' 2>/dev/null || true"
 
