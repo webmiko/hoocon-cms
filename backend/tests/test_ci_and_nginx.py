@@ -109,10 +109,50 @@ def test_ci_workflow_triggers_on_develop_and_main() -> None:
     assert "main" in push_branches
 
 
-def test_nginx_conf_file_exists() -> None:
-    """The nginx site config exists at the expected path."""
-    assert NGINX_CONF.exists(), f"Missing nginx config: {NGINX_CONF}"
-    assert NGINX_SITE_INC.exists(), f"Missing nginx site include: {NGINX_SITE_INC}"
+def _nginx_brace_errors(text: str) -> list[str]:
+    """Unbalanced ``{``/``}`` outside comments and quotes (what ``nginx -t`` rejects first)."""
+    import re
+
+    depth = 0
+    errors: list[str] = []
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        line = re.sub(r"\"[^\"]*\"|'[^']*'", "", raw).split("#", 1)[0]
+        for char in line:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth < 0:
+                    errors.append(f"line {lineno}: unexpected }}")
+                    depth = 0
+    if depth:
+        errors.append(f"{depth} unclosed {{")
+    return errors
+
+
+def test_nginx_brace_lint_catches_unbalanced_block() -> None:
+    assert _nginx_brace_errors("server {\n  location / { return 200; }\n}\n") == []
+    assert _nginx_brace_errors('server {\n  return 200 "}";  # }\n}\n') == []
+    assert _nginx_brace_errors("server {\n  location / {\n}\n") == ["1 unclosed {"]
+    assert _nginx_brace_errors("}\n") == ["line 1: unexpected }"]
+
+
+def test_nginx_configs_have_balanced_braces() -> None:
+    """Was «файл существует»: битая скобка в конфиге проходила тест и роняла ``nginx -t`` на VPS."""
+    for path in (NGINX_CONF, NGINX_SITE_INC):
+        assert _nginx_brace_errors(path.read_text(encoding="utf-8")) == [], path.name
+
+
+def test_nginx_local_includes_are_shipped_by_deploy() -> None:
+    """Every ``include /etc/nginx/<file>`` must exist in deploy/nginx and be copied by deploy-remote.sh."""
+    import re
+
+    deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+    included = set(re.findall(r"^\s*include /etc/nginx/([\w.-]+);", NGINX_CONF.read_text(encoding="utf-8"), re.M))
+    assert included == {"hoocon-site.inc", "redirects.map"}
+    for name in included:
+        assert (NGINX_CONF.parent / name).is_file(), name
+        assert f"cp '${{DEPLOY_PATH}}/deploy/nginx/{name}' /etc/nginx/{name}" in deploy, name
 
 
 def test_nginx_conf_has_api_proxy() -> None:
@@ -241,9 +281,28 @@ def test_nginx_conf_enables_https_apex() -> None:
     assert "hoocon-site.inc" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 
-def test_redirects_map_file_exists() -> None:
-    """The redirects.map stub file exists."""
-    assert REDIRECTS_MAP.exists(), f"Missing redirects map: {REDIRECTS_MAP}"
+def test_redirects_map_rules_parse_as_nginx_map() -> None:
+    """Was «файл существует» + «есть комментарий»: map грузится nginx до export_nginx_redirects.
+
+    Each rule must be ``<safe path> <safe path>;`` as ``render_nginx_map`` writes it, with unique
+    sources (nginx refuses duplicate map keys) and real Tilda ``/tproduct/`` rules.
+    """
+    from redirects.pathutils import is_safe_internal_path
+
+    rules = [
+        line
+        for line in REDIRECTS_MAP.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+    assert rules
+    bad = [line for line in rules if not line.endswith(";") or len(line[:-1].split(" ")) != 2]
+    assert bad == []
+    pairs = [line[:-1].split(" ") for line in rules]
+    unsafe = [pair for pair in pairs if not all(is_safe_internal_path(path) for path in pair)]
+    assert unsafe == []
+    sources = [source for source, _ in pairs]
+    assert len(sources) == len(set(sources))
+    assert any(source.startswith("/tproduct/") for source in sources)
 
 
 def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
@@ -262,13 +321,6 @@ def test_vps_free_disk_script_exists() -> None:
     assert "docker image prune" in text
     assert "hoocon_spa" in text
     assert "vps-free-disk.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
-
-
-def test_redirects_map_has_documentation() -> None:
-    """redirects.map has usage documentation (not just empty)."""
-    content = REDIRECTS_MAP.read_text(encoding="utf-8")
-    assert len(content) > 100  # has explanatory comments
-    assert "tproduct" in content  # references the Tilda URL pattern
 
 
 def test_ci_does_not_cancel_main_deploys() -> None:
