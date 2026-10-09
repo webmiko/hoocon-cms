@@ -357,6 +357,7 @@ def test_download_recording_binary_and_empty(
     assert mango.download_recording("rec-1") is None
 
 
+@pytest.mark.django_db
 def test_mango_command_requires_keys(settings: Any) -> None:
     """Без key/salt — RuntimeError до сети."""
     from crm import mango
@@ -368,6 +369,7 @@ def test_mango_command_requires_keys(settings: Any) -> None:
         mango.mango_command("callback", {})
 
 
+@pytest.mark.django_db
 def test_mango_command_transport_error(
     monkeypatch: pytest.MonkeyPatch,
     mango_settings: Any,
@@ -385,6 +387,7 @@ def test_mango_command_transport_error(
         mango.initiate_callback("101", "79151112233")
 
 
+@pytest.mark.django_db
 def test_callback_webhook_substitutes_digits(
     monkeypatch: pytest.MonkeyPatch,
     settings: Any,
@@ -420,6 +423,7 @@ def test_callback_webhook_substitutes_digits(
     assert "TelNumbr=79151112233" in hits[0]
 
 
+@pytest.mark.django_db
 def test_callback_webhook_unconfigured(settings: Any) -> None:
     """Без MANGO_CALLBACK_WEBHOOK_URL — понятный RuntimeError."""
     from crm import mango

@@ -290,6 +290,13 @@ class StaffVpbxProfile(models.Model):
         default=True,
         help_text=_("Выкл — звонки на этот добавочный не привязываются к сотруднику."),
     )
+    uis_employee_id = models.CharField(
+        _("ID сотрудника UIS"),
+        max_length=20,
+        blank=True,
+        default="",
+        help_text=_("Числовой id сотрудника в Новосистем (UIS). Нужен для звонка из карточки, когда виджет включён."),
+    )
 
     class Meta:
         verbose_name = _("Добавочный сотрудника (Mango)")

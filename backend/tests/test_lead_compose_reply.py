@@ -28,12 +28,14 @@ def test_mail_compose_headline_uses_text_color_not_surface() -> None:
 
 
 def test_hoocon_toggle_css_replaces_checkmark_with_switch() -> None:
-    """Global extras CSS restyles .hoocon-toggle checkboxes as on/off switches."""
+    """Switch skin: включённое состояние зелёное, не цветом акцента."""
     css = _EXTRAS_CSS.read_text(encoding="utf-8")
     block = css.split('input[type="checkbox"].hoocon-toggle {')[1].split("}")[0]
     assert "appearance: none" in block
     checked = css.split('input[type="checkbox"].hoocon-toggle:checked {')[1].split("}")[0]
-    assert "var(--os27-accent" in checked
+    assert "#16a34a" in checked
+    assert "--os27-accent" not in checked
+    assert "--hoocon-primary" not in checked
     assert 'input[type="checkbox"].hoocon-toggle::after' in css
     assert "translateX" in css
 

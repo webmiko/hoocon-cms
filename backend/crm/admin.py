@@ -851,43 +851,55 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             mango_configured,
             webhook_callback_configured,
         )
+        from crm.novosystem import initiate_employee_call, novosystem_configured
 
         extension = ""
+        uis_employee_id = ""
         profile = getattr(request.user, "vpbx_profile", None)
-        if profile is not None:
-            extension = profile.extension if profile.is_enabled else ""
+        if profile is not None and profile.is_enabled:
+            extension = profile.extension
+            uis_employee_id = (profile.uis_employee_id or "").strip()
         blockers: list[str] = []
-        use_api = mango_configured()
-        if not use_api and not webhook_callback_configured():
-            blockers.append(
-                str(_("Mango не настроен: нет ни MANGO_VPBX_API_KEY/SALT, ни MANGO_CALLBACK_WEBHOOK_URL."))
-            )
-        if not extension:
-            blockers.append(
-                str(
-                    _(
-                        "У вас не задан добавочный Mango — укажите его в профиле "
-                        "пользователя («Добавочный сотрудника»)."
-                    )
+        use_mango = mango_configured() or webhook_callback_configured()
+        use_uis = novosystem_configured()
+        can_mango = bool(use_mango and extension)
+        can_uis = bool(use_uis and uis_employee_id)
+        if not use_mango and not use_uis:
+            blockers.append(str(_("Телефония выключена: включите виджет Mango или Новосистем в интеграциях.")))
+        elif not can_mango and not can_uis:
+            if use_mango:
+                blockers.append(
+                    str(_("У вас не задан добавочный — укажите его в профиле пользователя («Телефония сотрудника»)."))
                 )
-            )
+            if use_uis:
+                blockers.append(str(_("Укажите ID сотрудника UIS в профиле пользователя («Телефония сотрудника»).")))
         if not client.phone:
             blockers.append(str(_("У клиента не заполнен телефон.")))
 
         if request.method == "POST" and not blockers:
             try:
-                if use_api:
+                if can_mango and mango_configured():
                     result = initiate_callback(extension, client.phone)
-                else:
+                    via = "Mango"
+                elif can_mango:
                     initiate_callback_webhook(extension, client.phone)
                     result = {}
+                    via = "Mango"
+                else:
+                    result = {
+                        "call_session_id": initiate_employee_call(
+                            employee_id=uis_employee_id,
+                            employee_phone="",
+                            contact=client.phone,
+                        )
+                    }
+                    via = "Новосистем"
             except RuntimeError as exc:
                 self.message_user(request, str(exc), messages.ERROR)
             else:
                 self.message_user(
                     request,
-                    _("Вызов инициирован: Mango соединит ваш добавочный %(ext)s с %(phone)s.")
-                    % {"ext": extension, "phone": client.phone},
+                    _("Вызов инициирован: %(via)s соединит вас с %(phone)s.") % {"via": via, "phone": client.phone},
                     messages.SUCCESS,
                 )
                 logger.info(
@@ -1736,6 +1748,8 @@ class CallAdmin(ModelAdmin):
         """Scoped download link for the stored recording."""
         if not obj.recording:
             if obj.recording_id:
+                if (obj.entry_id or "").startswith("uis:"):
+                    return str(_("Запись есть в UIS. Слушать её можно в личном кабинете Новосистем."))
                 return str(_("Запись есть в Mango, ещё не скачана"))
             return "—"
         url = reverse("admin:crm_call_recording_download", args=[obj.pk])

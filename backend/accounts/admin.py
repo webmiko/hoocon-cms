@@ -90,9 +90,9 @@ class StaffVpbxProfileInline(admin.StackedInline):
     can_delete = False
     extra = 1
     max_num = 1
-    fields = ("extension", "is_enabled")
-    verbose_name = "Добавочный (Mango)"
-    verbose_name_plural = "Добавочный сотрудника (Mango)"
+    fields = ("extension", "uis_employee_id", "is_enabled")
+    verbose_name = "Телефония сотрудника"
+    verbose_name_plural = "Телефония сотрудника"
 
 
 class UserAdmin(BaseUserAdmin, ModelAdmin):

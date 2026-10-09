@@ -19,7 +19,6 @@ import logging
 import re
 from typing import Any, cast
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -58,11 +57,12 @@ def mango_sign(api_key: str, json_payload: str, api_salt: str) -> str:
 
 
 def verify_mango_signature(api_key: str, json_payload: str, sign: str) -> bool:
-    """Constant-time signature check; False when keys are not configured."""
+    """Constant-time signature check; False when the widget is off or keys are empty."""
+    from sitesettings.telephony import mango_settings
+
+    enabled, expected_key, salt, _callback = mango_settings()
     api_key = (api_key or "").strip()
-    salt = (getattr(settings, "MANGO_VPBX_API_SALT", "") or "").strip()
-    expected_key = (getattr(settings, "MANGO_VPBX_API_KEY", "") or "").strip()
-    if not expected_key or not salt or api_key != expected_key:
+    if not enabled or not expected_key or not salt or api_key != expected_key:
         return False
     expected = mango_sign(api_key, json_payload, salt)
     return hmac.compare_digest(expected, (sign or "").strip())

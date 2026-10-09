@@ -583,6 +583,7 @@ REST_FRAMEWORK = {
         "max_webhook": "120/min",
         # Mango шлёт серию событий на вызов (appeared→connected→disconnected).
         "mango_webhook": "120/min",
+        "novosystem_webhook": "120/min",
         "staff_otp": "30/hour",
         # Client cabinet: register/login/OTP (per IP) and RFQ-repeat (per session).
         "client_auth": "30/hour",

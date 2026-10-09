@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import quote
 
 from django import forms
 from django.conf import settings
-from django.contrib import admin
-from django.http import HttpRequest, HttpResponse
-from django.urls import reverse
+from django.contrib import admin, messages
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
 
@@ -17,8 +18,63 @@ from config.admin_mixins import OpenChangeLinkMixin
 from sitesettings.credentials import token_source_label
 from sitesettings.integration_dashboard import build_integration_dashboard
 from sitesettings.models import SiteSettings
+from sitesettings.telephony import mango_settings, novosystem_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[str, Any]]:
+    """Context for the Mango and Novosystem forms on the integrations page."""
+    mango_on, mango_key, mango_salt, mango_callback = mango_settings(site)
+    uis_on, uis_token, uis_phone, uis_secret = novosystem_settings(site)
+    webhook = request.build_absolute_uri(reverse("novosystem-events"))
+    if uis_secret:
+        webhook = f"{webhook}?token={quote(uis_secret, safe='')}"
+
+    def status(enabled: bool, ready: bool) -> tuple[str, str]:
+        if enabled and ready:
+            return "on", "Подключён"
+        if enabled:
+            return "partial", "Не полностью"
+        return "off", "Выключен"
+
+    mango_ready = bool(mango_key and mango_salt) or bool(mango_callback)
+    uis_ready = bool(uis_token and uis_phone and uis_secret)
+    mango_status, mango_label = status(mango_on, mango_ready)
+    uis_status, uis_label = status(uis_on, uis_ready)
+    return [
+        {
+            "provider": "mango",
+            "name": "Mango",
+            "status": mango_status,
+            "status_label": mango_label,
+            "ready": mango_ready,
+            "enabled": mango_on,
+            "callback": mango_callback,
+            "key_set": bool(mango_key),
+            "salt_set": bool(mango_salt),
+            "hint": (
+                "События: /api/telephony/mango/events/. Ключ и соль из ЛК Mango. "
+                "Пустые поля секретов не стирают сохранённые."
+            ),
+        },
+        {
+            "provider": "novosystem",
+            "name": "Новосистем",
+            "status": uis_status,
+            "status_label": uis_label,
+            "ready": uis_ready,
+            "enabled": uis_on,
+            "virtual_phone": uis_phone,
+            "token_set": bool(uis_token),
+            "secret_set": bool(uis_secret),
+            "webhook_url": webhook,
+            "hint": (
+                "В ЛК UIS: API Базовый набор, белый IP сервера, HTTP-уведомление POST на URL выше. "
+                "ID сотрудника — в карточке пользователя."
+            ),
+        },
+    ]
 
 
 class SiteSettingsAdminForm(forms.ModelForm):
@@ -416,15 +472,68 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         )
         return format_html("<strong>{}</strong>", label)
 
+    def get_urls(self) -> list[Any]:
+        """Widget save lives next to the integrations changelist."""
+        custom = [
+            path(
+                "telephony-widget/",
+                self.admin_site.admin_view(self.telephony_widget_view),
+                name="sitesettings_telephony_widget",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def telephony_widget_view(self, request: HttpRequest) -> HttpResponse:
+        """Save one telephony widget without opening the full settings form."""
+        if not self.has_change_permission(request):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied
+        if request.method != "POST":
+            return HttpResponseRedirect(reverse("admin:sitesettings_sitesettings_changelist"))
+        site = SiteSettings.load()
+        provider = (request.POST.get("provider") or "").strip()
+        if provider == "mango":
+            site.mango_enabled = request.POST.get("mango_enabled") == "on"
+            key = (request.POST.get("mango_api_key") or "").strip()
+            salt = (request.POST.get("mango_api_salt") or "").strip()
+            if key:
+                site.mango_api_key = key
+            if salt:
+                site.mango_api_salt = salt
+            site.mango_callback_webhook_url = (request.POST.get("mango_callback_webhook_url") or "").strip()
+            site.save()
+            messages.success(request, "Виджет Mango сохранён.")
+        elif provider == "novosystem":
+            site.novosystem_enabled = request.POST.get("novosystem_enabled") == "on"
+            token = (request.POST.get("novosystem_access_token") or "").strip()
+            secret = (request.POST.get("novosystem_webhook_secret") or "").strip()
+            if token:
+                site.novosystem_access_token = token
+            if secret:
+                site.novosystem_webhook_secret = secret
+            site.novosystem_virtual_phone = (request.POST.get("novosystem_virtual_phone") or "").strip()
+            site.save()
+            messages.success(request, "Виджет Новосистем сохранён.")
+        else:
+            messages.error(request, "Неизвестный виджет телефонии.")
+        return HttpResponseRedirect(reverse("admin:sitesettings_sitesettings_changelist"))
+
     def changelist_view(
         self,
         request: HttpRequest,
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
         """Show integration status dashboard instead of a one-row table."""
-        SiteSettings.load()
+        site = SiteSettings.load()
         context = dict(extra_context or {})
-        context["integration_dashboard"] = build_integration_dashboard()
+        dash = build_integration_dashboard(site)
+        widgets = _telephony_widgets(request, site)
+        dash["total_count"] += len(widgets)
+        dash["connected_count"] += sum(1 for widget in widgets if widget["status"] == "on")
+        context["integration_dashboard"] = dash
+        context["telephony_widgets"] = widgets
+        context["telephony_widget_url"] = reverse("admin:sitesettings_telephony_widget")
         return super().changelist_view(request, extra_context=context)
 
     def has_add_permission(self, request: HttpRequest) -> bool:

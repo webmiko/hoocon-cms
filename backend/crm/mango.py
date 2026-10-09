@@ -16,9 +16,8 @@ import urllib.request
 import uuid
 from typing import Any
 
-from django.conf import settings
-
 from crm.telephony import mango_sign
+from sitesettings.telephony import mango_settings
 
 logger = logging.getLogger("hoocon.crm")
 
@@ -27,10 +26,9 @@ _TIMEOUT_SEC = 15
 
 
 def mango_configured() -> bool:
-    """True когда заданы ключ и соль — без них любые команды бессмысленны."""
-    key = (getattr(settings, "MANGO_VPBX_API_KEY", "") or "").strip()
-    salt = (getattr(settings, "MANGO_VPBX_API_SALT", "") or "").strip()
-    return bool(key and salt)
+    """True когда виджет включён и заданы ключ и соль."""
+    enabled, key, salt, _callback = mango_settings()
+    return bool(enabled and key and salt)
 
 
 def mango_command(command: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -39,10 +37,11 @@ def mango_command(command: str, payload: dict[str, Any]) -> dict[str, Any]:
     Raises RuntimeError on transport/HTTP errors — caller maps to a user
     message or a Celery retry.
     """
-    key = (getattr(settings, "MANGO_VPBX_API_KEY", "") or "").strip()
-    salt = (getattr(settings, "MANGO_VPBX_API_SALT", "") or "").strip()
+    enabled, key, salt, _callback = mango_settings()
+    if not enabled:
+        raise RuntimeError("Виджет Mango выключен")
     if not key or not salt:
-        raise RuntimeError("Mango VPBX не настроен (MANGO_VPBX_API_KEY/SALT)")
+        raise RuntimeError("Mango VPBX не настроен: укажите ключ и соль в виджете")
 
     json_payload = json.dumps(payload, ensure_ascii=False)
     form = urllib.parse.urlencode(
@@ -80,8 +79,9 @@ def initiate_callback(extension: str, to_number: str) -> dict[str, Any]:
 
 
 def webhook_callback_configured() -> bool:
-    """True когда задан URL «исходящего звонка через вебхук» из ЛК Mango."""
-    return bool(getattr(settings, "MANGO_CALLBACK_WEBHOOK_URL", "").strip())
+    """True когда виджет включён и задан URL исходящего звонка из ЛК Mango."""
+    enabled, _key, _salt, callback = mango_settings()
+    return bool(enabled and callback)
 
 
 def initiate_callback_webhook(extension: str, to_number: str) -> None:
@@ -94,9 +94,11 @@ def initiate_callback_webhook(extension: str, to_number: str) -> None:
     """
     from crm.telephony import normalize_phone_digits
 
-    template = getattr(settings, "MANGO_CALLBACK_WEBHOOK_URL", "").strip()
+    enabled, _key, _salt, template = mango_settings()
+    if not enabled:
+        raise RuntimeError("Виджет Mango выключен")
     if not template:
-        raise RuntimeError("Не задан MANGO_CALLBACK_WEBHOOK_URL")
+        raise RuntimeError("Не задан URL вебхука исходящего звонка Mango")
     ext = "".join(ch for ch in extension if ch.isdigit())
     num = normalize_phone_digits(to_number)
     if not ext or not num:

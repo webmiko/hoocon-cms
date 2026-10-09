@@ -198,6 +198,62 @@ class SiteSettings(models.Model):
         help_text=("При первой публикации статьи/новости отправить анонс во все включённые каналы (фоновая очередь)."),
     )
 
+    # ── Mango telephony widget (Admin; env is the fallback) ──
+    mango_enabled: models.BooleanField = models.BooleanField(
+        "Mango включён",
+        default=True,
+        help_text="Выкл — вебхук и звонок из карточки клиента не ходят в Mango, даже если ключи заданы.",
+    )
+    mango_api_key: models.CharField = models.CharField(
+        "ключ API Mango",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Пустое поле не стирает сохранённый ключ. Запасной вариант: MANGO_VPBX_API_KEY.",
+    )
+    mango_api_salt: models.CharField = models.CharField(
+        "соль API Mango",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Пустое поле не стирает сохранённую соль. Запасной вариант: MANGO_VPBX_API_SALT.",
+    )
+    mango_callback_webhook_url: models.CharField = models.CharField(
+        "URL вебхука исходящего звонка Mango",
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Шаблон из ЛК Mango. Плейсхолдеры {ext} и {num}. Пусто — MANGO_CALLBACK_WEBHOOK_URL.",
+    )
+
+    # ── Novosystem / UIS telephony widget ──
+    novosystem_enabled: models.BooleanField = models.BooleanField(
+        "Новосистем включён",
+        default=False,
+        help_text="Выкл — вебхук UIS и звонок из карточки не используются.",
+    )
+    novosystem_access_token: models.CharField = models.CharField(
+        "ключ API Новосистем",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Постоянный ключ пользователя UIS с доступом к Call API. Пустое поле не стирает ключ.",
+    )
+    novosystem_virtual_phone: models.CharField = models.CharField(
+        "виртуальный номер Новосистем",
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Номер в формате E.164 без плюса, например 74951234567. С него идут исходящие.",
+    )
+    novosystem_webhook_secret: models.CharField = models.CharField(
+        "секрет вебхука Новосистем",
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Добавьте его в URL уведомления UIS как token. Пустое поле не стирает секрет.",
+    )
+
     # ── Telegram integration ──
     telegram_enabled: models.BooleanField = models.BooleanField(
         "Telegram включён",
