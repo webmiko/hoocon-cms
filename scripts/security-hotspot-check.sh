@@ -11,14 +11,27 @@ fail() { echo "✗ $1"; FAIL=$((FAIL + 1)); }
 ok() { echo "✓ $1"; }
 
 # 1) Frontend: no dangerouslySetInnerHTML without sanitization.
-# Allow only if the __html value is wrapped in sanitizeHtml(...) (DOMPurify).
+# Allow only if the __html value is wrapped in sanitizeHtml(...) (DOMPurify),
+# or its root variable is declared in the same file from sanitizeHtml(...)
+# (e.g. `const body = extractArticleToc(sanitizeHtml(raw))` → `body.html`).
+html_var_is_sanitized() {
+  local file="$1" text="$2" var
+  var=$(printf '%s' "$text" | sed -nE 's/.*__html:[[:space:]]*([A-Za-z_][A-Za-z0-9_]*).*/\1/p')
+  [ -n "$var" ] || return 1
+  grep -qE "^[[:space:]]*const[[:space:]]+${var}[[:space:]]*=.*sanitizeHtml\(" "$file"
+}
+
 if [ -d "$ROOT/frontend/src" ]; then
   VIOLATIONS=""
   while IFS= read -r line; do
     file_line="$line"
-    if ! printf '%s' "$file_line" | grep -qE 'sanitizeHtml\('; then
-      VIOLATIONS="$VIOLATIONS\n$file_line"
+    if printf '%s' "$file_line" | grep -qE 'sanitizeHtml\('; then
+      continue
     fi
+    if html_var_is_sanitized "${file_line%%:*}" "${file_line#*:*:}"; then
+      continue
+    fi
+    VIOLATIONS="$VIOLATIONS\n$file_line"
   done < <(grep -RInE 'dangerouslySetInnerHTML' frontend/src 2>/dev/null | grep -v node_modules || true)
   if [ -n "$VIOLATIONS" ]; then
     printf "%b\n" "$VIOLATIONS"
