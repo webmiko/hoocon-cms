@@ -24,18 +24,27 @@ _ATTR_VALUE_MAX_LEN = _value_max_length
 
 # slug → Attribute for one enrichment run; None outside ``attribute_cache``.
 _attribute_cache: ContextVar[dict[str, Attribute] | None] = ContextVar("etl_attribute_cache", default=None)
+# sku.pk → {attribute_id: row} for the SKU last passed to clear_etl_attributes
+# (at most one entry); None outside ``attribute_cache``.
+_cleared_rows: ContextVar[dict[int, dict[int, AttributeValue]] | None] = ContextVar("etl_cleared_rows", default=None)
 
 
 @contextmanager
 def attribute_cache() -> Iterator[None]:
-    """Reuse Attribute rows across SKUs within one run (one lookup per slug)."""
+    """Reuse Attribute rows across SKUs within one run (one lookup per slug).
+
+    After :func:`clear_etl_attributes` the SKU's remaining rows are known, so
+    its next :func:`set_sku_attribute` calls skip the per-row SELECT.
+    """
     if _attribute_cache.get() is not None:
         yield
         return
     token = _attribute_cache.set({})
+    rows_token = _cleared_rows.set({})
     try:
         yield
     finally:
+        _cleared_rows.reset(rows_token)
         _attribute_cache.reset(token)
 
 
@@ -115,9 +124,15 @@ def set_sku_attribute(
     """
     attr = ensure_attribute(slug, name, unit)
     clipped = clip_attribute_value(value)
-    row = AttributeValue.objects.filter(sku=sku, attribute=attr).first()
+    known = (_cleared_rows.get() or {}).get(sku.pk)
+    if known is not None:
+        row = known.get(attr.pk)
+    else:
+        row = AttributeValue.objects.filter(sku=sku, attribute=attr).first()
     if row is None:
-        AttributeValue.objects.create(sku=sku, attribute=attr, value=clipped)
+        row = AttributeValue.objects.create(sku=sku, attribute=attr, value=clipped)
+        if known is not None:
+            known[attr.pk] = row
         return True
     if row.is_manual:
         return False
@@ -137,6 +152,10 @@ def clear_etl_attributes(sku: SKU) -> int:
         Number of deleted rows; Admin-edited rows (``is_manual``) stay.
     """
     deleted, _ = AttributeValue.objects.filter(sku=sku, is_manual=False).delete()
+    cleared = _cleared_rows.get()
+    if cleared is not None:
+        cleared.clear()
+        cleared[sku.pk] = {row.attribute_id: row for row in AttributeValue.objects.filter(sku=sku)}
     return deleted
 
 
