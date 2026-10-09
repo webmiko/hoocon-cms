@@ -37,11 +37,28 @@ def test_normalize_path(raw: str, expected: str) -> None:
         ("/novosti/news-1", ObjectType.NEWS, "news-1"),
         ("/company", ObjectType.PAGE, "company"),
         ("/search", ObjectType.SEARCH, ""),
+        ("/search/junk-1", ObjectType.OTHER, "search/junk-1"),
         ("/rfq", ObjectType.LEAD, "rfq"),
     ],
 )
 def test_classify_path(path: str, otype: str, okey: str) -> None:
     assert classify_path(path) == (otype, okey)
+
+
+@pytest.mark.django_db
+def test_junk_search_and_category_paths_do_not_open_stat_rows() -> None:
+    """M28: /search/<мусор> и выдуманная категория перед SKU не плодят строки статистики."""
+    from django.test import RequestFactory
+
+    request = RequestFactory().post("/api/analytics/hit/")
+    _published_sku("sku-canon", "SKU Canon")
+
+    for junk in ("/search/a", "/search/b/c"):
+        assert record_page_hit(request=request, path=junk)
+    for category in ("a", "made-up", "another-fake"):
+        assert record_page_hit(request=request, path=f"/catalog/{category}/sku-canon")
+
+    assert list(PageDailyStat.objects.values_list("path", "views")) == [("/catalog/a/sku-canon", 3)]
 
 
 # Секунда до полуночи по МСК: без заморозки хит и проверка попадали в разные дни.

@@ -96,7 +96,7 @@ def classify_path(path: str) -> tuple[str, str]:
     """
     if path == "/":
         return ObjectType.HOME, ""
-    if path == "/search" or path.startswith("/search/"):
+    if path == "/search":
         return ObjectType.SEARCH, ""
     if path in _LEAD_PATHS or path.rstrip("/") in _LEAD_PATHS:
         return ObjectType.LEAD, path.strip("/").split("/")[0]
@@ -150,6 +150,28 @@ def route_title(object_type: str, object_key: str) -> str | None:
         return None
     found = query.first()
     return str(found) if found else None
+
+
+def canonical_sku_path(sku_slug: str) -> str | None:
+    """``/catalog/<category>/<sku>`` with the category taken from the catalog.
+
+    The SPA accepts any category segment before a SKU slug; without this
+    every made-up segment would open its own stats row for the same card.
+
+    Args:
+        sku_slug: SKU slug from the client path.
+
+    Returns:
+        Canonical path, or None for an unpublished / unknown / uncategorised SKU.
+    """
+    from catalog.models import SKU
+    from catalog.sku_access import sku_category_slug_or_empty
+
+    sku = SKU.objects.filter(slug=sku_slug, is_published=True).select_related("product__category").first()
+    category = sku_category_slug_or_empty(sku)
+    if sku is None or not category:
+        return None
+    return f"/catalog/{category}/{sku.slug}"
 
 
 def visitor_id_for(request: HttpRequest, day: date) -> str:
@@ -209,6 +231,11 @@ def record_page_hit(
         return True
 
     otype, okey = classify_path(normalized)
+    if otype == ObjectType.SKU:
+        canonical = canonical_sku_path(okey)
+        if canonical is None:
+            return True
+        normalized = canonical
     day = timezone.localdate()
     title = ""
     if not PageDailyStat.objects.filter(day=day, path=normalized).exists():
