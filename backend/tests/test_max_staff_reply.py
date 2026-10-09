@@ -733,6 +733,36 @@ def test_staff_assign_to_button_reassigns_dialog() -> None:
 
 
 @pytest.mark.django_db
+def test_assign_to_button_requires_support_permission() -> None:
+    """L18: кнопка «Передать» в MAX без supportchat.change_conversation не переназначает диалог."""
+    from social.max_staff_reply import staff_assign_to_callback_payload
+
+    presser = _make_manager(email="mgr-noperm@hoocon.ru", max_user_id="970")
+    target = _make_manager(email="mgr-noperm-target@hoocon.ru", max_user_id="971")
+    perm = Permission.objects.get(content_type__app_label="supportchat", codename="change_conversation")
+    Group.objects.get(name=GROUP_MANAGER).permissions.remove(perm)
+    presser.user_permissions.remove(perm)  # type: ignore[attr-defined]
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-noperm-assign")
+    with patch(
+        "social.publishers.answer_max_callback",
+        return_value=PublishResult(ok=True),
+    ) as answer:
+        handle_max_update(
+            {
+                "update_type": "message_callback",
+                "callback": {
+                    "user": {"user_id": 970},
+                    "payload": staff_assign_to_callback_payload(conv.pk, target.pk),
+                    "callback_id": "cb-noperm-assign",
+                },
+            },
+        )
+    conv.refresh_from_db()
+    assert conv.assignee_id is None
+    assert answer.call_args.kwargs["notification"] == "Недостаточно прав для ответа в поддержке."
+
+
+@pytest.mark.django_db
 def test_note_button_on_taken_dialog_is_rejected() -> None:
     """«📝 Заметка» on a dialog taken by someone else is refused."""
     from social.max_staff_reply import staff_note_callback_payload

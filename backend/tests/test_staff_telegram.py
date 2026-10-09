@@ -648,6 +648,42 @@ def test_assign_to_button_rejects_non_support_staff_telegram() -> None:
     assert api.call_args.args[1]["text"] == "Сотрудник не найден"
 
 
+def _strip_support_permission(*users: object) -> None:
+    """Manager group stays, but nobody in it may change support dialogs."""
+    from django.contrib.auth.models import Permission
+
+    perm = Permission.objects.get(content_type__app_label="supportchat", codename="change_conversation")
+    Group.objects.get(name=GROUP_MANAGER).permissions.remove(perm)
+    for user in users:
+        user.user_permissions.remove(perm)  # type: ignore[attr-defined]
+
+
+@pytest.mark.django_db
+def test_assign_to_button_requires_support_permission_telegram() -> None:
+    """L18: кнопка «Передать» в Telegram без supportchat.change_conversation не переназначает диалог."""
+    from social.telegram_staff_reply import staff_assign_to_callback_data
+    from supportchat.models import Channel, Conversation, Message, MessageDirection
+
+    presser = _make_manager(email="mgr-noperm-tg@hoocon.ru", chat_id="8501")
+    target = _make_manager(email="mgr-target-tg@hoocon.ru", chat_id="8502")
+    _strip_support_permission(presser, target)
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-tg-noperm")
+    with patch("social.telegram_bot.telegram_api_call") as api:
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-noperm",
+                    "data": staff_assign_to_callback_data(conv.pk, target.pk),
+                    "from": {"id": 8501, "first_name": "Mgr"},
+                },
+            },
+        )
+    conv.refresh_from_db()
+    assert conv.assignee_id is None
+    assert not Message.objects.filter(conversation=conv, direction=MessageDirection.NOTE).exists()
+    assert api.call_args.args[1]["text"] == "Недостаточно прав для ответа в поддержке."
+
+
 def test_telegram_html_text_clips_by_utf16_before_escape() -> None:
     """4000 эмодзи = 8000 UTF-16 units > 4096; обрезка после escape рвала «&amp;»."""
     from social.copy import telegram_html_text

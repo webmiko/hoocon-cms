@@ -23,6 +23,20 @@ _STAFF_ASSIGN_RE = re.compile(
 _STAFF_TEMPLATE_RE = re.compile(r"^/t\s+([\w-]+)\s*$", re.IGNORECASE)
 _STAFF_TEMPLATE_LIST = {"/t", "/tpls", "/templates"}
 
+STAFF_SUPPORT_PERMISSION = "supportchat.change_conversation"
+STAFF_SUPPORT_DENIED = "Недостаточно прав для ответа в поддержке."
+
+
+def staff_may_handle_support(staff_user: AbstractBaseUser | None) -> bool:
+    """True when the user may reply, note or transfer support dialogs.
+
+    One gate for every messenger entry point (text replies and inline
+    buttons alike) — the same permission the Admin change view requires.
+    """
+    from django.contrib.auth.models import PermissionsMixin
+
+    return isinstance(staff_user, PermissionsMixin) and staff_user.has_perm(STAFF_SUPPORT_PERMISSION)
+
 
 def support_staff_queryset() -> QuerySet[Any]:
     """Active managers/admins/superusers who may own a support dialog."""
@@ -78,17 +92,14 @@ def submit_staff_reply(
     Returns:
         (ok, plain-text status for the staff chat).
     """
-    from django.contrib.auth.models import PermissionsMixin
-
-    if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
-        "supportchat.change_conversation",
-    ):
+    if not staff_may_handle_support(staff_user):
         logger.warning(
-            "staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
+            "staff_reply_denied user=%s conv=%s — missing %s",
             getattr(staff_user, "pk", None),
             conversation_id,
+            STAFF_SUPPORT_PERMISSION,
         )
-        return False, "Недостаточно прав для ответа в поддержке."
+        return False, STAFF_SUPPORT_DENIED
 
     try:
         conversation = Conversation.objects.get(pk=conversation_id)

@@ -364,7 +364,12 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
     )
     from supportchat.models import Conversation
     from supportchat.presentation import staff_public_name
-    from supportchat.staff_actions import assign_conversation, notify_conversation_assigned
+    from supportchat.staff_actions import (
+        STAFF_SUPPORT_DENIED,
+        assign_conversation,
+        notify_conversation_assigned,
+        staff_may_handle_support,
+    )
 
     parsed = parse_staff_alert_callback(str(query.get("data") or ""))
     if parsed is None:
@@ -380,6 +385,13 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
             telegram_api_call(
                 "answerCallbackQuery",
                 {"callback_query_id": query_id, "text": "Недоступно"},
+            )
+        return None
+    if not staff_may_handle_support(staff_user):
+        if query_id:
+            telegram_api_call(
+                "answerCallbackQuery",
+                {"callback_query_id": query_id, "text": STAFF_SUPPORT_DENIED},
             )
         return None
 
