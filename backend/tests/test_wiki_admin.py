@@ -366,6 +366,25 @@ def test_seed_wiki_guide_explains_lead_contact_verification() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_guide_explains_contact_verified_only_visibility() -> None:
+    """Руководство 3.0: «в работу» и ответ в чате больше не открывают кабинет — только подтверждённый контакт."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert 'id="contact-verified"' in body
+    assert "Заявка, которую он только что отправил, уже лежит в его кабинете" not in body
+    assert 'id="changelog-contact-verified-only"' in changelog
+    assert changelog.index("changelog-contact-verified-only") < changelog.index("changelog-chat-telephony-guards")
+    row = changelog.split('id="changelog-contact-verified-only"', 1)[1].split("</tr>", 1)[0]
+    assert row.count("<td>") + row.count("<td ") == 3
+    assert 'href="#contact-verified"' in row
+
+
+@pytest.mark.django_db
 def test_seed_wiki_mango_guide_has_webhook_address_and_rejected_call() -> None:
     """Гайд Mango: адрес внешней системы для событий и ошибка «Mango отклонил звонок»."""
     from io import StringIO
