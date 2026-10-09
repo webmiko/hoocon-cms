@@ -413,18 +413,28 @@ def test_ssh_trust_is_strict_with_pinned_key(tmp_path: Path) -> None:
     assert "vps.example ssh-ed25519 AAAAC3Nza" in known
 
 
-def test_ssh_trust_warns_in_ci_without_pinned_key(tmp_path: Path) -> None:
+def test_ssh_trust_fails_in_ci_without_pinned_key(tmp_path: Path) -> None:
+    """L6: без SSH_KNOWN_HOSTS чистый раннер CI доверял любому ключу VPS (TOFU) — теперь деплой падает."""
     import subprocess
 
-    script = f'source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust'
+    script = f'set -euo pipefail; source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust; echo reached-ssh'
     out = subprocess.run(
         ["bash", "-c", script],
-        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "GITHUB_ACTIONS": "true"},
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "GITHUB_ACTIONS": "true", "SERVER_HOST": "vps.example"},
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
-    assert "::warning::SSH_KNOWN_HOSTS" in out.stderr
+    assert out.returncode != 0
+    assert "::error::SSH_KNOWN_HOSTS" in out.stderr
+    assert "reached-ssh" not in out.stdout
+    assert not (tmp_path / ".ssh" / "known_hosts").exists()
+
+
+def test_ssh_trust_local_run_keeps_trust_on_first_use(tmp_path: Path) -> None:
+    """L6: вне CI (ручной деплой с машины разработчика) секрет не обязателен."""
+    opts, _ = _ssh_trust_opts(tmp_path, {})
+    assert "StrictHostKeyChecking=accept-new" in opts
 
 
 def test_telephony_webhook_token_not_in_access_log() -> None:
