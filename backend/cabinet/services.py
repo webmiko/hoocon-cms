@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from django.conf import settings
-from django.core.cache import cache
+from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
@@ -18,25 +18,31 @@ from django.template.loader import render_to_string
 
 from accounts.models import ClientAccount, ClientAuthMode
 from config.admin_otp import (
+    AdminOtpError,
+    OtpAttemptsExhaustedError,
+    OtpChallengeStore,
+    OtpExpiredError,
     consume_otp_request_quota,
     generate_otp_code,
-    hash_otp_code,
     mask_email,
-    otp_max_attempts,
     otp_resend_cooldown_seconds,
     otp_ttl_human,
-    otp_ttl_seconds,
 )
+from config.pdn import PDN_CONSENT_REQUIRED, stamp_pdn_consent
 from crm.models import Client
 
 logger = logging.getLogger(__name__)
 
-_OTP_CHALLENGE_PREFIX = "client_otp:v1:"
+_OTP = OtpChallengeStore(key_prefix="client_otp:v1:", settings_prefix="CLIENT_OTP")
 _OTP_REQ_PREFIX = "client_otp:req_v1:"
 
 
 class ClientAuthError(Exception):
     """User-facing auth failure (неверные данные, код, лимит)."""
+
+
+class ClientRateLimitError(ClientAuthError):
+    """Too many code requests from this address (HTTP 429)."""
 
 
 def normalize_client_email(raw: str) -> str:
@@ -55,51 +61,66 @@ def _min_fill_seconds() -> int:
     return int(getattr(settings, "CLIENT_AUTH_MIN_FILL_SECONDS", 2))
 
 
+def _max_form_age_seconds() -> int:
+    return int(getattr(settings, "CLIENT_AUTH_MAX_FORM_AGE_SECONDS", 24 * 60 * 60))
+
+
 def check_honeypot(request: HttpRequest, form_start_ts: Any, trap_value: str) -> None:
-    """Anti-bot guard for register/OTP forms: honeypot + min fill time.
+    """Anti-bot guard for register/OTP forms: honeypot + fill-time window.
 
     Own stack per security-baseline (no third-party CAPTCHA). Trap value is
     a field bots fill and humans never see; ``form_start_ts`` marks when the
-    form was rendered — submissions faster than the threshold are rejected.
+    form was rendered. A missing, future, too-fast or day-old stamp is a bot.
     """
     if (trap_value or "").strip():
         raise ClientAuthError("Запрос отклонён.")
     try:
-        elapsed = time.time() - float(form_start_ts or 0)
+        started = float(form_start_ts or 0)
     except (TypeError, ValueError):
         raise ClientAuthError("Запрос отклонён.") from None
-    if elapsed < _min_fill_seconds():
+    elapsed = time.time() - started
+    if started <= 0 or elapsed < _min_fill_seconds() or elapsed > _max_form_age_seconds():
         raise ClientAuthError("Запрос отклонён.")
 
 
-def register_client(
+def start_client_registration(
+    request: HttpRequest,
     *,
     email: str,
     password: str,
     name: str = "",
     phone: str = "",
-) -> ClientAccount:
-    """Create a ClientAccount (mode A: email + password) and link CRM card."""
+    pdn_consent: bool = False,
+) -> dict[str, str]:
+    """Mode A step 1: email a code; the account appears only after verify.
+
+    The password waits hashed in the challenge, so nobody can pre-register
+    someone else's address and keep a password on the verified account.
+    An existing verified account gets a plain login code — same response,
+    no enumeration, password untouched.
+    """
     email = normalize_client_email(email)
     if len(password or "") < 8:
         raise ClientAuthError("Пароль — минимум 8 символов.")
-    with transaction.atomic():
-        if ClientAccount.objects.filter(email=email).exists():
-            raise ClientAuthError("Аккаунт с этой почтой уже существует.")
-        account = ClientAccount(
-            email=email,
-            auth_mode=ClientAuthMode.PASSWORD,
-            name=(name or "").strip(),
-            phone=(phone or "").strip(),
-        )
-        account.set_password(password)
-        account.save()
-        link_client_account(account)
-    return account
+    existing = ClientAccount.objects.filter(email=email).first()
+    if existing is not None and not existing.is_active:
+        raise ClientAuthError("Аккаунт недоступен. Обратитесь к менеджеру.")
+    pending: dict[str, str] | None = None
+    if existing is None or existing.email_verified_at is None:
+        pending = {
+            "password_hash": make_password(password),
+            "name": (name or "").strip(),
+            "phone": (phone or "").strip(),
+        }
+    return _issue_challenge(request, email=email, pending=pending, pdn_consent=pdn_consent)
 
 
 def authenticate_password(*, email: str, password: str) -> ClientAccount:
-    """Mode A login: verify email + password (uniform error, no enumeration)."""
+    """Mode A login: verify email + password (uniform error, no enumeration).
+
+    Accounts whose email was never verified cannot use a password — it was
+    set by whoever typed the address, not necessarily its owner.
+    """
     email = normalize_client_email(email)
     try:
         account = ClientAccount.objects.get(email=email, is_active=True)
@@ -107,92 +128,130 @@ def authenticate_password(*, email: str, password: str) -> ClientAccount:
         raise ClientAuthError("Неверная почта или пароль.") from exc
     if not account.check_password(password or ""):
         raise ClientAuthError("Неверная почта или пароль.")
+    if account.email_verified_at is None:
+        raise ClientAuthError("Подтвердите почту: войдите по коду из письма.")
     return account
 
 
-def start_client_otp(request: HttpRequest, email: str) -> dict[str, str]:
-    """Mode B step 1: email a fresh 6-digit code; return challenge id."""
+def start_client_otp(request: HttpRequest, email: str, *, pdn_consent: bool = False) -> dict[str, str]:
+    """Mode B step 1: email a fresh 6-digit code; return challenge id.
+
+    No account or CRM card is created here — only after the code proves
+    the visitor owns the address (:func:`verify_client_otp`).
+    """
     email = normalize_client_email(email)
-    consume_otp_request_quota(
-        request,
-        cache_prefix=_OTP_REQ_PREFIX,
-        limit=int(getattr(settings, "CLIENT_OTP_REQUEST_LIMIT", 20)),
-        window=int(getattr(settings, "CLIENT_OTP_REQUEST_WINDOW_SECONDS", 3600)),
-    )
-    account, created = ClientAccount.objects.get_or_create(
-        email=email,
-        defaults={"auth_mode": ClientAuthMode.OTP_EMAIL},
-    )
-    if not account.is_active:
+    if ClientAccount.objects.filter(email=email, is_active=False).exists():
         raise ClientAuthError("Аккаунт недоступен. Обратитесь к менеджеру.")
-    if created:
-        link_client_account(account)
-    code = generate_otp_code()
-    challenge_id = secrets.token_urlsafe(24)
-    payload = {
-        "account_id": account.pk,
-        "code_hash": hash_otp_code(code),
-        "attempts": 0,
-        "sent_at": time.time(),
-        "resend_after": time.time() + otp_resend_cooldown_seconds("CLIENT_OTP"),
-    }
-    cache.set(_otp_key(challenge_id), payload, timeout=otp_ttl_seconds("CLIENT_OTP"))
-    _send_client_otp_email(email=email, code=code)
-    return {"challenge_id": challenge_id, "email_masked": mask_email(email)}
+    return _issue_challenge(request, email=email, pending=None, pdn_consent=pdn_consent)
 
 
 def verify_client_otp(*, challenge_id: str, code: str) -> ClientAccount:
-    """Mode B step 2: validate code → account (marks email verified)."""
-    payload = cache.get(_otp_key(challenge_id))
-    if not payload:
-        raise ClientAuthError("Код истёк — запросите новый.")
-    if payload["attempts"] >= otp_max_attempts("CLIENT_OTP"):
-        cache.delete(_otp_key(challenge_id))
-        raise ClientAuthError("Превышено число попыток — запросите новый код.")
-    if hash_otp_code((code or "").strip()) != payload["code_hash"]:
-        payload["attempts"] += 1
-        cache.set(_otp_key(challenge_id), payload, timeout=otp_ttl_seconds("CLIENT_OTP"))
-        raise ClientAuthError("Неверный код.")
-    cache.delete(_otp_key(challenge_id))
+    """Step 2 for both modes: validate code → verified, linked account."""
     try:
-        account = ClientAccount.objects.get(pk=payload["account_id"], is_active=True)
-    except ClientAccount.DoesNotExist as exc:
-        raise ClientAuthError("Аккаунт недоступен.") from exc
-    if account.email_verified_at is None:
-        from django.utils import timezone
-
-        account.email_verified_at = timezone.now()
-        account.save(update_fields=["email_verified_at", "updated_at"])
-    return account
+        payload = _OTP.verify(challenge_id, (code or "").strip())
+    except OtpExpiredError:
+        raise ClientAuthError("Код истёк — запросите новый.") from None
+    except OtpAttemptsExhaustedError:
+        raise ClientAuthError("Превышено число попыток — запросите новый код.") from None
+    except AdminOtpError:
+        raise ClientAuthError("Неверный код.") from None
+    return _account_for_verified_email(payload)
 
 
 def resend_client_otp(request: HttpRequest, challenge_id: str) -> dict[str, str]:
     """Re-send the OTP email honouring the resend cooldown."""
-    payload = cache.get(_otp_key(challenge_id))
-    if not payload:
+    payload = _OTP.get(challenge_id)
+    if payload is None:
         raise ClientAuthError("Код истёк — запросите новый.")
     now = time.time()
     if now < payload["resend_after"]:
         raise ClientAuthError("Подождите перед повторной отправкой.")
-    account = ClientAccount.objects.get(pk=payload["account_id"], is_active=True)
-    consume_otp_request_quota(
-        request,
-        cache_prefix=_OTP_REQ_PREFIX,
-        limit=int(getattr(settings, "CLIENT_OTP_REQUEST_LIMIT", 20)),
-        window=int(getattr(settings, "CLIENT_OTP_REQUEST_WINDOW_SECONDS", 3600)),
-    )
+    _consume_quota(request)
     code = generate_otp_code()
-    payload["code_hash"] = hash_otp_code(code)
-    payload["attempts"] = 0
-    payload["sent_at"] = now
-    payload["resend_after"] = now + otp_resend_cooldown_seconds("CLIENT_OTP")
-    cache.set(_otp_key(challenge_id), payload, timeout=otp_ttl_seconds("CLIENT_OTP"))
-    _send_client_otp_email(email=account.email, code=code)
-    return {"challenge_id": challenge_id, "email_masked": mask_email(account.email)}
+    payload = {**payload, "sent_at": now, "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP")}
+    _OTP.put(challenge_id, payload, code=code)
+    _send_client_otp_email(email=payload["email"], code=code)
+    return {"challenge_id": challenge_id, "email_masked": mask_email(payload["email"])}
+
+
+def _consume_quota(request: HttpRequest) -> None:
+    try:
+        consume_otp_request_quota(
+            request,
+            cache_prefix=_OTP_REQ_PREFIX,
+            limit=int(getattr(settings, "CLIENT_OTP_REQUEST_LIMIT", 20)),
+            window=int(getattr(settings, "CLIENT_OTP_REQUEST_WINDOW_SECONDS", 3600)),
+        )
+    except AdminOtpError as exc:
+        raise ClientRateLimitError(str(exc)) from exc
+
+
+def _issue_challenge(
+    request: HttpRequest,
+    *,
+    email: str,
+    pending: dict[str, str] | None,
+    pdn_consent: bool = False,
+) -> dict[str, str]:
+    """Store a fresh code challenge for ``email`` and send the letter."""
+    _consume_quota(request)
+    code = generate_otp_code()
+    challenge_id = secrets.token_urlsafe(24)
+    now = time.time()
+    _OTP.put(
+        challenge_id,
+        {
+            "email": email,
+            "pending": pending,
+            "pdn_consent": bool(pdn_consent),
+            "sent_at": now,
+            "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP"),
+        },
+        code=code,
+    )
+    _send_client_otp_email(email=email, code=code)
+    return {"challenge_id": challenge_id, "email_masked": mask_email(email)}
+
+
+def _account_for_verified_email(payload: dict[str, Any]) -> ClientAccount:
+    """Create or update the account behind a proven email, then link CRM.
+
+    A password set before verification (legacy unverified account) is
+    replaced by the one from this challenge or dropped — it was never
+    proven to belong to the address owner. No account is created without
+    PDN consent given in the form that requested the code.
+    """
+    from django.utils import timezone
+
+    email = payload["email"]
+    pending = payload.get("pending") or {}
+    with transaction.atomic():
+        account = ClientAccount.objects.select_for_update().filter(email=email).first()
+        if account is None and not payload.get("pdn_consent"):
+            raise ClientAuthError(PDN_CONSENT_REQUIRED)
+        if account is None:
+            account = ClientAccount(
+                email=email,
+                auth_mode=ClientAuthMode.PASSWORD if pending else ClientAuthMode.OTP_EMAIL,
+                name=pending.get("name", ""),
+                phone=pending.get("phone", ""),
+            )
+        if not account.is_active:
+            raise ClientAuthError("Аккаунт недоступен.")
+        if account.email_verified_at is None:
+            account.password_hash = pending.get("password_hash", "")
+            if pending:
+                account.auth_mode = ClientAuthMode.PASSWORD
+            account.email_verified_at = timezone.now()
+        if payload.get("pdn_consent"):
+            stamp_pdn_consent(account)
+        account.save()
+        link_client_account(account)
+    return account
 
 
 def _otp_key(challenge_id: str) -> str:
-    return f"{_OTP_CHALLENGE_PREFIX}{challenge_id}"
+    return _OTP.key(challenge_id)
 
 
 def _send_client_otp_email(*, email: str, code: str) -> None:

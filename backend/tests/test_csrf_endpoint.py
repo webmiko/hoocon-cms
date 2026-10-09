@@ -61,6 +61,7 @@ def test_lead_post_with_csrf_token_succeeds() -> None:
     token = csrf_response.json()["csrfToken"]
     # Step 2: POST a lead with the token in the X-CSRFToken header.
     payload = {
+        "pdn_consent": True,
         "lead_type": "consultation",
         "name": "Иван Тестов",
         "email": "ivan.test@example.com",

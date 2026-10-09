@@ -143,6 +143,9 @@ class CspMiddleware:
             request: request carrying optional csp_nonce.
             response: the HttpResponse to modify.
         """
+        if "Content-Security-Policy" in response.headers:
+            # A view already set a stricter per-response policy (private files).
+            return
         nonce = getattr(request, "csp_nonce", None)
         # Nonce only for HTML SPA shells — API JSON does not need it.
         content_type = response.get("Content-Type", "")

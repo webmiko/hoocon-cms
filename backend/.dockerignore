@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 media/
+private_media/
 staticfiles/
 coverage.json
 htmlcov/
@@ -13,3 +14,8 @@ db.sqlite3
 .DS_Store
 tests/
 reports/
+.coverage
+.env
+.env.*
+*.log
+uv.lock

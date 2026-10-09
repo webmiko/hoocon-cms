@@ -9,6 +9,8 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from config.pdn import PdnConsentFields
+
 
 class SuperuserRecoveryCode(models.Model):
     """Hashed one-time recovery code for superuser Admin break-glass login.
@@ -254,7 +256,7 @@ class StaffMailbox(models.Model):
         return f"IMAP({self.user_id}, {addr})"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Sign the app password at rest before persisting."""
+        """Encrypt the app password at rest before persisting."""
         from accounts.mailbox_secrets import encrypt_mailbox_secret
 
         self.imap_password = encrypt_mailbox_secret(self.imap_password or "")
@@ -262,7 +264,7 @@ class StaffMailbox(models.Model):
 
     @property
     def imap_password_plain(self) -> str:
-        """App password for IMAP/SMTP (decrypts signed storage)."""
+        """App password for IMAP/SMTP (decrypts Fernet or legacy storage)."""
         from accounts.mailbox_secrets import decrypt_mailbox_secret
 
         return decrypt_mailbox_secret(self.imap_password or "")
@@ -315,7 +317,7 @@ class ClientAuthMode(models.TextChoices):
     YANDEX = "yandex", "Яндекс ID"
 
 
-class ClientAccount(models.Model):
+class ClientAccount(PdnConsentFields):
     """Client cabinet login — separate from staff ``auth.User``.
 
     Session-based: after login the account id is stored in the Django

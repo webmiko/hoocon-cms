@@ -282,3 +282,78 @@ def test_normalize_recovery_helpers() -> None:
     assert normalize_recovery_code("ab cd-efgh") == "ABCD-EFGH"
     assert normalize_recovery_code("ABCDEFGH") == "ABCD-EFGH"
     assert len(hash_recovery_code("ABCD-EFGH")) == 64
+
+
+def _recovery_post(client: Client, login: str, code: str) -> object:
+    return _csrf_post(
+        client,
+        "/admin/login/?mode=recovery",
+        {"mode": "recovery", "username": login, "recovery_code": code, "next": "/admin/"},
+    )
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS, ADMIN_RECOVERY_MAX_FAILS=3)
+def test_recovery_form_locks_login_after_wrong_codes() -> None:
+    """Break-glass form had no attempt limit: recovery codes could be brute-forced per login."""
+    admin_user = _superuser(username="su-brute", email="su-brute@example.com")
+    codes = replace_recovery_codes(admin_user)
+    for _ in range(3):
+        assert _recovery_post(Client(), admin_user.username, "ZZZZ-ZZZZ").status_code == 200
+
+    # Same user via email shares the lock; the valid code is not even tried.
+    client = Client()
+    locked = _recovery_post(client, admin_user.email, codes[0])
+    assert locked.status_code == 200
+    assert client.session.get("_auth_user_id") is None
+    assert unused_recovery_code_count(admin_user) == 10
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS, ADMIN_RECOVERY_MAX_FAILS=3)
+def test_otp_page_recovery_limited_when_email_failed() -> None:
+    """SMTP down → no challenge → recovery codes on /admin/otp/ were unlimited."""
+    admin_user = _superuser(username="su-smtp-brute", email="su-smtp-brute@example.com")
+    codes = replace_recovery_codes(admin_user)
+    client = Client()
+    with patch("config.admin_otp.send_admin_otp_email", side_effect=RuntimeError("smtp down")):
+        _csrf_post(client, "/admin/login/", {"username": admin_user.username, "next": "/admin/"})
+    csrf = client.cookies["csrftoken"].value
+    for _ in range(3):
+        wrong = client.post("/admin/otp/", {"otp_code": "ZZZZ-ZZZZ", "csrfmiddlewaretoken": csrf})
+        assert "Неверный резервный код" in wrong.content.decode()
+
+    locked = client.post("/admin/otp/", {"otp_code": codes[0], "csrfmiddlewaretoken": csrf})
+    assert "Слишком много неверных резервных кодов" in locked.content.decode()
+    assert client.session.get("_auth_user_id") is None
+    assert unused_recovery_code_count(admin_user) == 10
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS)
+def test_otp_lock_applies_before_recovery_code() -> None:
+    """Recovery code was checked before the challenge lock, bypassing the progressive delay."""
+    admin_user = _superuser(username="su-delay", email="su-delay@example.com")
+    codes = replace_recovery_codes(admin_user)
+    client = Client()
+    with patch("config.admin_otp.generate_otp_code", return_value="424242"):
+        _csrf_post(client, "/admin/login/", {"username": admin_user.username, "next": "/admin/"})
+    csrf = client.cookies["csrftoken"].value
+    client.post("/admin/otp/", {"otp_code": "000000", "csrfmiddlewaretoken": csrf})
+
+    blocked = client.post("/admin/otp/", {"otp_code": codes[0], "csrfmiddlewaretoken": csrf})
+    assert "Подождите" in blocked.content.decode()
+    assert client.session.get("_auth_user_id") is None
+    assert unused_recovery_code_count(admin_user) == 10
+
+
+def test_axes_masks_one_time_codes_in_access_attempt() -> None:
+    """axes stored otp_code / recovery_code in AccessAttempt.post_data as plain text."""
+    from axes.helpers import get_query_str
+    from django.http import QueryDict
+
+    stored = get_query_str(QueryDict("username=su&otp_code=424242&recovery_code=ABCD-EFGH&code=777777"))
+    assert "424242" not in stored
+    assert "ABCD-EFGH" not in stored
+    assert "777777" not in stored
+    assert "username=su" in stored

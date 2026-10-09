@@ -6,10 +6,15 @@ names only as display label, no internal notes).
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import serializers
 
 from cabinet.models import Order, OrderItem, RmaCase, SpecList, SpecListItem
+from catalog.models import SKU
+from config.pdn import pdn_consent_field, require_pdn_consent
 from crm.models import ClientDocument, Quote
+from leads.serializers import MAX_ITEM_QUANTITY
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -22,6 +27,10 @@ class RegisterSerializer(serializers.Serializer):
     # Honeypot trap — bots fill it, humans never see it (silent reject).
     website = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
     form_start_ts = serializers.FloatField(required=False, default=0)
+    pdn_consent = pdn_consent_field()
+
+    def validate_pdn_consent(self, value: bool) -> bool:
+        return require_pdn_consent(value)
 
 
 class LoginSerializer(serializers.Serializer):
@@ -37,6 +46,10 @@ class OtpStartSerializer(serializers.Serializer):
     email = serializers.EmailField()
     website = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
     form_start_ts = serializers.FloatField(required=False, default=0)
+    pdn_consent = pdn_consent_field()
+
+    def validate_pdn_consent(self, value: bool) -> bool:
+        return require_pdn_consent(value)
 
 
 class OtpVerifySerializer(serializers.Serializer):
@@ -79,12 +92,38 @@ class SpecListSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
 
+SPEC_MAX_ITEMS = 300
+
+
+class SpecListItemWriteSerializer(serializers.Serializer):
+    """Client-submitted position: published SKU by id, or a free-text code."""
+
+    sku = serializers.PrimaryKeyRelatedField(
+        queryset=SKU.objects.filter(is_published=True),
+        required=False,
+        allow_null=True,
+    )
+    sku_code = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    quantity = serializers.IntegerField(min_value=1, max_value=MAX_ITEM_QUANTITY, required=False, default=1)
+    position = serializers.IntegerField(min_value=0, max_value=10_000, required=False, allow_null=True)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if attrs.get("sku") is None and not attrs.get("sku_code", "").strip():
+            raise serializers.ValidationError("Укажите артикул.")
+        return attrs
+
+
 class SpecListWriteSerializer(serializers.Serializer):
     """Create/update a spec: name + flat items list (replaces items)."""
 
     name = serializers.CharField(max_length=200)
     note = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
-    items = SpecListItemSerializer(many=True, required=False, default=list)
+    items: serializers.ListSerializer = serializers.ListSerializer(
+        child=SpecListItemWriteSerializer(),
+        required=False,
+        default=list,
+        max_length=SPEC_MAX_ITEMS,
+    )
 
 
 class QuoteSerializer(serializers.ModelSerializer):

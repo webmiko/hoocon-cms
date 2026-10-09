@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
-from urllib.parse import urlparse
 
 from django.contrib import admin, messages
 from django.contrib.auth import login as auth_login
@@ -28,6 +27,7 @@ from accounts.passkeys import (
     complete_registration,
     passkeys_for_user,
 )
+from config.safe_paths import safe_same_site_path
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,7 @@ def _parse_json_body(request: HttpRequest) -> dict[str, Any]:
 
 def _safe_next_url(raw: str) -> str:
     """Allow only same-site relative admin paths."""
-    candidate = (raw or "").strip() or "/admin/"
-    parsed = urlparse(candidate)
-    if parsed.scheme or parsed.netloc:
-        return "/admin/"
-    if not candidate.startswith("/"):
-        return "/admin/"
-    return candidate
+    return safe_same_site_path(raw, fallback="/admin/")
 
 
 def _require_enabled() -> HttpResponse | None:

@@ -26,12 +26,34 @@ def test_resolve_default_database_requires_db_name() -> None:
             resolve_default_database()
 
 
-def test_default_cors_includes_local_vite_5174() -> None:
-    """Pinned dev port 5174 is trusted for CORS/CSRF out of the box."""
-    from config import settings
+def test_default_cors_includes_local_vite_5174_in_debug() -> None:
+    """Pinned dev port 5174 is trusted for CORS/CSRF out of the box in DEBUG."""
+    from config.settings import origins_from_env
 
-    assert "http://localhost:5174" in settings.CORS_ALLOWED_ORIGINS
-    assert "http://127.0.0.1:5174" in settings.CSRF_TRUSTED_ORIGINS
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("CORS_ALLOWED_ORIGINS", None)
+        assert "http://localhost:5174" in origins_from_env("CORS_ALLOWED_ORIGINS", debug=True)
+        assert "http://127.0.0.1:5174" in origins_from_env("CORS_ALLOWED_ORIGINS", debug=True)
+
+
+def test_prod_without_env_trusts_no_localhost_origin() -> None:
+    """DEBUG=False without CORS/CSRF env silently trusted localhost — now fails closed."""
+    from config.settings import origins_from_env
+
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("CSRF_TRUSTED_ORIGINS", None)
+        assert origins_from_env("CSRF_TRUSTED_ORIGINS", debug=False) == []
+    with patch.dict(os.environ, {"CSRF_TRUSTED_ORIGINS": "https://hoocon.ru, https://www.hoocon.ru"}):
+        assert origins_from_env("CSRF_TRUSTED_ORIGINS", debug=False) == ["https://hoocon.ru", "https://www.hoocon.ru"]
+
+
+def test_e2e_server_trusts_its_own_vite_origin() -> None:
+    """CI e2e runs with DJANGO_DEBUG=false, so the webserver script must pass its origins."""
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[2] / "scripts" / "e2e-webserver.sh").read_text(encoding="utf-8")
+    assert 'export CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-${E2E_ORIGINS}}"' in script
+    assert script.index("CSRF_TRUSTED_ORIGINS") < script.index("runserver")
 
 
 def test_drf_public_api_uses_session_auth_only() -> None:

@@ -150,6 +150,53 @@ def test_quote_sent_closes_source_lead() -> None:
 
 
 @pytest.mark.django_db
+def test_quote_issue_pdf_uses_items_saved_in_same_form() -> None:
+    """Финализация шла в save_model до инлайнов: клиент получал PDF со старыми строками."""
+    from unittest.mock import patch
+
+    from crm.models import QuoteItem
+
+    admin = _superuser()
+    lead = _make_lead(status=Lead.LeadStatus.IN_PROGRESS, assignee=admin)
+    quote = Quote.objects.create(client=lead.client, lead=lead, created_by=admin)
+    item = QuoteItem.objects.create(quote=quote, sku_code="OLD-1", quantity=1, sort_order=0)
+    seen: list[list[tuple[str, int]]] = []
+
+    def capture(q: Quote) -> None:
+        seen.append([(i.sku_code, i.quantity) for i in q.items.order_by("sort_order")])
+        raise RuntimeError("no pdf in test")
+
+    page = DjClient()
+    page.force_login(admin)
+    with patch("crm.quote_docs.ensure_quote_pdf_document", side_effect=capture):
+        response = page.post(
+            reverse("admin:crm_quote_change", args=[quote.pk]),
+            {
+                "status": QuoteStatus.SENT,
+                "client": str(quote.client_id),
+                "lead": str(lead.pk),
+                "created_by": "",
+                "comment": "",
+                "vat_rate": "22.00",
+                "valid_until": "",
+                "items-TOTAL_FORMS": "1",
+                "items-INITIAL_FORMS": "1",
+                "items-MIN_NUM_FORMS": "0",
+                "items-MAX_NUM_FORMS": "1000",
+                "items-0-id": str(item.pk),
+                "items-0-quote": str(quote.pk),
+                "items-0-sku": "",
+                "items-0-sku_code": "NEW-5",
+                "items-0-quantity": "5",
+                "items-0-unit_price": "",
+                "items-0-sort_order": "0",
+            },
+        )
+    assert response.status_code == 302
+    assert seen == [[("NEW-5", 5)]]
+
+
+@pytest.mark.django_db
 def test_create_quote_requires_add_quote_perm() -> None:
     """Без crm.add_quote кнопка недоступна (403)."""
     staff = _staff_with_perms(

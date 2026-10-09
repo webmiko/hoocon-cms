@@ -58,17 +58,24 @@ class StaffUserCreationForm(AdminUserCreationForm):
             self.fields[
                 "usable_password"
             ].help_text = "Если выкл. — пароль не задаётся (удобно, когда вход только по одноразовому коду на почту)."
-            self.fields["usable_password"].choices = [
+            usable_password = self.fields["usable_password"]
+            assert isinstance(usable_password, forms.ChoiceField)
+            usable_password.choices = [
                 ("true", "Задать пароль"),
                 ("false", "Без пароля (код на почту)"),
             ]
 
-    def validate_passwords(self, *args: object, **kwargs: object) -> None:
+    def validate_passwords(
+        self,
+        password1_field_name: str = "password1",
+        password2_field_name: str = "password2",
+        usable_password_field_name: str = "usable_password",
+    ) -> None:
         """OTP mode: skip password checks; permanent password is not used."""
         if admin_email_otp_enabled():
             self.cleaned_data["set_usable_password"] = False
             return
-        super().validate_passwords(*args, **kwargs)  # type: ignore[misc]
+        super().validate_passwords(password1_field_name, password2_field_name, usable_password_field_name)  # type: ignore[misc]
 
     def clean_email(self) -> str:
         """Normalize email; reject duplicates on username or email."""

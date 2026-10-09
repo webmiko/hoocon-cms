@@ -465,7 +465,14 @@ class ClientAccountAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_display_links = ("email",)
     list_filter = ("auth_mode", "is_active")
     search_fields = ("email", "name", "phone")
-    readonly_fields = ("password_hash", "email_verified_at", "created_at", "updated_at")
+    readonly_fields = (
+        "password_hash",
+        "email_verified_at",
+        "pdn_consent_at",
+        "pdn_policy_version",
+        "created_at",
+        "updated_at",
+    )
     inlines = (SocialAccountInline,)
 
     def has_add_permission(self, request: HttpRequest) -> bool:

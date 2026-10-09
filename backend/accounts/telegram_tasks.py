@@ -124,7 +124,7 @@ def retire_telegram_support_alert(conversation_id: int, author_user_id: int | No
     )
     from social.publishers import telegram_api_call
     from social.telegram_staff_reply import load_support_alert_message_id
-    from supportchat.services import staff_public_name
+    from supportchat.presentation import staff_public_name
 
     author = get_user_model().objects.filter(pk=author_user_id).first() if author_user_id else None
     author_label = staff_public_name(author)

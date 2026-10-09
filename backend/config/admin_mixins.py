@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.html import format_html
@@ -39,6 +41,42 @@ def filter_autocomplete_by_client(
     if client_id.isdigit():
         return qs.filter(client_id=int(client_id))
     return qs
+
+
+ScopeFn = Callable[[HttpRequest], QuerySet[Any]]
+
+
+class ScopedForeignKeyMixin:
+    """Limit FK choices *and POST validation* to rows the user may see.
+
+    Autocomplete widgets only filter the dropdown; without a scoped
+    ``queryset`` any pk is accepted on submit. The value already stored on
+    the edited object stays valid, so a record linked by automation can
+    still be saved by its manager.
+    """
+
+    scoped_fk: Mapping[str, ScopeFn] = {}
+
+    def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        scope = self.scoped_fk.get(db_field.name)
+        if scope is not None:
+            kwargs["queryset"] = self._scope_with_current(db_field, request, scope(request))
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)  # type: ignore[misc]
+
+    def _scope_with_current(self, db_field: Any, request: HttpRequest, queryset: QuerySet[Any]) -> QuerySet[Any]:
+        match = getattr(request, "resolver_match", None)
+        object_id = (getattr(match, "kwargs", None) or {}).get("object_id")
+        if not object_id:
+            return queryset
+        model = self.model  # type: ignore[attr-defined]
+        try:
+            current = model._default_manager.filter(pk=object_id).values_list(db_field.attname, flat=True).first()
+        except (ValueError, ValidationError):
+            return queryset
+        if current is None:
+            return queryset
+        target = db_field.remote_field.model._default_manager
+        return target.filter(Q(pk__in=queryset.values("pk")) | Q(pk=current))
 
 
 class OpenChangeLinkMixin:

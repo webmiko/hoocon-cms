@@ -1121,7 +1121,7 @@ def test_desktop_sidebar_stops_above_lead_action_bar() -> None:
 
 
 def test_create_quote_button_uses_primary_open_style() -> None:
-    """«Создать КП» is a button; dark theme must not leave it on the pale mail wash."""
+    """Primary CTAs («Создать КП», «Настроить») fill with #dc1313 like «Сохранить», not the pale dark accent."""
     extras = _EXTRAS_CSS.read_text(encoding="utf-8")
     os27 = _OS27_CSS.read_text(encoding="utf-8")
     open_rule = extras.split("button.hoocon-admin-open {", 1)[1].split("}", 1)[0]
@@ -1135,7 +1135,10 @@ def test_create_quote_button_uses_primary_open_style() -> None:
     assert "height: var(--hoocon-btn-min-h)" in actions
     assert "min-height: 2.5rem" not in actions
     os27_rule = os27.split("body.hoocon-os27 button.hoocon-admin-open,", 1)[1].split("}", 1)[0]
-    assert "background: var(--os27-accent)" in os27_rule
+    assert "background: var(--hoocon-primary)" in os27_rule
+    assert "var(--os27-accent)" not in os27_rule
+    os27_hover = os27.split("body.hoocon-os27 button.hoocon-admin-open:hover {", 1)[1].split("}", 1)[0]
+    assert "background: var(--hoocon-primary-hover)" in os27_hover
 
 
 def test_dark_text_links_use_readable_accent() -> None:

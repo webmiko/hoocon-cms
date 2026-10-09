@@ -18,6 +18,7 @@ import re
 import secrets
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -26,6 +27,8 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.http import HttpRequest
 from django.template.loader import render_to_string
+
+from config.client_ip import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +54,6 @@ class AdminOtpDeliveryError(AdminOtpError):
 
 class AdminOtpVerifyError(AdminOtpError):
     """Code rejected (wrong, expired, or attempts exhausted)."""
-
-
-@dataclass(frozen=True, slots=True)
-class AdminOtpChallenge:
-    """Cached challenge payload."""
-
-    code_hash: str
-    attempts: int
-    locked_until: float = 0.0
 
 
 def admin_email_otp_enabled() -> bool:
@@ -155,15 +149,113 @@ def hash_otp_code(code: str) -> str:
     return digest.hexdigest()
 
 
-def _client_ip(request: HttpRequest) -> str:
-    """Client IP behind one reverse proxy (nginx → gunicorn)."""
-    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
-    if forwarded:
-        # Leftmost entry is the original client when the edge proxy appends.
-        parts = [part.strip() for part in forwarded.split(",") if part.strip()]
-        if parts:
-            return parts[0]
-    return (request.META.get("REMOTE_ADDR") or "0.0.0.0").strip() or "0.0.0.0"
+class OtpExpiredError(AdminOtpError):
+    """No live challenge under this id."""
+
+
+class OtpAttemptsExhaustedError(AdminOtpError):
+    """The attempt limit was already used up; the challenge is dropped."""
+
+
+class OtpCodeMismatchError(AdminOtpError):
+    """Wrong code; ``remaining`` tries left."""
+
+    def __init__(self, remaining: int) -> None:
+        super().__init__("wrong code")
+        self.remaining = remaining
+
+
+@dataclass(frozen=True, slots=True)
+class OtpChallengeStore:
+    """Cache-backed OTP challenges shared by Admin, staff app and client cabinet.
+
+    The attempt counter lives in its own key and grows via ``cache.incr``
+    before the code is compared, so parallel guesses cannot all see
+    «0 attempts» and slip past the limit.
+    """
+
+    key_prefix: str
+    settings_prefix: str
+    # False keeps the spent challenge so «resend» can issue a new code on it.
+    drop_on_last_miss: bool = True
+
+    def key(self, challenge_id: str) -> str:
+        return f"{self.key_prefix}{challenge_id}"
+
+    def _attempts_key(self, challenge_id: str) -> str:
+        return f"{self.key(challenge_id)}:attempts"
+
+    def ttl(self) -> int:
+        return otp_ttl_seconds(self.settings_prefix)
+
+    def max_attempts(self) -> int:
+        return otp_max_attempts(self.settings_prefix)
+
+    def put(self, challenge_id: str, payload: dict[str, Any], *, code: str) -> None:
+        """Store ``payload`` with the hashed ``code``; resets the attempt counter."""
+        cache.set_many(
+            {
+                self.key(challenge_id): {**payload, "code_hash": hash_otp_code(code)},
+                self._attempts_key(challenge_id): 0,
+            },
+            timeout=self.ttl(),
+        )
+
+    def update(self, challenge_id: str, payload: dict[str, Any]) -> None:
+        """Rewrite payload fields without touching the code or the counter."""
+        ttl = self.ttl()
+        cache.set(self.key(challenge_id), payload, timeout=ttl)
+        # Keep the attempts counter alive as long as the payload so it
+        # cannot expire independently and reset the brute-force guard.
+        cache.touch(self._attempts_key(challenge_id), timeout=ttl)
+
+    def get(self, challenge_id: str) -> dict[str, Any] | None:
+        raw = cache.get(self.key(challenge_id))
+        if not isinstance(raw, dict) or not isinstance(raw.get("code_hash"), str):
+            return None
+        return raw
+
+    def attempts(self, challenge_id: str) -> int:
+        try:
+            return int(cache.get(self._attempts_key(challenge_id)) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def register_attempt(self, challenge_id: str) -> int:
+        """Atomically count one more try and return the new total."""
+        counter = self._attempts_key(challenge_id)
+        try:
+            return int(cache.incr(counter))
+        except ValueError:
+            cache.add(counter, 0, timeout=self.ttl())
+            return int(cache.incr(counter))
+
+    def drop(self, challenge_id: str) -> None:
+        cache.delete_many([self.key(challenge_id), self._attempts_key(challenge_id)])
+
+    def verify(self, challenge_id: str, code: str) -> dict[str, Any]:
+        """Return the payload for a correct ``code`` and drop the challenge.
+
+        Raises:
+            OtpExpiredError: Nothing stored under ``challenge_id``.
+            OtpAttemptsExhaustedError: Limit already used up before this try.
+            OtpCodeMismatchError: Wrong code (last miss drops it if ``drop_on_last_miss``).
+        """
+        payload = self.get(challenge_id)
+        if payload is None:
+            raise OtpExpiredError("expired")
+        attempts = self.register_attempt(challenge_id)
+        limit = self.max_attempts()
+        if attempts > limit:
+            self.drop(challenge_id)
+            raise OtpAttemptsExhaustedError("attempts exhausted")
+        if not hmac.compare_digest(str(payload["code_hash"]), hash_otp_code(code)):
+            remaining = limit - attempts
+            if remaining <= 0 and self.drop_on_last_miss:
+                self.drop(challenge_id)
+            raise OtpCodeMismatchError(remaining)
+        self.drop(challenge_id)
+        return payload
 
 
 def consume_otp_request_quota(
@@ -176,7 +268,7 @@ def consume_otp_request_quota(
     """Count OTP send/resend for this IP; raise if over limit."""
     resolved_limit = otp_request_limit() if limit is None else limit
     resolved_window = otp_request_window_seconds() if window is None else window
-    key = f"{cache_prefix}{_client_ip(request)}"
+    key = f"{cache_prefix}{client_ip(request)}"
     try:
         count = int(cache.incr(key))
     except ValueError:
@@ -193,9 +285,12 @@ def consume_otp_request_quota(
         raise AdminOtpDeliveryError("Слишком много запросов. Попробуйте позже.")
 
 
-def _cache_key(user_id: int, session_key: str) -> str:
+_ADMIN_OTP = OtpChallengeStore(key_prefix="admin_email_otp:v1:", settings_prefix="ADMIN_EMAIL_OTP")
+
+
+def _challenge_id(user_id: int, session_key: str) -> str:
     session_digest = hashlib.sha256(session_key.encode("utf-8")).hexdigest()[:32]
-    return f"admin_email_otp:v1:{user_id}:{session_digest}"
+    return f"{user_id}:{session_digest}"
 
 
 def _ensure_session_key(request: HttpRequest) -> str:
@@ -215,7 +310,7 @@ def clear_admin_otp_challenge(request: HttpRequest) -> None:
     request.session.pop(SESSION_EMAIL_FAILED, None)
     session_key = request.session.session_key
     if user_id is not None and session_key:
-        cache.delete(_cache_key(int(user_id), session_key))
+        _ADMIN_OTP.drop(_challenge_id(int(user_id), session_key))
 
 
 def pending_otp_email_failed(request: HttpRequest) -> bool:
@@ -289,29 +384,28 @@ def find_staff_user_for_otp(login: str) -> AbstractBaseUser | None:
 
 
 def _store_challenge(user_id: int, session_key: str, code: str) -> None:
-    payload = {"code_hash": hash_otp_code(code), "attempts": 0, "locked_until": 0.0}
-    cache.set(_cache_key(user_id, session_key), payload, timeout=otp_ttl_seconds())
+    _ADMIN_OTP.put(_challenge_id(user_id, session_key), {"locked_until": 0.0}, code=code)
 
 
-def _load_challenge(user_id: int, session_key: str) -> AdminOtpChallenge | None:
-    raw = cache.get(_cache_key(user_id, session_key))
-    if not isinstance(raw, dict):
-        return None
-    code_hash = raw.get("code_hash")
-    attempts = raw.get("attempts", 0)
-    locked_until = raw.get("locked_until", 0.0)
-    if not isinstance(code_hash, str):
-        return None
+def _locked_until(payload: dict[str, Any]) -> float:
     try:
-        attempts_int = int(attempts)
-        locked_f = float(locked_until or 0.0)
+        return float(payload.get("locked_until") or 0.0)
     except (TypeError, ValueError):
-        return None
-    return AdminOtpChallenge(
-        code_hash=code_hash,
-        attempts=attempts_int,
-        locked_until=locked_f,
-    )
+        return 0.0
+
+
+def _delay_next_try(challenge_id: str, attempts: int) -> None:
+    """Progressive pause after a miss (best-effort; the limit itself is atomic)."""
+    payload = _ADMIN_OTP.get(challenge_id)
+    delay = _delay_after_attempts(attempts)
+    if payload is not None and delay:
+        _ADMIN_OTP.update(challenge_id, {**payload, "locked_until": time.time() + delay})
+
+
+def _register_miss(challenge_id: str) -> int:
+    attempts = _ADMIN_OTP.register_attempt(challenge_id)
+    _delay_next_try(challenge_id, attempts)
+    return attempts
 
 
 def _delay_after_attempts(attempts: int) -> int:
@@ -424,13 +518,28 @@ def peek_admin_otp_next_url(request: HttpRequest, *, fallback: str) -> str:
     return fallback
 
 
-def _try_recovery_code(user: AbstractBaseUser, raw_code: str) -> bool:
-    """Consume a superuser recovery code when present; False if unused / invalid."""
-    if not getattr(user, "is_superuser", False):
-        return False
-    from accounts.recovery_codes import consume_recovery_code
+def _verify_recovery_code(
+    user: AbstractBaseUser,
+    raw_code: str,
+    challenge_id: str | None,
+) -> None:
+    """Accept a superuser recovery code or raise; misses count on both limiters."""
+    from accounts.recovery_codes import (
+        RecoveryAttempt,
+        attempt_recovery_code,
+        recovery_lock_seconds,
+        recovery_subject,
+    )
 
-    return consume_recovery_code(user, raw_code)
+    outcome = attempt_recovery_code(user, raw_code, subject=recovery_subject(user))
+    if outcome is RecoveryAttempt.OK:
+        return
+    if challenge_id is not None:
+        _register_miss(challenge_id)
+    if outcome is RecoveryAttempt.LOCKED:
+        minutes = max(1, recovery_lock_seconds() // 60)
+        raise AdminOtpVerifyError(f"Слишком много неверных резервных кодов. Подождите {minutes} мин.")
+    raise AdminOtpVerifyError("Неверный резервный код. Введите сохранённый код формата XXXX-XXXX.")
 
 
 def verify_admin_otp(
@@ -448,70 +557,53 @@ def verify_admin_otp(
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
 
+    from accounts.recovery_codes import looks_like_recovery_code
+
+    challenge_id = _challenge_id(int(user.pk), session_key)
+    payload = _ADMIN_OTP.get(challenge_id)
+    now = time.time()
+    if payload is not None and _locked_until(payload) > now:
+        wait = max(1, int(math.ceil(_locked_until(payload) - now)))
+        raise AdminOtpVerifyError(f"Подождите {wait} сек. перед следующей попыткой.")
+    if payload is not None and _ADMIN_OTP.attempts(challenge_id) >= _ADMIN_OTP.max_attempts():
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.")
+
     # Superuser may paste a saved recovery code even when email OTP is missing/wrong.
-    if _try_recovery_code(user, raw_code):
+    if getattr(user, "is_superuser", False) and looks_like_recovery_code(raw_code):
+        _verify_recovery_code(user, raw_code, challenge_id if payload is not None else None)
         clear_admin_otp_challenge(request)
         return user, next_url
 
-    challenge = _load_challenge(int(user.pk), session_key)
-    email_failed = pending_otp_email_failed(request)
-    if challenge is None:
-        if email_failed and getattr(user, "is_superuser", False):
+    if payload is None:
+        if pending_otp_email_failed(request) and getattr(user, "is_superuser", False):
             raise AdminOtpVerifyError(
                 "Неверный резервный код. Введите сохранённый код формата XXXX-XXXX.",
             )
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Код истёк. Войдите снова.")
 
-    now = time.time()
-    if challenge.locked_until > now:
-        wait = max(1, int(math.ceil(challenge.locked_until - now)))
-        raise AdminOtpVerifyError(f"Подождите {wait} сек. перед следующей попыткой.")
-
-    if challenge.attempts >= otp_max_attempts():
-        clear_admin_otp_challenge(request)
-        raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.")
-
     code = normalize_otp_input(raw_code)
     if len(code) != _OTP_DIGITS:
-        _bump_attempts(int(user.pk), session_key, challenge)
+        _register_miss(challenge_id)
         raise AdminOtpVerifyError(
             f"Введите {_OTP_DIGITS}-значный код из письма или резервный код супер-админа (XXXX-XXXX).",
         )
 
-    expected = challenge.code_hash
-    actual = hash_otp_code(code)
-    if not hmac.compare_digest(expected, actual):
-        updated = _bump_attempts(int(user.pk), session_key, challenge)
-        remaining = otp_max_attempts() - updated.attempts
-        if remaining <= 0:
+    try:
+        _ADMIN_OTP.verify(challenge_id, code)
+    except OtpExpiredError:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Код истёк. Войдите снова.") from None
+    except OtpAttemptsExhaustedError:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None
+    except OtpCodeMismatchError as exc:
+        if exc.remaining <= 0:
             clear_admin_otp_challenge(request)
-            raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.")
-        raise AdminOtpVerifyError(f"Неверный код. Осталось попыток: {remaining}.")
+            raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None
+        _delay_next_try(challenge_id, _ADMIN_OTP.max_attempts() - exc.remaining)
+        raise AdminOtpVerifyError(f"Неверный код. Осталось попыток: {exc.remaining}.") from None
 
     clear_admin_otp_challenge(request)
     return user, next_url
-
-
-def _bump_attempts(
-    user_id: int,
-    session_key: str,
-    challenge: AdminOtpChallenge,
-) -> AdminOtpChallenge:
-    new_attempts = challenge.attempts + 1
-    delay = _delay_after_attempts(new_attempts)
-    updated = AdminOtpChallenge(
-        code_hash=challenge.code_hash,
-        attempts=new_attempts,
-        locked_until=time.time() + delay if delay else 0.0,
-    )
-    cache.set(
-        _cache_key(user_id, session_key),
-        {
-            "code_hash": updated.code_hash,
-            "attempts": updated.attempts,
-            "locked_until": updated.locked_until,
-        },
-        timeout=otp_ttl_seconds(),
-    )
-    return updated

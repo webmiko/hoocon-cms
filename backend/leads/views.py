@@ -15,18 +15,17 @@ docs/security-baseline.md §3 (PII не в логах; honeypot silent drop; 429
 
 from __future__ import annotations
 
-from django.db import transaction
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
+from cabinet.auth import session_owns_email
 from config.logging_utils import setup_logger
+from leads.lifecycle import on_lead_created
 from leads.models import Lead
 from leads.serializers import LeadSerializer
-from leads.services import assign_lead_on_create
-from leads.tasks import send_lead_client_confirmation, send_lead_notification
 
 logger = setup_logger("hoocon.leads")
 
@@ -77,36 +76,11 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lead = serializer.save()
+        if session_owns_email(request, lead.email):
+            Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
+            lead.contact_verified = True
 
-        assign_lead_on_create(lead)
-
-        # Schedule emails via on_commit — tasks fire only after DB commit
-        # (avoids running if the transaction rolls back).
-        lead_id = lead.pk
-        transaction.on_commit(lambda: send_lead_notification.delay(lead_id))
-        transaction.on_commit(lambda: send_lead_client_confirmation.delay(lead_id))
-
-        def _staff_push() -> None:
-            try:
-                from accounts.tasks import notify_staff_max_new_lead, notify_staff_telegram_new_lead
-                from staff_api.tasks import notify_staff_fcm_new_lead
-                from webpush.tasks import notify_staff_new_lead
-
-                notify_staff_fcm_new_lead.delay(lead_id)
-                notify_staff_new_lead.delay(lead_id)
-                notify_staff_telegram_new_lead.delay(lead_id)
-                notify_staff_max_new_lead.delay(lead_id)
-            except Exception:  # noqa: BLE001 — optional broker/app may be absent
-                logger.exception("lead_staff_push_enqueue_failed lead_id=%s", lead_id)
-
-        transaction.on_commit(_staff_push)
-
-        # PII-safe log: only lead_id and type (NO email/phone).
-        logger.info(
-            "Lead created: lead_id=%s type=%s",
-            lead.pk,
-            lead.lead_type,
-        )
+        on_lead_created(lead)
 
         return Response(
             LeadSerializer(lead, context=self.get_serializer_context()).data,

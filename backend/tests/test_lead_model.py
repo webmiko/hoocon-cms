@@ -224,6 +224,7 @@ def test_lead_serializer_valid_data() -> None:
         "company": "ООО Ромашка",
         "message": "Нужен КП на 10 приводов.",
         "lead_type": "rfq",
+        "pdn_consent": True,
     }
     ser = LeadSerializer(data=data)
     assert ser.is_valid(), ser.errors

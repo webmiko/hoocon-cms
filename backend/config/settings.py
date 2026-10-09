@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -36,6 +37,9 @@ SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
     "django-insecure-change-me-in-local-env-only",
 )
+# Fernet key (urlsafe base64, 32 bytes) for staff mailbox passwords at rest.
+# Empty → derived from SECRET_KEY; rotating SECRET_KEY then needs re-entry.
+MAILBOX_ENCRYPTION_KEY = os.getenv("MAILBOX_ENCRYPTION_KEY", "")
 # Fail closed: require explicit DJANGO_DEBUG=True for local; prod omits it.
 DEBUG = _env_bool("DJANGO_DEBUG", default=False)
 
@@ -84,17 +88,27 @@ if not DEBUG:
     if _env_bool("DJANGO_BEHIND_HTTPS_PROXY", default=True):
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-_DEFAULT_CORS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
-CORS_ALLOWED_ORIGINS = [
-    origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", _DEFAULT_CORS).split(",") if origin.strip()
-]
+DEV_VITE_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
+
+
+def origins_from_env(name: str, *, debug: bool) -> list[str]:
+    """Comma-separated origins from ``name``; Vite dev origins only as a DEBUG default.
+
+    Fail closed: prod without the variable trusts no extra origin instead of
+    localhost (same-origin requests still pass Django's CSRF origin check).
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        raw = DEV_VITE_ORIGINS if debug else ""
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+CORS_ALLOWED_ORIGINS = origins_from_env("CORS_ALLOWED_ORIGINS", debug=DEBUG)
 CORS_ALLOW_CREDENTIALS = False
 
 # Trusted origins for CSRF (admin login POST from SPA dev server / prod domain).
 # Spec: security-baseline §CORS/CSRF; ПЛАН §6 Iter 4 — F8.
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", _DEFAULT_CORS).split(",") if origin.strip()
-]
+CSRF_TRUSTED_ORIGINS = origins_from_env("CSRF_TRUSTED_ORIGINS", debug=DEBUG)
 
 # Hotlink: foreign <img src="https://ours/media/..."> gets 403 (Referer allowlist).
 # Empty Referer allowed (direct tab, mail PDF). Prod nginx mirrors this — see
@@ -188,12 +202,15 @@ AXES_COOLOFF_TIME = int(os.getenv("AXES_COOLOFF_TIME", "1"))  # hours
 AXES_LOCKOUT_PARAMETERS = [["ip_address"]]
 AXES_RESET_ON_SUCCESS = True
 AXES_VERBOSE = _env_bool("DJANGO_DEBUG", default=False)
-# Trust one reverse-proxy hop (nginx) for client IP.
-AXES_IPWARE_PROXY_COUNT = int(os.getenv("AXES_IPWARE_PROXY_COUNT", "1"))
-AXES_IPWARE_META_PRECEDENCE_ORDER = [
-    "HTTP_X_FORWARDED_FOR",
-    "REMOTE_ADDR",
-]
+# AccessAttempt.post_data keeps the raw form; mask every one-time secret.
+AXES_SENSITIVE_PARAMETERS = ["otp_code", "recovery_code", "code", "csrfmiddlewaretoken"]
+# Superuser recovery codes: misses per login before a lock (config.admin_otp).
+ADMIN_RECOVERY_MAX_FAILS = int(os.getenv("ADMIN_RECOVERY_MAX_FAILS", "5"))
+ADMIN_RECOVERY_LOCK_SECONDS = int(os.getenv("ADMIN_RECOVERY_LOCK_SECONDS", "900"))
+# Proxies that append to X-Forwarded-For (host nginx). Shared by axes,
+# DRF throttles and OTP quotas via config.client_ip.
+TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "1"))
+AXES_CLIENT_IP_CALLABLE = "config.client_ip.client_ip"
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -498,20 +515,24 @@ VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "").strip()
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()
 GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-2").strip()
-GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-}
+# Verified against certifi + certs/ Russian Trusted CA; false only for debugging.
+GIGACHAT_VERIFY_SSL = _env_bool("GIGACHAT_VERIFY_SSL", default=True)
 # triage — приветствие и передача менеджеру; full — ответы из gigachat_kb.txt
 GIGACHAT_MODE = os.getenv("GIGACHAT_MODE", "triage").strip().casefold()
 SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = int(
     os.getenv("SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS", "300"),
 )
-# Если менеджер не ответил на сообщение клиента за N секунд — бот подхватывает диалог.
+# Менеджер уже вёл диалог и не ответил клиенту за N секунд — бот подхватывает.
 SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS = int(
     os.getenv("SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS", "45"),
 )
+# Бот передал чат, а его никто не взял за N минут — бот возвращается
+# (не раньше, чем клиенту предложено «оставьте email»).
+SUPPORT_AI_RESUME_STALE_MINUTES = int(os.getenv("SUPPORT_AI_RESUME_STALE_MINUTES", "30"))
+
+# Редакция политики ПДн, под которой ставится согласие (лид, кабинет, чат).
+# Меняйте при новой редакции /privacy — старые согласия хранят свою версию.
+PDN_POLICY_VERSION = os.getenv("PDN_POLICY_VERSION", "2026-10-09").strip() or "2026-10-09"
 
 MAX_BOT_TOKEN = os.getenv("MAX_BOT_TOKEN", "").strip()
 MAX_WEBHOOK_SECRET = os.getenv("MAX_WEBHOOK_SECRET", "").strip()
@@ -559,8 +580,9 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
+    "NUM_PROXIES": TRUSTED_PROXY_HOPS,
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -588,6 +610,8 @@ REST_FRAMEWORK = {
         # Client cabinet: register/login/OTP (per IP) and RFQ-repeat (per session).
         "client_auth": "30/hour",
         "client_repeat": "10/min",
+        # Whole-cabinet documents ZIP (heavy: reads every file).
+        "client_zip": "10/hour",
     },
 }
 
@@ -605,6 +629,9 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# Hung SMTP/IMAP/HTTP must not pin a worker (concurrency 2 → OTP and chat stall).
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", "300"))
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "360"))
 
 # Shared cache for DRF throttles (LocMem is per-worker — weak under Gunicorn).
 # Set DJANGO_CACHE_URL=locmem:// in CI (no Redis). Prod: redis://…/2 or omit for default.
@@ -655,8 +682,16 @@ EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND",
     "django.core.mail.backends.smtp.EmailBackend",
 )
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "30"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 LEAD_NOTIFY_EMAIL = os.getenv("LEAD_NOTIFY_EMAIL", "")
+# Подписи менеджеров в ответах CRM (staff User не хранит телефон):
+# {"mailbox@hoocon.ru": {"name": …, "company": …, "phone": …}}. Env — JSON.
+MANAGER_SIGNATURE_CONTACTS: dict[str, dict[str, str]] = json.loads(
+    os.getenv("MANAGER_SIGNATURE_CONTACTS_JSON", "").strip() or "null"
+) or {
+    "assistant@hoocon.ru": {"name": "Людмила", "company": 'ООО "ХОГОН"', "phone": "+7(995)780-70-18"},
+}
 
 # Inbound CRM mail (IMAP poll by beat task ``crm.fetch_inbound_email``).
 # Яндекс 360: пароль приложения ящика (webhook у них нет — только IMAP).
@@ -668,6 +703,7 @@ IMAP_PASSWORD = os.getenv("IMAP_PASSWORD", "")
 IMAP_FOLDER = os.getenv("IMAP_FOLDER", "INBOX").strip() or "INBOX"
 IMAP_USE_SSL = _env_bool("IMAP_USE_SSL", default=True)
 IMAP_FETCH_LIMIT = int(os.getenv("IMAP_FETCH_LIMIT", "50"))
+IMAP_TIMEOUT = int(os.getenv("IMAP_TIMEOUT", "30"))
 
 # Mango VPBX (IP-телефония): ключи из ЛК Mango Office → события на
 # /api/telephony/mango/events/ + исходящие команды (callback, записи).
@@ -725,7 +761,9 @@ CABINET_SHOW_PRICES = _env_bool("CABINET_SHOW_PRICES", default=False)
 # Staff mobile API (Flutter manager app). Internal distribution only.
 STAFF_API_ENABLED = _env_bool("STAFF_API_ENABLED", default=False)
 STAFF_API_TOKEN_TTL_DAYS = int(os.getenv("STAFF_API_TOKEN_TTL_DAYS", "90"))
-FCM_SERVER_KEY = os.getenv("FCM_SERVER_KEY", "").strip()
+# FCM HTTP v1: Firebase service-account key (file path or inline JSON).
+FCM_SERVICE_ACCOUNT_FILE = os.getenv("FCM_SERVICE_ACCOUNT_FILE", "").strip()
+FCM_SERVICE_ACCOUNT_JSON = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "").strip()
 
 # ── Logging (PII-safe: never log full phone/email; see security-baseline §3.2) ─
 LOGGING = {

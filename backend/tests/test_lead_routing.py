@@ -154,12 +154,13 @@ def test_api_aterna_assigns_assistant(client) -> None:
     )
     _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
     payload = {
+        "pdn_consent": True,
         "name": "API Aterna",
         "email": "api-aterna-client@example.com",
         "company": "ООО Атерна",
         "message": "Заявка от Атерны через API.",
     }
-    with patch("leads.views.send_lead_notification") as mock_task:
+    with patch("leads.lifecycle.send_lead_notification") as mock_task:
         response = client.post(
             "/api/leads/",
             data=payload,
@@ -400,12 +401,13 @@ def test_api_assign_sales_sets_assignee(client) -> None:
     mgr = _make_manager(username="api-rr", email="api-rr@hoocon.ru")
     _set_mode(SiteSettings.LeadRoutingMode.ASSIGN_SALES)
     payload = {
+        "pdn_consent": True,
         "name": "API RR",
         "email": "api-rr-client@example.com",
         "company": "ООО RoundRobin",
         "message": "Заявка через API с автоназначением.",
     }
-    with patch("leads.views.send_lead_notification") as mock_task:
+    with patch("leads.lifecycle.send_lead_notification") as mock_task:
         response = client.post(
             "/api/leads/",
             data=payload,

@@ -35,6 +35,22 @@ def test_csp_header_present_on_api_response() -> None:
     assert _csp_value(response)
 
 
+def test_csp_middleware_keeps_stricter_policy_set_by_view() -> None:
+    """Middleware затирал sandbox-CSP приватных вложений чата общим CSP сайта."""
+    from django.http import HttpResponse
+    from django.test import RequestFactory
+
+    from config.csp_middleware import CspMiddleware
+
+    def view(_request):
+        response = HttpResponse(b"x", content_type="image/png")
+        response["Content-Security-Policy"] = "sandbox; default-src 'none'"
+        return response
+
+    response = CspMiddleware(view)(RequestFactory().get("/api/support/messages/1/attachment/"))
+    assert response["Content-Security-Policy"] == "sandbox; default-src 'none'"
+
+
 @pytest.mark.django_db
 def test_csp_object_src_none() -> None:
     """CSP forbids object/embed/applet (object-src 'none')."""

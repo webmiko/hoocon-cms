@@ -651,3 +651,29 @@ def test_admin_set_status_requires_change_perm_and_csrf() -> None:
         content_type="application/json",
     )
     assert no_csrf.status_code == 403
+
+
+@pytest.mark.django_db
+def test_mark_done_skips_already_done_leads() -> None:
+    """Повторное «Завершена» писало ещё одну запись в историю и сдвигало processed_by."""
+    from crm.models import Activity, ActivityType
+
+    manager = User.objects.create_superuser(
+        username="mark-done-twice",
+        email="mark-done-twice@example.com",
+        password="password12",
+    )
+    lead = Lead.objects.create(
+        name="Twice",
+        email="twice@example.com",
+        message="Завершить дважды.",
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=manager,
+    )
+    client = Client()
+    client.force_login(manager)
+    payload = {"action": "action_mark_done", "_selected_action": [str(lead.pk)]}
+    client.post("/admin/leads/lead/", payload)
+    client.post("/admin/leads/lead/", payload)
+    done = Activity.objects.filter(lead=lead, activity_type=ActivityType.STATUS, subject__startswith="Завершена")
+    assert done.count() == 1

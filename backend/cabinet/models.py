@@ -227,9 +227,9 @@ def _private_media_storage() -> FileSystemStorage:
 
 def rma_photo_upload_to(instance: RmaCase, filename: str) -> str:
     """Store under ``rma_photos/<client_id>/<uuid>_<safe_name>`` (private)."""
-    from catalog.validators import sanitize_upload_filename
+    from catalog.validators import storage_safe_filename
 
-    safe = sanitize_upload_filename(filename)
+    safe = storage_safe_filename(filename)
     return f"rma_photos/{instance.client_id}/{uuid.uuid4().hex}_{safe}"
 
 

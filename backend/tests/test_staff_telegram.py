@@ -119,7 +119,7 @@ def test_lead_telegram_skipped_when_webpush_connected() -> None:
     from webpush.services import upsert_subscription
 
     upsert_subscription(
-        endpoint="https://push.example/mgr-connected",
+        endpoint="https://fcm.googleapis.com/fcm/send/mgr-connected",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -140,7 +140,7 @@ def test_lead_telegram_skipped_when_webpush_connected() -> None:
     assert pub.call_args.kwargs["chat_id"] == "2020"
 
     upsert_subscription(
-        endpoint="https://push.example/su-connected",
+        endpoint="https://fcm.googleapis.com/fcm/send/su-connected",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -205,7 +205,7 @@ def test_support_telegram_parallel_despite_webpush() -> None:
     from webpush.services import upsert_subscription
 
     upsert_subscription(
-        endpoint="https://push.example/mgr-support-parallel",
+        endpoint="https://fcm.googleapis.com/fcm/send/mgr-support-parallel",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -615,6 +615,50 @@ def test_staff_assign_to_button_reassigns_dialog_telegram() -> None:
     assert "передан" in note.body
     assert notify.call_args.kwargs["chat_id"] == "8202"
     cache.clear()
+
+
+@pytest.mark.django_db
+def test_assign_to_button_rejects_non_support_staff_telegram() -> None:
+    """Кнопка «Передать» с pk контент-редактора: раньше хватало is_staff."""
+    from django.contrib.auth import get_user_model
+
+    from social.telegram_staff_reply import staff_assign_to_callback_data
+    from supportchat.models import Channel, Conversation
+
+    _make_manager(email="mgr-guard-tg@hoocon.ru", chat_id="8401")
+    editor = get_user_model().objects.create_user(
+        username="editor-tg",
+        email="editor-tg@hoocon.ru",
+        password="pw-12345",
+        is_staff=True,
+    )
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-tg-guard")
+    with patch("social.telegram_bot.telegram_api_call") as api:
+        handle_telegram_update(
+            {
+                "callback_query": {
+                    "id": "cq-guard",
+                    "data": staff_assign_to_callback_data(conv.pk, editor.pk),
+                    "from": {"id": 8401, "first_name": "Mgr"},
+                },
+            },
+        )
+    conv.refresh_from_db()
+    assert conv.assignee_id is None
+    assert api.call_args.args[1]["text"] == "Сотрудник не найден"
+
+
+def test_telegram_html_text_clips_by_utf16_before_escape() -> None:
+    """4000 эмодзи = 8000 UTF-16 units > 4096; обрезка после escape рвала «&amp;»."""
+    from social.copy import telegram_html_text
+
+    emoji = telegram_html_text("😀" * 4000)
+    assert len(emoji.encode("utf-16-le")) // 2 <= 4096
+    assert emoji.endswith("…")
+    amp = telegram_html_text("&" * 5000)
+    assert amp.endswith("&amp;…")
+    assert "&am…" not in amp
+    assert telegram_html_text("<b>") == "&lt;b&gt;"
 
 
 @pytest.mark.django_db
