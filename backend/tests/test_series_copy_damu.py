@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from catalog.etl.series_copy_damu import instructions_for_damu_sku
+import pytest
+
+from catalog.etl.series_copy_damu import (
+    TORQUE_SPECS,
+    apply_damu_enrichment,
+    instructions_for_damu_sku,
+)
+from catalog.models import SKU, AttributeValue, Category, Product
 
 
 def test_instructions_for_damu_sku_scopes_voltage_and_aux() -> None:
@@ -15,7 +22,7 @@ def test_instructions_for_damu_sku_scopes_voltage_and_aux() -> None:
     assert "Исполнения 230" not in text
     assert "Вспомогательные переключатели" not in text
     assert "84,8 × 145,6 × 65" in text
-    assert "8…16 мм" in text
+    assert "круглый 6…16 мм / квадратный 8×8…12×12 мм" in text
 
 
 def test_instructions_for_damu_sku_modulating_with_aux() -> None:
@@ -43,6 +50,115 @@ def test_instructions_for_damu_sku_on_off_aux_omits_dip() -> None:
     assert "клеммы 21,22" in text
     assert "Переключатель b" not in text
     assert "DIP-переключатели" not in text
+
+
+_MANUAL_SWITCH_A = (
+    "– 0–10°: клеммы 21,22 замкнуто / клеммы 21,23 разомкнуто.",
+    "– 10–90°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
+)
+_MANUAL_SWITCH_B = (
+    "– 0–80°: клеммы 24,25 разомкнуто / клеммы 24,26 замкнуто.",
+    "– 80–90°: клеммы 24,25 замкнуто / клеммы 24,26 разомкнуто.",
+)
+
+
+def _switch_rows(text: str, header: str) -> list[str]:
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(header))
+    return lines[start + 1 : start + 3]
+
+
+def test_damu_aux_switch_table_matches_ru_manual() -> None:
+    """Regression: 0–80° sat under switch a and b was «аналогично a»."""
+    text = instructions_for_damu_sku("DA8MU24-AS")
+    assert text is not None
+    assert tuple(_switch_rows(text, "– Переключатель a")) == _MANUAL_SWITCH_A
+    assert tuple(_switch_rows(text, "– Переключатель b")) == _MANUAL_SWITCH_B
+    assert "аналогично" not in text
+    assert "0–80°: клеммы 21" not in text
+
+
+def test_damu_series_instructions_carry_both_switch_tables() -> None:
+    from catalog.etl.series_copy_damu import SERIES_INSTRUCTIONS
+
+    for row in (*_MANUAL_SWITCH_A, *_MANUAL_SWITCH_B):
+        assert row in SERIES_INSTRUCTIONS
+    assert "аналогично переключателю a" not in SERIES_INSTRUCTIONS
+
+
+def test_damu_specs_match_ru_manual_shaft_and_feedback() -> None:
+    """Regression: DA2/4/6 shaft «8…16» and DIP feedback «0(4)…10 мА»."""
+    from catalog.etl.series_copy_damu import TORQUE_SPECS
+
+    assert TORQUE_SPECS[2]["shaft-diameter"] == "круглый 6…16 мм / квадратный 5×5…12×12 мм"
+    for nm in (4, 6):
+        assert TORQUE_SPECS[nm]["shaft-diameter"] == "круглый 6…16 мм / квадратный 8×8…12×12 мм"
+    text = instructions_for_damu_sku("DA8MU24-AS")
+    assert text is not None
+    assert "ON — 0(4)...20 мА." in text
+    assert "10 мА" not in text
+
+
+_FACTORY_DIP4 = (
+    "– №4 Направление вращения при увеличении сигнала: OFF — по часовой стрелке; ON — против часовой стрелки."
+)
+_FACTORY_DIP2 = "– №2 Начало диапазона входного сигнала: OFF — 0...10 В= / 0...20 мА; ON — 2...10 В= / 4...20 мА."
+
+
+def test_damu24_dip_map_matches_factory_pdf() -> None:
+    """Regression: DIP 4 was inverted / «№2 и №4 не используются» vs factory PDF."""
+    for code in ("DA8MU24-AS", "DA32MU24-AS"):
+        text = instructions_for_damu_sku(code)
+        assert text is not None
+        assert _FACTORY_DIP4 in text
+        assert _FACTORY_DIP2 in text
+        assert "все в положении OFF" in text
+        assert "не используются" not in text
+        assert text.count("№4 Направление вращения") == 1
+
+
+def test_damu24_a_without_aux_still_gets_dip_map() -> None:
+    """Regression: DIP block lived under the aux chapter, so -A got none."""
+    text = instructions_for_damu_sku("DA16MU24-A")
+    assert text is not None
+    assert "Вспомогательные переключатели" not in text
+    assert _FACTORY_DIP4 in text
+    assert "DIP-переключателем №4" in text
+    assert "переключатель направления на корпусе" not in text
+
+
+def test_factory_dip_map_scoped_to_damu24_modulating() -> None:
+    """Only DA8…32MU24-A/AS carry the factory map; on/off and 230 V do not."""
+    for code in ("DA8MU24-DS", "DA8MU230-AS", "DA4MU24-AS"):
+        text = instructions_for_damu_sku(code)
+        assert text is not None
+        assert _FACTORY_DIP4 not in text
+
+
+@pytest.mark.django_db
+def test_apply_damu_enrichment_damu24_weight_from_factory_pdf() -> None:
+    """Regression: DA8…32MU24-A/AS weight «≈ 1,3 кг» vs factory «1,2…1,3 кг»."""
+    cat, _ = Category.objects.get_or_create(
+        slug="elektroprivody-bez-pruzhiny",
+        defaults={"name": "Без пружины"},
+    )
+    product, _ = Product.objects.get_or_create(
+        slug="damu-8nm-weight-test",
+        defaults={"name": "DA8MU", "category": cat},
+    )
+    skus = {
+        code: SKU.objects.update_or_create(
+            sku_code=code,
+            defaults={"product": product, "name": code, "slug": code.lower()},
+        )[0]
+        for code in ("DA8MU24-A", "DA8MU24-D")
+    }
+
+    apply_damu_enrichment()
+
+    weight = {code: AttributeValue.objects.get(sku=sku, attribute__slug="weight").value for code, sku in skus.items()}
+    assert weight["DA8MU24-A"] == "1,2…1,3 кг"
+    assert weight["DA8MU24-D"] == TORQUE_SPECS[8]["weight"]
 
 
 def test_instructions_for_damu_sku_rejects_other_series() -> None:

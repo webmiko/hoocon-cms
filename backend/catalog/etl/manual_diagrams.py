@@ -20,11 +20,10 @@ from pathlib import Path
 from typing import Any, Final, Literal, cast
 
 import pypdfium2 as pdfium
-from django.core.files.base import ContentFile
-from django.db import transaction
 from django.db.models import Q
 from PIL import Image, ImageDraw, ImageFont
 
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.manual_pdfs import (
     default_manuals_dir,
     find_manual_file,
@@ -33,7 +32,7 @@ from catalog.etl.manual_pdfs import (
     parse_manual_stem,
     parse_safu_manual_stem,
 )
-from catalog.etl.sku_variant import parse_sku_variant
+from catalog.etl.sku_variant import HvaCode, parse_hva_code, parse_sku_variant
 from catalog.etl.webp import convert_bytes_to_webp
 from catalog.models import SKU, ProductFile, ProductImage
 
@@ -643,32 +642,16 @@ def _upsert_diagram(
             max_edge=1600,
         )
     )
-    existing = ProductImage.objects.filter(sku=sku, source_url=crop.source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
-    filename = f"{sku.sku_code.lower()}-{crop.kind}.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=crop.alt[:300],
-                source_url=crop.source_url,
-                sort_order=crop.sort_order,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-
-        existing.alt = crop.alt[:300]
-        existing.sort_order = crop.sort_order
-        existing.is_published = True
-        existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=crop.source_url,
+        filename=f"{sku.sku_code.lower()}-{crop.kind}.webp",
+        webp=webp,
+        alt=crop.alt,
+        sort_order=crop.sort_order,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def apply_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
@@ -954,53 +937,6 @@ def _load_shaft_label_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTyp
     return ImageFont.load_default()
 
 
-# Relative boxes over PDF caption ``6...16mm`` (right of ○/◇ icons).
-# English manuals print 6…16; catalog ТТХ for DA2/4/6MU use 8…16 mm.
-_SHAFT_LABEL_6_TO_8_REGION: Final[dict[int, tuple[float, float, float, float]]] = {
-    2: (0.261, 0.040, 0.369, 0.088),
-    4: (0.250, 0.080, 0.340, 0.140),
-    6: (0.250, 0.080, 0.340, 0.140),
-}
-
-
-def patch_damu_dimensions_shaft_label(
-    image: Image.Image,
-    *,
-    series_nm: int,
-) -> Image.Image:
-    """Replace PDF label ``6...16mm`` with catalog value ``8...16mm``.
-
-    Applies to DA2MU / DA4MU / DA6MU dimension crops from English manuals.
-    """
-    rel = _SHAFT_LABEL_6_TO_8_REGION.get(series_nm)
-    if rel is None:
-        return image
-    width, height = image.size
-    region = (
-        int(rel[0] * width),
-        int(rel[1] * height),
-        int(rel[2] * width),
-        int(rel[3] * height),
-    )
-    patched = image.copy()
-    draw = ImageDraw.Draw(patched)
-    draw.rectangle(region, fill=(255, 255, 255))
-    font_size = max(12, int(0.030 * height))
-    font = _load_shaft_label_font(font_size)
-    label = "8...16mm"
-    text_box = draw.textbbox((0, 0), label, font=font)
-    text_h = text_box[3] - text_box[1]
-    x = region[0] + 2
-    y = region[1] + max(0, ((region[3] - region[1]) - text_h) // 2) - 1
-    draw.text((x, y), label, fill=(20, 20, 20), font=font)
-    return patched
-
-
-def patch_da2mu_dimensions_shaft_label(image: Image.Image) -> Image.Image:
-    """Backward-compatible alias for DA2MU shaft-label patch."""
-    return patch_damu_dimensions_shaft_label(image, series_nm=2)
-
-
 # Belimo RU glossary: docs/tech-copy-belimo-ru.md (Wiring Diagram section).
 _WIRING_LABEL_ACTUATOR_RU: Final[str] = "Привод"
 _WIRING_LABEL_AUX_RU: Final[str] = "Вспомогательный переключатель"
@@ -1127,11 +1063,14 @@ def diagrams_from_damu_pdf(
     series_nm: int,
     edition: Edition,
 ) -> list[DiagramCrop]:
-    """Build wiring + dimensions crops from a DA..MU English manual PDF."""
+    """Build wiring + dimensions crops from a DA..MU English manual PDF.
+
+    The dimensions crop stays as printed: the PDF shaft range (6…16 mm)
+    matches the catalog ТТХ, so no label is redrawn.
+    """
     page = render_pdf_page(pdf_path, 1)
     wiring_img, dims_img = crop_damu_diagrams(page)
     wiring_img = patch_damu_wiring_labels_ru(wiring_img)
-    dims_img = patch_damu_dimensions_shaft_label(dims_img, series_nm=series_nm)
     series = f"DA{series_nm}MU"
     return [
         DiagramCrop(
@@ -1722,11 +1661,8 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
 
 # ── HVA: dimensions from Russian Illustrator catalog (PDF-compatible .ai) ──
 
-_HVA_CODE = re.compile(
-    r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)(?P<fast>q)?$",
-)
 _HVA_CATALOG_NAME = "浒江2022俄文画册3.ai"
-_HVA_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/hva{nm}{fast}-{kind}.webp"
+_HVA_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/hva{token}-{kind}.webp"
 # Page index in the catalog spread (left column = this family).
 _HVA_CATALOG_PAGE: Final[dict[tuple[int, bool], int]] = {
     (5, False): 0,
@@ -1738,38 +1674,32 @@ _HVA_CATALOG_PAGE: Final[dict[tuple[int, bool], int]] = {
     (20, True): 6,
     (40, True): 7,
 }
-# Envelope H × W × D from catalog 2025 «Размеры привода» (same order as HVD air).
-_HVA_ENVELOPE_MM: Final[dict[tuple[int, bool], str]] = {
-    (5, False): "144,1 × 71,1 × 62,1 мм",
-    (5, True): "144,1 × 71,1 × 62,1 мм",
-    (10, False): "167,8 × 86,2 × 68 мм",
-    (10, True): "167,8 × 86,2 × 68 мм",
-    (20, False): "191,8 × 103,4 × 68 мм",
-    (20, True): "191,8 × 103,4 × 68 мм",
-    (40, False): "198,6 × 110,2 × 68 мм",
-    (40, True): "198,6 × 110,2 × 68 мм",
-}
-# Datasheet Weight row per Nm/fast family (shared by all SKUs of that family).
-_HVA_WEIGHT: Final[dict[tuple[int, bool], str]] = {
-    (5, False): "< 0,8 кг",
-    (5, True): "< 0,8 кг",
-    (10, False): "< 1,1 кг",
-    (10, True): "< 1,1 кг",
-    (20, False): "< 1,4 кг",
-    (20, True): "< 1,4 кг",
-    (40, False): "< 1,5 кг",
-    (40, True): "< 1,5 кг",
+# Families without their own catalog page share a housing drawing
+# (envelope in ``FAMILY_SPECS``: 2 Нм = 5 Нм body; 5UQ / 8Q = 10Q body).
+_HVA_SAME_HOUSING_PAGE: Final[dict[tuple[int, str], tuple[int, bool]]] = {
+    (2, ""): (5, False),
+    (5, "uq"): (10, True),
+    (8, "q"): (10, True),
 }
 _HVA_DIMS_TITLE = "Размеры привода(mm)"
 _HVA_CATALOG_SCALE: Final[float] = 2.5
 
 
 def parse_hva_series(sku_code: str) -> tuple[int, bool] | None:
-    """Return ``(nm, is_fast_q)`` from ``HVA24S-5Q`` → ``(5, True)``."""
-    match = _HVA_CODE.match((sku_code or "").strip().replace(" ", ""))
-    if match is None:
+    """Return ``(nm, is_fast_q)`` for std / Q codes: ``HVA24S-5Q`` → ``(5, True)``."""
+    hva = parse_hva_code(sku_code)
+    if hva is None or hva.suffix not in ("", "q"):
         return None
-    return int(match.group("nm")), bool(match.group("fast"))
+    return hva.nm, hva.suffix == "q"
+
+
+def hva_catalog_page_key(hva: HvaCode) -> tuple[int, bool] | None:
+    """Catalog page ``(nm, fast)`` with this family's housing drawing."""
+    if hva.suffix in ("", "q"):
+        own = (hva.nm, hva.suffix == "q")
+        if own in _HVA_CATALOG_PAGE:
+            return own
+    return _HVA_SAME_HOUSING_PAGE.get((hva.nm, hva.suffix))
 
 
 def find_hva_catalog_ai(*, manuals_dir: Path | None = None) -> Path | None:
@@ -1847,10 +1777,10 @@ def crop_hva_catalog_dimensions(
     return page_image.crop((crop_left, crop_top, crop_right, crop_bottom))
 
 
-def source_url_for_hva(series_nm: int, *, fast: bool, kind: DiagramKind) -> str:
-    """Stable local-asset key for an HVA diagram row."""
-    fast_key = "q" if fast else ""
-    return _HVA_SOURCE_URL.format(nm=series_nm, fast=fast_key, kind=kind)
+def source_url_for_hva(series_nm: int, *, fast: bool, kind: DiagramKind, suffix: str | None = None) -> str:
+    """Stable local-asset key for an HVA diagram row (``hva5uq-dimensions``)."""
+    token = f"{series_nm}{suffix if suffix is not None else ('q' if fast else '')}"
+    return _HVA_SOURCE_URL.format(token=token, kind=kind)
 
 
 def diagrams_from_hva_catalog(
@@ -1858,8 +1788,12 @@ def diagrams_from_hva_catalog(
     *,
     series_nm: int,
     fast: bool,
+    family: HvaCode | None = None,
 ) -> list[DiagramCrop]:
-    """Build dimensions crop from the HVA catalog page for one torque family."""
+    """Build dimensions crop from the HVA catalog page for one torque family.
+
+    ``family`` labels the crop when the page is a shared-housing drawing.
+    """
     page_index = _HVA_CATALOG_PAGE.get((series_nm, fast))
     if page_index is None:
         return []
@@ -1871,14 +1805,19 @@ def diagrams_from_hva_catalog(
     finally:
         document.close()
 
-    label = f"HVA-{series_nm}{'Q' if fast else ''}"
+    label = family.family if family is not None else f"HVA-{series_nm}{'Q' if fast else ''}"
+    source_url = (
+        source_url_for_hva(family.nm, fast=False, kind="dimensions", suffix=family.suffix)
+        if family is not None
+        else source_url_for_hva(series_nm, fast=fast, kind="dimensions")
+    )
     return [
         DiagramCrop(
             kind="dimensions",
             png_bytes=_pil_to_png_bytes(dims_img),
             alt=f"{label} | Габаритные размеры привода (мм), чертёж из каталога",
             sort_order=SORT_DIMENSIONS,
-            source_url=source_url_for_hva(series_nm, fast=fast, kind="dimensions"),
+            source_url=source_url,
         ),
     ]
 
@@ -1886,10 +1825,11 @@ def diagrams_from_hva_catalog(
 def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     """Attach HVA dimensions crops from the Illustrator catalog to galleries.
 
-    Also backfills ``dimensions`` / ``weight`` ТТХ from the known family maps
-    (same envelope for all SKUs of one Nm/fast family; mass may differ by family).
+    Also backfills ``dimensions`` / ``weight`` ТТХ from ``series_copy_hva.FAMILY_SPECS``
+    (the one datasheet table, incl. 2 Нм, 5UQ and 8Q).
     """
     from catalog.etl.attr_write import set_sku_attribute
+    from catalog.etl.series_copy_hva import FAMILY_SPECS
 
     summary: dict[str, Any] = {
         "created": 0,
@@ -1904,11 +1844,12 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     if catalog is None:
         logger.info("hva_catalog_ai_missing")
 
-    crop_cache: dict[tuple[int, bool], list[DiagramCrop] | None] = {}
+    crop_cache: dict[str, list[DiagramCrop] | None] = {}
     skus = list(SKU.objects.filter(sku_code__istartswith="HVA").order_by("sku_code"))
     for sku in skus:
-        parsed = parse_hva_series(sku.sku_code)
-        if parsed is None:
+        hva = parse_hva_code(sku.sku_code)
+        family_specs = FAMILY_SPECS.get((hva.nm, hva.suffix)) if hva is not None else None
+        if hva is None or family_specs is None:
             summary["skipped"] += 1
             continue
         # Prefer local HV-pack razmer + wiring over Illustrator catalog crop.
@@ -1920,32 +1861,30 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
             ):
                 summary["skipped"] += 1
                 continue
-        series_nm, fast = parsed
-        cache_key = (series_nm, fast)
-        if catalog is not None and cache_key not in crop_cache:
-            if cache_key not in _HVA_CATALOG_PAGE:
-                crop_cache[cache_key] = None
+        page_key = hva_catalog_page_key(hva)
+        if catalog is not None and hva.token not in crop_cache:
+            if page_key is None:
+                crop_cache[hva.token] = None
             else:
                 try:
-                    crop_cache[cache_key] = diagrams_from_hva_catalog(
+                    crop_cache[hva.token] = diagrams_from_hva_catalog(
                         catalog,
-                        series_nm=series_nm,
-                        fast=fast,
+                        series_nm=page_key[0],
+                        fast=page_key[1],
+                        family=hva,
                     )
                 except Exception as exc:
                     logger.exception(
-                        "hva_catalog_diagram_crop_failed nm=%s fast=%s err_type=%s",
-                        series_nm,
-                        fast,
+                        "hva_catalog_diagram_crop_failed family=%s err_type=%s",
+                        hva.family,
                         type(exc).__name__,
                     )
-                    crop_cache[cache_key] = None
+                    crop_cache[hva.token] = None
 
-        crops = crop_cache.get(cache_key) if catalog is not None else None
+        crops = crop_cache.get(hva.token) if catalog is not None else None
         if crops:
-            series_key = f"hva-{series_nm}{'q' if fast else ''}"
             series_stats = summary["series"].setdefault(
-                series_key,
+                f"hva-{hva.token}",
                 {"created": 0, "updated": 0, "skus": 0},
             )
             series_stats["skus"] += 1
@@ -1960,25 +1899,21 @@ def apply_hva_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         else:
             summary["skipped"] += 1
 
-        envelope = _HVA_ENVELOPE_MM.get(cache_key)
-        weight = _HVA_WEIGHT.get(cache_key)
         if not dry_run:
-            if envelope:
-                set_sku_attribute(
-                    sku,
-                    slug="dimensions",
-                    value=envelope,
-                    name="Габаритные размеры",
-                    unit="мм",
-                )
-            if weight:
-                set_sku_attribute(
-                    sku,
-                    slug="weight",
-                    value=weight,
-                    name="Масса",
-                    unit="кг",
-                )
+            set_sku_attribute(
+                sku,
+                slug="dimensions",
+                value=family_specs["dimensions"],
+                name="Габаритные размеры",
+                unit="мм",
+            )
+            set_sku_attribute(
+                sku,
+                slug="weight",
+                value=family_specs["weight"],
+                name="Масса",
+                unit="кг",
+            )
 
     summary["unpublished_catalog_dims"] = unpublish_redundant_hva_catalog_dimensions(
         dry_run=dry_run,

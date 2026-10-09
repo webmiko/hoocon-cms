@@ -69,6 +69,11 @@ export default function ProfilePage() {
           {company.members.length > 0 && (
             <p className={styles.muted}>Сотрудников: {company.members.length}</p>
           )}
+          {!company.confirmed && (
+            <p className={styles.muted}>
+              Реквизиты появятся, когда менеджер подтвердит, что вы сотрудник компании.
+            </p>
+          )}
         </div>
       ) : null}
     </section>

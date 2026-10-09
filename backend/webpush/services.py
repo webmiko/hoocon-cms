@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from urllib.parse import urlsplit
 
+import requests
 from django.conf import settings
 from django.db.models import QuerySet
 
+from config.safe_paths import safe_same_site_path
 from webpush.models import PushSubscription
 
 logger = logging.getLogger("hoocon.webpush")
@@ -43,6 +46,35 @@ def webpush_configured() -> bool:
     return bool(vapid_public_key() and getattr(settings, "WEBPUSH_VAPID_PRIVATE_KEY", "").strip())
 
 
+PUSH_SEND_TIMEOUT_SECONDS = 10
+# Browser push services (Chrome/Yandex/Opera → FCM, Firefox, Safari, Edge).
+PUSH_SERVICE_HOST_SUFFIXES = (
+    "fcm.googleapis.com",
+    "android.googleapis.com",
+    "push.services.mozilla.com",
+    "push.apple.com",
+    "notify.windows.com",
+)
+
+
+def is_allowed_push_endpoint(endpoint: str) -> bool:
+    """True for ``https://`` endpoints on a known browser push service.
+
+    The endpoint comes from the visitor and the server POSTs to it, so any
+    other host would let a visitor aim the worker at internal services.
+    """
+    try:
+        parts = urlsplit((endpoint or "").strip())
+    except ValueError:
+        return False
+    host = (parts.hostname or "").lower()
+    if parts.scheme != "https" or not host or parts.username or parts.password:
+        return False
+    if parts.port not in (None, 443):
+        return False
+    return any(host == suffix or host.endswith(f".{suffix}") for suffix in PUSH_SERVICE_HOST_SUFFIXES)
+
+
 def upsert_subscription(
     *,
     endpoint: str,
@@ -59,6 +91,8 @@ def upsert_subscription(
     auth = (auth or "").strip()
     if not endpoint or not p256dh or not auth:
         raise ValueError("endpoint, p256dh and auth are required")
+    if not is_allowed_push_endpoint(endpoint):
+        raise ValueError("endpoint is not a known push service")
     if not topic_support and not topic_marketing:
         raise ValueError("at least one topic required")
 
@@ -128,14 +162,8 @@ def remove_subscription(endpoint: str) -> int:
 
 
 def sanitize_push_url(url: str) -> str:
-    """Allow only same-origin path URLs (reject protocol-relative ``//``)."""
-    raw = (url or "").strip() or "/"
-    if not raw.startswith("/") or raw.startswith("//"):
-        return "/"
-    # Keep path + query + hash; block schemes smuggled after slash.
-    if "://" in raw:
-        return "/"
-    return raw[:500]
+    """Allow only same-origin path URLs (path + query + hash)."""
+    return safe_same_site_path(url)
 
 
 def send_push_to_subscription(
@@ -149,6 +177,9 @@ def send_push_to_subscription(
     """Send one notification. Returns False if skipped/gone; deletes on 410."""
     if not webpush_configured():
         logger.warning("webpush_skip_not_configured")
+        return False
+    if not is_allowed_push_endpoint(subscription.endpoint):
+        logger.warning("webpush_skip_foreign_endpoint id=%s", subscription.pk)
         return False
 
     from pywebpush import WebPushException, webpush
@@ -172,6 +203,7 @@ def send_push_to_subscription(
             vapid_private_key=vapid_private_key(),
             vapid_claims=vapid_claims(),
             ttl=86_400,
+            timeout=PUSH_SEND_TIMEOUT_SECONDS,
         )
         subscription.touch()
         return True
@@ -189,6 +221,9 @@ def send_push_to_subscription(
         )
         return False
     except WebPushConfigError:
+        return False
+    except requests.RequestException as exc:
+        logger.warning("webpush_network id=%s err=%s", subscription.pk, type(exc).__name__)
         return False
 
 

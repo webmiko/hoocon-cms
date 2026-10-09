@@ -1,7 +1,7 @@
 """Mango VPBX telephony: event signature check, parsing, Call upsert.
 
 Подпись запросов Mango: ``sha256(vpbx_api_key + json + vpbx_api_salt)``
-(hex). События приходят form-POST'ом на ``/api/telephony/mango/events/`` —
+(hex). События приходят form-POST’ом на ``/api/telephony/mango/events/<тип>`` —
 ``vpbx_api_key``, ``sign``, ``json`` (строка). Один URL принимает оба типа
 событий: ``call`` (состояние вызова) и ``recording`` (готовность записи).
 
@@ -14,15 +14,14 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
 import logging
 import re
 from typing import Any, cast
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from config.secret_compare import secrets_equal
 from crm.models import (
     Activity,
     ActivityType,
@@ -58,14 +57,15 @@ def mango_sign(api_key: str, json_payload: str, api_salt: str) -> str:
 
 
 def verify_mango_signature(api_key: str, json_payload: str, sign: str) -> bool:
-    """Constant-time signature check; False when keys are not configured."""
+    """Constant-time signature check; False when the widget is off or keys are empty."""
+    from sitesettings.telephony import mango_settings
+
+    enabled, expected_key, salt, _callback = mango_settings()
     api_key = (api_key or "").strip()
-    salt = (getattr(settings, "MANGO_VPBX_API_SALT", "") or "").strip()
-    expected_key = (getattr(settings, "MANGO_VPBX_API_KEY", "") or "").strip()
-    if not expected_key or not salt or api_key != expected_key:
+    if not enabled or not expected_key or not salt or not secrets_equal(expected_key, api_key):
         return False
     expected = mango_sign(api_key, json_payload, salt)
-    return hmac.compare_digest(expected, (sign or "").strip())
+    return secrets_equal(expected, (sign or "").strip())
 
 
 def _epoch(ts: Any) -> Any:
@@ -108,11 +108,11 @@ def _client_and_extension(payload: dict[str, Any]) -> tuple[str, str]:
 
 
 def _resolve_client(client_number: str) -> Client | None:
-    """Find the CRM card by normalized phone digits."""
+    """Active CRM card by normalized phone digits (merged duplicates are inactive)."""
     digits = normalize_phone_digits(client_number)
     if len(digits) < 5:
         return None
-    return Client.objects.filter(phone_digits=digits).exclude(phone_digits="").order_by("id").first()
+    return Client.objects.filter(is_active=True, phone_digits=digits).order_by("id").first()
 
 
 def _resolve_manager(extension: str) -> Any:
@@ -155,7 +155,12 @@ def handle_mango_event(payload: dict[str, Any]) -> str:
 
 
 def _handle_call_event(payload: dict[str, Any]) -> str:
-    """Upsert Call by entry_id; Activity once on first Disconnected."""
+    """Upsert Call by entry_id; Activity once on first Disconnected.
+
+    A finished call keeps ``DISCONNECTED``: later legs of the same entry
+    (transfer, second Disconnected with the same timestamp) must neither
+    roll the state back nor log a second timeline entry.
+    """
     entry_id = (payload.get("entry_id") or "").strip()
     if not entry_id:
         return "skipped"
@@ -183,11 +188,13 @@ def _handle_call_event(payload: dict[str, Any]) -> str:
                 "last_seq": seq,
             },
         )
+        was_finished = not created and call.finished_at is not None
         if not created:
             if seq and seq <= call.last_seq:
                 return "ignored"  # устаревшее событие / ретрай
             call.call_id = call.call_id or (payload.get("call_id") or "")[:200]
-            call.state = state
+            if not was_finished:
+                call.state = state
             call.from_number = from_number[:32] or call.from_number
             call.to_number = to_number[:32] or call.to_number
             call.extension = extension[:20] or call.extension
@@ -208,7 +215,7 @@ def _handle_call_event(payload: dict[str, Any]) -> str:
             if call.connected_at:
                 call.talk_duration = max(0, int((ts - call.connected_at).total_seconds()))
         call.save()
-        first_disconnect = state == CallState.DISCONNECTED and call.finished_at == ts
+        first_disconnect = state == CallState.DISCONNECTED and not was_finished
 
     if first_disconnect:
         _log_call_activity(call)

@@ -5,7 +5,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useAsync } from "../hooks/useAsync";
+import { LoadMore } from "../components/LoadMore";
+import { usePagedList } from "../hooks/usePagedList";
 import styles from "./Account.module.css";
 import { accountApi, AccountApiError, type AccountLead } from "./api";
 
@@ -18,16 +19,20 @@ function fmtDate(iso: string): string {
 }
 
 export default function LeadsPage() {
-  const { data, loading, error } = useAsync(() => accountApi.leads());
+  const {
+    items: leads,
+    loading,
+    error,
+    hasNext,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  } = usePagedList<AccountLead>((page, signal) => accountApi.leads({ page }, signal));
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
   if (loading) return <p className={styles.muted}>Загрузка…</p>;
   if (error) return <p className={styles.error}>Не удалось загрузить заявки.</p>;
-
-  const leads: AccountLead[] = Array.isArray(data)
-    ? data
-    : ((data?.results as AccountLead[] | undefined) ?? []);
 
   async function repeat(id: number) {
     setBusyId(id);
@@ -91,6 +96,12 @@ export default function LeadsPage() {
           </tbody>
         </table>
       )}
+      <LoadMore
+        hasNext={hasNext}
+        loading={loadingMore}
+        error={loadMoreError}
+        onLoadMore={() => void loadMore()}
+      />
     </section>
   );
 }

@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 from typing import Any, Final
 
+from catalog.etl.attr_write import write_copy
+from catalog.etl.belimo_analogs import belimo_family_by_area
 from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.tech_copy import normalize_tech_copy
 from catalog.models import SKU, Product
@@ -25,43 +27,10 @@ _FOOTNOTE = normalize_tech_copy(
     "уточняйте по паспорту / шильдику заменяемого привода.",
 )
 
-# Belimo non-spring families by torque (EU datasheets: TMC2 / LM5 / NM10 / SM20 / GM40).
-_BELIMO_AIR: Final[dict[int, str]] = {
-    2: "TMC",
-    5: "LM",
-    8: "NM",
-    10: "NM",
-    16: "SM",
-    20: "SM",
-    24: "SM",
-    32: "GM",
-    40: "GM",
-}
-
-# Belimo quick-running (HVA-Q / DAMQU / HVD-Q).
-# Official Q rotary bands: LMQ≈4, NMQ≈8, SMQ≈16 Нм; no 24 Нм Q → GMQ class.
-_BELIMO_FAST: Final[dict[int, str]] = {
-    5: "LMQ",
-    8: "NMQ",
-    10: "NMQ",
-    16: "SMQ",
-    20: "SMQ",
-    24: "GMQ",
-    40: "GMQ",
-}
-
 
 def belimo_fast_family(nm: int) -> str:
-    """Belimo Q-series letters for a torque (never collapse 16/24 onto NMQ)."""
-    if nm in _BELIMO_FAST:
-        return _BELIMO_FAST[nm]
-    if nm <= 6:
-        return "LMQ"
-    if nm <= 12:
-        return "NMQ"
-    if nm <= 20:
-        return "SMQ"
-    return "GMQ"
+    """Belimo Q-series by area (LMQ 0.4 / NMQ 0.8 / SMQ 1.6 / GMQ 4.0 м²)."""
+    return belimo_family_by_area("fast", nm / 10) or "GMQ"
 
 
 # Siemens OpenAir (on/off base; modulating → …61).
@@ -147,7 +116,7 @@ def _lines_major_air(
     fast: bool,
 ) -> list[str]:
     """Bullet lines for one edition (major brands only)."""
-    family = belimo_fast_family(nm) if fast else (_BELIMO_AIR.get(nm) or "NM")
+    family = belimo_family_by_area("fast" if fast else "air_no_spring", nm / 10) or "GM"
     siemens = _SIEMENS_AIR.get(nm, "GLB")
     lines = [
         f"– {_belimo_air(family, voltage, modulating=modulating, aux=aux)}",
@@ -463,10 +432,8 @@ def apply_major_analogs_enrichment(
         summary["slugs"].append(product.slug)
         if dry_run:
             continue
-        product.analogs_text = text
-        product.save(update_fields=["analogs_text", "updated_at"])
+        write_copy(product, analogs_text=text)
         for sku in SKU.objects.filter(product=product):
-            sku.analogs_text = filter_analogs_for_sku(text, sku.sku_code)
-            sku.save(update_fields=["analogs_text", "updated_at"])
+            write_copy(sku, analogs_text=filter_analogs_for_sku(text, sku.sku_code))
             summary["skus"] += 1
     return summary

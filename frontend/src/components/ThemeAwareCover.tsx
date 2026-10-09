@@ -1,3 +1,6 @@
+import { useContext } from "react";
+
+import { ThemeContext } from "../theme/ThemeContext";
 import styles from "./ThemeAwareCover.module.css";
 
 type ThemeAwareCoverProps = {
@@ -11,10 +14,16 @@ type ThemeAwareCoverProps = {
   loading?: "eager" | "lazy";
 };
 
+function documentIsDark(): boolean {
+  return typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
+}
+
 /**
- * Article/news cover that swaps light/dark assets with ``html[data-theme]``.
+ * Article/news cover for the resolved light/dark theme.
  *
- * Same pattern as BrandLogo: both images in DOM, CSS toggles visibility.
+ * One ``<img>`` whose src follows the theme: two hidden-by-CSS images both
+ * downloaded eagerly and doubled the LCP bytes. Page CSS gives the img an
+ * aspect-ratio, so swapping src on theme change does not shift layout.
  */
 export function ThemeAwareCover({
   light,
@@ -24,26 +33,19 @@ export function ThemeAwareCover({
   imgClassName,
   loading = "lazy",
 }: ThemeAwareCoverProps) {
-  const hasDark = Boolean(dark);
+  const theme = useContext(ThemeContext);
+  const isDark = theme ? theme.resolved === "dark" : documentIsDark();
+  const src = isDark && dark ? dark : light;
   return (
     <span className={[styles.root, className].filter(Boolean).join(" ")}>
       <img
-        className={[styles.light, imgClassName].filter(Boolean).join(" ")}
-        src={light}
+        className={imgClassName}
+        src={src}
         alt={alt}
         loading={loading}
+        fetchPriority={loading === "eager" ? "high" : undefined}
         decoding="async"
       />
-      {hasDark ? (
-        <img
-          className={[styles.dark, imgClassName].filter(Boolean).join(" ")}
-          src={dark!}
-          alt=""
-          aria-hidden
-          loading={loading}
-          decoding="async"
-        />
-      ) : null}
     </span>
   );
 }

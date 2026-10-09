@@ -454,6 +454,10 @@
   min-width: 0;
 }
 
+.metaConsent {
+  padding: 0 1rem 0.5rem;
+}
+
 .metaActions {
   display: flex;
   justify-content: flex-end;

@@ -64,13 +64,13 @@ export function DocsPage() {
   const listKey = `${q}\0${series}\0${kind}\0${family}`;
 
   const { data, loading, error } = useAsync(
-    () =>
+    (signal) =>
       api.docs({
         q: q || undefined,
         series: series || undefined,
         kind: kind || undefined,
         family: family || undefined,
-      }),
+      }, signal),
     listKey,
   );
 

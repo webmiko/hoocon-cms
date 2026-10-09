@@ -24,7 +24,6 @@ from supportchat.gigachat.quiz_bot import (
 from supportchat.gigachat.triage import (
     is_product_intent,
     is_triage_mode,
-    parse_triage_escalation_note,
     triage_handoff_reply,
     triage_site_nav_reply,
 )
@@ -32,7 +31,6 @@ from supportchat.gigachat.triage_docs import is_document_intent, triage_docs_rep
 from supportchat.gigachat.triage_guard import (
     full_output_blocked,
     triage_greeting_reply,
-    triage_output_blocked,
     uncertain_branch_reply,
 )
 from supportchat.gigachat.triage_product import (
@@ -242,6 +240,7 @@ def generate_ai_reply(
             payload_extra=actions_payload(manager_branch_actions()),
         )
 
+    # Triage answered above without the API; only full mode reaches GigaChat.
     # Ветки базы подбираем по всей переписке клиента: требования из ранних
     # сообщений (пружинный возврат, напряжение, серия) не должны теряться.
     retrieval_query = " ".join(m["content"] for m in history if m["role"] == "user")[-800:]
@@ -257,42 +256,15 @@ def generate_ai_reply(
             return AiReply(text=docs_fallback, escalate=False, escalation_note="")
     model_escalate = any(pattern.search(raw) for pattern in _ESCALATE_PATTERNS)
     text = _strip_escalate_marker(raw)
-    if not is_triage_mode():
-        user_texts = [m["content"] for m in history if m["role"] == "user"]
-        if full_output_blocked(text, user_texts=user_texts):
-            # Назван несуществующий/противоречивый артикул или внешняя ссылка —
-            # лучше безопасный фолбэк, чем неверный факт клиенту.
-            return AiReply(
-                text=_SPEC_GUARD_TEXT,
-                escalate=False,
-                escalation_note="",
-                payload_extra=actions_payload(call_manager_only_actions()),
-            )
-    if is_triage_mode() and triage_output_blocked(text, user_query=user_query):
-        if (
-            product_clarification_already_sent(conversation)
-            and thread_has_product_topic(history)
-            and not is_document_intent(user_query)
-        ):
-            return AiReply(
-                text=triage_product_followup_reply(history),
-                escalate=False,
-                escalation_note="",
-                payload_extra=actions_payload(call_manager_only_actions()),
-            )
-        if is_product_intent(user_query):
-            return AiReply(
-                text=triage_product_clarification_reply(user_query),
-                escalate=False,
-                escalation_note="",
-                product_clarify=True,
-                payload_extra=actions_payload(call_manager_only_actions()),
-            )
+    user_texts = [m["content"] for m in history if m["role"] == "user"]
+    if full_output_blocked(text, user_texts=user_texts):
+        # Назван несуществующий/противоречивый артикул или внешняя ссылка —
+        # лучше безопасный фолбэк, чем неверный факт клиенту.
         return AiReply(
-            text=uncertain_branch_reply(),
+            text=_SPEC_GUARD_TEXT,
             escalate=False,
             escalation_note="",
-            payload_extra=actions_payload(manager_branch_actions()),
+            payload_extra=actions_payload(call_manager_only_actions()),
         )
     if model_escalate and not inbound_requests_manager_handoff(user_query, payload):
         cleaned = text.strip() or "Могу подключить менеджера для точного ответа."
@@ -302,9 +274,5 @@ def generate_ai_reply(
             escalation_note="",
             payload_extra=actions_payload(call_manager_only_actions()),
         )
-    note = ""
-    if model_escalate:
-        note = parse_triage_escalation_note(text) if is_triage_mode() else ""
-        if not note:
-            note = "Клиент запросил менеджера или вопрос вне компетенции бота."
+    note = "Клиент запросил менеджера или вопрос вне компетенции бота." if model_escalate else ""
     return AiReply(text=text, escalate=model_escalate, escalation_note=note)

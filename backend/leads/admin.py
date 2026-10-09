@@ -43,7 +43,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import SKU
-from config.admin_mixins import OpenChangeLinkMixin, filter_autocomplete_by_client
+from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin, filter_autocomplete_by_client
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -124,8 +124,18 @@ class LeadItemInline(TabularInline):
     add_button_text = _("Добавить ещё одну позицию к заявке")
 
 
+def _scoped_crm_clients(request: HttpRequest) -> QuerySet[CrmClient]:
+    from crm.services import scope_clients_for_manager
+
+    return scope_clients_for_manager(CrmClient.objects.all(), request.user)
+
+
+def _scoped_leads(request: HttpRequest) -> QuerySet[Lead]:
+    return scope_leads_for_manager(Lead.objects.all(), request.user)
+
+
 @admin.register(Lead)
-class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
+class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for customer inquiries (RFQ / consultation / replacement).
 
     PII (email/phone) is visible to staff in Admin — that's the only
@@ -169,6 +179,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "items__sku_code",
     )
     autocomplete_fields = ("sku", "client", "assignee", "processed_by", "rfq_bundle_root")
+    scoped_fk = {"client": _scoped_crm_clients, "rfq_bundle_root": _scoped_leads}
     readonly_fields = (
         "created_at",
         "updated_at",
@@ -177,6 +188,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         "rfq_bundle_key",
         "rfq_desk_summary",
         "rfq_thread_links",
+        "pdn_consent_at",
+        "pdn_policy_version",
     )
     ordering = ()
     actions = ("action_take_in_work", "action_mark_done", "action_mark_thread_done")
@@ -193,7 +206,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Контакт",
             {
-                "fields": ("company", "name", "phone", "email", "client"),
+                "fields": ("company", "name", "phone", "email", "client", "contact_verified"),
                 "description": (
                     "Эл. почта = ID клиента в CRM. Нить КП = компания + имя (для RFQ компания обязательна)."
                 ),
@@ -241,6 +254,14 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             "Метаданные",
             {
                 "fields": ("seen_at", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Согласие на обработку ПДн",
+            {
+                "fields": ("pdn_consent_at", "pdn_policy_version"),
+                "description": "Отмечено в форме на сайте; пусто — заявка пришла не из формы (почта, кабинет).",
                 "classes": ("collapse",),
             },
         ),
@@ -444,13 +465,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         for sibling in qs:
             url = reverse("admin:leads_lead_change", args=[sibling.pk])
             mark = " (корень)" if sibling.rfq_bundle_root_id is None else ""
+            # Sort the prefetched rows: order_by()/values_list() re-query per sibling.
             codes = [
-                c
-                for c in sibling.items.order_by("sort_order", "id").values_list(
-                    "sku_code",
-                    flat=True,
-                )
-                if c
+                item.sku_code
+                for item in sorted(sibling.items.all(), key=lambda row: (row.sort_order, row.pk))
+                if item.sku_code
             ]
             sibling_sku = cast(SKU | None, sibling.sku)
             if not codes and sibling.sku_id and sibling_sku is not None:
@@ -462,7 +481,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                     url,
                     sibling.pk,
                     sibling.get_status_display(),
-                    sibling.created_at.strftime("%Y-%m-%d %H:%M"),
+                    timezone.localtime(sibling.created_at).strftime("%Y-%m-%d %H:%M"),
                     codes_label,
                     mark,
                 ),
@@ -953,6 +972,8 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             if prev is not None:
                 prev_status = str(prev.get("status") or "")
                 prev_assignee_id = prev.get("assignee_id")
+        if not change or ("client" in (getattr(form, "changed_data", None) or []) and obj.client_id):
+            obj.contact_verified = True
         apply_lead_manager_on_save(obj, actor=request.user)
         super().save_model(request, obj, form, change)
         if not change:
@@ -986,7 +1007,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
 
         transaction.on_commit(_crm_tg)
 
-    @admin.action(description="Взять в работу (назначить на меня)")
+    @admin.action(description="Взять в работу (назначить на меня)", permissions=("change",))
     def action_take_in_work(
         self,
         request: HttpRequest,
@@ -1019,7 +1040,7 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
                 messages.SUCCESS,
             )
 
-    @admin.action(description="Отметить обработанными (я завершил)")
+    @admin.action(description="Отметить обработанными (я завершил)", permissions=("change",))
     def action_mark_done(
         self,
         request: HttpRequest,
@@ -1033,7 +1054,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
         """
         now = timezone.now()
         count = 0
+        already = 0
         for lead in queryset:
+            if lead.status == Lead.LeadStatus.DONE:
+                already += 1
+                continue
             lead.status = Lead.LeadStatus.DONE
             apply_lead_manager_on_save(lead, actor=request.user)
             if lead.processed_at is None:
@@ -1048,11 +1073,11 @@ class LeadAdmin(OpenChangeLinkMixin, ModelAdmin):
             count += 1
         self.message_user(
             request,
-            f"Завершено: {count}",
+            f"Завершено: {count}" + (f". Уже были завершены: {already}" if already else ""),
             messages.SUCCESS,
         )
 
-    @admin.action(description="Отметить нить КП завершённой")
+    @admin.action(description="Отметить нить КП завершённой", permissions=("change",))
     def action_mark_thread_done(
         self,
         request: HttpRequest,

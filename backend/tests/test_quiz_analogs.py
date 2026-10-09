@@ -6,7 +6,7 @@ import pytest
 from rest_framework.test import APIRequestFactory
 
 from catalog.etl.attr_write import set_sku_attribute
-from catalog.models import SKU, Category, Product
+from catalog.models import SKU, AttributeValue, Category, Product
 from catalog.quiz_analogs import (
     build_kit_bundle_for_valve,
     family_matches_voltage,
@@ -395,3 +395,76 @@ def test_quiz_analog_api_returns_kit_components(client) -> None:
     assert bundle["drive_code"] == "DA6MU24-D"
     assert bundle["in_stock"] is True
     assert "отдельных позиций" in payload["note"]
+
+
+def _kit_catalog(valve_count: int) -> None:
+    valve_cat = Category.objects.create(name="Шаровые краны", slug="sharovye-krany")
+    drive_cat = Category.objects.create(name="Приводы", slug="elektroprivody")
+    adapter_cat = Category.objects.create(name="Адаптеры", slug="adaptery")
+    for n in range(valve_count):
+        code = f"8100-BV2{n:02d}A"
+        product = Product.objects.create(name=code, slug=f"sharovoy-kran-{n}", category=valve_cat)
+        sku = SKU.objects.create(
+            product=product, name=code, slug=code.casefold(), sku_code=code, is_published=True, stock_qty=1
+        )
+        set_sku_attribute(sku, slug="dn", value="25", name="DN", unit="")
+        set_sku_attribute(
+            sku, slug="compatible-actuators", value="DA5FU24, DA6MU24 (−D/−DS)", name="Совместимый привод", unit=""
+        )
+    for family in ("DA5FU24", "DA6MU24"):
+        product = Product.objects.create(name=family, slug=family.casefold(), category=drive_cat)
+        code = f"{family}-D"
+        SKU.objects.create(product=product, name=code, slug=code.casefold(), sku_code=code, is_published=True)
+    adapter = Product.objects.create(name="BR-M", slug="br-m", category=adapter_cat)
+    SKU.objects.create(product=adapter, name="BR-M", slug="br-m-sku", sku_code="BR-M", is_published=True)
+
+
+@pytest.mark.django_db
+def test_kit_bundles_scan_drives_once_regardless_of_valve_count() -> None:
+    """M33: приводы DA* читаются один раз на запрос квиза, а не на каждую пару кран×семейство."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _kit_catalog(5)
+    request = APIRequestFactory().get(
+        "/api/catalog/quiz-analogs/",
+        {"need": "kit", "quiz_voltage": "24", "quiz_control": "onoff", "quiz_aux": "no", "dn": "25"},
+    )
+    with CaptureQueriesContext(connection) as ctx:
+        bundles = find_kit_analog_bundles(request)
+
+    assert len(bundles) == 5
+    drive_scans = [q["sql"] for q in ctx.captured_queries if "'DA%'" in q["sql"]]
+    bracket_codes = {bundle["bracket_code"] for bundle in bundles}
+    bracket_lookups = [
+        q["sql"] for q in ctx.captured_queries if any(f"UPPER('{code}')" in q["sql"] for code in bracket_codes)
+    ]
+    assert len(drive_scans) == 1
+    assert len(bracket_lookups) == len(bracket_codes)
+
+
+def _kit_query_count(valve_count: int) -> int:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _kit_catalog(valve_count)
+    request = APIRequestFactory().get(
+        "/api/catalog/quiz-analogs/",
+        {"need": "kit", "quiz_voltage": "24", "quiz_control": "onoff", "quiz_aux": "no", "dn": "25"},
+    )
+    with CaptureQueriesContext(connection) as ctx:
+        bundles = find_kit_analog_bundles(request)
+    assert len(bundles) == valve_count
+    return len(ctx.captured_queries)
+
+
+@pytest.mark.django_db
+def test_kit_bundles_valve_attributes_without_n_plus_one() -> None:
+    """M33: attribute_values кранов читаются одним prefetch — число запросов не растёт с числом кранов."""
+    two = _kit_query_count(2)
+    AttributeValue.objects.all().delete()
+    SKU.objects.all().delete()
+    Product.objects.all().delete()
+    Category.objects.all().delete()
+    five = _kit_query_count(5)
+    assert five == two

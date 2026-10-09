@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import email
+import hashlib
 import imaplib
 import re
 from dataclasses import dataclass
@@ -28,8 +29,10 @@ from email.utils import parseaddr, parsedate_to_datetime
 from typing import Any, cast
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import InterfaceError, OperationalError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from config.logging_utils import setup_logger
@@ -192,6 +195,23 @@ def _extract_body(parsed: Message) -> str:
     return ""
 
 
+_MESSAGE_ID_MAX = 255
+
+
+def normalize_message_id(raw: str | None) -> str | None:
+    """Stored form of a Message-ID: as is, or ``sha256:<hex>`` past the column limit.
+
+    A longer header used to fail the INSERT every run (and the cursor moved
+    past it, so the mail was lost); hashing keeps dedupe and thread matching.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return None
+    if len(value) <= _MESSAGE_ID_MAX:
+        return value
+    return "sha256:" + hashlib.sha256(value.encode("utf-8", "surrogateescape")).hexdigest()
+
+
 def _references(parsed: Message) -> set[str]:
     """Message-IDs this mail answers to (In-Reply-To + References)."""
     refs: set[str] = set()
@@ -199,7 +219,7 @@ def _references(parsed: Message) -> set[str]:
         for token in str(parsed.get(header) or "").split():
             token = token.strip()
             if token.startswith("<") and token.endswith(">"):
-                refs.add(token)
+                refs.add(cast(str, normalize_message_id(token)))
     return refs
 
 
@@ -259,13 +279,19 @@ def _resolve_client(parsed: Message) -> tuple[Client, bool]:
     return client, True
 
 
-def _find_lead(*, references: set[str], subject: str) -> Lead | None:
-    """Thread match (In-Reply-To → outbound message_id), then «Заявка #N»."""
+def _find_lead(*, references: set[str], subject: str, client: Client) -> Lead | None:
+    """Thread match (In-Reply-To → outbound message_id), then «Заявка #N».
+
+    Both keys come from the sender (a subject is free text, old Message-IDs
+    leak in forwards), so a lead is matched only when it belongs to the
+    same sender — otherwise anyone could post into a foreign lead.
+    """
+    owned = Lead.objects.filter(Q(client=client) | Q(email__iexact=client.email))
     if references:
         parent = (
             EmailMessage.objects.filter(
                 message_id__in=references,
-                lead__isnull=False,
+                lead__in=owned,
             )
             .select_related("lead")
             .first()
@@ -274,7 +300,7 @@ def _find_lead(*, references: set[str], subject: str) -> Lead | None:
             return cast(Lead, parent.lead)
     match = _LEAD_REF_RE.search(subject or "")
     if match:
-        return Lead.objects.filter(pk=int(match.group(1))).first()
+        return owned.filter(pk=int(match.group(1))).first()
     return None
 
 
@@ -367,10 +393,11 @@ def _notify_staff(msg_row: EmailMessage, box: _Mailbox) -> None:
 def _connect(box: _Mailbox) -> imaplib.IMAP4:
     """Login to IMAP for one mailbox (host/port/SSL — общие из settings)."""
     conn: imaplib.IMAP4
+    timeout = settings.IMAP_TIMEOUT
     if settings.IMAP_USE_SSL:
-        conn = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT)
+        conn = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT, timeout=timeout)
     else:
-        conn = imaplib.IMAP4(settings.IMAP_HOST, settings.IMAP_PORT)
+        conn = imaplib.IMAP4(settings.IMAP_HOST, settings.IMAP_PORT, timeout=timeout)
     conn.login(box.user, box.password)
     return conn
 
@@ -398,7 +425,7 @@ def _fetch_raw(conn: imaplib.IMAP4, uid: int) -> bytes:
     """UID FETCH (RFC822) → raw bytes."""
     typ, data = conn.uid("fetch", str(uid), "(RFC822)")
     if typ != "OK":
-        raise ValueError(f"UID FETCH failed: {typ}")
+        raise imaplib.IMAP4.error(f"UID FETCH failed: {typ}")
     for item in data or []:
         if isinstance(item, tuple) and len(item) > 1 and isinstance(item[1], bytes):
             return item[1]
@@ -409,7 +436,7 @@ def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
     """Fetch + store one message; 'created' | 'duplicate'."""
     raw = _fetch_raw(conn, uid)
     parsed = email.message_from_bytes(raw)
-    message_id = (parsed.get("Message-ID") or "").strip() or None
+    message_id = normalize_message_id(parsed.get("Message-ID"))
     if message_id and EmailMessage.objects.filter(message_id=message_id).exists():
         return "duplicate"
 
@@ -419,7 +446,7 @@ def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
 
     with transaction.atomic():
         client, is_new_client = _resolve_client(parsed)
-        lead = _find_lead(references=references, subject=subject)
+        lead = _find_lead(references=references, subject=subject, client=client)
         if lead is None and is_new_client:
             lead = _create_lead_from_email(client=client, subject=subject, body=body)
             _route_new_lead(box, lead)
@@ -433,7 +460,7 @@ def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
             subject=subject,
             body=body[:_BODY_MAX_CHARS],
             message_id=message_id,
-            in_reply_to=(parsed.get("In-Reply-To") or "").strip()[:255],
+            in_reply_to=normalize_message_id(parsed.get("In-Reply-To")) or "",
             imap_uid=uid,
             mailbox=box.staff_mailbox,
             received_at=_received_at(parsed),
@@ -450,6 +477,29 @@ def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
     return "created"
 
 
+# Network / server / DB hiccups: retry the same UID next run instead of
+# skipping it. Anything else is a broken message and is passed over.
+_TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (
+    imaplib.IMAP4.error,
+    OSError,
+    OperationalError,
+    InterfaceError,
+)
+_TRANSIENT_RETRIES = 3
+
+
+def _transient_budget_spent(box: _Mailbox, uid: int) -> bool:
+    """Count a transient failure; True once a UID failed ``_TRANSIENT_RETRIES`` runs."""
+    key = f"imap_fetch:transient:{box.key}:{uid}"
+    cache.add(key, 0, timeout=86400)
+    try:
+        failures = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=86400)
+        failures = 1
+    return failures >= _TRANSIENT_RETRIES
+
+
 def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
     """Fetch one mailbox; merge counters; update cursor + health on its row."""
     state = box.state
@@ -459,10 +509,19 @@ def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
         uids = _new_uids(conn, state.last_uid, limit)
         report["seen"] += len(uids)
         max_uid = state.last_uid
+        last_error = ""
         for uid in uids:
             try:
                 result = _process_uid(conn, uid, box)
-            except Exception:  # noqa: BLE001 — считаем и идём дальше
+            except _TRANSIENT_ERRORS as exc:
+                logger.warning("imap_fetch_transient box=%s uid=%s: %s", box.key, uid, exc)
+                report["errors"] += 1
+                if not _transient_budget_spent(box, uid):
+                    # Cursor stays before this uid: the next run retries it.
+                    last_error = f"UID {uid}: {exc}"[:500]
+                    break
+                logger.error("imap_fetch_giving_up box=%s uid=%s", box.key, uid)
+            except Exception:  # noqa: BLE001 — «ядовитое» письмо: пропускаем
                 logger.exception("imap_fetch_message_failed box=%s uid=%s", box.key, uid)
                 report["errors"] += 1
             else:
@@ -470,7 +529,7 @@ def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
             max_uid = max(max_uid, uid)
         state.last_uid = max_uid
         state.last_run_at = timezone.now()
-        state.last_error = ""
+        state.last_error = last_error
         state.save(update_fields=["last_uid", "last_run_at", "last_error"])
     finally:
         _logout(conn)

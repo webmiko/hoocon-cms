@@ -90,9 +90,9 @@ class StaffVpbxProfileInline(admin.StackedInline):
     can_delete = False
     extra = 1
     max_num = 1
-    fields = ("extension", "is_enabled")
-    verbose_name = "Добавочный (Mango)"
-    verbose_name_plural = "Добавочный сотрудника (Mango)"
+    fields = ("extension", "uis_employee_id", "is_enabled")
+    verbose_name = "Телефония сотрудника"
+    verbose_name_plural = "Телефония сотрудника"
 
 
 class UserAdmin(BaseUserAdmin, ModelAdmin):
@@ -465,7 +465,14 @@ class ClientAccountAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_display_links = ("email",)
     list_filter = ("auth_mode", "is_active")
     search_fields = ("email", "name", "phone")
-    readonly_fields = ("password_hash", "email_verified_at", "created_at", "updated_at")
+    readonly_fields = (
+        "password_hash",
+        "email_verified_at",
+        "pdn_consent_at",
+        "pdn_policy_version",
+        "created_at",
+        "updated_at",
+    )
     inlines = (SocialAccountInline,)
 
     def has_add_permission(self, request: HttpRequest) -> bool:

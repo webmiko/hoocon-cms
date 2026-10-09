@@ -170,3 +170,32 @@ def test_da8mu_does_not_match_da8mqu() -> None:
     bare = ArticleRelatedSkuSerializer(sku, context={}).data
     assert bare["image"] is not None
     assert bare["image"].startswith("/media/")
+
+
+@pytest.mark.django_db
+def test_related_skus_card_images_are_prefetched(django_assert_max_num_queries) -> None:
+    """M33: «связанные SKU» статьи — без N+1 по картинкам и без загрузки всех карточек."""
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from catalog.models import SKU, Category, Product, ProductImage
+    from content.serializers import ArticleRelatedSkuSerializer
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(10, 20, 30)).save(buf, format="PNG")
+
+    cat = Category.objects.create(name="Rel", slug="rel-n1")
+    codes = ["DA3FU24-D", "DA5FU24-D", "DA6MU24-D", "SA10MU24-DS", "DA8MU24-D"]
+    for code in codes:
+        product = Product.objects.create(name=code, slug=f"rel-{code.casefold()}", category=cat)
+        sku = SKU.objects.create(product=product, name=code, slug=code.casefold(), sku_code=code, is_published=True)
+        ProductImage.objects.create(sku=sku, image=SimpleUploadedFile(f"{code}.png", buf.getvalue()))
+
+    with django_assert_max_num_queries(3):
+        found = mentioned_skus_for_article(" ".join(codes), limit=8)
+        data = ArticleRelatedSkuSerializer(found, many=True).data
+
+    assert len(data) == len(codes)
+    assert all(row["image"] for row in data)

@@ -25,11 +25,14 @@ def ops_alert_dedup_seconds() -> int:
     return int(getattr(settings, "OPS_ALERT_DEDUP_SECONDS", 900))
 
 
+def _dedup_cache_key(dedup_key: str) -> str:
+    key = (dedup_key or "ops").strip() or "ops"
+    return f"ops_alert:v1:{key}"
+
+
 def should_send_ops_alert(dedup_key: str) -> bool:
     """Return True when this alert key was not sent recently."""
-    key = (dedup_key or "ops").strip() or "ops"
-    cache_key = f"ops_alert:v1:{key}"
-    return bool(cache.add(cache_key, 1, timeout=ops_alert_dedup_seconds()))
+    return bool(cache.add(_dedup_cache_key(dedup_key), 1, timeout=ops_alert_dedup_seconds()))
 
 
 def format_ops_telegram_message(*, title: str, body: str) -> str:
@@ -46,11 +49,15 @@ def send_ops_telegram_alert(
     body: str,
     dedup_key: str,
 ) -> int:
-    """Send an ops alert when dedup allows; return success count."""
-    if not should_send_ops_alert(dedup_key):
-        return 0
+    """Send an ops alert when dedup allows; return success count.
+
+    The dedup slot is released when nothing was delivered, so a Telegram
+    outage does not mute the same alert for the whole TTL.
+    """
     chat_ids = ops_telegram_chat_ids()
     if not chat_ids:
+        return 0
+    if not should_send_ops_alert(dedup_key):
         return 0
     text = format_ops_telegram_message(title=title, body=body)
     sent = 0
@@ -58,4 +65,6 @@ def send_ops_telegram_alert(
         result: PublishResult = publish_telegram(chat_id=chat_id, text=text)
         if result.ok:
             sent += 1
+    if sent == 0:
+        cache.delete(_dedup_cache_key(dedup_key))
     return sent

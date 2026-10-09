@@ -415,6 +415,139 @@ def test_manager_cannot_see_foreign_linked_call() -> None:
     assert "79152220000" in list_html
 
 
+def test_every_custom_admin_action_declares_permissions() -> None:
+    """Actions без allowed_permissions были доступны роли «только просмотр» (Аналитик)."""
+    import inspect
+    from pathlib import Path
+
+    from django.conf import settings
+    from django.contrib.admin.sites import site
+
+    root = Path(settings.BASE_DIR).resolve()
+
+    def ours(model_admin) -> bool:
+        path = Path(inspect.getfile(type(model_admin))).resolve()
+        return path.is_relative_to(root) and ".venv" not in path.parts
+
+    project_admins = [ma for ma in site._registry.values() if ours(ma)]  # noqa: SLF001
+    assert len(project_admins) > 10
+    missing = [
+        f"{type(model_admin).__name__}.{name}"
+        for model_admin in project_admins
+        for func, name, _desc in model_admin._get_base_actions()  # noqa: SLF001
+        if name != "delete_selected" and not getattr(func, "allowed_permissions", None)
+    ]
+    assert missing == []
+
+
+@pytest.mark.django_db
+def test_view_only_staff_gets_no_mutating_lead_or_client_actions() -> None:
+    from django.contrib.admin.sites import site
+    from django.test import RequestFactory
+
+    from crm.admin import ClientAdmin, CompanyAdmin
+    from crm.models import Company
+    from leads.admin import LeadAdmin
+
+    viewer = _staff_with_perms(
+        username="view-only-actions",
+        codenames=("view_lead", "view_client", "view_company", "change_company"),
+    )
+    request = RequestFactory().get("/admin/")
+    request.user = viewer
+    assert LeadAdmin(Lead, site).get_actions(request) == {}
+    assert ClientAdmin(CrmClient, site).get_actions(request) == {}
+    assert "merge_companies_action" not in CompanyAdmin(Company, site).get_actions(request)
+
+
+def _fk_field(admin_cls, model, field: str, user, object_id: int | None = None):
+    """Admin form field for ``field`` exactly as the change form builds it."""
+    from types import SimpleNamespace
+
+    from django.contrib.admin.sites import site
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    request.resolver_match = SimpleNamespace(kwargs={"object_id": str(object_id)} if object_id else {})
+    return admin_cls(model, site).formfield_for_foreignkey(model._meta.get_field(field), request)
+
+
+@pytest.mark.django_db
+def test_manager_cannot_relink_own_lead_to_foreign_client() -> None:
+    """Autocomplete принимал любой pk: менеджер привязывал свой лид к чужому клиенту и видел его письма/КП."""
+    from django.core.exceptions import ValidationError
+
+    from crm.services import scope_clients_for_manager
+    from leads.admin import LeadAdmin
+
+    mgr, _other, mine, foreign = _foreign_client_pair()
+    own_lead = Lead.objects.create(
+        name="Mine", email="mine-lead@example.com", message="x" * 20, assignee=mgr, client=mine
+    )
+    field = _fk_field(LeadAdmin, Lead, "client", mgr, own_lead.pk)
+    assert field.clean(mine.pk) == mine
+    with pytest.raises(ValidationError):
+        field.clean(foreign.pk)
+    assert foreign.pk not in set(scope_clients_for_manager(CrmClient.objects.all(), mgr).values_list("pk", flat=True))
+
+
+@pytest.mark.django_db
+def test_scoped_fk_keeps_value_linked_by_automation() -> None:
+    """Лид, привязанный по email к чужой карточке, всё ещё сохраняется своим менеджером."""
+    from leads.admin import LeadAdmin
+
+    mgr, _other, _mine, foreign = _foreign_client_pair()
+    auto_linked = Lead.objects.create(name="Auto", email=foreign.email, message="x" * 20, assignee=mgr, client=foreign)
+    field = _fk_field(LeadAdmin, Lead, "client", mgr, auto_linked.pk)
+    assert field.clean(foreign.pk) == foreign
+
+
+@pytest.mark.django_db
+def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
+    """Quote/Call/ClientDocument/Activity/Email принимали чужие client/lead/quote/order."""
+    from django.core.exceptions import ValidationError
+
+    from cabinet.models import Order
+    from crm.admin import ActivityAdmin, CallAdmin, ClientDocumentAdmin, EmailMessageAdmin, QuoteAdmin
+    from crm.models import Call, ClientDocument, EmailMessage, Quote
+
+    mgr, _other, mine, foreign = _foreign_client_pair()
+    foreign_lead = Lead.objects.get(client=foreign)
+    foreign_quote = Quote.objects.create(client=foreign)
+    foreign_order = Order.objects.create(client=foreign, number="ORD-SCOPE-FK")
+    for admin_cls, model in (
+        (QuoteAdmin, Quote),
+        (CallAdmin, Call),
+        (ActivityAdmin, Activity),
+        (EmailMessageAdmin, EmailMessage),
+        (ClientDocumentAdmin, ClientDocument),
+    ):
+        client_field = _fk_field(admin_cls, model, "client", mgr)
+        assert client_field.clean(mine.pk) == mine
+        with pytest.raises(ValidationError):
+            client_field.clean(foreign.pk)
+        if admin_cls is not ClientDocumentAdmin:
+            with pytest.raises(ValidationError):
+                _fk_field(admin_cls, model, "lead", mgr).clean(foreign_lead.pk)
+    with pytest.raises(ValidationError):
+        _fk_field(ClientDocumentAdmin, ClientDocument, "quote", mgr).clean(foreign_quote.pk)
+    with pytest.raises(ValidationError):
+        _fk_field(ClientDocumentAdmin, ClientDocument, "order", mgr).clean(foreign_order.pk)
+
+
+def test_activity_author_is_read_only_in_admin() -> None:
+    """Подделка автора заметки расширяла видимость карточки другому менеджеру."""
+    from django.contrib.admin.sites import site
+
+    from crm.admin import ActivityAdmin, ActivityInline
+    from crm.models import Client as CrmModel
+
+    assert "author" in ActivityAdmin(Activity, site).readonly_fields
+    assert "author" not in ActivityAdmin.autocomplete_fields
+    assert "author" in ActivityInline(CrmModel, site).readonly_fields
+
+
 @pytest.mark.django_db
 def test_manager_cannot_open_foreign_spec_list() -> None:
     """Cabinet spec templates follow CRM client visibility."""

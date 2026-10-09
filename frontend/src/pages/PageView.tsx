@@ -1,6 +1,7 @@
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ContentUnavailable } from "../components/ContentUnavailable";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -23,7 +24,7 @@ export function PageView({ slug: slugProp }: PageViewProps) {
   const params = useParams<{ slug: string }>();
   const slug = slugProp ?? params.slug ?? "";
   const { data: page, loading, error } = useAsync(
-    () => api.pageDetail(slug),
+    (signal) => api.pageDetail(slug, signal),
     slug,
   );
   const { data: faqSeo } = useAsync(
@@ -34,29 +35,20 @@ export function PageView({ slug: slugProp }: PageViewProps) {
     slug,
   );
 
-  if (!slug) {
-    return (
-      <div className={styles.notFound}>
-        <h1>Страница не найдена</h1>
-        <Link to="/" className={styles.link}>
-          ← На главную
-        </Link>
-      </div>
-    );
-  }
-
-  if (loading) {
+  if (slug && loading) {
     return <p className={styles.status}>Загрузка…</p>;
   }
 
-  if (error || !page) {
+  if (!slug || error || !page) {
     return (
-      <div className={styles.notFound}>
-        <h1>Страница не найдена</h1>
-        <Link to="/" className={styles.link}>
-          ← На главную
-        </Link>
-      </div>
+      <ContentUnavailable
+        error={slug ? error : undefined}
+        notFoundTitle="Страница не найдена"
+        backTo="/"
+        backLabel="← На главную"
+        className={styles.notFound}
+        linkClassName={styles.link}
+      />
     );
   }
 

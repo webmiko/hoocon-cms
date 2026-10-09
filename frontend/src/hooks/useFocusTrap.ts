@@ -11,10 +11,14 @@ function listFocusable(container: HTMLElement): HTMLElement[] {
 
 /**
  * Trap keyboard focus inside an open modal/dialog and restore focus on close.
+ *
+ * ``resetKey`` re-arms the trap when the ref moves to another element while
+ * still active (e.g. banner → settings panel).
  */
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   active: boolean,
+  resetKey?: unknown,
 ): void {
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -60,5 +64,5 @@ export function useFocusTrap(
       trapRoot.removeEventListener("keydown", onKeyDown);
       previousFocusRef.current?.focus();
     };
-  }, [active, containerRef]);
+  }, [active, containerRef, resetKey]);
 }

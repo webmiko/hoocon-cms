@@ -22,6 +22,49 @@ from catalog.validators import (
     validate_pdf_upload,
 )
 
+# Product/SKU text fields an ETL series enricher may rewrite from manuals.
+ETL_COPY_FIELDS: tuple[str, ...] = (
+    "name",
+    "description",
+    "instructions",
+    "specs_text",
+    "analogs_text",
+)
+COPY_LOCKED_HELP = (
+    "Название и тексты правили в админке: обогащение серии из мануала их не "
+    "перезаписывает. Ставится само при сохранении правок; снимите галочку, "
+    "чтобы вернуть канон."
+)
+# Set on an instance by Admin save paths; any other save keeps locked fields.
+ADMIN_EDIT_FLAG = "_admin_edit"
+
+
+def _keep_locked_fields(
+    instance: models.Model,
+    *,
+    locked: bool,
+    fields: tuple[str, ...],
+    update_fields: object,
+) -> None:
+    """Restore DB values of ``fields`` unless the save comes from Admin.
+
+    ETL, management commands and Celery jobs may assign copy/values freely;
+    while the row is locked their writes become no-ops.
+    """
+    if instance.pk is None or not locked or instance.__dict__.pop(ADMIN_EDIT_FLAG, False):
+        return
+    own = {f.name for f in instance._meta.concrete_fields}
+    wanted = [
+        f
+        for f in fields
+        if f in own and (update_fields is None or f in update_fields)  # type: ignore[operator]
+    ]
+    if not wanted:
+        return
+    stored = type(instance)._default_manager.filter(pk=instance.pk).values(*wanted).first()
+    for field, value in (stored or {}).items():
+        setattr(instance, field, value)
+
 
 def product_file_upload_to(instance: ProductFile, filename: str) -> str:
     """Store under product_files/<sku_id>/<uuid>_<safe_basename>.
@@ -151,6 +194,11 @@ class Product(models.Model):
         default="",
         help_text="Аналоги линейки (до уточнения по артикулу SKU).",
     )
+    copy_locked: models.BooleanField = models.BooleanField(
+        "тексты правлены вручную",
+        default=False,
+        help_text=COPY_LOCKED_HELP,
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
@@ -162,6 +210,16 @@ class Product(models.Model):
     def __str__(self) -> str:
         """Return the product name for Admin and logs."""
         return self.name
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Keep Admin-locked copy (see ``copy_locked``)."""
+        _keep_locked_fields(
+            self,
+            locked=self.copy_locked,
+            fields=ETL_COPY_FIELDS,
+            update_fields=kwargs.get("update_fields"),
+        )
+        super().save(*args, **kwargs)  # type: ignore[arg-type]
 
 
 class SKU(models.Model):
@@ -275,6 +333,11 @@ class SKU(models.Model):
         default="",
         help_text="Аналоги для этого издания (артикула).",
     )
+    copy_locked: models.BooleanField = models.BooleanField(
+        "тексты правлены вручную",
+        default=False,
+        help_text=COPY_LOCKED_HELP,
+    )
     is_published: models.BooleanField = models.BooleanField(
         "опубликован",
         default=True,
@@ -302,10 +365,16 @@ class SKU(models.Model):
         return self.name
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Stamp ``first_published_at`` on first public publish."""
+        """Stamp ``first_published_at``; keep Admin-locked copy."""
         from catalog.newness import ensure_first_published_at
 
         ensure_first_published_at(self)
+        _keep_locked_fields(
+            self,
+            locked=self.copy_locked,
+            fields=ETL_COPY_FIELDS,
+            update_fields=kwargs.get("update_fields"),
+        )
         super().save(*args, **kwargs)  # type: ignore[arg-type]
 
     @property
@@ -387,6 +456,14 @@ class AttributeValue(models.Model):
         verbose_name="атрибут",
     )
     value: models.CharField = models.CharField("значение", max_length=200)
+    is_manual: models.BooleanField = models.BooleanField(
+        "правлено вручную",
+        default=False,
+        help_text=(
+            "Значение задано в админке: обогащение серии из мануала его не "
+            "удаляет и не перезаписывает. Снимите галочку, чтобы вернуть канон."
+        ),
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
@@ -399,6 +476,16 @@ class AttributeValue(models.Model):
     def __str__(self) -> str:
         """Return 'sku_code / attribute_name = value' for Admin readability."""
         return f"{self.sku.sku_code} / {self.attribute.name} = {self.value}"  # type: ignore[attr-defined]
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Keep an Admin-edited value (see ``is_manual``)."""
+        _keep_locked_fields(
+            self,
+            locked=self.is_manual,
+            fields=("value",),
+            update_fields=kwargs.get("update_fields"),
+        )
+        super().save(*args, **kwargs)  # type: ignore[arg-type]
 
 
 class ProductFile(models.Model):
@@ -538,6 +625,14 @@ class ProductImage(models.Model):
         default=True,
         db_index=True,
     )
+    hidden_by_editor: models.BooleanField = models.BooleanField(
+        "скрыто вручную",
+        default=False,
+        help_text=(
+            "Фото сняли с публикации в админке: аудит галереи и загрузка "
+            "медиа его не возвращают. Снимается, если снова включить «опубликовано»."
+        ),
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
@@ -568,9 +663,19 @@ class ProductImage(models.Model):
             validate_image_upload(self.image)
 
     def save(self, *args: object, **kwargs: object) -> None:
-        """Persist row; re-encode JPEG/PNG uploads to WebP; sync card preview."""
+        """Persist row; re-encode JPEG/PNG uploads to WebP; sync card preview.
+
+        A photo hidden in Admin (``hidden_by_editor``) stays unpublished
+        whatever ETL/media job saves it.
+        """
         from catalog.etl.webp import attach_image_card, ensure_field_file_webp
 
+        _keep_locked_fields(
+            self,
+            locked=self.hidden_by_editor,
+            fields=("is_published",),
+            update_fields=kwargs.get("update_fields"),
+        )
         raw_fields = kwargs.get("update_fields")
         update_fields: frozenset[str] | None = None
         if isinstance(raw_fields, (list, tuple, set, frozenset)):

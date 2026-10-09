@@ -364,11 +364,12 @@ class AnalogLookupView(APIView):
     http_method_names = ["get", "head", "options"]
 
     def get(self, request: Request) -> Response:
+        from catalog.models import normalize_analog_code
         from catalog.services import analogs_find
 
         brand = (request.query_params.get("brand") or "").strip()
         code = (request.query_params.get("code") or "").strip()
-        if not code:
+        if not normalize_analog_code(code):
             return Response(
                 {"detail": "Передайте параметр code (артикул аналога)."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -414,9 +415,15 @@ class ProductFileViewSet(
         return [AllowAny()]
 
     def get_queryset(self) -> QuerySet[ProductFile]:
-        """Published files for the SKU identified by sku_slug."""
+        """Published files for the SKU identified by sku_slug.
+
+        Anonymous visitors only see files of published SKUs (a hidden card
+        must not leak through its manuals).
+        """
         sku_slug = self.kwargs.get("sku_slug")
         qs = ProductFile.objects.filter(is_published=True).select_related("sku")
+        if not self.request.user.is_staff:
+            qs = qs.filter(sku__is_published=True)
         if sku_slug:
             qs = qs.filter(sku__slug=sku_slug)
         return qs.order_by("sort_order", "title")

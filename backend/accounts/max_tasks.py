@@ -108,7 +108,7 @@ def retire_max_support_alert(conversation_id: int, author_user_id: int | None = 
     from social.max_staff_reply import load_support_alert_mid
     from social.publishers import edit_max_message
     from supportchat.models import Conversation
-    from supportchat.services import staff_public_name
+    from supportchat.presentation import staff_public_name
 
     try:
         conv = Conversation.objects.select_related("assignee").get(pk=conversation_id)

@@ -32,6 +32,23 @@ def site_page(path: str) -> str:
     return f"{base}{path}"
 
 
+TELEGRAM_TEXT_MAX = 4096
+
+
+def telegram_html_text(text: str, *, limit: int = TELEGRAM_TEXT_MAX) -> str:
+    """Plain text → Telegram ``parse_mode=HTML`` body that fits ``sendMessage``.
+
+    Telegram counts the limit in UTF-16 units after entity parsing, so the
+    plain text is clipped first (emoji take two units) and escaped after —
+    clipping escaped HTML could cut an ``&amp;`` in half.
+    """
+    units = text.encode("utf-16-le")
+    if len(units) > limit * 2:
+        clipped = units[: (limit - 1) * 2].decode("utf-16-le", errors="ignore").rstrip()
+        text = f"{clipped}…"
+    return html.escape(text)
+
+
 def clip_text(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text

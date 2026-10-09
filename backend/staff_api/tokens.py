@@ -6,6 +6,7 @@ import hashlib
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils import timezone
 
 from staff_api.models import StaffAuthToken, generate_staff_token
@@ -29,7 +30,7 @@ def staff_token_ttl() -> timedelta:
     return timedelta(days=max(days, 1))
 
 
-def issue_staff_token(user: object) -> str:
+def issue_staff_token(user: User) -> str:
     """Create a hashed token row and return the plaintext bearer secret once."""
     raw = generate_staff_token()
     StaffAuthToken.objects.create(

@@ -27,6 +27,7 @@ from django.test import override_settings
 def test_post_lead_creates_lead_and_returns_201(client) -> None:
     """Valid POST creates a Lead and returns 201."""
     payload = {
+        "pdn_consent": True,
         "lead_type": "rfq",
         "name": "Иван Иванов",
         "email": "ivan@example.com",
@@ -56,12 +57,13 @@ def test_post_lead_sends_notification_email_on_commit(client) -> None:
     from unittest.mock import patch
 
     payload = {
+        "pdn_consent": True,
         "name": "Anna",
         "email": "anna@example.com",
         "company": "ООО ВентСервис",
         "message": "Помогите подобрать привод для вентиляции.",
     }
-    with patch("leads.views.send_lead_notification") as mock_task:
+    with patch("leads.lifecycle.send_lead_notification") as mock_task:
         response = client.post(
             "/api/leads/",
             data=payload,
@@ -113,7 +115,7 @@ def test_post_lead_missing_name_returns_400(client) -> None:
     """POST without name returns 400."""
     response = client.post(
         "/api/leads/",
-        data={"email": "x@example.com", "message": "a" * 20},
+        data={"pdn_consent": True, "email": "x@example.com", "message": "a" * 20},
         content_type="application/json",
     )
     assert response.status_code == 400
@@ -125,7 +127,7 @@ def test_post_lead_missing_email_returns_400(client) -> None:
     """POST without email returns 400."""
     response = client.post(
         "/api/leads/",
-        data={"name": "X", "message": "a" * 20},
+        data={"pdn_consent": True, "name": "X", "message": "a" * 20},
         content_type="application/json",
     )
     assert response.status_code == 400
@@ -137,7 +139,7 @@ def test_post_lead_missing_message_returns_400(client) -> None:
     """POST without message returns 400."""
     response = client.post(
         "/api/leads/",
-        data={"name": "X", "email": "x@example.com"},
+        data={"pdn_consent": True, "name": "X", "email": "x@example.com"},
         content_type="application/json",
     )
     assert response.status_code == 400
@@ -149,7 +151,7 @@ def test_post_lead_invalid_email_returns_400(client) -> None:
     """POST with malformed email returns 400."""
     response = client.post(
         "/api/leads/",
-        data={"name": "X", "email": "not-an-email", "message": "a" * 20},
+        data={"pdn_consent": True, "name": "X", "email": "not-an-email", "message": "a" * 20},
         content_type="application/json",
     )
     assert response.status_code == 400
@@ -163,6 +165,7 @@ def test_post_lead_invalid_email_returns_400(client) -> None:
 def test_post_lead_honeypot_filled_silent_drop(client) -> None:
     """Honeypot field filled → 201 returned but NO Lead created (silent drop)."""
     payload = {
+        "pdn_consent": True,
         "name": "Bot",
         "email": "bot@spam.com",
         "message": "spam message that is long enough",
@@ -179,6 +182,7 @@ def test_post_lead_honeypot_filled_silent_drop(client) -> None:
 def test_post_lead_honeypot_empty_creates_lead(client) -> None:
     """Honeypot field empty → normal creation (lead created)."""
     payload = {
+        "pdn_consent": True,
         "name": "Real User",
         "email": "real@example.com",
         "company": "ООО Реал",
@@ -199,6 +203,7 @@ def test_post_lead_honeypot_empty_creates_lead(client) -> None:
 def test_post_lead_response_does_not_expose_email_or_phone(client) -> None:
     """API response does NOT include email/phone (PII write-only)."""
     payload = {
+        "pdn_consent": True,
         "name": "X",
         "email": "secret@example.com",
         "phone": "+7-999-000-00-00",
@@ -222,6 +227,7 @@ def test_post_lead_response_does_not_expose_email_or_phone(client) -> None:
 def test_post_lead_throttle_after_limit(client) -> None:
     """> 10 POST /api/leads/ per hour from same IP → 429."""
     payload = {
+        "pdn_consent": True,
         "name": "X",
         "email": "x@example.com",
         "company": "ООО Throttle",
@@ -288,6 +294,7 @@ def test_post_lead_rejects_unpublished_sku(client) -> None:
         is_published=False,
     )
     payload = {
+        "pdn_consent": True,
         "name": "Buyer",
         "email": "buyer-sku@example.com",
         "company": "ООО Байер",
@@ -309,6 +316,7 @@ def test_post_lead_rolls_back_on_bundle_failure(client) -> None:
     from leads.models import Lead, LeadItem
 
     payload = {
+        "pdn_consent": True,
         "lead_type": "rfq",
         "name": "Иван Иванов",
         "email": "ivan@example.com",
@@ -322,3 +330,23 @@ def test_post_lead_rolls_back_on_bundle_failure(client) -> None:
 
     assert Lead.objects.count() == 0
     assert LeadItem.objects.count() == 0
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("quantity", "status"), [(100_000, 201), (100_001, 400), (2**31, 400), (10**12, 400)])
+def test_post_lead_rejects_huge_quantity_with_400(client, quantity: int, status: int) -> None:
+    """M62: quantity > int4 падал 500 на INSERT; теперь 400 по max_value."""
+    payload = {
+        "pdn_consent": True,
+        "lead_type": "rfq",
+        "name": "Иван Иванов",
+        "email": "ivan@example.com",
+        "company": "ООО Ромашка",
+        "message": "Нужен КП на приводы HVA-5NM для объекта.",
+        "items": [{"sku_code": "HVA-5NM", "quantity": quantity}],
+    }
+    response = client.post("/api/leads/", data=payload, content_type="application/json")
+    assert response.status_code == status, response.content
+    from leads.models import Lead
+
+    assert Lead.objects.count() == (1 if status == 201 else 0)

@@ -149,6 +149,33 @@ def test_article_detail_by_slug(client) -> None:
     assert "cover" in data
     assert "related_skus" in data
     assert data["related_skus"] == []
+    assert data["body"] == "<p>Текст гайда.</p>"
+
+
+@pytest.mark.django_db
+def test_article_list_ships_reading_minutes_not_body(client) -> None:
+    """Список отдавал полный body вопреки комментарию «light» — только время чтения."""
+    from content.models import Article
+
+    Article.objects.create(
+        title="Длинная",
+        slug="dlinnaya",
+        body="<p>" + "слово " * 400 + "</p>",
+        excerpt="анонс",
+        is_published=True,
+    )
+    row = client.get("/api/content/articles/").json()["results"][0]
+    assert "body" not in row
+    assert row["reading_minutes"] == 2
+
+
+def test_article_reading_minutes_matches_card_rule() -> None:
+    """Порог 40 слов и округление к ближайшей минуте, как было на фронте."""
+    from content.serializers import article_reading_minutes
+
+    assert article_reading_minutes("", "<p>" + "a " * 39 + "</p>") == 0
+    assert article_reading_minutes("", "a " * 40) == 1
+    assert article_reading_minutes("a " * 10, "<b>" + "a " * 260 + "</b>") == 2
 
 
 @pytest.mark.django_db

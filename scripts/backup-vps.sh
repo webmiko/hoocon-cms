@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backup Postgres + media on the VPS host (run via cron on hoocon-prod).
+# Backup Postgres + media + private_media on the VPS host (run via cron on hoocon-prod).
 # Spec: docs/infra-reg-ru.md § backups; ПЛАН Iter 5.
 #
 # Usage (on VPS):
@@ -8,12 +8,13 @@
 #   ssh hoocon-prod '/opt/hoocon/scripts/backup-vps.sh'
 #
 # Env overrides:
-#   DEPLOY_PATH=/opt/hoocon  BACKUP_ROOT=...  RETENTION_DAYS=3  MEDIA_PATH=...
+#   DEPLOY_PATH=/opt/hoocon  BACKUP_ROOT=...  RETENTION_DAYS=3  MEDIA_PATH=...  PRIVATE_MEDIA_PATH=...
 set -euo pipefail
 
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/hoocon}"
 BACKUP_ROOT="${BACKUP_ROOT:-${DEPLOY_PATH}/backups}"
 MEDIA_PATH="${MEDIA_PATH:-/var/www/hoocon/media}"
+PRIVATE_MEDIA_PATH="${PRIVATE_MEDIA_PATH:-/var/www/hoocon/private_media}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${BACKUP_ROOT}/${STAMP}"
@@ -44,6 +45,17 @@ if [[ -d "${MEDIA_PATH}" ]]; then
   ls -lh "${DEST}/media.tar.gz"
 else
   echo "WARN: media path missing (${MEDIA_PATH}); skip media" >&2
+fi
+
+# Call recordings, client documents, mail/chat attachments, RMA photos.
+if [[ -d "${PRIVATE_MEDIA_PATH}" ]]; then
+  echo "==> private media tar (${PRIVATE_MEDIA_PATH})"
+  tar -C "$(dirname "${PRIVATE_MEDIA_PATH}")" -czf "${DEST}/private_media.tar.gz" \
+    "$(basename "${PRIVATE_MEDIA_PATH}")"
+  chmod 600 "${DEST}/private_media.tar.gz"
+  ls -lh "${DEST}/private_media.tar.gz"
+else
+  echo "WARN: private media path missing (${PRIVATE_MEDIA_PATH}); skip" >&2
 fi
 
 echo "${STAMP}" > "${DEST}/COMPLETED"

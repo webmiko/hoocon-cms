@@ -22,7 +22,7 @@ describe("quizAnalogParams", () => {
         page: "1",
         page_size: "6",
         dn: "25",
-        kvs: "10,16",
+        kvs: "10|16",
         ways: "2-ходовый",
       },
     );
@@ -33,7 +33,7 @@ describe("quizAnalogParams", () => {
       quiz_control: "onoff",
       quiz_aux: "no",
       dn: "25",
-      kvs: "10,16",
+      kvs: "10|16",
       ways: "2-ходовый",
     });
   });

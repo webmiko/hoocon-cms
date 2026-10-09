@@ -23,8 +23,10 @@ from typing import Any
 from django.conf import settings
 from django.db import models
 
+from config.pdn import PdnConsentFields
 
-class Lead(models.Model):
+
+class Lead(PdnConsentFields):
     """Customer inquiry (RFQ / consultation / replacement matching).
 
     Создаётся через публичный `POST /api/leads/` (Slice 19). Менеджер
@@ -119,6 +121,13 @@ class Lead(models.Model):
         related_name="leads",
         verbose_name="клиент CRM",
         help_text="Карточка клиента в CRM (создаётся автоматически при новой заявке).",
+    )
+    contact_verified: models.BooleanField = models.BooleanField(
+        "контакт подтверждён",
+        default=False,
+        help_text="Заявка видна в кабинете клиента, только если контакт подтверждён "
+        "(ставится само для заявок из кабинета, заведённых менеджером и после отправки КП). "
+        "Взятие в работу контакт не подтверждает: почту в форме сайта может указать кто угодно.",
     )
     assignee: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,

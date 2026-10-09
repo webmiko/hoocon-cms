@@ -9,6 +9,8 @@ import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from config.secret_compare import secrets_equal
+
 _WORKERS_WELCOME = "https://hoocon-telegram-api.npok9.workers.dev/welcome.jpg"
 
 
@@ -82,6 +84,23 @@ def test_telegram_webhook_rejects_bad_secret(settings) -> None:
         HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="wrong",
     )
     assert wrong.status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("setting", "path", "header"),
+    [
+        ("TELEGRAM_WEBHOOK_SECRET", "/api/integrations/telegram/webhook/", "HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN"),
+        ("MAX_WEBHOOK_SECRET", "/api/integrations/max/webhook/", "HTTP_X_MAX_BOT_API_SECRET"),
+    ],
+)
+def test_bot_webhook_secret_compared_in_constant_time(settings, setting, path, header) -> None:
+    """Секрет вебхука сверяется через compare_digest, не ``!=`` (тайминг-утечка)."""
+    setattr(settings, setting, "expected-secret")
+    with patch("social.views.secrets_equal", wraps=secrets_equal) as spy:
+        response = APIClient().post(path, data={"update_id": 1}, format="json", **{header: "секрет"})
+    assert response.status_code == 403
+    spy.assert_called_once_with("expected-secret", "секрет")
 
 
 @pytest.mark.django_db
@@ -549,7 +568,7 @@ def test_telegram_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> 
         patch("supportchat.services.is_open_now", return_value=True),
         patch(
             "social.publishers.telegram_download_file",
-            return_value=(b"\x89PNG\x00fake", "file_1.jpg"),
+            return_value=(b"\xff\xd8\xff\xe0fake-jpeg", "file_1.jpg"),
         ) as dl,
     ):
         from social.telegram_bot import handle_telegram_update

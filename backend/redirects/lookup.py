@@ -42,6 +42,13 @@ def lookup_redirect(path: str) -> RedirectHit | None:
                 "to_path",
                 "status_code",
             )
-            _index = {from_path: RedirectHit(to_path, status_code) for from_path, to_path, status_code in rows}
+            from redirects.pathutils import is_safe_internal_path
+
+            # Rows written by ETL bypass model validators — never serve them.
+            _index = {
+                from_path: RedirectHit(to_path, status_code)
+                for from_path, to_path, status_code in rows
+                if is_safe_internal_path(to_path)
+            }
             _index_at = now
         return _index.get(path)

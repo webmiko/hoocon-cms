@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoocon — Телефония Новосистем (UIS) · Инструкция</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --surface: #1a2332;
+    --surface2: #243044;
+    --border: #2d3a4f;
+    --text: #e8edf4;
+    --muted: #8b9cb3;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --violet: #a78bfa;
+    --radius: 12px;
+    --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; overflow-x: hidden; width: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+  .header {
+    background: linear-gradient(135deg, #1b2f52 0%, #0f1419 65%);
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 2rem 2rem;
+  }
+  .header-inner { max-width: 1100px; margin: 0 auto; }
+  .badge-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .9rem; }
+  .badge {
+    display: inline-block; padding: .18rem .65rem; border-radius: 999px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  }
+  .badge-ver { background: var(--green); color: #062b16; }
+  .badge-cat { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.02em; overflow-wrap: break-word; }
+  .header .sub { color: var(--muted); margin-top: .5rem; font-size: 1rem; max-width: 60ch; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
+
+  nav.toc { margin: 1.5rem 0 2.5rem; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+  .toc a {
+    display: block; padding: .8rem 1rem; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); text-decoration: none; font-size: .92rem;
+    transition: border-color .15s;
+  }
+  .toc a:hover { border-color: var(--accent); }
+  .toc a small { display: block; color: var(--muted); font-size: .78rem; margin-top: .2rem; }
+
+  section { margin-bottom: 3rem; }
+  h2 {
+    font-size: 1.4rem; margin-bottom: .35rem; letter-spacing: -.01em;
+    padding-top: 1rem; border-top: 1px solid var(--border);
+  }
+  h2 .num { color: var(--accent); font-weight: 700; margin-right: .5rem; }
+  h3 { font-size: 1.08rem; margin: 1.4rem 0 .5rem; color: var(--accent2); }
+  h2 + p.lead, .lead { color: var(--muted); font-size: .95rem; margin-bottom: 1.1rem; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem;
+  }
+  .card h4 { font-size: 1rem; margin-bottom: .45rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .card p, .card li { font-size: .9rem; color: var(--muted); }
+  .card ul, .card ol { padding-left: 1.2rem; margin-top: .35rem; }
+  .card li { margin-bottom: .3rem; }
+  .card p { margin-bottom: .4rem; }
+
+  .flow {
+    display: flex; align-items: stretch; gap: .6rem; flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+  .flow .step {
+    flex: 1 1 150px; min-width: 140px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: .8rem .9rem; text-align: center;
+  }
+  .flow .step .ico { font-size: 1.3rem; display: block; margin-bottom: .3rem; }
+  .flow .step b { font-size: .85rem; display: block; }
+  .flow .step small { color: var(--muted); font-size: .75rem; display: block; margin-top: .2rem; }
+  .flow .arrow { align-self: center; color: var(--accent); font-size: 1.2rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: .8rem 0; font-size: .88rem; }
+  th, td { padding: .55rem .7rem; border: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: break-word; }
+  th { background: var(--surface2); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td { background: var(--surface); }
+
+  .note {
+    border-left: 3px solid var(--accent); background: var(--surface);
+    padding: .8rem 1rem; border-radius: 0 var(--radius) var(--radius) 0;
+    margin: .9rem 0; font-size: .9rem; color: var(--muted);
+  }
+  .note.warn { border-left-color: var(--yellow); }
+  .note.ok { border-left-color: var(--green); }
+  .note b, .note strong { color: var(--text); }
+
+  code, .mono {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .82em; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 5px; padding: .1em .4em; color: var(--accent2);
+    overflow-wrap: break-word;
+  }
+
+  .tag { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .tag-new { background: var(--green); color: #062b16; }
+  .tag-info { background: var(--accent); color: #fff; }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: .8rem 0; }
+  ol.steps li {
+    counter-increment: s; position: relative;
+    padding: .7rem .9rem .7rem 3.1rem; margin-bottom: .5rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: .92rem;
+  }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: .9rem; top: .7rem;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps li b { color: var(--text); }
+  ol.steps li small { display: block; color: var(--muted); margin-top: .15rem; }
+
+  .footer { color: var(--muted); font-size: .8rem; text-align: center; padding-top: 2rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 700px) {
+    .container { padding: 1rem .9rem 3rem; }
+    .header { padding: 1.8rem 1rem 1.4rem; }
+    .header h1 { font-size: 1.45rem; }
+    .toc-grid { grid-template-columns: 1fr; }
+    table { display: block; overflow-x: auto; }
+    .flow { flex-direction: column; }
+    .flow .arrow { transform: rotate(90deg); align-self: center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="badge-row">
+      <span class="badge badge-ver">Новое</span>
+      <span class="badge badge-cat">Инструкции</span>
+      <span class="badge badge-cat">Новосистем · UIS</span>
+    </div>
+    <h1>Телефония Новосистем — звонки из CRM</h1>
+    <p class="sub">Как включить виджет Новосистем, что настроить в личном кабинете UIS, как связать сотрудника и как звонить клиенту из карточки.</p>
+  </div>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <div class="toc-grid">
+    <a href="#how"><b>1. Как это работает</b><small>звонок сначала вам, потом клиенту</small></a>
+    <a href="#widget"><b>2. Виджет в интеграциях</b><small>включение, ключ, номер, секрет</small></a>
+    <a href="#uis"><b>3. Настройка ЛК UIS</b><small>опция API, белый IP, ключ, уведомления</small></a>
+    <a href="#employee"><b>4. Сотрудник</b><small>ID сотрудника UIS и добавочный</small></a>
+    <a href="#call"><b>5. Позвонить клиенту</b><small>кнопка в карточке клиента</small></a>
+    <a href="#journal"><b>6. Журнал звонков</b><small>раздел «Звонки»</small></a>
+    <a href="#trouble"><b>7. Если не работает</b><small>сообщения и что делать</small></a>
+    <a href="#faq"><b>8. FAQ</b><small>Mango и Новосистем вместе, записи</small></a>
+  </div>
+</nav>
+
+<section id="how">
+  <h2><span class="num">1</span>Как это работает</h2>
+  <p class="lead">Новосистем работает на платформе UIS. CRM просит UIS соединить вас с клиентом: сначала звонит ваш телефон, вы берёте трубку, затем UIS набирает клиента. Клиент видит виртуальный номер компании.</p>
+
+  <div class="flow">
+    <div class="step"><span class="ico">🖱</span><b>Вы</b><small>«Позвонить клиенту» в карточке</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">📞</span><b>UIS</b><small>звонит вам как сотруднику</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">✋</span><b>Вы берёте трубку</b><small>UIS набирает клиента</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="ico">👤</span><b>Клиент</b><small>видит виртуальный номер</small></div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Виджет с выключателем</h4>
+      <p>Все настройки Новосистем — в одной карточке на странице «Интеграции». Выключили виджет — CRM перестаёт звонить через UIS и принимать от него события.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Звонок из карточки</h4>
+      <p>Та же кнопка «Позвонить клиенту», что и для Mango. CRM сама выбирает, через кого звонить.</p>
+    </div>
+    <div class="card">
+      <h4><span class="tag tag-new">NEW</span> Журнал звонков</h4>
+      <p>UIS присылает уведомления о звонках, CRM пишет их в раздел «Звонки» и находит клиента по цифрам номера.</p>
+    </div>
+  </div>
+</section>
+
+<section id="widget">
+  <h2><span class="num">2</span>Виджет в интеграциях</h2>
+  <p class="lead">Настраивает администратор. Менеджеру этот раздел нужен, только чтобы понять, почему звонок не идёт.</p>
+
+  <ol class="steps">
+    <li><b>Откройте «Настройки сайта» → «Интеграции».</b><small>Вверху страницы две карточки телефонии: Mango и Новосистем.</small></li>
+    <li><b>В карточке «Новосистем» включите переключатель.</b><small>Подпись сразу меняется: «Виджет выключен», «Не полностью» или «Виджет включён».</small></li>
+    <li><b>«Ключ API»</b> — постоянный ключ пользователя UIS с доступом к Call API.<small>Как его получить — раздел 3.</small></li>
+    <li><b>«Виртуальный номер»</b> — номер компании в UIS, только цифры, например <code>74951234567</code>.<small>Его клиент увидит при звонке из CRM.</small></li>
+    <li><b>«Секрет вебхука»</b> — любая длинная случайная строка, которую вы придумали сами.<small>По ней CRM понимает, что уведомление пришло от вашего кабинета UIS.</small></li>
+    <li><b>Нажмите «Сохранить».</b><small>Под полями появится «URL для ЛК UIS» — он уже содержит <code>?token=</code> с вашим секретом. Его вставляют в уведомления UIS.</small></li>
+  </ol>
+
+  <table>
+    <tr><th>Статус на карточке</th><th>Что значит</th></tr>
+    <tr><td>«Подключён»</td><td>Виджет включён, заполнены ключ, виртуальный номер и секрет</td></tr>
+    <tr><td>«Не полностью»</td><td>Виджет включён, но какого-то поля не хватает</td></tr>
+    <tr><td>«Выключен»</td><td>Галочка снята: звонки через UIS и приём событий отключены</td></tr>
+  </table>
+
+  <div class="note"><b>Пустое поле не стирает ключ.</b> Ключ и секрет после сохранения не показываются, в поле написано «сохранён». Чтобы сменить, введите новое значение. Оставили пустым — остаётся старое.</div>
+</section>
+
+<section id="uis">
+  <h2><span class="num">3</span>Настройка личного кабинета UIS</h2>
+  <p class="lead">Делается один раз, в кабинете Новосистем (UIS) с правами администратора.</p>
+
+  <ol class="steps">
+    <li><b>Подключите опции API.</b><small>«Администратор → Аккаунт → Тариф и опции»: «API Базовый» для уведомлений и «Call API Базовый набор» для звонка из карточки.</small></li>
+    <li><b>Добавьте IP сервера CRM в белый список.</b><small>«Аккаунт → Правила и настройки безопасности → API». Пока список пуст, UIS отклоняет запросы CRM. IP сервера даёт администратор хостинга.</small></li>
+    <li><b>Выпустите ключ.</b><small>«Управление пользователями» → пользователь → галочки «Доступ по ключу» и «Доступ к Call API». Ключ показывается один раз — сразу вставьте его в «Ключ API» виджета.</small></li>
+    <li><b>Создайте HTTP-уведомление.</b><small>«Сервисы и статистика → Уведомления» (в новом кабинете — «Интеграции»). Метод POST, адрес — «URL для ЛК UIS» из виджета целиком, вместе с <code>?token=…</code>.</small></li>
+    <li><b>Добавьте параметры в тело уведомления.</b><small>Кнопкой «Добавить параметр», имена — ровно как в таблице ниже.</small></li>
+  </ol>
+
+  <table>
+    <tr><th>Параметр</th><th>Зачем CRM</th></tr>
+    <tr><td><code>call_session_id</code></td><td>Обязателен. Один звонок — одна строка в журнале, повторы обновляют её</td></tr>
+    <tr><td><code>direction</code></td><td>Входящий или исходящий (<code>in</code> / <code>out</code>)</td></tr>
+    <tr><td><code>contact_phone_number</code></td><td>Номер клиента — по нему находится карточка</td></tr>
+    <tr><td><code>virtual_phone_number</code></td><td>Номер компании</td></tr>
+    <tr><td><code>employee_id</code></td><td>ID сотрудника UIS — по нему журнал находит менеджера</td></tr>
+    <tr><td><code>extension</code></td><td>Добавочный, если ID в уведомлении нет</td></tr>
+    <tr><td><code>start_time</code></td><td>Начало разговора. Без него в журнале окажется время прихода уведомления</td></tr>
+    <tr><td><code>talk_duration</code></td><td>Длительность разговора в секундах</td></tr>
+    <tr><td><code>finish_time</code>, <code>is_lost</code></td><td>Звонок завершён или пропущен</td></tr>
+  </table>
+
+  <div class="note warn"><b>Без <code>call_session_id</code> событие отклоняется.</b> Без верного <code>token</code> или при выключенном виджете — тоже. Журнал отправок в UIS: «Отчёты → Служебные». Если CRM не ответила, UIS повторит отправку через 2, 4, 8 и 16 часов.</div>
+</section>
+
+<section id="employee">
+  <h2><span class="num">4</span>Сотрудник: ID UIS и добавочный</h2>
+  <p class="lead">Чтобы кнопка звонка знала, кому звонить первым, у менеджера в CRM должен быть указан его ID сотрудника в UIS.</p>
+
+  <ol class="steps">
+    <li><b>Узнайте ID сотрудника в ЛК UIS.</b><small>«Управление пользователями» / «Сотрудники» → карточка сотрудника, числовой идентификатор.</small></li>
+    <li><b>Откройте пользователя в CRM:</b> «Пользователи» → нужный менеджер.<small>Внизу страницы — блок «Телефония сотрудника».</small></li>
+    <li><b>Заполните «ID сотрудника UIS».</b><small>Только цифры.</small></li>
+    <li><b>«Добавочный»</b> — внутренний номер, если UIS присылает его в уведомлении.<small>Короткий добавочный в звонок из карточки не подставляется: UIS звонит сотруднику по ID из его кабинета.</small></li>
+    <li><b>Галочка «включён» должна стоять. Сохраните.</b></li>
+  </ol>
+</section>
+
+<section id="call">
+  <h2><span class="num">5</span>Позвонить клиенту</h2>
+  <p class="lead">Нужно три вещи: виджет «Подключён», у вас указан ID сотрудника UIS, у клиента заполнен телефон.</p>
+
+  <ol class="steps">
+    <li><b>Откройте карточку клиента.</b><small>CRM → Клиенты → нужный клиент.</small></li>
+    <li><b>Нажмите «Позвонить клиенту».</b></li>
+    <li><b>Проверьте номер и подтвердите.</b></li>
+    <li><b>Возьмите трубку.</b><small>Сначала UIS позвонит вам, потом наберёт клиента. Вверху появится «Вызов инициирован: Новосистем соединит вас с …».</small></li>
+  </ol>
+</section>
+
+<section id="journal">
+  <h2><span class="num">6</span>Журнал звонков</h2>
+  <p class="lead">CRM → <b>Звонки</b> — тот же журнал, что и для Mango. Звонки UIS отличаются ID записи: он начинается с <code>uis:</code>.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>Клиент находится сам</h4>
+      <p>По цифрам номера: формат не важен (+7, 8, скобки). Неизвестный номер сохраняется без клиента — его можно назначить вручную на странице звонка.</p>
+    </div>
+    <div class="card">
+      <h4>Менеджер</h4>
+      <p>Сначала по <code>employee_id</code>, если он совпадает с «ID сотрудника UIS». Если ID в уведомлении нет — по добавочному.</p>
+    </div>
+    <div class="card">
+      <h4>Повторы не дублируются</h4>
+      <p>UIS может прислать несколько уведомлений по одному звонку. Они обновляют одну строку журнала: состояние, длительность, номера.</p>
+    </div>
+  </div>
+</section>
+
+<section id="trouble">
+  <h2><span class="num">7</span>Если не работает</h2>
+  <p class="lead">Что пишет страница звонка и что делать.</p>
+
+  <table>
+    <tr><th>Сообщение</th><th>Причина</th><th>Что делать</th></tr>
+    <tr>
+      <td>«Телефония выключена: включите виджет Mango или Новосистем в интеграциях.»</td>
+      <td>Оба виджета выключены или не заполнены</td>
+      <td>Администратору: раздел 2</td>
+    </tr>
+    <tr>
+      <td>«Укажите ID сотрудника UIS в профиле пользователя («Телефония сотрудника»).»</td>
+      <td>У вас пустое поле «ID сотрудника UIS»</td>
+      <td>Раздел 4</td>
+    </tr>
+    <tr>
+      <td>«У клиента не заполнен телефон.»</td>
+      <td>Пустое поле в карточке</td>
+      <td>Заполнить телефон и повторить</td>
+    </tr>
+    <tr>
+      <td>«Новосистем API недоступен…»</td>
+      <td>Сеть или сервис UIS</td>
+      <td>Повторить через минуту; если повторяется — администратору</td>
+    </tr>
+    <tr>
+      <td>«Новосистем отклонил вызов: …»</td>
+      <td>UIS вернул ошибку: IP не в белом списке, неверный ключ, нет «Доступа к Call API», неверный ID сотрудника</td>
+      <td>Администратору: текст после двоеточия подскажет причину, проверить раздел 3</td>
+    </tr>
+    <tr>
+      <td>Звонки не появляются в журнале</td>
+      <td>Уведомление не настроено, неверный token или нет <code>call_session_id</code></td>
+      <td>Администратору: «Отчёты → Служебные» в UIS и раздел 3</td>
+    </tr>
+  </table>
+</section>
+
+<section id="faq">
+  <h2><span class="num">8</span>FAQ</h2>
+  <table>
+    <tr><th>Вопрос</th><th>Ответ</th></tr>
+    <tr>
+      <td>Включены и Mango, и Новосистем. Через кого пойдёт звонок?</td>
+      <td>Через Mango, если у вас задан добавочный и виджет Mango настроен. Если добавочного нет, а ID сотрудника UIS заполнен и виджет Новосистем включён — звонок идёт через Новосистем. Журнал принимает события от обоих.</td>
+    </tr>
+    <tr>
+      <td>Клиент видит мой номер?</td>
+      <td>Нет, клиент видит виртуальный номер компании из виджета.</td>
+    </tr>
+    <tr>
+      <td>Где слушать запись разговора?</td>
+      <td>В ЛК UIS. В карточке звонка CRM пишет, что запись есть в UIS и в CRM не скачивается.</td>
+    </tr>
+    <tr>
+      <td>Сменили ключ в UIS — что делать?</td>
+      <td>Вставить новый в «Ключ API» виджета и нажать «Сохранить». Остальные поля трогать не нужно.</td>
+    </tr>
+  </table>
+
+  <div class="note ok"><b>Смотрите также:</b> «Телефония Mango · звонки из CRM» и общая инструкция «Панель управления 3.0 · инструкция для менеджеров».</div>
+</section>
+
+<div class="footer">
+  Телефония Новосистем (UIS) в CRM · виджет, звонок из карточки, журнал · инструкция
+</div>
+
+</div>
+</body>
+</html>

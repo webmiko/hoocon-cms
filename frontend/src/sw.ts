@@ -8,6 +8,8 @@
 import { clientsClaim } from "workbox-core";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 
+import { safeSameOriginPath } from "./utils/safePath";
+
 declare let self: ServiceWorkerGlobalScope;
 
 void self.skipWaiting();
@@ -57,7 +59,7 @@ self.addEventListener("push", (event: PushEvent) => {
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const raw = (event.notification.data as { url?: string } | undefined)?.url;
-  const target = safeSameOriginPath(raw);
+  const target = safeSameOriginPath(raw, self.location.origin);
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({
@@ -77,13 +79,3 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
     })(),
   );
 });
-
-/** Same-origin path only; reject protocol-relative ``//evil`` open redirects. */
-function safeSameOriginPath(raw: unknown): string {
-  if (typeof raw !== "string") return "/";
-  const url = raw.trim() || "/";
-  if (!url.startsWith("/") || url.startsWith("//") || url.includes("://")) {
-    return "/";
-  }
-  return url.slice(0, 500);
-}

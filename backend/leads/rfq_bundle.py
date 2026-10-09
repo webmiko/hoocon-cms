@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
@@ -14,6 +14,10 @@ from leads.models import Lead
 RFQ_BUNDLE_WINDOW_DAYS = 14
 
 _MAX_KEY_LEN = 400
+
+# Namespace of the two-int advisory lock so it never collides with other
+# ``pg_advisory_xact_lock`` users.
+_BUNDLE_LOCK_NAMESPACE = 7301
 
 
 def normalize_rfq_name(raw: str) -> str:
@@ -63,12 +67,23 @@ def resolve_open_bundle_root(key: str, *, exclude_pk: int | None = None) -> Lead
     return None
 
 
+def _lock_bundle_key(key: str) -> None:
+    """Serialize root lookup per key until the outer transaction ends."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_advisory_xact_lock(%s, hashtext(%s))",
+            [_BUNDLE_LOCK_NAMESPACE, key],
+        )
+
+
 def attach_rfq_bundle(lead: Lead) -> None:
     """Set ``rfq_bundle_key`` / ``rfq_bundle_root`` for an RFQ lead.
 
     Non-RFQ leads clear the key. Call after the lead row exists (has pk).
-    The root lookup runs inside ``select_for_update`` so two concurrent
-    leads with the same company+name cannot both become independent roots.
+    The root lookup holds a transaction-scoped advisory lock on the key, so
+    two concurrent leads with the same company+name cannot both become
+    independent roots: the second waits for the first to commit and then
+    sees it as the root.
     """
     if lead.lead_type != Lead.LeadType.RFQ:
         if lead.rfq_bundle_key or lead.rfq_bundle_root_id:
@@ -79,6 +94,8 @@ def attach_rfq_bundle(lead: Lead) -> None:
 
     key = build_rfq_bundle_key(company=lead.company, name=lead.name)
     with transaction.atomic():
+        if key:
+            _lock_bundle_key(key)
         root = resolve_open_bundle_root(key, exclude_pk=lead.pk)
         lead.rfq_bundle_key = key
         lead.rfq_bundle_root = root

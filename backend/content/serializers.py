@@ -7,6 +7,7 @@ dangerouslySetInnerHTML on user HTML; see security-baseline §3.6).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from rest_framework import serializers
@@ -40,11 +41,24 @@ class PageSerializer(_ContentSerializer):
         model = Page
 
 
+_WORDS_PER_MINUTE = 180
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def article_reading_minutes(excerpt: str, body: str) -> int:
+    """Same rule as the /statyi card: under 40 words → 0, else ≥1 minute."""
+    words = len(_TAG_RE.sub(" ", f"{excerpt or ''} {body or ''}").split())
+    if words < 40:
+        return 0
+    return max(1, int(words / _WORDS_PER_MINUTE + 0.5))
+
+
 class ArticleListSerializer(_ContentSerializer):
-    """Article card for /statyi list (no related SKUs)."""
+    """Article card for /statyi list: no body, only the reading time."""
 
     cover = RelativeImageField(read_only=True, allow_null=True)
     cover_dark = RelativeImageField(read_only=True, allow_null=True)
+    reading_minutes = serializers.SerializerMethodField()
 
     class Meta(_ContentSerializer.Meta):
         model = Article
@@ -55,13 +69,17 @@ class ArticleListSerializer(_ContentSerializer):
             "excerpt",
             "cover",
             "cover_dark",
-            "body",
+            "reading_minutes",
             "is_published",
             "published_at",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+    def get_reading_minutes(self, obj: Article) -> int:
+        """Minutes to read; the list does not ship the full HTML body."""
+        return article_reading_minutes(obj.excerpt, obj.body)
 
 
 class ArticleRelatedSkuSerializer(serializers.Serializer):
@@ -97,7 +115,7 @@ class ArticleSerializer(ArticleListSerializer):
     related_skus = serializers.SerializerMethodField()
 
     class Meta(ArticleListSerializer.Meta):
-        fields = (*ArticleListSerializer.Meta.fields, "related_skus")
+        fields = (*ArticleListSerializer.Meta.fields, "body", "related_skus")
         read_only_fields = fields
 
     def get_related_skus(self, obj: Article) -> list[dict[str, Any]]:

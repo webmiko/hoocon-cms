@@ -26,8 +26,16 @@ def login_client(request: HttpRequest, account: ClientAccount) -> None:
 
 
 def logout_client(request: HttpRequest) -> None:
-    """Drop the client account from the session."""
+    """Drop the client account and its support chat; rotate the session key.
+
+    Without this the next visitor on the same browser kept the chat thread
+    (and the old session id) of the client who signed out.
+    """
+    from supportchat.services import SESSION_KEY as SUPPORT_SESSION_KEY
+
     request.session.pop(_SESSION_KEY, None)
+    request.session.pop(SUPPORT_SESSION_KEY, None)
+    request.session.cycle_key()
 
 
 def load_client_account(request: HttpRequest | Request) -> ClientAccount | None:
@@ -44,12 +52,36 @@ def load_client_account(request: HttpRequest | Request) -> ClientAccount | None:
     return account
 
 
+def session_owns_email(request: HttpRequest | Request, email: str) -> bool:
+    """True when the visitor is signed in with a verified account for ``email``.
+
+    Contact emails typed into public forms are unproven; only this match
+    lets a lead or chat appear in that client's cabinet automatically.
+    """
+    wanted = (email or "").strip().casefold()
+    if not wanted:
+        return False
+    account = load_client_account(request)
+    return bool(
+        account is not None
+        and account.email_verified_at is not None
+        and (account.email or "").strip().casefold() == wanted
+    )
+
+
 class IsClientAccount(BasePermission):
-    """DRF permission: request must carry an active client session."""
+    """DRF permission: an active client session with a verified email.
+
+    The CRM card (quotes, orders, documents) is matched by email, so an
+    unproven address must never reach ``/api/account/*``.
+    """
+
+    message = "Подтвердите эл. почту: войдите по коду из письма."
 
     def has_permission(self, request: Request, view: Any) -> bool:
         # ClientSessionAuthentication already resolved the account into
         # request.user — reuse it; the session lookup is the fallback.
-        if isinstance(request.user, ClientAccount):
-            return True
-        return load_client_account(request) is not None
+        account = request.user if isinstance(request.user, ClientAccount) else load_client_account(request)
+        if account is None:
+            return False
+        return account.email_verified_at is not None

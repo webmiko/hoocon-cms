@@ -4,7 +4,6 @@ import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { registerSW } from "virtual:pwa-register";
 
-import { AccountAuthProvider } from "./account/AuthContext";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { HOOCON_MAIN_CSS_ID } from "./hooconMainCss";
@@ -12,7 +11,9 @@ import "./styles/fonts";
 import "./styles/global.css";
 import App from "./App";
 import { clearChunkReloadFlag, recoverFromStaleChunk } from "./utils/chunkLoadRecovery";
+import { reloadGuard } from "./utils/reloadGuard";
 import { reloadIfReleaseStale } from "./utils/reloadIfReleaseStale";
+import { removeServerSeoTags } from "./utils/serverSeoTags";
 import { installSupportChatControl } from "./utils/supportChatControl";
 
 /**
@@ -27,6 +28,7 @@ function promoteMainStylesheet(): void {
 }
 
 promoteMainStylesheet();
+removeServerSeoTags();
 installSupportChatControl();
 
 // Home is eager — clear the one-shot guard once the shell stays healthy.
@@ -40,10 +42,13 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
+// Created at boot so it sees every keystroke before a deploy or pull reload.
+const guard = reloadGuard();
+
 if (import.meta.env.PROD) {
   let swRegistration: ServiceWorkerRegistration | undefined;
   const checkRelease = () => {
-    void reloadIfReleaseStale();
+    void reloadIfReleaseStale(undefined, () => guard.requestReload());
   };
   const poke = () => {
     void swRegistration?.update();
@@ -55,6 +60,9 @@ if (import.meta.env.PROD) {
   });
   registerSW({
     immediate: true,
+    onNeedReload() {
+      guard.requestReload();
+    },
     onRegisteredSW(_swUrl, registration) {
       swRegistration = registration;
       if (!registration) return;
@@ -69,9 +77,7 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter useTransitions={false}>
         <ThemeProvider>
           <PullToRefresh>
-            <AccountAuthProvider>
-              <App />
-            </AccountAuthProvider>
+            <App />
           </PullToRefresh>
         </ThemeProvider>
       </BrowserRouter>

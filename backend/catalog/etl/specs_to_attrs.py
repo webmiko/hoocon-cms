@@ -10,13 +10,18 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, set_sku_attribute
 from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.label_to_slug import CANONICAL_ATTRS, canonical_meta, label_to_slug
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs
 from catalog.etl.series_copy_damqu import is_damqu_product_slug
 from catalog.etl.sku_variant import filter_description_for_variant, parse_sku_variant
-from catalog.etl.tech_copy import normalize_manual_override_value, normalize_tech_copy
+from catalog.etl.tech_copy import (
+    PROTECTION_CLASS_II,
+    PROTECTION_CLASS_III,
+    normalize_manual_override_value,
+    normalize_tech_copy,
+)
 from catalog.models import SKU, Product
 
 logger = logging.getLogger(__name__)
@@ -132,9 +137,9 @@ def _normalize_value(slug: str, value: str) -> str:
     if slug == "protection-class":
         low = v.casefold()
         if "iii" in low or "iii" in v or "Ⅲ" in v or re.search(r"\bIII\b", v):
-            return "III (безопасное сверхнизкое напряжение)"
+            return PROTECTION_CLASS_III
         if "ii" in low or "Ⅱ" in v or re.search(r"\bII\b", v):
-            return "II (все изолировано / полная изоляция)"
+            return PROTECTION_CLASS_II
     if slug == "ip-rating":
         m = re.search(r"IP\s*(\d{2})", v, re.I)
         if m:
@@ -398,6 +403,7 @@ def maybe_clear_product_specs(product: Product) -> bool:
     return False
 
 
+@cached_attributes
 def enrich_catalog_cards(
     *,
     product_slug: str | None = None,

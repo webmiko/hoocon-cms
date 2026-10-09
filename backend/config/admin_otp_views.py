@@ -26,7 +26,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from accounts.recovery_codes import consume_recovery_code
+from accounts.recovery_codes import RecoveryAttempt, attempt_recovery_code, recovery_subject
 from config.admin_otp import (
     AdminOtpDeliveryError,
     AdminOtpVerifyError,
@@ -204,7 +204,10 @@ class AdminSuperuserRecoveryForm(forms.Form):
         if user is None and "@" in username:
             user = qs.filter(email__iexact=username).first()
 
-        if user is None or not getattr(user, "is_superuser", False) or not consume_recovery_code(user, code):
+        if user is not None and not getattr(user, "is_superuser", False):
+            user = None
+        outcome = attempt_recovery_code(user, code, subject=recovery_subject(user, username))
+        if outcome is not RecoveryAttempt.OK:
             raise forms.ValidationError(_GENERIC_RECOVERY_FAIL, code="invalid_recovery")
 
         self.user_cache = user

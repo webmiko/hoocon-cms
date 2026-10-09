@@ -611,8 +611,12 @@ class SKUDetailSerializer(SKUListSerializer):
 
     def get_files(self, obj: SKU) -> list[dict[str, Any]]:
         """Return only published ProductFile rows, ordered."""
-        qs = obj.files.filter(is_published=True).order_by("sort_order", "title")
-        return ProductFileSerializer(qs, many=True, context=self.context).data
+        # .all() reuses the retrieve Prefetch; .filter() re-queried per SKU.
+        files = sorted(
+            (f for f in obj.files.all() if f.is_published),
+            key=lambda f: (f.sort_order, f.title),
+        )
+        return ProductFileSerializer(files, many=True, context=self.context).data
 
     def get_images(self, obj: SKU) -> list[dict[str, Any]]:
         """Return published gallery images for this edition only."""

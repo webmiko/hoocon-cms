@@ -18,7 +18,9 @@ _THROTTLE = "analytics_hit"
 class PageHitView(APIView):
     """Record one SPA navigation hit (no marketing consent required).
 
-    Uses the Django session cookie (essential) for unique-visitor counting.
+    Unique visitors: existing session key or a daily IP+UA hash — the hit
+    itself never creates a session. ``title`` / ``object_*`` from the client
+    are accepted for compatibility and ignored.
     """
 
     permission_classes = (AllowAny,)
@@ -30,13 +32,7 @@ class PageHitView(APIView):
         serializer = PageHitSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        ok = record_page_hit(
-            request=request._request,
-            path=str(data.get("path") or ""),
-            title=str(data.get("title") or ""),
-            object_type=str(data.get("object_type") or ""),
-            object_key=str(data.get("object_key") or ""),
-        )
+        ok = record_page_hit(request=request._request, path=str(data.get("path") or ""))
         if not ok:
             return Response(
                 {"detail": "invalid path"},

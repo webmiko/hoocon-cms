@@ -149,6 +149,126 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_novosystem_guide() -> None:
+    """Вики Новосистем: виджет, ЛК UIS, ID сотрудника; ссылка в руководстве 3.0."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
+    assert doc.category == "Инструкции"
+    for anchor in ("widget", "uis", "employee", "call", "journal", "trouble"):
+        assert f'id="{anchor}"' in doc.body
+    assert "ID сотрудника UIS" in doc.body
+    assert "call_session_id" in doc.body
+    assert "employee_id" in doc.body
+    assert "именно на этот номер" not in doc.body
+    assert "?token=" in doc.body
+    assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "09.10.2026" in guide.body
+    assert "Телефония Новосистем (UIS)" in guide.body
+    mango = WikiDocument.objects.get(slug="mango-telephony-guide")
+    assert "настройках сервера" not in mango.body
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_manual_catalog_edits() -> None:
+    """Руководство 3.0: ручные правки карточки и галочки блокировки — в каталоге и журнале."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert 'id="catalog-manual"' in guide.body
+    for label in ("тексты правлены вручную", "правлено вручную", "скрыто вручную"):
+        assert label in guide.body
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert "Пересборка карточек из мануалов" in changelog
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_company_member_confirmation() -> None:
+    """Руководство 3.0: реквизиты компании в кабинете — только после «подтверждён менеджером»."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-company-confirm"' in changelog
+    assert "подтверждён менеджером" in changelog
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_quote_transitions_and_mail_matching() -> None:
+    """Руководство 3.0: порядок статусов КП и привязка писем только от клиента заявки."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-quote-transitions"' in changelog
+    assert "Черновик сразу в «Согласовано» не перетащить" in changelog
+    assert "только письма её клиента" in changelog
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_staged_chat_handoff() -> None:
+    """Руководство 3.0: бот не забирает передачу менеджеру через минуту."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-chat-handoff"' in changelog
+    assert "менеджеры заняты" in changelog
+    assert "через 30 минут" in changelog
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_pdn_consent_and_kept_manual_edits() -> None:
+    """Руководство 3.0: согласие 152-ФЗ в карточках; редиректы и статьи не затираются импортом."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-pdn-consent"' in changelog
+    assert "Согласие на обработку ПДн" in changelog
+    assert 'id="changelog-manual-edits-kept"' in changelog
+    assert "правлено вручную" in changelog
+    assert changelog.index("changelog-pdn-consent") < changelog.index("changelog-chat-handoff")
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_chat_and_telephony_guards() -> None:
+    """Руководство 3.0: одна оценка, «Передать» только менеджерам, скрытый токен вебхука, https для Mango."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-chat-telephony-guards"' in changelog
+    assert "Оценка уже сохранена" in changelog
+    assert "https://" in changelog
+    assert changelog.index("changelog-chat-telephony-guards") < changelog.index("changelog-pdn-consent")
+    row = changelog.split('id="changelog-chat-telephony-guards"', 1)[1].split("</tr>", 1)[0]
+    assert row.count("<td>") + row.count("<td ") == 3
+
+
+@pytest.mark.django_db
 def test_seed_wiki_includes_year_stock_dashboard() -> None:
     """Yearly stock dashboard seed is wired in seed_wiki."""
     from io import StringIO
@@ -171,6 +291,52 @@ def test_seed_wiki_includes_year_stock_dashboard() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_keeps_admin_edits_and_deactivation() -> None:
+    """seed_wiki на каждом старте затирал правки вики из админки и включал выключенные страницы."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="mango-telephony-guide")
+    assert doc.seed_hash
+    doc.body = "<p>Правка менеджера</p>"
+    doc.is_active = False
+    doc.save()
+
+    out = StringIO()
+    call_command("seed_wiki", stdout=out)
+    doc.refresh_from_db()
+    assert doc.body == "<p>Правка менеджера</p>"
+    assert doc.is_active is False
+    assert "Skipped Wiki: mango-telephony-guide" in out.getvalue()
+
+    call_command("seed_wiki", "--force", stdout=StringIO())
+    doc.refresh_from_db()
+    assert doc.body != "<p>Правка менеджера</p>"
+    assert doc.is_active is False
+
+
+@pytest.mark.django_db
+def test_seed_wiki_refreshes_unedited_page_from_repo() -> None:
+    """Неправленная страница обновляется из репозитория (руководство доходит до прода)."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from content.management.commands.seed_wiki import body_hash
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    old = "<p>Старая версия из репозитория</p>"
+    WikiDocument.objects.filter(pk=doc.pk).update(body=old, seed_hash=body_hash(old))
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc.refresh_from_db()
+    assert 'id="changelog"' in doc.body
+
+
+@pytest.mark.django_db
 def test_wiki_browse_requires_permission(client) -> None:
     """User without content.view_wikidocument cannot open Wiki browse."""
     user = User.objects.create_user(
@@ -183,3 +349,50 @@ def test_wiki_browse_requires_permission(client) -> None:
     url = reverse("admin:content_wikidocument_browse")
     response = client.get(url)
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_lead_contact_verification() -> None:
+    """Руководство 3.0: заявка с сайта видна в кабинете после «в работу», КП или галочки."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-contact-verified"' in changelog
+    assert "контакт подтверждён" in changelog
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_contact_verified_only_visibility() -> None:
+    """Руководство 3.0: «в работу» и ответ в чате больше не открывают кабинет — только подтверждённый контакт."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert 'id="contact-verified"' in body
+    assert "Заявка, которую он только что отправил, уже лежит в его кабинете" not in body
+    assert 'id="changelog-contact-verified-only"' in changelog
+    assert changelog.index("changelog-contact-verified-only") < changelog.index("changelog-chat-telephony-guards")
+    row = changelog.split('id="changelog-contact-verified-only"', 1)[1].split("</tr>", 1)[0]
+    assert row.count("<td>") + row.count("<td ") == 3
+    assert 'href="#contact-verified"' in row
+
+
+@pytest.mark.django_db
+def test_seed_wiki_mango_guide_has_webhook_address_and_rejected_call() -> None:
+    """Гайд Mango: адрес внешней системы для событий и ошибка «Mango отклонил звонок»."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="mango-telephony-guide")
+    assert 'id="trouble-journal-empty"' in guide.body
+    assert "/api/telephony/mango" in guide.body
+    assert 'id="trouble-rejected"' in guide.body

@@ -23,11 +23,6 @@ def _nginx_site_text() -> str:
     return NGINX_CONF.read_text(encoding="utf-8") + "\n" + NGINX_SITE_INC.read_text(encoding="utf-8")
 
 
-def test_ci_workflow_file_exists() -> None:
-    """The CI workflow file exists at the expected path."""
-    assert CI_YML.exists(), f"Missing CI workflow: {CI_YML}"
-
-
 def test_ci_workflow_is_valid_yaml() -> None:
     """The CI workflow is parseable YAML."""
     import yaml
@@ -114,10 +109,50 @@ def test_ci_workflow_triggers_on_develop_and_main() -> None:
     assert "main" in push_branches
 
 
-def test_nginx_conf_file_exists() -> None:
-    """The nginx site config exists at the expected path."""
-    assert NGINX_CONF.exists(), f"Missing nginx config: {NGINX_CONF}"
-    assert NGINX_SITE_INC.exists(), f"Missing nginx site include: {NGINX_SITE_INC}"
+def _nginx_brace_errors(text: str) -> list[str]:
+    """Unbalanced ``{``/``}`` outside comments and quotes (what ``nginx -t`` rejects first)."""
+    import re
+
+    depth = 0
+    errors: list[str] = []
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        line = re.sub(r"\"[^\"]*\"|'[^']*'", "", raw).split("#", 1)[0]
+        for char in line:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth < 0:
+                    errors.append(f"line {lineno}: unexpected }}")
+                    depth = 0
+    if depth:
+        errors.append(f"{depth} unclosed {{")
+    return errors
+
+
+def test_nginx_brace_lint_catches_unbalanced_block() -> None:
+    assert _nginx_brace_errors("server {\n  location / { return 200; }\n}\n") == []
+    assert _nginx_brace_errors('server {\n  return 200 "}";  # }\n}\n') == []
+    assert _nginx_brace_errors("server {\n  location / {\n}\n") == ["1 unclosed {"]
+    assert _nginx_brace_errors("}\n") == ["line 1: unexpected }"]
+
+
+def test_nginx_configs_have_balanced_braces() -> None:
+    """Was «файл существует»: битая скобка в конфиге проходила тест и роняла ``nginx -t`` на VPS."""
+    for path in (NGINX_CONF, NGINX_SITE_INC):
+        assert _nginx_brace_errors(path.read_text(encoding="utf-8")) == [], path.name
+
+
+def test_nginx_local_includes_are_shipped_by_deploy() -> None:
+    """Every ``include /etc/nginx/<file>`` must exist in deploy/nginx and be copied by deploy-remote.sh."""
+    import re
+
+    deploy = (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
+    included = set(re.findall(r"^\s*include /etc/nginx/([\w.-]+);", NGINX_CONF.read_text(encoding="utf-8"), re.M))
+    assert included == {"hoocon-site.inc", "redirects.map"}
+    for name in included:
+        assert (NGINX_CONF.parent / name).is_file(), name
+        assert f"cp '${{DEPLOY_PATH}}/deploy/nginx/{name}' /etc/nginx/{name}" in deploy, name
 
 
 def test_nginx_conf_has_api_proxy() -> None:
@@ -246,9 +281,28 @@ def test_nginx_conf_enables_https_apex() -> None:
     assert "hoocon-site.inc" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 
-def test_redirects_map_file_exists() -> None:
-    """The redirects.map stub file exists."""
-    assert REDIRECTS_MAP.exists(), f"Missing redirects map: {REDIRECTS_MAP}"
+def test_redirects_map_rules_parse_as_nginx_map() -> None:
+    """Was «файл существует» + «есть комментарий»: map грузится nginx до export_nginx_redirects.
+
+    Each rule must be ``<safe path> <safe path>;`` as ``render_nginx_map`` writes it, with unique
+    sources (nginx refuses duplicate map keys) and real Tilda ``/tproduct/`` rules.
+    """
+    from redirects.pathutils import is_safe_internal_path
+
+    rules = [
+        line
+        for line in REDIRECTS_MAP.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+    assert rules
+    bad = [line for line in rules if not line.endswith(";") or len(line[:-1].split(" ")) != 2]
+    assert bad == []
+    pairs = [line[:-1].split(" ") for line in rules]
+    unsafe = [pair for pair in pairs if not all(is_safe_internal_path(path) for path in pair)]
+    assert unsafe == []
+    sources = [source for source, _ in pairs]
+    assert len(sources) == len(set(sources))
+    assert any(source.startswith("/tproduct/") for source in sources)
 
 
 def test_deploy_remote_prepares_spa_cache_dir_before_nginx_reload() -> None:
@@ -269,8 +323,153 @@ def test_vps_free_disk_script_exists() -> None:
     assert "vps-free-disk.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
 
 
-def test_redirects_map_has_documentation() -> None:
-    """redirects.map has usage documentation (not just empty)."""
-    content = REDIRECTS_MAP.read_text(encoding="utf-8")
-    assert len(content) > 100  # has explanatory comments
-    assert "tproduct" in content  # references the Tilda URL pattern
+def test_ci_does_not_cancel_main_deploys() -> None:
+    """M36: новый push в main не отменяет идущий деплой между up -d и reload nginx."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    cancel = str(data["concurrency"]["cancel-in-progress"])
+    assert cancel != "True"
+    assert "refs/heads/main" in cancel
+    assert "!=" in cancel
+
+
+def test_release_pr_scripts_exist_and_merge_whole_pr() -> None:
+    """M38: правила «чкд»/деплоя вызывают эти скрипты — их не было в репо."""
+    import os
+
+    scripts = ROOT / "scripts"
+    ensure = scripts / "ensure-release-pr.sh"
+    merge = scripts / "merge-release-pr.sh"
+    for script in (ensure, merge):
+        assert script.exists(), script
+        assert os.access(script, os.X_OK), f"{script} is not executable"
+    ensure_text = ensure.read_text(encoding="utf-8")
+    assert "gh pr list --base" in ensure_text
+    assert "gh pr create" in ensure_text
+    merge_text = merge.read_text(encoding="utf-8")
+    assert "gh pr checks" in merge_text
+    assert "--merge" in merge_text
+    assert "--squash" not in merge_text
+    assert "git push" not in merge_text
+
+
+def test_nginx_rate_limits_admin_login() -> None:
+    """M40: /admin/ открыта без IP-allowlist — логин должен быть под limit_req."""
+    assert "zone=admin_login:10m" in NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
+    block = content.split("location = /admin/login/", 1)[1].split("}", 1)[0]
+    assert "limit_req zone=admin_login" in block
+    assert "proxy_pass http://hoocon_app" in block
+    assert "X-Forwarded-For $remote_addr" in block
+
+
+def test_ci_actions_pinned_by_commit_sha() -> None:
+    """Actions were pinned by moving tags (@v4): a retagged action ran with deploy secrets."""
+    import re
+
+    uses = re.findall(r"uses:\s*(\S+)", CI_YML.read_text(encoding="utf-8"))
+    assert uses
+    unpinned = [u for u in uses if not re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", u)]
+    assert unpinned == []
+
+
+def test_deploy_pins_vps_host_key() -> None:
+    """CI ran ssh-keyscan + accept-new each deploy (TOFU); the key now comes from a secret."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    deploy_env = next(
+        step.get("env", {}) for step in data["jobs"]["deploy"]["steps"] if step.get("name") == "Deploy to VPS"
+    )
+    assert deploy_env.get("SSH_KNOWN_HOSTS") == "${{ secrets.SSH_KNOWN_HOSTS }}"
+
+    for name in ("deploy-remote.sh", "vps-free-disk.sh", "vps-install-cron.sh", "vps-install-logrotate.sh"):
+        text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert "hoocon_ssh_trust" in text, name
+        assert "accept-new" not in text, name
+        assert "ssh-keyscan" not in text, name
+
+
+def _ssh_trust_opts(tmp_path: Path, env: dict[str, str]) -> tuple[str, str]:
+    import subprocess
+
+    script = f'source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust; printf "%s " "${{SSH_OPTS[@]}}"'
+    out = subprocess.run(
+        ["bash", "-c", script],
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    known = tmp_path / ".ssh" / "known_hosts"
+    return out.stdout, known.read_text() if known.exists() else ""
+
+
+def test_ssh_trust_is_strict_with_pinned_key(tmp_path: Path) -> None:
+    opts, known = _ssh_trust_opts(tmp_path, {"SSH_KNOWN_HOSTS": "vps.example ssh-ed25519 AAAAC3Nza"})
+    assert "StrictHostKeyChecking=yes" in opts
+    assert f"UserKnownHostsFile={tmp_path}/.ssh/known_hosts " in opts
+    assert "vps.example ssh-ed25519 AAAAC3Nza" in known
+
+
+def test_ssh_trust_fails_in_ci_without_pinned_key(tmp_path: Path) -> None:
+    """L6: без SSH_KNOWN_HOSTS чистый раннер CI доверял любому ключу VPS (TOFU) — теперь деплой падает."""
+    import subprocess
+
+    script = f'set -euo pipefail; source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust; echo reached-ssh'
+    out = subprocess.run(
+        ["bash", "-c", script],
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "GITHUB_ACTIONS": "true", "SERVER_HOST": "vps.example"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert out.returncode != 0
+    assert "::error::SSH_KNOWN_HOSTS" in out.stderr
+    assert "reached-ssh" not in out.stdout
+    assert not (tmp_path / ".ssh" / "known_hosts").exists()
+
+
+def test_ssh_trust_local_run_keeps_trust_on_first_use(tmp_path: Path) -> None:
+    """L6: вне CI (ручной деплой с машины разработчика) секрет не обязателен."""
+    opts, _ = _ssh_trust_opts(tmp_path, {})
+    assert "StrictHostKeyChecking=accept-new" in opts
+
+
+def test_telephony_webhook_token_not_in_access_log() -> None:
+    """UIS sends ?token=<secret>; the default access log wrote it to disk."""
+    conf = NGINX_CONF.read_text(encoding="utf-8")
+    fmt = conf.split("log_format hoocon_noargs", 1)[1].split(";", 1)[0]
+    assert "$uri" in fmt
+    assert "$request " not in fmt and "$request_uri" not in fmt and "$args" not in fmt
+    block = NGINX_SITE_INC.read_text(encoding="utf-8").split("location /api/telephony/", 1)[1].split("\n}", 1)[0]
+    assert "access_log /var/log/nginx/access.log hoocon_noargs;" in block
+    assert "proxy_pass http://hoocon_app;" in block
+    assert "proxy_set_header X-Forwarded-For $remote_addr;" in block
+
+
+def test_all_shell_scripts_parse_with_bash_n() -> None:
+    """Поведенческая проверка вместо «файл существует»: каждый scripts/*.sh парсится bash."""
+    import subprocess
+
+    scripts = sorted((ROOT / "scripts").glob("*.sh"))
+    assert scripts
+    broken = {
+        path.name: proc.stderr.strip()
+        for path in scripts
+        if (proc := subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, check=False)).returncode
+    }
+    assert broken == {}
+
+
+def test_stray_uv_lock_is_gitignored() -> None:
+    """Poetry — единственный lock; uv.lock рядом не должен попасть в коммит."""
+    import subprocess
+
+    proc = subprocess.run(
+        ["git", "check-ignore", "-q", "backend/uv.lock"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert proc.returncode == 0

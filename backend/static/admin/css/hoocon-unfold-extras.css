@@ -1644,6 +1644,104 @@ kbd.hoocon-sidebar-shortcut > span {
   line-height: 1.35;
 }
 
+.hoocon-pbx {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+@container (min-width: 720px) {
+  .hoocon-pbx {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.hoocon-pbx__widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.hoocon-pbx__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.hoocon-pbx__state {
+  display: none;
+}
+
+.hoocon-pbx__toggle .hoocon-pbx__state--off {
+  display: inline;
+}
+
+.hoocon-pbx__toggle:has(input:checked) .hoocon-pbx__state--off {
+  display: none;
+}
+
+.hoocon-pbx__widget--ready .hoocon-pbx__toggle:has(input:checked) .hoocon-pbx__state--on,
+.hoocon-pbx__widget:not(.hoocon-pbx__widget--ready) .hoocon-pbx__toggle:has(input:checked) .hoocon-pbx__state--partial {
+  display: inline;
+}
+
+.hoocon-pbx__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--hoocon-quiet);
+}
+
+.hoocon-pbx__field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--hoocon-glass-border);
+  border-radius: var(--hoocon-radius-btn-sm, 0.5rem);
+  background: var(--hoocon-surface);
+  color: inherit;
+  font-size: 0.875rem;
+}
+
+.hoocon-pbx__url {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.hoocon-pbx__url summary {
+  cursor: pointer;
+}
+
+.hoocon-pbx__url code {
+  display: block;
+  margin-top: 0.35rem;
+  user-select: all;
+}
+
+.hoocon-pbx__save {
+  align-self: flex-start;
+  margin-top: auto;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.9rem;
+  border: 0;
+  border-radius: var(--hoocon-radius-btn, 0.6rem);
+  background: var(--hoocon-primary, #dc1313);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* Admin text fields: frosted glass fill, brand border when active.
    Explicit [type=…] so :focus beats the base rule (long :not() chains win specificity). */
 #content-main form .field-line input[type="text"],
@@ -3626,7 +3724,7 @@ input[type="checkbox"].hoocon-toggle::after {
 }
 
 input[type="checkbox"].hoocon-toggle:checked {
-  background: var(--os27-accent, var(--hoocon-primary, #dc1313)) !important;
+  background: #16a34a !important;
 }
 
 input[type="checkbox"].hoocon-toggle:checked::after {
@@ -3650,7 +3748,7 @@ html.dark input[type="checkbox"].hoocon-toggle {
 
 .dark input[type="checkbox"].hoocon-toggle:checked,
 html.dark input[type="checkbox"].hoocon-toggle:checked {
-  background: var(--os27-accent, #f87171) !important;
+  background: #16a34a !important;
 }
 
 /* Client card — inline «Написать»/«Позвонить» next to email/phone inputs. */

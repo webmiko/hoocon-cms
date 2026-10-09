@@ -289,6 +289,14 @@ class WikiDocument(models.Model):
         default=True,
         db_index=True,
     )
+    seed_hash: models.CharField = models.CharField(
+        "хэш сида",
+        max_length=64,
+        blank=True,
+        default="",
+        editable=False,
+        help_text="sha256 HTML из репозитория на момент последнего сида; иначе — правка в админке.",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 

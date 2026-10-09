@@ -214,19 +214,20 @@ body.hoocon-os27 .hoocon-dash__panel-head a {
   font-weight: 500;
 }
 
-/* Primary actions — pill CTA in brand red. */
+/* Primary actions — pill CTA in brand red. Fill stays --hoocon-primary in dark:
+   --os27-accent there is the pale text tone, and white on it fails AA. */
 body.hoocon-os27 a.hoocon-admin-open,
 body.hoocon-os27 a.hoocon-admin-lead-open,
 body.hoocon-os27 button.hoocon-admin-open,
 body.hoocon-os27 .hoocon-lead-view-toggle a.is-active {
-  background: var(--os27-accent);
-  border-color: color-mix(in srgb, var(--os27-accent) 35%, var(--os27-hairline));
+  background: var(--hoocon-primary);
+  border-color: color-mix(in srgb, var(--hoocon-primary) 35%, var(--os27-hairline));
 }
 
 body.hoocon-os27 a.hoocon-admin-open:hover,
 body.hoocon-os27 a.hoocon-admin-lead-open:hover,
 body.hoocon-os27 button.hoocon-admin-open:hover {
-  background: var(--os27-accent-hover);
+  background: var(--hoocon-primary-hover);
 }
 
 /* Header — flat iOS navigation bar on gray canvas. */

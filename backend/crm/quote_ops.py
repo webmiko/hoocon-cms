@@ -31,7 +31,7 @@ def sibling_open_quotes(client: Client) -> list[Quote]:
 
 
 def finalize_quote_status(quote: Quote, *, actor: Any = None) -> dict[str, Any]:
-    """Stamp first SENT, issue PDF, close source lead; clear sent_at if unsent.
+    """Stamp first SENT, issue PDF, close source lead; clear sent_at on recall to draft.
 
     Idempotent on re-save of an already issued quote.
 
@@ -66,6 +66,9 @@ def finalize_quote_status(quote: Quote, *, actor: Any = None) -> dict[str, Any]:
         if document is not None and client.email:
             notify_quote_issued(quote, author=actor, document=document)
         lead = cast("Lead | None", quote.lead)
+        if lead is not None and not lead.contact_verified:
+            Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
+            lead.contact_verified = True
         if lead is not None and lead.status != Lead.LeadStatus.DONE:
             from leads.services import set_lead_status
 
@@ -79,10 +82,27 @@ def finalize_quote_status(quote: Quote, *, actor: Any = None) -> dict[str, Any]:
             else:
                 result["lead_closed"] = updated.pk
         return result
-    if quote.sent_at is not None:
+    if quote.status == QuoteStatus.DRAFT and quote.sent_at is not None:
         quote.sent_at = None
         quote.save(update_fields=["sent_at", "updated_at"])
     return result
+
+
+def transition_quote(quote: Quote, status: str, *, actor: Any = None) -> tuple[dict[str, Any], str | None]:
+    """Move a КП along ``QUOTE_TRANSITIONS`` and run the SENT side effects.
+
+    Returns:
+        ``(finalize_result, error)`` — error ``"invalid_transition"`` leaves
+        the quote untouched.
+    """
+    from crm.models import quote_transition_allowed
+
+    if not quote_transition_allowed(quote.status, status):
+        return {}, "invalid_transition"
+    if quote.status != status:
+        quote.status = status
+        quote.save(update_fields=["status", "updated_at"])
+    return finalize_quote_status(quote, actor=actor), None
 
 
 def duplicate_quote(quote: Quote, *, author: Any) -> Quote:
@@ -119,16 +139,18 @@ def create_order_from_quote(quote: Quote) -> tuple[Order, bool]:
     Returns:
         ``(order, created)``.
     """
-    existing = quote.orders.exclude(status=OrderStatus.CANCELLED).order_by("pk").first()
-    if existing is not None:
-        return existing, False
-    base = f"З-{quote.number or quote.pk}"
-    number = base
-    suffix = 2
-    while Order.objects.filter(client_id=quote.client_id, number=number).exists():
-        number = f"{base}-{suffix}"
-        suffix += 1
     with transaction.atomic():
+        # Row lock: a double click in Admin waits here and then reuses the order.
+        quote = Quote.objects.select_for_update().get(pk=quote.pk)
+        existing = quote.orders.exclude(status=OrderStatus.CANCELLED).order_by("pk").first()
+        if existing is not None:
+            return existing, False
+        base = f"З-{quote.number or quote.pk}"
+        number = base
+        suffix = 2
+        while Order.objects.filter(client_id=quote.client_id, number=number).exists():
+            number = f"{base}-{suffix}"
+            suffix += 1
         order = Order.objects.create(
             client=cast(Client, quote.client),
             quote=quote,

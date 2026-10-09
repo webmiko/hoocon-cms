@@ -14,8 +14,26 @@ const FAQ_PATH_LABELS: Record<string, string> = {
   "/replacement": "подбор аналога Belimo",
 };
 
+/** First path segments that are real site routes; "AC/DC" or "MU/FU" stay text. */
+const FAQ_LINK_ROOTS = new Set([
+  "catalog",
+  "company",
+  "compare",
+  "consultation",
+  "dokumentaciya",
+  "faq",
+  "gde-kupit",
+  "kontakty",
+  "novosti",
+  "o-kompanii",
+  "replacement",
+  "rfq",
+  "statyi",
+  "zavod",
+]);
+
 const FAQ_PATH_RE =
-  /\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*(?:\?[^\s]+)?(?:#[a-z0-9-]+)?/gi;
+  /(?<![\p{L}\p{N}/])\/([a-z0-9][a-z0-9-]*)(?:\/[a-z0-9][a-z0-9-]*)*(?:\?[^\s]+)?(?:#[a-z0-9-]+)?/gu;
 
 function faqLinkLabel(href: string): string {
   const [path, query = ""] = href.split(/[?#]/, 2);
@@ -41,8 +59,11 @@ export function faqAnswerNodes(
   const nodes: ReactNode[] = [];
   let last = 0;
   let match: RegExpExecArray | null;
-  const re = new RegExp(FAQ_PATH_RE.source, "gi");
+  const re = new RegExp(FAQ_PATH_RE.source, FAQ_PATH_RE.flags);
   while ((match = re.exec(text)) !== null) {
+    if (!FAQ_LINK_ROOTS.has(match[1])) {
+      continue;
+    }
     if (match.index > last) {
       nodes.push(text.slice(last, match.index));
     }

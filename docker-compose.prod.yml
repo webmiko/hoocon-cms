@@ -62,8 +62,10 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /var/www/hoocon/media:/app/media
+      - /var/www/hoocon/private_media:/app/private_media
       - /var/www/hoocon/staticfiles:/app/staticfiles
       - /var/www/hoocon/frontend/dist:/app/frontend/dist:ro
+      - /var/www/hoocon/manuals-src:/app/manuals-src:ro
     depends_on:
       db:
         condition: service_healthy
@@ -95,8 +97,10 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
       DJANGO_CACHE_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+      RUN_BOOTSTRAP: "0"
     volumes:
       - /var/www/hoocon/media:/app/media
+      - /var/www/hoocon/private_media:/app/private_media
     depends_on:
       db:
         condition: service_healthy
@@ -125,8 +129,10 @@ services:
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
       DJANGO_CACHE_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+      RUN_BOOTSTRAP: "0"
     volumes:
       - /var/www/hoocon/media:/app/media
+      - /var/www/hoocon/private_media:/app/private_media
     depends_on:
       db:
         condition: service_healthy

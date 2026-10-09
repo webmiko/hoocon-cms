@@ -281,3 +281,26 @@ def test_list_files_for_sku(client) -> None:
     assert response.status_code == 200
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["title"] == "Паспорт"
+
+
+@pytest.mark.django_db
+def test_files_of_unpublished_sku_hidden_from_public(client, django_user_model) -> None:
+    """M31: скрытая карточка не «светится» через свои PDF в публичном API."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from catalog.models import ProductFile
+
+    sku = _make_sku()
+    ProductFile.objects.create(
+        sku=sku,
+        title="Паспорт",
+        file=SimpleUploadedFile("d.pdf", _pdf_bytes(64), content_type="application/pdf"),
+        file_type=ProductFile.FileType.DATASHEET,
+    )
+    sku.is_published = False
+    sku.save(update_fields=["is_published"])
+    url = reverse("catalog-sku-file-list", kwargs={"sku_slug": sku.slug})
+
+    assert client.get(url).data["results"] == []
+    client.force_login(_staff_user(django_user_model))
+    assert len(client.get(url).data["results"]) == 1

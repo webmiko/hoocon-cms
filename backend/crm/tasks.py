@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from email.utils import make_msgid
 from typing import Any, cast
 
 from celery import shared_task
+from django.conf import settings
 from django.core.mail import EmailMessage as DjangoEmailMessage
 from django.core.mail import EmailMultiAlternatives, get_connection
 
@@ -38,6 +40,7 @@ def _smtp_connection_for(msg: EmailMessage) -> Any | None:
         password=password,
         use_ssl=bool(mailbox.smtp_use_ssl),
         use_tls=not mailbox.smtp_use_ssl,
+        timeout=settings.EMAIL_TIMEOUT,
         fail_silently=False,
     )
 
@@ -67,7 +70,7 @@ def send_crm_email(self: object, email_id: int) -> None:
         # входящий ответ (In-Reply-To) не свяжется с этой записью.
         if not msg.message_id:
             domain = (msg.from_email or "").split("@")[-1] or "hoocon.ru"
-            msg.message_id = f"<crm-email-{msg.pk}@{domain}>"
+            msg.message_id = make_msgid(idstring=f"crm-email-{msg.pk}", domain=domain)
             EmailMessage.objects.filter(pk=msg.pk, message_id__isnull=True).update(
                 message_id=msg.message_id,
             )
@@ -137,7 +140,18 @@ def send_crm_email(self: object, email_id: int) -> None:
     logger.info("crm_email_sent id=%s", email_id)
 
 
-@shared_task(name="crm.fetch_inbound_email", bind=True, max_retries=2, default_retry_delay=120)
+_IMAP_FETCH_LOCK = "crm:imap_fetch:lock"
+_IMAP_FETCH_LOCK_TTL = 15 * 60
+
+
+@shared_task(
+    name="crm.fetch_inbound_email",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=120,
+    soft_time_limit=10 * 60,
+    time_limit=11 * 60,
+)
 def fetch_inbound_email(self: object) -> str:
     """Poll IMAP for new inbound mail → EmailMessage(direction=inbound).
 
@@ -146,9 +160,15 @@ def fetch_inbound_email(self: object) -> str:
     источников нет — выходит сразу. Ошибка одного ящика не роняет цикл;
     здоровье каждого — в его ``last_error``.
     """
+    from django.core.cache import cache
+
     from crm.imap_fetch import fetch_inbound_email as _fetch
     from crm.models import InboundMailboxState
 
+    # Beat fires every few minutes; a slow run must not overlap the next one
+    # (same UIDs fetched twice, both workers busy).
+    if not cache.add(_IMAP_FETCH_LOCK, 1, timeout=_IMAP_FETCH_LOCK_TTL):
+        return "locked"
     try:
         report = _fetch()
     except Exception as exc:
@@ -157,6 +177,8 @@ def fetch_inbound_email(self: object) -> str:
         state.save(update_fields=["last_error"])
         logger.exception("imap_fetch_failed")
         raise self.retry(exc=exc)  # type: ignore[attr-defined]
+    finally:
+        cache.delete(_IMAP_FETCH_LOCK)
     if report.get("skipped"):
         return "disabled"
     return f"seen={report['seen']} created={report['created']} dup={report['duplicates']} err={report['errors']}"

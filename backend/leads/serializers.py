@@ -24,6 +24,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from catalog.models import SKU
+from config.pdn import pdn_consent_field, require_pdn_consent, stamp_pdn_consent
 from leads.models import Lead, LeadItem
 from leads.rfq_bundle import attach_rfq_bundle
 
@@ -31,6 +32,8 @@ from leads.rfq_bundle import attach_rfq_bundle
 _MESSAGE_MIN_LENGTH = 10
 _MESSAGE_MAX_LENGTH = 5000
 _MAX_LEAD_ITEMS = 30
+# One position quantity; also keeps PositiveIntegerField far from int4 overflow.
+MAX_ITEM_QUANTITY = 100_000
 
 
 class LeadItemWriteSerializer(serializers.Serializer):
@@ -48,7 +51,7 @@ class LeadItemWriteSerializer(serializers.Serializer):
         max_length=100,
         default="",
     )
-    quantity = serializers.IntegerField(min_value=1, default=1, required=False)
+    quantity = serializers.IntegerField(min_value=1, max_value=MAX_ITEM_QUANTITY, default=1, required=False)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Require sku FK or non-empty sku_code."""
@@ -89,6 +92,7 @@ class LeadSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     items = LeadItemWriteSerializer(many=True, required=False, write_only=True)
+    pdn_consent = pdn_consent_field()
 
     class Meta:
         model = Lead
@@ -108,6 +112,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "website",
+            "pdn_consent",
         )
         read_only_fields = ("id", "status", "created_at", "updated_at")
         # PII-safe response: email/phone are write-only (never returned to client).
@@ -128,6 +133,9 @@ class LeadSerializer(serializers.ModelSerializer):
                 f"Message must be at most {_MESSAGE_MAX_LENGTH} characters.",
             )
         return value
+
+    def validate_pdn_consent(self, value: bool) -> bool:
+        return require_pdn_consent(value)
 
     def validate_items(self, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Cap line count."""
@@ -175,11 +183,14 @@ class LeadSerializer(serializers.ModelSerializer):
         leaving a partial row in the database.
         """
         validated_data.pop("website", None)
+        validated_data.pop("pdn_consent", None)
         items_data: list[dict[str, Any]] = validated_data.pop("_resolved_items", [])
         validated_data.pop("items", None)
 
         with transaction.atomic():
-            lead = Lead.objects.create(**validated_data)
+            lead = Lead(**validated_data)
+            stamp_pdn_consent(lead)
+            lead.save()
             lead_items: list[LeadItem] = []
             for index, row in enumerate(items_data):
                 sku = row.get("sku")

@@ -179,7 +179,7 @@ export function SkuDetailPage() {
   const slug = softSlug || routeSlug;
   const { resolved: theme } = useTheme();
   const { data: sku, loading, error } = useAsync(
-    () => api.skuDetail(slug),
+    (signal) => api.skuDetail(slug, { signal }),
     slug,
     slug ? `catalog:sku:${slug}` : undefined,
   );
@@ -346,6 +346,7 @@ export function SkuDetailPage() {
     description: sku.description,
     price: "price" in sku ? sku.price : null,
     price_on_request: sku.price_on_request,
+    in_stock: Boolean(displayInStock),
     category_name: sku.category_name || sku.category_slug,
     category_slug: sku.category_slug,
   });

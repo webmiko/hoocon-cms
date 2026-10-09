@@ -12,6 +12,9 @@ import { parseAreaM2, parseMomentNm } from "./quizMomentEstimate";
 
 export { parseAreaM2, parseMomentNm } from "./quizMomentEstimate";
 
+/** OR separator for facet params; commas are decimal («1,6», «до 1,0 м²»). */
+export const FACET_OR_SEPARATOR = "|";
+
 export function matchVoltageFacet(
   values: readonly string[],
   choice: Exclude<QuizVoltage, "skip">,
@@ -67,23 +70,34 @@ export function matchControlFacet(
   if (discrete.length === 0) {
     return null;
   }
-  return [...new Set(discrete)].join(",");
+  return [...new Set(discrete)].join(FACET_OR_SEPARATOR);
 }
 
+/** Drives above this multiple of the required torque are oversized. */
+const MOMENT_HEADROOM_K = 2;
+
+/**
+ * Every torque chip from the required step up to ×2 (OR).
+ *
+ * Series ladders interleave (DA 2/4/6/8/16/24/32, HV 5/10/20/40 Нм), so a
+ * single exact chip would leave only one series in the results.
+ */
 export function matchMomentNmFacet(
   values: readonly string[],
   targetNm: number,
 ): string | null {
   const parsed = values
     .map((value) => ({ value, nm: parseMomentNm(value) }))
-    .filter((row): row is { value: string; nm: number } => row.nm !== null);
+    .filter((row): row is { value: string; nm: number } => row.nm !== null)
+    .sort((a, b) => a.nm - b.nm);
 
-  const exact = parsed.find((row) => row.nm === targetNm);
-  if (exact) {
-    return exact.value;
+  const fitting = parsed.filter(
+    (row) => row.nm >= targetNm && row.nm <= targetNm * MOMENT_HEADROOM_K,
+  );
+  if (fitting.length > 0) {
+    return [...new Set(fitting.map((row) => row.value))].join(FACET_OR_SEPARATOR);
   }
 
-  parsed.sort((a, b) => a.nm - b.nm);
   return parsed.find((row) => row.nm >= targetNm)?.value ?? parsed.at(-1)?.value ?? null;
 }
 
@@ -253,7 +267,7 @@ export function parseKvsM3h(value: string): number | null {
 }
 
 /**
- * Pick catalog Kvs values in the quiz band (comma OR for the API).
+ * Pick catalog Kvs values in the quiz band (OR for the API).
  * All chips in-band are kept so DN65–150 / 8100Q are not dropped when the
  * band also contains other Kvs (e.g. «больше 40» → 63,100,160…).
  */
@@ -271,7 +285,7 @@ export function matchKvsFacet(
     return null;
   }
 
-  return [...new Set(inBand.map((row) => row.value))].join(",");
+  return [...new Set(inBand.map((row) => row.value))].join(FACET_OR_SEPARATOR);
 }
 
 export function facetValuesForKey(

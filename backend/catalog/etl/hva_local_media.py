@@ -18,26 +18,23 @@ pack reuse the nearest std family body photo.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
-from django.db import transaction
-
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.manual_diagrams import (
     SORT_WIRING,
     parse_hva_series,
     unpublish_combined_when_split_diagrams,
     unpublish_redundant_hva_catalog_dimensions,
 )
+from catalog.etl.sku_variant import parse_hva_code
 from catalog.etl.webp import convert_bytes_to_webp
-from catalog.models import SKU, ProductImage
+from catalog.models import SKU
 
 logger = logging.getLogger(__name__)
 
 _SOURCE_URL = "https://hoocon.ru/.local-assets/hva-catalog/hva{nm}{fast}-{kind}.webp"
-_QX_RE = re.compile(r"(?i)^hva(?:24|230)s?-(?P<nm>\d+)qx$")
 SORT_PRODUCT: Final[int] = 0
 # Wiring stays at 5; dimensions come from ``attach_hv_catalog_dimensions`` (sort=6).
 
@@ -142,11 +139,10 @@ def _media_target(sku_code: str) -> tuple[int, bool, str] | None:
     if parsed is not None:
         nm, fast = parsed
         return nm, fast, f"HVA-{nm}{'Q' if fast else ''}"
-    match = _QX_RE.match((sku_code or "").strip().replace(" ", ""))
-    if match is None:
+    hva = parse_hva_code(sku_code)
+    if hva is None or hva.suffix != "qx":
         return None
-    nm = int(match.group("nm"))
-    return nm, False, f"HVA-{nm}QX"
+    return hva.nm, False, hva.family
 
 
 def _source_url(nm: int, *, fast: bool, kind: str) -> str:
@@ -163,31 +159,16 @@ def _upsert_bytes(
     source_url: str,
     dry_run: bool,
 ) -> str:
-    webp = convert_bytes_to_webp(raw, quality=90, max_edge=1600)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-    filename = f"{sku.sku_code.lower()}-{kind}.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=sort_order,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-        existing.alt = alt[:300]
-        existing.sort_order = sort_order
-        existing.is_published = True
-        existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=source_url,
+        filename=f"{sku.sku_code.lower()}-{kind}.webp",
+        webp=convert_bytes_to_webp(raw, quality=90, max_edge=1600),
+        alt=alt,
+        sort_order=sort_order,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def apply_hva_local_media(

@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { PdnConsentCheckbox } from "../components/PdnConsentCheckbox";
 import account from "./Account.module.css";
 import { accountApi, AccountApiError } from "./api";
 import { useAccountAuth } from "./AuthContext";
@@ -29,6 +30,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [pdnConsent, setPdnConsent] = useState(false);
   // Stamped on mount (not during render) for the server-side min-fill check.
   const formStartTs = useRef(0);
   useEffect(() => {
@@ -57,7 +59,7 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
     setError("");
     setBusy(true);
     try {
-      const res = await accountApi.otpStart(email, formStartTs.current);
+      const res = await accountApi.otpStart(email, formStartTs.current, pdnConsent);
       setChallengeId(res.challenge_id);
     } catch (err) {
       setError(err instanceof AccountApiError ? err.detail : "Не удалось отправить код.");
@@ -139,13 +141,14 @@ export function CabinetOffer({ email }: CabinetOfferProps) {
       <p className={styles.hint}>
         Без пароля — пришлём код для входа на <strong>{email}</strong>
       </p>
+      <PdnConsentCheckbox checked={pdnConsent} onChange={setPdnConsent} />
       {error && (
         <p className={account.error} role="alert">
           {error}
         </p>
       )}
       <div className={styles.row}>
-        <button className={account.button} type="submit" disabled={busy}>
+        <button className={account.button} type="submit" disabled={busy || !pdnConsent}>
           Создать кабинет
         </button>
         <button type="button" className={styles.dismiss} onClick={() => setDismissed(true)}>

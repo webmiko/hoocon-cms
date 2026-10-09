@@ -369,7 +369,8 @@ def apply_stock_rows(rows: list[tuple[str, int | None]]) -> StockImportReport:
         to_update.append(sku)
         seen_ids.add(sku.pk)
 
-    for key in set(base_by_key) | set(ma_by_key):
+    # Sorted: alias keys sharing a SKU resolve the same way on every run.
+    for key in sorted(set(base_by_key) | set(ma_by_key)):
         raw_code = (base_by_key.get(key) or ma_by_key[key])[0]
         targets = _resolve_stock_target_skus(key, sku_by_key, skus_by_bare)
         if not targets:

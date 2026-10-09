@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from crm.models import ActivityType, Client
 from leads.models import Lead
 from supportchat.models import Conversation, Message
-from supportchat.services import (
-    conversation_party_company,
-    conversation_party_label,
-    conversation_party_phone,
-)
+from supportchat.presentation import conversation_party_company, conversation_party_label, conversation_party_phone
 
 
 class OtpStartSerializer(serializers.Serializer):
@@ -61,7 +58,7 @@ class DeviceSerializer(serializers.Serializer):
     platform = serializers.ChoiceField(choices=["android", "ios"], default="android")
 
 
-def serialize_user(user) -> dict:
+def serialize_user(user: User) -> dict[str, object]:
     from accounts.roles import staff_sees_all_leads
 
     groups = list(user.groups.values_list("name", flat=True))
@@ -121,7 +118,7 @@ def serialize_client(client: Client, *, detail: bool = False) -> dict:
                 "subject": a.subject or "",
                 "body": a.body or "",
                 "created_at": a.created_at.isoformat() if a.created_at else None,
-                "author": (a.author.get_full_name() if a.author else "") or "",
+                "author": (a.author.get_full_name() if isinstance(a.author, User) else "") or "",
             }
             for a in acts
         ]

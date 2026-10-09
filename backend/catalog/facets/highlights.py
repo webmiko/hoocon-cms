@@ -273,7 +273,7 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
     Returns:
         Number of AttributeValue rows created or updated.
     """
-    from catalog.etl.attr_write import clip_attribute_value
+    from catalog.etl.attr_write import clip_attribute_value, ensure_attribute
     from catalog.etl.tech_copy import (
         CONTROL_SIGNAL_Y_CANON,
         CONTROL_SIGNAL_Y_LABEL,
@@ -311,13 +311,7 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
     }
     for slug, name, value in specs:
         clipped = clip_attribute_value(value)
-        attr, _created = Attribute.objects.get_or_create(
-            slug=slug,
-            defaults={"name": name, "unit": ""},
-        )
-        if attr.name != name:
-            attr.name = name
-            attr.save(update_fields=["name"])
+        attr = ensure_attribute(slug, name)
         av, created = AttributeValue.objects.get_or_create(
             sku=sku,
             attribute=attr,
@@ -325,7 +319,7 @@ def ensure_modulating_signal_attributes(sku: SKU) -> int:
         )
         if created:
             changed += 1
-        elif (av.value or "").strip() != clipped:
+        elif not av.is_manual and (av.value or "").strip() != clipped:
             av.value = clipped
             av.save(update_fields=["value"])
             changed += 1

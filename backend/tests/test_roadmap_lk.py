@@ -107,11 +107,19 @@ def test_quote_admin_sent_transition_issues_document() -> None:
     request.session = SessionStore()  # type: ignore[assignment]
     request._messages = FallbackStorage(request)  # type: ignore[attr-defined]
 
+    from types import SimpleNamespace
+
     from django.contrib.admin.sites import site
 
     model_admin = site._registry[Quote]
+    form = SimpleNamespace(instance=quote, save_m2m=lambda: None)
+
+    def admin_save() -> None:
+        model_admin.save_model(request, quote, form=form, change=True)
+        model_admin.save_related(request, form, formsets=[], change=True)
+
     quote.status = QuoteStatus.SENT
-    model_admin.save_model(request, quote, form=None, change=True)
+    admin_save()
 
     quote.refresh_from_db()
     assert quote.sent_at is not None
@@ -121,7 +129,7 @@ def test_quote_admin_sent_transition_issues_document() -> None:
 
     # Re-save in SENT does not queue a second notification.
     EmailMessage.objects.filter(client=client).delete()
-    model_admin.save_model(request, quote, form=None, change=True)
+    admin_save()
     assert not EmailMessage.objects.filter(client=client).exists()
 
 
@@ -377,3 +385,82 @@ def test_outbound_email_sends_attachment(settings) -> None:
     assert len(mail.outbox) == 1
     sent = mail.outbox[0]
     assert sent.attachments and sent.attachments[0][0] == "kp.pdf"
+
+
+@pytest.mark.django_db
+def test_analog_lookup_rejects_symbol_only_code_and_hides_unpublished() -> None:
+    """M31: код «---» не отдаёт первые 10 строк карты; скрытый SKU не виден в подборе."""
+    published = _sku("HVA-PUB-5")
+    hidden = _sku("HVA-HIDDEN-5")
+    hidden.is_published = False
+    hidden.save(update_fields=["is_published"])
+    AnalogMap.objects.create(brand="Belimo", foreign_code="LM24A", sku=published)
+    AnalogMap.objects.create(brand="Belimo", foreign_code="SM24A", sku=hidden)
+    api = DjangoClient()
+
+    assert api.get("/api/catalog/analogs/", {"code": "---"}).status_code == 400
+    assert api.get("/api/catalog/analogs/", {"code": "SM24A"}).json()["count"] == 0
+    assert api.get("/api/catalog/analogs/", {"code": "LM24A"}).json()["count"] == 1
+
+
+def test_quote_vat_rounds_half_up_and_label_drops_zeros() -> None:
+    """НДС округлялся банковским HALF_EVEN, ставка печаталась как «22.00%»."""
+    from decimal import Decimal
+
+    from crm.quote_pdf import vat_amount_rub, vat_rate_label
+
+    # 0.125 ₽ → 0.13 (HALF_EVEN gave 0.12).
+    assert vat_amount_rub(Decimal("0.625"), Decimal("20")) == Decimal("0.13")
+    assert vat_rate_label(Decimal("22.00")) == "22"
+    assert vat_rate_label(Decimal("12.50")) == "12.5"
+    assert vat_rate_label(Decimal("20")) == "20"
+
+
+@pytest.mark.django_db
+def test_quote_pdf_prints_local_dates_and_clean_vat(monkeypatch: pytest.MonkeyPatch, settings) -> None:
+    """Дата КП в PDF была по UTC: КП от 00:30 МСК печаталось вчерашним числом."""
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from reportlab.pdfgen.canvas import Canvas
+
+    from crm.quote_pdf import render_quote_pdf
+
+    settings.TIME_ZONE = "Europe/Moscow"
+    quote = _quote(_client("quote-tz@acme.test"))
+    item = quote.items.first()
+    item.unit_price = Decimal("0.625")
+    item.quantity = 1
+    item.save()
+    Quote.objects.filter(pk=quote.pk).update(
+        created_at=datetime(2026, 10, 8, 21, 30, tzinfo=UTC), vat_rate=Decimal("20.00")
+    )
+    quote.refresh_from_db()
+
+    drawn: list[str] = []
+    for method in ("drawString", "drawRightString"):
+        original = getattr(Canvas, method)
+
+        def _capture(self, x, y, text, *a, _orig=original, **kw):  # noqa: ANN001, ANN202
+            drawn.append(str(text))
+            return _orig(self, x, y, text, *a, **kw)
+
+        monkeypatch.setattr(Canvas, method, _capture)
+
+    render_quote_pdf(quote)
+    assert "Дата: 09.10.2026" in drawn
+    assert "НДС 20%: 0.13 ₽" in drawn
+
+
+@pytest.mark.django_db
+def test_call_str_uses_local_time(settings) -> None:
+    """Call.__str__ показывал время звонка по UTC."""
+    from datetime import UTC, datetime
+
+    from crm.models import Call
+
+    settings.TIME_ZONE = "Europe/Moscow"
+    call = Call(
+        entry_id="tz-1", from_number="7915", to_number="101", started_at=datetime(2026, 10, 8, 21, 5, tzinfo=UTC)
+    )
+    assert str(call).endswith("09.10 00:05")

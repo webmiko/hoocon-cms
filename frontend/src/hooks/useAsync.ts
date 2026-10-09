@@ -1,12 +1,24 @@
-import { useEffect, useEffectEvent, useReducer } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { peekAsyncCache, setAsyncCache } from "../utils/asyncDataCache";
 
 /** Primitive key that triggers a refetch when it changes (Object.is). */
 export type AsyncRefreshKey = string | number | boolean | null | undefined;
 
+interface AsyncState<T> {
+  key: string;
+  data: T | undefined;
+  loading: boolean;
+  error: Error | undefined;
+}
+
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
+}
+
+function freshState<T>(key: string, cacheKey?: string): AsyncState<T> {
+  const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
+  return { key, data: cached, loading: cached === undefined, error: undefined };
 }
 
 /**
@@ -22,7 +34,8 @@ function isAbortError(err: unknown): boolean {
  *     catalog/PDP do not flash an empty skeleton on back-navigation.
  *
  * Returns:
- *   { data, loading, error } — standard async state.
+ *   { data, loading, error } — always for the *current* key: data of a
+ *   previous key is never returned (no stale card / canonical on A→B).
  */
 export function useAsync<T>(
   asyncFn: (signal?: AbortSignal) => Promise<T>,
@@ -33,64 +46,42 @@ export function useAsync<T>(
   loading: boolean;
   error: Error | undefined;
 } {
-  const [state, dispatch] = useReducer(
-    (
-      prev: { data: T | undefined; loading: boolean; error: Error | undefined },
-      action:
-        | { type: "loading" }
-        | { type: "success"; data: T }
-        | { type: "error"; error: Error },
-    ) => {
-      switch (action.type) {
-        case "loading":
-          return { data: prev.data, loading: true, error: undefined };
-        case "success":
-          return { data: action.data, loading: false, error: undefined };
-        case "error":
-          return { data: prev.data, loading: false, error: action.error };
-      }
-    },
-    undefined,
-    () => {
-      const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
-      return {
-        data: cached,
-        loading: cached === undefined,
-        error: undefined,
-      };
-    },
-  );
+  const key = `${String(refreshKey)}\u0000${cacheKey ?? ""}`;
+  const [stored, setStored] = useState<AsyncState<T>>(() => freshState<T>(key, cacheKey));
+  let state = stored;
+  if (stored.key !== key) {
+    // Reset during render: the old key's data must not paint even once.
+    state = freshState<T>(key, cacheKey);
+    setStored(state);
+  }
 
   const load = useEffectEvent(asyncFn);
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    const cached = cacheKey ? peekAsyncCache<T>(cacheKey) : undefined;
-    // Keep painted data on remount; only show loading when nothing to show.
-    if (cached === undefined) {
-      dispatch({ type: "loading" });
-    }
     void load(controller.signal)
       .then((result) => {
         if (cancelled) return;
         if (cacheKey) {
           setAsyncCache(cacheKey, result);
         }
-        dispatch({ type: "success", data: result });
+        setStored({ key, data: result, loading: false, error: undefined });
       })
       .catch((err: unknown) => {
         if (cancelled || isAbortError(err)) return;
-        dispatch({
-          type: "error",
+        setStored((prev) => ({
+          key,
+          data: prev.key === key ? prev.data : undefined,
+          loading: false,
           error: err instanceof Error ? err : new Error(String(err)),
-        });
+        }));
       });
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [refreshKey, cacheKey]);
+  }, [key, cacheKey]);
 
-  return state;
+  return { data: state.data, loading: state.loading, error: state.error };
 }

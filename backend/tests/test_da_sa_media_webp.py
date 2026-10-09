@@ -283,6 +283,36 @@ def test_clone_damqu_images_from_da8_to_16_24() -> None:
             target = skus[f"DA{nm}MQU{ed}"]
             assert ProductImage.objects.filter(sku=target, sort_order=0, is_published=True).exists()
 
+    files_before = {img.pk: img.image.name for img in ProductImage.objects.filter(sku__product__in=products.values())}
+    again = clone_damqu_images_from_donor()
+    assert (again["created"], again["updated"], again["skipped"]) == (0, 0, 4)
+    files_after = {img.pk: img.image.name for img in ProductImage.objects.filter(sku__product__in=products.values())}
+    assert files_after == files_before
+
+
+@pytest.mark.django_db
+def test_clone_damqu_skips_unpublished_donor_and_keeps_empty_source_idempotent() -> None:
+    """M42: клон шёл мимо upsert_sku_image — без source_url плодил дубли, а скрытое фото донора копировал."""
+    from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
+
+    cat = Category.objects.create(name="MQU clone", slug="mqu-clone")
+    skus: dict[int, SKU] = {}
+    for nm in (8, 16):
+        product = Product.objects.create(name=f"DA{nm}MQU", slug=f"da{nm}mqu", category=cat)
+        code = f"DA{nm}MQU24-A"
+        skus[nm] = SKU.objects.create(product=product, sku_code=code, name=code, slug=code.lower(), is_published=True)
+    for name, published in (("hero.webp", True), ("hidden.webp", False)):
+        img = ProductImage(sku=skus[8], alt=name, source_url="", sort_order=0, is_published=published)
+        img.image.save(name, SimpleUploadedFile(name, _png(color=(10, 10, 10)), content_type="image/webp"), save=False)
+        img.save()
+
+    clone_damqu_images_from_donor(target_nms=(16,))
+    clone_damqu_images_from_donor(target_nms=(16,))
+
+    cloned = ProductImage.objects.filter(sku=skus[16])
+    assert cloned.count() == 1
+    assert cloned.get().alt == "hero.webp"
+
 
 @pytest.mark.django_db
 def test_damqu_16_24_pack_fallback_uses_da10_mask(tmp_path: Path) -> None:

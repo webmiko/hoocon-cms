@@ -487,3 +487,44 @@ class _PubOk:
     ok = True
     error = None
     skipped = False
+
+
+@pytest.mark.django_db
+def test_burst_of_messages_gets_one_bot_reply(gigachat_on) -> None:
+    """M25: три сообщения подряд → бот отвечает один раз, на последнее."""
+    conv = _conversation()
+    first, _ = add_inbound_message(conv, "zxqwv первый")
+    second, _ = add_inbound_message(conv, "zxqwv второй")
+    latest, _ = add_inbound_message(conv, "zxqwv третий")
+
+    assert gigachat_reply(conv.pk, first.pk) == "superseded"
+    assert gigachat_reply(conv.pk, second.pk) == "superseded"
+    assert gigachat_reply(conv.pk, latest.pk) == "ok"
+
+    replies = Message.objects.filter(conversation=conv, raw_payload__ai=True)
+    assert replies.count() == 1
+    assert replies.get().pk > latest.pk
+    conv.refresh_from_db()
+    assert conv.ai_turn_count == 1
+
+
+@pytest.mark.django_db
+def test_reply_dropped_when_new_message_arrives_during_generation(gigachat_on) -> None:
+    """M25: пока GigaChat думал, клиент дописал — старый ответ не публикуется."""
+    from unittest.mock import patch
+
+    from supportchat.gigachat.reply import AiReply
+
+    conv = _conversation()
+    first, _ = add_inbound_message(conv, "Нужен привод")
+
+    def _slow_reply(conversation: Conversation, *, inbound_message: Message) -> AiReply:
+        Message.objects.create(conversation=conversation, direction=MessageDirection.INBOUND, body="на 24 В")
+        return AiReply(text="Подберу привод.", escalate=False, escalation_note="")
+
+    with patch("supportchat.gigachat.reply.generate_ai_reply", _slow_reply):
+        assert gigachat_reply(conv.pk, first.pk) == "superseded_race"
+
+    assert not Message.objects.filter(conversation=conv, raw_payload__ai=True).exists()
+    conv.refresh_from_db()
+    assert conv.ai_turn_count == 0

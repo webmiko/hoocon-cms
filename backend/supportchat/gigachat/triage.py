@@ -191,51 +191,6 @@ def triage_site_nav_reply(text: str) -> str | None:
     return None
 
 
-def triage_site_nav_prompt_block() -> str:
-    """Navigation cheat sheet for the triage system prompt."""
-    lines = ["## Разделы сайта (можно советовать без [ESCALATE])"]
-    for section in SITE_NAV_SECTIONS:
-        lines.append(f"- {section.title} → {section.path}")
-    lines.append("- Документация → /dokumentaciya (с артикулом: /dokumentaciya?q=DA2MU24)")
-    lines.append("- Квиз подбора на главной → /#podbor")
-    lines.append(
-        "Давай путь в ответе. Не выдумывай других URL. "
-        "Паспорт/инструкция на модель — ссылка на /dokumentaciya?q=…, не подбор привода."
-    )
-    return "\n".join(lines)
-
-
-def triage_clarification_prompt_block() -> str:
-    """How to qualify product requests before handoff to a manager."""
-    return """\
-## Уточнение перед менеджером (важно)
-Если клиент спрашивает про продукцию, подбор, цену, КП, артикул или характеристики:
-1. **Не консультируй**: не называй серии DA/SA/HV, артикулы, моменты, «рекомендуем модель».
-   Не используй формат ``## [manual.…]`` — его нет в этом режиме.
-2. Задай **1–2 уточняющих вопроса** (тип арматуры, площадь/диаметр, перепад/расход,
-   напряжение 24/230 В, fail-safe, количество) — только то, чего нет в переписке.
-3. Можно без [ESCALATE] посоветовать категорию каталога или квиз /#podbor на главной.
-4. Не подбирай конкретную модель по площади заслонки — это делает менеджер или квиз.
-5. После ответа клиента на уточнение — [ESCALATE] с строкой «Для менеджера: …» (факты из чата)."""
-
-
-_MANAGER_SUMMARY_RE = re.compile(
-    r"(?:для менеджера|передал менеджеру|менеджеру)\s*:\s*(.+)$",
-    re.IGNORECASE | re.MULTILINE,
-)
-
-
-def parse_triage_escalation_note(text: str) -> str:
-    """Extract manager handoff summary from bot reply."""
-    body = (text or "").strip()
-    if not body:
-        return ""
-    match = _MANAGER_SUMMARY_RE.search(body)
-    if match:
-        return match.group(1).strip()[:500]
-    return ""
-
-
 def triage_handoff_reply(text: str) -> tuple[str, str]:
     """Static handoff message and escalation note for triage mode."""
     if wants_manager(text):

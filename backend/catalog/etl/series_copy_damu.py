@@ -1,7 +1,8 @@
 """Canonical copy + ТТХ for Hoocon DA..MU (damper actuators, no spring return).
 
-Source: English manuals in ``_инструкции-pdf`` (``da2mu-*.pdf``,
-``da4_6mu-*.pdf``, ``da8_16_24_32mu*.pdf``) + Belimo RU glossary.
+Source: RU manuals in ``_инструкции-pdf/RU`` (``DA2MU-*.pdf``,
+``DA4_6MU-*.pdf``, ``DA8_16_24_32MU*.pdf``; HTML in ``_manuals-ru/DA``)
++ Belimo RU glossary.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Final
 
+from django.db import transaction
 from django.db.models import QuerySet
 
 from catalog.etl.attr_groups import (
@@ -17,7 +19,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
@@ -29,11 +31,13 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
+    PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
 )
 from catalog.facets import normalize_aux_switch_value
-from catalog.models import SKU, AttributeValue, Product
+from catalog.models import SKU, Product
 
 _DAMU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)mu(?!q)")
 _DAMU_PRODUCT = re.compile(r"(?i)damu|bez-pruzhin")
@@ -120,7 +124,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
     ),
 )
 
-# Per-torque rows from English manuals (page 2 ТТХ + dimension crops).
+# Per-torque rows from RU manuals (ТТХ table + dimension crops).
 # Envelope W × H × D from «Actuator Dimensions» drawings (same body for 4/6 and 8…32).
 _DAMU_DIMS_2: Final[str] = "66 × 116 × 59 мм"
 _DAMU_DIMS_4_6: Final[str] = "84,8 × 145,6 × 65 мм"
@@ -132,7 +136,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "damper-area": "до 0,2 м²",
         "running-time": "< 30 с (95°)",
         "ip-rating": "IP54",
-        "shaft-diameter": "круглый 8…16 мм или квадратный 8×8 — 12×12 мм",
+        "shaft-diameter": "круглый 6…16 мм / квадратный 5×5…12×12 мм",
         "dimensions": _DAMU_DIMS_2,
         "weight": "< 0,5 кг",
         "aux_groups": "1",
@@ -144,7 +148,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "damper-area": "до 0,4 м²",
         "running-time": "< 50 с (95°)",
         "ip-rating": "IP44",
-        "shaft-diameter": "круглый 8…16 мм / квадратный 8×8…12×12 мм",
+        "shaft-diameter": "круглый 6…16 мм / квадратный 8×8…12×12 мм",
         "dimensions": _DAMU_DIMS_4_6,
         "weight": "< 0,7 кг",
         "aux_groups": "2",
@@ -156,7 +160,7 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "damper-area": "до 0,6 м²",
         "running-time": "< 70 с (95°)",
         "ip-rating": "IP44",
-        "shaft-diameter": "круглый 8…16 мм / квадратный 8×8…12×12 мм",
+        "shaft-diameter": "круглый 6…16 мм / квадратный 8×8…12×12 мм",
         "dimensions": _DAMU_DIMS_4_6,
         "weight": "< 0,7 кг",
         "aux_groups": "2",
@@ -261,6 +265,39 @@ SERIES_DESCRIPTION = normalize_tech_copy(
     ),
 )
 
+# Factory angle tables from the RU manuals (DA2MU has switch a only).
+_AUX_SWITCH_A_LINES: tuple[str, ...] = (
+    "– Переключатель a, клеммы 21,22,23 (заводские настройки):",
+    "– 0–10°: клеммы 21,22 замкнуто / клеммы 21,23 разомкнуто.",
+    "– 10–90°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
+)
+_AUX_SWITCH_B_LINES: tuple[str, ...] = (
+    "– Переключатель b, клеммы 24,25,26 (заводские настройки):",
+    "– 0–80°: клеммы 24,25 разомкнуто / клеммы 24,26 замкнуто.",
+    "– 80–90°: клеммы 24,25 замкнуто / клеммы 24,26 разомкнуто.",
+)
+_AUX_SWITCH_ANGLE_NOTE = "– Угол срабатывания переключателя устанавливается по требованию заказчика."
+
+# DA8/16/24/32MU24-A/AS — factory PDF «DA8_16_24_32MU24-A&AS.pdf».
+_FACTORY_DAMU24_TORQUES: Final[tuple[int, ...]] = (8, 16, 24, 32)
+_FACTORY_DAMU24_WEIGHT: Final[str] = "1,2…1,3 кг"
+_FACTORY_DAMU24_DIP_LINES: tuple[str, ...] = (
+    (
+        "– DIP-переключатели (заводская установка — все в положении OFF: "
+        "вход 0…10 В=, обратная связь 0…10 В=, вращение по часовой стрелке):"
+    ),
+    "– №1 Сигнал обратной связи (U): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
+    "– №2 Начало диапазона входного сигнала: OFF — 0...10 В= / 0...20 мА; ON — 2...10 В= / 4...20 мА.",
+    "– №3 Управляющий сигнал (Y): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
+    "– №4 Направление вращения при увеличении сигнала: OFF — по часовой стрелке; ON — против часовой стрелки.",
+)
+
+
+def _is_factory_damu24_modulating(torque_nm: int, variant: SkuVariant) -> bool:
+    """DA8/16/24/32MU24-A/AS: DIP map and weight pinned to the factory PDF."""
+    return torque_nm in _FACTORY_DAMU24_TORQUES and variant.voltage == "24" and variant.control == "modulating"
+
+
 SERIES_INSTRUCTIONS = normalize_tech_copy(
     "\n".join(
         [
@@ -299,12 +336,10 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
             "5. Вспомогательные переключатели (-AS / -DS)",
             "",
             "– Настройка вспомогательных переключателей (модели с суффиксом -S / -AS / -DS):",
-            "– Переключатель a, клеммы 21,22,23 (заводские настройки):",
-            "– 0–10°: клеммы 21,22 замкнуто / клеммы 21,23 разомкнуто.",
-            "– 10–90°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
-            "– 0–80°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
-            "– Угол срабатывания переключателя устанавливается по требованию заказчика.",
-            "– Переключатель b (2 группы SPDT), клеммы 24,25,26 — аналогично переключателю a.",
+            *_AUX_SWITCH_A_LINES,
+            "– Переключатель b — только в исполнениях с 2 группами SPDT (DA4MU и выше):",
+            *_AUX_SWITCH_B_LINES,
+            _AUX_SWITCH_ANGLE_NOTE,
             "– Используйте контакты для индикации положения в системе управления.",
         ],
     ),
@@ -329,6 +364,7 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
     if row is None:
         return None
     variant = parse_sku_variant(sku_code)
+    factory_dip = _is_factory_damu24_modulating(torque_nm, variant)
     series = f"DA{torque_nm}MU"
     lines: list[str] = [
         f"Инструкция по установке и управлению приводом заслонки Hoocon {series}",
@@ -358,7 +394,11 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
         "",
         "4. Настройка направления вращения",
         "",
-        "– Установите переключатель направления на корпусе в нужное положение.",
+        (
+            "– Направление вращения задаётся DIP-переключателем №4 (см. раздел 5)."
+            if factory_dip
+            else "– Установите переключатель направления на корпусе в нужное положение."
+        ),
     ]
     if variant.control == "modulating":
         lines.extend(
@@ -368,6 +408,7 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
                 "",
                 f"– {CONTROL_SIGNAL_Y_LABEL}: {CONTROL_SIGNAL_Y_CANON}.",
                 f"– {FEEDBACK_SIGNAL_U_LABEL}: {FEEDBACK_SIGNAL_U_CANON}.",
+                *(_FACTORY_DAMU24_DIP_LINES if factory_dip else ()),
             ],
         )
         next_ch = 6
@@ -397,12 +438,12 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
                 "– Используйте контакты для индикации положения в системе управления.",
             ],
         )
-        if variant.control == "modulating":
+        if variant.control == "modulating" and not factory_dip:
             lines.extend(
                 [
                     "",
                     "– DIP-переключатели режима сигнала (заводская установка: вход 0…10 В=, обратная связь 0…10 В=):",
-                    "– №1 Режим сигнала обратной связи (U): OFF — 0(2)...10 В=; ON — 0(4)...10 мА.",
+                    "– №1 Режим сигнала обратной связи (U): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
                     "– №3 Режим управляющего сигнала (Y): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
                     "– №2 и №4 не используются.",
                 ],
@@ -411,20 +452,11 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
 
 
 def _damu_aux_switch_adjustment_lines(*, aux_groups: str) -> list[str]:
-    """Factory angle table for DA..MU auxiliary switches (from Belimo RU glossary)."""
-    lines = [
-        "– Переключатель a, клеммы 21,22,23 (заводские настройки):",
-        "– 0–10°: клеммы 21,22 замкнуто / клеммы 21,23 разомкнуто.",
-        "– 10–90°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
-        "– 0–80°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
-        "– Угол срабатывания переключателя устанавливается по требованию заказчика.",
-    ]
+    """Factory angle table for DA..MU auxiliary switches (RU manual)."""
+    lines = list(_AUX_SWITCH_A_LINES)
     if aux_groups != "1":
-        lines.extend(
-            [
-                "– Переключатель b, клеммы 24,25,26 — аналогично переключателю a.",
-            ],
-        )
+        lines.extend(_AUX_SWITCH_B_LINES)
+    lines.append(_AUX_SWITCH_ANGLE_NOTE)
     return lines
 
 
@@ -499,12 +531,10 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
-def _clear_sku_attributes(sku: SKU) -> None:
-    AttributeValue.objects.filter(sku=sku).delete()
-
-
+@cached_attributes
+@transaction.atomic
 def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
-    """Rewrite all DA..MU products/SKUs from English-manual ТТХ.
+    """Rewrite all DA..MU products/SKUs from RU-manual ТТХ.
 
     Args:
         dry_run: When True, count only (no writes).
@@ -526,12 +556,12 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             continue
         title = _product_title(torque_nm)
         if not dry_run:
-            product.name = title[:300]
-            product.description = SERIES_DESCRIPTION
-            product.instructions = SERIES_INSTRUCTIONS
-            product.specs_text = ""
-            product.save(
-                update_fields=["name", "description", "instructions", "specs_text"],
+            write_copy(
+                product,
+                name=title[:300],
+                description=SERIES_DESCRIPTION,
+                instructions=SERIES_INSTRUCTIONS,
+                specs_text="",
             )
 
         for sku in skus:
@@ -541,11 +571,13 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 continue
             variant = parse_sku_variant(sku.sku_code)
             if not dry_run:
-                sku.name = _product_title(nm)[:300]
-                sku.description = _sku_description(variant, nm, row)
-                sku.specs_text = ""
-                sku.save(update_fields=["name", "description", "specs_text"])
-                _clear_sku_attributes(sku)
+                write_copy(
+                    sku,
+                    name=_product_title(nm)[:300],
+                    description=_sku_description(variant, nm, row),
+                    specs_text="",
+                )
+                clear_etl_attributes(sku)
 
             for name, slug, unit, value, _group in SHARED_ATTRS:
                 if not dry_run:
@@ -589,7 +621,13 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     row["dimensions"],
                     ATTR_GROUP_SIZE,
                 ),
-                ("Масса", "weight", "кг", row["weight"], ATTR_GROUP_SIZE),
+                (
+                    "Масса",
+                    "weight",
+                    "кг",
+                    (_FACTORY_DAMU24_WEIGHT if _is_factory_damu24_modulating(nm, variant) else row["weight"]),
+                    ATTR_GROUP_SIZE,
+                ),
             )
             for name, slug, unit, value, _group in torque_rows:
                 if not dry_run:
@@ -617,7 +655,7 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "III (безопасное сверхнизкое напряжение)",
+                        PROTECTION_CLASS_III,
                     )
                 attrs += 3
             elif variant.voltage == "230":
@@ -641,7 +679,7 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "II (все изолировано / полная изоляция)",
+                        PROTECTION_CLASS_II,
                     )
                 attrs += 3
 

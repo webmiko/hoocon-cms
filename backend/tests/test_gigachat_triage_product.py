@@ -8,17 +8,8 @@ import pytest
 
 from supportchat.gigachat.reply import generate_ai_reply
 from supportchat.gigachat.triage import triage_site_nav_reply
-from supportchat.gigachat.triage_product import (
-    triage_product_clarification_reply,
-    triage_response_violates_policy,
-)
+from supportchat.gigachat.triage_product import triage_product_clarification_reply
 from supportchat.models import Channel, Conversation, Message, MessageDirection
-
-
-def test_violates_policy_catches_kb_style_answer() -> None:
-    """Ответ с веткой manual.* и DA2MU — запрещён в triage."""
-    text = "## [manual.DA2MU] Руководство\nрекомендуем привод DA2MU 2 Н·м для заслонки 1 кв.м"
-    assert triage_response_violates_policy(text) is True
 
 
 def test_site_nav_skips_catalog_for_multi_series_product_request() -> None:

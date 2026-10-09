@@ -26,20 +26,21 @@ from supportchat.models import (
     SupportScheduleDay,
     SupportScheduleInterval,
 )
-from supportchat.services import (
-    SupportChatError,
-    active_reply_templates,
-    add_staff_note,
-    add_staff_reply,
-    assign_conversation,
+from supportchat.presentation import (
     conversation_party_label,
-    count_staff_unread,
-    delete_unlinked_conversation,
     message_attachment_is_image,
     message_sender_name,
-    request_client_rating,
     staff_public_name,
 )
+from supportchat.rating import request_client_rating
+from supportchat.services import (
+    SupportChatError,
+    add_staff_note,
+    add_staff_reply,
+    count_staff_unread,
+    delete_unlinked_conversation,
+)
+from supportchat.staff_actions import active_reply_templates, assign_conversation
 
 
 def _admin_attachment_url(msg: Message) -> str:
@@ -176,6 +177,8 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         "staff_unread_count",
         "created_at",
         "updated_at",
+        "pdn_consent_at",
+        "pdn_policy_version",
     )
     autocomplete_fields = ("assignee", "client", "lead")
     # Messages render in the messenger template (not a tabular inline).
@@ -205,7 +208,7 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "CRM",
             {
-                "fields": ("client", "lead"),
+                "fields": ("client", "contact_verified", "lead", "pdn_consent_at", "pdn_policy_version"),
                 "classes": ("collapse",),
             },
         ),
@@ -467,13 +470,15 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         form: Any,
         change: bool,
     ) -> None:
+        if "client" in (form.changed_data or []) and obj.client_id:
+            obj.contact_verified = True
         super().save_model(request, obj, form, change)
         if change and "assignee" in (form.changed_data or []):
-            assign_conversation(obj, obj.assignee, actor=request.user)
+            assign_conversation(obj, obj.assignee, actor=request.user if request.user.is_authenticated else None)
         if change and "status" in (form.changed_data or []) and obj.status == ConversationStatus.CLOSED:
             request_client_rating(obj)
 
-    @admin.action(description="Отметить прочитанными")
+    @admin.action(description="Отметить прочитанными", permissions=("change",))
     def action_mark_read(
         self,
         request: HttpRequest,
@@ -503,18 +508,21 @@ class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
         else:
             self.message_user(request, f"Прочитано: {updated}")
 
-    @admin.action(description="Закрыть диалоги")
+    @admin.action(description="Закрыть диалоги", permissions=("change",))
     def action_close(
         self,
         request: HttpRequest,
         queryset: QuerySet[Conversation],
     ) -> None:
-        updated = queryset.update(status=ConversationStatus.CLOSED)
-        for conv in queryset:
+        # Re-evaluating ``queryset`` after update() would hit a «status=open»
+        # filter from the changelist and return nothing.
+        pks = list(queryset.exclude(status=ConversationStatus.CLOSED).values_list("pk", flat=True))
+        updated = Conversation.objects.filter(pk__in=pks).update(status=ConversationStatus.CLOSED)
+        for conv in Conversation.objects.filter(pk__in=pks):
             request_client_rating(conv)
         self.message_user(request, f"Закрыто: {updated}")
 
-    @admin.action(description="Удалить (без CRM)")
+    @admin.action(description="Удалить (без CRM)", permissions=("delete",))
     def action_delete_unlinked(
         self,
         request: HttpRequest,

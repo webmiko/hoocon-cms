@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpRequest, HttpResponse
+
+logger = logging.getLogger(__name__)
 
 
 class OpsTelegramAlertMiddleware:
@@ -30,7 +34,7 @@ class OpsTelegramAlertMiddleware:
             return
 
         from accounts.tasks import send_ops_telegram_alert_task
-        from config.ops_alerts import ops_telegram_chat_ids
+        from config.ops_alerts import ops_alert_dedup_seconds, ops_telegram_chat_ids
 
         if not ops_telegram_chat_ids():
             return
@@ -39,8 +43,13 @@ class OpsTelegramAlertMiddleware:
         dedup_key = f"http{response.status_code}:{path}"
         title = f"HTTP {response.status_code} на {settings.SITE_URL.rstrip('/')}{path}"
         body = f"{method} {path}"
-        send_ops_telegram_alert_task.delay(
-            title=title,
-            body=body,
-            dedup_key=dedup_key,
-        )
+        try:
+            if not cache.add(f"ops_alert_queued:v1:{dedup_key}", 1, timeout=ops_alert_dedup_seconds()):
+                return
+            send_ops_telegram_alert_task.delay(
+                title=title,
+                body=body,
+                dedup_key=dedup_key,
+            )
+        except Exception:
+            logger.exception("ops alert not queued for %s", dedup_key)

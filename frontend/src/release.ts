@@ -1,7 +1,10 @@
 /** App release label (keep in sync with backend/config/release.py). */
 
-/** Beta: ``X.Y.Z``; after GA: ``MAJOR.MINOR`` (see docs/releases.md). */
-export const RELEASE_VERSION = "3.1";
+/**
+ * Beta: ``X.Y.Z``; after GA: ``MAJOR.MINOR.PATCH`` — PATCH is internal,
+ * UI shows ``vMAJOR.MINOR`` (see _docs/releases.md).
+ */
+export const RELEASE_VERSION = "3.2.0";
 export const RELEASE_CHANNEL = "";
 
 const VERSION_CORE = /^(\d+)\.(\d+)(?:\.(\d+))?$/;

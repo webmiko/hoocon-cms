@@ -1,8 +1,9 @@
 /**
  * First-party site analytics (essential cookies — no marketing consent).
  *
- * Posts SPA pageviews to /api/analytics/hit/. Uses Django session for unique
- * visitors. Independent of Yandex Metrika / GA4 (those stay opt-in).
+ * Posts SPA pageviews to /api/analytics/hit/. Unique visitors: an existing
+ * session or a daily IP+UA hash — the hit never creates a session.
+ * Independent of Yandex Metrika / GA4 (those stay opt-in).
  */
 
 import { api } from "../api/client";

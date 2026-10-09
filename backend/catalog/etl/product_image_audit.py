@@ -18,6 +18,7 @@ from typing import Any, Final
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import Q
 
 from catalog.etl.webp import (
     DEFAULT_WEBP_QUALITY,
@@ -230,8 +231,9 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
         "samples": [],
     }
     heroes_by_sku: dict[int, list[ProductImage]] = {}
-    # Include unpublished heroes so a previous prune can be corrected.
-    qs = ProductImage.objects.all().select_related("sku")
+    # Include unpublished heroes so a previous prune can be corrected; photos
+    # an editor hid by hand are not candidates at all.
+    qs = ProductImage.objects.exclude(hidden_by_editor=True).select_related("sku")
     for image in qs.iterator(chunk_size=500):
         if not image.sku_id or not _is_hero_candidate(image):
             continue
@@ -248,8 +250,7 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
             summary["skus"] += 1
             summary["republished"] += 1
             if not dry_run:
-                keep.is_published = True
-                keep.save(update_fields=["is_published", "updated_at"])
+                _republish(keep)
                 logger.info(
                     "hero_restore sku=%s keep=%s",
                     keep.sku.sku_code if keep.sku_id else sku_id,
@@ -268,8 +269,7 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
         if not keep.is_published:
             summary["republished"] += 1
             if not dry_run:
-                keep.is_published = True
-                keep.save(update_fields=["is_published", "updated_at"])
+                _republish(keep)
         for image in ranked[1:]:
             if not image.is_published:
                 continue
@@ -296,14 +296,17 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
     return summary
 
 
+def _republish(image: ProductImage) -> None:
+    image.is_published = True
+    image.save(update_fields=["is_published", "updated_at"])
+
+
 def restore_secondary_gallery_angles(*, dry_run: bool = False) -> dict[str, Any]:
     """Re-publish secondary gallery angles unpublished by an over-broad hero prune."""
-    from django.db.models import Q
-
     q = Q()
     for n in range(2, 10):
         q |= Q(alt__icontains=f"фото {n}")
-    qs = ProductImage.objects.filter(is_published=False).filter(q)
+    qs = ProductImage.objects.filter(is_published=False, hidden_by_editor=False).filter(q)
     count = qs.count()
     if not dry_run and count:
         qs.update(is_published=True)

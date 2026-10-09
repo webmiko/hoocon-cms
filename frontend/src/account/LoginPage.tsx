@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { PdnConsentCheckbox } from "../components/PdnConsentCheckbox";
 import { Seo } from "../components/Seo";
 import styles from "./Account.module.css";
 import { accountApi, AccountApiError } from "./api";
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [challengeId, setChallengeId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pdnConsent, setPdnConsent] = useState(false);
   // Stamped on mount (not during render) for the server-side min-fill check.
   const formStartTs = useRef(0);
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const res = await accountApi.otpStart(email.trim(), formStartTs.current);
+      const res = await accountApi.otpStart(email.trim(), formStartTs.current, pdnConsent);
       setChallengeId(res.challenge_id);
     } catch (err) {
       setError(err instanceof AccountApiError ? err.detail : "Не удалось отправить код.");
@@ -204,12 +206,13 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </label>
+          <PdnConsentCheckbox checked={pdnConsent} onChange={setPdnConsent} />
           {error && (
             <p className={styles.error} role="alert">
               {error}
             </p>
           )}
-          <button className={styles.button} type="submit" disabled={busy}>
+          <button className={styles.button} type="submit" disabled={busy || !pdnConsent}>
             Получить код
           </button>
         </form>

@@ -13,6 +13,7 @@ from email.message import EmailMessage as StdEmailMessage
 from typing import Any, ClassVar
 
 import pytest
+from django.conf import settings as django_settings
 from django_celery_beat.models import PeriodicTask
 
 from crm.imap_fetch import fetch_inbound_email
@@ -90,6 +91,9 @@ class _FakeIMAP:
         return "OK"
 
 
+_IMAP_CONNECT_TIMEOUTS: list[float | None] = []
+
+
 @pytest.fixture()
 def _imap(
     monkeypatch: pytest.MonkeyPatch,
@@ -108,10 +112,13 @@ def _imap(
     # Storage резолвит settings при импорте модели — патчим location.
     storage = EmailAttachment._meta.get_field("file").storage
     monkeypatch.setattr(storage, "location", str(tmp_path / "private_media"))
-    monkeypatch.setattr(
-        "crm.imap_fetch.imaplib.IMAP4_SSL",
-        lambda host, port: _FakeIMAP(host, port, messages=store),
-    )
+
+    def _connect(host: str, port: int, *, timeout: float | None = None) -> _FakeIMAP:
+        _IMAP_CONNECT_TIMEOUTS.append(timeout)
+        return _FakeIMAP(host, port, messages=store)
+
+    _IMAP_CONNECT_TIMEOUTS.clear()
+    monkeypatch.setattr("crm.imap_fetch.imaplib.IMAP4_SSL", _connect)
     monkeypatch.setattr("crm.imap_fetch._notify_staff", lambda msg_row, box: None)
     return store
 
@@ -205,6 +212,53 @@ def test_fetch_links_lead_by_subject_ref(_imap: dict[int, bytes]) -> None:
 
 
 @pytest.mark.django_db
+def test_subject_ref_ignored_for_foreign_sender(_imap: dict[int, bytes]) -> None:
+    """M20: «Заявка #N» от чужого адреса не попадает в чужую заявку."""
+    Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.CONSULTATION, name="B", email="buyer@example.test", message="Вопрос"
+    )
+    _imap[11] = _raw_email(
+        message_id="<spoof@t>",
+        from_addr="Злоумышленник <evil@attacker.test>",
+        subject=f"Re: Заявка #{lead.pk}",
+    )
+
+    fetch_inbound_email()
+
+    row = EmailMessage.objects.get(message_id="<spoof@t>")
+    assert row.lead_id != lead.pk
+    assert row.client.email == "evil@attacker.test"
+
+
+@pytest.mark.django_db
+def test_thread_reference_ignored_for_foreign_sender(_imap: dict[int, bytes]) -> None:
+    """M20: утёкший Message-ID исходящего не привязывает письмо чужого отправителя."""
+    owner = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(lead_type=Lead.LeadType.RFQ, name="B", email=owner.email, message="RFQ")
+    EmailMessage.objects.create(
+        client=owner,
+        lead=lead,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.SENT,
+        to_email=owner.email,
+        subject="КП",
+        body="…",
+        message_id="<leaked@hoocon.ru>",
+    )
+    _imap[12] = _raw_email(
+        message_id="<spoof2@t>",
+        from_addr="Злоумышленник <evil2@attacker.test>",
+        in_reply_to="<leaked@hoocon.ru>",
+        subject="Re: КП",
+    )
+
+    fetch_inbound_email()
+
+    assert EmailMessage.objects.get(message_id="<spoof2@t>").lead_id != lead.pk
+
+
+@pytest.mark.django_db
 def test_fetch_unknown_sender_creates_client_and_lead(_imap: dict[int, bytes]) -> None:
     """Новый отправитель → Client + заявка-консультация (письмо не теряется)."""
     _imap[2] = _raw_email(
@@ -264,6 +318,84 @@ def test_fetch_skips_poison_message_and_advances_cursor(
     assert InboundMailboxState.get_solo().last_uid == 8
 
 
+def _flaky_fetch(monkeypatch: pytest.MonkeyPatch, *, uid: int, failures: int) -> None:
+    """``_fetch_raw`` raises a network error for ``uid`` the first ``failures`` times."""
+    from django.core.cache import cache
+
+    from crm import imap_fetch
+
+    cache.clear()
+    real = imap_fetch._fetch_raw
+    left = {"n": failures}
+
+    def _fetch(conn: Any, current: int) -> bytes:
+        if current == uid and left["n"] > 0:
+            left["n"] -= 1
+            raise OSError("connection reset")
+        return real(conn, current)
+
+    monkeypatch.setattr(imap_fetch, "_fetch_raw", _fetch)
+
+
+@pytest.mark.django_db
+def test_transient_error_keeps_cursor_before_failed_uid(
+    _imap: dict[int, bytes], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Курсор уезжал за письмо при сетевой ошибке — письмо терялось навсегда."""
+    Client.objects.create(email="buyer@example.test", name="B")
+    _imap[6] = _raw_email(message_id="<six@t>")
+    _imap[7] = _raw_email(message_id="<seven@t>")
+    _imap[8] = _raw_email(message_id="<eight@t>")
+    _flaky_fetch(monkeypatch, uid=7, failures=1)
+
+    first = fetch_inbound_email()
+    state = InboundMailboxState.get_solo()
+    assert first["created"] == 1 and first["errors"] == 1
+    assert state.last_uid == 6
+    assert "UID 7" in state.last_error
+
+    second = fetch_inbound_email()
+    assert second["created"] == 2
+    assert set(EmailMessage.objects.values_list("message_id", flat=True)) == {"<six@t>", "<seven@t>", "<eight@t>"}
+    assert InboundMailboxState.get_solo().last_error == ""
+
+
+@pytest.mark.django_db
+def test_transient_error_gives_up_after_retries(_imap: dict[int, bytes], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Вечно падающий UID не блокирует ящик: после 3 попыток курсор идёт дальше."""
+    Client.objects.create(email="buyer@example.test", name="B")
+    _imap[7] = _raw_email(message_id="<stuck@t>")
+    _imap[8] = _raw_email(message_id="<after@t>")
+    _flaky_fetch(monkeypatch, uid=7, failures=99)
+
+    fetch_inbound_email()
+    fetch_inbound_email()
+    assert InboundMailboxState.get_solo().last_uid == 0
+    fetch_inbound_email()
+    assert InboundMailboxState.get_solo().last_uid == 8
+    assert EmailMessage.objects.filter(message_id="<after@t>").exists()
+
+
+@pytest.mark.django_db
+def test_long_message_id_stored_hashed_and_deduped(_imap: dict[int, bytes]) -> None:
+    """Message-ID > 255 символов падал на INSERT, а курсор уходил дальше — письмо пропадало."""
+    from crm.imap_fetch import normalize_message_id
+
+    Client.objects.create(email="buyer@example.test", name="B")
+    long_id = "<" + "x" * 300 + "@example.test>"
+    _imap[3] = _raw_email(message_id=long_id, in_reply_to=long_id)
+
+    assert fetch_inbound_email()["created"] == 1
+    row = EmailMessage.objects.get()
+    assert row.message_id == normalize_message_id(long_id)
+    assert row.message_id.startswith("sha256:") and len(row.message_id) <= 255
+    assert row.in_reply_to == row.message_id
+
+    InboundMailboxState.objects.update(last_uid=0)
+    assert fetch_inbound_email()["duplicates"] == 1
+    assert normalize_message_id("<short@t>") == "<short@t>"
+
+
 @pytest.mark.django_db
 def test_fetch_disabled_returns_skipped(settings: Any) -> None:
     """IMAP_ENABLED=false → задача выходит без подключения."""
@@ -300,7 +432,32 @@ def test_outbound_send_stamps_message_id() -> None:
 
     row.refresh_from_db()
     assert row.status == EmailStatus.SENT
-    assert row.message_id == f"<crm-email-{row.pk}@{row.from_email.split('@')[-1]}>"
+    assert row.message_id.startswith("<")
+    assert row.message_id.endswith(f".crm-email-{row.pk}@{row.from_email.split('@')[-1]}>")
+
+
+@pytest.mark.django_db
+def test_outbound_message_id_not_guessable() -> None:
+    """M20: Message-ID исходящих случайный — по номеру письма его не угадать."""
+    from crm.tasks import send_crm_email
+
+    client = Client.objects.create(email="guess@example.test", name="B")
+    ids = []
+    for _ in range(2):
+        row = EmailMessage.objects.create(
+            client=client,
+            direction=EmailDirection.OUTBOUND,
+            status=EmailStatus.QUEUED,
+            to_email=client.email,
+            from_email="noreply@hoocon.ru",
+            subject="КП",
+            body="…",
+        )
+        send_crm_email.run(row.pk)
+        row.refresh_from_db()
+        assert row.message_id != f"<crm-email-{row.pk}@hoocon.ru>"
+        ids.append(row.message_id)
+    assert ids[0] != ids[1]
 
 
 def _staff_user(username: str = "mgr") -> Any:
@@ -568,7 +725,7 @@ def test_mailbox_form_keeps_password_on_empty_input() -> None:
 
 @pytest.mark.django_db
 def test_mailbox_password_roundtrip_survives_save() -> None:
-    """Plain app passwords are signed at rest and decrypt for IMAP."""
+    """Plain app passwords are encrypted at rest and decrypt for IMAP."""
     from accounts.mailbox_secrets import decrypt_mailbox_secret, encrypt_mailbox_secret
     from accounts.models import StaffMailbox
 
@@ -578,9 +735,66 @@ def test_mailbox_password_roundtrip_survives_save() -> None:
         imap_password="app-not-secret-1",
     )
     mailbox.refresh_from_db()
-    assert mailbox.imap_password.startswith("signed1:")
+    assert mailbox.imap_password.startswith("fernet1:")
     assert decrypt_mailbox_secret(mailbox.imap_password) == "app-not-secret-1"
     assert encrypt_mailbox_secret(mailbox.imap_password) == mailbox.imap_password
+
+
+@pytest.mark.django_db
+def test_mailbox_password_unreadable_from_db_dump() -> None:
+    """Регресс: signing.dumps — это base64, пароль читался из дампа БД без ключа."""
+    import base64
+
+    from accounts.models import StaffMailbox
+
+    mailbox = StaffMailbox.objects.create(
+        user=_staff_user(),
+        imap_user="dump@hoocon.ru",
+        imap_password="app-not-secret-2",
+    )
+    stored = StaffMailbox.objects.values_list("imap_password", flat=True).get(pk=mailbox.pk)
+    token = stored.split(":", 1)[1]
+    blob = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
+    assert b"app-not-secret-2" not in blob
+    assert "app-not-secret-2" not in stored
+
+
+@pytest.mark.django_db
+def test_legacy_signed_mailbox_password_upgrades_on_save() -> None:
+    """Старые строки signed1: читаются и при сохранении переходят на Fernet."""
+    from django.core.signing import dumps
+
+    from accounts.mailbox_secrets import decrypt_mailbox_secret
+    from accounts.models import StaffMailbox
+
+    legacy = "signed1:" + dumps("legacy-pass", salt="hoocon.staff-mailbox.imap", compress=True)
+    assert decrypt_mailbox_secret(legacy) == "legacy-pass"
+    mailbox = StaffMailbox.objects.create(user=_staff_user(), imap_user="l@hoocon.ru", imap_password=legacy)
+    mailbox.refresh_from_db()
+    assert mailbox.imap_password.startswith("fernet1:")
+    assert mailbox.imap_password_plain == "legacy-pass"
+
+
+def test_legacy_signed_bad_signature_preserved_not_wiped() -> None:
+    """Bugbot: rotated SECRET_KEY made _decode_legacy return '' → encrypt persisted ''."""
+    from accounts.mailbox_secrets import encrypt_mailbox_secret
+
+    corrupted = "signed1:INVALID_PAYLOAD_THAT_CANNOT_VERIFY"
+    result = encrypt_mailbox_secret(corrupted)
+    assert result == corrupted, "Bad-signature legacy token must stay intact, not become ''"
+
+
+def test_mailbox_password_uses_explicit_key(settings: Any) -> None:
+    """MAILBOX_ENCRYPTION_KEY отделяет ключ ящиков от SECRET_KEY."""
+    from cryptography.fernet import Fernet
+
+    from accounts.mailbox_secrets import decrypt_mailbox_secret, encrypt_mailbox_secret
+
+    settings.MAILBOX_ENCRYPTION_KEY = Fernet.generate_key().decode()
+    sealed = encrypt_mailbox_secret("k-pass")
+    assert decrypt_mailbox_secret(sealed) == "k-pass"
+    settings.MAILBOX_ENCRYPTION_KEY = Fernet.generate_key().decode()
+    assert decrypt_mailbox_secret(sealed) == ""
 
 
 class _FakeConnection:
@@ -643,6 +857,7 @@ def test_outbound_sends_via_personal_smtp(
             "password": "app-not-secret",
             "use_ssl": False,
             "use_tls": True,
+            "timeout": django_settings.EMAIL_TIMEOUT,
             "fail_silently": False,
         }
     ]
@@ -855,3 +1070,57 @@ def test_lead_reply_no_bcc_when_reply_to_is_client(
 
     assert len(dj_mail.outbox) == 1
     assert not dj_mail.outbox[0].bcc
+
+
+@pytest.mark.django_db
+def test_imap_connect_uses_timeout(_imap: dict[int, bytes], settings: Any) -> None:
+    """M35: IMAP без timeout вешал воркер Celery навсегда (concurrency 2 → OTP/чат стоят)."""
+    settings.IMAP_TIMEOUT = 17
+    fetch_inbound_email()
+    assert _IMAP_CONNECT_TIMEOUTS == [17]
+
+
+@pytest.mark.django_db
+def test_fetch_task_skips_when_previous_run_holds_lock(_imap: dict[int, bytes]) -> None:
+    """M35: медленный опрос IMAP не перекрывается следующим запуском beat."""
+    from django.core.cache import cache
+
+    from crm.tasks import _IMAP_FETCH_LOCK
+    from crm.tasks import fetch_inbound_email as fetch_task
+
+    cache.add(_IMAP_FETCH_LOCK, 1, timeout=60)
+    try:
+        assert fetch_task.run() == "locked"
+        assert _IMAP_CONNECT_TIMEOUTS == []
+    finally:
+        cache.delete(_IMAP_FETCH_LOCK)
+
+    assert fetch_task.run().startswith("seen=")
+    assert cache.get(_IMAP_FETCH_LOCK) is None
+
+
+@pytest.mark.django_db
+def test_personal_smtp_connection_has_timeout(settings: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """M35: личный SMTP менеджера тоже с timeout (EMAIL_TIMEOUT)."""
+    from accounts.models import StaffMailbox
+    from crm.tasks import _smtp_connection_for
+
+    settings.EMAIL_TIMEOUT = 23
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr("crm.tasks.get_connection", lambda **kw: calls.append(kw) or object())
+    user = _staff_user("smtp-mgr")
+    box = StaffMailbox.objects.create(
+        user=user, imap_user="mgr@hoocon.ru", imap_password="pw", smtp_host="smtp.test", smtp_port=465
+    )
+    row = EmailMessage(mailbox=box, direction=EmailDirection.OUTBOUND, to_email="c@x.test")
+
+    assert _smtp_connection_for(row) is not None
+    assert calls[0]["timeout"] == 23
+
+
+def test_celery_has_global_time_limits() -> None:
+    """M35: глобальные soft/hard лимиты задач подхватываются приложением Celery."""
+    from config.celery import app
+
+    assert app.conf.task_soft_time_limit and app.conf.task_time_limit
+    assert app.conf.task_soft_time_limit < app.conf.task_time_limit

@@ -17,9 +17,10 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import NotFound
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny
+from rest_framework.parsers import JSONParser
+from rest_framework.permissions import SAFE_METHODS, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -46,15 +47,18 @@ from cabinet.serializers import (
 )
 from cabinet.services import (
     ClientAuthError,
+    ClientRateLimitError,
     authenticate_password,
     check_honeypot,
     link_client_account,
-    register_client,
     resend_client_otp,
     start_client_otp,
+    start_client_registration,
     verify_client_otp,
 )
+from config.pagination import DefaultPagination
 from crm.models import Client, QuoteStatus
+from leads.lifecycle import on_lead_created
 from leads.models import Lead
 
 logger = logging.getLogger(__name__)
@@ -64,17 +68,28 @@ _REPEAT_WINDOW_SECONDS = 300
 
 def _session_account(request: Request) -> ClientAccount:
     """The authenticated client account (IsClientAccount guarantees it)."""
-    account = request.user
-    if not isinstance(account, ClientAccount):
-        account = load_client_account(request)
+    user = request.user
+    account = user if isinstance(user, ClientAccount) else load_client_account(request)
     if account is None:
         raise Http404
     return account
 
 
 def _client_for(request: Request) -> Client:
-    """Resolve the CRM card of the session account (404-safe)."""
-    return link_client_account(_session_account(request))
+    """Resolve the CRM card linked to the verified session account.
+
+    Read-only on the hot path; linking (by proven email) happens at
+    verification and only re-runs when staff unlinked the card.
+    """
+    account = _session_account(request)
+    client = Client.objects.filter(account=account).first()
+    return client if client is not None else link_client_account(account)
+
+
+def _auth_error(exc: ClientAuthError) -> Response:
+    """Uniform error shape for /api/auth/*; 429 for send quotas."""
+    code = status.HTTP_429_TOO_MANY_REQUESTS if isinstance(exc, ClientRateLimitError) else status.HTTP_400_BAD_REQUEST
+    return Response({"detail": str(exc)}, status=code)
 
 
 def _account_payload(account: ClientAccount) -> dict[str, Any]:
@@ -121,8 +136,27 @@ class _CabinetGatedView(APIView):
         super().initial(request, *args, **kwargs)
 
 
-class RegisterView(_CabinetGatedView):
-    """POST /api/auth/register/ — mode A (email + password), honeypot-gated."""
+class _AuthView(_CabinetGatedView):
+    """``/api/auth/*``: CSRF even for anonymous visitors, JSON bodies only.
+
+    DRF skips CSRF for unauthenticated requests, which allowed login CSRF:
+    a foreign page could sign the victim into the attacker's cabinet.
+    """
+
+    parser_classes = (JSONParser,)
+
+    def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
+        super().initial(request, *args, **kwargs)
+        if request.method not in SAFE_METHODS:
+            SessionAuthentication().enforce_csrf(request)
+
+
+class RegisterView(_AuthView):
+    """POST /api/auth/register/ — mode A step 1: email a confirmation code.
+
+    Same response as ``otp/start``; the account is created by
+    ``otp/verify`` once the code proves the email belongs to the visitor.
+    """
 
     permission_classes = (AllowAny,)
     throttle_classes = (ScopedRateThrottle,)
@@ -134,20 +168,21 @@ class RegisterView(_CabinetGatedView):
         data = serializer.validated_data
         try:
             check_honeypot(request, data.get("form_start_ts"), data.get("website", ""))
-            account = register_client(
+            result = start_client_registration(
+                request._request,  # noqa: SLF001 — DRF wraps HttpRequest
                 email=data["email"],
                 password=data["password"],
                 name=data.get("name", ""),
                 phone=data.get("phone", ""),
+                pdn_consent=data["pdn_consent"],
             )
         except ClientAuthError as exc:
             # Honeypot/validation errors share one shape — no detail leaks.
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        login_client(request._request, account)  # noqa: SLF001 — DRF wraps HttpRequest
-        return Response(_account_payload(account), status=status.HTTP_201_CREATED)
+            return _auth_error(exc)
+        return Response(result, status=status.HTTP_202_ACCEPTED)
 
 
-class LoginView(_CabinetGatedView):
+class LoginView(_AuthView):
     """POST /api/auth/login/ — mode A password check."""
 
     permission_classes = (AllowAny,)
@@ -163,12 +198,12 @@ class LoginView(_CabinetGatedView):
                 password=serializer.validated_data["password"],
             )
         except ClientAuthError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _auth_error(exc)
         login_client(request._request, account)  # noqa: SLF001
         return Response(_account_payload(account))
 
 
-class OtpStartView(_CabinetGatedView):
+class OtpStartView(_AuthView):
     """POST /api/auth/otp/start/ — mode B: send a fresh 6-digit code."""
 
     permission_classes = (AllowAny,)
@@ -181,13 +216,17 @@ class OtpStartView(_CabinetGatedView):
         data = serializer.validated_data
         try:
             check_honeypot(request, data.get("form_start_ts"), data.get("website", ""))
-            result = start_client_otp(request._request, data["email"])  # noqa: SLF001
+            result = start_client_otp(
+                request._request,  # noqa: SLF001
+                data["email"],
+                pdn_consent=data["pdn_consent"],
+            )
         except ClientAuthError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _auth_error(exc)
         return Response(result)
 
 
-class OtpVerifyView(_CabinetGatedView):
+class OtpVerifyView(_AuthView):
     """POST /api/auth/otp/verify/ — mode B: verify the code → session."""
 
     permission_classes = (AllowAny,)
@@ -203,12 +242,12 @@ class OtpVerifyView(_CabinetGatedView):
                 code=serializer.validated_data["code"],
             )
         except ClientAuthError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _auth_error(exc)
         login_client(request._request, account)  # noqa: SLF001
         return Response(_account_payload(account))
 
 
-class OtpResendView(_CabinetGatedView):
+class OtpResendView(_AuthView):
     """POST /api/auth/otp/resend/ — cooldown-gated resend."""
 
     permission_classes = (AllowAny,)
@@ -224,11 +263,11 @@ class OtpResendView(_CabinetGatedView):
                 serializer.validated_data["challenge_id"],
             )
         except ClientAuthError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _auth_error(exc)
         return Response(result)
 
 
-class LogoutView(_CabinetGatedView):
+class LogoutView(_AuthView):
     """POST /api/auth/logout/ — drop the client session."""
 
     permission_classes = (AllowAny,)
@@ -297,23 +336,37 @@ class AccountSummaryView(ClientApiView):
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
-        from supportchat.models import Conversation, ConversationStatus
+        from supportchat.models import ConversationStatus
 
         return Response(
             {
-                "active_leads": client.leads.exclude(status=Lead.LeadStatus.DONE).count(),
+                "active_leads": _scoped_leads(client).exclude(status=Lead.LeadStatus.DONE).count(),
                 "quotes_pending": client.quotes.filter(status=QuoteStatus.SENT).count(),
                 "orders_in_work": client.orders.exclude(status__in=("done", "cancelled")).count(),
-                "unread_conversations": Conversation.objects.filter(
-                    client=client,
-                    status=ConversationStatus.OPEN,
-                ).count(),
+                "unread_conversations": _scoped_conversations(client).filter(status=ConversationStatus.OPEN).count(),
             }
         )
 
 
 def _scoped_leads(client: Client) -> QuerySet[Lead]:
-    return client.leads.prefetch_related("items__sku").order_by("-created_at")
+    """Leads proven to belong to this client (``contact_verified``).
+
+    Anyone can type a foreign email into the public form. Taking the lead
+    into work proves nothing about the sender, so only an explicit
+    confirmation (cabinet, manager link, sent quote) surfaces it.
+    """
+    return client.leads.filter(contact_verified=True).prefetch_related("items__sku").order_by("-created_at")
+
+
+def _scoped_conversations(client: Client) -> QuerySet[Any]:
+    """Chats proven to belong to this client (``contact_verified``).
+
+    ``contact_email`` in the widget is typed by the visitor; a manager reply
+    does not prove the visitor owns that mailbox.
+    """
+    from supportchat.models import Conversation
+
+    return Conversation.objects.filter(client=client, contact_verified=True)
 
 
 def _lead_payload(lead: Lead) -> dict[str, Any]:
@@ -342,7 +395,7 @@ def _lead_payload(lead: Lead) -> dict[str, Any]:
 class AccountLeadsView(ClientApiView):
     """GET /api/account/leads/ — own leads only."""
 
-    pagination_class = PageNumberPagination
+    pagination_class = DefaultPagination
 
     def get(self, request: Request) -> Response:
         client = _client_for(request)
@@ -350,7 +403,7 @@ class AccountLeadsView(ClientApiView):
         status_filter = (request.query_params.get("status") or "").strip()
         if status_filter:
             leads = leads.filter(status=status_filter)
-        paginator = PageNumberPagination()
+        paginator = DefaultPagination()
         page = paginator.paginate_queryset(leads, request)
         return paginator.get_paginated_response([_lead_payload(lead) for lead in page] if page else [])
 
@@ -362,7 +415,8 @@ class AccountLeadDetailView(ClientApiView):
         client = _client_for(request)
         lead = get_object_or_404(_scoped_leads(client), pk=pk)
         payload = _lead_payload(lead)
-        payload["quotes"] = QuoteSerializer(lead.quotes.all(), many=True).data
+        quotes = lead.quotes.exclude(status=QuoteStatus.DRAFT).prefetch_related("items").order_by("-created_at")
+        payload["quotes"] = QuoteSerializer(quotes, many=True).data
         return Response(payload)
 
 
@@ -379,11 +433,12 @@ class AccountLeadRepeatView(ClientApiView):
     def post(self, request: Request, pk: int) -> Response:
         client = _client_for(request)
         source = get_object_or_404(_scoped_leads(client), pk=pk)
+        repeat_message = f"Повтор заявки #{source.pk}"
         recent = (
             Lead.objects.filter(
                 client=client,
                 created_at__gte=timezone.now() - timedelta(seconds=_REPEAT_WINDOW_SECONDS),
-                message__contains=f"#{source.pk}",
+                message=repeat_message,
                 lead_type=Lead.LeadType.RFQ,
             )
             .order_by("-created_at")
@@ -399,7 +454,8 @@ class AccountLeadRepeatView(ClientApiView):
                 phone=client.phone,
                 company=client.company,
                 client=client,
-                message=f"Повтор заявки #{source.pk}",
+                contact_verified=True,
+                message=repeat_message,
             )
             for item in source.items.all():
                 lead.items.create(
@@ -408,6 +464,7 @@ class AccountLeadRepeatView(ClientApiView):
                     quantity=item.quantity,
                     sort_order=item.sort_order,
                 )
+            on_lead_created(lead)
         return Response(_lead_payload(lead), status=status.HTTP_201_CREATED)
 
 
@@ -468,6 +525,7 @@ class AccountSpecToLeadView(ClientApiView):
                 phone=client.phone,
                 company=client.company,
                 client=client,
+                contact_verified=True,
                 message=f"Заявка из спецификации «{spec.name}»",
             )
             for item in spec.items.all():
@@ -477,6 +535,7 @@ class AccountSpecToLeadView(ClientApiView):
                     quantity=item.quantity,
                     sort_order=item.position,
                 )
+            on_lead_created(lead)
         return Response(_lead_payload(lead), status=status.HTTP_201_CREATED)
 
 
@@ -501,17 +560,15 @@ def _save_spec(account: ClientAccount, data: dict[str, Any], spec: SpecList | No
             spec.items.all().delete()
             for idx, raw in enumerate(data["items"]):
                 code = (raw.get("sku_code") or "").strip()
-                sku = None
-                sku_id = raw.get("sku")
-                if sku_id:
-                    sku = SKU.objects.filter(pk=sku_id).first()
-                elif code:
-                    sku = SKU.objects.filter(sku_code__iexact=code).first()
+                sku = raw.get("sku")
+                if sku is None and code:
+                    sku = SKU.objects.filter(is_published=True, sku_code__iexact=code).first()
+                position = raw.get("position")
                 spec.items.create(
                     sku=sku,
                     sku_code=code or (sku.sku_code if sku else ""),
-                    quantity=max(int(raw.get("quantity") or 1), 1),
-                    position=int(raw.get("position") or idx),
+                    quantity=raw.get("quantity") or 1,
+                    position=idx if position is None else position,
                 )
     return spec
 
@@ -567,27 +624,48 @@ class AccountDocumentDownloadView(ClientApiView):
         return FileResponse(doc.file.open("rb"), as_attachment=True, filename=doc.title)
 
 
+# Sum of document sizes one archive may hold; bigger sets are downloaded
+# one by one (the archive is spooled to disk, not kept in RAM).
+DOCUMENTS_ZIP_MAX_BYTES = 200 * 1024 * 1024
+_ZIP_SPOOL_BYTES = 8 * 1024 * 1024
+
+
 class AccountDocumentsZipView(ClientApiView):
     """GET /api/account/documents/zip/ — все документы клиента одним ZIP (ЛК-8).
 
     Files come from private media only; names are sanitized against
-    path traversal and de-duplicated inside the archive.
+    path traversal and de-duplicated inside the archive. The archive is
+    built in a spooled temp file with a total size cap and its own throttle.
     """
 
-    def get(self, request: Request) -> FileResponse:
-        import io
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "client_zip"
+
+    def get(self, request: Request) -> FileResponse | Response:
+        import shutil
+        import tempfile
         import zipfile
 
         from catalog.validators import sanitize_upload_filename
 
         client = _client_for(request)
-        docs = client.documents.order_by("kind", "created_at")
-        buf = io.BytesIO()
+        docs = [doc for doc in client.documents.order_by("kind", "created_at") if doc.file]
+        total = 0
+        for doc in docs:
+            try:
+                total += doc.file.size
+            except (FileNotFoundError, OSError):
+                continue
+        if total > DOCUMENTS_ZIP_MAX_BYTES:
+            return Response(
+                {"detail": "Документов слишком много для одного архива — скачайте их по отдельности."},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+
+        buf = tempfile.SpooledTemporaryFile(max_size=_ZIP_SPOOL_BYTES)  # noqa: SIM115
         used_names: set[str] = set()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for doc in docs:
-                if not doc.file:
-                    continue
                 base = sanitize_upload_filename(doc.title or f"document-{doc.pk}")
                 name = base
                 n = 2
@@ -595,9 +673,13 @@ class AccountDocumentsZipView(ClientApiView):
                     stem, dot, ext = base.rpartition(".")
                     name = f"{stem}-{n}.{ext}" if dot else f"{base}-{n}"
                     n += 1
+                try:
+                    with doc.file.open("rb") as fh, zf.open(name, "w") as out:
+                        shutil.copyfileobj(fh, out, 1024 * 1024)
+                except (FileNotFoundError, OSError):
+                    logger.warning("account_zip_missing_file document_id=%s", doc.pk)
+                    continue
                 used_names.add(name)
-                with doc.file.open("rb") as fh:
-                    zf.writestr(name, fh.read())
         buf.seek(0)
         filename = f"hoocon-docs-{client.pk}.zip"
         return FileResponse(buf, as_attachment=True, filename=filename)
@@ -625,11 +707,9 @@ class AccountConversationsView(ClientApiView):
     """GET /api/account/conversations/ — own supportchat threads (ЛК-4)."""
 
     def get(self, request: Request) -> Response:
-        from supportchat.models import Conversation
-
         client = _client_for(request)
         convs = (
-            Conversation.objects.filter(client=client)
+            _scoped_conversations(client)
             .order_by("-updated_at")
             .only("id", "status", "channel", "updated_at", "created_at")
         )
@@ -653,15 +733,21 @@ class AccountCompanyView(ClientApiView):
     """GET /api/account/company/ — реквизиты linked Company (ЛК-5)."""
 
     def get(self, request: Request) -> Response:
+        """Requisites only for a manager-confirmed member.
+
+        The company link comes from a free-text name in a lead, so an
+        unconfirmed visitor sees only the name they typed themselves.
+        """
         client = _client_for(request)
         company = getattr(client, "company_ref", None)
-        if company is None:
+        if company is None or not company.members.filter(client=client, is_confirmed=True).exists():
             return Response(
                 {
                     "name": client.company,
                     "inn": "",
                     "legal_address": "",
                     "members": [],
+                    "confirmed": False,
                 }
             )
         return Response(
@@ -669,6 +755,7 @@ class AccountCompanyView(ClientApiView):
                 "name": company.name,
                 "inn": company.inn,
                 "legal_address": company.legal_address,
+                "confirmed": True,
                 "members": [
                     {
                         "id": m.pk,
@@ -701,6 +788,10 @@ class AccountRmaView(ClientApiView):
         )
         serializer.is_valid(raise_exception=True)
         case = serializer.save(client=client)
+        from cabinet.tasks import notify_staff_new_rma
+
+        case_id = case.pk
+        transaction.on_commit(lambda: notify_staff_new_rma.delay(case_id))
         return Response(RmaCaseSerializer(case).data, status=status.HTTP_201_CREATED)
 
 

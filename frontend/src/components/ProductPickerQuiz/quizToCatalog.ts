@@ -104,13 +104,16 @@ export function buildCatalogParams(
       );
       if (momentValue) {
         params.moment = momentValue;
-      }
-      const areaValue = matchAreaForMomentNmFacet(
-        facetValuesForKey(facets, "area"),
-        estimatedNm,
-      );
-      if (areaValue) {
-        params.area = areaValue;
+      } else {
+        // Area cap per Nm differs by series (DA16 → 1,6 м², HV10 → 1,0 м²):
+        // pinning it next to moment drops a whole series. Fallback only.
+        const areaValue = matchAreaForMomentNmFacet(
+          facetValuesForKey(facets, "area"),
+          estimatedNm,
+        );
+        if (areaValue) {
+          params.area = areaValue;
+        }
       }
     }
 

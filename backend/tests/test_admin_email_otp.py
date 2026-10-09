@@ -313,9 +313,9 @@ def test_find_staff_and_pending_edge_cases() -> None:
     from django.test import RequestFactory
 
     from config.admin_otp import (
+        _ADMIN_OTP,
         AdminOtpVerifyError,
-        _cache_key,
-        _load_challenge,
+        _challenge_id,
         find_staff_user_for_otp,
         get_pending_admin_otp_user,
         pending_admin_otp_user_id,
@@ -358,16 +358,11 @@ def test_find_staff_and_pending_edge_cases() -> None:
     req.session = client.session
     assert get_pending_admin_otp_user(req) is None
 
-    cache.set(_cache_key(admin_user.pk, "sess"), "not-a-dict", timeout=60)
-    assert _load_challenge(admin_user.pk, "sess") is None
-    cache.set(_cache_key(admin_user.pk, "sess"), {"code_hash": 1}, timeout=60)
-    assert _load_challenge(admin_user.pk, "sess") is None
-    cache.set(
-        _cache_key(admin_user.pk, "sess"),
-        {"code_hash": "abc", "attempts": "x"},
-        timeout=60,
-    )
-    assert _load_challenge(admin_user.pk, "sess") is None
+    challenge_id = _challenge_id(admin_user.pk, "sess")
+    cache.set(_ADMIN_OTP.key(challenge_id), "not-a-dict", timeout=60)
+    assert _ADMIN_OTP.get(challenge_id) is None
+    cache.set(_ADMIN_OTP.key(challenge_id), {"code_hash": 1}, timeout=60)
+    assert _ADMIN_OTP.get(challenge_id) is None
 
     session = client.session
     session["admin_otp_user_id"] = admin_user.pk

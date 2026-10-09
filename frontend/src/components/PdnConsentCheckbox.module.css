@@ -1,0 +1,23 @@
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  line-height: 1.45;
+  cursor: pointer;
+  user-select: none;
+}
+
+.consent input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-brand);
+}
+
+.consent a {
+  color: var(--color-link);
+  font-weight: 600;
+}

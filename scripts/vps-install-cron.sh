@@ -21,17 +21,13 @@ else
   exit 1
 fi
 
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${HOME}/.ssh/known_hosts}")
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ssh-trust.sh"
+hoocon_ssh_trust
 CRON_SRC="${CRON_SRC:-$(cd "$(dirname "$0")/.." && pwd)/deploy/cron/hoocon-vps.cron}"
 
 if [[ ! -f "${CRON_SRC}" ]]; then
   echo "ERROR: missing cron template ${CRON_SRC}" >&2
   exit 1
-fi
-
-mkdir -p "${HOME}/.ssh"
-if [[ -n "${SERVER_HOST:-}" ]]; then
-  ssh-keyscan -H "${SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null || true
 fi
 
 echo "Install VPS cron → ${SSH_TARGET}:/etc/cron.d/hoocon"

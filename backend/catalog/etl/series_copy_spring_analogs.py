@@ -23,33 +23,25 @@ Fire damper (SAFU, spring + 12×12):
 
 from __future__ import annotations
 
+from catalog.etl.belimo_analogs import belimo_family_by_area
 from catalog.etl.series_copy_major_analogs import _FOOTNOTE
 from catalog.etl.tech_copy import normalize_tech_copy
 
-# Hoocon SAMU Nm → Belimo smoke family (no spring).
+# Hoocon Nm per series → Belimo family, largest whose area ≤ Hoocon area.
 _SAMU_BELIMO: dict[int, tuple[str, str]] = {
-    # (primary, secondary optional)
-    10: ("BEN", "BLE"),  # 10 Нм → 15 Нм class (EMF-*-10 is not a Belimo actuator)
-    15: ("BEN", "BLE"),
-    30: ("BEE", "BE"),
+    # (primary, secondary): BLE is the second 15 Нм smoke model next to BEN.
+    nm: (family, "BLE" if family == "BEN" else family)
+    for nm in (10, 15, 30)
+    if (family := belimo_family_by_area("smoke", nm / 10))
 }
 
-# Hoocon DAFU Nm → Belimo spring-return air family.
 _DAFU_BELIMO: dict[int, str] = {
-    3: "TF",
-    5: "LF",
-    10: "NF",
-    15: "SF",
-    20: "SF",
+    nm: family for nm in (3, 5, 10, 15, 20) if (family := belimo_family_by_area("air_spring", nm / 10))
 }
 
-# Hoocon SAFU Nm → Belimo fire family.
+# SA20FU: BF 18/12 Нм is the largest compact fire actuator Belimo makes.
 _SAFU_BELIMO: dict[int, str] = {
-    3: "BFL",
-    5: "BLF",
-    10: "BFN",
-    15: "BF",
-    20: "BF",  # BF 18/12 Нм — ближайший к 20; BFL/BLF «-20N» в старых карточках — ошибка
+    nm: family for nm in (3, 5, 10, 15, 20) if (family := belimo_family_by_area("fire_spring", nm / 10))
 }
 
 

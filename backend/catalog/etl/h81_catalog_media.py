@@ -24,6 +24,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image
 
+from catalog.etl.file_refresh import refresh_product_file
 from catalog.etl.manual_diagrams import (
     SORT_AUX_SWITCH,
     SORT_DIMENSIONS,
@@ -666,9 +667,7 @@ def apply_h81_instruction_pdfs(
                     title,
                 )
             else:
-                current_size = existing.file.size if existing.file else 0
-                if current_size != len(payload):
-                    existing.file.save(basename, ContentFile(payload), save=True)
+                if refresh_product_file(existing, basename=basename, payload=payload):
                     existing.is_published = True
                     existing.save(update_fields=["is_published", "updated_at"])
                     summary["updated"] += 1

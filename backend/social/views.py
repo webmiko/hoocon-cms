@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from config.secret_compare import secrets_equal
 from social.webhooks import accept_bot_webhook
 
 logger = logging.getLogger("hoocon.social")
@@ -40,7 +41,7 @@ class TelegramWebhookView(APIView):
         """Accept a Telegram Update and enqueue reply handling."""
         expected = getattr(settings, "TELEGRAM_WEBHOOK_SECRET", "").strip()
         provided = (request.headers.get(_TELEGRAM_SECRET_HEADER) or "").strip()
-        if not expected or provided != expected:
+        if not expected or not secrets_equal(expected, provided):
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
 
         from social.tasks import process_telegram_update_task
@@ -70,7 +71,7 @@ class MaxWebhookView(APIView):
         """Accept a MAX Update and enqueue reply handling."""
         expected = getattr(settings, "MAX_WEBHOOK_SECRET", "").strip()
         provided = (request.headers.get(_MAX_SECRET_HEADER) or "").strip()
-        if not expected or provided != expected:
+        if not expected or not secrets_equal(expected, provided):
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
 
         from social.max_bot import handle_max_update

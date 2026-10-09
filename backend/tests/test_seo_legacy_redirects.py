@@ -200,3 +200,91 @@ def test_flat_tpost_redirects() -> None:
     ensure_article_tpost_redirects()
 
     assert Redirect.objects.get(from_path=f"/tpost/{old}").to_path == f"/statyi/{new}"
+
+
+@pytest.mark.django_db
+def test_etl_keeps_admin_edited_redirect(hvd_product: Product) -> None:
+    """M47: ETL перезаписывал to_path, который поправили в админке."""
+    SKU.objects.create(
+        product=hvd_product,
+        sku_code="HVD230S-5",
+        slug="privod-vozdushniy-hvd-5nm-hvd230s-5",
+        name="230S",
+        is_published=True,
+    )
+    Redirect.objects.create(
+        from_path="/privod-vozdushniy-hvd-5nm",
+        to_path="/promo/hvd",
+        status_code=302,
+        edited_in_admin=True,
+    )
+    ensure_seo_legacy_redirects()
+    row = Redirect.objects.get(from_path="/privod-vozdushniy-hvd-5nm")
+    assert (row.to_path, row.status_code) == ("/promo/hvd", 302)
+
+
+@pytest.mark.django_db
+def test_etl_does_not_reenable_redirect_disabled_in_admin(hvd_product: Product) -> None:
+    """M47: выключенный вручную редирект ETL включал обратно."""
+    SKU.objects.create(
+        product=hvd_product,
+        sku_code="HVD230S-5",
+        slug="privod-vozdushniy-hvd-5nm-hvd230s-5",
+        name="230S",
+        is_published=True,
+    )
+    Redirect.objects.create(
+        from_path="/privod-vozdushniy-hvd-5nm",
+        to_path="/catalog",
+        is_active=False,
+        edited_in_admin=True,
+    )
+    ensure_seo_legacy_redirects()
+    assert Redirect.objects.get(from_path="/privod-vozdushniy-hvd-5nm").is_active is False
+
+
+@pytest.mark.django_db
+def test_collapse_redirect_chains_points_to_final_target() -> None:
+    """M47: цепочки A → B → C схлопываются в один 301; ручные строки и циклы не трогаются."""
+    from redirects.services import collapse_redirect_chains
+
+    Redirect.objects.create(from_path="/a", to_path="/b")
+    Redirect.objects.create(from_path="/b", to_path="/c")
+    Redirect.objects.create(from_path="/c", to_path="/final")
+    Redirect.objects.create(from_path="/manual", to_path="/b", edited_in_admin=True)
+    Redirect.objects.create(from_path="/x", to_path="/y")
+    Redirect.objects.create(from_path="/y", to_path="/x")
+
+    assert collapse_redirect_chains(dry_run=True) == 2
+    assert Redirect.objects.get(from_path="/a").to_path == "/b"
+
+    assert collapse_redirect_chains() == 2
+    assert Redirect.objects.get(from_path="/a").to_path == "/final"
+    assert Redirect.objects.get(from_path="/b").to_path == "/final"
+    assert Redirect.objects.get(from_path="/manual").to_path == "/b"
+    assert Redirect.objects.get(from_path="/x").to_path == "/y"
+
+
+@pytest.mark.django_db
+def test_csv_seed_skips_admin_edited_rows(tmp_path) -> None:
+    """M47 (sibling): CSV-сид редиректов тоже не перезаписывает ручные строки."""
+    from redirects.services import load_redirects_from_csv
+
+    Redirect.objects.create(from_path="/old", to_path="/manual-target", edited_in_admin=True)
+    seed = tmp_path / "seed.csv"
+    seed.write_text("from_path,to_path,status_code\n/old,/seed-target,301\n/new,/seed-target,301\n", encoding="utf-8")
+    result = load_redirects_from_csv(seed)
+    assert result["skipped"] == 1
+    assert Redirect.objects.get(from_path="/old").to_path == "/manual-target"
+    assert Redirect.objects.get(from_path="/new").to_path == "/seed-target"
+
+
+@pytest.mark.django_db
+def test_admin_save_marks_redirect_edited(admin_client) -> None:
+    """M47: сохранение в админке ставит «правлено вручную»."""
+    response = admin_client.post(
+        "/admin/redirects/redirect/add/",
+        {"from_path": "/promo-old", "to_path": "/promo-new", "status_code": 301, "is_active": "on"},
+    )
+    assert response.status_code == 302, response.content[:500]
+    assert Redirect.objects.get(from_path="/promo-old").edited_in_admin is True

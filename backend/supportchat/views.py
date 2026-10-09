@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.conf import settings
+from django.core.files import File
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -14,7 +17,9 @@ from rest_framework.views import APIView
 
 from config.logging_utils import setup_logger
 from sitesettings.models import SiteSettings
-from supportchat.models import Message, MessageDirection
+from supportchat.attachments import ATTACHMENT_CSP, is_inline_image, served_content_type
+from supportchat.models import Conversation, Message, MessageDirection
+from supportchat.rating import rate_conversation
 from supportchat.schedule import schedule_public_payload
 from supportchat.serializers import (
     ConversationStartSerializer,
@@ -26,7 +31,6 @@ from supportchat.services import (
     add_inbound_message,
     chat_faq_items,
     get_web_conversation,
-    rate_conversation,
     start_or_resume_web_conversation,
 )
 
@@ -36,7 +40,7 @@ _MSG_THROTTLE = "support_message"
 _POLL_THROTTLE = "support_poll"
 
 
-def _conversation_public_payload(conversation) -> dict[str, object]:
+def _conversation_public_payload(conversation: Conversation) -> dict[str, object]:
     """Visitor-facing conversation state for the support widget."""
     return {
         "id": conversation.pk,
@@ -134,21 +138,18 @@ class ConversationStartView(APIView):
                 {"id": None, "channel": "web"},
                 status=status.HTTP_201_CREATED,
             )
-        conv = start_or_resume_web_conversation(
-            request._request,
-            display_name=serializer.validated_data.get("display_name", ""),
-            contact_email=serializer.validated_data.get("contact_email", ""),
-            page_url=serializer.validated_data.get("page_url", ""),
-        )
+        try:
+            conv = start_or_resume_web_conversation(
+                request._request,
+                display_name=serializer.validated_data.get("display_name", ""),
+                contact_email=serializer.validated_data.get("contact_email", ""),
+                page_url=serializer.validated_data.get("page_url", ""),
+                pdn_consent=serializer.validated_data.get("pdn_consent", False),
+            )
+        except SupportChatError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(
-            {
-                "id": conv.pk,
-                "channel": conv.channel,
-                "display_name": conv.display_name,
-                "contact_email": conv.contact_email,
-                "ai_active": bool(conv.ai_active and conv.ai_escalated_at is None),
-                "ai_escalated": conv.ai_escalated_at is not None,
-            },
+            {**_conversation_public_payload(conv), "channel": conv.channel},
             status=status.HTTP_201_CREATED,
         )
 
@@ -244,23 +245,26 @@ class MessageAttachmentView(APIView):
         )
         if not staff_ok and (conv is None or conv.pk != msg.conversation_id):
             raise Http404
-        filename = msg.attachment_name or (msg.attachment.name or "file").rsplit("/", 1)[-1]
+        stored_name = msg.attachment.name or ""
+        filename = msg.attachment_name or (stored_name or "file").rsplit("/", 1)[-1]
+        handle: File
         try:
             handle = msg.attachment.open("rb")
         except FileNotFoundError:
             from django.core.files.storage import default_storage
 
-            if not default_storage.exists(msg.attachment.name):
+            if not stored_name or not default_storage.exists(stored_name):
                 raise Http404 from None
-            handle = default_storage.open(msg.attachment.name, "rb")
+            handle = default_storage.open(stored_name, "rb")
         response = FileResponse(
             handle,
-            as_attachment=not (msg.attachment_mime or "").startswith("image/"),
+            as_attachment=not is_inline_image(msg.attachment_mime),
             filename=filename,
+            content_type=served_content_type(msg.attachment_mime),
         )
         response["Cache-Control"] = "private, no-store"
-        if msg.attachment_mime:
-            response["Content-Type"] = msg.attachment_mime
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Content-Security-Policy"] = ATTACHMENT_CSP
         return response
 
 
@@ -276,7 +280,7 @@ class ConversationRateView(APIView):
         conv = get_web_conversation(request._request)
         if conv is None:
             return Response({"detail": "Диалог не найден."}, status=status.HTTP_404_NOT_FOUND)
-        raw = request.data.get("rating")
+        raw: Any = request.data.get("rating") if isinstance(request.data, dict) else None
         try:
             score = int(raw)
         except (TypeError, ValueError):

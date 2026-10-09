@@ -258,7 +258,8 @@ def staff_transfer_keyboard_attachments(
     exclude_pk: int | None = None,
 ) -> list[dict[str, Any]]:
     """Inline keyboard message attachment listing colleagues for transfer."""
-    from supportchat.services import staff_public_name, staff_transfer_candidates
+    from supportchat.presentation import staff_public_name
+    from supportchat.staff_actions import staff_transfer_candidates
 
     buttons = [
         [
@@ -312,7 +313,7 @@ def submit_staff_reply_from_max(
     Returns:
         (ok, plain-text status for the staff MAX chat).
     """
-    from supportchat.services import submit_staff_reply
+    from supportchat.staff_actions import submit_staff_reply
 
     return submit_staff_reply(staff_user, conversation_id, body)
 

@@ -27,7 +27,7 @@ location /api/ {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
@@ -60,7 +60,7 @@ location /api/catalog/ {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
@@ -78,7 +78,19 @@ location /api/content/ {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# Telephony webhooks (Mango / UIS) — same proxy as /api/, query-less log.
+location /api/telephony/ {
+    access_log /var/log/nginx/access.log hoocon_noargs;
+    limit_req zone=api_limit burst=20 nodelay;
+    limit_conn api_conn 12;
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
@@ -89,18 +101,29 @@ location /api/leads/ {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
-# Django Admin — IP allowlist (see admin-allow.conf.example).
-# Copy example → /etc/nginx/admin-allow.conf, set allow IPs, then uncomment.
+# Django Admin is reachable from the internet on purpose: managers work from
+# home/mobile networks without fixed IPs. Defence: OTP/passkey + axes lockout
+# + the admin_login rate limit below. For a fixed-IP office, copy
+# admin-allow.conf.example → /etc/nginx/admin-allow.conf and uncomment include.
+location = /admin/login/ {
+    limit_req zone=admin_login burst=5 nodelay;
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 location /admin/ {
     # include /etc/nginx/admin-allow.conf;
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
@@ -189,7 +212,7 @@ location = /admin/sw.js {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
@@ -258,6 +281,6 @@ location @spa {
     proxy_pass http://hoocon_app;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
 }

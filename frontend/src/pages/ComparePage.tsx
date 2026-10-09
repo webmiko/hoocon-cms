@@ -22,12 +22,15 @@ import {
 } from "../compare/constants";
 import { parseCompareSlugsParam } from "../compare/storage";
 import { useAsync } from "../hooks/useAsync";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { softBreak } from "../utils/softBreak";
 import { compactCardSpecName } from "../utils/cardHighlights";
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
 import { productCardImageSrc } from "../utils/productImageSrc";
 import styles from "./ComparePage.module.css";
+
+const COMPARE_SEARCH_DEBOUNCE_MS = 250;
 
 interface CompareRowView {
   key: string;
@@ -81,9 +84,9 @@ export function ComparePage() {
   }, [urlSlugs.length, items, setSearchParams]);
 
   const { data, loading, error } = useAsync<CompareResponse>(
-    () =>
+    (signal) =>
       slugs.length > 0
-        ? api.compare(slugs.slice(0, COMPARE_MAX_SKUS))
+        ? api.compare(slugs.slice(0, COMPARE_MAX_SKUS), signal)
         : Promise.resolve({ skus: [], rows: [] }),
     slugs.join(","),
   );
@@ -104,15 +107,13 @@ export function ComparePage() {
     }
   }, [addOpen]);
 
+  const searchQuery = useDebouncedValue(addQuery.trim(), COMPARE_SEARCH_DEBOUNCE_MS);
   const { data: searchData, loading: searchLoading } = useAsync(
-    () =>
+    (signal) =>
       addOpen
-        ? api.skus({
-            q: addQuery.trim(),
-            page_size: "12",
-          })
+        ? api.skus({ q: searchQuery, page_size: "12" }, signal)
         : Promise.resolve({ results: [], count: 0 }),
-    addOpen ? `add:${addQuery}` : "add:closed",
+    addOpen ? `add:${searchQuery}` : "add:closed",
   );
 
   function syncSlugs(next: string[]) {

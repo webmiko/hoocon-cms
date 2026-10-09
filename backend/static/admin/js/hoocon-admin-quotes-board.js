@@ -255,7 +255,7 @@
             setRowStatusBadge(moving, fromStatus);
             recountKanban(board);
             if (result.http === 409) {
-              window.alert("Не удалось сменить статус КП.");
+              window.alert("Так перевести КП нельзя: сначала выдайте КП клиенту (статус «Выдано»).");
             } else {
               window.alert("Не удалось сменить статус КП.");
             }

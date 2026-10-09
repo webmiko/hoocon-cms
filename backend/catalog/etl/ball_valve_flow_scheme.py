@@ -14,10 +14,8 @@ import re
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
-from django.db import transaction
-
-from catalog.models import SKU, ProductImage
+from catalog.etl.image_upsert import upsert_sku_image
+from catalog.models import SKU
 
 logger = logging.getLogger(__name__)
 
@@ -42,35 +40,16 @@ def is_8100_three_way_edition(sku_code: str) -> bool:
 
 
 def _upsert_flow(sku: SKU, *, webp: bytes, dry_run: bool) -> str:
-    existing = ProductImage.objects.filter(sku=sku, source_url=_SOURCE_URL).first()
-    if dry_run:
-        return "update" if existing else "create"
-
-    alt = f"{sku.sku_code} | схема направления потока (3-ходовой)"
-    filename = f"{sku.sku_code.lower()}-flow-3way.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=_SOURCE_URL,
-                sort_order=_SORT_FLOW,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-
-        existing.alt = alt[:300]
-        existing.sort_order = _SORT_FLOW
-        existing.is_published = True
-        current = existing.image.size if existing.image else 0
-        if current != len(webp):
-            existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=_SOURCE_URL,
+        filename=f"{sku.sku_code.lower()}-flow-3way.webp",
+        webp=webp,
+        alt=f"{sku.sku_code} | схема направления потока (3-ходовой)",
+        sort_order=_SORT_FLOW,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def apply_ball_valve_flow_scheme(*, dry_run: bool = False) -> dict[str, Any]:

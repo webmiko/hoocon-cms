@@ -63,6 +63,45 @@ class SkuVariant:
     fault_alarm: bool | None = None  # H8205 ``T`` / ``ST`` emergency signal
 
 
+# HVA(24|230)[S]-{Nm}[Q|UQ|QX|P] — the one parser for HVA codes across ETL/docs.
+_HVA_CODE_RE = re.compile(r"(?i)^hva(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)(?P<suffix>uq|qx|q|p)?$")
+# Same grammar without named groups, for Postgres ``__iregex`` filters.
+HVA_CODE_SQL_PATTERN = r"hva(24|230)s?-[0-9]+(uq|qx|q|p)?"
+
+
+@dataclass(frozen=True, slots=True)
+class HvaCode:
+    """Parsed HVA edition code (``HVA230S-5UQ`` → 230 V, aux, 5 Нм, ``uq``)."""
+
+    voltage: str
+    aux: bool
+    nm: int
+    suffix: str  # "" | "q" | "uq" | "qx" | "p"
+
+    @property
+    def token(self) -> str:
+        """Family token as in manuals/assets: ``5``, ``5q``, ``5uq``, ``8q``."""
+        return f"{self.nm}{self.suffix}"
+
+    @property
+    def family(self) -> str:
+        """Display family: ``HVA-5UQ``."""
+        return f"HVA-{self.token.upper()}"
+
+
+def parse_hva_code(sku_code: str) -> HvaCode | None:
+    """Parse an HVA SKU code; ``None`` for anything else."""
+    match = _HVA_CODE_RE.fullmatch((sku_code or "").strip().replace(" ", ""))
+    if match is None:
+        return None
+    return HvaCode(
+        voltage=match.group("volt"),
+        aux=bool(match.group("aux")),
+        nm=int(match.group("nm")),
+        suffix=(match.group("suffix") or "").casefold(),
+    )
+
+
 def parse_sku_variant(sku_code: str) -> SkuVariant:
     """Infer voltage / control / aux-switch from a Tilda edition SKU code.
 
@@ -130,21 +169,14 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     elif re.fullmatch(r"hvd(?:24|230)s?-\d+qx", code):
         control = "on_off"
         aux = bool(re.match(r"hvd(?:24|230)s-", code))
-    elif re.fullmatch(r"hva(?:24|230)s?-\d+qx", code):
+    # HVA std / Q / UQ / QX (capacitor) / P (spring) — all modulating.
+    elif (hva := parse_hva_code(code)) is not None:
         control = "modulating"
-        aux = bool(re.match(r"hva(?:24|230)s-", code))
-    # HVA24-5P — spring-return modulating (24 V manuals).
-    elif re.fullmatch(r"hva(?:24|230)s?-\d+p", code):
-        control = "modulating"
-        aux = bool(re.match(r"hva(?:24|230)s-", code))
+        aux = hva.aux
     # HVD24-5 / HVD24S-10 / HVD230S-40Q — air on/off (+ optional aux S). Not QX.
     elif re.fullmatch(r"hvd(?:24|230)s?-\d+q?", code):
         control = "on_off"
         aux = bool(re.match(r"hvd(?:24|230)s-", code))
-    # HVA24-5 / HVA24S-5Q / HVA24-5UQ — air damper without spring (modulating).
-    elif re.fullmatch(r"hva(?:24|230)s?-\d+(?:uq|q)?", code):
-        control = "modulating"
-        aux = bool(re.match(r"hva(?:24|230)s-", code))
     # Suffixes are hyphen-prefixed edition tags strictly at the code end.
     # ``-dst`` before ``-ds`` (thermal ON/OFF with aux).
     elif code.endswith("-as"):

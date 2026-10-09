@@ -22,6 +22,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError, URLError
 
 from django.core.exceptions import ValidationError
@@ -36,7 +37,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
     ATTR_GROUP_VALVE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.ball_valve_medium import (
     WORKING_MEDIUM_ATTR,
     WORKING_MEDIUM_BULLET,
@@ -99,7 +100,7 @@ from catalog.etl.tech_copy import (
 )
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, convert_bytes_to_webp
 from catalog.facets import normalize_aux_switch_value
-from catalog.models import SKU, AttributeValue, Category, Product, ProductFile, ProductImage
+from catalog.models import SKU, Category, Product, ProductFile, ProductImage
 from catalog.urls_paths import catalog_path_for_sku
 from config.warranty import WARRANTY_BULLET, WARRANTY_LINE
 
@@ -1106,6 +1107,8 @@ def ensure_h8205_lav_series(series: H8205LavSeries) -> dict[str, int]:
     return {"products_created": products_created, "skus_created": skus_created}
 
 
+@cached_attributes
+@transaction.atomic
 def apply_h8205_lav_enrichment(
     series: H8205LavSeries,
     *,
@@ -1124,10 +1127,12 @@ def apply_h8205_lav_enrichment(
             "pdf_attached": 0,
         }
 
-    product.name = series.product_name[:200]
-    product.description = _lav_series_description(series)
-    product.specs_text = ""
-    product.save(update_fields=["name", "description", "specs_text"])
+    write_copy(
+        product,
+        name=series.product_name[:200],
+        description=_lav_series_description(series),
+        specs_text="",
+    )
 
     wanted = {c.upper() for c in h8205_edition_sku_codes(series)}
     skus = [
@@ -1140,13 +1145,15 @@ def apply_h8205_lav_enrichment(
     body_attrs = _lav_body_attrs(series)
 
     for sku in skus:
-        sku.name = series.product_name[:300]
-        sku.description = _lav_sku_description(series, sku.sku_code)
-        sku.is_published = True
-        sku.specs_text = ""
-        sku.save(update_fields=["name", "description", "specs_text", "is_published"])
+        write_copy(
+            sku,
+            name=series.product_name[:300],
+            description=_lav_sku_description(series, sku.sku_code),
+            specs_text="",
+            is_published=True,
+        )
 
-        AttributeValue.objects.filter(sku=sku).delete()
+        clear_etl_attributes(sku)
         for name, slug, unit, value, _group in body_attrs:
             if not value:
                 continue
@@ -1255,6 +1262,21 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
+def _refresh_gallery_row(sku: SKU, source_url: str, *, sort_order: int, dry_run: bool) -> bool:
+    """Re-sort an already attached gallery row; True when it exists.
+
+    Bulk ``update`` skips ``ProductImage.save``, so the editor-hidden lock
+    is applied here explicitly.
+    """
+    rows = ProductImage.objects.filter(sku=sku, source_url=source_url)
+    if not rows.exists():
+        return False
+    if not dry_run:
+        rows.update(sort_order=sort_order)
+        rows.filter(hidden_by_editor=False, is_published=False).update(is_published=True)
+    return True
+
+
 def attach_gallery_images(
     sku: SKU,
     urls: tuple[str, ...],
@@ -1270,11 +1292,7 @@ def attach_gallery_images(
     existing = 0
     failed = 0
     for sort_order, url in enumerate(urls):
-        updated = ProductImage.objects.filter(sku=sku, source_url=url).update(
-            sort_order=sort_order,
-            is_published=True,
-        )
-        if updated:
+        if _refresh_gallery_row(sku, url, sort_order=sort_order, dry_run=dry_run):
             existing += 1
             continue
         if dry_run:
@@ -1510,11 +1528,7 @@ def attach_local_gallery_images(
     for sort_order, name in enumerate(filenames):
         path = root / name
         source_url = f"https://hoocon.ru/.local-catalog/{name}"
-        updated = ProductImage.objects.filter(sku=sku, source_url=source_url).update(
-            sort_order=sort_order,
-            is_published=True,
-        )
-        if updated:
+        if _refresh_gallery_row(sku, source_url, sort_order=sort_order, dry_run=False):
             existing += 1
             continue
         if not path.is_file():
@@ -1585,6 +1599,8 @@ def attach_catalog_pdf(sku: SKU, *, pdf_path: Path | None = None) -> bool:
     return True
 
 
+@cached_attributes
+@transaction.atomic
 def apply_series_enrichment(
     series: BallValveSeries,
     *,
@@ -1604,15 +1620,15 @@ def apply_series_enrichment(
             "pdf_attached": 0,
         }
 
-    product.name = series.product_name[:200]
-    product.description = _series_description(series)
-    product.specs_text = ""
-    if "3-ходов" in (series.ways or "").casefold():
-        product.instructions = THREE_WAY_FLOW_INSTRUCTIONS
-    elif (product.instructions or "").strip():
-        # 2-way: drop stale flow notes if a previous run left them.
-        product.instructions = ""
-    product.save(update_fields=["name", "description", "specs_text", "instructions"])
+    # 2-way: drop stale flow notes if a previous run left them.
+    instructions = THREE_WAY_FLOW_INSTRUCTIONS if "3-ходов" in (series.ways or "").casefold() else ""
+    write_copy(
+        product,
+        name=series.product_name[:200],
+        description=_series_description(series),
+        specs_text="",
+        instructions=instructions,
+    )
 
     skus = list(SKU.objects.filter(product=product).order_by("sku_code"))
     attrs = 0
@@ -1631,12 +1647,14 @@ def apply_series_enrichment(
             )
             continue
 
-        sku.name = series.product_name[:300]
-        sku.description = _sku_description(series, kvs)
-        sku.specs_text = ""
-        sku.save(update_fields=["name", "description", "specs_text"])
+        write_copy(
+            sku,
+            name=series.product_name[:300],
+            description=_sku_description(series, kvs),
+            specs_text="",
+        )
 
-        AttributeValue.objects.filter(sku=sku).delete()
+        clear_etl_attributes(sku)
         for name, slug, unit, value, _group in shared:
             if not value:
                 continue
@@ -1684,6 +1702,8 @@ def apply_series_enrichment(
     }
 
 
+@cached_attributes
+@transaction.atomic
 def apply_flanged_kit_enrichment(
     kit: FlangedKitSeries,
     *,
@@ -1708,10 +1728,12 @@ def apply_flanged_kit_enrichment(
             "pdf_attached": 0,
         }
 
-    product.name = kit.product_name[:200]
-    product.description = _kit_family_description(kit)
-    product.specs_text = ""
-    product.save(update_fields=["name", "description", "specs_text"])
+    write_copy(
+        product,
+        name=kit.product_name[:200],
+        description=_kit_family_description(kit),
+        specs_text="",
+    )
 
     wanted = {c.upper() for c in flanged_kit_edition_sku_codes(kit)}
     skus = [
@@ -1726,13 +1748,15 @@ def apply_flanged_kit_enrichment(
     body_attrs = _kit_body_attrs(kit)
 
     for sku in skus:
-        sku.name = kit.sku_display_name[:300]
-        sku.description = _kit_sku_description(kit, sku.sku_code)
-        sku.is_published = True
-        sku.specs_text = ""
-        sku.save(update_fields=["name", "description", "specs_text", "is_published"])
+        write_copy(
+            sku,
+            name=kit.sku_display_name[:300],
+            description=_kit_sku_description(kit, sku.sku_code),
+            specs_text="",
+            is_published=True,
+        )
 
-        AttributeValue.objects.filter(sku=sku).delete()
+        clear_etl_attributes(sku)
         for name, slug, unit, value, _group in body_attrs:
             if not value:
                 continue
@@ -1866,9 +1890,11 @@ def merge_brass_bv_onto_dn_products(
             if product.category_id != category.pk:
                 product.category = category
                 product.save(update_fields=["category"])
-            product.name = series.product_name[:200]
-            product.description = _series_description(series)
-            product.save(update_fields=["name", "description"])
+            write_copy(
+                product,
+                name=series.product_name[:200],
+                description=_series_description(series),
+            )
 
         sku_by_pk: dict[int, SKU] = {}
         for code in edition_sku_codes(series):
@@ -2010,8 +2036,7 @@ def merge_h81_kits_onto_family_products(
             if product.category_id != category.pk:
                 product.category = category
                 product.save(update_fields=["category"])
-            product.name = h81_family_product_name(family)[:200]
-            product.save(update_fields=["name"])
+            write_copy(product, name=h81_family_product_name(family)[:200])
 
         skus = list(
             SKU.objects.filter(sku_code__istartswith=f"{prefix}-").select_related(
@@ -2334,10 +2359,12 @@ def ensure_8100q_bodies() -> dict[str, int]:
             )
             products_created += 1
         else:
-            product.category = category
-            product.name = name
-            product.description = _q8100_description(body=body, dn=dn, kvs=kvs)
-            product.save(update_fields=["category", "name", "description"])
+            write_copy(
+                product,
+                category=category,
+                name=name,
+                description=_q8100_description(body=body, dn=dn, kvs=kvs),
+            )
 
         sku_code = q8100_sku_code(body)
         slug = brass_sku_slug(product_slug, sku_code)
@@ -2355,26 +2382,23 @@ def ensure_8100q_bodies() -> dict[str, int]:
             )
             skus_created += 1
         else:
-            changed: list[str] = []
-            if existing.product_id != product.pk:
-                existing.product = product
-                changed.append("product")
+            fields: dict[str, Any] = {
+                "product": product,
+                "is_published": True,
+                "name": name[:300],
+                "description": _q8100_description(body=body, dn=dn, kvs=kvs),
+            }
             if (existing.slug or "") != slug and not SKU.objects.filter(slug=slug).exclude(
                 pk=existing.pk,
             ).exists():
-                existing.slug = slug[:300]
-                changed.append("slug")
-            if not existing.is_published:
-                existing.is_published = True
-                changed.append("is_published")
-            existing.name = name[:300]
-            existing.description = _q8100_description(body=body, dn=dn, kvs=kvs)
-            changed.extend(["name", "description"])
-            existing.save(update_fields=list(dict.fromkeys(changed)))
+                fields["slug"] = slug[:300]
+            write_copy(existing, **fields)
         _ = (length, od, height_act, height_stem)  # used in enrich
     return {"products_created": products_created, "skus_created": skus_created}
 
 
+@cached_attributes
+@transaction.atomic
 def apply_8100q_enrichment(*, attach_pdf: bool = True) -> dict[str, int]:
     """Write ТТХ / copy for all 8100Q bodies; optionally attach series PDF."""
     from catalog.etl.h81_kits import Q8100_BODY_ROWS
@@ -2387,10 +2411,12 @@ def apply_8100q_enrichment(*, attach_pdf: bool = True) -> dict[str, int]:
         if sku is None:
             continue
         name = _q8100_product_name(body, dn)
-        sku.name = name[:300]
-        sku.description = _q8100_description(body=body, dn=dn, kvs=kvs)
-        sku.is_published = True
-        sku.save(update_fields=["name", "description", "is_published"])
+        write_copy(
+            sku,
+            name=name[:300],
+            description=_q8100_description(body=body, dn=dn, kvs=kvs),
+            is_published=True,
+        )
         for label, slug, unit, value, _group in _q8100_shared_attrs(
             dn=dn,
             kvs=kvs,
@@ -2431,6 +2457,7 @@ def apply_8100q_enrichment(*, attach_pdf: bool = True) -> dict[str, int]:
     }
 
 
+@cached_attributes
 def apply_all_ball_valve_enrichment(
     *,
     import_images: bool = True,

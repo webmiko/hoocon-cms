@@ -1,23 +1,36 @@
 """Quote PDF generation (ЛК-3): reportlab + bundled DejaVu (Cyrillic).
 
 The font lives in ``backend/assets/fonts/`` so the Docker image renders
-Cyrillic without system fonts. Output is small (<50 KB) — generated
-on demand per request and stored on ``Quote.pdf`` for reuse.
+Cyrillic without system fonts. Output is small (<50 KB); ``crm.quote_docs``
+stores it as the client's ``ClientDocument(kind=quote_pdf)``.
 """
 
 from __future__ import annotations
 
 import io
+from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from django.conf import settings
+from django.utils import timezone
 
 if TYPE_CHECKING:
     from crm.models import Client, Quote
 
 _FONTS_DIR = Path(settings.BASE_DIR) / "assets" / "fonts"
+_KOPECK = Decimal("0.01")
+
+
+def vat_amount_rub(total: Decimal, rate: Decimal) -> Decimal:
+    """VAT rounded to kopecks half-up, as accountants do (not banker's rounding)."""
+    return (total * rate / 100).quantize(_KOPECK, rounding=ROUND_HALF_UP)
+
+
+def vat_rate_label(rate: Decimal) -> str:
+    """``22.00`` → ``22``, ``12.50`` → ``12.5`` (Decimal ``:g`` keeps the zeros)."""
+    return format(Decimal(rate).normalize(), "f")
 
 
 @lru_cache(maxsize=1)
@@ -71,9 +84,9 @@ def render_quote_pdf(quote: Quote) -> io.BytesIO:
     pdf.drawString(x_margin, y, f"Коммерческое предложение {quote.number}")
     y -= 8 * mm
     pdf.setFont(font, 10)
-    pdf.drawString(x_margin, y, f"Дата: {quote.created_at:%d.%m.%Y}")
+    pdf.drawString(x_margin, y, f"Дата: {timezone.localtime(quote.created_at):%d.%m.%Y}")
     if quote.sent_at:
-        pdf.drawString(x_margin + 60 * mm, y, f"Выдано: {quote.sent_at:%d.%m.%Y}")
+        pdf.drawString(x_margin + 60 * mm, y, f"Выдано: {timezone.localtime(quote.sent_at):%d.%m.%Y}")
     if quote.valid_until:
         pdf.drawString(x_margin + 110 * mm, y, f"Действует до: {quote.valid_until:%d.%m.%Y}")
     y -= 6 * mm
@@ -132,10 +145,10 @@ def render_quote_pdf(quote: Quote) -> io.BytesIO:
         y -= 6 * mm
         vat_rate = quote.vat_rate
         if vat_rate:
-            vat_amount = total * vat_rate / 100
+            vat_amount = vat_amount_rub(Decimal(total), vat_rate)
             grand = total + vat_amount
             pdf.setFont(font, 9)
-            pdf.drawRightString(width - x_margin, y, f"НДС {vat_rate:g}%: {vat_amount:.2f} ₽")
+            pdf.drawRightString(width - x_margin, y, f"НДС {vat_rate_label(vat_rate)}%: {vat_amount:.2f} ₽")
             y -= 6 * mm
             pdf.setFont(font_bold, 10)
             pdf.drawRightString(width - x_margin, y, f"Итого с НДС: {grand:.2f} ₽")

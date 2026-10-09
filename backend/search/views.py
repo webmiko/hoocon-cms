@@ -13,7 +13,7 @@ docs/readiness-backend-ux.md §2.3 (`GET /api/search/?q=`).
   только семейное имя) — издания в поиске различимы.
 - Для SKU snippet = ``extract_sku_lead`` (тот же lead, что под H1 на PDP).
 - PII: Lead НЕ участвует в поиске; никаких email/phone в выдаче.
-- Пагинация стандартная (DRF PageNumberPagination).
+- Пагинация стандартная (``config.pagination.DefaultPagination``).
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from collections.abc import Sequence
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.db.models import QuerySet
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,6 +30,7 @@ from rest_framework.views import APIView
 from catalog.facets.copy import extract_sku_lead, format_sku_heading_name
 from catalog.models import SKU
 from catalog.urls_paths import catalog_path_for_sku
+from config.pagination import DefaultPagination
 from content.etl.tilda_articles import strip_html_to_text
 from content.models import Article, News, Page
 from content.views import publicly_visible
@@ -103,7 +103,7 @@ class SearchView(APIView):
 
     permission_classes = (AllowAny,)
     http_method_names = ["get", "head", "options"]
-    pagination_class = PageNumberPagination
+    pagination_class = DefaultPagination
     serializer_class = SearchResponseSerializer
 
     def get(self, request: Request, *args: object, **kwargs: object) -> Response:

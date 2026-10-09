@@ -43,7 +43,7 @@ export function CookieConsent() {
   const settingsTitleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useFocusTrap(panelRef, mode !== "hidden");
+  useFocusTrap(panelRef, mode !== "hidden", mode);
 
   useEffect(() => {
     function onOpen() {

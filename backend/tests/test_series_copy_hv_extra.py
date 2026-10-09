@@ -132,3 +132,13 @@ def test_enriched_10nm_q_qx_damper_area_is_one_m2(sku_code: str) -> None:
     assert moment == "10 Нм"
     assert area == damper_area_for_nm(10)
     assert area == "до 1,0 м²"
+
+
+@pytest.mark.parametrize("nm", [5, 10, 20, 40])
+def test_hvd_q_power_matches_attached_hva_q_manual(nm: int) -> None:
+    """HVD-Q 10/20 Нм показывали 9 и 8 Вт / 0,5 Вт, а прикреплённый RU-мануал HVA-Q — 5 и 8 Вт / 1 Вт."""
+    from catalog.etl.series_copy_hva import FAMILY_SPECS
+
+    manual = FAMILY_SPECS[(nm, "q")]
+    assert HVD_Q_SPECS[nm]["dimensions"] == manual["dimensions"]
+    assert HVD_Q_SPECS[nm]["power"] == manual["power-24"]

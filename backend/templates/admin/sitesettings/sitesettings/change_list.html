@@ -26,6 +26,54 @@
     </nav>
   </header>
 
+  <section class="hoocon-pbx" aria-label="Телефония">
+    {% for widget in telephony_widgets %}
+    <article class="hoocon-pbx__widget hoocon-integrations__card hoocon-integrations__card--{{ widget.status }}{% if widget.ready %} hoocon-pbx__widget--ready{% endif %}">
+      <div class="hoocon-integrations__card-top">
+        <p class="hoocon-lead-stats__label">{{ widget.name }}</p>
+        <span class="hoocon-integrations__badge hoocon-integrations__badge--{{ widget.status }}">{{ widget.status_label }}</span>
+      </div>
+      <label class="hoocon-pbx__toggle">
+        <input type="checkbox" class="hoocon-toggle" name="{{ widget.provider }}_enabled" form="telephony-{{ widget.provider }}" {% if widget.enabled %}checked{% endif %}>
+        <span class="hoocon-pbx__state hoocon-pbx__state--off">Виджет выключен</span>
+        <span class="hoocon-pbx__state hoocon-pbx__state--partial">Не полностью</span>
+        <span class="hoocon-pbx__state hoocon-pbx__state--on">Виджет включён</span>
+      </label>
+      {% if widget.provider == "mango" %}
+        <label class="hoocon-pbx__field">Ключ API
+          <input type="password" name="mango_api_key" form="telephony-mango" autocomplete="new-password" placeholder="{% if widget.key_set %}сохранён{% else %}не задан{% endif %}">
+        </label>
+        <label class="hoocon-pbx__field">Соль API
+          <input type="password" name="mango_api_salt" form="telephony-mango" autocomplete="new-password" placeholder="{% if widget.salt_set %}сохранена{% else %}не задана{% endif %}">
+        </label>
+        <label class="hoocon-pbx__field">URL исходящего звонка
+          <input type="text" name="mango_callback_webhook_url" form="telephony-mango" value="{{ widget.callback }}" placeholder="{ext} и {num}">
+        </label>
+      {% else %}
+        <label class="hoocon-pbx__field">Ключ API
+          <input type="password" name="novosystem_access_token" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.token_set %}сохранён{% else %}не задан{% endif %}">
+        </label>
+        <label class="hoocon-pbx__field">Виртуальный номер
+          <input type="text" name="novosystem_virtual_phone" form="telephony-novosystem" value="{{ widget.virtual_phone }}" placeholder="74951234567">
+        </label>
+        <label class="hoocon-pbx__field">Секрет вебхука
+          <input type="password" name="novosystem_webhook_secret" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.secret_set %}сохранён{% else %}не задан{% endif %}">
+        </label>
+        {% if widget.secret_set %}
+        <details class="hoocon-pbx__url">
+          <summary>URL для ЛК UIS: {{ widget.webhook_url_masked }} — показать</summary>
+          <code>{{ widget.webhook_url }}</code>
+        </details>
+        {% else %}
+        <p class="hoocon-pbx__url">URL для ЛК UIS: {{ widget.webhook_url }}</p>
+        {% endif %}
+      {% endif %}
+      <p class="hoocon-integrations__hint">{{ widget.hint }}</p>
+      <button type="submit" class="hoocon-pbx__save" form="telephony-{{ widget.provider }}">Сохранить</button>
+    </article>
+    {% endfor %}
+  </section>
+
   <section class="hoocon-lead-stats__cards hoocon-integrations__cards" aria-label="Каналы">
     {% for card in dash.cards %}
     <article class="hoocon-lead-stats__card hoocon-integrations__card hoocon-integrations__card--{{ card.status }}">
@@ -46,4 +94,11 @@
 {% endwith %}
 {% endblock %}
 
-{% block pagination %}{% endblock %}
+{% block pagination %}
+{% for widget in telephony_widgets %}
+<form id="telephony-{{ widget.provider }}" method="post" action="{{ telephony_widget_url }}">
+  {% csrf_token %}
+  <input type="hidden" name="provider" value="{{ widget.provider }}">
+</form>
+{% endfor %}
+{% endblock %}

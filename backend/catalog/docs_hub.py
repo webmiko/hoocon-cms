@@ -15,9 +15,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
+from django.core.cache import cache
 from django.db.models import QuerySet
 from django.utils.text import slugify
 
+from catalog.etl.sku_variant import parse_hva_code
 from catalog.models import SKU, Category, Product, ProductFile
 from catalog.validators import sanitize_upload_filename
 
@@ -34,10 +36,6 @@ _HVD_F_FAMILY = re.compile(
 # HVD24-5 / HVD24S-40 / HVD230-40QX → HVD-5 / HVD-40 / HVD-40QX
 _HVD_AIR_FAMILY = re.compile(
     r"(?i)^hvd(?:24|230)s?-(\d+(?:uq|qx|q)?)\b",
-)
-# HVA24-5 / HVA230S-5Q / HVA24-5UQ → HVA-5 / HVA-5Q / HVA-5UQ
-_HVA_FAMILY = re.compile(
-    r"(?i)^hva(?:24|230)s?-(\d+(?:uq|qx|q)?)\b",
 )
 _HV_FAMILY_KEY = re.compile(r"(?i)^(hva|hvd)-(\d+)([a-z]*)$")
 _H81_FAMILY = re.compile(r"(?i)^(h81\d{2})\b")
@@ -123,9 +121,9 @@ def doc_family_key(sku_code: str) -> str:
     if m is not None:
         return f"HVD-{m.group(1).upper()}"
 
-    m = _HVA_FAMILY.match(code)
-    if m is not None:
-        return f"HVA-{m.group(1).upper()}"
+    hva = parse_hva_code(code)
+    if hva is not None and hva.suffix != "p":
+        return hva.family
 
     m = _H81_FAMILY.match(code)
     if m is not None:
@@ -280,6 +278,29 @@ def _file_size(pf: ProductFile) -> int:
         return 0
 
 
+_SIZE_CACHE_TTL = 24 * 60 * 60
+
+
+def _size_cache_key(pf: ProductFile) -> str:
+    stamp = pf.updated_at.timestamp() if pf.updated_at else 0
+    return f"docs-hub-size:v1:{pf.pk}:{stamp}:{pf.file.name if pf.file else ''}"
+
+
+def cached_file_sizes(files: Iterable[ProductFile]) -> dict[int, int]:
+    """Sizes keyed by ProductFile pk; storage is hit only for new/changed files.
+
+    The key carries ``updated_at`` + file name, so a re-upload misses the cache.
+    """
+    by_key = {_size_cache_key(pf): pf for pf in files}
+    hits = cache.get_many(list(by_key))
+    sizes = {by_key[key].pk: int(size) for key, size in hits.items()}
+    fresh = {key: _file_size(pf) for key, pf in by_key.items() if key not in hits}
+    if fresh:
+        cache.set_many(fresh, timeout=_SIZE_CACHE_TTL)
+        sizes.update({by_key[key].pk: size for key, size in fresh.items()})
+    return sizes
+
+
 def _file_url(pf: ProductFile, request: Any | None) -> str:
     """Absolute or relative media URL for the PDF."""
     if not pf.file:
@@ -314,7 +335,12 @@ def dedupe_files_by_family_title(
     return sorted(best.values(), key=sort_key)
 
 
-def row_from_product_file(pf: ProductFile, request: Any | None = None) -> DocsFileRow:
+def row_from_product_file(
+    pf: ProductFile,
+    request: Any | None = None,
+    *,
+    size_bytes: int | None = None,
+) -> DocsFileRow:
     """Build a hub DTO from a ProductFile (caller supplies deduped rows)."""
     sku = cast(SKU, pf.sku)
     product = cast(Product, sku.product)
@@ -332,7 +358,7 @@ def row_from_product_file(pf: ProductFile, request: Any | None = None) -> DocsFi
         sku_slug=sku.slug,
         product_slug=product.slug,
         category_slug=category_slug,
-        size_bytes=_file_size(pf),
+        size_bytes=_file_size(pf) if size_bytes is None else size_bytes,
         updated_at=pf.updated_at,
     )
 
@@ -400,7 +426,8 @@ def collect_hub_payload(
 ) -> dict[str, Any]:
     """Deduped files + family metas for ``GET /api/catalog/docs/``."""
     unique = dedupe_files_by_family_title(published_files_qs())
-    rows = [row_from_product_file(pf, request) for pf in unique]
+    sizes = cached_file_sizes(unique)
+    rows = [row_from_product_file(pf, request, size_bytes=sizes.get(pf.pk)) for pf in unique]
     filtered = filter_doc_rows(
         rows,
         q=q,

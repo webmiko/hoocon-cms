@@ -9,7 +9,8 @@ import pytest
 from sitesettings.models import SiteSettings
 from supportchat.gigachat.reply import AiReply
 from supportchat.models import Channel, Conversation, Message, MessageDirection
-from supportchat.services import add_inbound_message, add_staff_reply, message_sender_name
+from supportchat.presentation import message_sender_name
+from supportchat.services import add_inbound_message, add_staff_reply
 from supportchat.tasks import gigachat_reply
 
 

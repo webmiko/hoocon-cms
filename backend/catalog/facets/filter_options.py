@@ -21,6 +21,26 @@ from catalog.facets.defs import (
 from catalog.facets.normalize import normalize_facet_value, values_match
 from catalog.models import SKU, Attribute, AttributeValue
 
+# Public ``?facet=a|b|…`` — OR over at most this many parts (each part costs a
+# Python match pass; an unbounded list was a cheap DoS on the catalog API).
+MAX_FACET_VALUE_PARTS = 10
+FACET_OR_SEPARATOR = "|"
+# Legacy comma OR: chip labels carry decimal commas («до 1,0 м²», Kvs «1,6»)
+# and «, » inside text («AC 100…240 В, 50/60 Гц») — neither is a separator.
+_LEGACY_OR_COMMA = re.compile(r"(?<!\d),(?!\s)|,(?![\d\s])")
+
+
+def facet_value_parts(value: str) -> list[str]:
+    """Distinct non-empty OR parts of a facet value, capped."""
+    raw = str(value)
+    if FACET_OR_SEPARATOR in raw:
+        split = raw.split(FACET_OR_SEPARATOR)
+    else:
+        split = _LEGACY_OR_COMMA.split(raw)
+    parts = dict.fromkeys(part.strip() for part in split)
+    parts.pop("", None)
+    return list(parts)[:MAX_FACET_VALUE_PARTS]
+
 
 def filter_skus_by_facet(
     queryset: QuerySet[SKU],
@@ -31,48 +51,48 @@ def filter_skus_by_facet(
 ) -> QuerySet[SKU]:
     """Filter SKUs whose EAV value matches the facet (loose).
 
-    Comma-separated ``value`` means OR (any part matches) — used by the
+    ``|``-separated ``value`` means OR (any part matches) — used by the
     product picker when discrete on/off spans several canon labels
-    (``Открыто/закрыто`` and ``2-/3-позиционное``).
+    (``Открыто/закрыто`` and ``2-/3-позиционное``). Parts are matched in
+    one pass over the scoped attribute rows.
     """
     if facet.key == "analog":
         return _filter_skus_by_belimo_analog(queryset, value)
 
-    parts = [part.strip() for part in str(value).split(",") if part.strip()]
-    if len(parts) > 1:
-        matching: set[int] = set()
-        for part in parts:
-            matching.update(
-                filter_skus_by_facet(
-                    queryset,
-                    facet,
-                    part,
-                    attr_ids=attr_ids,
-                ).values_list("pk", flat=True),
-            )
-        if not matching:
-            return queryset.none()
-        return queryset.filter(pk__in=matching)
-
+    parts = facet_value_parts(value)
+    if not parts:
+        return queryset.none()
     ids = list(attr_ids) if attr_ids is not None else attribute_ids_for_facet(facet)
     if not ids:
         return queryset.none()
 
-    # Prefer exact DB filter when possible; fall back to Python match for loose.
-    # Area / voltage / control / aux / temp_sensor need canon match (legacy spellings).
-    if facet.key not in {"aux_switch", "voltage", "control", "area", "temp_sensor"}:
+    if facet.key not in _FACETS_NEEDING_SKU_CONTEXT and len(parts) == 1:
         exact = queryset.filter(
             attribute_values__attribute_id__in=ids,
-            attribute_values__value=value,
+            attribute_values__value=parts[0],
         )
         if exact.exists():
             return exact.distinct()
 
+    matching_sku_ids = _match_facet_parts(queryset, facet, ids, parts)
+    if not matching_sku_ids:
+        return queryset.none()
+    return queryset.filter(pk__in=matching_sku_ids)
+
+
+def _match_facet_parts(
+    queryset: QuerySet[SKU],
+    facet: FacetDef,
+    attr_ids: list[int],
+    parts: list[str],
+) -> set[int]:
+    """SKU ids matching any part; a part with exact hits ignores loose ones."""
     scoped_sku_ids = queryset.values_list("pk", flat=True)
-    matching_sku_ids: set[int] = set()
-    if facet.key in {"aux_switch", "voltage", "control", "area", "temp_sensor"}:
+    if facet.key in _FACETS_NEEDING_SKU_CONTEXT:
+        wanted = {normalize_facet_value(facet.key, part) for part in parts}
+        matching: set[int] = set()
         detailed_rows = AttributeValue.objects.filter(
-            attribute_id__in=ids,
+            attribute_id__in=attr_ids,
             sku_id__in=scoped_sku_ids,
         ).values_list(
             "sku_id",
@@ -89,24 +109,21 @@ def filter_skus_by_facet(
                 description=str(description or ""),
                 category_slug=str(category_slug or "") or None,
             )
-            if normalized == normalize_facet_value(facet.key, value):
-                matching_sku_ids.add(sku_id)
-            elif values_match(str(stored), value):
-                matching_sku_ids.add(sku_id)
-    else:
-        simple_rows = AttributeValue.objects.filter(
-            attribute_id__in=ids,
+            if normalized in wanted or any(values_match(str(stored), part) for part in parts):
+                matching.add(sku_id)
+        return matching
+
+    rows = list(
+        AttributeValue.objects.filter(
+            attribute_id__in=attr_ids,
             sku_id__in=scoped_sku_ids,
-        ).values_list(
-            "sku_id",
-            "value",
-        )
-        for sku_id, stored in simple_rows:
-            if values_match(str(stored), value):
-                matching_sku_ids.add(sku_id)
-    if not matching_sku_ids:
-        return queryset.none()
-    return queryset.filter(pk__in=matching_sku_ids)
+        ).values_list("sku_id", "value"),
+    )
+    matching = set()
+    for part in parts:
+        exact = {sku_id for sku_id, stored in rows if str(stored) == part}
+        matching |= exact or {sku_id for sku_id, stored in rows if values_match(str(stored), part)}
+    return matching
 
 
 def facet_defs_for_category(category_slug: str | None) -> tuple[FacetDef, ...]:
@@ -131,6 +148,7 @@ _FACETS_NEEDING_SKU_CONTEXT: frozenset[str] = frozenset(
 )
 # Above this size, skip Belimo inference and use only persisted analog codes.
 _ANALOG_INFERENCE_SKU_CAP = 150
+_BELIMO_CODE_MAX_LEN = 64
 
 
 def collect_facet_options(
@@ -239,6 +257,8 @@ def _filter_skus_by_belimo_analog(
     """Match SKUs that list the Belimo article (card text, field, or inference)."""
     from catalog.etl.belimo_analogs import belimo_codes_for_sku, normalize_belimo_code
 
+    if len(value) > _BELIMO_CODE_MAX_LEN:
+        return queryset.none()
     needle = normalize_belimo_code(value)
     if not needle:
         return queryset.none()
@@ -246,6 +266,9 @@ def _filter_skus_by_belimo_analog(
     direct_ids = set(
         queryset.filter(analog_belimo_code__iexact=needle).values_list("id", flat=True),
     )
+    # Same rule as the «Аналоги» facet: inference only on small scopes.
+    if queryset.count() > _ANALOG_INFERENCE_SKU_CAP:
+        return queryset.filter(id__in=direct_ids) if direct_ids else queryset.none()
     skus = queryset.select_related("product", "product__category").prefetch_related(
         "attribute_values__attribute",
     )

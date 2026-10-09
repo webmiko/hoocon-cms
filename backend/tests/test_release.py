@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,7 @@ import pytest
 from config.release import (
     RELEASE_CHANNEL,
     RELEASE_VERSION,
+    bump_version,
     display_version,
     package_version,
     release_label,
@@ -21,12 +24,51 @@ _VERSION_CORE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
 
 def test_release_label_ga_format() -> None:
-    """Display string is ``vMAJOR.MINOR`` / ``MAJOR.MINOR`` after GA."""
+    """Internal ``MAJOR.MINOR.PATCH``; prod label is ``vMAJOR.MINOR`` only."""
     assert RELEASE_CHANNEL == ""
-    assert re.fullmatch(r"\d+\.\d+", RELEASE_VERSION), RELEASE_VERSION
-    assert release_label() == f"v{display_version()}"
-    assert release_label(with_v=False) == display_version()
-    assert release_label() == f"v{RELEASE_VERSION}"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", RELEASE_VERSION), RELEASE_VERSION
+    major, minor, _patch = RELEASE_VERSION.split(".")
+    assert release_label() == f"v{major}.{minor}"
+    assert release_label(with_v=False) == f"{major}.{minor}"
+
+
+def test_patch_bump_keeps_prod_label_minor_bump_changes_it() -> None:
+    """PATCH is internal (label unchanged); MINOR is the prod release."""
+    assert bump_version("1.1.0", "patch") == "1.1.1"
+    assert bump_version("1.1.1", "minor") == "1.2.0"
+    assert bump_version("1.17.4", "major") == "2.0.0"
+    assert bump_version("3.2", "patch") == "3.2.1"
+    assert display_version("1.1.1", channel="") == display_version("1.1.0", channel="")
+    assert display_version("1.2.0", channel="") == "1.2"
+
+
+def test_bump_version_rejects_minor_past_limit_and_unknown_part() -> None:
+    """MINOR stops at 99 (MAJOR only on explicit command)."""
+    with pytest.raises(ValueError, match="MINOR would exceed"):
+        bump_version("1.99.3", "minor")
+    with pytest.raises(ValueError, match="Unknown bump part"):
+        bump_version("1.2.0", "build")  # type: ignore[arg-type]
+
+
+def test_bump_release_script_check_passes_on_repo() -> None:
+    """``scripts/bump-release.py --check``: all four version files agree."""
+    script = _REPO_ROOT / "scripts" / "bump-release.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_merge_release_pr_requires_new_prod_minor() -> None:
+    """Prod merge refuses when develop still has prod's ``MAJOR.MINOR``."""
+    script = (_REPO_ROOT / "scripts" / "merge-release-pr.sh").read_text(encoding="utf-8")
+    guard = script.index('"${prod_public}" == "${next_public}"')
+    assert guard < script.index("gh pr merge")
+    assert "RELEASE_ALLOW_SAME_MINOR" in script
+    assert "bump-release.py minor" in script
 
 
 def test_unfold_environment_badge_is_full_label_tuple() -> None:

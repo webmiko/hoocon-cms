@@ -20,6 +20,7 @@ from typing import Any
 from django.db.models import Case, F, IntegerField, QuerySet, Value, When
 from django.utils import timezone
 
+from catalog.etl.sku_variant import HVA_CODE_SQL_PATTERN
 from catalog.models import SKU
 
 NEW_WINDOW_DAYS: int = 30
@@ -29,7 +30,7 @@ NOVINKI_CAROUSEL_LIMIT: int = 20
 # HV wave (2025 catalog fill): all HVA; HVD fast-Q; spring P; capacitor QX.
 _HV_NEWNESS_CODE = re.compile(
     r"(?i)^(?:"
-    r"hva(?:24|230)s?-\d+(?:uq|q|p|qx)?"
+    rf"{HVA_CODE_SQL_PATTERN}"
     r"|hvd(?:24|230)s?-\d+(?:q|qx)"
     r")$",
 )

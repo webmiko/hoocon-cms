@@ -67,7 +67,7 @@ class SocialAnnounceAdminMixin:
         """Typed shim — real implementation comes from ModelAdmin."""
         admin.ModelAdmin.message_user(self, *args, **kwargs)  # type: ignore[arg-type]
 
-    @admin.action(description=_("Опубликовать в соцсети (Telegram / VK / MAX)"))
+    @admin.action(description=_("Опубликовать в соцсети (Telegram / VK / MAX)"), permissions=("change",))
     def announce_to_social(
         self,
         request: HttpRequest,

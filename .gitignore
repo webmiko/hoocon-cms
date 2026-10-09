@@ -125,3 +125,6 @@ celerybeat.pid
 
 # Шаблоны коммитов (не коммитить)
 .git_commit_template
+
+# Poetry is canonical (backend/poetry.lock); stray uv lock must not be committed.
+backend/uv.lock

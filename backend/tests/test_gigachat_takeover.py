@@ -9,7 +9,11 @@ import pytest
 from django.utils import timezone
 
 from sitesettings.models import SiteSettings
-from supportchat.gigachat.manager_silence import manager_reply_timeout_seconds
+from supportchat.gigachat.busy_followup import escalation_busy_followup_seconds
+from supportchat.gigachat.manager_silence import (
+    escalation_takeover_seconds,
+    manager_reply_timeout_seconds,
+)
 from supportchat.gigachat.triage import gigachat_mode, is_triage_mode
 from supportchat.models import (
     Channel,
@@ -33,19 +37,29 @@ def gigachat_on(settings, monkeypatch: pytest.MonkeyPatch) -> SiteSettings:
     return site
 
 
-def _escalated_conversation() -> Conversation:
+def _escalated_conversation(*, ago: timedelta = timedelta(0)) -> Conversation:
     return Conversation.objects.create(
         channel=Channel.WEB,
         external_user_id="takeover",
         ai_active=False,
-        ai_escalated_at=timezone.now(),
+        ai_escalated_at=timezone.now() - ago,
     )
 
 
+def _stale_escalation() -> Conversation:
+    """Handoff nobody picked up for longer than the takeover window."""
+    return _escalated_conversation(ago=timedelta(seconds=escalation_takeover_seconds() + 60))
+
+
 @pytest.mark.django_db(transaction=True)
-def test_inbound_schedules_watchdog_when_manager_owned(gigachat_on, django_capture_on_commit_callbacks) -> None:
-    """Входящее в эскалированном диалоге ставит watchdog подхвата ботом."""
+def test_inbound_schedules_watchdog_when_manager_owned(
+    gigachat_on, django_user_model, django_capture_on_commit_callbacks
+) -> None:
+    """Менеджер вёл диалог и замолчал — watchdog через окно ответа (45 с)."""
+    staff = django_user_model.objects.create_user(username="owner", is_staff=True)
     conv = _escalated_conversation()
+    conv.assignee = staff
+    conv.save(update_fields=["assignee"])
     with django_capture_on_commit_callbacks(execute=True):
         with patch("supportchat.tasks.support_manager_silence_watchdog.apply_async") as enqueue:
             add_inbound_message(conv, "А привод DA2MU24 в наличии?")
@@ -53,6 +67,79 @@ def test_inbound_schedules_watchdog_when_manager_owned(gigachat_on, django_captu
     enqueue.assert_called_once()
     assert enqueue.call_args.kwargs["countdown"] == 45
     assert enqueue.call_args.kwargs["args"][0] == conv.pk
+
+
+@pytest.mark.django_db(transaction=True)
+def test_inbound_on_fresh_handoff_waits_for_human(gigachat_on, django_capture_on_commit_callbacks) -> None:
+    """M24: свежая передача менеджеру — watchdog не раньше окна эскалации."""
+    conv = _escalated_conversation()
+    with django_capture_on_commit_callbacks(execute=True):
+        with patch("supportchat.tasks.support_manager_silence_watchdog.apply_async") as enqueue:
+            add_inbound_message(conv, "А привод DA2MU24 в наличии?")
+
+    enqueue.assert_called_once()
+    countdown = enqueue.call_args.kwargs["countdown"]
+    assert countdown > escalation_busy_followup_seconds()
+    assert countdown >= escalation_takeover_seconds() - 5
+
+
+def test_takeover_window_outlasts_busy_followup(settings) -> None:
+    """M24: «менеджеры заняты» всегда раньше возврата бота, даже при коротком stale."""
+    settings.SUPPORT_AI_RESUME_STALE_MINUTES = 1
+    settings.SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = 300
+    assert escalation_takeover_seconds() > escalation_busy_followup_seconds()
+
+
+@pytest.mark.django_db
+def test_watchdog_does_not_take_fresh_handoff(gigachat_on) -> None:
+    """M24: через 45 с после передачи менеджеру бот не забирает чат обратно."""
+    conv = _escalated_conversation(ago=timedelta(seconds=manager_reply_timeout_seconds() + 5))
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Нужен менеджер",
+    )
+
+    with patch("supportchat.tasks.gigachat_reply.delay") as reply_delay:
+        result = support_manager_silence_watchdog(conv.pk, inbound.pk)
+
+    assert result == "escalation_waiting"
+    reply_delay.assert_not_called()
+    conv.refresh_from_db()
+    assert conv.ai_active is False
+    assert conv.ai_escalated_at is not None
+
+
+@pytest.mark.django_db
+def test_gigachat_outage_escalation_does_not_loop(gigachat_on, django_capture_on_commit_callbacks) -> None:
+    """M24: GigaChat недоступен → эскалация не возвращается боту через минуту.
+
+    Раньше watchdog через 45 с снимал эскалацию, бот снова падал и клиент
+    получал «бот недоступен» / «бот вернулся» по кругу.
+    """
+    from supportchat.gigachat.client import GigachatError
+    from supportchat.tasks import gigachat_reply
+
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="down-loop")
+    inbound = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Подскажите по приводу",
+    )
+    with (
+        patch("supportchat.gigachat.reply.generate_ai_reply", side_effect=GigachatError("down")),
+        patch("supportchat.tasks.support_manager_silence_watchdog.apply_async") as enqueue,
+        patch("supportchat.tasks.support_escalation_busy_followup.apply_async"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        gigachat_reply.push_request(retries=gigachat_reply.max_retries)
+        try:
+            gigachat_reply.run(conv.pk, inbound.pk)
+        finally:
+            gigachat_reply.pop_request()
+
+    assert enqueue.call_args.kwargs["countdown"] > escalation_busy_followup_seconds()
+    assert support_manager_silence_watchdog(conv.pk, inbound.pk) == "escalation_waiting"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -78,7 +165,7 @@ def test_escalation_schedules_watchdog(gigachat_on, django_capture_on_commit_cal
 @pytest.mark.django_db
 def test_watchdog_takeover_skips_reply_when_already_answered(gigachat_on) -> None:
     """Вопрос уже отвечен ботом до эскалации — повторный ответ не нужен."""
-    conv = _escalated_conversation()
+    conv = _stale_escalation()
     inbound = Message.objects.create(
         conversation=conv,
         direction=MessageDirection.INBOUND,
@@ -138,7 +225,7 @@ def test_watchdog_resumes_ai_when_manager_silent(gigachat_on, django_user_model)
 @pytest.mark.django_db
 def test_watchdog_takeover_answers_latest_inbound(gigachat_on) -> None:
     """Серия сообщений клиента — ответ один, по последнему входящему."""
-    conv = _escalated_conversation()
+    conv = _stale_escalation()
     first = Message.objects.create(
         conversation=conv,
         direction=MessageDirection.INBOUND,

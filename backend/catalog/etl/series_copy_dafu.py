@@ -11,13 +11,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from django.db import transaction
+
 from catalog.etl.attr_groups import (
     ATTR_GROUP_ELECTRICAL,
     ATTR_GROUP_FUNCTIONAL,
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
@@ -27,10 +29,12 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_LABEL,
     MANUAL_OVERRIDE_NONE,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
+    PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
 )
-from catalog.models import SKU, AttributeValue, Product
+from catalog.models import SKU, Product
 
 _DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
 _DAFU_PRODUCT = re.compile(r"(?i)dafu")
@@ -58,13 +62,6 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "rotation-angle",
         "°",
         "макс. 95°",
-        ATTR_GROUP_FUNCTIONAL,
-    ),
-    (
-        "Уровень шума",
-        "noise",
-        "дБ(A)",
-        "макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины",
         ATTR_GROUP_FUNCTIONAL,
     ),
     (
@@ -103,20 +100,6 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         ATTR_GROUP_OPERATING,
     ),
     (
-        "Длина вала заслонки",
-        "shaft-length",
-        "мм",
-        "> 50 мм",
-        ATTR_GROUP_SIZE,
-    ),
-    (
-        "Диаметр вала",
-        "shaft-diameter",
-        "мм",
-        "круглый 10…16 мм, квадратный 7×7…11×11 мм",
-        ATTR_GROUP_SIZE,
-    ),
-    (
         "Длина кабеля",
         "cable-length",
         "мм",
@@ -132,61 +115,138 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
     ),
 )
 
-# Torque family → moment / damper / power / running / weight / transformer.
-# DA5 rows match the published manual; other Nm from series tables / site copy.
 _TorqueSpec = dict[str, str]
 # Overall housing from DA5FU dimension photo (Ш × В × Г); DA3 shares the small body.
 _DAFU_SMALL_DIMENSIONS = "98 × 156 × 84 мм"
 # DA10…20 share the large spring-return body (page-3 «Габаритные размеры»).
 _DAFU_LARGE_DIMENSIONS = "100 × 249 × 87,3 мм"
 
+# Torque family → fields common to every edition of that Nm.
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
         "moment": "3 Нм",
         "damper-area": "до 0,3 м²",
-        "power": "5 Вт под нагрузкой / 2 Вт в режиме удержания",
-        "running-time": "≤ 20 с",
-        "weight": "< 1,3 кг",
         "transformer-va": "5 В·А",
         "dimensions": _DAFU_SMALL_DIMENSIONS,
     },
     5: {
         "moment": "5 Нм",
         "damper-area": "до 0,5 м²",
-        "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
-        "running-time": "≤ 20 с",
-        "weight": "< 1,5 кг",
         "transformer-va": "10 В·А",
         "dimensions": _DAFU_SMALL_DIMENSIONS,
     },
     10: {
         "moment": "10 Нм",
         "damper-area": "до 1,0 м²",
-        "power": "6 Вт под нагрузкой / 1,5 Вт в режиме удержания",
-        "running-time": "≤ 25 с",
-        "weight": "< 2,6 кг",
         "transformer-va": "10 В·А",
         "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
     15: {
         "moment": "15 Нм",
         "damper-area": "до 1,5 м²",
-        "power": "7 Вт под нагрузкой / 2 Вт в режиме удержания",
-        "running-time": "≤ 25 с",
-        "weight": "< 2,6 кг",
         "transformer-va": "15 В·А",
         "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
     20: {
         "moment": "20 Нм",
         "damper-area": "до 2,0 м²",
-        "power": "10 Вт под нагрузкой / 3,5 Вт в режиме удержания",
-        "running-time": "≤ 25 с",
-        "weight": "< 2,8 кг",
         "transformer-va": "20 В·А",
         "dimensions": _DAFU_LARGE_DIMENSIONS,
     },
 }
+
+EDITION_ON_OFF = "D"
+EDITION_MODULATING = "A"
+
+_SHAFT_SMALL = {
+    "shaft-length": "> 50 мм",
+    "shaft-diameter": "круглый 10…16 мм, квадратный 7×7…11×11 мм",
+}
+_SHAFT_LARGE_ON_OFF = {
+    "shaft-length": "> 90 мм",
+    "shaft-diameter": "круглый 10…21 мм, квадратный 9×9…15×15 мм",
+}
+_NOISE_62 = "макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"
+
+# (Nm, edition) → RU manual table: DA3FU-D/DS, DA5FU-D/DS, DA5FU24-A/AS,
+# DA10-15-20FU24/230-D/DS, DA10-15-20FU24-A/AS. «running-time» is the motor
+# time followed by the spring return, same shape as SAFU.
+EDITION_SPECS: dict[tuple[int, str], _TorqueSpec] = {
+    (3, EDITION_ON_OFF): {
+        "running-time": "< 75 с / возврат пружины < 25 с",
+        "power": "5 Вт под нагрузкой / 2 Вт в режиме удержания",
+        "weight": "< 1,3 кг",
+        "shaft-length": "> 50 мм",
+        "shaft-diameter": "квадратный 12×12 мм (втулки 8×8, 10×10 мм)",
+        "noise": "макс. 45 дБ(А) при работе двигателя, макс. 50 дБ(А) при возврате пружины",
+    },
+    (5, EDITION_ON_OFF): {
+        "running-time": "< 70 с / возврат пружины < 20 с",
+        "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
+        "weight": "< 1,5 кг",
+        **_SHAFT_SMALL,
+        "noise": _NOISE_62,
+    },
+    (5, EDITION_MODULATING): {
+        "running-time": "< 100 с / возврат пружины < 20 с",
+        "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
+        "weight": "< 1,5 кг",
+        **_SHAFT_SMALL,
+        "noise": _NOISE_62,
+    },
+    (10, EDITION_ON_OFF): {
+        "running-time": "< 100 с / возврат пружины < 25 с",
+        "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
+        "weight": "< 2,3 кг",
+        **_SHAFT_LARGE_ON_OFF,
+        "noise": _NOISE_62,
+    },
+    (10, EDITION_MODULATING): {
+        "running-time": "< 110 с / возврат пружины < 25 с",
+        "power": "6 Вт под нагрузкой / 1,5 Вт в режиме удержания",
+        "weight": "< 2,6 кг",
+        **_SHAFT_SMALL,
+        "noise": _NOISE_62,
+    },
+    **{
+        (nm, EDITION_ON_OFF): {
+            "running-time": "< 150 с / возврат пружины < 25 с",
+            "power": "10 Вт под нагрузкой / 3 Вт в режиме удержания",
+            "weight": "< 2,5 кг",
+            **_SHAFT_LARGE_ON_OFF,
+            "noise": _NOISE_62,
+        }
+        for nm in (15, 20)
+    },
+    **{
+        (nm, EDITION_MODULATING): {
+            "running-time": "< 150 с / возврат пружины < 25 с",
+            "power": "10 Вт под нагрузкой / 3 Вт в режиме удержания",
+            "weight": "< 2,6 кг",
+            **_SHAFT_SMALL,
+            "noise": _NOISE_62,
+        }
+        for nm in (15, 20)
+    },
+}
+
+
+def dafu_edition(variant: SkuVariant) -> str:
+    """Manual table an article belongs to: A/AS for modulating, else D/DS."""
+    return EDITION_MODULATING if variant.control == "modulating" else EDITION_ON_OFF
+
+
+def dafu_spec(torque_nm: int, edition: str) -> _TorqueSpec | None:
+    """Merge torque fields with the edition table; DA3 has only D/DS."""
+    base = TORQUE_SPECS.get(torque_nm)
+    if base is None:
+        return None
+    extra = EDITION_SPECS.get((torque_nm, edition)) or EDITION_SPECS.get(
+        (torque_nm, EDITION_ON_OFF),
+        {},
+    )
+    return {**base, **extra}
+
 
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
@@ -228,8 +288,10 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
             "",
             "Проверка совместимости:",
             "– Убедитесь, что вал заслонки соответствует требованиям:",
-            "– Длина вала: > 50 мм.",
+            "– Длина вала: > 50 мм; DA10…20FU -D / -DS: > 90 мм.",
             "– Диаметр вала: круглый 10…16 мм, квадратный 7×7…11×11 мм.",
+            "– DA3FU: квадратный вал 12×12 мм (втулки 8×8, 10×10 мм).",
+            "– DA10…20FU -D / -DS: круглый 10…21 мм, квадратный 9×9…15×15 мм.",
             (
                 "– Подберите модель по крутящему моменту (3–20 Нм) и площади заслонки "
                 "(см. таблицу характеристик выбранного артикула)."
@@ -290,7 +352,7 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
             "Аварийный возврат пружиной:",
             (
                 "– При отключении питания пружина возвращает заслонку в исходное положение "
-                "(время возврата пружины < 20 с; время поворота двигателя — см. характеристики)."
+                "(время возврата пружины < 20…25 с; время поворота двигателя — см. характеристики)."
             ),
             "",
             "6. Техника безопасности и обслуживание",
@@ -355,10 +417,10 @@ def instructions_for_dafu_sku(sku_code: str) -> str | None:
     torque_nm = parse_dafu_torque_nm(sku_code)
     if torque_nm is None:
         return None
-    row = TORQUE_SPECS.get(torque_nm)
+    variant = parse_sku_variant(sku_code)
+    row = dafu_spec(torque_nm, dafu_edition(variant))
     if row is None:
         return None
-    variant = parse_sku_variant(sku_code)
     series = f"DA{torque_nm}FU"
     lines: list[str] = [
         f"Инструкция по установке и управлению приводом заслонки Hoocon {series}",
@@ -369,8 +431,8 @@ def instructions_for_dafu_sku(sku_code: str) -> str | None:
         "1. Подготовка к установке",
         "",
         "Проверка совместимости:",
-        "– Длина вала заслонки: > 50 мм.",
-        "– Диаметр вала: круглый 10…16 мм, квадратный 7×7…11×11 мм.",
+        f"– Длина вала заслонки: {row['shaft-length']}.",
+        f"– Диаметр вала: {row['shaft-diameter']}.",
         (f"– Крутящий момент: {row['moment']}; площадь заслонки {format_damper_area(row['damper-area'])}."),
         f"– Габаритные размеры: {row['dimensions']}.",
         "",
@@ -447,7 +509,7 @@ def instructions_for_dafu_sku(sku_code: str) -> str | None:
             "",
             (
                 f"– При отключении питания пружина возвращает заслонку в исходное положение "
-                f"(время поворота двигателя {row['running-time']}; возврат пружины < 20 с)."
+                f"(время поворота двигателя {row['running-time']})."
             ),
             "",
             f"{next_ch + 1}. Техника безопасности и обслуживание",
@@ -496,10 +558,8 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
-def _clear_sku_attributes(sku: SKU) -> None:
-    AttributeValue.objects.filter(sku=sku).delete()
-
-
+@cached_attributes
+@transaction.atomic
 def apply_dafu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Rewrite all DAFU products/SKUs from the datasheet canon.
 
@@ -522,32 +582,33 @@ def apply_dafu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             torque_nm = parse_dafu_torque_nm(sku.sku_code)
             if torque_nm is not None:
                 break
-        if torque_nm is None:
-            continue
-        spec = TORQUE_SPECS.get(torque_nm)
-        if spec is None:
+        if torque_nm is None or torque_nm not in TORQUE_SPECS:
             continue
         title = _product_title(torque_nm)
         if not dry_run:
-            product.name = title[:300]
-            product.description = SERIES_DESCRIPTION
-            product.instructions = SERIES_INSTRUCTIONS
-            product.specs_text = ""
-            product.save(
-                update_fields=["name", "description", "instructions", "specs_text"],
+            write_copy(
+                product,
+                name=title[:300],
+                description=SERIES_DESCRIPTION,
+                instructions=SERIES_INSTRUCTIONS,
+                specs_text="",
             )
 
         category_slug = product.category.slug if product.category_id else ""
         for sku in skus:
             nm = parse_dafu_torque_nm(sku.sku_code) or torque_nm
-            row = TORQUE_SPECS.get(nm, spec)
             variant = parse_sku_variant(sku.sku_code)
+            row = dafu_spec(nm, dafu_edition(variant)) or dafu_spec(torque_nm, dafu_edition(variant))
+            if row is None:
+                continue
             if not dry_run:
-                sku.name = title[:300]
-                sku.description = _sku_description(variant, nm, row)
-                sku.specs_text = ""
-                sku.save(update_fields=["name", "description", "specs_text"])
-                _clear_sku_attributes(sku)
+                write_copy(
+                    sku,
+                    name=title[:300],
+                    description=_sku_description(variant, nm, row),
+                    specs_text="",
+                )
+                clear_etl_attributes(sku)
 
             for name, slug, unit, value, _group in SHARED_ATTRS:
                 if not dry_run:
@@ -570,7 +631,28 @@ def apply_dafu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     row["running-time"],
                     ATTR_GROUP_FUNCTIONAL,
                 ),
+                (
+                    "Уровень шума",
+                    "noise",
+                    "дБ(A)",
+                    row["noise"],
+                    ATTR_GROUP_FUNCTIONAL,
+                ),
                 ("Масса", "weight", "кг", row["weight"], ATTR_GROUP_SIZE),
+                (
+                    "Длина вала заслонки",
+                    "shaft-length",
+                    "мм",
+                    row["shaft-length"],
+                    ATTR_GROUP_SIZE,
+                ),
+                (
+                    "Диаметр вала",
+                    "shaft-diameter",
+                    "мм",
+                    row["shaft-diameter"],
+                    ATTR_GROUP_SIZE,
+                ),
                 (
                     "Габаритные размеры",
                     "dimensions",
@@ -605,7 +687,7 @@ def apply_dafu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "III (безопасное сверхнизкое напряжение)",
+                        PROTECTION_CLASS_III,
                     )
                     _set_attr(
                         sku,
@@ -629,7 +711,7 @@ def apply_dafu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "II (все изолировано / полная изоляция)",
+                        PROTECTION_CLASS_II,
                     )
                 attrs += 2
 

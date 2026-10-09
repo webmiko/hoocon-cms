@@ -24,10 +24,10 @@ from pathlib import Path
 from typing import Any, Final
 
 import pypdfium2 as pdfium
-from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image, ImageChops
 
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.manual_pdfs import default_manuals_dir
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, MAX_EDGE_PX, convert_bytes_to_webp
 from catalog.models import SKU, ProductImage
@@ -189,35 +189,19 @@ def _upsert_dimensions(
     dry_run: bool,
 ) -> tuple[str, int]:
     """Create/update the catalog dimensions tile; return (action, demoted)."""
-    source_url = _SOURCE.format(stem=stem)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return ("update" if existing else "create"), 0
-    filename = f"{stem}-dimensions.webp"
     with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=SORT_DIMENSIONS,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            keep_pk = image.pk
-            action = "create"
-        else:
-            existing.alt = alt[:300]
-            existing.sort_order = SORT_DIMENSIONS
-            existing.is_published = True
-            existing.image.save(filename, ContentFile(webp), save=False)
-            existing.full_clean()
-            existing.save()
-            keep_pk = existing.pk
-            action = "update"
-        demoted = _demote_other_dimension_tiles(sku, keep_pk=keep_pk)
+        action, image = upsert_sku_image(
+            sku,
+            source_url=_SOURCE.format(stem=stem),
+            filename=f"{stem}-dimensions.webp",
+            webp=webp,
+            alt=alt,
+            sort_order=SORT_DIMENSIONS,
+            dry_run=dry_run,
+        )
+        if dry_run or image is None:
+            return action, 0
+        demoted = _demote_other_dimension_tiles(sku, keep_pk=image.pk)
     return action, demoted
 
 
@@ -290,7 +274,9 @@ def apply_hv_catalog_dimensions(
         summary["demoted"] += demoted
         if action == "create":
             summary["created"] += 1
-        else:
+        elif action == "update":
             summary["updated"] += 1
-    summary["attached"] = summary["created"] + summary["updated"]
+        else:
+            summary["unchanged"] = summary.get("unchanged", 0) + 1
+    summary["attached"] = summary["created"] + summary["updated"] + summary.get("unchanged", 0)
     return summary

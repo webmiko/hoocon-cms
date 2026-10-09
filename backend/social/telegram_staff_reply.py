@@ -215,7 +215,8 @@ def staff_transfer_keyboard_markup(
     exclude_pk: int | None = None,
 ) -> dict[str, Any]:
     """Inline keyboard listing colleagues the dialog can be handed to."""
-    from supportchat.services import staff_public_name, staff_transfer_candidates
+    from supportchat.presentation import staff_public_name
+    from supportchat.staff_actions import staff_transfer_candidates
 
     buttons = [
         [
@@ -266,6 +267,6 @@ def submit_staff_reply_from_telegram(
     body: str,
 ) -> tuple[bool, str]:
     """Store staff reply and enqueue delivery to the client's channel."""
-    from supportchat.services import submit_staff_reply
+    from supportchat.staff_actions import submit_staff_reply
 
     return submit_staff_reply(staff_user, conversation_id, body)

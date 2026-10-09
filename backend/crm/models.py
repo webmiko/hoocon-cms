@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.utils import timezone
@@ -401,9 +402,9 @@ def email_attachment_upload_to(instance: EmailAttachment, filename: str) -> str:
     Filenames from mail are untrusted — sanitize; uuid part prevents
     collisions for repeated filenames in one message.
     """
-    from catalog.validators import sanitize_upload_filename
+    from catalog.validators import storage_safe_filename
 
-    safe = sanitize_upload_filename(filename)
+    safe = storage_safe_filename(filename)
     return f"email_attachments/{instance.email_id}/{uuid.uuid4().hex}_{safe}"
 
 
@@ -488,6 +489,21 @@ class QuoteStatus(models.TextChoices):
     REJECTED = "rejected", "Отклонено"
 
 
+# Draft → Accepted/Rejected skips the PDF and the client email, so a quote
+# must be issued first. Back to draft only from «Выдано» (recall to fix).
+QUOTE_TRANSITIONS: dict[str, frozenset[str]] = {
+    QuoteStatus.DRAFT: frozenset({QuoteStatus.SENT}),
+    QuoteStatus.SENT: frozenset({QuoteStatus.DRAFT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED}),
+    QuoteStatus.ACCEPTED: frozenset({QuoteStatus.SENT, QuoteStatus.REJECTED}),
+    QuoteStatus.REJECTED: frozenset({QuoteStatus.SENT, QuoteStatus.ACCEPTED}),
+}
+
+
+def quote_transition_allowed(current: str, target: str) -> bool:
+    """True when ``current`` → ``target`` is a legal КП status move (same = no-op)."""
+    return current == target or target in QUOTE_TRANSITIONS.get(current, frozenset())
+
+
 class Quote(models.Model):
     """Коммерческое предложение — результат обработки заявки.
 
@@ -570,6 +586,16 @@ class Quote(models.Model):
         """Human label: number + client."""
         return f"{self.number or f'КП-{self.pk}'} · {self.client}"
 
+    def clean(self) -> None:
+        """Reject illegal status moves on Admin edit (see ``QUOTE_TRANSITIONS``)."""
+        super().clean()
+        if self.pk is None:
+            return
+        current = Quote.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+        if current is not None and not quote_transition_allowed(current, self.status):
+            source, target = QuoteStatus(current).label, QuoteStatus(self.status).label
+            raise ValidationError({"status": f"Нельзя перевести КП из «{source}» в «{target}»."})
+
     def save(self, *args: object, **kwargs: object) -> None:
         """Assign sequential number and default validity on first save."""
         if self._state.adding and self.valid_until is None:
@@ -634,9 +660,9 @@ class QuoteItem(models.Model):
 
 def client_document_upload_to(instance: ClientDocument, filename: str) -> str:
     """Store under ``client_docs/<client_id>/<uuid>_<safe_name>`` (private)."""
-    from catalog.validators import sanitize_upload_filename
+    from catalog.validators import storage_safe_filename
 
-    safe = sanitize_upload_filename(filename)
+    safe = storage_safe_filename(filename)
     return f"client_docs/{instance.client_id}/{uuid.uuid4().hex}_{safe}"
 
 
@@ -820,6 +846,12 @@ class CompanyMember(models.Model):
         choices=CompanyMemberRole.choices,
         default=CompanyMemberRole.BUYER,
     )
+    is_confirmed: models.BooleanField = models.BooleanField(
+        "подтверждён менеджером",
+        default=False,
+        help_text="Только подтверждённые сотрудники видят ИНН, адрес и состав компании в кабинете. "
+        "Связь по названию из заявки создаётся неподтверждённой.",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
 
     class Meta:
@@ -962,5 +994,5 @@ class Call(models.Model):
 
     def __str__(self) -> str:
         arrow = "→" if self.direction == CallDirection.OUTBOUND else "←"
-        when = self.started_at or self.created_at
+        when = timezone.localtime(self.started_at or self.created_at)
         return f"{self.from_number or '?'} {arrow} {self.to_number or '?'} · {when:%d.%m %H:%M}"

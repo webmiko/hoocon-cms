@@ -1,8 +1,12 @@
 /**
  * Analytics events after consent (Yandex Metrika + GA4).
  *
- * Counter scripts load in Analytics.tsx; this module only fires when APIs exist.
+ * Counter scripts load in Analytics.tsx; this module only fires when APIs exist
+ * and consent is still given — it is re-read on every call because the visitor
+ * may withdraw it without a reload.
  */
+
+import { isAnalyticsAllowed, readCookieConsent } from "./cookieConsent";
 
 export type LeadTrackType = "rfq" | "consultation" | "replacement";
 
@@ -35,6 +39,24 @@ export function setAnalyticsCounters(
     ga4MeasurementId.startsWith("G-") ? ga4MeasurementId : null;
 }
 
+function thirdPartyAllowed(): boolean {
+  return typeof window !== "undefined" && isAnalyticsAllowed(readCookieConsent());
+}
+
+/**
+ * Switch the loaded GA4 tag on/off after a consent change.
+ *
+ * Metrika has no runtime off switch (webvisor keeps recording), so the
+ * caller reloads the tab on withdrawal; this covers GA4 and the gap.
+ */
+export function applyAnalyticsConsent(allowed: boolean): void {
+  if (typeof window === "undefined") return;
+  if (ga4Id !== null) {
+    (window as unknown as Record<string, unknown>)[`ga-disable-${ga4Id}`] = !allowed;
+  }
+  window.gtag?.("consent", "update", { analytics_storage: allowed ? "granted" : "denied" });
+}
+
 /** Reset SPA hit dedupe (tests / consent re-init). */
 export function resetSpaHitTracking(): void {
   lastSpaHitPath = null;
@@ -60,6 +82,7 @@ export function trackSpaHit(path: string, title?: string): void {
     return;
   }
   lastSpaHitPath = normalized;
+  if (!thirdPartyAllowed()) return;
 
   const pageTitle = title ?? (typeof document !== "undefined" ? document.title : "");
   if (ymCounterId !== null && typeof window !== "undefined" && window.ym) {
@@ -81,6 +104,7 @@ export function trackSpaHit(path: string, title?: string): void {
  *   leadType: RFQ / consultation / Belimo replacement.
  */
 export function trackLeadSubmit(leadType: LeadTrackType): void {
+  if (!thirdPartyAllowed()) return;
   if (ymCounterId !== null && typeof window !== "undefined" && window.ym) {
     window.ym(ymCounterId, "reachGoal", LEAD_SUBMIT_GOAL, {
       lead_type: leadType,
@@ -98,6 +122,7 @@ function trackQuizGoal(
   goal: string,
   params?: Record<string, string | number | boolean>,
 ): void {
+  if (!thirdPartyAllowed()) return;
   if (ymCounterId !== null && typeof window !== "undefined" && window.ym) {
     window.ym(ymCounterId, "reachGoal", goal, params);
   }

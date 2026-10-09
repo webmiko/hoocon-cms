@@ -162,12 +162,13 @@ def test_post_lead_schedules_client_confirmation(client) -> None:
     from unittest.mock import patch
 
     payload = {
+        "pdn_consent": True,
         "name": "Anna",
         "email": "anna@example.com",
         "company": "ООО ВентСервис",
         "message": "Помогите подобрать привод для вентиляции.",
     }
-    with patch("leads.views.send_lead_client_confirmation") as mock_task:
+    with patch("leads.lifecycle.send_lead_client_confirmation") as mock_task:
         response = client.post("/api/leads/", data=payload, content_type="application/json")
     assert response.status_code == 201
     lead = Lead.objects.first()

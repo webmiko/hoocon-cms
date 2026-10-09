@@ -28,7 +28,6 @@ import tempfile
 from pathlib import Path
 from typing import Any, Final, Literal
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 
 from catalog.etl.hv_media_webp import (
@@ -36,8 +35,9 @@ from catalog.etl.hv_media_webp import (
     _demote_other_product_shots,
     default_media_webp_root,
 )
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, MAX_EDGE_PX, convert_bytes_to_webp
-from catalog.models import SKU, Product, ProductImage
+from catalog.models import SKU, Product
 
 logger = logging.getLogger(__name__)
 
@@ -273,38 +273,18 @@ def _upsert_product(
     dry_run: bool,
 ) -> str:
     """Create or update the media-webp product hero; demote other heroes."""
-    source_url = _SOURCE_URL.format(stem=stem)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
-    alt = f"{label} | фото шарового крана"
-    filename = f"{sku.sku_code.lower()}-product.webp"
     with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=SORT_PRODUCT,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            action = "create"
-            keep_pk = image.pk
-        else:
-            existing.alt = alt[:300]
-            existing.sort_order = SORT_PRODUCT
-            existing.is_published = True
-            existing.image.save(filename, ContentFile(webp), save=False)
-            existing.full_clean()
-            existing.save()
-            action = "update"
-            keep_pk = existing.pk
-
-        _demote_other_product_shots(sku, keep_pk=keep_pk)
+        action, image = upsert_sku_image(
+            sku,
+            source_url=_SOURCE_URL.format(stem=stem),
+            filename=f"{sku.sku_code.lower()}-product.webp",
+            webp=webp,
+            alt=f"{label} | фото шарового крана",
+            sort_order=SORT_PRODUCT,
+            dry_run=dry_run,
+        )
+        if not dry_run and image is not None:
+            _demote_other_product_shots(sku, keep_pk=image.pk)
     return action
 
 
@@ -358,9 +338,11 @@ def _attach_product_shot(
         if action == "create":
             summary["created"] += 1
             created_n += 1
-        else:
+        elif action == "update":
             summary["updated"] += 1
             updated_n += 1
+        else:
+            summary["unchanged"] = summary.get("unchanged", 0) + 1
         logger.info(
             "ball_valve_media_webp %s %s ← %s (%s)",
             action,

@@ -24,19 +24,6 @@ _SERIES_NAV: tuple[tuple[str, str, str], ...] = (
     ("hvd", "HVD", "воздушные заслонки без пружинного возврата"),
 )
 
-_FORBIDDEN_OUTPUT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"##\s*\[", re.IGNORECASE),
-    re.compile(r"\bDA[A-Z0-9]{2,}", re.IGNORECASE),
-    re.compile(r"\bSA[A-Z0-9]{2,}", re.IGNORECASE),
-    re.compile(r"\bHV[A-Z0-9]{2,}", re.IGNORECASE),
-    re.compile(r"рекомендуем\b", re.IGNORECASE),
-    re.compile(r"\b\d+(?:[.,]\d+)?\s*н·м\b", re.IGNORECASE),
-    re.compile(r"\bmanual\.", re.IGNORECASE),
-    re.compile(r"\b\d+(?:[.,]\d+)?\s*(?:руб|₽|rub)\b", re.IGNORECASE),
-    re.compile(r"\b(?:срок\w*\s+поставк|в\s+наличии\s+на\s+складе)\b", re.IGNORECASE),
-    re.compile(r"\b(?:обычно|как\s+правило|по\s+опыту)\b", re.IGNORECASE),
-)
-
 _AREA_RE = re.compile(
     r"(?i)(\d+(?:[.,]\d+)?)\s*(?:кв\.?\s*м|м2|м²|квадрат)",
 )
@@ -55,14 +42,6 @@ def _product_kind(body: str) -> str:
     if has_valve:
         return "ball"
     return "actuator"
-
-
-def triage_response_violates_policy(text: str) -> bool:
-    """Triage bot must not recommend models or cite KB branches."""
-    body = (text or "").strip()
-    if not body:
-        return False
-    return any(pattern.search(body) for pattern in _FORBIDDEN_OUTPUT_PATTERNS)
 
 
 def product_clarification_already_sent(conversation: Conversation) -> bool:

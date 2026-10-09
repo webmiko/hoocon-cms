@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+if TYPE_CHECKING:
+    from rest_framework.permissions import _PermissionClass
+
 from config.admin_otp import AdminOtpDeliveryError, AdminOtpVerifyError
+from config.pagination import DefaultPagination
 from crm.models import Activity, Client
 from crm.services import (
     create_outbound_email,
@@ -52,12 +59,8 @@ from staff_api.serializers import (
 )
 from staff_api.tokens import issue_staff_token
 from supportchat.models import Conversation, ConversationStatus
-from supportchat.services import (
-    SupportChatError,
-    add_staff_reply,
-    count_staff_unread,
-    delete_unlinked_conversation,
-)
+from supportchat.rating import request_client_rating
+from supportchat.services import SupportChatError, add_staff_reply, count_staff_unread, delete_unlinked_conversation
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +75,21 @@ def _require_enabled() -> Response | None:
     return None
 
 
-class StaffPagination(PageNumberPagination):
+class StaffPagination(DefaultPagination):
     page_size = 20
-    page_size_query_param = "page_size"
-    max_page_size = 100
 
 
 class StaffAuthMixin:
-    authentication_classes = [StaffTokenAuthentication]
-    permission_classes = [IsStaffManager]
+    authentication_classes: Sequence[type[BaseAuthentication]] = (StaffTokenAuthentication,)
+    permission_classes: Sequence[_PermissionClass] = (IsStaffManager,)
+
+
+def _staff_user(request: Request) -> User:
+    """The token-authenticated manager (``IsStaffManager`` guarantees it)."""
+    user = request.user
+    if not isinstance(user, User):
+        raise NotAuthenticated
+    return user
 
 
 class OtpStartView(APIView):
@@ -158,7 +167,7 @@ class MeView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        return Response(serialize_user(request.user))
+        return Response(serialize_user(_staff_user(request)))
 
 
 class BadgesView(StaffAuthMixin, APIView):
@@ -168,7 +177,7 @@ class BadgesView(StaffAuthMixin, APIView):
             return blocked
         return Response(
             {
-                "leads_new": count_new_leads(user=request.user),
+                "leads_new": count_new_leads(user=_staff_user(request)),
                 "support_unread": count_staff_unread(),
             },
         )
@@ -179,13 +188,13 @@ class LeadListView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = scope_leads_for_manager(Lead.objects.all(), request.user).order_by("-created_at")
+        qs = scope_leads_for_manager(Lead.objects.all(), _staff_user(request)).order_by("-created_at")
         status_filter = (request.query_params.get("status") or "").strip()
         if status_filter:
             qs = qs.filter(status=status_filter)
         paginator = StaffPagination()
         page = paginator.paginate_queryset(qs, request)
-        data = [serialize_lead(lead) for lead in page]
+        data = [serialize_lead(lead) for lead in page or []]
         return paginator.get_paginated_response(data)
 
 
@@ -194,7 +203,7 @@ class LeadDetailView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = scope_leads_for_manager(Lead.objects.all(), request.user)
+        qs = scope_leads_for_manager(Lead.objects.all(), _staff_user(request))
         lead = get_object_or_404(qs, pk=pk)
         from leads.services import mark_lead_seen
 
@@ -208,9 +217,9 @@ class LeadTakeView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = scope_leads_for_manager(Lead.objects.all(), request.user)
+        qs = scope_leads_for_manager(Lead.objects.all(), _staff_user(request))
         lead = get_object_or_404(qs, pk=pk)
-        lead, taken = take_lead_in_work(lead, request.user)
+        lead, taken = take_lead_in_work(lead, _staff_user(request))
         if not taken:
             return Response(
                 {"detail": "Заявку уже взял другой менеджер."},
@@ -226,10 +235,10 @@ class LeadStatusView(StaffAuthMixin, APIView):
             return blocked
         ser = LeadStatusSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        qs = scope_leads_for_manager(Lead.objects.all(), request.user)
+        qs = scope_leads_for_manager(Lead.objects.all(), _staff_user(request))
         lead = get_object_or_404(qs, pk=pk)
         new_status = ser.validated_data["status"]
-        lead, error = set_lead_status(lead, status=new_status, actor=request.user)
+        lead, error = set_lead_status(lead, status=new_status, actor=_staff_user(request))
         if error == "conflict":
             return Response(
                 {"detail": "Заявку уже взял другой менеджер."},
@@ -245,7 +254,7 @@ class ClientListView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = scope_clients_for_manager(Client.objects.all(), request.user).order_by("-id")
+        qs = scope_clients_for_manager(Client.objects.all(), _staff_user(request)).order_by("-id")
         q = (request.query_params.get("q") or "").strip()
         if q:
             from django.db.models import Q
@@ -255,7 +264,7 @@ class ClientListView(StaffAuthMixin, APIView):
             )
         paginator = StaffPagination()
         page = paginator.paginate_queryset(qs, request)
-        return paginator.get_paginated_response([serialize_client(c) for c in page])
+        return paginator.get_paginated_response([serialize_client(c) for c in page or []])
 
 
 class ClientDetailView(StaffAuthMixin, APIView):
@@ -263,7 +272,7 @@ class ClientDetailView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        qs = scope_clients_for_manager(Client.objects.all(), request.user)
+        qs = scope_clients_for_manager(Client.objects.all(), _staff_user(request))
         client = get_object_or_404(qs, pk=pk)
         return Response(serialize_client(client, detail=True))
 
@@ -275,14 +284,14 @@ class ClientActivityCreateView(StaffAuthMixin, APIView):
             return blocked
         ser = ActivityCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        qs = scope_clients_for_manager(Client.objects.all(), request.user)
+        qs = scope_clients_for_manager(Client.objects.all(), _staff_user(request))
         client = get_object_or_404(qs, pk=pk)
         act = Activity.objects.create(
             client=client,
             activity_type=ser.validated_data["activity_type"],
             subject=ser.validated_data.get("subject") or "",
             body=ser.validated_data.get("body") or "",
-            author=request.user,
+            author=_staff_user(request),
         )
         return Response(
             {
@@ -302,7 +311,7 @@ class ClientEmailCreateView(StaffAuthMixin, APIView):
             return blocked
         ser = EmailCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        qs = scope_clients_for_manager(Client.objects.all(), request.user)
+        qs = scope_clients_for_manager(Client.objects.all(), _staff_user(request))
         client = get_object_or_404(qs, pk=pk)
         to_email = (ser.validated_data.get("to_email") or "").strip() or None
         msg = create_outbound_email(
@@ -310,7 +319,7 @@ class ClientEmailCreateView(StaffAuthMixin, APIView):
             subject=ser.validated_data["subject"],
             body=ser.validated_data["body"],
             to_email=to_email,
-            author=request.user,
+            author=_staff_user(request),
             send_now=bool(ser.validated_data.get("send_now", True)),
         )
         return Response(
@@ -333,7 +342,7 @@ class ConversationListView(StaffAuthMixin, APIView):
         paginator = StaffPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(
-            [serialize_conversation(c) for c in page],
+            [serialize_conversation(c) for c in page or []],
         )
 
 
@@ -352,6 +361,10 @@ class ConversationDetailView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not _staff_user(request).has_perm("supportchat.delete_conversation"):
+            return Response(
+                {"detail": "Удалять диалоги может только администратор."}, status=status.HTTP_403_FORBIDDEN
+            )
         conv = get_object_or_404(Conversation, pk=pk)
         try:
             delete_unlinked_conversation(conv)
@@ -385,7 +398,7 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
             try:
-                msg = add_staff_reply(conv, ser.validated_data["body"], author=request.user)
+                msg = add_staff_reply(conv, ser.validated_data["body"], author=_staff_user(request))
             except SupportChatError as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         from supportchat.tasks import deliver_outbound_message
@@ -421,7 +434,7 @@ class ConversationAssignView(StaffAuthMixin, APIView):
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
-            conv.assignee = request.user
+            conv.assignee = _staff_user(request)
             conv.status = ConversationStatus.OPEN
             conv.save(update_fields=["assignee", "status", "updated_at"])
         return Response(serialize_conversation(conv))
@@ -435,8 +448,10 @@ class ConversationCloseView(StaffAuthMixin, APIView):
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
-            conv.status = ConversationStatus.CLOSED
-            conv.save(update_fields=["status", "updated_at"])
+            if conv.status != ConversationStatus.CLOSED:
+                conv.status = ConversationStatus.CLOSED
+                conv.save(update_fields=["status", "updated_at"])
+                request_client_rating(conv)
         return Response(serialize_conversation(conv))
 
 
@@ -467,7 +482,7 @@ class DeviceRegisterView(StaffAuthMixin, APIView):
         platform = ser.validated_data["platform"]
         device, _created = StaffDevice.objects.update_or_create(
             fcm_token=token,
-            defaults={"user": request.user, "platform": platform},
+            defaults={"user": _staff_user(request), "platform": platform},
         )
         return Response(
             {"id": device.pk, "platform": device.platform},
@@ -480,6 +495,6 @@ class DeviceDeleteView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
-        device = get_object_or_404(StaffDevice, pk=pk, user=request.user)
+        device = get_object_or_404(StaffDevice, pk=pk, user=_staff_user(request))
         device.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

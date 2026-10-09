@@ -46,6 +46,19 @@ def test_render_email_template_substitutes_known_placeholders() -> None:
     assert body == "Здравствуйте, Иван! {unknown} {"
 
 
+def test_render_email_template_escapes_public_values_in_html_body() -> None:
+    """Имя из публичной формы заявки вставлялось в HTML-шаблон как разметка (XSS в редакторе письма)."""
+    tpl = EmailTemplate(name="T", subject="{имя}", body="<p>Здравствуйте, {имя}!</p>")
+    payload = '<img src=x onerror="alert(1)">'
+    subject, body = render_email_template(tpl, context={"имя": payload})
+    assert body == "<p>Здравствуйте, &lt;img src=x onerror=&quot;alert(1)&quot;&gt;!</p>"
+    assert subject == payload
+
+    plain = EmailTemplate(name="P", subject="", body="Здравствуйте, {имя}!")
+    _, plain_body = render_email_template(plain, context={"имя": "Рога & Копыта"})
+    assert plain_body == "Здравствуйте, Рога & Копыта!"
+
+
 @pytest.mark.django_db
 def test_email_template_context_for_client() -> None:
     """Context maps the Client card fields one to one."""

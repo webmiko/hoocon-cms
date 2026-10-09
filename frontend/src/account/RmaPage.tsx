@@ -13,7 +13,8 @@ function fmtDate(iso: string): string {
 }
 
 export default function RmaPage() {
-  const { data, loading, error } = useAsync(() => accountApi.rmaCases());
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { data, loading, error } = useAsync(() => accountApi.rmaCases(), refreshKey);
   const { data: orders } = useAsync(() => accountApi.orders());
   const [showForm, setShowForm] = useState(false);
   const [subject, setSubject] = useState("");
@@ -48,7 +49,7 @@ export default function RmaPage() {
       setOrderId("");
       setPhoto(null);
       setShowForm(false);
-      window.location.reload();
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setNotice(err instanceof AccountApiError ? err.detail : "Не удалось отправить.");
     } finally {

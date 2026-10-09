@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 
 from catalog.etl.hv_media_webp import (
@@ -34,12 +33,14 @@ from catalog.etl.hv_media_webp import (
     _demote_other_product_shots,
     default_media_webp_root,
 )
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, MAX_EDGE_PX, convert_bytes_to_webp
 from catalog.models import SKU, ProductImage
 
 logger = logging.getLogger(__name__)
 
 _SOURCE_URL = "https://hoocon.ru/.local-assets/media-webp/{stem}-product.webp"
+_CLONE_SOURCE_URL = "https://hoocon.ru/.local-assets/media-webp/clone/{stem}"
 
 _STEM_RE = re.compile(
     r"(?i)^"
@@ -215,38 +216,18 @@ def _upsert_product(
     dry_run: bool,
 ) -> str:
     """Create or update the media-webp product hero; demote other heroes."""
-    source_url = _SOURCE_URL.format(stem=stem)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
-    alt = f"{sku.sku_code} | фото привода"
-    filename = f"{sku.sku_code.lower()}-product.webp"
     with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=SORT_PRODUCT,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            action = "create"
-            keep_pk = image.pk
-        else:
-            existing.alt = alt[:300]
-            existing.sort_order = SORT_PRODUCT
-            existing.is_published = True
-            existing.image.save(filename, ContentFile(webp), save=False)
-            existing.full_clean()
-            existing.save()
-            action = "update"
-            keep_pk = existing.pk
-
-        _demote_other_product_shots(sku, keep_pk=keep_pk)
+        action, image = upsert_sku_image(
+            sku,
+            source_url=_SOURCE_URL.format(stem=stem),
+            filename=f"{sku.sku_code.lower()}-product.webp",
+            webp=webp,
+            alt=f"{sku.sku_code} | фото привода",
+            sort_order=SORT_PRODUCT,
+            dry_run=dry_run,
+        )
+        if not dry_run and image is not None:
+            _demote_other_product_shots(sku, keep_pk=image.pk)
     return action
 
 
@@ -322,9 +303,11 @@ def apply_da_sa_media_webp(
         if action == "create":
             summary["created"] += 1
             stem_stats["created"] += 1
-        else:
+        elif action == "update":
             summary["updated"] += 1
             stem_stats["updated"] += 1
+        else:
+            summary["unchanged"] = summary.get("unchanged", 0) + 1
         logger.info("da_sa_media_webp %s %s ← %s", action, sku.sku_code, shot.stem)
 
     return summary
@@ -344,46 +327,32 @@ def _clone_one_image(
     target: SKU,
     dry_run: bool,
 ) -> str:
-    """Upsert one gallery row onto ``target`` from ``donor_img`` bytes."""
-    source_url = (donor_img.source_url or "").strip()
-    existing = None
-    if source_url:
-        existing = ProductImage.objects.filter(sku=target, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing is not None else "create"
+    """Upsert one gallery row onto ``target`` from ``donor_img`` bytes.
 
-    payload = b""
-    if donor_img.image:
-        donor_img.image.open("rb")
-        try:
-            payload = donor_img.image.read()
-        finally:
-            donor_img.image.close()
+    Only published donor photos are cloned; a rerun with the same bytes is a
+    ``skipped`` (no storage write).
+    """
+    if not donor_img.is_published or not donor_img.image:
+        return "skipped"
+    donor_img.image.open("rb")
+    try:
+        payload = donor_img.image.read()
+    finally:
+        donor_img.image.close()
     if not payload:
         return "skipped"
-    stem = Path(getattr(donor_img.image, "name", "") or "photo.webp").name
-    filename = f"{target.sku_code.lower()}-{stem}"
-    alt = (donor_img.alt or f"{target.sku_code} | фото привода")[:300]
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=target,
-                alt=alt,
-                source_url=source_url,
-                sort_order=donor_img.sort_order,
-                is_published=donor_img.is_published,
-            )
-            image.image.save(filename, ContentFile(payload), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-        existing.alt = alt
-        existing.sort_order = donor_img.sort_order
-        existing.is_published = donor_img.is_published
-        existing.image.save(filename, ContentFile(payload), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    stem = Path(donor_img.image.name or "photo.webp").name
+    source_url = (donor_img.source_url or "").strip() or _CLONE_SOURCE_URL.format(stem=stem)
+    action, _ = upsert_sku_image(
+        target,
+        source_url=source_url,
+        filename=f"{target.sku_code.lower()}-{stem}",
+        webp=payload,
+        alt=donor_img.alt or f"{target.sku_code} | фото привода",
+        sort_order=donor_img.sort_order,
+        dry_run=dry_run,
+    )
+    return "skipped" if action == "skip" else action
 
 
 def clone_damqu_images_from_donor(

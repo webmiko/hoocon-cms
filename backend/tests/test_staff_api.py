@@ -197,11 +197,16 @@ def test_conversations_party_label_not_channel() -> None:
 @pytest.mark.django_db
 @override_settings(**STAFF_SETTINGS)
 def test_delete_unlinked_conversation_only() -> None:
-    """DELETE removes anonymous chats; CRM-linked chats stay."""
+    """DELETE removes anonymous chats; CRM-linked chats stay. Managers may not delete (roles.py)."""
+    from accounts.roles import GROUP_ADMIN
+    from accounts.services import ensure_staff_groups
     from crm.models import Client
     from supportchat.models import Channel, Conversation, Message, MessageDirection
 
+    ensure_staff_groups()
+    manager = _manager(email="chatdel-mgr@example.com")
     user = _manager(email="chatdel@example.com")
+    user.groups.set([Group.objects.get(name=GROUP_ADMIN)])
     linked = Conversation.objects.create(
         channel=Channel.WEB,
         external_user_id="sess-linked-del",
@@ -231,6 +236,10 @@ def test_delete_unlinked_conversation_only() -> None:
         direction=MessageDirection.INBOUND,
         body="delete me",
     )
+
+    denied = _auth_client(manager).delete(f"/api/staff/conversations/{orphan.pk}/")
+    assert denied.status_code == 403
+    assert Conversation.objects.filter(pk=orphan.pk).exists()
 
     api = _auth_client(user)
     blocked = api.delete(f"/api/staff/conversations/{linked.pk}/")
@@ -392,3 +401,71 @@ def test_otp_verify_rotates_previous_token() -> None:
         403,
     }
     assert Client().get("/api/staff/me/", HTTP_AUTHORIZATION=f"Token {new_plain}").status_code == 200
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
+def test_otp_start_reply_does_not_reveal_unknown_login() -> None:
+    """Unknown login got 400 «Проверьте логин» vs 200 for staff — logins were enumerable."""
+    user = _manager(email="real@example.com")
+    client = Client()
+    with patch("config.admin_otp.send_admin_otp_email") as send:
+        real = client.post("/api/staff/auth/otp/start/", {"login": user.email}, content_type="application/json")
+        ghost = client.post(
+            "/api/staff/auth/otp/start/", {"login": "ghost@example.com"}, content_type="application/json"
+        )
+    assert real.status_code == ghost.status_code == 200
+    assert set(real.json()) == set(ghost.json())
+    assert send.call_count == 1
+
+    verify = client.post(
+        "/api/staff/auth/otp/verify/",
+        {"challenge_id": ghost.json()["challenge_id"], "code": "000000"},
+        content_type="application/json",
+    )
+    assert verify.status_code == 400
+    assert verify.json()["detail"] == "Неверный код."
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS, ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS=0, ADMIN_EMAIL_OTP_MAX_ATTEMPTS=2)
+def test_otp_resend_resets_real_attempt_counter() -> None:
+    """Resend zeroed a dead ``attempts`` field; the real counter kept the new code locked."""
+    user = _manager(email="resend@example.com")
+    client = Client()
+    with patch("config.admin_otp.send_admin_otp_email"):
+        with patch("staff_api.otp.generate_otp_code", return_value="111111"):
+            start = client.post("/api/staff/auth/otp/start/", {"login": user.email}, content_type="application/json")
+        challenge_id = start.json()["challenge_id"]
+        for _ in range(2):
+            client.post(
+                "/api/staff/auth/otp/verify/",
+                {"challenge_id": challenge_id, "code": "999999"},
+                content_type="application/json",
+            )
+        with patch("staff_api.otp.generate_otp_code", return_value="222222"):
+            resent = client.post(
+                "/api/staff/auth/otp/resend/", {"challenge_id": challenge_id}, content_type="application/json"
+            )
+    assert resent.status_code == 200
+    verify = client.post(
+        "/api/staff/auth/otp/verify/",
+        {"challenge_id": challenge_id, "code": "222222"},
+        content_type="application/json",
+    )
+    assert verify.status_code == 200, verify.content
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
+def test_staff_close_requests_rating_once() -> None:
+    """Закрытие из мобильного приложения не просило клиента оценить диалог (в Admin просило)."""
+    from supportchat.models import Channel, Conversation
+
+    user = _manager(email="close-rate@example.com")
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="sess-close-rate", status="open")
+    api = _auth_client(user)
+    with patch("staff_api.views.request_client_rating") as rating:
+        api.post(f"/api/staff/conversations/{conv.pk}/close/")
+        api.post(f"/api/staff/conversations/{conv.pk}/close/")
+    assert rating.call_count == 1

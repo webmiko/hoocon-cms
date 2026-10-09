@@ -10,8 +10,6 @@ from supportchat.gigachat.reply import generate_ai_reply
 from supportchat.gigachat.triage_guard import (
     is_greeting_intent,
     response_has_disallowed_site_paths,
-    response_misroutes_docs_to_catalog,
-    triage_output_blocked,
     uncertain_branch_reply,
 )
 from supportchat.gigachat.triage_scope import triage_out_of_scope_reply
@@ -42,16 +40,6 @@ def test_out_of_scope_gates_without_escalation() -> None:
 def test_disallowed_site_path_detected() -> None:
     assert response_has_disallowed_site_paths("Смотрите /admin/secret") is True
     assert response_has_disallowed_site_paths("Каталог: /catalog") is False
-
-
-def test_docs_misroute_to_catalog_blocked() -> None:
-    bad = "Паспорт доступен в разделе каталога на сайте."
-    assert response_misroutes_docs_to_catalog(bad, user_query="нужен паспорт на SA10FU24") is True
-    assert triage_output_blocked(bad, user_query="нужен паспорт на SA10FU24") is True
-
-
-def test_uncertain_model_phrase_blocked() -> None:
-    assert triage_output_blocked("К сожалению, не знаю точный ответ.") is True
 
 
 @pytest.mark.django_db

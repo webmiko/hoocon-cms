@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -106,6 +107,21 @@ def test_create_order_from_quote_reuses_open_order() -> None:
 
 
 @pytest.mark.django_db
+def test_create_order_from_quote_locks_quote_row() -> None:
+    """Двойной клик: два запроса видели «заказа нет» и падали IntegrityError на номере."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    admin = _superuser()
+    client = Client.objects.create(name="К", email="quote-lock@example.com")
+    quote = Quote.objects.create(client=client, created_by=admin, status=QuoteStatus.ACCEPTED)
+    with CaptureQueriesContext(connection) as ctx:
+        create_order_from_quote(quote)
+    selects = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
+    assert any('"crm_quote"' in sql for sql in selects)
+
+
+@pytest.mark.django_db
 def test_create_quote_from_spec_needs_crm_card() -> None:
     """Спецификация ЛК → черновик КП на карточке клиента."""
     admin = _superuser()
@@ -201,10 +217,10 @@ def test_quote_duplicate_and_order_views_are_post_only() -> None:
 
 @pytest.mark.django_db
 def test_quote_kanban_set_status_json() -> None:
-    """Kanban POST /set-status/ меняет статус КП."""
+    """Kanban POST /set-status/ меняет статус КП по разрешённому переходу."""
     admin = _superuser()
     client = Client.objects.create(name="К", email="kanban-q@example.com")
-    quote = Quote.objects.create(client=client, created_by=admin)
+    quote = Quote.objects.create(client=client, created_by=admin, status=QuoteStatus.SENT, sent_at=timezone.now())
     page = DjClient()
     page.force_login(admin)
     response = page.post(
@@ -216,6 +232,73 @@ def test_quote_kanban_set_status_json() -> None:
     assert response.json()["ok"] is True
     quote.refresh_from_db()
     assert quote.status == QuoteStatus.REJECTED
+
+
+@pytest.mark.django_db
+def test_quote_kanban_rejects_draft_to_accepted() -> None:
+    """M13: черновик нельзя «согласовать» мимо выдачи (нет PDF и письма клиенту)."""
+    admin = _superuser()
+    client = Client.objects.create(name="К", email="kanban-draft@example.com")
+    quote = Quote.objects.create(client=client, created_by=admin)
+    page = DjClient()
+    page.force_login(admin)
+    response = page.post(
+        reverse("admin:crm_quote_set_status", args=[quote.pk]),
+        data='{"status": "accepted"}',
+        content_type="application/json",
+    )
+    assert response.status_code == 409
+    assert response.json()["error"] == "invalid_transition"
+    quote.refresh_from_db()
+    assert quote.status == QuoteStatus.DRAFT
+
+
+@pytest.mark.django_db
+def test_accepted_quote_keeps_sent_at_and_does_not_resend() -> None:
+    """M13: «Согласовано» не стирает sent_at; возврат в «Выдано» не шлёт письмо повторно."""
+    from crm.quote_ops import transition_quote
+
+    admin = _superuser()
+    client = Client.objects.create(name="К", email="keep-sent@example.com")
+    quote = Quote.objects.create(client=client, created_by=admin)
+    with (
+        patch("crm.quote_docs.ensure_quote_pdf_document", return_value=object()),
+        patch("crm.quote_docs.notify_quote_issued") as notify,
+    ):
+        _, err = transition_quote(quote, QuoteStatus.SENT, actor=admin)
+        assert err is None
+        sent_at = Quote.objects.get(pk=quote.pk).sent_at
+        assert sent_at is not None
+        transition_quote(quote, QuoteStatus.ACCEPTED, actor=admin)
+        assert Quote.objects.get(pk=quote.pk).sent_at == sent_at
+        transition_quote(quote, QuoteStatus.SENT, actor=admin)
+    assert notify.call_count == 1
+    assert Quote.objects.get(pk=quote.pk).sent_at == sent_at
+
+
+@pytest.mark.django_db
+def test_quote_admin_form_rejects_illegal_transition() -> None:
+    """M13: та же машина состояний в Admin-форме (Quote.clean)."""
+    from django.core.exceptions import ValidationError
+
+    client = Client.objects.create(name="К", email="clean@example.com")
+    quote = Quote.objects.create(client=client)
+    quote.status = QuoteStatus.REJECTED
+    with pytest.raises(ValidationError) as exc:
+        quote.full_clean()
+    assert "status" in exc.value.message_dict
+
+
+@pytest.mark.django_db
+def test_funnel_counts_accepted_quotes_as_sent() -> None:
+    """M13: воронка считает выданными и согласованные/отклонённые КП."""
+    client = Client.objects.create(name="К", email="funnel@example.com")
+    now = timezone.now()
+    for status in (QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED):
+        Quote.objects.create(client=client, status=status, sent_at=now)
+    Quote.objects.create(client=client)
+    report = build_sales_report(since=now - timedelta(days=1))
+    assert report["totals"]["quotes_sent"] == 3
 
 
 @pytest.mark.django_db

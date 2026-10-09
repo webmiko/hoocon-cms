@@ -7,6 +7,7 @@ drive from EAV «Совместимый привод» + bracket (BR-M / BR-ML /
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any, Literal, cast
 
 from django.db.models import Prefetch, QuerySet
@@ -19,9 +20,10 @@ from catalog.ball_valve_kit import (
     resolve_bracket_for_drive,
 )
 from catalog.facets import FACET_BY_KEY, filter_skus_by_facet
-from catalog.models import SKU, ProductImage
+from catalog.models import SKU, AttributeValue, ProductImage
 from catalog.ordering import annotate_moment_nm, catalog_list_order_by
 from catalog.series_categories import spec_order_case
+from catalog.sku_access import sku_attribute_values
 
 QuizVoltage = Literal["24", "230", "skip"]
 QuizControl = Literal["onoff", "modulating", "skip"]
@@ -89,27 +91,40 @@ def pick_drive_family(
     return matched[0]
 
 
+def published_drive_index() -> dict[str, SKU]:
+    """Published DA* drives keyed by normalized article (first by sku_code wins)."""
+    index: dict[str, SKU] = {}
+    for sku in _published_sku_qs().filter(sku_code__istartswith="DA"):
+        index.setdefault(_normalize_code(sku.sku_code or ""), sku)
+    return index
+
+
 def resolve_published_drive(
     family: str,
     suffix: str,
     *,
-    queryset: QuerySet[SKU] | None = None,
+    index: Mapping[str, SKU] | None = None,
 ) -> SKU | None:
-    """Find a published drive SKU for ``family`` + edition ``suffix``."""
-    target = _normalize_code(format_drive_sku_code(family, suffix))
-    qs = queryset if queryset is not None else _published_sku_qs()
-    for sku in qs.filter(sku_code__istartswith="DA"):
-        if _normalize_code(sku.sku_code or "") == target:
-            return sku
-    return None
+    """Find a published drive SKU for ``family`` + edition ``suffix``.
+
+    Pass a shared ``index`` when resolving many families — building it is
+    one query; without it every call rescans all drives.
+    """
+    drives = index if index is not None else published_drive_index()
+    return drives.get(_normalize_code(format_drive_sku_code(family, suffix)))
 
 
-def resolve_published_bracket(code: str) -> SKU | None:
+def resolve_published_bracket(code: str, *, cache: dict[str, SKU | None] | None = None) -> SKU | None:
     """Resolve BR-M / BR-ML / BR-H adapter SKU by exact article."""
     needle = (code or "").strip().upper()
     if not needle:
         return None
-    return _published_sku_qs().filter(sku_code__iexact=needle).first()
+    if cache is not None and needle in cache:
+        return cache[needle]
+    found = _published_sku_qs().filter(sku_code__iexact=needle).first()
+    if cache is not None:
+        cache[needle] = found
+    return found
 
 
 def _published_sku_qs() -> QuerySet[SKU]:
@@ -139,6 +154,9 @@ def _valve_queryset(request: Request, limit: int) -> list[SKU]:
     qs = annotate_moment_nm(
         _published_sku_qs()
         .filter(product__category__slug=_BALL_VALVE_CATEGORY)
+        .prefetch_related(
+            Prefetch("attribute_values", queryset=AttributeValue.objects.select_related("attribute")),
+        )
         .annotate(
             category_spec_order=spec_order_case(
                 slug_field="product__category__slug",
@@ -167,7 +185,8 @@ def build_kit_bundle_for_valve(
     control: QuizControl | str | None,
     aux_switch: QuizAuxSwitch | str | None,
     *,
-    drive_lookup: QuerySet[SKU] | None = None,
+    drive_index: Mapping[str, SKU] | None = None,
+    bracket_cache: dict[str, SKU | None] | None = None,
 ) -> dict[str, Any] | None:
     """Assemble valve + drive + bracket when a factory kit is unavailable.
 
@@ -176,7 +195,8 @@ def build_kit_bundle_for_valve(
         voltage: Quiz voltage answer.
         control: Quiz control answer.
         aux_switch: Quiz aux-switch answer.
-        drive_lookup: Optional queryset limiting drive resolution.
+        drive_index: Shared :func:`published_drive_index` for batch calls.
+        bracket_cache: Shared bracket lookups for batch calls.
 
     Returns:
         Dict with ``valve``, ``drive``, ``bracket``, ``drive_code``,
@@ -203,7 +223,8 @@ def build_kit_bundle_for_valve(
 
     suffix = quiz_drive_suffix(control, aux_switch)
     families = list(kit_options["drive_families"])
-    drive_by_family = {family: resolve_published_drive(family, suffix, queryset=drive_lookup) for family in families}
+    drives = drive_index if drive_index is not None else published_drive_index()
+    drive_by_family = {family: resolve_published_drive(family, suffix, index=drives) for family in families}
     family = pick_drive_family(
         families,
         voltage,
@@ -212,11 +233,7 @@ def build_kit_bundle_for_valve(
     )
     if family is None:
         return None
-    drive = drive_by_family.get(family) or resolve_published_drive(
-        family,
-        suffix,
-        queryset=drive_lookup,
-    )
+    drive = drive_by_family.get(family)
     if drive is None:
         return None
 
@@ -224,7 +241,7 @@ def build_kit_bundle_for_valve(
         family,
         flanged=_is_flanged_valve(valve_sku),
     )
-    bracket = resolve_published_bracket(bracket_code)
+    bracket = resolve_published_bracket(bracket_code, cache=bracket_cache)
     components_in_stock = valve_sku.in_stock and drive.in_stock and (bracket is None or bracket.in_stock)
     return {
         "valve": valve_sku,
@@ -265,7 +282,8 @@ def find_kit_analog_bundles(
     if not valves:
         return []
 
-    drive_lookup = _published_sku_qs().filter(sku_code__istartswith="DA")
+    drive_index = published_drive_index()
+    bracket_cache: dict[str, SKU | None] = {}
     bundles: list[dict[str, Any]] = []
     for valve in valves:
         bundle = build_kit_bundle_for_valve(
@@ -273,7 +291,8 @@ def find_kit_analog_bundles(
             voltage,
             control,
             aux_switch,
-            drive_lookup=drive_lookup,
+            drive_index=drive_index,
+            bracket_cache=bracket_cache,
         )
         if bundle is None:
             continue
@@ -291,7 +310,7 @@ def find_kit_analog_bundles(
 def _compatible_actuators_text(sku: SKU) -> str:
     from catalog.models import Attribute
 
-    for av in sku.attribute_values.all():
+    for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)
         slug = (attr.slug or "").casefold()
         name = (attr.name or "").casefold()
@@ -303,7 +322,7 @@ def _compatible_actuators_text(sku: SKU) -> str:
 def _is_flanged_valve(sku: SKU) -> bool:
     from catalog.models import Attribute
 
-    for av in sku.attribute_values.all():
+    for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)
         slug = (attr.slug or "").casefold()
         val = str(av.value or "").casefold()

@@ -23,10 +23,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
 from django.utils.text import slugify
 
 from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.tech_copy import normalize_tech_copy
 from catalog.etl.webp import enhance_transparent_catalog_photo_bytes
 from catalog.models import SKU, Category, Product, ProductImage
@@ -397,26 +397,16 @@ def _attach_image(
                 row.save(update_fields=["is_published", "updated_at"])
 
     safe = slugify(sku.sku_code) or f"sku-{sku.pk}"
-    filename = f"{safe}-local.webp"
-    if same_source is not None:
-        same_source.alt = alt[:300]
-        same_source.sort_order = 0
-        same_source.is_published = True
-        same_source.source_url = source_url
-        same_source.image.save(filename, ContentFile(webp), save=False)
-        same_source.save()
-        return "written"
-
-    img = ProductImage(
-        sku=sku,
-        alt=alt[:300],
+    action, _ = upsert_sku_image(
+        sku,
         source_url=source_url,
+        filename=f"{safe}-local.webp",
+        webp=webp,
+        alt=alt,
         sort_order=0,
-        is_published=True,
+        dry_run=False,
     )
-    img.image.save(filename, ContentFile(webp), save=False)
-    img.save()
-    return "written"
+    return "exists" if action == "skip" else "written"
 
 
 def ensure_br_adapters(

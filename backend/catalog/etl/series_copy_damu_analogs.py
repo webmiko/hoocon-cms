@@ -8,8 +8,8 @@ Belimo non-spring rotary (official EU datasheets):
 - SM  = 20 Нм
 - GM  = 40 Нм
 
-Hoocon 4/6/8/16/24/32 Нм map to the *nearest* Belimo family (no invented
-``NM24D`` / ``SM230D`` / torque-mismatched NM-on-16Нм cards).
+Hoocon 4/6/8/16/24/32 Нм map to the largest Belimo family whose damper area ≤ Hoocon's
+(i.e. the Hoocon actuator covers at least the Belimo's rated area).
 
 DA2MU keeps the dedicated ``data/damu_2nm_analogs.txt`` (TMC + verified clones).
 """
@@ -18,20 +18,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from catalog.etl.belimo_analogs import BELIMO_FAMILY_AREA, belimo_family_by_area
 from catalog.etl.series_copy_major_analogs import _FOOTNOTE, _lines_major_air
 from catalog.etl.tech_copy import normalize_tech_copy
 
 _DAMU_2NM = Path(__file__).resolve().parent / "data" / "damu_2nm_analogs.txt"
 
-# Nearest Belimo non-spring family for each Hoocon DAMU torque.
+# Recommended area of the largest Belimo family whose area ≤ Hoocon's.
+# Siemens/Honeywell analogs in the copy key off this Belimo area band.
+_AIR_AREA = dict(BELIMO_FAMILY_AREA["air_no_spring"])
 DAMU_BELIMO_NM: dict[int, int] = {
-    2: 2,
-    4: 5,
-    6: 5,
-    8: 10,
-    16: 20,
-    24: 20,
-    32: 40,
+    nm: int(_AIR_AREA[family] * 10)
+    for nm in (2, 4, 6, 8, 16, 24, 32)
+    if (family := belimo_family_by_area("air_no_spring", nm / 10))
 }
 
 
@@ -45,8 +44,8 @@ def build_damu_analogs(nm: int) -> str:
         (f"Список аналогов для привода заслонки Hoocon серии DA{nm}MU (без возвратной пружины, {nm} Нм)"),
         "",
         (
-            "Belimo: ближайший класс по каталогу "
-            f"(TMC 2 / LM 5 / NM 10 / SM 20 / GM 40 Нм) → полоса {band} Нм. "
+            "Belimo: наибольший класс, площадь которого не превышает площадь "
+            f"заслонки Hoocon (TMC 2 / LM 5 / NM 10 / SM 20 / GM 40 Нм) → полоса {band} Нм. "
             "Крупные марки: Belimo, Siemens, Honeywell, Schneider Electric, "
             "Johnson Controls, Danfoss, Gruner."
         ),

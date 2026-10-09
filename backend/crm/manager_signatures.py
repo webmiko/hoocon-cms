@@ -1,36 +1,19 @@
-"""Plain-text manager signatures for CRM lead replies."""
+"""Manager signatures for CRM lead replies (plain text and HTML)."""
 
 from __future__ import annotations
 
 import re
+from html import escape
+
+from django.conf import settings
 
 from crm.email_body import is_html_email_body
 
-_ASSISTANT_EMAIL = "assistant@hoocon.ru"
 
-_EMAIL_LINE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-# Персональные контакты менеджеров по служебной почте — «профиль» подписи
-# (staff User не хранит телефон; каноничный источник — этот словарь).
-_MANAGER_CONTACTS: dict[str, dict[str, str]] = {
-    _ASSISTANT_EMAIL: {
-        "name": "Людмила",
-        "company": 'ООО "ХОГОН"',
-        "phone": "+7(995)780-70-18",
-    },
-}
-
-_MANAGER_SIGNATURES: dict[str, str] = {
-    email: f"С уважением, {c['name']}\n{c['company']}\n{c['phone']}\n{email}" for email, c in _MANAGER_CONTACTS.items()
-}
-
-
-def manager_reply_signature(manager_email: str) -> str:
-    """Return a plain-text signature block for the manager mailbox, if configured."""
-    key = (manager_email or "").strip().casefold()
-    if not key:
-        return ""
-    return _MANAGER_SIGNATURES.get(key, "")
+def _contacts_by_email() -> dict[str, dict[str, str]]:
+    """``settings.MANAGER_SIGNATURE_CONTACTS`` keyed by casefolded mailbox."""
+    raw = getattr(settings, "MANAGER_SIGNATURE_CONTACTS", None) or {}
+    return {str(email).strip().casefold(): dict(contact) for email, contact in raw.items()}
 
 
 def manager_signature_contacts(manager_email: str) -> dict[str, str] | None:
@@ -41,40 +24,42 @@ def manager_signature_contacts(manager_email: str) -> dict[str, str] | None:
 
     Returns:
         Dict with ``name``/``company``/``phone``/``email``, or None when the
-        mailbox is not configured in ``_MANAGER_CONTACTS``.
+        mailbox has no entry in ``settings.MANAGER_SIGNATURE_CONTACTS``.
     """
     key = (manager_email or "").strip().casefold()
-    if not key or key not in _MANAGER_CONTACTS:
+    contact = _contacts_by_email().get(key) if key else None
+    if contact is None:
         return None
-    return {**_MANAGER_CONTACTS[key], "email": key}
+    return {
+        "name": contact.get("name", ""),
+        "company": contact.get("company", ""),
+        "phone": contact.get("phone", ""),
+        "email": key,
+    }
+
+
+def manager_reply_signature(manager_email: str) -> str:
+    """Return a plain-text signature block for the manager mailbox, if configured."""
+    contact = manager_signature_contacts(manager_email)
+    if contact is None:
+        return ""
+    lines = [f"С уважением, {contact['name']}", contact["company"], contact["phone"], contact["email"]]
+    return "\n".join(line for line in lines if line)
 
 
 def manager_reply_signature_html(manager_email: str) -> str:
-    """HTML signature block for rich-text compose replies."""
-    plain = manager_reply_signature(manager_email)
-    if not plain:
+    """HTML signature block for rich-text compose replies (tel/mailto links)."""
+    contact = manager_signature_contacts(manager_email)
+    if contact is None:
         return ""
-    lines: list[str] = []
-    for line in plain.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("mailto:"):
-            addr = stripped.removeprefix("mailto:")
-            lines.append(f'<a href="mailto:{addr}">{addr}</a>')
-            continue
-        tel_match = re.search(r"^(?P<label>.+?)\s*\(tel:(?P<href>[^)]+)\)\s*$", stripped)
-        if tel_match:
-            label = tel_match.group("label").strip()
-            href = tel_match.group("href").strip()
-            lines.append(f'<a href="tel:{href}">{label}</a>')
-            continue
-        if _EMAIL_LINE.fullmatch(stripped):
-            lines.append(f'<a href="mailto:{stripped}">{stripped}</a>')
-            continue
-        if stripped.startswith("+") and any(ch.isdigit() for ch in stripped):
-            tel_href = "+" + re.sub(r"\D", "", stripped)
-            lines.append(f'<a href="tel:{tel_href}">{stripped}</a>')
-            continue
-        lines.append(stripped)
+    lines = [escape(f"С уважением, {contact['name']}", quote=False)]
+    if contact["company"]:
+        lines.append(escape(contact["company"], quote=False))
+    if contact["phone"]:
+        tel_href = "+" + re.sub(r"\D", "", contact["phone"])
+        lines.append(f'<a href="tel:{tel_href}">{escape(contact["phone"], quote=False)}</a>')
+    email = escape(contact["email"])
+    lines.append(f'<a href="mailto:{email}">{email}</a>')
     return "<br>".join(lines)
 
 

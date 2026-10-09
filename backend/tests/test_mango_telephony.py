@@ -69,6 +69,15 @@ def test_webhook_rejects_bad_signature(client: Any, mango_settings: Any) -> None
 
 
 @pytest.mark.django_db
+def test_webhook_non_ascii_sign_is_403_not_500(client: Any, mango_settings: Any) -> None:
+    """compare_digest on non-ASCII str raised TypeError → 500 for a forged sign/key."""
+    body = _signed_body(_mango_payload())
+    assert client.post(URL, {**body, "sign": "подпись"}).status_code == 403
+    assert client.post(URL, {**body, "vpbx_api_key": "ключ"}).status_code == 403
+    assert Call.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_webhook_rejects_when_not_configured(client: Any, settings: Any) -> None:
     """403 when MANGO keys are empty — webhook is closed by default."""
     settings.MANGO_VPBX_API_KEY = ""
@@ -351,12 +360,111 @@ def test_download_recording_binary_and_empty(
     """download_recording отдаёт байты из raw; JSON без raw → None."""
     from crm import mango
 
-    monkeypatch.setattr(mango, "mango_command", lambda cmd, payload: {"raw": b"BIN"})
+    paths: list[str] = []
+
+    def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        paths.append(path)
+        return {"raw": b"BIN"}
+
+    monkeypatch.setattr(mango, "_mango_post", _post)
     assert mango.download_recording("rec-1") == b"BIN"
-    monkeypatch.setattr(mango, "mango_command", lambda cmd, payload: {"result": 0})
+    assert paths == ["queries/recording/post"]
+    monkeypatch.setattr(mango, "_mango_post", lambda path, payload: {"result": 0})
     assert mango.download_recording("rec-1") is None
 
 
+@pytest.mark.django_db
+def test_second_disconnect_same_timestamp_logs_once(client: Any, mango_settings: Any) -> None:
+    """M18: второй Disconnected (другое плечо, тот же ts) не дублирует «Звонок» в ленте."""
+    card = Client.objects.create(name="К", email="dup-call@acme.test", phone="+7 915 111-22-33")
+    for seq, state in ((1, "Appeared"), (2, "Connected"), (3, "Disconnected"), (4, "Disconnected")):
+        payload = _mango_payload(seq=seq, call_state=state, call_id=f"leg-{seq}")
+        assert client.post(URL, _signed_body(payload)).status_code == 200
+    assert Activity.objects.filter(client=card, subject__icontains="звонок").count() == 1
+
+
+@pytest.mark.django_db
+def test_finished_call_state_not_rolled_back(client: Any, mango_settings: Any) -> None:
+    """M18: после Disconnected позднее событие другого плеча не откатывает state."""
+    for seq, state in ((1, "Appeared"), (2, "Disconnected"), (3, "Connected")):
+        payload = _mango_payload(seq=seq, call_state=state, timestamp=1760000000 + seq)
+        client.post(URL, _signed_body(payload))
+    call = Call.objects.get(entry_id="entry-1")
+    assert call.state == CallState.DISCONNECTED
+    assert call.finished_at is not None
+
+
+@pytest.mark.django_db
+def test_call_skips_inactive_merged_card(client: Any, mango_settings: Any) -> None:
+    """M19: звонок не падает на деактивированный дубль с тем же номером."""
+    merged = Client.objects.create(name="Дубль", email="old@acme.test", phone="+79151112233", is_active=False)
+    live = Client.objects.create(name="Живая", email="new@acme.test", phone="+79151112233")
+    assert merged.pk < live.pk
+    client.post(URL, _signed_body(_mango_payload()))
+    assert Call.objects.get(entry_id="entry-1").client_id == live.pk
+
+
+@pytest.mark.django_db
+def test_merge_clients_moves_calls() -> None:
+    """M19: объединение карточек переносит и звонки («все связи»)."""
+    from crm.services import merge_clients
+
+    target = Client.objects.create(name="Цель", email="target@acme.test")
+    dup = Client.objects.create(name="Дубль", email="dup@acme.test")
+    call = Call.objects.create(client=dup, entry_id="merge-1", direction="inbound")
+    moved = merge_clients(target, [dup])
+    call.refresh_from_db()
+    assert call.client_id == target.pk
+    assert moved["calls"] == 1
+
+
+@pytest.mark.django_db
+def test_recording_download_uses_queries_endpoint(monkeypatch: pytest.MonkeyPatch, mango_settings: Any) -> None:
+    """M16: запись качается через /vpbx/queries/recording/post (не commands/)."""
+    captured: dict[str, str] = {}
+
+    class _Resp:
+        def __enter__(self) -> Any:
+            return self
+
+        def __exit__(self, *a: Any) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"ID3-mp3-bytes"
+
+    def _urlopen(req: Any, timeout: int = 0) -> Any:
+        captured["url"] = req.full_url
+        return _Resp()
+
+    monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+    from crm.mango import download_recording
+
+    assert download_recording("rec-9") == b"ID3-mp3-bytes"
+    assert captured["url"] == "https://app.mango-office.ru/vpbx/queries/recording/post"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("suffix", ["call", "summary", "recording", "record/added", "call/"])
+def test_webhook_accepts_mango_event_paths(client: Any, mango_settings: Any, suffix: str) -> None:
+    """M16: Mango шлёт на <base>/events/call|summary|recording — без слеша на конце."""
+    raw = json.dumps({"entry_id": "path-1", "call_state": "Appeared", "seq": 1, "timestamp": 1700000000})
+    sign = hashlib.sha256(f"test-key{raw}test-salt".encode()).hexdigest()
+    resp = client.post(f"{URL}{suffix}", {"vpbx_api_key": "test-key", "json": raw, "sign": sign})
+    assert resp.status_code == 200, suffix
+
+
+@pytest.mark.django_db
+def test_callback_non_success_result_raises(monkeypatch: pytest.MonkeyPatch, mango_settings: Any) -> None:
+    """M17: HTTP 200 с result≠1000 — ошибка, а не «звонок пошёл»."""
+    from crm import mango
+
+    monkeypatch.setattr(mango, "mango_command", lambda cmd, payload: {"result": 3102})
+    with pytest.raises(RuntimeError, match="3102"):
+        mango.initiate_callback("101", "79151112233")
+
+
+@pytest.mark.django_db
 def test_mango_command_requires_keys(settings: Any) -> None:
     """Без key/salt — RuntimeError до сети."""
     from crm import mango
@@ -368,6 +476,7 @@ def test_mango_command_requires_keys(settings: Any) -> None:
         mango.mango_command("callback", {})
 
 
+@pytest.mark.django_db
 def test_mango_command_transport_error(
     monkeypatch: pytest.MonkeyPatch,
     mango_settings: Any,
@@ -385,6 +494,7 @@ def test_mango_command_transport_error(
         mango.initiate_callback("101", "79151112233")
 
 
+@pytest.mark.django_db
 def test_callback_webhook_substitutes_digits(
     monkeypatch: pytest.MonkeyPatch,
     settings: Any,
@@ -420,6 +530,24 @@ def test_callback_webhook_substitutes_digits(
     assert "TelNumbr=79151112233" in hits[0]
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "template",
+    ["file:///etc/passwd?{ext}{num}", "http://10.0.0.5/hook?{ext}{num}", "ftp://x/{ext}{num}", "https:///{ext}"],
+)
+def test_callback_webhook_rejects_non_https(settings: Any, monkeypatch: pytest.MonkeyPatch, template: str) -> None:
+    """URL вебхука без проверки схемы: urlopen читал file:// и ходил во внутреннюю сеть."""
+    import urllib.request
+
+    from crm import mango
+
+    settings.MANGO_CALLBACK_WEBHOOK_URL = template
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: pytest.fail("urlopen must not run"))
+    with pytest.raises(RuntimeError, match="https://"):
+        mango.initiate_callback_webhook("101", "79151112233")
+
+
+@pytest.mark.django_db
 def test_callback_webhook_unconfigured(settings: Any) -> None:
     """Без MANGO_CALLBACK_WEBHOOK_URL — понятный RuntimeError."""
     from crm import mango

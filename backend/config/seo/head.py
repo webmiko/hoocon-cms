@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from html import escape
@@ -401,7 +402,15 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
 
 
 def _replace_tag(html: str, pattern: str, replacement: str) -> str:
-    new_html, count = re.subn(pattern, replacement, html, count=1, flags=re.IGNORECASE | re.DOTALL)
+    # Callable replacement: titles come from CMS content, and ``\1`` / ``\g<x>``
+    # in a plain replacement string would be parsed as a group reference.
+    new_html, count = re.subn(
+        pattern,
+        lambda _match: replacement,
+        html,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     return new_html if count else html
 
 
@@ -492,13 +501,16 @@ def inject_json_ld(html: str, blocks: list[dict[str, object]], *, nonce: str | N
     Returns:
         HTML with JSON-LD scripts injected.
     """
-    import json
-
     if not blocks:
         return html
     nonce_attr = f' nonce="{escape(nonce, quote=True)}"' if nonce else ""
     scripts = "".join(
-        f'<script type="application/ld+json"{nonce_attr}>{json.dumps(block, ensure_ascii=False)}</script>'
-        for block in blocks
+        f'<script type="application/ld+json"{nonce_attr}>{_json_for_script(block)}</script>' for block in blocks
     )
     return html.replace("</head>", f"{scripts}\n  </head>", 1)
+
+
+def _json_for_script(block: dict[str, object]) -> str:
+    """JSON safe inside ``<script>``: CMS text with ``</script>`` cannot close it."""
+    text = json.dumps(block, ensure_ascii=False)
+    return text.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")

@@ -7,6 +7,7 @@
  * Spec: ПЛАН §6; docs/readiness-backend-ux.md §2.3.
  */
 
+import { responseErrorMessage } from "../utils/drfErrors";
 import type { components, paths } from "./schema";
 
 // ── Re-export generated types for convenience ────────────────────────
@@ -218,6 +219,10 @@ export type Article = components["schemas"]["Article"] & {
     image: string | null;
   }>;
 };
+/** /statyi card: the list API ships reading time instead of the HTML body. */
+export type ArticleListItem = Omit<Article, "body" | "related_skus"> & {
+  reading_minutes: number;
+};
 export type News = components["schemas"]["News"] & {
   cover?: string | null;
   category?: { slug: string; name: string } | null;
@@ -241,17 +246,23 @@ const API_BASE = "";
 
 // ── Fetch helper ─────────────────────────────────────────────────────
 
+/** JSON content type only for string bodies; FormData sets its own boundary. */
+function requestHeaders(init?: RequestInit): Headers {
+  const headers = new Headers(init?.headers);
+  if (typeof init?.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  return headers;
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${url}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers: requestHeaders(init),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    const error = await response.json().catch(() => ({}));
     throw new ApiError(response.status, error);
   }
 
@@ -270,7 +281,7 @@ export class ApiError extends Error {
   body: { detail?: string; [key: string]: unknown };
 
   constructor(status: number, body: { detail?: string; [key: string]: unknown }) {
-    super(`API ${status}: ${body.detail ?? "Unknown error"}`);
+    super(responseErrorMessage(status, body));
     this.name = "ApiError";
     this.status = status;
     this.body = body;
@@ -288,37 +299,37 @@ function getCsrfToken(): string | null {
 
 export const api = {
   // ── Catalog ───────────────────────────────────────────────────────
-  categories(): Promise<CategoryListResponse> {
-    return apiFetch<CategoryListResponse>("/api/catalog/categories/");
+  categories(signal?: AbortSignal): Promise<CategoryListResponse> {
+    return apiFetch<CategoryListResponse>("/api/catalog/categories/", { signal });
   },
 
-  skus(params?: Record<string, string>): Promise<SKUListResponse> {
+  skus(params?: Record<string, string>, signal?: AbortSignal): Promise<SKUListResponse> {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-    return apiFetch<SKUListResponse>(`/api/catalog/skus/${qs}`);
+    return apiFetch<SKUListResponse>(`/api/catalog/skus/${qs}`, { signal });
   },
 
-  quizAnalogs(params: Record<string, string>): Promise<QuizAnalogResponse> {
+  quizAnalogs(params: Record<string, string>, signal?: AbortSignal): Promise<QuizAnalogResponse> {
     const qs = new URLSearchParams(params).toString();
-    return apiFetch<QuizAnalogResponse>(`/api/catalog/quiz-analogs/?${qs}`);
+    return apiFetch<QuizAnalogResponse>(`/api/catalog/quiz-analogs/?${qs}`, { signal });
   },
 
-  facets(params?: { category?: string }): Promise<CatalogFacetsResponse> {
+  facets(params?: { category?: string }, signal?: AbortSignal): Promise<CatalogFacetsResponse> {
     const qs = params?.category
       ? `?${new URLSearchParams({ category: params.category }).toString()}`
       : "";
-    return apiFetch<CatalogFacetsResponse>(`/api/catalog/facets/${qs}`);
+    return apiFetch<CatalogFacetsResponse>(`/api/catalog/facets/${qs}`, { signal });
   },
 
   skuDetail(slug: string, init?: RequestInit): Promise<SKUDetailResponse> {
     return apiFetch<SKUDetailResponse>(`/api/catalog/skus/${slug}/`, init);
   },
 
-  compare(slugs: string[]): Promise<CompareResponse> {
+  compare(slugs: string[], signal?: AbortSignal): Promise<CompareResponse> {
     const qs =
       slugs.length > 0
         ? `?${new URLSearchParams({ skus: slugs.join(",") }).toString()}`
         : "";
-    return apiFetch<CompareResponse>(`/api/catalog/compare/${qs}`);
+    return apiFetch<CompareResponse>(`/api/catalog/compare/${qs}`, { signal });
   },
 
   /** Deduped manuals / passports hub (``/dokumentaciya``). */
@@ -327,59 +338,66 @@ export const api = {
     series?: string;
     kind?: string;
     family?: string;
-  }): Promise<DocsHubResponse> {
+  }, signal?: AbortSignal): Promise<DocsHubResponse> {
     const qs = new URLSearchParams();
     if (params?.q) qs.set("q", params.q);
     if (params?.series) qs.set("series", params.series);
     if (params?.kind) qs.set("kind", params.kind);
     if (params?.family) qs.set("family", params.family);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<DocsHubResponse>(`/api/catalog/docs/${suffix}`);
+    return apiFetch<DocsHubResponse>(`/api/catalog/docs/${suffix}`, { signal });
   },
 
   // ── Content ───────────────────────────────────────────────────────
-  pages(): Promise<{ count: number; results: Page[] }> {
-    return apiFetch("/api/content/pages/");
+  pages(signal?: AbortSignal): Promise<{ count: number; results: Page[] }> {
+    return apiFetch("/api/content/pages/", { signal });
   },
 
-  pageDetail(slug: string): Promise<Page> {
-    return apiFetch(`/api/content/pages/${slug}/`);
+  pageDetail(slug: string, signal?: AbortSignal): Promise<Page> {
+    return apiFetch(`/api/content/pages/${slug}/`, { signal });
   },
 
-  articles(): Promise<{ count: number; results: Article[] }> {
-    return apiFetch("/api/content/articles/");
+  articles(
+    page?: number,
+    signal?: AbortSignal,
+  ): Promise<{ count: number; next: string | null; results: ArticleListItem[] }> {
+    const suffix = page && page > 1 ? `?page=${page}` : "";
+    return apiFetch(`/api/content/articles/${suffix}`, { signal });
   },
 
-  articleDetail(slug: string): Promise<Article> {
-    return apiFetch(`/api/content/articles/${slug}/`);
+  articleDetail(slug: string, signal?: AbortSignal): Promise<Article> {
+    return apiFetch(`/api/content/articles/${slug}/`, { signal });
   },
 
-  news(params?: {
-    category?: string;
-    ordering?: "newest" | "oldest";
-    page?: number;
-  }): Promise<{ count: number; results: News[] }> {
+  news(
+    params?: {
+      category?: string;
+      ordering?: "newest" | "oldest";
+      page?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<{ count: number; next: string | null; results: News[] }> {
     const qs = new URLSearchParams();
     if (params?.category) qs.set("category", params.category);
     if (params?.ordering) qs.set("ordering", params.ordering);
-    if (params?.page) qs.set("page", String(params.page));
+    if (params?.page && params.page > 1) qs.set("page", String(params.page));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch(`/api/content/news/${suffix}`);
+    return apiFetch(`/api/content/news/${suffix}`, { signal });
   },
 
-  newsCategories(): Promise<NewsCategory[]> {
-    return apiFetch("/api/content/news-categories/");
+  newsCategories(signal?: AbortSignal): Promise<NewsCategory[]> {
+    return apiFetch("/api/content/news-categories/", { signal });
   },
 
-  newsDetail(slug: string): Promise<News> {
-    return apiFetch(`/api/content/news/${slug}/`);
+  newsDetail(slug: string, signal?: AbortSignal): Promise<News> {
+    return apiFetch(`/api/content/news/${slug}/`, { signal });
   },
 
   // ── Search ─────────────────────────────────────────────────────────
-  search(q: string, page?: number): Promise<SearchResponse> {
+  search(q: string, page?: number, signal?: AbortSignal): Promise<SearchResponse> {
     const params = new URLSearchParams({ q });
     if (page) params.set("page", String(page));
-    return apiFetch<SearchResponse>(`/api/search/?${params.toString()}`);
+    return apiFetch<SearchResponse>(`/api/search/?${params.toString()}`, { signal });
   },
 
   // ── CSRF ──────────────────────────────────────────────────────────
@@ -455,6 +473,7 @@ export const api = {
     display_name?: string;
     contact_email?: string;
     page_url?: string;
+    pdn_consent?: boolean;
   }): Promise<{
     id: number | null;
     channel: string;
