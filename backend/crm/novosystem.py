@@ -42,13 +42,13 @@ def novosystem_configured() -> bool:
 
 def webhook_token_ok(presented: str) -> bool:
     """True when the widget is on and ``presented`` matches the saved secret."""
-    import hmac
+    from config.secret_compare import secrets_equal
 
     enabled, _token, _phone, secret = novosystem_settings()
     presented = (presented or "").strip()
     if not enabled or not secret or not presented:
         return False
-    return hmac.compare_digest(secret, presented)
+    return secrets_equal(secret, presented)
 
 
 def initiate_employee_call(*, employee_id: str, employee_phone: str, contact: str) -> int:

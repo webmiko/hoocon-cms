@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 from collections.abc import Iterable
 from typing import Any
 
@@ -26,6 +28,8 @@ from crm.models import (
 from leads.models import Lead
 
 logger = setup_logger("hoocon.crm")
+
+_HTML_TAG_RE = re.compile(r"<(p|br|div|ul|ol|li|b|strong|i|em|u|a|span|blockquote)\b", re.IGNORECASE)
 
 
 def normalize_client_email(raw: str) -> str:
@@ -554,13 +558,15 @@ def render_email_template(
         context: placeholder → value mapping (see ``email_template_context_*``).
 
     Returns:
-        ``(subject, body)`` with placeholders substituted.
+        ``(subject, body)`` with placeholders substituted. Values come from
+        public forms, so they are HTML-escaped inside an HTML body.
     """
     subject, body = template.subject, template.body
+    body_is_html = bool(_HTML_TAG_RE.search(body))
     for key, value in context.items():
         token = "{" + key + "}"
         subject = subject.replace(token, value)
-        body = body.replace(token, value)
+        body = body.replace(token, html.escape(value) if body_is_html else value)
     return subject.strip(), body.strip()
 
 
@@ -609,7 +615,7 @@ def merge_clients(target: Client, sources: list[Client], *, actor: Any = None) -
     """Merge duplicate client cards into ``target`` (same company, diff emails).
 
     Все связи переносятся на целевую карточку: заявки, активности, письма,
-    КП, документы, заказы, RMA, диалоги поддержки, членства в компаниях.
+    КП, документы, заказы, RMA, диалоги поддержки, звонки, членства в компаниях.
     Пустые поля цели заполняются из источников; привязка аккаунта ЛК
     сохраняется (у цели приоритет, иначе берётся первый найденный).
     Исходные карточки деактивируются (``is_active=False``), не удаляются —
@@ -635,6 +641,7 @@ def merge_clients(target: Client, sources: list[Client], *, actor: Any = None) -
         "orders": 0,
         "rma_cases": 0,
         "conversations": 0,
+        "calls": 0,
     }
     emails_log: list[str] = []
     with transaction.atomic():
@@ -651,6 +658,7 @@ def merge_clients(target: Client, sources: list[Client], *, actor: Any = None) -
             moved["conversations"] += Conversation.objects.filter(client=source).update(
                 client=target,
             )
+            moved["calls"] += source.calls.update(client=target)
             source.company_memberships.update(client=target)
             if source.account_id and target.account_id is None:
                 target.account_id = source.account_id

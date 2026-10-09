@@ -31,21 +31,26 @@ def link_new_lead_to_client(
     from crm.models import Activity, ActivityType
     from crm.services import link_lead_to_client
 
+    # Savepoint: a DB error here must not poison the caller's transaction
+    # (the lead itself and its items are saved in the same atomic block).
+    linked_before = (instance.client_id, instance.assignee_id)
     try:
-        if not instance.client_id:
-            link_lead_to_client(instance)
-        client_id = instance.client_id
-        if not client_id:
-            return
-        _inherit_client_assignee(instance)
-        Activity.objects.create(
-            client_id=client_id,
-            lead=instance,
-            activity_type=ActivityType.NOTE,
-            subject=f"Входящая заявка #{instance.pk}: {instance.get_lead_type_display()}",
-            body=(instance.message or "")[:2000],
-        )
+        with transaction.atomic():
+            if not instance.client_id:
+                link_lead_to_client(instance)
+            client_id = instance.client_id
+            if not client_id:
+                return
+            _inherit_client_assignee(instance)
+            Activity.objects.create(
+                client_id=client_id,
+                lead=instance,
+                activity_type=ActivityType.NOTE,
+                subject=f"Входящая заявка #{instance.pk}: {instance.get_lead_type_display()}",
+                body=(instance.message or "")[:2000],
+            )
     except (DatabaseError, IntegrityError):
+        instance.client_id, instance.assignee_id = linked_before
         logger.exception("crm_link_lead_failed lead_id=%s", instance.pk)
 
 

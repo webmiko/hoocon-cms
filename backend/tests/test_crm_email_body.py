@@ -47,15 +47,22 @@ def test_manager_reply_signature_unknown_email_returns_empty() -> None:
     assert manager_reply_signature("other@hoocon.ru") == ""
 
 
-def test_manager_reply_signature_html_supports_legacy_mailto_and_tel_lines() -> None:
-    """Legacy signature lines with mailto:/tel: suffixes still linkify in HTML."""
-    from crm.manager_signatures import _MANAGER_SIGNATURES
-
-    _MANAGER_SIGNATURES["legacy@hoocon.ru"] = "Legacy\n+7(900)000-00-00 (tel:+79000000000)\nmailto:legacy@hoocon.ru"
-    html = manager_reply_signature_html("legacy@hoocon.ru")
+def test_signature_contacts_come_from_settings(settings) -> None:
+    """Контакты подписи были зашиты в модуль; мёртвые ветки mailto:/tel: разбирали несуществующий формат."""
+    settings.MANAGER_SIGNATURE_CONTACTS = {
+        "Sales@Hoocon.ru": {"name": "Ирина", "company": "ООО <Хогон>", "phone": "+7 900 000-00-00"},
+    }
+    html = manager_reply_signature_html("sales@hoocon.ru")
     assert 'href="tel:+79000000000"' in html
-    assert 'href="mailto:legacy@hoocon.ru"' in html
-    del _MANAGER_SIGNATURES["legacy@hoocon.ru"]
+    assert 'href="mailto:sales@hoocon.ru"' in html
+    assert "ООО &lt;Хогон&gt;" in html
+    assert manager_reply_signature("sales@hoocon.ru").splitlines() == [
+        "С уважением, Ирина",
+        "ООО <Хогон>",
+        "+7 900 000-00-00",
+        "sales@hoocon.ru",
+    ]
+    assert manager_reply_signature("assistant@hoocon.ru") == ""
 
 
 def test_assemble_lead_reply_body_appends_plain_signature() -> None:

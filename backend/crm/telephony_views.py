@@ -33,7 +33,7 @@ class MangoEventsView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "mango_webhook"
 
-    def post(self, request: Request) -> Response:
+    def post(self, request: Request, kind: str = "") -> Response:
         """Verify signature, decode ``json``, route the event."""
         data = request.data
         if not isinstance(data, dict):

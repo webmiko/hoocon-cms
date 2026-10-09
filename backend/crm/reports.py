@@ -53,7 +53,8 @@ def build_sales_report(
     lead_created = Q()
     lead_done = Q(status=Lead.LeadStatus.DONE)
     quote_created = Q()
-    quote_sent = Q(status=QuoteStatus.SENT)
+    # Issued once = sent_at stamped; accepted/rejected КП were sent too.
+    quote_sent = Q(sent_at__isnull=False)
     quote_accepted = Q(status=QuoteStatus.ACCEPTED)
     order_created = Q()
     email_sent = Q(status=EmailStatus.SENT)
