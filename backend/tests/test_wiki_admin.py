@@ -149,6 +149,31 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_novosystem_guide() -> None:
+    """Вики Новосистем: виджет, ЛК UIS, ID сотрудника; ссылка в руководстве 3.0."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
+    assert doc.category == "Инструкции"
+    for anchor in ("widget", "uis", "employee", "call", "journal", "trouble"):
+        assert f'id="{anchor}"' in doc.body
+    assert "ID сотрудника UIS" in doc.body
+    assert "call_session_id" in doc.body
+    assert "employee_id" in doc.body
+    assert "именно на этот номер" not in doc.body
+    assert "?token=" in doc.body
+    assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "09.10.2026" in guide.body
+    assert "Телефония Новосистем (UIS)" in guide.body
+    mango = WikiDocument.objects.get(slug="mango-telephony-guide")
+    assert "настройках сервера" not in mango.body
+
+
+@pytest.mark.django_db
 def test_seed_wiki_includes_year_stock_dashboard() -> None:
     """Yearly stock dashboard seed is wired in seed_wiki."""
     from io import StringIO

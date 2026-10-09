@@ -34,6 +34,17 @@ WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
         "sort_order": 2,
     },
     {
+        "slug": "novosystem-telephony-guide",
+        "title": "Телефония Новосистем (UIS) · звонки из CRM",
+        "category": "Инструкции",
+        "summary": (
+            "Виджет Новосистем в интеграциях, настройка ЛК UIS, ID сотрудника, "
+            "звонок из карточки клиента, журнал и разбор ошибок."
+        ),
+        "fixture": "novosystem-telephony-guide.html",
+        "sort_order": 3,
+    },
+    {
         "slug": "ostatki-prodazhi-god-2025-09-2026-08",
         "title": "Анализ остатков и продаж · сен 2025 — авг 2026",
         "category": "Аналитика склада",
