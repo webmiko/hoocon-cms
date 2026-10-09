@@ -128,3 +128,17 @@ def test_ensure_br_adapters_force_images_rewrites_local_hero() -> None:
     assert first.is_published is True
     assert first.image.size != size_before
     assert "hoocon.spb.ru" not in (first.source_url or "")
+
+
+@pytest.mark.django_db
+def test_ensure_br_adapters_force_with_same_bytes_does_not_rewrite_file() -> None:
+    """M42: ``--force-images`` с теми же байтами раньше перезаписывал файл; теперь upsert по sha256 — skip."""
+    photo = enhance_transparent_catalog_photo_bytes(_png_bytes((160, 100)))
+    with patch("catalog.etl.ensure_br_adapters.resolve_adapter_photo_bytes", return_value=photo):
+        ensure_br_adapters(dry_run=False, force_images=True)
+        br_m = SKU.objects.get(sku_code="BR-M")
+        name_before = ProductImage.objects.get(sku=br_m, is_published=True).image.name
+        summary = ensure_br_adapters(dry_run=False, force_images=True)
+
+    assert summary["images"]["BR-M"] == "exists"
+    assert ProductImage.objects.get(sku=br_m, is_published=True).image.name == name_before

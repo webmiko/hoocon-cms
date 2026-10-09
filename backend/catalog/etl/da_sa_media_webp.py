@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 
 from catalog.etl.hv_media_webp import (
@@ -41,6 +40,7 @@ from catalog.models import SKU, ProductImage
 logger = logging.getLogger(__name__)
 
 _SOURCE_URL = "https://hoocon.ru/.local-assets/media-webp/{stem}-product.webp"
+_CLONE_SOURCE_URL = "https://hoocon.ru/.local-assets/media-webp/clone/{stem}"
 
 _STEM_RE = re.compile(
     r"(?i)^"
@@ -327,46 +327,32 @@ def _clone_one_image(
     target: SKU,
     dry_run: bool,
 ) -> str:
-    """Upsert one gallery row onto ``target`` from ``donor_img`` bytes."""
-    source_url = (donor_img.source_url or "").strip()
-    existing = None
-    if source_url:
-        existing = ProductImage.objects.filter(sku=target, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing is not None else "create"
+    """Upsert one gallery row onto ``target`` from ``donor_img`` bytes.
 
-    payload = b""
-    if donor_img.image:
-        donor_img.image.open("rb")
-        try:
-            payload = donor_img.image.read()
-        finally:
-            donor_img.image.close()
+    Only published donor photos are cloned; a rerun with the same bytes is a
+    ``skipped`` (no storage write).
+    """
+    if not donor_img.is_published or not donor_img.image:
+        return "skipped"
+    donor_img.image.open("rb")
+    try:
+        payload = donor_img.image.read()
+    finally:
+        donor_img.image.close()
     if not payload:
         return "skipped"
-    stem = Path(getattr(donor_img.image, "name", "") or "photo.webp").name
-    filename = f"{target.sku_code.lower()}-{stem}"
-    alt = (donor_img.alt or f"{target.sku_code} | фото привода")[:300]
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=target,
-                alt=alt,
-                source_url=source_url,
-                sort_order=donor_img.sort_order,
-                is_published=donor_img.is_published,
-            )
-            image.image.save(filename, ContentFile(payload), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-        existing.alt = alt
-        existing.sort_order = donor_img.sort_order
-        existing.is_published = donor_img.is_published
-        existing.image.save(filename, ContentFile(payload), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    stem = Path(donor_img.image.name or "photo.webp").name
+    source_url = (donor_img.source_url or "").strip() or _CLONE_SOURCE_URL.format(stem=stem)
+    action, _ = upsert_sku_image(
+        target,
+        source_url=source_url,
+        filename=f"{target.sku_code.lower()}-{stem}",
+        webp=payload,
+        alt=donor_img.alt or f"{target.sku_code} | фото привода",
+        sort_order=donor_img.sort_order,
+        dry_run=dry_run,
+    )
+    return "skipped" if action == "skip" else action
 
 
 def clone_damqu_images_from_donor(
