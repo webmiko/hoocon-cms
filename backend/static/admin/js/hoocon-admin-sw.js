@@ -65,12 +65,20 @@ self.addEventListener("notificationclick", function (event) {
   );
 });
 
-/** Same-origin Admin path only. */
+/**
+ * Same-origin Admin path only. Resolved like the browser does: string checks
+ * miss "/\evil.com", which navigates to //evil.com.
+ */
 function safeAdminPath(raw) {
   if (typeof raw !== "string") return "/admin/";
-  var url = raw.trim() || "/admin/";
-  if (!url.startsWith("/") || url.startsWith("//") || url.indexOf("://") !== -1) {
+  var value = raw.trim();
+  if (!value.startsWith("/")) return "/admin/";
+  var url;
+  try {
+    url = new URL(value, self.location.origin);
+  } catch (e) {
     return "/admin/";
   }
-  return url.slice(0, 500);
+  if (url.origin !== self.location.origin) return "/admin/";
+  return (url.pathname + url.search + url.hash).slice(0, 500);
 }

@@ -59,7 +59,14 @@
         <label class="hoocon-pbx__field">Секрет вебхука
           <input type="password" name="novosystem_webhook_secret" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.secret_set %}сохранён{% else %}не задан{% endif %}">
         </label>
+        {% if widget.secret_set %}
+        <details class="hoocon-pbx__url">
+          <summary>URL для ЛК UIS: {{ widget.webhook_url_masked }} — показать</summary>
+          <code>{{ widget.webhook_url }}</code>
+        </details>
+        {% else %}
         <p class="hoocon-pbx__url">URL для ЛК UIS: {{ widget.webhook_url }}</p>
+        {% endif %}
       {% endif %}
       <p class="hoocon-integrations__hint">{{ widget.hint }}</p>
       <button type="submit" class="hoocon-pbx__save" form="telephony-{{ widget.provider }}">Сохранить</button>

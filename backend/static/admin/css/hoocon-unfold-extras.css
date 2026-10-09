@@ -1719,6 +1719,16 @@ kbd.hoocon-sidebar-shortcut > span {
   overflow-wrap: anywhere;
 }
 
+.hoocon-pbx__url summary {
+  cursor: pointer;
+}
+
+.hoocon-pbx__url code {
+  display: block;
+  margin-top: 0.35rem;
+  user-select: all;
+}
+
 .hoocon-pbx__save {
   align-self: flex-start;
   margin-top: auto;

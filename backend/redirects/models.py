@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from django.db import models
 
+from redirects.pathutils import validate_internal_path
+
 
 class Redirect(models.Model):
     """A permanent/temporary redirect from `from_path` to `to_path`.
@@ -21,6 +23,7 @@ class Redirect(models.Model):
         to_path: канонический path, напр. `/sharovoy-kran-bv215`.
         status_code: 301 (default) или 302.
         is_active: включён ли редирект (можно выключать не удаляя).
+        edited_in_admin: правка из админки — ETL/CSV строку не трогают.
         created_at / updated_at: авто-таймстампы.
     """
 
@@ -37,11 +40,13 @@ class Redirect(models.Model):
         max_length=512,
         unique=True,
         db_index=True,
+        validators=[validate_internal_path],
         help_text="Старый URL с ведущим слэшем, напр. /tproduct/12345-bv215.",
     )
     to_path: models.CharField = models.CharField(
         "куда",
         max_length=512,
+        validators=[validate_internal_path],
         help_text="Канонический путь URL, напр. /sharovoy-kran-bv215.",
     )
     status_code: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
@@ -55,6 +60,15 @@ class Redirect(models.Model):
         default=True,
         db_index=True,
         help_text="Можно выключить редирект без удаления записи.",
+    )
+    edited_in_admin: models.BooleanField = models.BooleanField(
+        "правлено вручную",
+        default=False,
+        help_text=(
+            "Редирект создан или изменён в админке: автоматическое обновление "
+            "редиректов каталога его не перезаписывает и не включает. Снимите "
+            "галочку, чтобы вернуть автообновление."
+        ),
     )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)

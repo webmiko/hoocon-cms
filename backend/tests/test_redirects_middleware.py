@@ -103,3 +103,63 @@ def test_redirect_index_invalidates_after_admin_save(client: Client) -> None:
     response = client.get("/fresh-old")
     assert response.status_code == 301
     assert response["Location"] == "/catalog"
+
+
+@pytest.mark.django_db
+def test_redirect_edit_visible_immediately_after_gc(client) -> None:
+    """M29: ресивер инвалидации не собирается GC — правка видна сразу, не через 60 с.
+
+    Раньше это было замыкание с weak=True: после ready() его собирал GC.
+    """
+    import gc
+
+    from redirects.lookup import clear_redirect_index, lookup_redirect
+
+    clear_redirect_index()
+    assert lookup_redirect("/promo-old") is None
+    gc.collect()
+
+    Redirect.objects.create(from_path="/promo-old", to_path="/catalog", status_code=301)
+
+    hit = lookup_redirect("/promo-old")
+    assert hit is not None
+    assert hit.to_path == "/catalog"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "bad",
+    ["//evil.com", "https://evil.com", "/a b", "/x;} server {", "/$host", '/q"', "/tab\there"],
+)
+def test_admin_form_rejects_open_or_unsafe_redirect_paths(bad: str) -> None:
+    """M29/M46: админка не сохраняет //evil.com и синтаксис nginx в путях."""
+    from django.contrib.admin.sites import site
+
+    form_class = site._registry[Redirect].get_form(None)
+    form = form_class(data={"from_path": "/old", "to_path": bad, "status_code": 301, "is_active": True})
+    assert not form.is_valid()
+    assert "to_path" in form.errors
+    form = form_class(data={"from_path": bad, "to_path": "/catalog", "status_code": 301, "is_active": True})
+    assert not form.is_valid()
+    assert "from_path" in form.errors
+
+
+@pytest.mark.django_db
+def test_unsafe_rows_from_etl_are_not_served_or_exported(client) -> None:
+    """M29/M46: строки в обход валидаторов (ETL) не отдаются и не попадают в nginx map."""
+    from redirects.lookup import clear_redirect_index
+
+    Redirect.objects.bulk_create(
+        [
+            Redirect(from_path="/go-evil", to_path="//evil.com", status_code=302),
+            Redirect(from_path="/inject", to_path="/x; } server { listen 81;", status_code=301),
+            Redirect(from_path="/fine", to_path="/catalog", status_code=301),
+        ]
+    )
+    clear_redirect_index()
+
+    assert "Location" not in client.get("/go-evil")
+    body = render_nginx_map(list(Redirect.objects.filter(is_active=True)))
+    assert "/fine /catalog;" in body
+    assert "evil" not in body
+    assert "server" not in body

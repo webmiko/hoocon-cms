@@ -318,6 +318,32 @@ def test_uis_webhook_url_quotes_secret(client: Any, django_user_model: Any) -> N
     assert "token=a&b" not in html
 
 
+@pytest.mark.django_db
+def test_uis_webhook_secret_hidden_until_revealed(client: Any, django_user_model: Any) -> None:
+    """URL вебхука с секретом был открытым текстом на странице интеграций."""
+    _enable_uis(secret="very-secret-token")
+    user = django_user_model.objects.create_superuser(
+        username="pbx-mask",
+        email="pbx-mask@example.com",
+        password="password12",
+    )
+    client.force_login(user)
+    html = client.get(reverse("admin:sitesettings_sitesettings_changelist")).content.decode()
+    summary = html.split('<details class="hoocon-pbx__url">', 1)[1].split("</summary>", 1)[0]
+    assert "token=••••" in summary
+    assert "very-secret-token" not in summary
+    assert "<code>" in html.split('<details class="hoocon-pbx__url">', 1)[1]
+
+
+@pytest.mark.django_db
+def test_novosystem_webhook_non_ascii_token_is_403(client: Any) -> None:
+    """compare_digest на не-ASCII токене падал TypeError → 500 вместо 403."""
+    _enable_uis()
+    body = {"call_session_id": "9100", "direction": "in", "token": "секрет"}
+    response = client.post("/api/telephony/novosystem/events/", body, content_type="application/json")
+    assert response.status_code == 403
+
+
 def test_uis_recording_label_is_not_mango() -> None:
     """Запись UIS не подписывается как ещё не скачанная запись Mango."""
     from django.contrib import admin
@@ -329,3 +355,198 @@ def test_uis_recording_label_is_not_mango() -> None:
     mango = Call(entry_id="mango-1", recording_id="rec-mango")
     assert "личном кабинете Новосистем" in labels.recording_link(uis)
     assert "Mango" in labels.recording_link(mango)
+
+
+def _fake_urlopen(monkeypatch: pytest.MonkeyPatch, *, body: bytes = b"", exc: Exception | None = None) -> None:
+    import io
+    import urllib.request
+
+    def _urlopen(req: Any, timeout: int = 0) -> Any:
+        del req, timeout
+        if exc is not None:
+            raise exc
+        return io.BytesIO(body)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+
+
+@pytest.mark.django_db
+def test_uis_click_to_call_rejects_incomplete_settings() -> None:
+    """Выключенный или недонастроенный виджет UIS не идёт в Call API."""
+    from crm.novosystem import initiate_employee_call
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.novosystem_enabled = False
+    site.save()
+    with pytest.raises(RuntimeError, match="выключен"):
+        initiate_employee_call(employee_id="55", employee_phone="", contact="79161112233")
+
+    _enable_uis(token="", phone="")
+    with pytest.raises(RuntimeError, match="не настроен"):
+        initiate_employee_call(employee_id="55", employee_phone="", contact="79161112233")
+
+    _enable_uis()
+    with pytest.raises(RuntimeError, match="ID сотрудника"):
+        initiate_employee_call(employee_id="abc", employee_phone="", contact="79161112233")
+
+
+@pytest.mark.django_db
+def test_uis_click_to_call_sends_full_employee_phone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Полный номер сотрудника уходит в UIS, в отличие от короткого добавочного."""
+    import io
+    import urllib.request
+
+    from crm.novosystem import initiate_employee_call
+
+    _enable_uis()
+    seen: dict[str, Any] = {}
+
+    def _urlopen(req: Any, timeout: int = 0) -> Any:
+        del timeout
+        seen["body"] = json.loads(req.data.decode())
+        return io.BytesIO(b'{"result":{"data":{"call_session_id":"77"}}}')
+
+    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+    assert initiate_employee_call(employee_id="55", employee_phone="+7 916 000-11-22", contact="79161112233") == 77
+    assert seen["body"]["params"]["employee"] == {"id": 55, "phone_number": "79160001122"}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("body", "exc", "message"),
+    [
+        (b"", OSError("timeout"), "недоступен"),
+        (b"<html>", None, "не JSON"),
+        (b'{"error":{"message":"bad_employee"}}', None, "bad_employee"),
+        (b'{"error":"plain_error"}', None, "plain_error"),
+        (b'{"result":{"data":{}}}', None, "идентификатор"),
+        (b'{"result":{"data":{"call_session_id":true}}}', None, "идентификатор"),
+        (b'{"result":{"data":{"call_session_id":"abc"}}}', None, "идентификатор"),
+    ],
+)
+def test_uis_click_to_call_reports_api_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    body: bytes,
+    exc: Exception | None,
+    message: str,
+) -> None:
+    """Сбои Call API UIS превращаются в понятный RuntimeError для менеджера."""
+    from crm.novosystem import initiate_employee_call
+
+    _enable_uis()
+    _fake_urlopen(monkeypatch, body=body, exc=exc)
+    with pytest.raises(RuntimeError, match=message):
+        initiate_employee_call(employee_id="55", employee_phone="", contact="79161112233")
+
+
+@pytest.mark.parametrize("raw", [b"<html>", b'{"error":{}}', b"[]"])
+def test_uis_http_error_without_message_falls_back_to_status(raw: bytes) -> None:
+    """HTTP-ошибка UIS без JSON-сообщения показывает код статуса."""
+    import io
+    import urllib.error
+
+    from crm.novosystem import _uis_error_message
+
+    exc = urllib.error.HTTPError("https://x", 502, "bad", hdrs=None, fp=io.BytesIO(raw))  # type: ignore[arg-type]
+    assert _uis_error_message(exc) == "HTTP 502"
+
+
+def test_uis_time_parser_accepts_unix_iso_and_rejects_garbage() -> None:
+    """Время UIS: unix (сек/мс), строка цифр, ISO; мусор и пустое — None."""
+    from datetime import UTC, datetime
+
+    from crm.novosystem import _parse_uis_time
+
+    expected = datetime(2024, 3, 1, 7, 15, tzinfo=UTC)
+    assert _parse_uis_time(1709277300) == expected
+    assert _parse_uis_time(1709277300000) == expected
+    assert _parse_uis_time("1709277300") == expected
+    assert _parse_uis_time("2024-03-01T10:15:00+03:00") == expected
+    for empty in (None, "", "   ", True, "not a date", 10**18):
+        assert _parse_uis_time(empty) is None
+
+
+def test_uis_talk_seconds_normalizes_duration() -> None:
+    """Длительность UIS: дробь и строка — целые секунды, мусор и минус — 0."""
+    from crm.novosystem import _talk_seconds
+
+    assert _talk_seconds("12.7") == 12
+    assert _talk_seconds(None) == 0
+    assert _talk_seconds("abc") == 0
+    assert _talk_seconds(-5) == 0
+
+
+@pytest.mark.django_db
+def test_novosystem_event_updates_open_call_and_logs_once(django_user_model: Any) -> None:
+    """Звонок UIS: пустой вебхук игнорируется, открытый звонок дополняется и закрывается."""
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Activity, ActivityType, Client
+    from crm.novosystem import handle_novosystem_event
+
+    _enable_uis()
+    manager = django_user_model.objects.create_user(username="uis-ext", email="ext@example.com")
+    StaffVpbxProfile.objects.create(user=manager, extension="301")
+    crm_client = Client.objects.create(email="uis@example.com", name="UIS", phone="79162223344")
+
+    assert handle_novosystem_event({}) == "ignored"
+    first = {"id": "9100", "calling_phone_number": "79162223344", "employee_id": "999"}
+    assert handle_novosystem_event(first) == "created"
+    call = Call.objects.get(entry_id="uis:9100")
+    assert call.state == "appeared"
+    assert call.manager_id is None
+
+    final = {
+        **first,
+        "extension": "301",
+        "start_time": "2024-03-01T10:00:00+03:00",
+        "finish_time": "2024-03-01T10:05:00+03:00",
+        "talk_time_duration": 90,
+        "call_records": ["rec-1"],
+    }
+    assert handle_novosystem_event(final) == "updated"
+    call.refresh_from_db()
+    assert call.state == "disconnected"
+    assert call.manager_id == manager.pk
+    assert call.recording_id == "rec-1"
+    assert call.talk_duration == 90
+    assert call.finished_at is not None
+    assert Activity.objects.filter(client=crm_client, activity_type=ActivityType.CALL).count() == 1
+
+
+@pytest.mark.django_db
+def test_mango_widget_rejects_non_https_callback(client: Any, django_user_model: Any) -> None:
+    """Форма виджета сохраняла file:// и http://внутренний-хост как URL вебхука."""
+    from sitesettings.models import SiteSettings
+
+    user = django_user_model.objects.create_superuser(
+        username="pbx-scheme",
+        email="pbx-scheme@example.com",
+        password="password12",
+    )
+    client.force_login(user)
+    url = reverse("admin:sitesettings_telephony_widget")
+    client.post(url, {"provider": "mango", "mango_callback_webhook_url": "file:///etc/passwd"})
+    assert SiteSettings.load().mango_callback_webhook_url == ""
+
+    ok = "https://integration-webhook.mango-office.ru/webhookapp/common?EmployeeNUM={ext}&TelNumbr={num}"
+    client.post(url, {"provider": "mango", "mango_callback_webhook_url": ok})
+    assert SiteSettings.load().mango_callback_webhook_url == ok
+
+
+@pytest.mark.django_db
+def test_settings_save_keeps_round_robin_cursor(django_user_model: Any) -> None:
+    """site.save() из формы телефонии затирал курсор round-robin, сдвинутый роутером."""
+    from sitesettings.models import SiteSettings
+
+    picked = django_user_model.objects.create_user(username="rr-picked", password="x", is_staff=True)
+    stale = SiteSettings.load()
+    fresh = SiteSettings.load()
+    fresh.lead_rr_last_user = picked
+    fresh.save(update_fields=["lead_rr_last_user", "updated_at"])
+
+    stale.mango_enabled = True
+    stale.save()
+    row = SiteSettings.load()
+    assert row.mango_enabled is True
+    assert row.lead_rr_last_user_id == picked.pk

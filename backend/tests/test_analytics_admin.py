@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
+import time_machine
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -11,8 +14,12 @@ from analytics.models import ObjectType, PageDailyStat, SiteDailyStat
 
 User = get_user_model()
 
+# Секунда до полуночи по МСК: «сегодня» в тесте и во вьюхе не должны разъехаться.
+_JUST_BEFORE_MIDNIGHT_MSK = datetime(2026, 10, 9, 20, 59, 59, 900000, tzinfo=UTC)
+
 
 @pytest.mark.django_db
+@time_machine.travel(_JUST_BEFORE_MIDNIGHT_MSK, tick=False)
 def test_analytics_stats_page_for_superuser(client) -> None:
     admin_user = User.objects.create_superuser(
         username="analytics-admin",
@@ -43,6 +50,7 @@ def test_analytics_stats_page_for_superuser(client) -> None:
 
 
 @pytest.mark.django_db
+@time_machine.travel(_JUST_BEFORE_MIDNIGHT_MSK, tick=False)
 def test_dashboard_includes_analytics_cards(client) -> None:
     admin_user = User.objects.create_superuser(
         username="dash-analytics",

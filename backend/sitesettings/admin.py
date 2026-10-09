@@ -27,9 +27,9 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
     """Context for the Mango and Novosystem forms on the integrations page."""
     mango_on, mango_key, mango_salt, mango_callback = mango_settings(site)
     uis_on, uis_token, uis_phone, uis_secret = novosystem_settings(site)
-    webhook = request.build_absolute_uri(reverse("novosystem-events"))
-    if uis_secret:
-        webhook = f"{webhook}?token={quote(uis_secret, safe='')}"
+    webhook_base = request.build_absolute_uri(reverse("novosystem-events"))
+    webhook = f"{webhook_base}?token={quote(uis_secret, safe='')}" if uis_secret else webhook_base
+    webhook_masked = f"{webhook_base}?token=••••" if uis_secret else webhook_base
 
     def status(enabled: bool, ready: bool) -> tuple[str, str]:
         if enabled and ready:
@@ -54,7 +54,8 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
             "key_set": bool(mango_key),
             "salt_set": bool(mango_salt),
             "hint": (
-                "События: /api/telephony/mango/events/. Ключ и соль из ЛК Mango. "
+                "Адрес внешней системы в ЛК Mango: https://<сайт>/api/telephony/mango — "
+                "Mango сам допишет /events/call, /events/summary, /events/recording. Ключ и соль из ЛК Mango. "
                 "Пустые поля секретов не стирают сохранённые."
             ),
         },
@@ -69,6 +70,7 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
             "token_set": bool(uis_token),
             "secret_set": bool(uis_secret),
             "webhook_url": webhook,
+            "webhook_url_masked": webhook_masked,
             "hint": (
                 "В ЛК UIS: API Базовый набор, белый IP сервера, HTTP-уведомление POST на URL выше. "
                 "ID сотрудника — в карточке пользователя."
@@ -501,7 +503,14 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                 site.mango_api_key = key
             if salt:
                 site.mango_api_salt = salt
-            site.mango_callback_webhook_url = (request.POST.get("mango_callback_webhook_url") or "").strip()
+            callback = (request.POST.get("mango_callback_webhook_url") or "").strip()
+            from crm.mango import callback_template_error
+
+            problem = callback_template_error(callback) if callback else ""
+            if problem:
+                messages.error(request, problem)
+                return HttpResponseRedirect(reverse("admin:sitesettings_sitesettings_changelist"))
+            site.mango_callback_webhook_url = callback
             site.save()
             messages.success(request, "Виджет Mango сохранён.")
         elif provider == "novosystem":

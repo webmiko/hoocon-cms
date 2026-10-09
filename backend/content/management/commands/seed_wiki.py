@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
 
 from content.models import WikiDocument
 
@@ -69,13 +70,26 @@ WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
 )
 
 
+def body_hash(body: str) -> str:
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 class Command(BaseCommand):
-    """Create or refresh WikiDocument rows from bundled HTML fixtures."""
+    """Create or refresh WikiDocument rows from bundled HTML fixtures.
+
+    Runs on every web container start, so it must never undo staff work:
+    a page whose HTML no longer matches the last seed was edited in Admin
+    and is skipped (``--force`` overwrites), and ``is_active`` is only set
+    when the page is created.
+    """
 
     help = "Seed staff Wiki pages (HTML dashboards) from content/fixtures/wiki/."
 
+    def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument("--force", action="store_true", help="Overwrite pages edited in Admin.")
+
     def handle(self, *args: object, **options: object) -> None:
-        del args, options
+        force = bool(options.get("force"))
         for seed in WIKI_SEEDS:
             fixture_name = str(seed["fixture"])
             path = _FIXTURES_DIR / fixture_name
@@ -83,16 +97,26 @@ class Command(BaseCommand):
                 self.stderr.write(self.style.ERROR(f"Missing fixture: {path}"))
                 continue
             body = path.read_text(encoding="utf-8")
-            obj, created = WikiDocument.objects.update_or_create(
-                slug=str(seed["slug"]),
-                defaults={
-                    "title": str(seed["title"]),
-                    "category": str(seed["category"]),
-                    "summary": str(seed["summary"]),
-                    "body": body,
-                    "sort_order": int(seed["sort_order"]),
-                    "is_active": True,
-                },
-            )
-            verb = "Created" if created else "Updated"
-            self.stdout.write(f"{verb} Wiki: {obj.slug} ({len(body):,} bytes HTML)")
+            fields = {
+                "title": str(seed["title"]),
+                "category": str(seed["category"]),
+                "summary": str(seed["summary"]),
+                "body": body,
+                "sort_order": int(seed["sort_order"]),
+                "seed_hash": body_hash(body),
+            }
+            obj = WikiDocument.objects.filter(slug=str(seed["slug"])).first()
+            if obj is None:
+                obj = WikiDocument.objects.create(slug=str(seed["slug"]), is_active=True, **fields)
+                self.stdout.write(f"Created Wiki: {obj.slug} ({len(body):,} bytes HTML)")
+                continue
+            edited = bool(obj.seed_hash) and body_hash(obj.body) != obj.seed_hash
+            if edited and not force:
+                self.stdout.write(self.style.WARNING(f"Skipped Wiki: {obj.slug} — edited in Admin (use --force)"))
+                continue
+            if obj.seed_hash == fields["seed_hash"] and not edited:
+                continue
+            for name, value in fields.items():
+                setattr(obj, name, value)
+            obj.save(update_fields=[*fields, "updated_at"])
+            self.stdout.write(f"Updated Wiki: {obj.slug} ({len(body):,} bytes HTML)")

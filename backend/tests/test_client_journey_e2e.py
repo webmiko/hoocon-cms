@@ -18,6 +18,7 @@ import hashlib
 import json
 import time
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -78,6 +79,31 @@ def _mango_call_payload(**over: Any) -> dict[str, Any]:
     return payload
 
 
+def _register_cabinet(api: APIClient, email: str, name: str) -> None:
+    """Register in the cabinet and confirm the emailed code (account appears on verify)."""
+    with patch("cabinet.tasks.send_client_otp_email_task.delay") as send:
+        resp = api.post(
+            "/api/auth/register/",
+            {
+                "pdn_consent": True,
+                "email": email,
+                "password": _PASSWORD,
+                "name": name,
+                "website": "",
+                "form_start_ts": time.time() - 10,
+            },
+            format="json",
+        )
+    assert resp.status_code == 202, resp.content
+    code = send.call_args.args[1]
+    verify = api.post(
+        "/api/auth/otp/verify/",
+        {"challenge_id": resp.json()["challenge_id"], "code": code},
+        format="json",
+    )
+    assert verify.status_code == 200, verify.content
+
+
 @pytest.mark.django_db
 def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
     """Сквозной маршрут: каждый артефакт сохранён и привязан к карточке."""
@@ -93,6 +119,7 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
     resp = api.post(
         "/api/leads/",
         {
+            "pdn_consent": True,
             "lead_type": "rfq",
             "name": "Иван Петров",
             "email": _CLIENT_EMAIL,
@@ -229,18 +256,7 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
 
     # ── Шаг 6: клиент регистрируется в кабинете той же почтой ──
     cab = APIClient()
-    resp = cab.post(
-        "/api/auth/register/",
-        {
-            "email": _CLIENT_EMAIL,
-            "password": _PASSWORD,
-            "name": "Иван Петров",
-            "website": "",
-            "form_start_ts": time.time() - 10,
-        },
-        format="json",
-    )
-    assert resp.status_code == 201, resp.content
+    _register_cabinet(cab, _CLIENT_EMAIL, "Иван Петров")
     account = ClientAccount.objects.get(email=_CLIENT_EMAIL)
     client.refresh_from_db()
     assert client.account_id == account.pk, "аккаунт не привязан к карточке"
@@ -273,18 +289,7 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
 
     # ── Шаг 7: изоляция — чужой аккаунт не видит данные ──
     other = APIClient()
-    resp = other.post(
-        "/api/auth/register/",
-        {
-            "email": "stranger@other.test",
-            "password": _PASSWORD,
-            "name": "Чужой",
-            "website": "",
-            "form_start_ts": time.time() - 10,
-        },
-        format="json",
-    )
-    assert resp.status_code == 201
+    _register_cabinet(other, "stranger@other.test", "Чужой")
     assert other.get(f"/api/account/quotes/{quote.pk}/").status_code == 404
     assert other.get(f"/api/account/quotes/{quote.pk}/pdf/").status_code == 404
     assert other.get(f"/api/account/documents/{doc.pk}/download/").status_code == 404
@@ -308,6 +313,7 @@ def test_web_conversation_auto_links_to_client_card() -> None:
     resp = api.post(
         "/api/support/conversations/",
         {
+            "pdn_consent": True,
             "display_name": "Чат-клиент",
             "contact_email": "chatter@corp.test",
             "website": "",
@@ -322,7 +328,7 @@ def test_web_conversation_auto_links_to_client_card() -> None:
     api2 = APIClient()
     resp = api2.post(
         "/api/support/conversations/",
-        {"contact_email": "newbie@fresh.test", "website": ""},
+        {"pdn_consent": True, "contact_email": "newbie@fresh.test", "website": ""},
         format="json",
     )
     assert resp.status_code == 201, resp.content
@@ -349,21 +355,20 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
     )
 
     cab = APIClient()
-    resp = cab.post(
-        "/api/auth/register/",
-        {
-            "email": "legacy@corp.test",
-            "password": _PASSWORD,
-            "name": "Легаси",
-            "website": "",
-            "form_start_ts": time.time() - 10,
-        },
-        format="json",
-    )
-    assert resp.status_code == 201, resp.content
+    _register_cabinet(cab, "legacy@corp.test", "Легаси")
 
     orphan.refresh_from_db()
     assert orphan.client_id == client.pk
+    # contact_email в виджете вводит посетитель — без ответа менеджера диалог скрыт.
+    assert cab.get("/api/account/conversations/").json() == []
+
+    manager = User.objects.create_user("legacy-mgr", password="x", is_staff=True)
+    Message.objects.create(
+        conversation=orphan,
+        direction=MessageDirection.OUTBOUND,
+        body="Добрый день!",
+        author=manager,
+    )
     convs = cab.get("/api/account/conversations/").json()
     assert convs[0]["id"] == orphan.pk
 
@@ -403,18 +408,7 @@ def test_journey_quote_draft_hidden_from_cabinet(settings: Any) -> None:
     )
 
     cab = APIClient()
-    resp = cab.post(
-        "/api/auth/register/",
-        {
-            "email": "buyer@corp.test",
-            "password": _PASSWORD,
-            "name": "Покупатель",
-            "website": "",
-            "form_start_ts": time.time() - 10,
-        },
-        format="json",
-    )
-    assert resp.status_code == 201
+    _register_cabinet(cab, "buyer@corp.test", "Покупатель")
     assert cab.get("/api/account/quotes/").json() == []
     assert cab.get(f"/api/account/quotes/{draft.pk}/").status_code == 404
 

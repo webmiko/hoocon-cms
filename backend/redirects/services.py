@@ -9,7 +9,7 @@ from typing import Any
 from django.db import transaction
 
 from redirects.models import Redirect
-from redirects.pathutils import normalize_path, validate_internal_path
+from redirects.pathutils import is_safe_internal_path, normalize_path, validate_internal_path
 
 REQUIRED_COLUMNS = ("from_path", "to_path", "status_code")
 
@@ -75,7 +75,16 @@ def load_redirects_from_csv(path: Path, *, dry_run: bool = False) -> dict[str, i
         return {"created": 0, "updated": 0, "skipped": total, "total": total}
 
     with transaction.atomic():
+        locked = set(
+            Redirect.objects.filter(
+                from_path__in=[item["from_path"] for item in rows],
+                edited_in_admin=True,
+            ).values_list("from_path", flat=True)
+        )
         for item in rows:
+            if item["from_path"] in locked:
+                skipped += 1
+                continue
             _obj, was_created = Redirect.objects.update_or_create(
                 from_path=item["from_path"],
                 defaults={
@@ -110,6 +119,38 @@ def render_nginx_map(redirects: list[Redirect]) -> str:
         "",
     ]
     for item in redirects:
-        lines.append(f"{item.from_path} {item.to_path};")
+        # Unquoted map syntax: an unsafe path would break or inject config.
+        if is_safe_internal_path(item.from_path) and is_safe_internal_path(item.to_path):
+            lines.append(f"{item.from_path} {item.to_path};")
     lines.append("")
     return "\n".join(lines)
+
+
+_MAX_CHAIN_HOPS = 10
+
+
+def collapse_redirect_chains(*, dry_run: bool = False) -> int:
+    """Point ``A → B → C`` straight at ``C`` (one 301 hop for crawlers).
+
+    Rows edited in Admin are left as they are; cycles are skipped.
+
+    Returns:
+        Number of rows rewritten (or that would be in ``dry_run``).
+    """
+    active = dict(Redirect.objects.filter(is_active=True).values_list("from_path", "to_path"))
+    rewritten = 0
+    for row in Redirect.objects.filter(is_active=True, edited_in_admin=False).iterator():
+        final = row.to_path
+        seen = {row.from_path}
+        hops = 0
+        while final in active and final not in seen and hops < _MAX_CHAIN_HOPS:
+            seen.add(final)
+            final = active[final]
+            hops += 1
+        if final in seen or final == row.to_path or final == row.from_path:
+            continue
+        rewritten += 1
+        if not dry_run:
+            Redirect.objects.filter(pk=row.pk).update(to_path=final)
+            active[row.from_path] = final
+    return rewritten

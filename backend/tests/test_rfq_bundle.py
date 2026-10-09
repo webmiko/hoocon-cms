@@ -53,6 +53,7 @@ def test_post_lead_ignores_invalid_basic_auth(client) -> None:
     response = client.post(
         "/api/leads/",
         data={
+            "pdn_consent": True,
             "lead_type": "consultation",
             "name": "Иван",
             "company": "ООО Тест",
@@ -71,6 +72,7 @@ def test_post_rfq_requires_company(client) -> None:
     response = client.post(
         "/api/leads/",
         data={
+            "pdn_consent": True,
             "lead_type": "rfq",
             "name": "Иван",
             "email": "a@example.com",
@@ -90,6 +92,7 @@ def test_post_consultation_requires_company(client) -> None:
     response = client.post(
         "/api/leads/",
         data={
+            "pdn_consent": True,
             "lead_type": "consultation",
             "name": "Иван",
             "email": "a@example.com",
@@ -109,6 +112,7 @@ def test_post_rfq_items_creates_lead_items(client) -> None:
     response = client.post(
         "/api/leads/",
         data={
+            "pdn_consent": True,
             "lead_type": "rfq",
             "name": "Иван",
             "email": "a@example.com",
@@ -141,6 +145,7 @@ def test_post_legacy_sku_creates_one_item(client) -> None:
     response = client.post(
         "/api/leads/",
         data={
+            "pdn_consent": True,
             "lead_type": "rfq",
             "name": "Пётр",
             "email": "b@example.com",
@@ -345,3 +350,119 @@ def test_render_notification_continuation_and_items() -> None:
     assert "HVA-5NM" in text_body
     assert "HVA-10NM" in text_body
     assert "HVA-5NM" in html_body
+
+
+@pytest.mark.django_db
+def test_rfq_bundle_root_lookup_waits_for_concurrent_lead() -> None:
+    """M21: поиск корня нити держит advisory-lock по ключу.
+
+    Без блокировки две параллельные RFQ с одной компанией+именем обе
+    становились корнями. Вторая сессия держит lock → attach ждёт.
+    """
+    from django.db import OperationalError, connections, transaction
+
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Иван",
+        email="lock@example.com",
+        company="ООО Замок",
+        message="Заявка на КП, проверка блокировки нити.",
+    )
+    key = build_rfq_bundle_key(company=lead.company, name=lead.name)
+    other = connections.create_connection("default")
+    try:
+        with other.cursor() as cursor:
+            cursor.execute("BEGIN")
+            cursor.execute("SELECT pg_advisory_xact_lock(7301, hashtext(%s))", [key])
+        with pytest.raises(OperationalError, match="lock timeout"), transaction.atomic():
+            with transaction.get_connection().cursor() as cursor:
+                cursor.execute("SET LOCAL lock_timeout = '200ms'")
+            attach_rfq_bundle(lead)
+    finally:
+        with other.cursor() as cursor:
+            cursor.execute("ROLLBACK")
+        other.close()
+
+
+@pytest.mark.django_db
+def test_lead_post_survives_db_error_in_crm_link_signal(client) -> None:
+    """M22: ошибка БД в «best-effort» сигнале не роняет заявку в 500.
+
+    Сигнал ловил DatabaseError без savepoint: транзакция заявки уже
+    сломана, LeadItem/bundle падали TransactionManagementError.
+    """
+    from unittest.mock import patch
+
+    from django.db import connection
+
+    def _broken_link(lead: Lead) -> None:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM crm_table_that_does_not_exist")
+
+    sku = _sku("HVA-20NM", slug="hva-20nm")
+    with (
+        patch("crm.services.link_lead_to_client", _broken_link),
+        patch("leads.lifecycle.send_lead_notification"),
+        patch("leads.lifecycle.send_lead_client_confirmation"),
+    ):
+        response = client.post(
+            "/api/leads/",
+            data={
+                "pdn_consent": True,
+                "lead_type": "rfq",
+                "name": "Иван",
+                "email": "sig@example.com",
+                "company": "ООО Сигнал",
+                "message": "Прошу КП, проверка сигнала связи с CRM.",
+                "items": [{"sku": sku.slug, "quantity": 1}],
+            },
+            content_type="application/json",
+        )
+
+    assert response.status_code == 201
+    lead = Lead.objects.get(pk=response.json()["id"])
+    assert lead.items.count() == 1
+    assert lead.client_id is None
+
+
+def _thread(size: int) -> Lead:
+    root = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Иван",
+        email=f"thread{size}@example.com",
+        company=f"ООО Нить {size}",
+        message="Корень нити для проверки запросов.",
+        rfq_bundle_key=f"thread-{size}",
+    )
+    for idx in range(size):
+        sibling = Lead.objects.create(
+            lead_type=Lead.LeadType.RFQ,
+            name="Иван",
+            email=f"thread{size}@example.com",
+            company=f"ООО Нить {size}",
+            message="Сосед по нити для проверки запросов.",
+            rfq_bundle_key=f"thread-{size}",
+            rfq_bundle_root=root,
+        )
+        sibling.items.create(sku_code=f"SKU-{idx}", quantity=1)
+    return root
+
+
+@pytest.mark.django_db
+def test_rfq_thread_links_query_count_flat() -> None:
+    """Ссылки нити делали запрос позиций на каждую заявку (N+1)."""
+    from django.contrib import admin
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from leads.admin import LeadAdmin
+
+    model_admin = LeadAdmin(Lead, admin.site)
+    counts = []
+    for size in (2, 6):
+        root = _thread(size)
+        with CaptureQueriesContext(connection) as ctx:
+            html = model_admin.rfq_thread_links(root)
+        counts.append(len(ctx.captured_queries))
+        assert "SKU-0" in html
+    assert counts[0] == counts[1]

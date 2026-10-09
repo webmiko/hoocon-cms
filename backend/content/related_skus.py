@@ -122,41 +122,56 @@ def mentioned_skus_for_article(
     Returns:
         List of SKU instances (may be empty).
     """
-    from catalog.models import SKU
+    from django.db.models import Prefetch
+
+    from catalog.models import SKU, ProductImage
 
     tokens = extract_model_tokens(text)
     if not tokens:
         return []
 
+    # Scan light rows only; full cards are loaded for the picked few.
+    rows = list(
+        SKU.objects.filter(is_published=True)
+        .order_by("sku_code")
+        .values_list("pk", "product_id", "sku_code", "product__slug"),
+    )
     # Longer tokens first so DA3FU230-DS beats DA3FU; MQU before MU; UQ before Q.
     tokens_sorted = sorted(tokens, key=len, reverse=True)
-    qs = (
-        SKU.objects.filter(is_published=True)
-        .select_related("product", "product__category")
-        .prefetch_related("images")
-        .order_by("sku_code")
-    )
-    picked: list[SKU] = []
+    picked: list[int] = []
     used_products: set[int] = set()
 
     for token in tokens_sorted:
         if len(picked) >= limit:
             break
         needle = token.casefold().replace("-", "")
-        for sku in qs:
-            if sku.product_id in used_products:
+        for pk, product_id, sku_code, product_slug in rows:
+            if product_id in used_products:
                 continue
-            code = sku.sku_code.casefold().replace("-", "").replace(" ", "")
-            product_slug = (getattr(sku.product, "slug", None) or "").casefold()
-            slug_compact = product_slug.replace("-", "")
+            code = (sku_code or "").casefold().replace("-", "").replace(" ", "")
+            slug_compact = (product_slug or "").casefold().replace("-", "")
             if not _token_hits_sku(
                 needle=needle,
                 code=code,
                 slug_compact=slug_compact,
             ):
                 continue
-            used_products.add(sku.product_id)
-            picked.append(sku)
+            used_products.add(product_id)
+            picked.append(pk)
             break
 
-    return picked[:limit]
+    if not picked:
+        return []
+    cards = (
+        SKU.objects.filter(pk__in=picked)
+        .select_related("product", "product__category")
+        .prefetch_related(
+            Prefetch(
+                "images",
+                queryset=ProductImage.objects.filter(is_published=True).order_by("sort_order", "id"),
+                to_attr="_prefetched_images",
+            ),
+        )
+        .in_bulk()
+    )
+    return [cards[pk] for pk in picked[:limit] if pk in cards]

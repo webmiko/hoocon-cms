@@ -23,11 +23,6 @@ def _nginx_site_text() -> str:
     return NGINX_CONF.read_text(encoding="utf-8") + "\n" + NGINX_SITE_INC.read_text(encoding="utf-8")
 
 
-def test_ci_workflow_file_exists() -> None:
-    """The CI workflow file exists at the expected path."""
-    assert CI_YML.exists(), f"Missing CI workflow: {CI_YML}"
-
-
 def test_ci_workflow_is_valid_yaml() -> None:
     """The CI workflow is parseable YAML."""
     import yaml
@@ -274,3 +269,145 @@ def test_redirects_map_has_documentation() -> None:
     content = REDIRECTS_MAP.read_text(encoding="utf-8")
     assert len(content) > 100  # has explanatory comments
     assert "tproduct" in content  # references the Tilda URL pattern
+
+
+def test_ci_does_not_cancel_main_deploys() -> None:
+    """M36: новый push в main не отменяет идущий деплой между up -d и reload nginx."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    cancel = str(data["concurrency"]["cancel-in-progress"])
+    assert cancel != "True"
+    assert "refs/heads/main" in cancel
+    assert "!=" in cancel
+
+
+def test_release_pr_scripts_exist_and_merge_whole_pr() -> None:
+    """M38: правила «чкд»/деплоя вызывают эти скрипты — их не было в репо."""
+    import os
+
+    scripts = ROOT / "scripts"
+    ensure = scripts / "ensure-release-pr.sh"
+    merge = scripts / "merge-release-pr.sh"
+    for script in (ensure, merge):
+        assert script.exists(), script
+        assert os.access(script, os.X_OK), f"{script} is not executable"
+    ensure_text = ensure.read_text(encoding="utf-8")
+    assert "gh pr list --base" in ensure_text
+    assert "gh pr create" in ensure_text
+    merge_text = merge.read_text(encoding="utf-8")
+    assert "gh pr checks" in merge_text
+    assert "--merge" in merge_text
+    assert "--squash" not in merge_text
+    assert "git push" not in merge_text
+
+
+def test_nginx_rate_limits_admin_login() -> None:
+    """M40: /admin/ открыта без IP-allowlist — логин должен быть под limit_req."""
+    assert "zone=admin_login:10m" in NGINX_CONF.read_text(encoding="utf-8")
+    content = _nginx_site_text()
+    block = content.split("location = /admin/login/", 1)[1].split("}", 1)[0]
+    assert "limit_req zone=admin_login" in block
+    assert "proxy_pass http://hoocon_app" in block
+    assert "X-Forwarded-For $remote_addr" in block
+
+
+def test_ci_actions_pinned_by_commit_sha() -> None:
+    """Actions were pinned by moving tags (@v4): a retagged action ran with deploy secrets."""
+    import re
+
+    uses = re.findall(r"uses:\s*(\S+)", CI_YML.read_text(encoding="utf-8"))
+    assert uses
+    unpinned = [u for u in uses if not re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", u)]
+    assert unpinned == []
+
+
+def test_deploy_pins_vps_host_key() -> None:
+    """CI ran ssh-keyscan + accept-new each deploy (TOFU); the key now comes from a secret."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    deploy_env = next(
+        step.get("env", {}) for step in data["jobs"]["deploy"]["steps"] if step.get("name") == "Deploy to VPS"
+    )
+    assert deploy_env.get("SSH_KNOWN_HOSTS") == "${{ secrets.SSH_KNOWN_HOSTS }}"
+
+    for name in ("deploy-remote.sh", "vps-free-disk.sh", "vps-install-cron.sh", "vps-install-logrotate.sh"):
+        text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert "hoocon_ssh_trust" in text, name
+        assert "accept-new" not in text, name
+        assert "ssh-keyscan" not in text, name
+
+
+def _ssh_trust_opts(tmp_path: Path, env: dict[str, str]) -> tuple[str, str]:
+    import subprocess
+
+    script = f'source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust; printf "%s " "${{SSH_OPTS[@]}}"'
+    out = subprocess.run(
+        ["bash", "-c", script],
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    known = tmp_path / ".ssh" / "known_hosts"
+    return out.stdout, known.read_text() if known.exists() else ""
+
+
+def test_ssh_trust_is_strict_with_pinned_key(tmp_path: Path) -> None:
+    opts, known = _ssh_trust_opts(tmp_path, {"SSH_KNOWN_HOSTS": "vps.example ssh-ed25519 AAAAC3Nza"})
+    assert "StrictHostKeyChecking=yes" in opts
+    assert f"UserKnownHostsFile={tmp_path}/.ssh/known_hosts " in opts
+    assert "vps.example ssh-ed25519 AAAAC3Nza" in known
+
+
+def test_ssh_trust_warns_in_ci_without_pinned_key(tmp_path: Path) -> None:
+    import subprocess
+
+    script = f'source "{ROOT / "scripts" / "ssh-trust.sh"}"; hoocon_ssh_trust'
+    out = subprocess.run(
+        ["bash", "-c", script],
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "GITHUB_ACTIONS": "true"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "::warning::SSH_KNOWN_HOSTS" in out.stderr
+
+
+def test_telephony_webhook_token_not_in_access_log() -> None:
+    """UIS sends ?token=<secret>; the default access log wrote it to disk."""
+    conf = NGINX_CONF.read_text(encoding="utf-8")
+    fmt = conf.split("log_format hoocon_noargs", 1)[1].split(";", 1)[0]
+    assert "$uri" in fmt
+    assert "$request " not in fmt and "$request_uri" not in fmt and "$args" not in fmt
+    block = NGINX_SITE_INC.read_text(encoding="utf-8").split("location /api/telephony/", 1)[1].split("\n}", 1)[0]
+    assert "access_log /var/log/nginx/access.log hoocon_noargs;" in block
+    assert "proxy_pass http://hoocon_app;" in block
+    assert "proxy_set_header X-Forwarded-For $remote_addr;" in block
+
+
+def test_all_shell_scripts_parse_with_bash_n() -> None:
+    """Поведенческая проверка вместо «файл существует»: каждый scripts/*.sh парсится bash."""
+    import subprocess
+
+    scripts = sorted((ROOT / "scripts").glob("*.sh"))
+    assert scripts
+    broken = {
+        path.name: proc.stderr.strip()
+        for path in scripts
+        if (proc := subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, check=False)).returncode
+    }
+    assert broken == {}
+
+
+def test_stray_uv_lock_is_gitignored() -> None:
+    """Poetry — единственный lock; uv.lock рядом не должен попасть в коммит."""
+    import subprocess
+
+    proc = subprocess.run(
+        ["git", "check-ignore", "-q", "backend/uv.lock"],
+        cwd=ROOT,
+        check=False,
+    )
+    assert proc.returncode == 0

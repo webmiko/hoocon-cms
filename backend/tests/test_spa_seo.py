@@ -171,3 +171,67 @@ def test_normalize_strips_trailing_slash() -> None:
 
     assert normalize_spa_path("/catalog/") == "/catalog"
     assert normalize_spa_path("/") == "/"
+
+
+@pytest.mark.django_db
+def test_spa_article_json_ld_cannot_close_script(client) -> None:
+    """M30: «</script>» в заголовке статьи не выходит из JSON-LD (XSS в SSR head)."""
+    import json
+    import re
+
+    from django.utils import timezone
+
+    from content.models import Article
+
+    Article.objects.create(
+        title='Привод </script><script>alert(1)</script> & "кавычки"',
+        slug="xss-seo",
+        body="<p>Текст.</p>",
+        excerpt="</script><img src=x onerror=alert(2)>",
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    response = client.get("/statyi/xss-seo")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "<script>alert(1)" not in body
+    assert "<img src=x" not in body
+    blocks = re.findall(r'<script type="application/ld\+json"[^>]*>(.*?)</script>', body, flags=re.DOTALL)
+    parsed = [json.loads(block) for block in blocks]
+    assert any(item.get("@type") == "Article" for item in parsed)
+
+
+def test_inject_json_ld_escapes_script_breakout() -> None:
+    """M30: любое поле JSON-LD с «</script>» экранируется как \\u003c — блок не закрывается."""
+    import json
+
+    from config.seo.head import inject_json_ld
+
+    html = "<html><head></head><body></body></html>"
+    block = {"@type": "Product", "name": "DA5 </script><script>alert(1)</script> & co"}
+    out = inject_json_ld(html, [block], nonce="n1")
+
+    assert "<script>alert(1)" not in out
+    assert out.count("</script>") == 1
+    payload = out.split('nonce="n1">', 1)[1].split("</script>", 1)[0]
+    assert "\\u003c/script\\u003e" in payload
+    assert json.loads(payload) == block
+
+
+@pytest.mark.django_db
+def test_spa_title_with_group_reference_does_not_500(client) -> None:
+    """M30: «\\1» / «\\g<0>» в заголовке из CMS не ломает re.subn (500)."""
+    from django.utils import timezone
+
+    from content.models import Article
+
+    Article.objects.create(
+        title=r"Схема \1 и \g<0> подключения",
+        slug="backref-seo",
+        body="<p>Текст.</p>",
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    response = client.get("/statyi/backref-seo")
+    assert response.status_code == 200
+    assert r"Схема \1 и \g&lt;0&gt; подключения" in response.content.decode()
