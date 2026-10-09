@@ -153,9 +153,6 @@ omit = [
     "catalog/etl/*",
     # Import-time env/prod branches — not reachable under pytest settings.
     "config/settings.py",
-    # Admin UI: exercised via HTTP admin tests; branch-dense Unfold forms.
-    "*/admin.py",
-    "*/admin/*",
     "manage.py",
     "**/asgi.py",
     "**/wsgi.py",

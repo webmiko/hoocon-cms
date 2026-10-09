@@ -5,9 +5,9 @@ Usage (from ``backend/``)::
 
     poetry run python ../scripts/check-coverage-floors.py
 
-Floors are the measured level when the gate was widened to every app;
-raise a floor when tests improve an app, never lower it to pass CI.
-Exit 1 when any app drops below its floor.
+Floors are the measured level (rounded down to 0.5) since ``admin.py`` and
+``admin/*`` joined the measured code; raise a floor when tests improve an
+app, never lower it to pass CI. Exit 1 when any app drops below its floor.
 """
 
 from __future__ import annotations
@@ -18,19 +18,19 @@ import sys
 from collections import defaultdict
 
 APP_FLOORS: dict[str, float] = {
-    "accounts": 82.5,
-    "analytics": 92.5,
-    "cabinet": 85.5,
-    "catalog": 91.5,
-    "config": 90.0,
-    "content": 87.0,
-    "crm": 90.0,
-    "leads": 91.0,
-    "redirects": 88.5,
-    "search": 95.5,
-    "sitesettings": 96.0,
-    "social": 64.0,
-    "staff_api": 72.5,
+    "accounts": 80.5,
+    "analytics": 92.0,
+    "cabinet": 82.5,
+    "catalog": 91.0,
+    "config": 90.5,
+    "content": 86.0,
+    "crm": 86.5,
+    "leads": 82.0,
+    "redirects": 91.0,
+    "search": 96.0,
+    "sitesettings": 89.5,
+    "social": 64.5,
+    "staff_api": 73.0,
     "supportchat": 80.0,
     "webpush": 72.5,
 }
