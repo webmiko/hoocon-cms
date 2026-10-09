@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { CatalogFacet } from "../../api/client";
 import { QUIZ_CATEGORY } from "./quizCategories";
-import { matchControlFacet, matchMomentNmFacet } from "./quizFacetMatch";
+import {
+  matchControlFacet,
+  matchKvsFacet,
+  matchMomentNmFacet,
+} from "./quizFacetMatch";
 import {
   buildCatalogParams,
   catalogUrlFromParams,
@@ -111,7 +115,7 @@ describe("quizToCatalog", () => {
     expect(params.category).toBe(QUIZ_CATEGORY.general);
     expect(params.voltage).toBe("230 В");
     expect(params.control).toBe("Открыто/закрыто");
-    expect(params.moment).toBe("10 Нм,20 Нм");
+    expect(params.moment).toBe("10 Нм|20 Нм");
     expect(params.area).toBeUndefined();
     expect(params.page_size).toBe("6");
   });
@@ -147,7 +151,7 @@ describe("quizToCatalog", () => {
       },
       facets,
     );
-    expect(params.moment).toBe("10 Нм,16 Нм,20 Нм");
+    expect(params.moment).toBe("10 Нм|16 Нм|20 Нм");
     expect(params.area).toBeUndefined();
   });
 
@@ -218,7 +222,7 @@ describe("quizToCatalog", () => {
     );
     expect(params.category).toBe(QUIZ_CATEGORY.kit);
     expect(params.dn).toBe("25");
-    expect(params.kvs).toBe("10,16");
+    expect(params.kvs).toBe("10|16");
     expect(params.ways).toBe("3-ходовый");
     expect(params.aux_switch).toBe("Нет");
   });
@@ -289,7 +293,7 @@ describe("quizToCatalog", () => {
     );
     expect(params.category).toBe(QUIZ_CATEGORY.ballValve);
     expect(params.dn).toBe("25");
-    expect(params.kvs).toBe("10,16");
+    expect(params.kvs).toBe("10|16");
     expect(params.ways).toBe("2-ходовый");
   });
 
@@ -305,7 +309,7 @@ describe("quizToCatalog", () => {
     );
     expect(params.category).toBe(QUIZ_CATEGORY.ballValve);
     expect(params.dn).toBe("65");
-    expect(params.kvs).toBe("63,100,400");
+    expect(params.kvs).toBe("63|100|400");
     expect(params.ways).toBe("2-ходовый");
   });
 
@@ -323,7 +327,7 @@ describe("quizToCatalog", () => {
     );
     expect(params.category).toBe(QUIZ_CATEGORY.kit);
     expect(params.dn).toBe("150");
-    expect(params.kvs).toBe("63,100,400");
+    expect(params.kvs).toBe("63|100|400");
     expect(params.ways).toBe("2-ходовый");
   });
 
@@ -389,13 +393,22 @@ describe("quizToCatalog", () => {
   });
 });
 
+describe("matchKvsFacet", () => {
+  it("joins decimal Kvs chips with | so «10,1» is not split by the API", () => {
+    // Regression: «10,10,1,16» was parsed as 10 / 1 / 16 — wrong valves.
+    expect(
+      matchKvsFacet(["4,0", "6,3", "10", "10,1", "16", "25"], "6_to_16"),
+    ).toBe("10|10,1|16");
+  });
+});
+
 describe("matchMomentNmFacet", () => {
   const ladder = [2, 4, 5, 6, 8, 10, 16, 20, 24, 32, 40].map((nm) => `${nm} Нм`);
 
   it("ORs every chip from the required torque up to ×2 across series", () => {
-    expect(matchMomentNmFacet(ladder, 6)).toBe("6 Нм,8 Нм,10 Нм");
-    expect(matchMomentNmFacet(ladder, 4)).toBe("4 Нм,5 Нм,6 Нм,8 Нм");
-    expect(matchMomentNmFacet(ladder, 32)).toBe("32 Нм,40 Нм");
+    expect(matchMomentNmFacet(ladder, 6)).toBe("6 Нм|8 Нм|10 Нм");
+    expect(matchMomentNmFacet(ladder, 4)).toBe("4 Нм|5 Нм|6 Нм|8 Нм");
+    expect(matchMomentNmFacet(ladder, 32)).toBe("32 Нм|40 Нм");
   });
 
   it("falls back to the nearest larger or the largest chip", () => {
@@ -417,7 +430,7 @@ describe("matchControlFacet", () => {
         ["Открыто/закрыто", "2-/3-позиционное", "Пропорциональное"],
         "onoff",
       ),
-    ).toBe("2-/3-позиционное,Открыто/закрыто");
+    ).toBe("2-/3-позиционное|Открыто/закрыто");
   });
 
   it("maps modulating to proportional chip", () => {
