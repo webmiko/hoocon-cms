@@ -277,6 +277,26 @@ _AUX_SWITCH_B_LINES: tuple[str, ...] = (
 )
 _AUX_SWITCH_ANGLE_NOTE = "– Угол срабатывания переключателя устанавливается по требованию заказчика."
 
+# DA8/16/24/32MU24-A/AS — factory PDF «DA8_16_24_32MU24-A&AS.pdf».
+_FACTORY_DAMU24_TORQUES: Final[tuple[int, ...]] = (8, 16, 24, 32)
+_FACTORY_DAMU24_WEIGHT: Final[str] = "1,2…1,3 кг"
+_FACTORY_DAMU24_DIP_LINES: tuple[str, ...] = (
+    (
+        "– DIP-переключатели (заводская установка — все в положении OFF: "
+        "вход 0…10 В=, обратная связь 0…10 В=, вращение по часовой стрелке):"
+    ),
+    "– №1 Сигнал обратной связи (U): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
+    "– №2 Начало диапазона входного сигнала: OFF — 0...10 В= / 0...20 мА; ON — 2...10 В= / 4...20 мА.",
+    "– №3 Управляющий сигнал (Y): OFF — 0(2)...10 В=; ON — 0(4)...20 мА.",
+    "– №4 Направление вращения при увеличении сигнала: OFF — по часовой стрелке; ON — против часовой стрелки.",
+)
+
+
+def _is_factory_damu24_modulating(torque_nm: int, variant: SkuVariant) -> bool:
+    """DA8/16/24/32MU24-A/AS: DIP map and weight pinned to the factory PDF."""
+    return torque_nm in _FACTORY_DAMU24_TORQUES and variant.voltage == "24" and variant.control == "modulating"
+
+
 SERIES_INSTRUCTIONS = normalize_tech_copy(
     "\n".join(
         [
@@ -343,6 +363,7 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
     if row is None:
         return None
     variant = parse_sku_variant(sku_code)
+    factory_dip = _is_factory_damu24_modulating(torque_nm, variant)
     series = f"DA{torque_nm}MU"
     lines: list[str] = [
         f"Инструкция по установке и управлению приводом заслонки Hoocon {series}",
@@ -372,7 +393,11 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
         "",
         "4. Настройка направления вращения",
         "",
-        "– Установите переключатель направления на корпусе в нужное положение.",
+        (
+            "– Направление вращения задаётся DIP-переключателем №4 (см. раздел 5)."
+            if factory_dip
+            else "– Установите переключатель направления на корпусе в нужное положение."
+        ),
     ]
     if variant.control == "modulating":
         lines.extend(
@@ -382,6 +407,7 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
                 "",
                 f"– {CONTROL_SIGNAL_Y_LABEL}: {CONTROL_SIGNAL_Y_CANON}.",
                 f"– {FEEDBACK_SIGNAL_U_LABEL}: {FEEDBACK_SIGNAL_U_CANON}.",
+                *(_FACTORY_DAMU24_DIP_LINES if factory_dip else ()),
             ],
         )
         next_ch = 6
@@ -411,7 +437,7 @@ def instructions_for_damu_sku(sku_code: str) -> str | None:
                 "– Используйте контакты для индикации положения в системе управления.",
             ],
         )
-        if variant.control == "modulating":
+        if variant.control == "modulating" and not factory_dip:
             lines.extend(
                 [
                     "",
@@ -594,7 +620,13 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     row["dimensions"],
                     ATTR_GROUP_SIZE,
                 ),
-                ("Масса", "weight", "кг", row["weight"], ATTR_GROUP_SIZE),
+                (
+                    "Масса",
+                    "weight",
+                    "кг",
+                    (_FACTORY_DAMU24_WEIGHT if _is_factory_damu24_modulating(nm, variant) else row["weight"]),
+                    ATTR_GROUP_SIZE,
+                ),
             )
             for name, slug, unit, value, _group in torque_rows:
                 if not dry_run:

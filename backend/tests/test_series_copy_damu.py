@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from catalog.etl.series_copy_damu import instructions_for_damu_sku
+import pytest
+
+from catalog.etl.series_copy_damu import (
+    TORQUE_SPECS,
+    apply_damu_enrichment,
+    instructions_for_damu_sku,
+)
+from catalog.models import SKU, AttributeValue, Category, Product
 
 
 def test_instructions_for_damu_sku_scopes_voltage_and_aux() -> None:
@@ -90,6 +97,68 @@ def test_damu_specs_match_ru_manual_shaft_and_feedback() -> None:
     assert text is not None
     assert "ON — 0(4)...20 мА." in text
     assert "10 мА" not in text
+
+
+_FACTORY_DIP4 = (
+    "– №4 Направление вращения при увеличении сигнала: OFF — по часовой стрелке; ON — против часовой стрелки."
+)
+_FACTORY_DIP2 = "– №2 Начало диапазона входного сигнала: OFF — 0...10 В= / 0...20 мА; ON — 2...10 В= / 4...20 мА."
+
+
+def test_damu24_dip_map_matches_factory_pdf() -> None:
+    """Regression: DIP 4 was inverted / «№2 и №4 не используются» vs factory PDF."""
+    for code in ("DA8MU24-AS", "DA32MU24-AS"):
+        text = instructions_for_damu_sku(code)
+        assert text is not None
+        assert _FACTORY_DIP4 in text
+        assert _FACTORY_DIP2 in text
+        assert "все в положении OFF" in text
+        assert "не используются" not in text
+        assert text.count("№4 Направление вращения") == 1
+
+
+def test_damu24_a_without_aux_still_gets_dip_map() -> None:
+    """Regression: DIP block lived under the aux chapter, so -A got none."""
+    text = instructions_for_damu_sku("DA16MU24-A")
+    assert text is not None
+    assert "Вспомогательные переключатели" not in text
+    assert _FACTORY_DIP4 in text
+    assert "DIP-переключателем №4" in text
+    assert "переключатель направления на корпусе" not in text
+
+
+def test_factory_dip_map_scoped_to_damu24_modulating() -> None:
+    """Only DA8…32MU24-A/AS carry the factory map; on/off and 230 V do not."""
+    for code in ("DA8MU24-DS", "DA8MU230-AS", "DA4MU24-AS"):
+        text = instructions_for_damu_sku(code)
+        assert text is not None
+        assert _FACTORY_DIP4 not in text
+
+
+@pytest.mark.django_db
+def test_apply_damu_enrichment_damu24_weight_from_factory_pdf() -> None:
+    """Regression: DA8…32MU24-A/AS weight «≈ 1,3 кг» vs factory «1,2…1,3 кг»."""
+    cat, _ = Category.objects.get_or_create(
+        slug="elektroprivody-bez-pruzhiny",
+        defaults={"name": "Без пружины"},
+    )
+    product, _ = Product.objects.get_or_create(
+        slug="damu-8nm-weight-test",
+        defaults={"name": "DA8MU", "category": cat},
+    )
+    skus = {
+        code: SKU.objects.update_or_create(
+            sku_code=code,
+            defaults={"product": product, "name": code, "slug": code.lower()},
+        )[0]
+        for code in ("DA8MU24-A", "DA8MU24-D")
+    }
+
+    apply_damu_enrichment()
+
+    weight = {code: AttributeValue.objects.get(sku=sku, attribute__slug="weight").value for code, sku in skus.items()}
+    assert weight["DA8MU24-A"] == "1,2…1,3 кг"
+    assert weight["DA8MU24-D"] == TORQUE_SPECS[8]["weight"]
 
 
 def test_instructions_for_damu_sku_rejects_other_series() -> None:
