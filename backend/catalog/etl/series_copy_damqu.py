@@ -231,6 +231,17 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
 }
 
+# DA8/16/24MQU230-A/AS — factory «说明书DA8_16_24MQU230-A&AS.pages» (CN).
+_FACTORY_DAMQU230_TORQUES: Final[tuple[int, ...]] = (8, 16, 24)
+_FACTORY_DAMQU230_NOISE: Final[str] = "65"
+_FACTORY_DAMQU230_VOLTAGE_RANGE: Final[str] = "AC 85…265 В"
+
+
+def _is_factory_damqu230_modulating(torque_nm: int, variant: SkuVariant) -> bool:
+    """DA8/16/24MQU230-A/AS: noise and supply range pinned to the factory source."""
+    return torque_nm in _FACTORY_DAMQU230_TORQUES and variant.voltage == "230" and variant.control == "modulating"
+
+
 # Public catalog Nm; others (10/20) are retired with redirects.
 CANONICAL_NMS: Final[frozenset[int]] = frozenset(TORQUE_SPECS)
 _RETIRE_NM_REDIRECT: Final[dict[int, int]] = {10: 8, 20: 24}
@@ -432,6 +443,12 @@ def _enrich_sku(
 ) -> int:
     """Rewrite one SKU; return attribute write count."""
     variant = parse_sku_variant(sku.sku_code)
+    nm = parse_damqu_torque_nm(sku.sku_code)
+    factory = nm is not None and _is_factory_damqu230_modulating(nm, variant)
+    noise_unit = "дБ(A)"
+    if factory:
+        row = {**row, "noise": _FACTORY_DAMQU230_NOISE}
+        noise_unit = "дБ"
     write_copy(
         sku,
         name=title[:300],
@@ -458,7 +475,7 @@ def _enrich_sku(
             row["running-time"],
             ATTR_GROUP_FUNCTIONAL,
         ),
-        ("Уровень шума", "noise", "дБ(A)", row["noise"], ATTR_GROUP_FUNCTIONAL),
+        ("Уровень шума", "noise", noise_unit, row["noise"], ATTR_GROUP_FUNCTIONAL),
         (
             "Направление вращения",
             "rotation-direction",
@@ -546,6 +563,15 @@ def _enrich_sku(
             "II (все изолировано / полная изоляция)",
         )
         attrs += 4
+        if factory:
+            _set_attr(
+                sku,
+                "Диапазон напряжения",
+                "voltage-range",
+                "",
+                _FACTORY_DAMQU230_VOLTAGE_RANGE,
+            )
+            attrs += 1
 
     if variant.control == "modulating":
         _set_attr(sku, "Управление", "control", "", CONTROL_MODULATING)

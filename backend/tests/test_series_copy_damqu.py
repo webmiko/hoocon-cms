@@ -7,8 +7,10 @@ import pytest
 from catalog.etl.series_copy_damqu import (
     PRODUCT_SLUG,
     TORQUE_SPECS,
+    _is_factory_damqu230_modulating,
     _sku_description,
     apply_damqu_enrichment,
+    product_slug_for_nm,
 )
 from catalog.etl.sku_variant import parse_sku_variant
 from catalog.models import SKU, AttributeValue, Category, Product
@@ -319,3 +321,56 @@ def test_apply_damqu_enrichment_no_n_plus_one_on_category_slug() -> None:
     ]
     assert lazy_category == []
     assert lazy_product == []
+
+
+@pytest.mark.parametrize(
+    ("nm", "code", "expected"),
+    [
+        (8, "da8mqu230-a", True),
+        (24, "da24mqu230-as", True),
+        (16, "da16mqu230-d", False),
+        (16, "da16mqu24-a", False),
+        (5, "da5mqu230-a", False),
+    ],
+)
+def test_factory_damqu230_scope(nm: int, code: str, expected: bool) -> None:
+    """Заводской источник есть только для DA8/16/24MQU230-A/AS — другие не трогаем."""
+    assert _is_factory_damqu230_modulating(nm, parse_sku_variant(code)) is expected
+
+
+@pytest.mark.django_db
+def test_apply_damqu_enrichment_damqu230_factory_noise_and_voltage_range() -> None:
+    """На карточке DA16MQU230-AS стоял шум 55 дБ(A); на заводе — 65 дБ и AC 85…265 В."""
+    cat = Category.objects.create(name="Заслонки", slug="zaslonki-damqu-factory")
+    product = Product.objects.create(
+        category=cat,
+        name="old",
+        slug=product_slug_for_nm(16),
+        description="old",
+    )
+    codes = ("da16mqu230-as", "da16mqu230-d", "da16mqu24-a")
+    skus = {
+        code: SKU.objects.create(
+            product=product,
+            name="old",
+            slug=f"{code}-factory",
+            sku_code=code,
+            is_published=True,
+        )
+        for code in codes
+    }
+
+    apply_damqu_enrichment()
+
+    def attrs(code: str) -> dict[str, AttributeValue]:
+        return {
+            av.attribute.slug: av for av in AttributeValue.objects.filter(sku=skus[code]).select_related("attribute")
+        }
+
+    factory = attrs("da16mqu230-as")
+    assert factory["noise"].value == "65"
+    assert factory["voltage-range"].value == "AC 85…265 В"
+    for code in ("da16mqu230-d", "da16mqu24-a"):
+        other = attrs(code)
+        assert other["noise"].value == "55", code
+        assert "voltage-range" not in other, code
