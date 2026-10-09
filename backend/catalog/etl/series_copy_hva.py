@@ -23,6 +23,7 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
@@ -454,7 +455,7 @@ def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             set_sku_attribute(
                 sku,
                 slug="protection-class",
-                value="II (полная изоляция)",
+                value=PROTECTION_CLASS_II,
                 name="Класс защиты",
                 unit="",
             )

@@ -15,6 +15,7 @@ from catalog.etl.sku_variant import parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_ON_OFF,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
@@ -146,7 +147,7 @@ def _enrich_sku(sku: SKU, *, nm: int, voltage: str, has_aux: bool, row: dict[str
         )
     else:
         _set(sku, "Номинальное напряжение", "voltage", "В", "AC 100…240 В, 50/60 Гц")
-        _set(sku, "Класс защиты", "protection-class", "", "II (полная изоляция)")
+        _set(sku, "Класс защиты", "protection-class", "", PROTECTION_CLASS_II)
     attrs += 2
 
     if has_aux or variant.aux_switch is True:

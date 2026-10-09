@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from catalog.etl.tech_copy import normalize_control_attribute_value, normalize_tech_copy
 from catalog.management.commands.normalize_tech_copy import sku_category_slug
 from catalog.sku_access import (
@@ -236,4 +238,48 @@ def test_series_etl_sources_use_one_spelling_for_shared_values() -> None:
             offenders.append(f"{path.name}: безопасное низкое")
         if '"III (безопасное' in text:
             offenders.append(f"{path.name}: literal instead of PROTECTION_CLASS_III")
+        if '"II (' in text:
+            offenders.append(f"{path.name}: literal instead of PROTECTION_CLASS_II")
     assert offenders == []
+
+
+def test_protection_class_ii_has_one_spelling() -> None:
+    """M41: класс II писался «II (полная изоляция)» и «II (все изолировано / …)» — два чипа фасета."""
+    from catalog.etl.specs_to_attrs import _normalize_value
+    from catalog.etl.tech_copy import PROTECTION_CLASS_II, PROTECTION_CLASS_III
+
+    assert normalize_tech_copy("II (все изолировано / полная изоляция)") == PROTECTION_CLASS_II
+    assert normalize_tech_copy("класс II (всё изолировано / полная изоляция)") == f"класс {PROTECTION_CLASS_II}"
+    assert normalize_tech_copy(PROTECTION_CLASS_II) == PROTECTION_CLASS_II
+    assert _normalize_value("protection-class", "II") == PROTECTION_CLASS_II
+    assert _normalize_value("protection-class", "III") == PROTECTION_CLASS_III
+
+
+@pytest.mark.django_db
+def test_protection_class_ii_migration_unifies_stored_values() -> None:
+    """M41: data-миграция сводит сохранённое старое написание к канону, правленное вручную не трогает."""
+    import importlib
+
+    from django.apps import apps
+
+    from catalog.etl.attr_write import set_sku_attribute
+    from catalog.etl.tech_copy import PROTECTION_CLASS_II
+    from catalog.models import SKU, AttributeValue, Category, Product
+
+    migration = importlib.import_module("catalog.migrations.0020_unify_protection_class_ii")
+    category = Category.objects.create(name="Приводы", slug="elektroprivody")
+    product = Product.objects.create(name="DA", slug="da", category=category)
+    auto, manual = (
+        SKU.objects.create(product=product, name=code, slug=code.casefold(), sku_code=code)
+        for code in ("DA2MU230", "DA4MU230")
+    )
+    for sku in (auto, manual):
+        set_sku_attribute(
+            sku, slug="protection-class", value="II (все изолировано / полная изоляция)", name="Класс защиты", unit=""
+        )
+    AttributeValue.objects.filter(sku=manual).update(is_manual=True)
+
+    migration.unify_protection_class_ii(apps, None)
+
+    assert AttributeValue.objects.get(sku=auto).value == PROTECTION_CLASS_II
+    assert AttributeValue.objects.get(sku=manual).value == "II (все изолировано / полная изоляция)"

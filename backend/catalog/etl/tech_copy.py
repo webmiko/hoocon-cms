@@ -93,10 +93,15 @@ _REPLACEMENTS: tuple[tuple[re.Pattern[str], _Repl], ...] = (
         re.compile(r"безопасное\s+низкое\s+напряжение", re.IGNORECASE),
         "безопасное сверхнизкое напряжение",
     ),
+    (
+        re.compile(r"\bII\s*\(\s*вс[её]\s+изолировано\s*/\s*полная\s+изоляция\s*\)", re.IGNORECASE),
+        "II (полная изоляция)",
+    ),
 )
 
-# Electrical protection class III (SELV) — one spelling across all series.
+# Electrical protection classes — one spelling across all series.
 PROTECTION_CLASS_III = "III (безопасное сверхнизкое напряжение)"
+PROTECTION_CLASS_II = "II (полная изоляция)"
 
 # Canonical «Управление» facet / EAV labels (four families).
 CONTROL_ON_OFF = "Открыто/закрыто"

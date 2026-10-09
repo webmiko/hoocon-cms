@@ -25,6 +25,7 @@ from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_t
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
@@ -575,7 +576,7 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "II (все изолировано / полная изоляция)",
+                        PROTECTION_CLASS_II,
                     )
                 attrs += 2
 

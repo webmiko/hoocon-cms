@@ -30,6 +30,7 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
@@ -238,7 +239,7 @@ def _set_voltage_attrs(sku: SKU, voltage: str) -> int:
         set_sku_attribute(
             sku,
             slug="protection-class",
-            value="II (полная изоляция)",
+            value=PROTECTION_CLASS_II,
             name="Класс защиты",
             unit="",
         )
@@ -531,7 +532,7 @@ def _enrich_qx_sku(
     set_sku_attribute(
         sku,
         slug="protection-class",
-        value="II (полная изоляция)",
+        value=PROTECTION_CLASS_II,
         name="Класс защиты",
         unit="",
     )

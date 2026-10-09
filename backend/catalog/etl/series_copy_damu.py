@@ -31,6 +31,7 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
@@ -678,7 +679,7 @@ def apply_damu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "II (все изолировано / полная изоляция)",
+                        PROTECTION_CLASS_II,
                     )
                 attrs += 3
 

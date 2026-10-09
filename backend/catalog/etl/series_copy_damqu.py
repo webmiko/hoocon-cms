@@ -36,6 +36,7 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_LABEL,
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
+    PROTECTION_CLASS_II,
     PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
@@ -560,7 +561,7 @@ def _enrich_sku(
             "Класс защиты",
             "protection-class",
             "",
-            "II (все изолировано / полная изоляция)",
+            PROTECTION_CLASS_II,
         )
         attrs += 4
         if factory:
