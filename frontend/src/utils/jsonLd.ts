@@ -62,27 +62,16 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
     ld.category = sku.category_name;
   }
 
-  if (sku.price != null && !sku.price_on_request) {
+  // Google rejects an Offer without price; «цена по запросу» gets no offers.
+  // Availability mirrors the PDP label: on hand → InStock, else «Под заказ».
+  if (sku.price != null && sku.price !== "" && !sku.price_on_request) {
     ld.offers = {
       "@type": "Offer",
       price: String(sku.price),
       priceCurrency: "RUB",
-      availability:
-        sku.in_stock === false
-          ? "https://schema.org/PreOrder"
-          : "https://schema.org/InStock",
-    };
-  } else {
-    ld.offers = {
-      "@type": "Offer",
-      availability:
-        sku.in_stock === false
-          ? "https://schema.org/PreOrder"
-          : "https://schema.org/InStock",
-      priceSpecification: {
-        "@type": "PriceSpecification",
-        priceCurrency: "RUB",
-      },
+      availability: sku.in_stock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/PreOrder",
     };
   }
 

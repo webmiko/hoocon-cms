@@ -37,16 +37,16 @@ const EMPTY: QuizResultsState = {
   analogNote: null,
 };
 
-async function fetchQuizPreview(answers: QuizAnswers): Promise<QuizResultsState> {
+async function fetchQuizPreview(answers: QuizAnswers, signal?: AbortSignal): Promise<QuizResultsState> {
   const category = buildCatalogParams(answers, []).category;
-  const facetsRes = await api.facets(category ? { category } : undefined);
+  const facetsRes = await api.facets(category ? { category } : undefined, signal);
   const strict = buildCatalogParams(answers, facetsRes.results ?? []);
   const variants = relaxCatalogParams(strict);
 
   let primary: QuizResultsState | null = null;
   for (let index = 0; index < variants.length; index += 1) {
     const params = variants[index]!;
-    const response = await api.skus(params);
+    const response = await api.skus(params, signal);
     if ((response.results?.length ?? 0) > 0 || index === variants.length - 1) {
       primary = {
         loading: false,
@@ -84,7 +84,7 @@ async function fetchQuizPreview(answers: QuizAnswers): Promise<QuizResultsState>
   }
 
   const analogParams = buildQuizAnalogParams(answers, primary.params);
-  const analogResponse = await api.quizAnalogs(analogParams);
+  const analogResponse = await api.quizAnalogs(analogParams, signal);
   if ((analogResponse.bundles?.length ?? 0) === 0) {
     return primary;
   }
@@ -113,7 +113,7 @@ export function useQuizResults(
   const refreshKey = enabled ? quizResultsKey(answers) : "quiz-off";
   const cacheKey = enabled ? `quiz-preview:${refreshKey}` : undefined;
   const { data, loading, error } = useAsync(
-    () => (enabled ? fetchQuizPreview(answers) : Promise.resolve(EMPTY)),
+    (signal) => (enabled ? fetchQuizPreview(answers, signal) : Promise.resolve(EMPTY)),
     refreshKey,
     cacheKey,
   );

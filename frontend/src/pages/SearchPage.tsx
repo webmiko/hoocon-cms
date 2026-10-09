@@ -31,7 +31,7 @@ type LoadMoreUi = {
 };
 
 /**
- * Search results page (/search/?q=...&page=...).
+ * Search results page (/search?q=...&page=...).
  *
  * Reads `q` and `page` from the URL query string (shareable, back/forward works).
  * Calls GET /api/search/?q=...&page=... and renders a ranked, paginated list
@@ -45,7 +45,7 @@ export function SearchPage() {
   const listKey = `${q}|${page}`;
 
   const { data, loading, error } = useAsync(
-    () => (q ? api.search(q, page) : Promise.resolve(null)),
+    (signal) => (q ? api.search(q, page, signal) : Promise.resolve(null)),
     `${q}\0${page}`,
   );
 
@@ -151,6 +151,7 @@ export function SearchPage() {
 
         <form className={styles.form} onSubmit={handleSearch} role="search">
           <input
+            key={q}
             type="search"
             name="q"
             defaultValue={q}

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { AccountAuthProvider } from "../account/AuthContext";
 import { CabinetOffer } from "../account/CabinetOffer";
 import { api, ApiError } from "../api/client";
 import { useCompare } from "../compare/useCompare";
 import { BallValveKitFields } from "./BallValveKitFields";
+import { leadFormErrors } from "./leadFormErrors";
 import { PhoneField } from "./PhoneField";
 import type { BallValveKitOptions } from "../utils/ballValveKit";
 import { trackLeadSubmit } from "../utils/analyticsTrack";
+import { userErrorMessage } from "../utils/drfErrors";
 import { formatPhone, parsePhone } from "../utils/phoneMask";
 import styles from "./LeadForm.module.css";
 
@@ -128,6 +131,14 @@ export function LeadForm({
     ...INITIAL_STATE,
     message: buildDefaultMessage(skuCodes, skuName),
   }));
+  // Product changed under a mounted form (A→B): refresh the untouched prefill.
+  const [prefill, setPrefill] = useState(defaultMessage);
+  if (prefill !== defaultMessage) {
+    setPrefill(defaultMessage);
+    if (form.message === prefill) {
+      setForm((prev) => ({ ...prev, message: defaultMessage }));
+    }
+  }
   const [lines, setLines] = useState<LineItem[]>(() =>
     initialLines(skuSlug, skuCodes, skuName),
   );
@@ -254,6 +265,7 @@ export function LeadForm({
       company: form.company.trim(),
       message: message || "Прошу подготовить коммерческое предложение.",
       website: form.website, // honeypot
+      pdn_consent: pdnConsent,
     };
 
     if (leadType === "replacement" && form.analog_belimo_code) {
@@ -293,19 +305,11 @@ export function LeadForm({
       setLines(initialLines(skuSlug, skuCodes, skuName));
       setPdnConsent(false);
     } catch (err) {
-      if (err instanceof ApiError) {
-        const fieldErrors: Record<string, string> = {};
-        for (const [key, value] of Object.entries(err.body)) {
-          if (Array.isArray(value) && value.length > 0) {
-            fieldErrors[key] = String(value[0]);
-          } else if (typeof value === "string") {
-            fieldErrors[key] = value;
-          }
-        }
-        setErrors(fieldErrors);
-      } else {
-        setErrors({ message: "Произошла ошибка. Попробуйте позже." });
-      }
+      setErrors(
+        err instanceof ApiError
+          ? leadFormErrors(err.status, err.body)
+          : { detail: userErrorMessage(err, "Произошла ошибка. Попробуйте позже.") },
+      );
     } finally {
       setSubmitting(false);
     }
@@ -329,7 +333,9 @@ export function LeadForm({
             Отправить ещё одну заявку
           </button>
         </div>
-        <CabinetOffer email={leadEmail} />
+        <AccountAuthProvider>
+          <CabinetOffer email={leadEmail} />
+        </AccountAuthProvider>
       </>
     );
   }

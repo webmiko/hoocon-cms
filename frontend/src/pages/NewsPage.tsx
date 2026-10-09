@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { RelatedArticlesCarousel } from "../components/RelatedArticlesCarousel";
 import { Breadcrumbs } from "../components/Breadcrumbs";
+import { ContentUnavailable } from "../components/ContentUnavailable";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import { useAsync } from "../hooks/useAsync";
@@ -23,7 +24,7 @@ import "../styles/cms-body-charts.css";
 export function NewsPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: news, loading, error } = useAsync(
-    () => api.newsDetail(slug!),
+    (signal) => api.newsDetail(slug!, signal),
     slug,
   );
   const { data: listData } = useAsync(() => api.news());
@@ -34,12 +35,14 @@ export function NewsPage() {
 
   if (error || !news) {
     return (
-      <div className={styles.notFound}>
-        <h1>Новость не найдена</h1>
-        <Link to="/novosti" className={styles.link}>
-          ← Все новости
-        </Link>
-      </div>
+      <ContentUnavailable
+        error={error}
+        notFoundTitle="Новость не найдена"
+        backTo="/novosti"
+        backLabel="← Все новости"
+        className={styles.notFound}
+        linkClassName={styles.link}
+      />
     );
   }
 

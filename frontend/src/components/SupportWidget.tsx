@@ -36,6 +36,8 @@ import {
 import { fitChatBubbleWidth } from "../utils/fitChatBubbleWidth";
 import { MaxLogo } from "./icons/MaxLogo";
 import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
+import { userErrorMessage } from "../utils/drfErrors";
+import { PdnConsentCheckbox } from "./PdnConsentCheckbox";
 import styles from "./SupportWidget.module.css";
 
 function SupportChatBubble({
@@ -299,6 +301,7 @@ export function SupportWidget() {
   const [draft, setDraft] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [pdnConsent, setPdnConsent] = useState(false);
   const [contactsLocked, setContactsLocked] = useState(false);
   const [isOpenNow, setIsOpenNow] = useState(true);
   const [outsideHint, setOutsideHint] = useState("");
@@ -706,9 +709,12 @@ export function SupportWidget() {
   }
 
   async function syncContacts(force = false) {
-    const displayName = name.trim();
-    const contactEmail = email.trim();
-    if (!force && !displayName && !contactEmail) {
+    // Contacts leave the browser only with 152-ФЗ consent; otherwise the
+    // chat starts anonymously and the typed fields stay local.
+    const share = pdnConsent && Boolean(name.trim() || email.trim());
+    const displayName = share ? name.trim() : "";
+    const contactEmail = share ? email.trim() : "";
+    if (!force && !share) {
       return;
     }
     await api.fetchCsrfToken();
@@ -716,6 +722,7 @@ export function SupportWidget() {
       display_name: displayName || undefined,
       contact_email: contactEmail || undefined,
       page_url: window.location.pathname,
+      pdn_consent: share || undefined,
     });
     setConversation({
       id: conv.id ?? 0,
@@ -805,7 +812,7 @@ export function SupportWidget() {
       setActiveFaq(null);
       if (result.message.outside_hours) setIsOpenNow(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить");
+      setError(userErrorMessage(err, "Не удалось отправить"));
     } finally {
       setBusy(false);
     }
@@ -827,12 +834,16 @@ export function SupportWidget() {
   async function onSaveContacts(event: FormEvent) {
     event.preventDefault();
     if (busy || (!name.trim() && !email.trim())) return;
+    if (!pdnConsent) {
+      setError("Отметьте согласие на обработку персональных данных.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       await syncContacts(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить контакты");
+      setError(userErrorMessage(err, "Не удалось сохранить контакты"));
     } finally {
       setBusy(false);
     }
@@ -963,11 +974,16 @@ export function SupportWidget() {
                   />
                 </label>
               </div>
+              <PdnConsentCheckbox
+                className={styles.metaConsent}
+                checked={pdnConsent}
+                onChange={setPdnConsent}
+              />
               <div className={styles.metaActions}>
                 <button
                   type="submit"
                   className={styles.metaSave}
-                  disabled={busy || (!name.trim() && !email.trim())}
+                  disabled={busy || !pdnConsent || (!name.trim() && !email.trim())}
                 >
                   Сохранить
                 </button>

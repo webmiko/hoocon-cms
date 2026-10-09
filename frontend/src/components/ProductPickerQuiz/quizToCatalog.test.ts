@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CatalogFacet } from "../../api/client";
 import { QUIZ_CATEGORY } from "./quizCategories";
-import { matchControlFacet } from "./quizFacetMatch";
+import { matchControlFacet, matchMomentNmFacet } from "./quizFacetMatch";
 import {
   buildCatalogParams,
   catalogUrlFromParams,
@@ -111,9 +111,44 @@ describe("quizToCatalog", () => {
     expect(params.category).toBe(QUIZ_CATEGORY.general);
     expect(params.voltage).toBe("230 В");
     expect(params.control).toBe("Открыто/закрыто");
-    expect(params.moment).toBe("10 Нм");
-    expect(params.area).toBe("до 1,0 м²");
+    expect(params.moment).toBe("10 Нм,20 Нм");
+    expect(params.area).toBeUndefined();
     expect(params.page_size).toBe("6");
+  });
+
+  it("keeps DA and HV series when the torque estimate lands on an HV step", () => {
+    // Regression: one exact «10 Нм» chip + «до 1,0 м²» hid DA16 (16 Нм,
+    // до 1,6 м²) for 0,6–1,0 м² dampers — DA never showed next to HV.
+    const facets: CatalogFacet[] = [
+      {
+        key: "moment",
+        label: "Крутящий момент",
+        values: [2, 4, 5, 6, 8, 10, 16, 20, 24, 32, 40].map((nm) => ({
+          value: `${nm} Нм`,
+          count: 4,
+        })),
+      },
+      {
+        key: "area",
+        label: "Площадь заслонки",
+        values: [
+          { value: "до 1,0 м²", count: 4 },
+          { value: "до 1,6 м²", count: 4 },
+        ],
+      },
+    ];
+    const params = buildCatalogParams(
+      {
+        need: "actuator",
+        application: "general",
+        damperArea: "0_6_1_0",
+        damperType: "rectangular",
+        damperPressure: "medium",
+      },
+      facets,
+    );
+    expect(params.moment).toBe("10 Нм,16 Нм,20 Нм");
+    expect(params.area).toBeUndefined();
   });
 
   it("maps aux and temp sensor facets for actuator answers", () => {
@@ -351,6 +386,21 @@ describe("quizToCatalog", () => {
     expect(last.control).toBe("Открыто/закрыто");
     expect(last.voltage).toBe("230 В");
     expect(last.temp_sensor).toBe("SAF72");
+  });
+});
+
+describe("matchMomentNmFacet", () => {
+  const ladder = [2, 4, 5, 6, 8, 10, 16, 20, 24, 32, 40].map((nm) => `${nm} Нм`);
+
+  it("ORs every chip from the required torque up to ×2 across series", () => {
+    expect(matchMomentNmFacet(ladder, 6)).toBe("6 Нм,8 Нм,10 Нм");
+    expect(matchMomentNmFacet(ladder, 4)).toBe("4 Нм,5 Нм,6 Нм,8 Нм");
+    expect(matchMomentNmFacet(ladder, 32)).toBe("32 Нм,40 Нм");
+  });
+
+  it("falls back to the nearest larger or the largest chip", () => {
+    expect(matchMomentNmFacet(["5 Нм", "40 Нм"], 10)).toBe("40 Нм");
+    expect(matchMomentNmFacet(["5 Нм", "10 Нм"], 40)).toBe("10 Нм");
   });
 });
 

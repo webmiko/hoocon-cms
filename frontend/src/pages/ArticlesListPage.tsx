@@ -4,8 +4,9 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
 import { ThemeAwareCover } from "../components/ThemeAwareCover";
 import { api } from "../api/client";
-import type { Article } from "../api/client";
-import { useAsync } from "../hooks/useAsync";
+import type { ArticleListItem } from "../api/client";
+import { LoadMore } from "../components/LoadMore";
+import { usePagedList } from "../hooks/usePagedList";
 import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import styles from "./ArticlesListPage.module.css";
@@ -15,8 +16,15 @@ import styles from "./ArticlesListPage.module.css";
  * Spec: docs/readiness-backend-ux.md §4.3 (контент как у OEM, не lifestyle-блог).
  */
 export function ArticlesListPage() {
-  const { data, loading, error } = useAsync(() => api.articles());
-  const articles: Article[] = data?.results ?? [];
+  const {
+    items: articles,
+    loading,
+    error,
+    hasNext,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  } = usePagedList<ArticleListItem>((page, signal) => api.articles(page, signal));
   const [featured, ...rest] = articles;
   const featuredCoverCaption = featured
     ? generatedCoverCaption("article", featured.slug)
@@ -143,12 +151,18 @@ export function ArticlesListPage() {
           })}
         </ul>
       ) : null}
+      <LoadMore
+        hasNext={hasNext}
+        loading={loadingMore}
+        error={loadMoreError}
+        onLoadMore={() => void loadMore()}
+      />
     </div>
   );
 }
 
-function Meta({ article }: { article: Article }) {
-  const minutes = readingMinutes(article);
+function Meta({ article }: { article: ArticleListItem }) {
+  const minutes = article.reading_minutes;
   return (
     <div className={styles.meta}>
       {article.published_at ? (
@@ -168,14 +182,4 @@ function Meta({ article }: { article: Article }) {
       {minutes > 0 ? <span>{minutes} мин чтения</span> : null}
     </div>
   );
-}
-
-function readingMinutes(article: Article): number {
-  const raw = `${article.excerpt ?? ""} ${article.body ?? ""}`.replace(
-    /<[^>]+>/g,
-    " ",
-  );
-  const words = raw.trim().split(/\s+/).filter(Boolean).length;
-  if (words < 40) return 0;
-  return Math.max(1, Math.round(words / 180));
 }

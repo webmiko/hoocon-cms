@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { RelatedArticlesCarousel } from "../components/RelatedArticlesCarousel";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ProtectedProductImage } from "../components/ProtectedProductImage";
+import { ContentUnavailable } from "../components/ContentUnavailable";
 import { Seo } from "../components/Seo";
 import { ThemeAwareCover } from "../components/ThemeAwareCover";
 import { api } from "../api/client";
@@ -30,7 +31,7 @@ const TOC_MIN_SECTIONS = 3;
 export function ArticlePage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: article, loading, error } = useAsync(
-    () => api.articleDetail(slug!),
+    (signal) => api.articleDetail(slug!, signal),
     slug,
   );
   const { data: listData } = useAsync(() => api.articles());
@@ -41,12 +42,14 @@ export function ArticlePage() {
 
   if (error || !article) {
     return (
-      <div className={styles.notFound}>
-        <h1>Статья не найдена</h1>
-        <Link to="/statyi" className={styles.link}>
-          ← Все статьи
-        </Link>
-      </div>
+      <ContentUnavailable
+        error={error}
+        notFoundTitle="Статья не найдена"
+        backTo="/statyi"
+        backLabel="← Все статьи"
+        className={styles.notFound}
+        linkClassName={styles.link}
+      />
     );
   }
 
@@ -178,10 +181,10 @@ export function ArticlePage() {
             </>
           ) : null}
 
-          {/* Body HTML from CMS; DOMPurify — security-baseline §3.6 (id kept for TOC) */}
+          {/* CMS HTML sanitized once above, before TOC ids — security-baseline §3.6 */}
           <div
             className={`${styles.body} cms-rich-body`}
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(bodyWithToc.html) }}
+            dangerouslySetInnerHTML={{ __html: bodyWithToc.html }}
           />
         </div>
 

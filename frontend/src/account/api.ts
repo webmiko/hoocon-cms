@@ -7,6 +7,8 @@
  * OpenAPI schema surface used by the catalog client.
  */
 
+import { responseErrorMessage } from "../utils/drfErrors";
+
 export type ClientSession = {
   email: string;
   name: string;
@@ -122,6 +124,8 @@ export type AccountCompany = {
   inn: string;
   legal_address: string;
   members: Array<{ id: number; role: string; role_label: string; client: number | null }>;
+  /** Requisites and members are shown only after a manager confirms the link. */
+  confirmed: boolean;
 };
 
 export class AccountApiError extends Error {
@@ -141,7 +145,16 @@ function csrfToken(): string {
   return match ? match[1] : "";
 }
 
+/** Code sent to the email; register and OTP login both finish via otpVerify. */
+export interface OtpChallenge {
+  challenge_id: string;
+  email_masked: string;
+}
+
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
+  if (init?.method && init.method !== "GET" && !csrfToken()) {
+    await fetch("/api/csrf/", { credentials: "same-origin" }).catch(() => undefined);
+  }
   const response = await fetch(url, {
     credentials: "same-origin",
     ...init,
@@ -152,8 +165,8 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { detail?: string };
-    throw new AccountApiError(response.status, body.detail ?? response.statusText);
+    const body: unknown = await response.json().catch(() => ({}));
+    throw new AccountApiError(response.status, responseErrorMessage(response.status, body));
   }
   if (response.status === 204) {
     return undefined as T;
@@ -177,8 +190,9 @@ export const accountApi = {
     phone?: string;
     form_start_ts?: number;
     website?: string;
-  }): Promise<ClientSession> {
-    return call<ClientSession>("/api/auth/register/", {
+    pdn_consent: boolean;
+  }): Promise<OtpChallenge> {
+    return call<OtpChallenge>("/api/auth/register/", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -189,13 +203,10 @@ export const accountApi = {
       body: JSON.stringify({ email, password }),
     });
   },
-  otpStart(
-    email: string,
-    formStartTs: number,
-  ): Promise<{ challenge_id: string; email_masked: string }> {
+  otpStart(email: string, formStartTs: number, pdnConsent: boolean): Promise<OtpChallenge> {
     return call("/api/auth/otp/start/", {
       method: "POST",
-      body: JSON.stringify({ email, form_start_ts: formStartTs }),
+      body: JSON.stringify({ email, form_start_ts: formStartTs, pdn_consent: pdnConsent }),
     });
   },
   otpVerify(challengeId: string, code: string): Promise<ClientSession> {
@@ -204,7 +215,7 @@ export const accountApi = {
       body: JSON.stringify({ challenge_id: challengeId, code }),
     });
   },
-  otpResend(challengeId: string): Promise<{ challenge_id: string; email_masked: string }> {
+  otpResend(challengeId: string): Promise<OtpChallenge> {
     return call("/api/auth/otp/resend/", {
       method: "POST",
       body: JSON.stringify({ challenge_id: challengeId }),
@@ -224,9 +235,15 @@ export const accountApi = {
       body: JSON.stringify(data),
     });
   },
-  leads(status?: string): Promise<{ results: AccountLead[] } | AccountLead[]> {
-    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    return call(`/api/account/leads/${qs}`);
+  leads(
+    params: { status?: string; page?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<{ results: AccountLead[]; next?: string | null } | AccountLead[]> {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status", params.status);
+    if (params.page && params.page > 1) qs.set("page", String(params.page));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return call(`/api/account/leads/${suffix}`, { signal });
   },
   lead(id: number): Promise<AccountLead> {
     return call(`/api/account/leads/${id}/`);
@@ -322,8 +339,8 @@ async function callForm<T>(url: string, form: FormData): Promise<T> {
     body: form,
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { detail?: string };
-    throw new AccountApiError(response.status, body.detail ?? response.statusText);
+    const body: unknown = await response.json().catch(() => ({}));
+    throw new AccountApiError(response.status, responseErrorMessage(response.status, body));
   }
   return response.json() as Promise<T>;
 }

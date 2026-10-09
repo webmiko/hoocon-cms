@@ -132,7 +132,7 @@ export function CatalogPage() {
     "catalog:categories",
   );
   const { data: facetsData } = useAsync(
-    () => api.facets(category ? { category } : undefined),
+    (signal) => api.facets(category ? { category } : undefined, signal),
     category,
     `catalog:facets:${category || "all"}`,
   );
@@ -150,7 +150,7 @@ export function CatalogPage() {
   const facetKey = FACET_KEYS.map((k) => activeFacets[k] ?? "").join("|");
   const listKey = `${category}|${q}|${page}|${facetKey}|${inStockOnly ? "1" : "0"}|${newOnly ? "1" : "0"}`;
   const { data: skusData, loading, error } = useAsync(
-    () => api.skus(params),
+    (signal) => api.skus(params, signal),
     listKey,
     `catalog:skus:${listKey}`,
   );

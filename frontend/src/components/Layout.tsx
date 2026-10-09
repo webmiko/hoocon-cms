@@ -1,7 +1,8 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { CompareProvider } from "../compare/CompareContext";
+import { ChunkLoadErrorBoundary } from "./ChunkLoadErrorBoundary";
 import { CookieConsent } from "./CookieConsent";
 import { DeferredShellMount } from "./DeferredShellMount";
 import { Analytics } from "./Analytics";
@@ -13,6 +14,7 @@ import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { MessengerLinks } from "./MessengerLinks";
 import { ThemeToggle } from "./ThemeToggle";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useSupportChannels } from "../hooks/useSupportChannels";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
 import { emptyDockCtaForPath } from "../utils/emptyDockCta";
@@ -60,6 +62,8 @@ export function Layout() {
   const [menuRoute, setMenuRoute] = useState(routeKey);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(menuPanelRef, menuOpen);
   const hideMobileCta =
     location.pathname.startsWith("/statyi") || location.pathname.startsWith("/novosti");
   const isHome = location.pathname === "/";
@@ -202,7 +206,7 @@ export function Layout() {
     const q = (formData.get("q") as string | null)?.trim() ?? "";
     if (q) {
       closeMenu();
-      navigate(`/search/?q=${encodeURIComponent(q)}`);
+      navigate(`/search?q=${encodeURIComponent(q)}`);
     }
   }
 
@@ -281,6 +285,7 @@ export function Layout() {
       </header>
 
       <div
+        ref={menuPanelRef}
         id={menuId}
         className={menuOpen ? styles.mobilePanelOpen : styles.mobilePanel}
         hidden={!menuOpen}
@@ -354,7 +359,9 @@ export function Layout() {
         className={!showMobileStickyCta ? `${styles.main} ${styles.mainNoStickyCta}` : styles.main}
       >
         <div className="container">
-          <RouteSlideOutlet />
+          <ChunkLoadErrorBoundary resetKey={location.pathname}>
+            <RouteSlideOutlet />
+          </ChunkLoadErrorBoundary>
         </div>
       </main>
 

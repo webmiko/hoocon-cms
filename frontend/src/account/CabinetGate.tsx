@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
+import { AccountAuthProvider } from "./AuthContext";
 import { useCabinetEnabled } from "./cabinetEnabled";
 
 interface CabinetGateProps {
@@ -22,5 +23,6 @@ export function CabinetGate({ children }: CabinetGateProps) {
   if (!enabled) {
     return <Navigate to="/" replace />;
   }
-  return <>{children}</>;
+  // Session probe (/api/csrf + /api/auth/me) only on cabinet routes, not every public page.
+  return <AccountAuthProvider>{children}</AccountAuthProvider>;
 }

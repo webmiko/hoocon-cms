@@ -70,20 +70,31 @@ export function matchControlFacet(
   return [...new Set(discrete)].join(",");
 }
 
+/** Drives above this multiple of the required torque are oversized. */
+const MOMENT_HEADROOM_K = 2;
+
+/**
+ * Every torque chip from the required step up to ×2 (comma OR).
+ *
+ * Series ladders interleave (DA 2/4/6/8/16/24/32, HV 5/10/20/40 Нм), so a
+ * single exact chip would leave only one series in the results.
+ */
 export function matchMomentNmFacet(
   values: readonly string[],
   targetNm: number,
 ): string | null {
   const parsed = values
     .map((value) => ({ value, nm: parseMomentNm(value) }))
-    .filter((row): row is { value: string; nm: number } => row.nm !== null);
+    .filter((row): row is { value: string; nm: number } => row.nm !== null)
+    .sort((a, b) => a.nm - b.nm);
 
-  const exact = parsed.find((row) => row.nm === targetNm);
-  if (exact) {
-    return exact.value;
+  const fitting = parsed.filter(
+    (row) => row.nm >= targetNm && row.nm <= targetNm * MOMENT_HEADROOM_K,
+  );
+  if (fitting.length > 0) {
+    return [...new Set(fitting.map((row) => row.value))].join(",");
   }
 
-  parsed.sort((a, b) => a.nm - b.nm);
   return parsed.find((row) => row.nm >= targetNm)?.value ?? parsed.at(-1)?.value ?? null;
 }
 

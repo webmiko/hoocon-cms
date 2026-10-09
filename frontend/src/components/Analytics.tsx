@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
 import {
+  applyAnalyticsConsent,
   setAnalyticsCounters,
   trackSpaHit,
 } from "../utils/analyticsTrack";
@@ -128,6 +129,10 @@ function loadGa4(measurementId: string): void {
   window.gtag("config", measurementId);
 }
 
+function metrikaLoaded(): boolean {
+  return document.getElementById("ym-script") !== null;
+}
+
 function clearPendingLoad(): void {
   if (loadTimer !== null) {
     clearTimeout(loadTimer);
@@ -186,12 +191,22 @@ export function Analytics() {
       if (event.key !== COOKIE_CONSENT_STORAGE_KEY) {
         return;
       }
-      if (isAnalyticsAllowed(parseCookieConsent(event.newValue))) {
+      const allowed = isAnalyticsAllowed(parseCookieConsent(event.newValue));
+      applyAnalyticsConsent(allowed);
+      if (allowed) {
         scheduleAnalyticsLoad();
       }
     }
 
     function onConsentChange() {
+      const allowed = isAnalyticsAllowed(readCookieConsent());
+      applyAnalyticsConsent(allowed);
+      if (!allowed && metrikaLoaded()) {
+        // Webvisor/clickmap cannot be stopped in-page; the visitor just saved
+        // the cookie panel, so a reload here loses no typed input.
+        window.location.reload();
+        return;
+      }
       scheduleAnalyticsLoad();
     }
 

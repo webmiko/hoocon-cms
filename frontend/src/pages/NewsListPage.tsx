@@ -4,7 +4,9 @@ import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
 import { api } from "../api/client";
 import type { News, NewsCategory } from "../api/client";
+import { LoadMore } from "../components/LoadMore";
 import { useAsync } from "../hooks/useAsync";
+import { usePagedList } from "../hooks/usePagedList";
 import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import { stripHtmlToText } from "../utils/stripHtml";
@@ -26,15 +28,18 @@ export function NewsListPage() {
 
   const { data: categories } = useAsync(() => api.newsCategories(), "cats");
   const listKey = `${category}|${ordering}`;
-  const { data, loading, error } = useAsync(
-    () =>
-      api.news({
-        category: category || undefined,
-        ordering,
-      }),
+  const {
+    items,
+    loading,
+    error,
+    hasNext,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  } = usePagedList<News>(
+    (page, signal) => api.news({ category: category || undefined, ordering, page }, signal),
     listKey,
   );
-  const items: News[] = data?.results ?? [];
   const [featured, ...rest] = items;
   const featuredExcerpt = featured ? excerptOf(featured) : "";
   const featuredCoverCaption = featured ? generatedCoverCaption("news", featured.slug) : null;
@@ -208,6 +213,12 @@ export function NewsListPage() {
           })}
         </ul>
       ) : null}
+      <LoadMore
+        hasNext={hasNext}
+        loading={loadingMore}
+        error={loadMoreError}
+        onLoadMore={() => void loadMore()}
+      />
     </div>
   );
 }

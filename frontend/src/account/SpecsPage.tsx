@@ -13,17 +13,14 @@ function fmtDate(iso: string): string {
 }
 
 export default function SpecsPage() {
-  const { data, loading, error } = useAsync(() => accountApi.specs());
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { data, loading, error } = useAsync(() => accountApi.specs(), refreshKey);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // Refresh via a second async read (simple remount of data).
-  void refreshKey;
   const refetch = () => setRefreshKey((k) => k + 1);
 
   if (loading) return <p className={styles.muted}>Загрузка…</p>;
@@ -51,7 +48,6 @@ export default function SpecsPage() {
       setShowForm(false);
       setNotice("Спецификация сохранена.");
       refetch();
-      window.location.reload();
     } catch (err) {
       setNotice(err instanceof AccountApiError ? err.detail : "Не удалось сохранить.");
     } finally {
@@ -76,7 +72,7 @@ export default function SpecsPage() {
     setBusy(true);
     try {
       await accountApi.deleteSpec(id);
-      window.location.reload();
+      refetch();
     } catch {
       setNotice("Не удалось удалить спецификацию.");
     } finally {

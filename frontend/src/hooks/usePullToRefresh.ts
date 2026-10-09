@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { reloadGuard } from "../utils/reloadGuard";
+
 const PULL_THRESHOLD_PX = 72;
 const PULL_MAX_PX = 120;
 const PULL_RESISTANCE = 0.45;
@@ -36,6 +38,32 @@ function getScrollTop(): number {
   return window.scrollY || document.documentElement.scrollTop || 0;
 }
 
+const OVERLAY_SELECTOR = 'dialog, [role="dialog"], [aria-modal="true"], [data-no-pull-refresh]';
+
+function scrollLocked(): boolean {
+  return (
+    document.body.style.overflow === "hidden" ||
+    document.documentElement.style.overflow === "hidden"
+  );
+}
+
+/**
+ * Whether a touch belongs to something other than the page scroll: an
+ * overlay (menu, lightbox, chat), an inner scroll area, or a locked page.
+ */
+export function pullGestureBlocked(target: EventTarget | null): boolean {
+  if (scrollLocked()) return true;
+  if (!(target instanceof Element)) return false;
+  if (target.closest(OVERLAY_SELECTOR)) return true;
+  for (let el: Element | null = target; el && el !== document.body; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Touch pull-to-refresh with rubber-band offset, arm threshold and haptics.
  */
@@ -68,7 +96,7 @@ export function usePullToRefresh(
       const handler = onRefreshRef.current;
       if (handler) {
         await handler();
-      } else {
+      } else if (!reloadGuard().hasUnsavedInput()) {
         window.location.reload();
       }
     } finally {
@@ -88,7 +116,7 @@ export function usePullToRefresh(
       if (statusRef.current === "refreshing") {
         return;
       }
-      if (getScrollTop() > 0) {
+      if (getScrollTop() > 0 || pullGestureBlocked(event.target)) {
         pullingRef.current = false;
         return;
       }

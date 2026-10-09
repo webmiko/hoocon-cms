@@ -10,6 +10,8 @@ type Props = {
   children: ReactNode;
   /** Shown when recovery already ran once this session. */
   fallback?: ReactNode;
+  /** Clears a caught error when it changes (route pathname). */
+  resetKey?: string;
 };
 
 type State = {
@@ -46,6 +48,12 @@ export class ChunkLoadErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error): void {
     recoverFromStaleChunk(error);
+  }
+
+  componentDidUpdate(prevProps: Props): void {
+    if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
   }
 
   render(): ReactNode {
