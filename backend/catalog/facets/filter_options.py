@@ -21,14 +21,23 @@ from catalog.facets.defs import (
 from catalog.facets.normalize import normalize_facet_value, values_match
 from catalog.models import SKU, Attribute, AttributeValue
 
-# Public ``?facet=a,b,…`` — OR over at most this many parts (each part costs a
+# Public ``?facet=a|b|…`` — OR over at most this many parts (each part costs a
 # Python match pass; an unbounded list was a cheap DoS on the catalog API).
 MAX_FACET_VALUE_PARTS = 10
+FACET_OR_SEPARATOR = "|"
+# Legacy comma OR: chip labels carry decimal commas («до 1,0 м²», Kvs «1,6»)
+# and «, » inside text («AC 100…240 В, 50/60 Гц») — neither is a separator.
+_LEGACY_OR_COMMA = re.compile(r"(?<!\d),(?!\s)|,(?![\d\s])")
 
 
 def facet_value_parts(value: str) -> list[str]:
-    """Distinct non-empty comma parts of a facet value, capped."""
-    parts = dict.fromkeys(part.strip() for part in str(value).split(","))
+    """Distinct non-empty OR parts of a facet value, capped."""
+    raw = str(value)
+    if FACET_OR_SEPARATOR in raw:
+        split = raw.split(FACET_OR_SEPARATOR)
+    else:
+        split = _LEGACY_OR_COMMA.split(raw)
+    parts = dict.fromkeys(part.strip() for part in split)
     parts.pop("", None)
     return list(parts)[:MAX_FACET_VALUE_PARTS]
 
@@ -42,7 +51,7 @@ def filter_skus_by_facet(
 ) -> QuerySet[SKU]:
     """Filter SKUs whose EAV value matches the facet (loose).
 
-    Comma-separated ``value`` means OR (any part matches) — used by the
+    ``|``-separated ``value`` means OR (any part matches) — used by the
     product picker when discrete on/off spans several canon labels
     (``Открыто/закрыто`` and ``2-/3-позиционное``). Parts are matched in
     one pass over the scoped attribute rows.

@@ -1338,14 +1338,68 @@ def test_comma_facet_value_is_one_pass_and_capped() -> None:
     seeded = _seed_with_attrs()
     scoped = SKU.objects.filter(is_published=True)
 
-    matched = filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], "5, 10,5")
+    matched = filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], "5| 10|5")
     assert set(matched.values_list("pk", flat=True)) == {seeded["sku5"].pk, seeded["sku10"].pk}
 
-    flood = ",".join(f"{n} Нм" for n in range(500))
+    flood = "|".join(f"{n} Нм" for n in range(500))
     assert len(facet_value_parts(flood)) == MAX_FACET_VALUE_PARTS
     with CaptureQueriesContext(connection) as ctx:
         list(filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], flood))
     assert len(ctx.captured_queries) <= 4
+
+
+def test_facet_value_parts_keeps_decimal_commas_and_label_commas() -> None:
+    """OR splits on «|»; legacy comma OR never cuts «1,0» or «В, 50/60 Гц»."""
+    from catalog.facets.filter_options import facet_value_parts
+
+    assert facet_value_parts("до 1,0 м²") == ["до 1,0 м²"]
+    assert facet_value_parts("10,1") == ["10,1"]
+    assert facet_value_parts("AC 100…240 В, 50/60 Гц") == ["AC 100…240 В, 50/60 Гц"]
+    assert facet_value_parts("10|10,1|16") == ["10", "10,1", "16"]
+    assert facet_value_parts("до 1,0 м²|до 1,6 м²") == ["до 1,0 м²", "до 1,6 м²"]
+    assert facet_value_parts("2-/3-позиционное,Открыто/закрыто") == [
+        "2-/3-позиционное",
+        "Открыто/закрыто",
+    ]
+
+
+@pytest.mark.django_db
+def test_decimal_area_and_kvs_filters_match_only_their_chip(client) -> None:
+    """«?area=до 1,0 м²» was split on the comma and returned DA16 (до 1,6 м²).
+
+    Same for Kvs «10,1»: the API must treat a decimal comma as part of the value.
+    """
+    from catalog.models import SKU, Attribute, AttributeValue, Category, Product
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnie")
+    product = Product.objects.create(name="Приводы", slug="privody", category=cat)
+    area = Attribute.objects.create(name="Площадь заслонки", slug="damper-area")
+    kvs = Attribute.objects.create(name="Kvs", slug="kvs")
+    rows = {
+        "hv10": ("до 1,0 м²", "10"),
+        "da16": ("до 1,6 м²", "10,1"),
+        "da2": ("до 0,2 м²", "16"),
+    }
+    for slug, (area_value, kvs_value) in rows.items():
+        sku = SKU.objects.create(
+            product=product,
+            name=slug,
+            slug=slug,
+            sku_code=slug.upper(),
+            is_published=True,
+        )
+        AttributeValue.objects.create(sku=sku, attribute=area, value=area_value)
+        AttributeValue.objects.create(sku=sku, attribute=kvs, value=kvs_value)
+
+    def slugs(**params: str) -> set[str]:
+        response = client.get(reverse("catalog-sku-list"), {"category": "vozdushnie", **params})
+        assert response.status_code == 200
+        return {row["slug"] for row in response.data["results"]}
+
+    assert slugs(area="до 1,0 м²") == {"hv10"}
+    assert slugs(area="до 1,0 м²|до 1,6 м²") == {"hv10", "da16"}
+    assert slugs(kvs="10,1") == {"da16"}
+    assert slugs(kvs="10|10,1") == {"hv10", "da16"}
 
 
 @pytest.mark.django_db
