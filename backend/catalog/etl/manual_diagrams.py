@@ -937,53 +937,6 @@ def _load_shaft_label_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTyp
     return ImageFont.load_default()
 
 
-# Relative boxes over PDF caption ``6...16mm`` (right of ○/◇ icons).
-# English manuals print 6…16; catalog ТТХ for DA2/4/6MU use 8…16 mm.
-_SHAFT_LABEL_6_TO_8_REGION: Final[dict[int, tuple[float, float, float, float]]] = {
-    2: (0.261, 0.040, 0.369, 0.088),
-    4: (0.250, 0.080, 0.340, 0.140),
-    6: (0.250, 0.080, 0.340, 0.140),
-}
-
-
-def patch_damu_dimensions_shaft_label(
-    image: Image.Image,
-    *,
-    series_nm: int,
-) -> Image.Image:
-    """Replace PDF label ``6...16mm`` with catalog value ``8...16mm``.
-
-    Applies to DA2MU / DA4MU / DA6MU dimension crops from English manuals.
-    """
-    rel = _SHAFT_LABEL_6_TO_8_REGION.get(series_nm)
-    if rel is None:
-        return image
-    width, height = image.size
-    region = (
-        int(rel[0] * width),
-        int(rel[1] * height),
-        int(rel[2] * width),
-        int(rel[3] * height),
-    )
-    patched = image.copy()
-    draw = ImageDraw.Draw(patched)
-    draw.rectangle(region, fill=(255, 255, 255))
-    font_size = max(12, int(0.030 * height))
-    font = _load_shaft_label_font(font_size)
-    label = "8...16mm"
-    text_box = draw.textbbox((0, 0), label, font=font)
-    text_h = text_box[3] - text_box[1]
-    x = region[0] + 2
-    y = region[1] + max(0, ((region[3] - region[1]) - text_h) // 2) - 1
-    draw.text((x, y), label, fill=(20, 20, 20), font=font)
-    return patched
-
-
-def patch_da2mu_dimensions_shaft_label(image: Image.Image) -> Image.Image:
-    """Backward-compatible alias for DA2MU shaft-label patch."""
-    return patch_damu_dimensions_shaft_label(image, series_nm=2)
-
-
 # Belimo RU glossary: docs/tech-copy-belimo-ru.md (Wiring Diagram section).
 _WIRING_LABEL_ACTUATOR_RU: Final[str] = "Привод"
 _WIRING_LABEL_AUX_RU: Final[str] = "Вспомогательный переключатель"
@@ -1110,11 +1063,14 @@ def diagrams_from_damu_pdf(
     series_nm: int,
     edition: Edition,
 ) -> list[DiagramCrop]:
-    """Build wiring + dimensions crops from a DA..MU English manual PDF."""
+    """Build wiring + dimensions crops from a DA..MU English manual PDF.
+
+    The dimensions crop stays as printed: the PDF shaft range (6…16 mm)
+    matches the catalog ТТХ, so no label is redrawn.
+    """
     page = render_pdf_page(pdf_path, 1)
     wiring_img, dims_img = crop_damu_diagrams(page)
     wiring_img = patch_damu_wiring_labels_ru(wiring_img)
-    dims_img = patch_damu_dimensions_shaft_label(dims_img, series_nm=series_nm)
     series = f"DA{series_nm}MU"
     return [
         DiagramCrop(

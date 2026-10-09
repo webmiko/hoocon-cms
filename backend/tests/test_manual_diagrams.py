@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from PIL import Image
 
@@ -224,6 +226,35 @@ def test_crop_damu_skips_black_section_titles() -> None:
     assert (78, 90, 12) in dim_colors
     assert (0, 0, 0) not in wire_colors
     assert (0, 0, 0) not in dim_colors
+
+
+@pytest.mark.parametrize("series_nm", [2, 4, 6])
+def test_damu_dimensions_crop_keeps_pdf_shaft_label(monkeypatch: pytest.MonkeyPatch, series_nm: int) -> None:
+    """M49: габариты DA2/4/6MU не переподписываются в «8…16 мм» — кроп совпадает с PDF (вал 6…16, как в ТТХ)."""
+    import io
+
+    from catalog.etl import manual_diagrams
+    from catalog.etl.series_copy_damu import TORQUE_SPECS
+
+    width, height = 2000, 1600
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    for y0, y1 in ((160, 200), (560, 600), (1100, 1140)):
+        for y in range(y0, y1):
+            for x in range(int(width * 0.48), width):
+                page.putpixel((x, y), (0, 0, 0))
+    for y in range(620, 1080):
+        for x in range(int(width * 0.5), width, 7):
+            page.putpixel((x, y), (40, 40, 40))
+    monkeypatch.setattr(manual_diagrams, "render_pdf_page", lambda _path, _index: page)
+
+    crops = manual_diagrams.diagrams_from_damu_pdf(Path("x.pdf"), series_nm=series_nm, edition="on_off")
+    dims_png = next(c.png_bytes for c in crops if c.kind == "dimensions")
+
+    _, expected = manual_diagrams.crop_damu_diagrams(page)
+    actual = Image.open(io.BytesIO(dims_png)).convert("RGB")
+    assert actual.tobytes() == expected.convert("RGB").tobytes()
+    assert not hasattr(manual_diagrams, "patch_damu_dimensions_shaft_label")
+    assert TORQUE_SPECS[series_nm]["shaft-diameter"].startswith("круглый 6…16 мм")
 
 
 def test_patch_damu_wiring_labels_ru_replaces_english_titles() -> None:
