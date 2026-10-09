@@ -13,6 +13,7 @@ from unfold.admin import ModelAdmin
 
 from catalog.admin import SKUAdmin
 from leads.admin import LeadAdmin
+from tests.css_rules import css_rule_body
 
 User = get_user_model()
 
@@ -645,7 +646,13 @@ def test_os27_css_covers_settings_layout() -> None:
     assert "box-shadow: none !important" in css
     assert "@media (min-width: 1024px)" in css
     assert "@media (min-width: 768px)" in css
-    assert "/* ── Sidebar nav (tablet flyout + desktop fixed panel)" in css
+    sidebar_selector = "body.hoocon-os27 .hoocon-nav-panel.hoocon-os27-sidebar-panel {"
+    sidebar_media = css[css.rindex("@media", 0, css.index(sidebar_selector)) :]
+    assert sidebar_media.startswith("@media (min-width: 768px) {")
+    assert sidebar_selector in css_rule_body(sidebar_media, "@media")
+    sidebar_panel = css_rule_body(css, sidebar_selector)
+    assert "width: var(--os27-sidebar-w) !important" in sidebar_panel
+    assert "backdrop-filter: blur(48px)" in sidebar_panel
     assert "@media (min-width: 768px) and (max-width: 1023px)" in css
     assert "@media (max-width: 767px)" in css
     assert "table.hoocon-admin-table-stacked:not(.hoocon-admin-card-table)" in css
@@ -875,7 +882,10 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "hoocon-admin-table-stacked" in css
     assert "hoocon-admin-cell-blank" in css
     assert "hoocon-admin-card-table" in css
-    assert "Changelist card grid canvas" in css
+    card_canvas = css_rule_body(
+        css, "#changelist table#result_list.hoocon-admin-card-table.hoocon-admin-table-stacked {"
+    )
+    assert "background-color: var(--hoocon-page-bg) !important" in card_canvas
     assert "App index model list" in css
     assert '#content .module table tr[class*="model-"]:hover > th' in css
     app_list_end = "/* Admin top bar stays under the viewport top while content scrolls. */"
@@ -899,7 +909,9 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert ".hoocon-lead-view-toggle" in css
     assert "hoocon-lead-wall-heading" in css
     assert "box-shadow: var(--hoocon-shadow-soft)" in css
-    assert "/* Card hierarchy — title / meta / badges" in css
+    badges = css_rule_body(css, "  th.field-rfq_thread_badge {")
+    assert "order: -2" in badges
+    assert "display: flex !important" in badges
     assert "td.field-email_id" in css
     assert "td.field-sku_code" in css
     assert "td.field-answer" in css

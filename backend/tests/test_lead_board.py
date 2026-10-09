@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 
 from leads.models import Lead
+from tests.css_rules import css_rule_body as _css_rule_body
 
 User = get_user_model()
 
@@ -22,21 +23,6 @@ def _apply_kanban_fn_source(src: str) -> str:
     start = src.index("function applyKanban")
     end = src.index("function restoreRowsToTable", start)
     return src[start:end]
-
-
-def _css_rule_body(css: str, selector: str) -> str:
-    """Return the first ``{...}`` body after ``selector`` (brace-balanced)."""
-    start = css.index(selector)
-    open_at = css.index("{", start)
-    depth = 0
-    for i, ch in enumerate(css[open_at:], start=open_at):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return css[open_at + 1 : i]
-    raise AssertionError(f"Unclosed CSS rule for {selector!r}")
 
 
 def test_lead_board_css_header_object_tools_row() -> None:
