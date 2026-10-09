@@ -46,6 +46,7 @@ dev = [
     "djangorestframework-stubs (>=3.18.1,<4.0.0)",
     "pytest-cov (>=6.0,<7)",
     "pip-audit (>=2.7,<3)",
+    "time-machine (>=2.16,<4)",
 ]
 
 [tool.ruff]
@@ -127,7 +128,23 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-source = ["catalog", "content", "leads", "crm", "search", "config", "sitesettings"]
+source = [
+    "accounts",
+    "analytics",
+    "cabinet",
+    "catalog",
+    "config",
+    "content",
+    "crm",
+    "leads",
+    "redirects",
+    "search",
+    "sitesettings",
+    "social",
+    "staff_api",
+    "supportchat",
+    "webpush",
+]
 omit = [
     "*/migrations/*",
     "*/tests/*",
@@ -138,6 +155,7 @@ omit = [
     "config/settings.py",
     # Admin UI: exercised via HTTP admin tests; branch-dense Unfold forms.
     "*/admin.py",
+    "*/admin/*",
     "manage.py",
     "**/asgi.py",
     "**/wsgi.py",
@@ -147,8 +165,9 @@ omit = [
 precision = 1
 show_missing = true
 skip_covered = false
-# Gate for measured apps (omit above). Tests catch bugs — do not pad % to hit 90.
-fail_under = 90
+# Total over every app (ratchet); per-app floors: scripts/check-coverage-floors.py.
+# Tests catch bugs — do not pad %; raise floors when real tests land.
+fail_under = 83
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",

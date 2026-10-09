@@ -13,7 +13,8 @@ else
   exit 1
 fi
 
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${HOME}/.ssh/known_hosts")
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ssh-trust.sh"
+hoocon_ssh_trust
 LOGROTATE_SRC="${LOGROTATE_SRC:-$(cd "$(dirname "$0")/.." && pwd)/deploy/logrotate/hoocon-logs}"
 
 if [[ ! -f "${LOGROTATE_SRC}" ]]; then

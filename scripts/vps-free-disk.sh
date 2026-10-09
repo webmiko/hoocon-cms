@@ -22,12 +22,8 @@ else
   exit 1
 fi
 
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="${HOME}/.ssh/known_hosts")
-
-mkdir -p "${HOME}/.ssh"
-if [[ -n "${SERVER_HOST:-}" ]]; then
-  ssh-keyscan -H "${SERVER_HOST}" >> "${HOME}/.ssh/known_hosts" 2>/dev/null || true
-fi
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ssh-trust.sh"
+hoocon_ssh_trust
 
 echo "Free disk on ${SSH_TARGET} (need >= ${DISK_MIN_FREE_MB} MiB free on /)"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s <<EOF

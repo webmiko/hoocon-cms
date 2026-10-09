@@ -49,27 +49,28 @@ else
 fi
 
 # ── 3. mypy ──────────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run mypy config leads crm catalog content manage.py) >/dev/null 2>&1; then
+if (cd "$BACKEND" && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api supportchat webpush manage.py) >/dev/null 2>&1; then
   ok "mypy — чисто"
 else
-  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content manage.py)"
+  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api supportchat webpush manage.py)"
 fi
 
-# ── 4. pytest + coverage ≥ 90% (exit 5 = нет тестов — допустимо на каркасе) ───
+# ── 4. pytest + coverage (общий порог в pyproject + пороги по приложениям) ───
 # Порог — сторож на измеряемом коде; не писать тесты ради процента (см. БЗ §0.8).
 # Align with CI: eager Celery so Activity/Telegram on_commit never hits live Redis.
 set +e
 (cd "$BACKEND" && CELERY_TASK_ALWAYS_EAGER=true poetry run pytest -q \
-  --cov --cov-report=term-missing:skip-covered --cov-fail-under=90)
+  --cov --cov-report=term-missing:skip-covered \
+  && poetry run python ../scripts/check-coverage-floors.py)
 PYTEST_CODE=$?
 set -e
 if [ "$PYTEST_CODE" -eq 0 ]; then
-  ok "pytest — тесты прошли (coverage ≥ 90%)"
+  ok "pytest — тесты прошли (coverage: общий порог и пороги приложений)"
 elif [ "$PYTEST_CODE" -eq 5 ]; then
   warn "pytest — тестов пока нет (exit 5); после catalog — обязательны"
   ok "pytest — каркас без тестов принят"
 else
-  fail "pytest — ошибки или coverage < 90% (cd backend && poetry run pytest -q --cov --cov-fail-under=90)"
+  fail "pytest — ошибки или coverage ниже порога (cd backend && poetry run pytest -q --cov && poetry run python ../scripts/check-coverage-floors.py)"
 fi
 
 # ── 5. pip-audit ─────────────────────────────────────────────
