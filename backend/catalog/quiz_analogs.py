@@ -20,9 +20,10 @@ from catalog.ball_valve_kit import (
     resolve_bracket_for_drive,
 )
 from catalog.facets import FACET_BY_KEY, filter_skus_by_facet
-from catalog.models import SKU, ProductImage
+from catalog.models import SKU, AttributeValue, ProductImage
 from catalog.ordering import annotate_moment_nm, catalog_list_order_by
 from catalog.series_categories import spec_order_case
+from catalog.sku_access import sku_attribute_values
 
 QuizVoltage = Literal["24", "230", "skip"]
 QuizControl = Literal["onoff", "modulating", "skip"]
@@ -153,6 +154,9 @@ def _valve_queryset(request: Request, limit: int) -> list[SKU]:
     qs = annotate_moment_nm(
         _published_sku_qs()
         .filter(product__category__slug=_BALL_VALVE_CATEGORY)
+        .prefetch_related(
+            Prefetch("attribute_values", queryset=AttributeValue.objects.select_related("attribute")),
+        )
         .annotate(
             category_spec_order=spec_order_case(
                 slug_field="product__category__slug",
@@ -306,7 +310,7 @@ def find_kit_analog_bundles(
 def _compatible_actuators_text(sku: SKU) -> str:
     from catalog.models import Attribute
 
-    for av in sku.attribute_values.all():
+    for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)
         slug = (attr.slug or "").casefold()
         name = (attr.name or "").casefold()
@@ -318,7 +322,7 @@ def _compatible_actuators_text(sku: SKU) -> str:
 def _is_flanged_valve(sku: SKU) -> bool:
     from catalog.models import Attribute
 
-    for av in sku.attribute_values.all():
+    for av in sku_attribute_values(sku):
         attr = cast(Attribute, av.attribute)
         slug = (attr.slug or "").casefold()
         val = str(av.value or "").casefold()

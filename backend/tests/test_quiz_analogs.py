@@ -6,7 +6,7 @@ import pytest
 from rest_framework.test import APIRequestFactory
 
 from catalog.etl.attr_write import set_sku_attribute
-from catalog.models import SKU, Category, Product
+from catalog.models import SKU, AttributeValue, Category, Product
 from catalog.quiz_analogs import (
     build_kit_bundle_for_valve,
     family_matches_voltage,
@@ -441,3 +441,30 @@ def test_kit_bundles_scan_drives_once_regardless_of_valve_count() -> None:
     ]
     assert len(drive_scans) == 1
     assert len(bracket_lookups) == len(bracket_codes)
+
+
+def _kit_query_count(valve_count: int) -> int:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    _kit_catalog(valve_count)
+    request = APIRequestFactory().get(
+        "/api/catalog/quiz-analogs/",
+        {"need": "kit", "quiz_voltage": "24", "quiz_control": "onoff", "quiz_aux": "no", "dn": "25"},
+    )
+    with CaptureQueriesContext(connection) as ctx:
+        bundles = find_kit_analog_bundles(request)
+    assert len(bundles) == valve_count
+    return len(ctx.captured_queries)
+
+
+@pytest.mark.django_db
+def test_kit_bundles_valve_attributes_without_n_plus_one() -> None:
+    """M33: attribute_values кранов читаются одним prefetch — число запросов не растёт с числом кранов."""
+    two = _kit_query_count(2)
+    AttributeValue.objects.all().delete()
+    SKU.objects.all().delete()
+    Product.objects.all().delete()
+    Category.objects.all().delete()
+    five = _kit_query_count(5)
+    assert five == two
