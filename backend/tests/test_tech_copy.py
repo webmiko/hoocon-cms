@@ -283,3 +283,46 @@ def test_protection_class_ii_migration_unifies_stored_values() -> None:
 
     assert AttributeValue.objects.get(sku=auto).value == PROTECTION_CLASS_II
     assert AttributeValue.objects.get(sku=manual).value == "II (все изолировано / полная изоляция)"
+
+
+@pytest.mark.django_db
+def test_selv_and_degree_migration_unifies_stored_values() -> None:
+    """M41: на проде у HVA/HVD-Q остались «безопасное низкое» и «°С» кириллицей — два чипа на одно значение."""
+    import importlib
+
+    from django.apps import apps
+
+    from catalog.etl.attr_write import set_sku_attribute
+    from catalog.etl.tech_copy import PROTECTION_CLASS_III, normalize_tech_copy
+    from catalog.models import SKU, AttributeValue, Category, Product
+
+    migration = importlib.import_module("catalog.migrations.0021_unify_selv_and_degree_spelling")
+    category = Category.objects.create(name="Приводы", slug="elektroprivody")
+    product = Product.objects.create(name="HVA", slug="hva", category=category)
+    auto, manual = (
+        SKU.objects.create(product=product, name=code, slug=code.casefold(), sku_code=code)
+        for code in ("HVA5-24", "HVA10-24")
+    )
+    old = {
+        "protection-class": "III (безопасное низкое напряжение)",
+        "ambient-temp": "от -20 °С до +50 °С",
+        "storage-temp": "от -40° С до +70° С",
+    }
+    for sku in (auto, manual):
+        for slug in old:
+            set_sku_attribute(sku, slug=slug, value="placeholder", name=slug, unit="")
+    for slug, value in old.items():
+        AttributeValue.objects.filter(attribute__slug=slug).update(value=value)
+    AttributeValue.objects.filter(sku=manual).update(is_manual=True)
+
+    migration.unify_selv_and_degree_spelling(apps, None)
+
+    stored = dict(AttributeValue.objects.filter(sku=auto).values_list("attribute__slug", "value"))
+    assert stored == {
+        "protection-class": PROTECTION_CLASS_III,
+        "ambient-temp": "от -20 °C до +50 °C",
+        "storage-temp": "от -40°C до +70°C",
+    }
+    assert all(normalize_tech_copy(value) == value for value in stored.values())
+    manual_values = dict(AttributeValue.objects.filter(sku=manual).values_list("attribute__slug", "value"))
+    assert manual_values == old
