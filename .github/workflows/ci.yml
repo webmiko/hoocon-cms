@@ -61,7 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        # Docker Hub rate-limits anonymous pulls from shared runner IPs.
+        image: public.ecr.aws/docker/library/postgres:16-alpine
         env:
           POSTGRES_USER: hoocon
           POSTGRES_PASSWORD: ci-db-password
