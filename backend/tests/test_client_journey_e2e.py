@@ -253,6 +253,8 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
         body="Уже высылаем на почту.",
         author=manager,
     )
+    # Ответ менеджера контакт не подтверждает — менеджер отмечает это в карточке диалога.
+    Conversation.objects.filter(pk=conv.pk).update(contact_verified=True)
 
     # ── Шаг 6: клиент регистрируется в кабинете той же почтой ──
     cab = APIClient()
@@ -359,7 +361,7 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
 
     orphan.refresh_from_db()
     assert orphan.client_id == client.pk
-    # contact_email в виджете вводит посетитель — без ответа менеджера диалог скрыт.
+    # contact_email в виджете вводит посетитель — без подтверждения контакта диалог скрыт.
     assert cab.get("/api/account/conversations/").json() == []
 
     manager = User.objects.create_user("legacy-mgr", password="x", is_staff=True)
@@ -369,6 +371,9 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
         body="Добрый день!",
         author=manager,
     )
+    assert cab.get("/api/account/conversations/").json() == []
+
+    Conversation.objects.filter(pk=orphan.pk).update(contact_verified=True)
     convs = cab.get("/api/account/conversations/").json()
     assert convs[0]["id"] == orphan.pk
 
@@ -393,6 +398,7 @@ def test_journey_quote_draft_hidden_from_cabinet(settings: Any) -> None:
         message="Тестовая заявка для черновика КП.",
         client=client,
         status=Lead.LeadStatus.IN_PROGRESS,
+        contact_verified=True,
     )
     manager = User.objects.create_user(
         username="mgr2",

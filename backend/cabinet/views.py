@@ -12,7 +12,7 @@ from datetime import timedelta
 from typing import Any
 
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import QuerySet
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -349,31 +349,24 @@ class AccountSummaryView(ClientApiView):
 
 
 def _scoped_leads(client: Client) -> QuerySet[Lead]:
-    """Leads proven to belong to this client.
+    """Leads proven to belong to this client (``contact_verified``).
 
-    Anyone can type a foreign email into the public form, so an anonymous
-    lead shows up only once a manager took it into work (or confirmed it).
+    Anyone can type a foreign email into the public form. Taking the lead
+    into work proves nothing about the sender, so only an explicit
+    confirmation (cabinet, manager link, sent quote) surfaces it.
     """
-    visible = Q(contact_verified=True) | ~Q(status=Lead.LeadStatus.NEW)
-    return client.leads.filter(visible).prefetch_related("items__sku").order_by("-created_at")
+    return client.leads.filter(contact_verified=True).prefetch_related("items__sku").order_by("-created_at")
 
 
 def _scoped_conversations(client: Client) -> QuerySet[Any]:
-    """Chats proven to belong to this client: confirmed or answered by a manager.
+    """Chats proven to belong to this client (``contact_verified``).
 
-    ``contact_email`` in the widget is typed by the visitor, so it alone
-    must not surface a thread in someone else's cabinet.
+    ``contact_email`` in the widget is typed by the visitor; a manager reply
+    does not prove the visitor owns that mailbox.
     """
-    from supportchat.models import Conversation, Message, MessageDirection
+    from supportchat.models import Conversation
 
-    manager_replied = Message.objects.filter(
-        conversation=OuterRef("pk"),
-        direction=MessageDirection.OUTBOUND,
-        author__isnull=False,
-    )
-    return Conversation.objects.filter(client=client).filter(
-        Q(contact_verified=True) | Exists(manager_replied),
-    )
+    return Conversation.objects.filter(client=client, contact_verified=True)
 
 
 def _lead_payload(lead: Lead) -> dict[str, Any]:

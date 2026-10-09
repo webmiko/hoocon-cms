@@ -491,8 +491,8 @@ def _cabinet_lead_ids(api: APIClient) -> list[int]:
 
 
 @pytest.mark.django_db
-def test_foreign_anonymous_lead_hidden_until_manager_takes_it() -> None:
-    """M8: аноним с чужим email не подкидывает заявку (и текст) в кабинет жертвы."""
+def test_foreign_anonymous_lead_hidden_until_contact_confirmed() -> None:
+    """M8: аноним с чужим email не подкидывает заявку в кабинет жертвы — даже после взятия в работу."""
     victim = _register(APIClient(), "victim@acme.test")
     forged = _post_public_lead(APIClient(), "victim@acme.test", "Срочно оплатите по ссылке evil.test")
     assert forged.client_id == Client.objects.get(email="victim@acme.test").pk
@@ -506,7 +506,36 @@ def test_foreign_anonymous_lead_hidden_until_manager_takes_it() -> None:
 
     manager = User.objects.create_user("m8-mgr", password="x", is_staff=True)
     take_lead_in_work(forged, manager)
+    assert forged.pk not in _cabinet_lead_ids(victim)
+    assert victim.get(f"/api/account/leads/{forged.pk}/").status_code == 404
+
+    Lead.objects.filter(pk=forged.pk).update(contact_verified=True)
     assert forged.pk in _cabinet_lead_ids(victim)
+
+
+@pytest.mark.django_db
+def test_foreign_web_chat_hidden_after_manager_reply() -> None:
+    """M8: ответ менеджера не делает чужой диалог видимым в кабинете владельца почты."""
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.test import RequestFactory
+
+    from supportchat.models import Message, MessageDirection
+    from supportchat.services import start_or_resume_web_conversation
+
+    victim = _register(APIClient(), "chat-victim@acme.test")
+    request = RequestFactory().post("/api/support/start/")
+    request.session = SessionStore()
+    forged = start_or_resume_web_conversation(request, contact_email="chat-victim@acme.test", pdn_consent=True)
+    manager = User.objects.create_user("m8-chat-mgr", password="x", is_staff=True)
+    Message.objects.create(
+        conversation=forged,
+        direction=MessageDirection.OUTBOUND,
+        author=manager,
+        body="Отправьте реквизиты",
+    )
+
+    assert victim.get("/api/account/conversations/").json() == []
+    assert victim.get("/api/account/summary/").json()["unread_conversations"] == 0
 
 
 @pytest.mark.django_db

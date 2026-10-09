@@ -125,9 +125,9 @@ class Lead(PdnConsentFields):
     contact_verified: models.BooleanField = models.BooleanField(
         "контакт подтверждён",
         default=False,
-        help_text="Новая заявка видна в кабинете клиента, только если контакт подтверждён "
+        help_text="Заявка видна в кабинете клиента, только если контакт подтверждён "
         "(ставится само для заявок из кабинета, заведённых менеджером и после отправки КП). "
-        "Взятая в работу видна всегда. Почту в форме сайта может указать кто угодно.",
+        "Взятие в работу контакт не подтверждает: почту в форме сайта может указать кто угодно.",
     )
     assignee: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,
