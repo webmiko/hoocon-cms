@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -13,14 +12,21 @@ from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
 
+from cabinet.auth import session_owns_email
+from config.pdn import PDN_CONSENT_REQUIRED, stamp_pdn_consent
 from supportchat.models import (
     Channel,
     Conversation,
     ConversationStatus,
     Message,
     MessageDirection,
-    ReplyTemplate,
     touch_conversation_message,
+)
+from supportchat.presentation import (
+    conversation_party_company,
+    conversation_party_label,
+    conversation_party_phone,
+    staff_public_name,
 )
 from supportchat.schedule import ensure_default_schedule, is_open_now
 
@@ -105,42 +111,50 @@ def start_or_resume_web_conversation(
     display_name: str = "",
     contact_email: str = "",
     page_url: str = "",
+    pdn_consent: bool = False,
 ) -> Conversation:
-    """Create or resume the web Conversation for this browser session."""
+    """Create or resume the web Conversation for this browser session.
+
+    Name/email are stored only with PDN consent — given now or earlier in
+    this thread; otherwise :class:`SupportChatError` and nothing is saved.
+    """
     session_id = get_or_create_web_session_id(request)
     page = (page_url or "").strip()[:500]
+    name = (display_name or "").strip()[:200]
+    email = (contact_email or "").strip()[:254]
     with transaction.atomic():
         conv, created = Conversation.objects.get_or_create(
             channel=Channel.WEB,
             external_user_id=session_id,
-            defaults={
-                "display_name": (display_name or "").strip()[:200],
-                "contact_email": (contact_email or "").strip()[:254],
-                "page_url": page,
-                "status": ConversationStatus.OPEN,
-            },
+            defaults={"page_url": page, "status": ConversationStatus.OPEN},
         )
         # Re-lock so concurrent resume/update for the same session does not
         # overwrite display_name/contact_email/status.
         conv = Conversation.objects.select_for_update().get(pk=conv.pk)
+        if (name or email) and not pdn_consent and conv.pdn_consent_at is None:
+            raise SupportChatError(PDN_CONSENT_REQUIRED)
+        updates: list[str] = []
+        if name and name != conv.display_name:
+            conv.display_name = name
+            updates.append("display_name")
+        if email and email != conv.contact_email:
+            conv.contact_email = email
+            updates.append("contact_email")
+        if pdn_consent and (name or email):
+            stamp_pdn_consent(conv)
+            updates += ["pdn_consent_at", "pdn_policy_version"]
         if not created:
-            updates: list[str] = []
-            name = (display_name or "").strip()[:200]
-            email = (contact_email or "").strip()[:254]
-            if name and name != conv.display_name:
-                conv.display_name = name
-                updates.append("display_name")
-            if email and email != conv.contact_email:
-                conv.contact_email = email
-                updates.append("contact_email")
             if page and page != conv.page_url:
                 conv.page_url = page
                 updates.append("page_url")
             if conv.status == ConversationStatus.CLOSED:
                 _reopen_conversation(conv)
-            if updates:
-                updates.append("updated_at")
-                conv.save(update_fields=updates)
+        if updates:
+            updates.append("updated_at")
+            conv.save(update_fields=updates)
+        if not conv.contact_verified and session_owns_email(request, conv.contact_email):
+            conv.contact_verified = True
+            conv.save(update_fields=["contact_verified"])
     _auto_link_client(conv)
     return conv
 
@@ -185,6 +199,10 @@ def add_inbound_message(
         if existing is not None:
             return existing, None
 
+    if attachment is not None:
+        from supportchat.attachments import safe_attachment_mime
+
+        attachment_mime = safe_attachment_mime(attachment, attachment_mime)
     if (body or "").strip():
         text = _sanitize_body(body)
     elif attachment is not None:
@@ -460,306 +478,6 @@ def add_staff_note(
     return msg
 
 
-def rate_conversation(conversation: Conversation, score: int) -> None:
-    """Persist client rating 1–5; requires at least one assistant/staff reply."""
-    if not isinstance(score, int) or not 1 <= score <= 5:
-        raise SupportChatError("Оценка должна быть от 1 до 5.")
-    has_reply = conversation.messages.filter(
-        direction__in=(MessageDirection.OUTBOUND, MessageDirection.SYSTEM),
-    ).exists()
-    if not has_reply:
-        raise SupportChatError("Пока нечего оценивать — дождитесь ответа.")
-    conversation.rating = score
-    conversation.rated_at = timezone.now()
-    conversation.save(update_fields=["rating", "rated_at", "updated_at"])
-    Message.objects.create(
-        conversation=conversation,
-        direction=MessageDirection.SYSTEM,
-        body=f"Клиент оценил диалог: {score}/5",
-        raw_payload={"rating": score},
-    )
-
-
-RATING_CALLBACK_PREFIX = "support_rate:"
-
-
-def support_rating_callback_payload(conversation_id: int, score: int) -> str:
-    """Inline-button payload ``support_rate:<conv>:<1..5>`` (TG/MAX)."""
-    return f"{RATING_CALLBACK_PREFIX}{conversation_id}:{score}"
-
-
-def parse_support_rating_callback(payload: str) -> tuple[int, int] | None:
-    """Parse ``support_rate:<conv>:<score>`` → ``(conv_id, score)`` or None."""
-    raw = (payload or "").strip()
-    if not raw.startswith(RATING_CALLBACK_PREFIX):
-        return None
-    parts = raw[len(RATING_CALLBACK_PREFIX) :].split(":")
-    if len(parts) != 2 or not all(p.isdigit() for p in parts):
-        return None
-    conv_id, score = int(parts[0]), int(parts[1])
-    if not 1 <= score <= 5:
-        return None
-    return conv_id, score
-
-
-def support_rating_reply_markup_tg(conversation_id: int) -> dict[str, Any]:
-    """Telegram inline keyboard: ⭐1…⭐5 under the rating request."""
-    buttons = [
-        {
-            "text": f"{n} ⭐",
-            "callback_data": support_rating_callback_payload(conversation_id, n),
-        }
-        for n in range(1, 6)
-    ]
-    return {"inline_keyboard": [buttons]}
-
-
-def support_rating_attachments_max(conversation_id: int) -> list[dict[str, Any]]:
-    """MAX inline keyboard: ⭐1…⭐5 under the rating request."""
-    buttons = [
-        {
-            "type": "callback",
-            "text": f"{n} ⭐",
-            "payload": support_rating_callback_payload(conversation_id, n),
-        }
-        for n in range(1, 6)
-    ]
-    return [{"type": "inline_keyboard", "payload": {"buttons": [buttons]}}]
-
-
-def request_client_rating(conversation: Conversation) -> None:
-    """Enqueue a rating request when a closed dialog has staff replies."""
-    if conversation.status != ConversationStatus.CLOSED or conversation.rating is not None:
-        return
-    conversation_id = conversation.pk
-
-    def _enqueue() -> None:
-        from supportchat.tasks import send_rating_request
-
-        send_rating_request.delay(conversation_id)
-
-    transaction.on_commit(_enqueue)
-
-
-_STAFF_ASSIGN_RE = re.compile(
-    r"^(?:@([\w.@+-]+)|/assign\s+@?([\w.@+-]+))\s*$",
-    re.IGNORECASE,
-)
-_STAFF_TEMPLATE_RE = re.compile(r"^/t\s+([\w-]+)\s*$", re.IGNORECASE)
-_STAFF_TEMPLATE_LIST = {"/t", "/tpls", "/templates"}
-
-
-def _staff_user_by_handle(handle: str) -> AbstractBaseUser | None:
-    """Active staff user for an ``@handle`` (username, email or first name)."""
-    from django.contrib.auth import get_user_model
-    from django.db.models import Q
-
-    from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
-
-    h = (handle or "").lstrip("@").strip()
-    if not h:
-        return None
-    return (
-        get_user_model()
-        .objects.filter(is_active=True, is_staff=True)
-        .filter(
-            Q(username__iexact=h)
-            | Q(email__iexact=h)
-            | Q(first_name__iexact=h)
-            | Q(username__iregex=rf"^{re.escape(h)}@"),
-        )
-        .filter(
-            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
-        )
-        .distinct()
-        .first()
-    )
-
-
-def submit_staff_reply(
-    staff_user: AbstractBaseUser,
-    conversation_id: int,
-    body: str,
-) -> tuple[bool, str]:
-    """Staff reply/note/assign/template from any messenger (shared core).
-
-    Commands inside the text: ``/note …`` internal note, ``@handle`` or
-    ``/assign …`` reassign, ``/t slug`` canned reply (``/t`` lists slugs).
-
-    Returns:
-        (ok, plain-text status for the staff chat).
-    """
-    from django.contrib.auth.models import PermissionsMixin
-
-    if not isinstance(staff_user, PermissionsMixin) or not staff_user.has_perm(
-        "supportchat.change_conversation",
-    ):
-        logger.warning(
-            "staff_reply_denied user=%s conv=%s — missing supportchat.change_conversation",
-            getattr(staff_user, "pk", None),
-            conversation_id,
-        )
-        return False, "Недостаточно прав для ответа в поддержке."
-
-    try:
-        conversation = Conversation.objects.get(pk=conversation_id)
-    except Conversation.DoesNotExist:
-        return False, f"Диалог #{conversation_id} не найден."
-
-    text = body.strip()
-    if text.lower().startswith("/note"):
-        try:
-            add_staff_note(conversation, text[5:].strip(), author=staff_user)
-        except SupportChatError as exc:
-            return False, str(exc)
-        return True, f"Заметка сохранена · диалог #{conversation_id} (клиенту не видна)"
-
-    if text.lower() in _STAFF_TEMPLATE_LIST:
-        templates = active_reply_templates()
-        if not templates:
-            return False, "Шаблоны не настроены (Admin → Диалоги поддержки → Шаблоны ответов)."
-        lines = "\n".join(f"• /t {tpl.slug} — {tpl.title}" for tpl in templates)
-        return True, f"Шаблоны ответов:\n{lines}\n\nИспользование: #{conversation_id} /t код"
-
-    template_match = _STAFF_TEMPLATE_RE.match(text)
-    if template_match:
-        slug = template_match.group(1)
-        template = find_reply_template(slug)
-        if template is None:
-            return False, f"Шаблон «{slug}» не найден. Список: /t"
-        text = template.body
-
-    assign_match = _STAFF_ASSIGN_RE.match(text)
-    if assign_match:
-        handle = assign_match.group(1) or assign_match.group(2) or ""
-        target = _staff_user_by_handle(handle)
-        if target is None:
-            return False, f"Сотрудник «{handle}» не найден (username/email/имя)."
-        assign_conversation(conversation, target, actor=staff_user)
-        return True, f"Диалог #{conversation_id} передан: {staff_public_name(target)}"
-
-    try:
-        message = add_staff_reply(conversation, text, author=staff_user)
-    except SupportChatError as exc:
-        return False, str(exc)
-
-    from supportchat.tasks import deliver_outbound_message
-
-    try:
-        deliver_outbound_message.delay(message.pk)
-    except Exception as exc:
-        logger.warning(
-            "staff_reply_deliver_enqueue_failed error=%s",
-            type(exc).__name__,
-        )
-        deliver_outbound_message(message.pk)
-
-    label = conversation.display_name or conversation.external_user_id
-    channel = conversation.get_channel_display()
-    return True, f"Ответ отправлен · диалог #{conversation_id} · {channel} · {label}"
-
-
-def find_reply_template(slug: str) -> ReplyTemplate | None:
-    """Active canned reply by slug (``/t dostavka`` in messengers)."""
-    key = (slug or "").strip().lower()
-    if not key:
-        return None
-    return ReplyTemplate.objects.filter(slug__iexact=key, is_active=True).first()
-
-
-def active_reply_templates() -> list[ReplyTemplate]:
-    """Canned replies for Admin composer dropdown / messenger ``/t`` list."""
-    return list(ReplyTemplate.objects.filter(is_active=True))
-
-
-def staff_transfer_candidates(*, exclude_pk: int | None = None) -> list[AbstractBaseUser]:
-    """Active managers/admins/superusers for the «Передать» picker."""
-    from django.contrib.auth import get_user_model
-    from django.db.models import Q
-
-    from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
-
-    qs = (
-        get_user_model()
-        .objects.filter(is_active=True, is_staff=True)
-        .filter(
-            Q(groups__name__in=(GROUP_MANAGER, GROUP_ADMIN)) | Q(is_superuser=True),
-        )
-        .distinct()
-        .order_by("first_name", "username")
-    )
-    if exclude_pk:
-        qs = qs.exclude(pk=exclude_pk)
-    return list(qs)
-
-
-def notify_conversation_assigned(
-    conversation: Conversation,
-    target: AbstractBaseUser,
-    actor: AbstractBaseUser | None,
-) -> None:
-    """Ping the new assignee in bound messengers; the notice carries reply buttons."""
-    from social.publishers import publish_max, publish_telegram
-
-    actor_label = staff_public_name(actor)
-    label = conversation.display_name or conversation.external_user_id
-    channel_label = conversation.get_channel_display()
-    text = f"🔀 {actor_label} передал вам диалог #{conversation.pk} · {channel_label} · {label}"
-
-    from accounts.telegram_alerts import telegram_chat_id_for
-
-    chat_id = telegram_chat_id_for(target)
-    if chat_id:
-        from social.telegram_staff_reply import (
-            staff_support_alert_reply_markup,
-            store_support_alert_message_id,
-        )
-
-        result = publish_telegram(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=staff_support_alert_reply_markup(conversation.pk),
-        )
-        if result.ok and result.external_id:
-            store_support_alert_message_id(conversation.pk, chat_id, result.external_id, text)
-
-    profile = getattr(target, "max_profile", None)
-    max_user_id = (getattr(profile, "max_user_id", "") or "").strip() if profile else ""
-    if max_user_id and getattr(profile, "max_alerts_enabled", False):
-        from social.max_staff_reply import (
-            staff_support_alert_attachments,
-            store_support_alert_mid,
-        )
-
-        result = publish_max(
-            user_id=max_user_id,
-            text=text,
-            attachments=staff_support_alert_attachments(conversation.pk),
-        )
-        if result.ok and result.external_id:
-            store_support_alert_mid(conversation.pk, max_user_id, result.external_id, text)
-
-
-@transaction.atomic
-def assign_conversation(
-    conversation: Conversation,
-    target: AbstractBaseUser | None,
-    *,
-    actor: AbstractBaseUser | None,
-) -> Message:
-    """Reassign the dialog to another staff member and log an internal note."""
-    conversation = Conversation.objects.select_for_update().get(pk=conversation.pk)
-    conversation.assignee = target  # type: ignore[assignment]
-    conversation.save(update_fields=["assignee", "updated_at"])
-    target_label = staff_public_name(target) if target is not None else "—"
-    actor_label = staff_public_name(actor)
-    return add_staff_note(
-        conversation,
-        f"{actor_label}: диалог передан → {target_label}",
-        author=actor,
-    )
-
-
 def _schedule_retire_max_support_alert(
     conversation_id: int,
     author: AbstractBaseUser | None,
@@ -853,127 +571,6 @@ def compose_staff_support_alert(
     if hint:
         parts.append(hint)
     return title, "\n\n".join(parts)
-
-
-def staff_public_name(user: AbstractBaseUser | None) -> str:
-    """Public label for a staff user (first_name; never email/username)."""
-    if user is None:
-        return "Поддержка"
-    first = (getattr(user, "first_name", "") or "").strip()
-    if first:
-        return first[:80]
-    full = ""
-    getter = getattr(user, "get_full_name", None)
-    if callable(getter):
-        full = (getter() or "").strip()
-    if full:
-        return full[:80]
-    return "Поддержка"
-
-
-def conversation_party_label(conversation: Conversation) -> str:
-    """Staff hub title: «Имя · Компания» or «Пользователь · телефон/email».
-
-    Prefer CRM client, then linked lead, then widget display_name. Anonymous
-    visitors without a name get «Пользователь» plus phone or email. Channel
-    name is never part of the title (shown separately in UI meta).
-    """
-    name = ""
-    company = ""
-    phone = ""
-    client = getattr(conversation, "client", None)
-    lead = getattr(conversation, "lead", None)
-    if client is not None:
-        name = (getattr(client, "name", None) or "").strip()
-        company = (getattr(client, "company", None) or "").strip()
-        phone = (getattr(client, "phone", None) or "").strip()
-    if lead is not None:
-        if not name:
-            name = (getattr(lead, "name", None) or "").strip()
-        if not company:
-            company = (getattr(lead, "company", None) or "").strip()
-        if not phone:
-            phone = (getattr(lead, "phone", None) or "").strip()
-    display = (conversation.display_name or "").strip()
-    if not name and display:
-        name = display
-
-    if name or company:
-        if name and company and name.casefold() != company.casefold():
-            return f"{name} · {company}"[:200]
-        return (name or company)[:200]
-
-    email = (conversation.contact_email or "").strip()
-    if phone:
-        return f"Пользователь · {phone}"[:200]
-    if email:
-        return f"Пользователь · {email}"[:200]
-    # Channel belongs in subtitle/meta — never as the hub title.
-    return "Пользователь"
-
-
-def conversation_party_phone(conversation: Conversation) -> str:
-    """Best-effort phone for staff UI (client → lead)."""
-    client = getattr(conversation, "client", None)
-    if client is not None:
-        phone = (getattr(client, "phone", None) or "").strip()
-        if phone:
-            return phone[:64]
-    lead = getattr(conversation, "lead", None)
-    if lead is not None:
-        phone = (getattr(lead, "phone", None) or "").strip()
-        if phone:
-            return phone[:64]
-    return ""
-
-
-def conversation_party_company(conversation: Conversation) -> str:
-    """Best-effort company for staff UI (client → lead)."""
-    client = getattr(conversation, "client", None)
-    if client is not None:
-        company = (getattr(client, "company", None) or "").strip()
-        if company:
-            return company[:200]
-    lead = getattr(conversation, "lead", None)
-    if lead is not None:
-        company = (getattr(lead, "company", None) or "").strip()
-        if company:
-            return company[:200]
-    return ""
-
-
-def message_attachment_is_image(message: Message) -> bool:
-    """True when the stored attachment should render as an image preview."""
-    mime = (message.attachment_mime or "").strip().lower()
-    if mime:
-        return mime.startswith("image/")
-    name = (message.attachment_name or message.attachment.name or "").lower()
-    return name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
-
-
-def message_sender_name(message: Message, *, staff_view: bool = False) -> str:
-    """Name next to a chat bubble (visitor UI or Admin messenger)."""
-    if message.direction == MessageDirection.INBOUND:
-        if staff_view:
-            label = conversation_party_label(message.conversation)
-            return label.split(" · ", 1)[0][:80]
-        label = (message.conversation.display_name or "").strip()
-        if label:
-            return label[:80]
-        return "Вы"
-    if message.direction == MessageDirection.SYSTEM:
-        from supportchat.gigachat.disclosure import BOT_SENDER_NAME
-
-        payload = message.raw_payload if isinstance(message.raw_payload, dict) else {}
-        if payload.get("ai"):
-            return BOT_SENDER_NAME
-        if payload.get("ai_handoff"):
-            return "Поддержка Hoocon"
-        return "Hoocon"
-    author_name = staff_public_name(message.author)
-    if author_name != "Поддержка":
-        return author_name
-    return staff_public_name(message.conversation.assignee)
 
 
 def _schedule_visitor_support_push(conversation_id: int) -> None:

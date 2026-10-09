@@ -9,7 +9,7 @@ from typing import Any
 from rest_framework import status
 from rest_framework.response import Response
 
-from social.webhook_dedup import begin_webhook_processing
+from social.webhook_dedup import webhook_once
 
 
 def accept_bot_webhook(
@@ -17,7 +17,7 @@ def accept_bot_webhook(
     channel: str,
     payload: object,
     enqueue: Callable[[dict[str, Any]], Any],
-    handle_sync: Callable[[dict[str, Any]], None],
+    handle_sync: Callable[[dict[str, Any]], object],
     logger: logging.Logger,
 ) -> Response:
     """Validate payload shape, enqueue async work, or fall back to sync handling.
@@ -39,11 +39,11 @@ def accept_bot_webhook(
             type(exc).__name__,
         )
 
-    if not begin_webhook_processing(channel, payload):
-        return Response({"ok": True, "duplicate": True}, status=status.HTTP_200_OK)
-
     try:
-        handle_sync(payload)
+        with webhook_once(channel, payload) as first:
+            if not first:
+                return Response({"ok": True, "duplicate": True}, status=status.HTTP_200_OK)
+            handle_sync(payload)
         return Response({"ok": True, "processed_sync": True}, status=status.HTTP_200_OK)
     except Exception as sync_exc:
         logger.error(

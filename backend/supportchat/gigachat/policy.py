@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from sitesettings.credentials import gigachat_credentials
 from sitesettings.models import SiteSettings
+from supportchat.gigachat.triage import is_triage_mode
 from supportchat.models import Conversation
 
 
 def ai_assistant_enabled() -> bool:
-    """Global toggle + credentials present."""
+    """Global toggle; full mode also needs GigaChat credentials (triage never calls the API)."""
     site = SiteSettings.load()
-    return bool(site.gigachat_enabled and gigachat_credentials(site))
+    if not site.gigachat_enabled:
+        return False
+    return is_triage_mode() or bool(gigachat_credentials(site))
 
 
 def conversation_ai_eligible(conversation: Conversation) -> bool:

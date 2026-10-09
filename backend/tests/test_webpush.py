@@ -38,7 +38,7 @@ def test_subscribe_support_links_session() -> None:
     resp = client.post(
         "/api/webpush/subscribe/",
         data={
-            "endpoint": "https://push.example/sub/1",
+            "endpoint": "https://fcm.googleapis.com/fcm/send/sub/1",
             "keys": {"p256dh": "p256", "auth": "authkey"},
             "topic_support": True,
         },
@@ -46,7 +46,7 @@ def test_subscribe_support_links_session() -> None:
         HTTP_X_CSRFTOKEN=token,
     )
     assert resp.status_code == 201
-    sub = PushSubscription.objects.get(endpoint="https://push.example/sub/1")
+    sub = PushSubscription.objects.get(endpoint="https://fcm.googleapis.com/fcm/send/sub/1")
     assert sub.topic_support is True
     assert sub.session_key  # support session uuid
 
@@ -61,7 +61,7 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
     client = _csrf_client()
     token = client.cookies["csrftoken"].value
     payload = {
-        "endpoint": "https://push.example/sub/persist",
+        "endpoint": "https://fcm.googleapis.com/fcm/send/sub/persist",
         "keys": {"p256dh": "p256", "auth": "authkey"},
         "topic_support": True,
     }
@@ -72,7 +72,7 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
         HTTP_X_CSRFTOKEN=token,
     )
     assert first.status_code == 201
-    sub = PushSubscription.objects.get(endpoint="https://push.example/sub/persist")
+    sub = PushSubscription.objects.get(endpoint="https://fcm.googleapis.com/fcm/send/sub/persist")
     session_a = sub.session_key
     assert sub.topic_support is True
 
@@ -101,7 +101,7 @@ def test_subscribe_marketing_requires_consent_header() -> None:
     client = _csrf_client()
     token = client.cookies["csrftoken"].value
     payload = {
-        "endpoint": "https://push.example/sub/mkt-gate",
+        "endpoint": "https://fcm.googleapis.com/fcm/send/sub/mkt-gate",
         "keys": {"p256dh": "p256", "auth": "authkey"},
         "topic_marketing": True,
     }
@@ -132,7 +132,7 @@ def test_subscribe_marketing_requires_consent_header() -> None:
 )
 def test_unsubscribe() -> None:
     upsert_subscription(
-        endpoint="https://push.example/gone",
+        endpoint="https://fcm.googleapis.com/fcm/send/gone",
         p256dh="p",
         auth="a",
         topic_marketing=True,
@@ -141,7 +141,7 @@ def test_unsubscribe() -> None:
     token = client.cookies["csrftoken"].value
     resp = client.post(
         "/api/webpush/unsubscribe/",
-        data={"endpoint": "https://push.example/gone"},
+        data={"endpoint": "https://fcm.googleapis.com/fcm/send/gone"},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
     )
@@ -158,7 +158,7 @@ def test_unsubscribe() -> None:
 )
 def test_send_deletes_on_410() -> None:
     sub = upsert_subscription(
-        endpoint="https://push.example/dead",
+        endpoint="https://fcm.googleapis.com/fcm/send/dead",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -174,9 +174,80 @@ def test_send_deletes_on_410() -> None:
 
 
 @pytest.mark.django_db
+@override_settings(WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey", WEBPUSH_VAPID_PRIVATE_KEY="test-private")
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://fcm.googleapis.com/fcm/send/x",
+        "https://127.0.0.1/admin/",
+        "https://redis:6379/",
+        "https://localhost/x",
+        "https://fcm.googleapis.com.evil.test/x",
+        "https://evilfcm.googleapis.com.attacker/x",
+        "https://user@fcm.googleapis.com/x",
+        "https://fcm.googleapis.com:8443/x",
+    ],
+)
+def test_subscribe_rejects_non_push_service_endpoint(endpoint: str) -> None:
+    """SSRF: endpoint от посетителя — только https на известном push-сервисе."""
+    client = _csrf_client()
+    resp = client.post(
+        "/api/webpush/subscribe/",
+        data={"endpoint": endpoint, "keys": {"p256dh": "p", "auth": "a"}, "topic_support": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
+    )
+    assert resp.status_code == 400
+    assert not PushSubscription.objects.filter(endpoint=endpoint).exists()
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://fcm.googleapis.com/fcm/send/abc",
+        "https://updates.push.services.mozilla.com/wpush/v2/abc",
+        "https://web.push.apple.com/abc",
+        "https://wns2-db5p.notify.windows.com/w/?token=abc",
+    ],
+)
+def test_real_browser_push_services_allowed(endpoint: str) -> None:
+    from webpush.services import is_allowed_push_endpoint
+
+    assert is_allowed_push_endpoint(endpoint)
+
+
+@pytest.mark.django_db
+@override_settings(WEBPUSH_VAPID_PUBLIC_KEY="BPtest", WEBPUSH_VAPID_PRIVATE_KEY="priv")
+def test_send_skips_legacy_foreign_endpoint_and_sets_timeout() -> None:
+    """Старые строки с внутренним хостом не отправляются; webpush вызывается с timeout."""
+    foreign = PushSubscription.objects.create(
+        endpoint="http://10.0.0.5/hook", p256dh="p", auth="a", topic_support=True
+    )
+    good = PushSubscription.objects.create(
+        endpoint="https://fcm.googleapis.com/fcm/send/ok", p256dh="p", auth="a", topic_support=True
+    )
+    with patch("pywebpush.webpush") as send:
+        assert send_push_to_subscription(foreign, title="t", body="b") is False
+        send.assert_not_called()
+        assert send_push_to_subscription(good, title="t", body="b") is True
+    assert send.call_args.kwargs["timeout"] == 10
+
+
+@pytest.mark.django_db
+@override_settings(WEBPUSH_VAPID_PUBLIC_KEY="BPtest", WEBPUSH_VAPID_PRIVATE_KEY="priv")
+def test_send_network_timeout_does_not_raise() -> None:
+    import requests
+
+    sub = PushSubscription.objects.create(
+        endpoint="https://fcm.googleapis.com/fcm/send/slow", p256dh="p", auth="a", topic_support=True
+    )
+    with patch("pywebpush.webpush", side_effect=requests.Timeout()):
+        assert send_push_to_subscription(sub, title="t", body="b") is False
+
+
+@pytest.mark.django_db
 @override_settings(
     CELERY_TASK_ALWAYS_EAGER=True,
-    FCM_SERVER_KEY="test-fcm-key",
     STAFF_API_ENABLED=True,
 )
 def test_inbound_bumps_support_sticker_and_triggers_push(
@@ -197,7 +268,7 @@ def test_inbound_bumps_support_sticker_and_triggers_push(
         password="x",
     )
     upsert_subscription(
-        endpoint="https://push.example/staff",
+        endpoint="https://fcm.googleapis.com/fcm/send/staff",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -282,7 +353,7 @@ def test_admin_pushsubscription_changelist_shows_topics() -> None:
         password="x",
     )
     PushSubscription.objects.create(
-        endpoint="https://push.example/admin-list",
+        endpoint="https://fcm.googleapis.com/fcm/send/admin-list",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -308,7 +379,7 @@ def test_admin_broadcast_form_renders_card() -> None:
         password="x",
     )
     PushSubscription.objects.create(
-        endpoint="https://push.example/mkt",
+        endpoint="https://fcm.googleapis.com/fcm/send/mkt",
         p256dh="p",
         auth="a",
         topic_marketing=True,
@@ -332,7 +403,7 @@ def test_admin_broadcast_form_renders_card() -> None:
 def test_clear_marketing_topic_keeps_support() -> None:
     client = _csrf_client()
     token = client.cookies["csrftoken"].value
-    endpoint = "https://push.example/sub/topics"
+    endpoint = "https://fcm.googleapis.com/fcm/send/sub/topics"
     upsert_subscription(
         endpoint=endpoint,
         p256dh="p",
@@ -382,13 +453,14 @@ def test_post_lead_triggers_staff_webpush(client, django_capture_on_commit_callb
         password="x",
     )
     upsert_subscription(
-        endpoint="https://push.example/lead-staff",
+        endpoint="https://fcm.googleapis.com/fcm/send/lead-staff",
         p256dh="p",
         auth="a",
         topic_support=True,
         user=user,
     )
     payload = {
+        "pdn_consent": True,
         "lead_type": "rfq",
         "name": "Пётр",
         "email": "petr@example.com",
@@ -426,7 +498,7 @@ def test_staff_subscribe_binds_user() -> None:
     )
     client = Client()
     client.force_login(staff)
-    endpoint = "https://push.example/staff-bind"
+    endpoint = "https://fcm.googleapis.com/fcm/send/staff-bind"
     resp = client.post(
         "/api/webpush/subscribe/",
         data={
@@ -470,7 +542,7 @@ def test_staff_push_disabled_skips_lead_and_support() -> None:
         password="x",
     )
     upsert_subscription(
-        endpoint="https://push.example/gate",
+        endpoint="https://fcm.googleapis.com/fcm/send/gate",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -517,7 +589,7 @@ def test_staff_push_uses_site_templates() -> None:
         password="x",
     )
     upsert_subscription(
-        endpoint="https://push.example/tpl",
+        endpoint="https://fcm.googleapis.com/fcm/send/tpl",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -554,7 +626,7 @@ def test_sitesettings_admin_shows_staff_push_fieldset() -> None:
         password="x",
     )
     upsert_subscription(
-        endpoint="https://push.example/listed",
+        endpoint="https://fcm.googleapis.com/fcm/send/listed",
         p256dh="p",
         auth="a",
         topic_support=True,
@@ -590,7 +662,7 @@ def test_admin_can_edit_staff_push_topic() -> None:
         is_staff=True,
     )
     sub = upsert_subscription(
-        endpoint="https://push.example/edit-topic",
+        endpoint="https://fcm.googleapis.com/fcm/send/edit-topic",
         p256dh="p",
         auth="a",
         topic_support=True,

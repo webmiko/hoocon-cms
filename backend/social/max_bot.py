@@ -618,7 +618,7 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         staff_user_for_max_user_id,
     )
     from social.publishers import answer_max_callback
-    from supportchat.services import parse_support_rating_callback
+    from supportchat.rating import parse_support_rating_callback
 
     rating = parse_support_rating_callback(payload)
     if rating is not None:
@@ -637,11 +637,8 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         return None
 
     from supportchat.models import Conversation
-    from supportchat.services import (
-        assign_conversation,
-        notify_conversation_assigned,
-        staff_public_name,
-    )
+    from supportchat.presentation import staff_public_name
+    from supportchat.staff_actions import assign_conversation, notify_conversation_assigned
 
     conv = Conversation.objects.filter(pk=conv_id).select_related("assignee").first()
     if conv is None:
@@ -657,9 +654,9 @@ def _handle_message_callback(update: dict[str, Any]) -> PublishResult | None:
         return None
 
     if action == "assign_to":
-        from django.contrib.auth import get_user_model
+        from supportchat.staff_actions import support_transfer_target
 
-        target = get_user_model().objects.filter(pk=target_uid or 0, is_active=True, is_staff=True).first()
+        target = support_transfer_target(target_uid)
         if target is None:
             if callback_id:
                 answer_max_callback(callback_id, notification="Сотрудник не найден")
@@ -709,19 +706,22 @@ def _handle_rating_callback(
     """Client taps ⭐ on a rating request — verify the presser owns the dialog."""
     from social.publishers import answer_max_callback
     from supportchat.models import Channel, Conversation
-    from supportchat.services import SupportChatError, rate_conversation
+    from supportchat.rating import rate_conversation
+    from supportchat.services import SupportChatError
 
     conv = Conversation.objects.filter(pk=conv_id, channel=Channel.MAX).first()
     ok = conv is not None and conv.external_user_id == user_key
+    failure = "Не удалось сохранить оценку"
     if ok and conv is not None:
         try:
             rate_conversation(conv, score)
-        except SupportChatError:
+        except SupportChatError as exc:
             ok = False
+            failure = str(exc)
     if callback_id:
         answer_max_callback(
             callback_id,
-            notification="Спасибо за оценку!" if ok else "Не удалось сохранить оценку",
+            notification="Спасибо за оценку!" if ok else failure,
         )
 
 

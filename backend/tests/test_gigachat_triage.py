@@ -7,14 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from sitesettings.models import SiteSettings
-from supportchat.gigachat.policy import ai_max_turns
-from supportchat.gigachat.prompts import build_system_prompt
+from supportchat.gigachat.policy import ai_assistant_enabled, ai_max_turns
 from supportchat.gigachat.reply import generate_ai_reply
-from supportchat.gigachat.triage import (
-    is_product_intent,
-    is_triage_mode,
-    parse_triage_escalation_note,
-)
+from supportchat.gigachat.triage import is_product_intent, is_triage_mode
 from supportchat.gigachat.triage_docs import build_docs_hub_path, triage_docs_reply
 from supportchat.models import Channel, Conversation, Message, MessageDirection
 from supportchat.services import add_inbound_message
@@ -36,6 +31,45 @@ def test_triage_mode_default(settings) -> None:
     """По умолчанию включён режим холодного чата."""
     settings.GIGACHAT_MODE = "triage"
     assert is_triage_mode() is True
+
+
+@pytest.mark.django_db
+def test_triage_bot_runs_without_gigachat_credentials(settings) -> None:
+    """Triage отвечает без API: пустой ключ не должен глушить холодный чат."""
+    settings.GIGACHAT_CREDENTIALS = ""
+    settings.GIGACHAT_MODE = "triage"
+    site = SiteSettings.load()
+    site.gigachat_enabled = True
+    site.gigachat_credentials = ""
+    site.save(update_fields=["gigachat_enabled", "gigachat_credentials"])
+    assert ai_assistant_enabled() is True
+
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="triage-no-key")
+    Message.objects.create(conversation=conv, direction=MessageDirection.INBOUND, body="Привет")
+    with patch("supportchat.gigachat.reply.chat_completion") as api:
+        reply = generate_ai_reply(conv)
+        api.assert_not_called()
+    assert reply.text
+
+    settings.GIGACHAT_MODE = "full"
+    assert ai_assistant_enabled() is False
+
+
+@pytest.mark.django_db
+def test_full_mode_blocks_unknown_sku_from_model(settings) -> None:
+    """Единственный путь к GigaChat — full: выдуманный артикул не уходит клиенту."""
+    settings.GIGACHAT_CREDENTIALS = "test-key"
+    settings.GIGACHAT_MODE = "full"
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="full-guard")
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Какой привод выбрать для заслонки?",
+    )
+    with patch("supportchat.gigachat.reply.chat_completion", return_value="Берите DA999MU24.") as api:
+        reply = generate_ai_reply(conv)
+    api.assert_called_once()
+    assert "DA999MU24" not in reply.text
 
 
 def test_product_intent_detects_sku_and_keywords() -> None:
@@ -61,22 +95,6 @@ def test_triage_docs_with_sku_links_model_page() -> None:
     assert reply is not None
     assert "/dokumentaciya?q=" in reply
     assert "DA2MU24" in reply
-
-
-@pytest.mark.django_db
-def test_triage_prompt_has_no_kb(settings) -> None:
-    """В triage промпт не подмешивает gigachat_kb.txt."""
-    settings.GIGACHAT_MODE = "triage"
-    prompt = build_system_prompt(user_query="Привет")
-    assert "холодный чат" in prompt.lower()
-    assert "gigachat_kb" not in prompt.lower()
-    assert "для менеджера" in prompt.lower()
-
-
-def test_parse_triage_escalation_note_extracts_summary() -> None:
-    """Сводка для менеджера парсится из ответа бота."""
-    text = "Для менеджера: заслонка, 5 Н·м, 24 В, 3 шт.\nПодключаю менеджера, он подберёт решение."
-    assert parse_triage_escalation_note(text) == "заслонка, 5 Н·м, 24 В, 3 шт."
 
 
 @pytest.mark.django_db

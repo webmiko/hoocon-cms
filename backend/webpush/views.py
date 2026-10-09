@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -80,7 +82,8 @@ class SubscribeView(APIView):
     def post(self, request: Request) -> Response:
         data = request.data if isinstance(request.data, dict) else {}
         endpoint = str(data.get("endpoint") or "").strip()
-        keys = data.get("keys") if isinstance(data.get("keys"), dict) else {}
+        raw_keys = data.get("keys")
+        keys: dict[str, Any] = raw_keys if isinstance(raw_keys, dict) else {}
         p256dh = str(keys.get("p256dh") or data.get("p256dh") or "").strip()
         auth = str(keys.get("auth") or data.get("auth") or "").strip()
         topic_support = bool(data.get("topic_support"))

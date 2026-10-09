@@ -10,7 +10,7 @@ from typing import Any
 
 from django.conf import settings
 
-from social.copy import EMAIL_SALES, PHONE, clip_text, compose_contacts_html, site_url
+from social.copy import EMAIL_SALES, PHONE, clip_text, compose_contacts_html, site_url, telegram_html_text
 from social.publishers import PublishResult, publish_telegram, telegram_api_call
 
 logger = logging.getLogger("hoocon.social")
@@ -346,7 +346,7 @@ def _ingest_support_text(
     if auto is not None:
         return publish_telegram(
             chat_id=chat_id,
-            text=html.escape(auto.body),
+            text=telegram_html_text(auto.body),
             reply_markup=main_menu_keyboard(),
         )
     return None
@@ -363,11 +363,8 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
         staff_user_for_telegram_chat_id,
     )
     from supportchat.models import Conversation
-    from supportchat.services import (
-        assign_conversation,
-        notify_conversation_assigned,
-        staff_public_name,
-    )
+    from supportchat.presentation import staff_public_name
+    from supportchat.staff_actions import assign_conversation, notify_conversation_assigned
 
     parsed = parse_staff_alert_callback(str(query.get("data") or ""))
     if parsed is None:
@@ -406,9 +403,9 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
         return None
 
     if action == "assign_to":
-        from django.contrib.auth import get_user_model
+        from supportchat.staff_actions import support_transfer_target
 
-        target = get_user_model().objects.filter(pk=target_uid or 0, is_active=True, is_staff=True).first()
+        target = support_transfer_target(target_uid)
         if target is None:
             if query_id:
                 telegram_api_call(
@@ -471,11 +468,8 @@ def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult |
 def _handle_rating_callback_query(query: dict[str, Any]) -> PublishResult | None:
     """Client taps ⭐ on a rating request — verify the presser owns the dialog."""
     from supportchat.models import Channel, Conversation
-    from supportchat.services import (
-        SupportChatError,
-        parse_support_rating_callback,
-        rate_conversation,
-    )
+    from supportchat.rating import parse_support_rating_callback, rate_conversation
+    from supportchat.services import SupportChatError
 
     data = str(query.get("data") or "")
     parsed = parse_support_rating_callback(data)
@@ -488,17 +482,19 @@ def _handle_rating_callback_query(query: dict[str, Any]) -> PublishResult | None
     user_key = str(from_user.get("id") or "")
     conv = Conversation.objects.filter(pk=conv_id, channel=Channel.TELEGRAM).first()
     ok = conv is not None and conv.external_user_id == user_key
+    failure = "Не удалось сохранить оценку"
     if ok and conv is not None:
         try:
             rate_conversation(conv, score)
-        except SupportChatError:
+        except SupportChatError as exc:
             ok = False
+            failure = str(exc)
     if query_id:
         telegram_api_call(
             "answerCallbackQuery",
             {
                 "callback_query_id": query_id,
-                "text": "Спасибо за оценку!" if ok else "Не удалось сохранить оценку",
+                "text": "Спасибо за оценку!" if ok else failure,
             },
         )
     return None
@@ -519,7 +515,7 @@ def _try_staff_telegram_reply(chat_key: str, text: str) -> PublishResult | None:
     )
 
     def _send(body: str) -> PublishResult:
-        return publish_telegram(chat_id=chat_key, text=html.escape(body))
+        return publish_telegram(chat_id=chat_key, text=telegram_html_text(body))
 
     staff_user = staff_user_for_telegram_chat_id(chat_key)
     if staff_user is None:

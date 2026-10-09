@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
+from config.pdn import pdn_consent_field
+from supportchat.attachments import (
+    DOWNLOAD_TYPES,
+    FALLBACK_TYPE,
+    claims_image_without_raster_bytes,
+    normalize_mime,
+)
 from supportchat.models import Message
-from supportchat.services import message_attachment_is_image, message_sender_name
+from supportchat.presentation import message_attachment_is_image, message_sender_name
 
 
 class ConversationStartSerializer(serializers.Serializer):
@@ -20,19 +30,12 @@ class ConversationStartSerializer(serializers.Serializer):
         max_length=500,
     )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    # Required (true) whenever name/email are sent — checked with the thread state in the service.
+    pdn_consent = pdn_consent_field(required=False)
 
 
 _ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
-_ATTACHMENT_MIME_PREFIXES = ("image/", "text/plain")
-_ATTACHMENT_MIME_TYPES = {
-    "application/pdf",
-    "application/zip",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-excel",
-    "application/octet-stream",
-}
+_ATTACHMENT_MIME_TYPES = DOWNLOAD_TYPES | {FALLBACK_TYPE}
 
 
 class MessageCreateSerializer(serializers.Serializer):
@@ -54,21 +57,23 @@ class MessageCreateSerializer(serializers.Serializer):
     )
     website = serializers.CharField(required=False, allow_blank=True, max_length=200)
 
-    def validate_attachment(self, file):
+    def validate_attachment(self, file: UploadedFile | None) -> UploadedFile | None:
         """Size + mime allowlist for widget uploads."""
         if file is None:
             return file
-        if file.size > _ATTACHMENT_MAX_BYTES:
+        if (file.size or 0) > _ATTACHMENT_MAX_BYTES:
             raise serializers.ValidationError("Файл больше 10 МБ.")
-        mime = (getattr(file, "content_type", "") or "").split(";")[0].strip().lower()
-        allowed = mime in _ATTACHMENT_MIME_TYPES or any(
-            mime.startswith(prefix) for prefix in _ATTACHMENT_MIME_PREFIXES
-        )
-        if not allowed:
+        claimed = getattr(file, "content_type", "") or ""
+        mime = normalize_mime(claimed)
+        if mime.startswith("image/"):
+            if claims_image_without_raster_bytes(file, claimed):
+                raise serializers.ValidationError("Картинка — только JPG, PNG, WebP или GIF.")
+            return file
+        if mime not in _ATTACHMENT_MIME_TYPES:
             raise serializers.ValidationError("Этот тип файла не поддерживается.")
         return file
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Either a non-empty body or an attachment is required."""
         body = (attrs.get("body") or "").strip()
         if not body and attrs.get("attachment") is None:

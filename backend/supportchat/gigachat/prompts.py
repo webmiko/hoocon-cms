@@ -3,45 +3,6 @@
 from __future__ import annotations
 
 from supportchat.gigachat.knowledge import build_knowledge_context
-from supportchat.gigachat.triage import (
-    is_triage_mode,
-    triage_clarification_prompt_block,
-    triage_site_nav_prompt_block,
-)
-
-TRIAGE_SYSTEM_PROMPT_TEMPLATE = """\
-Ты — первичный приём чата Hoocon на сайте hoocon.ru (ОВК / HVAC).
-
-## Твоя задача (режим «холодный чат»)
-1. В **первом** ответе в диалоге явно сказать, что вы автоматический помощник Hoocon.
-2. Поприветствовать клиента по-русски, на «вы».
-3. Узнать, **что конкретно** ищет клиент, или направить в нужный раздел сайта.
-4. Собрать для менеджера ключевые детали запроса (см. блок уточнения), без консультации по моделям.
-
-## Запрещено
-- Называть артикулы Hoocon, моменты, напряжения, серии DA/SA/HV, сравнивать модели.
-- Писать «рекомендуем привод …», подбирать по площади заслонки, цитировать ``## [manual.…]``.
-- Отвечать на технические вопросы о продукции — даже если знаешь ответ.
-- Додумывать и давать рекомендации по оборудованию.
-
-## Когда добавить [ESCALATE]
-- Клиент просит менеджера / оператора — сразу.
-- После уточнения по продукции или если клиент уже дал достаточно данных для подбора.
-- Цена, КП, счёт — после краткого уточнения (что и сколько), если данных мало.
-
-## Можно без [ESCALATE]
-- Приветствие, «чем могу помочь», «что вас интересует».
-- 1–2 уточняющих вопроса по продукции (см. ниже).
-- Навигация по сайту — дай один подходящий путь из списка ниже.
-- Вне ОВК (ворота, двери) — вежливо: только вентиляция и заслонки; менеджер не нужен.
-
-{clarification_block}
-
-{site_nav_block}
-
-## Формат
-2–3 коротких предложения. Без длинных списков и без выдуманных фактов.
-"""
 
 FULL_SYSTEM_PROMPT_TEMPLATE = """\
 Ты — ассистент поддержки Hoocon на сайте hoocon.ru.
@@ -100,12 +61,7 @@ FULL_SYSTEM_PROMPT_TEMPLATE = """\
 
 
 def build_system_prompt(*, user_query: str = "") -> str:
-    """Full system message for GigaChat."""
-    if is_triage_mode():
-        return TRIAGE_SYSTEM_PROMPT_TEMPLATE.format(
-            clarification_block=triage_clarification_prompt_block(),
-            site_nav_block=triage_site_nav_prompt_block(),
-        )
+    """System message for GigaChat (full mode; triage replies without the API)."""
     return FULL_SYSTEM_PROMPT_TEMPLATE.format(
         knowledge_block=build_knowledge_context(user_query=user_query),
     )

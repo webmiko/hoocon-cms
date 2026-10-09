@@ -7,11 +7,15 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.utils import timezone
+
+from config.pdn import PdnConsentFields
 
 
 class Channel(models.TextChoices):
@@ -30,9 +34,9 @@ def _private_media_storage() -> FileSystemStorage:
 
 def support_attachment_upload_to(instance: Message, filename: str) -> str:
     """Store under ``supportchat/attachments/<conv>/<uuid>_<safe>`` (private)."""
-    from catalog.validators import sanitize_upload_filename
+    from catalog.validators import storage_safe_filename
 
-    safe = sanitize_upload_filename(filename)
+    safe = storage_safe_filename(filename)
     conv = instance.conversation_id if instance.conversation_id is not None else "pending"
     return f"supportchat/attachments/{conv}/{uuid.uuid4().hex}_{safe}"
 
@@ -53,7 +57,7 @@ class MessageDirection(models.TextChoices):
     NOTE = "note", "Заметка"
 
 
-class Conversation(models.Model):
+class Conversation(PdnConsentFields):
     """One support thread (web session or messenger user)."""
 
     channel: models.CharField = models.CharField(
@@ -108,6 +112,12 @@ class Conversation(models.Model):
         blank=True,
         related_name="support_conversations",
         verbose_name="клиент CRM",
+    )
+    contact_verified = models.BooleanField(
+        "контакт подтверждён",
+        default=False,
+        help_text="Только такие диалоги видны в кабинете клиента. Ставится само, когда "
+        "диалог начат из кабинета или менеджер сам привязал клиента.",
     )
     lead = models.ForeignKey(
         "leads.Lead",
@@ -268,6 +278,17 @@ class Message(models.Model):
         return f"{self.get_direction_display()}: {self.body[:40]}"
 
 
+def validate_timezone_name(value: str) -> None:
+    """Reject names ``zoneinfo`` cannot load (a typo would break every chat inbound)."""
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValidationError(
+            "Неизвестный часовой пояс «%(value)s». Пример: Europe/Moscow.",
+            params={"value": value},
+        ) from exc
+
+
 class SupportSchedule(models.Model):
     """Singleton working-hours schedule for support chat."""
 
@@ -275,6 +296,7 @@ class SupportSchedule(models.Model):
         "часовой пояс",
         max_length=64,
         default="Europe/Moscow",
+        validators=[validate_timezone_name],
     )
     auto_reply_outside_hours: models.TextField = models.TextField(
         "автоответ вне часов",

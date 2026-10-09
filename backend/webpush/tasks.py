@@ -114,7 +114,7 @@ def notify_visitor_support_reply(conversation_id: int) -> int:
     return sent
 
 
-@shared_task
+@shared_task(soft_time_limit=30 * 60, time_limit=31 * 60)
 def broadcast_marketing_push(
     *,
     title: str,

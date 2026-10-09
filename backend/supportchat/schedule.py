@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.utils import timezone
 
+from config.logging_utils import setup_logger
 from supportchat.models import SupportSchedule, SupportScheduleDay, SupportScheduleInterval
+
+logger = setup_logger("hoocon.supportchat")
+
+DEFAULT_TIMEZONE = "Europe/Moscow"
 
 # Default intervals from plan §2.4.
 _DEFAULT_WEEKDAY_INTERVALS: dict[int, list[tuple[time, time]] | None] = {
@@ -43,9 +48,18 @@ def ensure_default_schedule() -> SupportSchedule:
     return schedule
 
 
-def _local_now(at: datetime | None, tz_name: str) -> datetime:
+def schedule_zone(sched: SupportSchedule) -> ZoneInfo:
+    """Schedule timezone; a bad stored name falls back to Moscow instead of 500."""
+    name = sched.timezone or DEFAULT_TIMEZONE
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        logger.warning("support_schedule_bad_timezone name=%r", name)
+        return ZoneInfo(DEFAULT_TIMEZONE)
+
+
+def _local_now(at: datetime | None, tz: ZoneInfo) -> datetime:
     """Normalize ``at`` (or now) to timezone-aware local datetime."""
-    tz = ZoneInfo(tz_name)
     if at is None:
         return timezone.now().astimezone(tz)
     if timezone.is_naive(at):
@@ -60,7 +74,7 @@ def is_open_now(
 ) -> bool:
     """True when support is within a configured open interval."""
     sched = schedule or ensure_default_schedule()
-    local = _local_now(at, sched.timezone or "Europe/Moscow")
+    local = _local_now(at, schedule_zone(sched))
     day = (
         SupportScheduleDay.objects.filter(schedule=sched, weekday=local.weekday())
         .prefetch_related("intervals")
@@ -83,7 +97,7 @@ def next_open_at(
 ) -> datetime | None:
     """Next datetime when support opens (local TZ, returned aware)."""
     sched = schedule or ensure_default_schedule()
-    local = _local_now(at, sched.timezone or "Europe/Moscow")
+    local = _local_now(at, schedule_zone(sched))
     if is_open_now(local, schedule=sched):
         return local
 
@@ -105,7 +119,7 @@ def next_open_at(
             start_dt = datetime.combine(
                 candidate_date,
                 interval.start_time,
-                tzinfo=ZoneInfo(sched.timezone or "Europe/Moscow"),
+                tzinfo=local.tzinfo,
             )
             if start_dt > local:
                 return start_dt

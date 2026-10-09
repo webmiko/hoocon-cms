@@ -305,7 +305,7 @@ def test_staff_template_command_sends_canned_reply() -> None:
 @pytest.mark.django_db
 def test_max_rating_callback_saves_score_for_dialog_owner() -> None:
     """⭐ tap on a rating request stores the score only for the dialog owner."""
-    from supportchat.services import support_rating_callback_payload
+    from supportchat.rating import support_rating_callback_payload
 
     conv = Conversation.objects.create(
         channel=Channel.MAX,

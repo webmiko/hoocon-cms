@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -127,11 +126,12 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
         # Idempotent: avoid duplicate TG sends on Celery retry after success.
         if (msg.external_message_id or "").strip():
             return "already_delivered"
+        from social.copy import telegram_html_text
         from social.publishers import publish_telegram
 
         result = publish_telegram(
             chat_id=conversation.external_user_id,
-            text=html.escape(msg.body),
+            text=telegram_html_text(msg.body),
         )
         if result.skipped:
             logger.warning("support_tg_outbound_skipped message_id=%s", message_id)
@@ -182,10 +182,7 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
 def send_rating_request(conversation_id: int) -> str:
     """Ask the client to rate the closed dialog (TG/MAX inline keyboard)."""
     from supportchat.models import Channel, Conversation, MessageDirection
-    from supportchat.services import (
-        support_rating_attachments_max,
-        support_rating_reply_markup_tg,
-    )
+    from supportchat.rating import support_rating_attachments_max, support_rating_reply_markup_tg
 
     try:
         conv = Conversation.objects.get(pk=conversation_id)
@@ -236,15 +233,6 @@ _AI_UNAVAILABLE_TEXT = (
 )
 
 
-def ai_resume_stale_escalation_minutes() -> int:
-    """Manager silence on an escalated chat before the bot takes it back."""
-    raw = getattr(settings, "SUPPORT_AI_RESUME_STALE_MINUTES", 30)
-    try:
-        return max(1, int(raw))
-    except (TypeError, ValueError):
-        return 30
-
-
 def ai_resume_manager_silence_hours() -> int:
     """Silence after a manager reply before the bot picks the thread back up."""
     raw = getattr(settings, "SUPPORT_AI_RESUME_MANAGER_HOURS", 24)
@@ -258,7 +246,7 @@ def _resume_stale_ai(conversation: Conversation, inbound: Message) -> bool:
     """Re-enable the bot on stale threads; returns True when it resumed.
 
     - Escalated but manager never replied → resume after
-      SUPPORT_AI_RESUME_STALE_MINUTES (fresh escalations stay with staff).
+      ``escalation_takeover_seconds`` (fresh escalations stay with staff).
     - Manager engaged earlier (assignee / outbound reply) → resume after
       SUPPORT_AI_RESUME_MANAGER_HOURS of silence before this inbound.
     """
@@ -268,6 +256,7 @@ def _resume_stale_ai(conversation: Conversation, inbound: Message) -> bool:
     from django.utils import timezone
 
     from supportchat.gigachat.busy_followup import manager_replied_after_escalation
+    from supportchat.gigachat.manager_silence import escalation_takeover_seconds
     from supportchat.gigachat.policy import conversation_ai_eligible
     from supportchat.models import Conversation, Message
 
@@ -279,7 +268,7 @@ def _resume_stale_ai(conversation: Conversation, inbound: Message) -> bool:
         manager_engaged = conv.assignee_id is not None or manager_replied_after_escalation(conv)
         escalated_at = conv.ai_escalated_at
         if escalated_at is not None and not manager_engaged:
-            if now < escalated_at + timedelta(minutes=ai_resume_stale_escalation_minutes()):
+            if now < escalated_at + timedelta(seconds=escalation_takeover_seconds()):
                 return False
         else:
             # Silence measured from the last message BEFORE this inbound —
@@ -326,6 +315,7 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
     )
     from supportchat.gigachat.reply import generate_ai_reply
     from supportchat.models import Conversation, Message, MessageDirection, touch_conversation_message
+    from supportchat.services import inbound_superseded
 
     if not ai_assistant_enabled():
         return "disabled"
@@ -359,6 +349,11 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
             conversation.save(
                 update_fields=["ai_active", "ai_escalated_at", "ai_turn_count", "updated_at"],
             )
+
+    # A burst of client messages gets one answer, to the latest one: the
+    # newer task sees the whole history, older ones would reply out of order.
+    if inbound_superseded(conversation_id, inbound.pk):
+        return "superseded"
 
     if not conversation_ai_eligible(conversation):
         if _resume_stale_ai(conversation, inbound):
@@ -405,6 +400,8 @@ def gigachat_reply(self: Any, conversation_id: int, inbound_message_id: int) -> 
         conversation = Conversation.objects.select_for_update().get(pk=conversation_id)
         if not conversation_ai_eligible(conversation):
             return "not_eligible_race"
+        if inbound_superseded(conversation_id, inbound.pk):
+            return "superseded_race"
         first_turn = conversation.ai_turn_count == 0
         reply_body = apply_bot_disclosure(ai.text, first_turn=first_turn)
         raw_payload: dict[str, object] = {"ai": True}
@@ -588,12 +585,16 @@ def _schedule_manager_silence_watchdog(conversation_id: int, inbound_message_id:
     """Enqueue takeover watchdog: bot answers if the manager stays silent."""
     from django.db import transaction
 
-    from supportchat.gigachat.manager_silence import manager_reply_timeout_seconds
+    from supportchat.gigachat.manager_silence import takeover_delay_seconds
     from supportchat.gigachat.policy import ai_assistant_enabled
+    from supportchat.models import Conversation
 
     if not ai_assistant_enabled():
         return
-    delay = manager_reply_timeout_seconds()
+    conversation = Conversation.objects.filter(pk=conversation_id).first()
+    if conversation is None:
+        return
+    delay = takeover_delay_seconds(conversation)
 
     def _enqueue() -> None:
         support_manager_silence_watchdog.apply_async(
@@ -608,14 +609,15 @@ def _schedule_manager_silence_watchdog(conversation_id: int, inbound_message_id:
 def support_manager_silence_watchdog(conversation_id: int, inbound_message_id: int) -> str:
     """Take the dialog back when no manager replied within the timeout.
 
-    Fires ~manager_reply_timeout_seconds() after an inbound on a thread
-    owned by a human (escalated / assigned / AI paused by a staff reply).
-    Manager replies cancel the takeover; a burst of client messages is
+    Fires ``takeover_delay_seconds`` after an inbound on a thread owned by
+    a human (escalated / assigned / AI paused by a staff reply). A fresh
+    handoff nobody picked up waits for a human (busy follow-up first);
+    manager replies cancel the takeover; a burst of client messages is
     answered once via the latest inbound.
     """
     from django.db import transaction
 
-    from supportchat.gigachat.manager_silence import manager_engaged_since
+    from supportchat.gigachat.manager_silence import escalation_takeover_due, manager_engaged_since
     from supportchat.gigachat.policy import ai_assistant_enabled, conversation_ai_eligible
     from supportchat.models import (
         Conversation,
@@ -636,6 +638,8 @@ def support_manager_silence_watchdog(conversation_id: int, inbound_message_id: i
         return "already_ai"
     if manager_engaged_since(conversation, message_id=inbound_message_id):
         return "manager_replied"
+    if not escalation_takeover_due(conversation):
+        return "escalation_waiting"
 
     with transaction.atomic():
         conv = Conversation.objects.select_for_update().get(pk=conversation_id)
@@ -645,6 +649,8 @@ def support_manager_silence_watchdog(conversation_id: int, inbound_message_id: i
             return "already_ai_race"
         if manager_engaged_since(conv, message_id=inbound_message_id):
             return "manager_replied_race"
+        if not escalation_takeover_due(conv):
+            return "escalation_waiting_race"
         # Turn count intentionally NOT reset: a bot that already hit the cap
         # must not ping-pong escalate→takeover→escalate every timeout.
         conv.ai_active = True

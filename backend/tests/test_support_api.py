@@ -146,7 +146,7 @@ def test_web_message_roundtrip_and_idor() -> None:
         token = c1.cookies["csrftoken"].value
         start = c1.post(
             "/api/support/conversations/",
-            data={"display_name": "Ivan"},
+            data={"pdn_consent": True, "display_name": "Ivan"},
             content_type="application/json",
             HTTP_X_CSRFTOKEN=token,
         )
@@ -316,6 +316,28 @@ def test_admin_assignee_change_writes_note() -> None:
 
 
 @pytest.mark.django_db
+def test_rate_conversation_rejects_json_list_body() -> None:
+    """JSON-массив вместо объекта давал 500 (``list.get``) — теперь 400."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Есть NM230A?"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        response = client.post(
+            "/api/support/conversations/current/rate/",
+            data=[5],
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
 def test_rate_conversation_api() -> None:
     """POST /rate/ stores 1–5 after a reply; rejects junk and empty dialogs."""
     ensure_default_schedule()
@@ -373,6 +395,40 @@ def test_rate_conversation_api() -> None:
 
         listing = client.get("/api/support/conversations/current/messages/")
         assert listing.json()["conversation"]["rating"] == 4
+
+
+@pytest.mark.django_db
+def test_rating_is_saved_once_and_start_returns_it() -> None:
+    """Оценка одна на диалог; start отдаёт status/rating, которые читает виджет."""
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "Есть NM230A?"},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        conv = Conversation.objects.get(channel=Channel.WEB)
+        Message.objects.create(conversation=conv, direction=MessageDirection.OUTBOUND, body="Да")
+        rate_url = "/api/support/conversations/current/rate/"
+        first = client.post(rate_url, data={"rating": 5}, content_type="application/json", HTTP_X_CSRFTOKEN=token)
+        again = client.post(rate_url, data={"rating": 1}, content_type="application/json", HTTP_X_CSRFTOKEN=token)
+        start = client.post(
+            "/api/support/conversations/",
+            data={"pdn_consent": True},
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+
+    assert first.status_code == 200
+    assert again.status_code == 400
+    conv.refresh_from_db()
+    assert conv.rating == 5
+    assert Message.objects.filter(conversation=conv, raw_payload__has_key="rating").count() == 1
+    assert start.json()["rating"] == 5
+    assert start.json()["status"] == conv.status
 
 
 @pytest.mark.django_db
@@ -450,7 +506,7 @@ def test_outside_hours_auto_reply() -> None:
         token = client.cookies["csrftoken"].value
         client.post(
             "/api/support/conversations/",
-            data={},
+            data={"pdn_consent": True},
             content_type="application/json",
             HTTP_X_CSRFTOKEN=token,
         )
@@ -485,7 +541,7 @@ def test_staff_outbound_visible_on_poll_after() -> None:
         token = client.cookies["csrftoken"].value
         client.post(
             "/api/support/conversations/",
-            data={},
+            data={"pdn_consent": True},
             content_type="application/json",
             HTTP_X_CSRFTOKEN=token,
         )
@@ -547,7 +603,7 @@ def test_support_poll_throttle_scope_allows_burst() -> None:
     token = client.cookies["csrftoken"].value
     client.post(
         "/api/support/conversations/",
-        data={},
+        data={"pdn_consent": True},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
     )
@@ -898,7 +954,7 @@ def test_admin_poll_sender_name_for_anonymous_inbound() -> None:
     from django.urls import reverse
 
     from supportchat.models import Channel, Message, MessageDirection
-    from supportchat.services import conversation_party_label, message_sender_name
+    from supportchat.presentation import conversation_party_label, message_sender_name
 
     staff = get_user_model().objects.create_superuser(
         username="support-name",
@@ -934,7 +990,7 @@ def test_conversation_party_label_name_company_and_anonymous_phone() -> None:
     from crm.models import Client
     from leads.models import Lead
     from supportchat.models import Channel
-    from supportchat.services import conversation_party_label
+    from supportchat.presentation import conversation_party_label
 
     named = Conversation.objects.create(
         channel=Channel.WEB,
@@ -974,7 +1030,7 @@ def test_conversation_party_phone_company_skip_empty_lead() -> None:
     from crm.models import Client
     from leads.models import Lead
     from supportchat.models import Channel
-    from supportchat.services import conversation_party_company, conversation_party_phone
+    from supportchat.presentation import conversation_party_company, conversation_party_phone
 
     conv = Conversation.objects.create(
         channel=Channel.WEB,
@@ -1288,6 +1344,38 @@ def test_web_attachment_upload_and_serialization(settings, tmp_path) -> None:
 
 
 @pytest.mark.django_db
+def test_web_attachment_with_encoded_slash_name_is_stored(settings, tmp_path) -> None:
+    """Имя «..%2f…» раньше роняло upload_to ValidationError → 500 вместо сохранения."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    png = SimpleUploadedFile("..%2fshildik.png", b"\x89PNG\r\n\x1a\nfakeimg", content_type="image/png")
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        send = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "фото", "attachment": png},
+            HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
+        )
+    assert send.status_code == 201
+    stored = Message.objects.get(pk=send.json()["message"]["id"])
+    assert stored.attachment.name.startswith(f"supportchat/attachments/{stored.conversation_id}/")
+    assert stored.attachment.name.endswith("_file.png")
+
+
+def test_storage_safe_filename_never_raises() -> None:
+    """upload_to-хелпер: враждебное имя → нейтральное, нормальное — как есть."""
+    from catalog.validators import storage_safe_filename
+
+    assert storage_safe_filename("dir/passport.pdf") == "passport.pdf"
+    assert storage_safe_filename("..%2Fsecret.pdf") == "file.pdf"
+    assert storage_safe_filename("x\x00.p$f") == "file"
+    assert storage_safe_filename("") == "file"
+
+
+@pytest.mark.django_db
 def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
     """Empty body + file → message saved with 📎 placeholder body."""
     settings.MEDIA_ROOT = str(tmp_path)
@@ -1355,6 +1443,99 @@ def test_web_attachment_rejected_types_and_size(settings, tmp_path) -> None:
     assert Message.objects.count() == 0
 
 
+_SVG_XSS = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.cookie)</script></svg>'
+
+
+@pytest.mark.django_db
+def test_web_attachment_rejects_svg_and_fake_images(settings, tmp_path) -> None:
+    """image/* по заявленному MIME пропускал SVG со скриптом — XSS в origin сайта у менеджера."""
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    client = _csrf_client()
+    token = client.cookies["csrftoken"].value
+    for name, data, mime in (
+        ("x.svg", _SVG_XSS, "image/svg+xml"),
+        ("x.png", b"<html><script>alert(1)</script>", "image/png"),
+    ):
+        resp = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"attachment": SimpleUploadedFile(name, data, content_type=mime)},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert resp.status_code == 400, name
+    assert Message.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_messenger_attachment_mime_is_sniffed_not_trusted(settings, tmp_path) -> None:
+    """MIME из Telegram/MAX сохранялся как есть; SVG под image/* открывался inline."""
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    from django.core.files.base import ContentFile
+
+    from supportchat.services import add_inbound_message
+
+    conv = Conversation.objects.create(channel=Channel.TELEGRAM, external_user_id="svg-1")
+    with patch("supportchat.services.is_open_now", return_value=True):
+        svg, _ = add_inbound_message(
+            conv, "", attachment=ContentFile(_SVG_XSS), attachment_name="a.svg", attachment_mime="image/svg+xml"
+        )
+        png, _ = add_inbound_message(
+            conv,
+            "",
+            attachment=ContentFile(b"\x89PNG\r\n\x1a\nreal"),
+            attachment_name="b.bin",
+            attachment_mime="application/octet-stream",
+        )
+    assert svg.attachment_mime == "application/octet-stream"
+    assert png.attachment_mime == "image/png"
+
+
+@pytest.mark.django_db
+def test_attachment_download_is_sandboxed_and_never_inline_svg(settings, tmp_path, django_user_model) -> None:
+    """Старые строки с image/svg+xml отдавались inline с MIME клиента."""
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    from django.core.files.base import ContentFile
+
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="svg-legacy")
+    legacy = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="📎 a.svg",
+        attachment_name="a.svg",
+        attachment_mime="image/svg+xml",
+    )
+    legacy.attachment.save("a.svg", ContentFile(_SVG_XSS))
+    image = Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="📎 b.png",
+        attachment_name="b.png",
+        attachment_mime="image/png",
+    )
+    image.attachment.save("b.png", ContentFile(b"\x89PNG\r\n\x1a\nreal"))
+
+    staff = django_user_model.objects.create_user(
+        username="svg-staff", password="test-pass-not-secret", is_staff=True, is_superuser=True
+    )
+    client = Client()
+    client.force_login(staff)
+
+    svg_resp = client.get(f"/api/support/messages/{legacy.pk}/attachment/")
+    assert svg_resp.status_code == 200
+    assert svg_resp["Content-Type"] == "application/octet-stream"
+    assert svg_resp["Content-Disposition"].startswith("attachment")
+    assert svg_resp["Content-Security-Policy"].startswith("sandbox")
+    assert svg_resp["X-Content-Type-Options"] == "nosniff"
+
+    png_resp = client.get(f"/api/support/messages/{image.pk}/attachment/")
+    assert png_resp["Content-Type"] == "image/png"
+    assert png_resp["Content-Disposition"].startswith("inline")
+    assert png_resp["Content-Security-Policy"].startswith("sandbox")
+
+
 @pytest.mark.django_db
 def test_attachment_only_empty_body_still_rejected_without_file() -> None:
     """No body and no attachment → validation error (unchanged behavior)."""
@@ -1397,3 +1578,64 @@ def test_attachment_indicated_in_staff_alerts(settings, tmp_path) -> None:
     _title, body = compose_staff_max_support_alert(conv)
     assert "📎" in body
     assert "nameplate.png" in body
+
+
+@pytest.mark.django_db
+def test_bad_schedule_timezone_does_not_break_inbound() -> None:
+    """M26: опечатка в часовом поясе (уже в БД) не роняет входящее в 500."""
+    from supportchat.models import SupportSchedule
+    from supportchat.schedule import is_open_now, next_open_at
+
+    sched = ensure_default_schedule()
+    SupportSchedule.objects.filter(pk=sched.pk).update(timezone="Europe/Moskow")
+    sched.refresh_from_db()
+
+    assert isinstance(is_open_now(schedule=sched), bool)
+    next_open_at(schedule=sched)
+    client = _csrf_client()
+    sent = client.post(
+        "/api/support/conversations/current/messages/",
+        data={"body": "Здравствуйте"},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
+    )
+    assert sent.status_code == 201
+
+
+@pytest.mark.django_db
+def test_admin_rejects_unknown_schedule_timezone() -> None:
+    """M26: форма расписания в админке не сохраняет неизвестный часовой пояс."""
+    from django.contrib.admin.sites import site
+
+    from supportchat.models import SupportSchedule
+
+    sched = ensure_default_schedule()
+    form_class = site._registry[SupportSchedule].get_form(None, sched)
+    bad = form_class(data={"timezone": "Europe/Moskow", "auto_reply_outside_hours": "x"}, instance=sched)
+    assert not bad.is_valid()
+    assert "timezone" in bad.errors
+    good = form_class(data={"timezone": "Asia/Yekaterinburg", "auto_reply_outside_hours": "x"}, instance=sched)
+    assert good.is_valid(), good.errors
+
+
+@pytest.mark.django_db
+def test_admin_close_from_filtered_list_requests_ratings() -> None:
+    """Закрытие из списка с фильтром «открытые»: queryset после update() пуст — оценки не уходили."""
+    admin_user = get_user_model().objects.create_superuser(
+        username="close-flt",
+        email="close-flt@example.com",
+        password="pw-12345",
+    )
+    convs = [
+        Conversation.objects.create(channel=Channel.WEB, external_user_id=f"sess-close-{i}", status="open")
+        for i in range(2)
+    ]
+    client = Client()
+    client.force_login(admin_user)
+    with patch("supportchat.admin.request_client_rating") as rating:
+        client.post(
+            "/admin/supportchat/conversation/?status__exact=open",
+            {"action": "action_close", "_selected_action": [str(c.pk) for c in convs]},
+        )
+    assert {call.args[0].pk for call in rating.call_args_list} == {c.pk for c in convs}
+    assert set(Conversation.objects.values_list("status", flat=True)) == {"closed"}

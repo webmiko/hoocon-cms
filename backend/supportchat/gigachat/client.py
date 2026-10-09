@@ -13,6 +13,8 @@ from typing import Any
 
 from django.conf import settings
 
+from config.tls import russian_trusted_ssl_context
+
 logger = logging.getLogger("hoocon.supportchat.gigachat")
 
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
@@ -32,10 +34,10 @@ def is_configured() -> bool:
     return bool(gigachat_credentials())
 
 
-def _ssl_context() -> ssl.SSLContext | None:
-    verify = getattr(settings, "GIGACHAT_VERIFY_SSL", True)
-    if verify:
-        return None
+def _ssl_context() -> ssl.SSLContext:
+    if getattr(settings, "GIGACHAT_VERIFY_SSL", True):
+        return russian_trusted_ssl_context()
+    logger.warning("GIGACHAT_VERIFY_SSL=false: TLS certificate is not verified")
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE

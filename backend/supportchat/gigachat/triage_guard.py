@@ -1,11 +1,8 @@
-"""Post-check GigaChat output in triage: whitelist URLs, no guesses."""
+"""Triage static replies and the full-mode output guard (URL whitelist, KB SKUs)."""
 
 from __future__ import annotations
 
 import re
-
-from supportchat.gigachat.triage_docs import is_document_intent
-from supportchat.gigachat.triage_product import triage_response_violates_policy
 
 # Public routes the bot may mention (prefix match).
 ALLOWED_SITE_PATH_PREFIXES: tuple[str, ...] = (
@@ -34,15 +31,6 @@ _FOREIGN_URL_RE = re.compile(r"https?://(?!(?:www\.)?hoocon\.ru)[^\s]+", re.IGNO
 _INTERNAL_PATH_RE = re.compile(
     r"(?i)/(?:_manuals-ru|_инструкции-pdf|_pack|_docs|_универсальная)\b",
 )
-_UNCERTAIN_RE = re.compile(
-    r"(?i)\b(?:"
-    r"не\s+уверен|не\s+знаю|возможно|вероятно|скорее\s+всего|"
-    r"по\s+моему\s+мнению|к\s+сожалению,?\s+(?:не\s+)?(?:могу|знаю|найти)|"
-    r"интернет|в\s+сети|поискал"
-    r")\b",
-)
-_CATALOG_FOR_DOCS_RE = re.compile(r"(?i)\b(?:раздел\w*\s+)?каталог\w*\b")
-
 _GREETING_RE = re.compile(
     r"(?i)^(?:"
     r"привет(?:ствую)?|здравствуйте|добрый\s+(?:день|вечер|утро)|"
@@ -121,39 +109,6 @@ def response_has_disallowed_site_paths(text: str) -> bool:
 def response_has_foreign_urls(text: str) -> bool:
     """External links are forbidden in triage replies."""
     return bool(_FOREIGN_URL_RE.search(text or ""))
-
-
-def response_suggests_uncertainty(text: str) -> bool:
-    """Model hedges or mentions searching — treat as unsure."""
-    return bool(_UNCERTAIN_RE.search(text or ""))
-
-
-def response_misroutes_docs_to_catalog(text: str, *, user_query: str) -> bool:
-    """Passport/manual request but bot sends user to catalog instead of docs."""
-    if not is_document_intent(user_query):
-        return False
-    body = (text or "").lower()
-    if "/dokumentaciya" in body or "dokumentaciya" in body:
-        return False
-    return bool(_CATALOG_FOR_DOCS_RE.search(body))
-
-
-def triage_output_blocked(text: str, *, user_query: str = "") -> bool:
-    """GigaChat reply must not be sent to the client."""
-    body = (text or "").strip()
-    if not body:
-        return True
-    if triage_response_violates_policy(body):
-        return True
-    if response_has_disallowed_site_paths(body):
-        return True
-    if response_has_foreign_urls(body):
-        return True
-    if response_suggests_uncertainty(body):
-        return True
-    if response_misroutes_docs_to_catalog(body, user_query=user_query):
-        return True
-    return False
 
 
 # ── Full-mode output guard ──
