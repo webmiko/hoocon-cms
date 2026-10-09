@@ -40,6 +40,43 @@ _THERMAL_BELIMO_TOKEN = re.compile(
     r"(?:^|-)fst(?:-|$)|fst$|st$|-t$",
 )
 
+# Belimo recommended max damper area per family, м² — EU datasheets / selection tools.
+# Primary criterion: the customer picks a Belimo actuator by the damper it must move.
+# Fire: motor/spring torque differs; area is still the selection key.
+# Smoke BEN and BLE share the 1.5 m² area class; BEN is the primary family.
+BELIMO_FAMILY_AREA: dict[str, tuple[tuple[str, float], ...]] = {
+    "air_no_spring": (("TMC", 0.2), ("LM", 0.5), ("NM", 1.0), ("SM", 2.0), ("GM", 4.0)),
+    "air_spring": (("TF", 0.25), ("LF", 0.4), ("NF", 1.0), ("SF", 2.0)),
+    "fire_spring": (("BFL", 0.4), ("BLF", 0.5), ("BFN", 0.8), ("BF", 1.5)),
+    "fast": (("LMQ", 0.4), ("NMQ", 0.8), ("SMQ", 1.6), ("GMQ", 4.0)),
+    "smoke": (("BEN", 1.5), ("BEE", 2.5), ("BE", 4.0)),
+}
+# HVA compact card copy uses BM24-5-05 / BM230-5-05 (≤ 0.5 м²).
+_BM_COMPACT_AREA = 0.5
+
+
+def belimo_family_by_area(purpose: str, area_m2: float) -> str | None:
+    """Largest Belimo family whose recommended area ≤ Hoocon area.
+
+    Belimo selects actuators by damper area.  The Hoocon actuator's area
+    must be **not less** than the Belimo's — we list only families the
+    customer could replace with our actuator (our damper ≥ theirs).
+    Above the largest family, the result stays the largest.
+    """
+    bands = BELIMO_FAMILY_AREA.get(purpose)
+    if not bands:
+        return None
+    result: str | None = None
+    for family, max_area in bands:
+        if max_area <= area_m2:
+            result = family
+        else:
+            break
+    # If even the smallest Belimo exceeds our area, still return it
+    # (the card at least names the closest family).
+    return result if result is not None else bands[0][0]
+
+
 # Category slug fragments → purpose for inference.
 _PURPOSE_BY_CATEGORY: tuple[tuple[str, Purpose], ...] = (
     ("uskoren", "fast"),
@@ -135,14 +172,17 @@ def infer_belimo_codes(
 ) -> list[str]:
     """Suggest typical Belimo article(s) from actuator purpose and ТТХ.
 
+    Belimo selects actuators by damper area first.  Torque is used only as
+    a fallback (converted to area via the standard HVAC 10 N·m / m² rule).
+
     Args:
         purpose: Actuator family inferred from category / SKU code.
-        moment_nm: Rated torque in N·m (preferred).
+        moment_nm: Rated torque in N·m (fallback for area).
         voltage: ``24`` or ``230``.
         control: ``on_off`` / ``modulating`` / ``3_point`` (treated as on_off).
         aux_spdt: 0 / 1 / 2 auxiliary SPDT switches.
         thermal: Fire actuator with thermal fuse (DST / -T).
-        damper_area_m2: Fallback when moment is missing.
+        damper_area_m2: Primary selection key — Hoocon SKU damper area.
 
     Returns:
         Zero or one primary Belimo code (list for API symmetry).
@@ -150,15 +190,15 @@ def infer_belimo_codes(
     if purpose in {"valve", "unknown"} or not voltage:
         return []
 
-    nm = moment_nm
-    if nm is None and damper_area_m2 is not None:
-        # Rough HVAC rule of thumb: ~10 N·m per m².
-        nm = round(damper_area_m2 * 10, 1)
-    if nm is None:
+    area = damper_area_m2
+    if area is None and moment_nm is not None:
+        # Standard HVAC rule of thumb: ~10 N·m per m².
+        area = round(moment_nm / 10.0, 2)
+    if area is None:
         return []
 
     modulating = control == "modulating"
-    family = _belimo_family(purpose, nm)
+    family = _belimo_family(purpose, area)
     if not family:
         return []
 
@@ -169,61 +209,16 @@ def infer_belimo_codes(
         aux_spdt=aux_spdt,
         thermal=thermal,
         purpose=purpose,
-        moment_nm=nm,
+        moment_nm=moment_nm or round(area * 10, 1),
     )
     return [code] if code else []
 
 
-def _belimo_family(purpose: Purpose, moment_nm: float) -> str | None:
-    """Map purpose + torque band to Belimo series letters."""
-    if purpose == "air_no_spring":
-        # TMC = 2 Нм (~35 с); LM = 5 Нм (~150 с). Do not map DA2MU → LM.
-        if moment_nm <= 2:
-            return "TMC"
-        if moment_nm <= 6:
-            return "LM"
-        if moment_nm <= 12:
-            return "NM"
-        if moment_nm <= 25:
-            return "SM"
-        return "GM"
-    if purpose == "air_spring":
-        if moment_nm <= 3:
-            return "TF"
-        if moment_nm <= 6:
-            return "LF"
-        if moment_nm <= 12:
-            return "NF"
-        return "SF"
-    if purpose == "fire_spring":
-        # Compact fire/smoke spring-return: BFL 4/3 → BLF 6/4 → BFN 9/7 → BF 18/12.
-        if moment_nm <= 4:
-            return "BFL"
-        if moment_nm <= 6.5:
-            return "BLF"
-        if moment_nm <= 12:
-            return "BFN"
-        return "BF"
-    if purpose == "fast":
-        # HVA compact uses BM compose path for ≤6; DAMQU/HVD-Q use L/N/S/GMQ.
-        if moment_nm <= 6:
-            return "BM"
-        if moment_nm <= 12:
-            return "NMQ"
-        if moment_nm <= 20:
-            return "SMQ"
-        return "GMQ"
-    if purpose == "smoke":
-        # Smoke-control (no spring): BEN/BLE 15, BEE 25, BE 40.
-        # CM 2 Нм is compact *air* — never use it for SA..MU.
-        if moment_nm <= 12:
-            return "BEN"
-        if moment_nm <= 20:
-            return "BLE"
-        if moment_nm <= 30:
-            return "BEE"
-        return "BE"
-    return None
+def _belimo_family(purpose: Purpose, area_m2: float) -> str | None:
+    """Map purpose + damper area to Belimo series letters."""
+    if purpose == "fast" and area_m2 <= _BM_COMPACT_AREA:
+        return "BM"
+    return belimo_family_by_area(purpose, area_m2)
 
 
 def _compose_belimo_article(

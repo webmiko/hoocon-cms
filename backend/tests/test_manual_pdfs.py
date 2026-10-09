@@ -370,3 +370,25 @@ def test_clone_damqu_manuals_from_da8_to_16_24() -> None:
     for nm in (16, 24):
         assert ProductFile.objects.filter(sku=skus[f"DA{nm}MQU24-A"], title=title_a).exists()
         assert ProductFile.objects.filter(sku=skus[f"DA{nm}MQU24-D"], title=title_d).exists()
+
+
+def test_series_attach_functions_share_one_upsert_loop() -> None:
+    """Семь копий цикла attach расходились (лог, переименование, dry-run) — теперь один движок."""
+    import inspect
+
+    from catalog.etl import manual_pdfs
+
+    for name in (
+        "attach_dafu_manuals",
+        "attach_safu_manuals",
+        "_attach_matches",
+        "attach_samu_manuals",
+        "attach_hvd_manuals",
+        "attach_hva_manuals",
+    ):
+        source = inspect.getsource(getattr(manual_pdfs, name))
+        assert "_upsert_manual_matches(" in source, name
+        assert "transaction.atomic" not in source, name
+    module = inspect.getsource(manual_pdfs)
+    # Engine + clone-to-sibling + BR adapters (own sort_order) + passports (own titles).
+    assert module.count("pf.file.save(") == 4

@@ -1320,3 +1320,51 @@ def test_adapter_category_facets_compatible_actuators_only(client) -> None:
     assert "compatible_actuators" in highlights
     # Facet sidebar for adaptery must not expose «Управление».
     assert "control" not in keys
+
+
+@pytest.mark.django_db
+def test_comma_facet_value_is_one_pass_and_capped() -> None:
+    """M27: «?moment=a,b,…» — один проход по строкам, не запрос на каждую часть.
+
+    Рекурсия по частям делала N полных сканов; сотни частей = DoS API.
+    """
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from catalog.facets.defs import FACET_BY_KEY
+    from catalog.facets.filter_options import MAX_FACET_VALUE_PARTS, facet_value_parts, filter_skus_by_facet
+    from catalog.models import SKU
+
+    seeded = _seed_with_attrs()
+    scoped = SKU.objects.filter(is_published=True)
+
+    matched = filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], "5, 10,5")
+    assert set(matched.values_list("pk", flat=True)) == {seeded["sku5"].pk, seeded["sku10"].pk}
+
+    flood = ",".join(f"{n} Нм" for n in range(500))
+    assert len(facet_value_parts(flood)) == MAX_FACET_VALUE_PARTS
+    with CaptureQueriesContext(connection) as ctx:
+        list(filter_skus_by_facet(scoped, FACET_BY_KEY["moment"], flood))
+    assert len(ctx.captured_queries) <= 4
+
+
+@pytest.mark.django_db
+def test_analog_filter_skips_inference_on_large_scope(monkeypatch: pytest.MonkeyPatch) -> None:
+    """M27: «?analog=» на большой выборке — только сохранённый код, без инференса по всем SKU."""
+    from catalog.facets import filter_options
+    from catalog.facets.defs import FACET_BY_KEY
+    from catalog.models import SKU
+
+    seeded = _seed_with_attrs()
+    SKU.objects.filter(pk=seeded["sku5"].pk).update(analog_belimo_code="LM24A")
+    monkeypatch.setattr(filter_options, "_ANALOG_INFERENCE_SKU_CAP", 1)
+
+    def _no_inference(_sku: object) -> list[str]:
+        raise AssertionError("inference must not run on a large scope")
+
+    monkeypatch.setattr("catalog.etl.belimo_analogs.belimo_codes_for_sku", _no_inference)
+    scoped = SKU.objects.filter(is_published=True)
+
+    matched = filter_options.filter_skus_by_facet(scoped, FACET_BY_KEY["analog"], "LM24A")
+    assert list(matched.values_list("pk", flat=True)) == [seeded["sku5"].pk]
+    assert not filter_options.filter_skus_by_facet(scoped, FACET_BY_KEY["analog"], "X" * 500).exists()

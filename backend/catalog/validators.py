@@ -60,6 +60,19 @@ def sanitize_upload_filename(filename: str) -> str:
     return base
 
 
+def storage_safe_filename(filename: str, *, fallback: str = "file") -> str:
+    """Basename for ``upload_to``: never raises, hostile names become ``fallback``.
+
+    ``upload_to`` runs inside ``FieldFile.save``; a ``ValidationError`` there
+    surfaces as HTTP 500 instead of a form error.
+    """
+    try:
+        return sanitize_upload_filename(filename)
+    except ValidationError:
+        ext = os.path.splitext(str(filename or ""))[1].lower()
+        return f"{fallback}{ext}" if ext[1:].isalnum() else fallback
+
+
 def _upload_size(uploaded: Any) -> int:
     """Best-effort size for UploadedFile / file-like objects."""
     size = getattr(uploaded, "size", None)

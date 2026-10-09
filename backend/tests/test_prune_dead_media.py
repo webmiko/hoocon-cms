@@ -168,3 +168,23 @@ def test_file_replace_deletes_old_after_commit(
         article.save()
 
     assert not old_path.exists()
+
+
+@pytest.mark.django_db
+def test_percent_encoded_and_versioned_body_urls_keep_files_alive(tmp_path: Path) -> None:
+    """``/media/…%D1%84.pdf`` и ``?v=2`` в теле статьи раньше уводили живой файл в карантин."""
+    Article.objects.create(
+        title="enc",
+        slug="enc",
+        body=(
+            '<a href="/media/article_inline/x/%D0%BF%D0%B0%D1%81%D0%BF%D0%BE%D1%80%D1%82.pdf">p</a>'
+            '<img src="/media/article_inline/x/hero.webp?v=2#top">'
+        ),
+    )
+    _touch(tmp_path, "article_inline/x/паспорт.pdf")
+    _touch(tmp_path, "article_inline/x/hero.webp")
+
+    report = audit_dead_media(tmp_path)
+
+    assert "article_inline/x/паспорт.pdf" not in report["dead"]
+    assert "article_inline/x/hero.webp" not in report["dead"]

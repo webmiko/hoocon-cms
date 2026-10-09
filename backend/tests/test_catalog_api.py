@@ -633,3 +633,24 @@ def test_unpublished_sku_detail_is_404(client) -> None:
     )
     response = client.get(url)
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_sku_list_honours_page_size_with_cap(client) -> None:
+    """M32: фронт шлёт page_size (6 квиз / 12 сравнение) — бэкенд его учитывает, максимум 100."""
+    from catalog.models import SKU, Category, Product
+
+    category = Category.objects.create(name="Пагинация", slug="pagination-cat")
+    product = Product.objects.create(name="P", slug="pagination-p", category=category)
+    SKU.objects.bulk_create(
+        [
+            SKU(product=product, name=f"S{n}", slug=f"pg-sku-{n}", sku_code=f"PG-{n:03d}", is_published=True)
+            for n in range(105)
+        ]
+    )
+
+    six = client.get("/api/catalog/skus/", {"page_size": 6}).json()
+    assert len(six["results"]) == 6
+    assert six["count"] == 105
+    assert len(client.get("/api/catalog/skus/").json()["results"]) == 20
+    assert len(client.get("/api/catalog/skus/", {"page_size": 5000}).json()["results"]) == 100

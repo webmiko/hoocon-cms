@@ -8,15 +8,18 @@ from __future__ import annotations
 import re
 from typing import Any, Final
 
-from catalog.etl.attr_write import set_sku_attribute
+from django.db import transaction
+
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_variant import parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_ON_OFF,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
+    PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
 from catalog.facets.aux import aux_spdt_count_from_sku, normalize_aux_switch_value
-from catalog.models import SKU, AttributeValue
+from catalog.models import SKU
 
 _SKU_RE: Final[re.Pattern[str]] = re.compile(
     r"(?i)^hvd(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)$",
@@ -42,8 +45,8 @@ _SHARED: Final[tuple[AttrRow, ...]] = (
     ("Угол поворота", "rotation-angle", "°", "0°…90°"),
     ("Уровень шума", "noise", "дБ(A)", "45 дБ"),
     ("Степень защиты", "ip-rating", "", "IP54"),
-    ("Температура окружающей среды", "ambient-temp", "°C", "от -20 °С до +50 °С"),
-    ("Температура хранения", "storage-temp", "°C", "от -30 °С до +80 °С"),
+    ("Температура окружающей среды", "ambient-temp", "°C", "от -20 °C до +50 °C"),
+    ("Температура хранения", "storage-temp", "°C", "от -30 °C до +80 °C"),
     ("Влажность", "humidity", "", "до 95% отн. влажности"),
     ("Сечение провода", "wire-cross-section", "мм²", "0,5 мм²"),
 )
@@ -112,12 +115,9 @@ def _enrich_sku(sku: SKU, *, nm: int, voltage: str, has_aux: bool, row: dict[str
     """Rewrite one bare HVD air SKU; return attribute write count."""
     title = PRODUCT_NAME_TMPL.format(nm=nm)
     variant = parse_sku_variant(sku.sku_code)
-    sku.name = title[:300]
-    sku.description = SERIES_DESCRIPTION
-    sku.specs_text = ""
-    sku.save(update_fields=["name", "description", "specs_text"])
+    write_copy(sku, name=title[:300], description=SERIES_DESCRIPTION, specs_text="")
 
-    AttributeValue.objects.filter(sku=sku).delete()
+    clear_etl_attributes(sku)
     attrs = 0
 
     family: tuple[AttrRow, ...] = (
@@ -142,7 +142,7 @@ def _enrich_sku(sku: SKU, *, nm: int, voltage: str, has_aux: bool, row: dict[str
             "Класс защиты",
             "protection-class",
             "",
-            "III (безопасное сверхнизкое напряжение)",
+            PROTECTION_CLASS_III,
         )
     else:
         _set(sku, "Номинальное напряжение", "voltage", "В", "AC 100…240 В, 50/60 Гц")
@@ -163,6 +163,8 @@ def _enrich_sku(sku: SKU, *, nm: int, voltage: str, has_aux: bool, row: dict[str
     return attrs
 
 
+@cached_attributes
+@transaction.atomic
 def apply_hvd_air_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Rewrite bare HVD air Products/SKUs (5/10/20/40 Нм) with full ТТХ."""
     summary: dict[str, Any] = {
@@ -191,10 +193,12 @@ def apply_hvd_air_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
 
         product = sku.product
         if product is not None and product.pk not in touched_products:
-            product.name = PRODUCT_NAME_TMPL.format(nm=nm)[:200]
-            product.description = SERIES_DESCRIPTION
-            product.specs_text = ""
-            product.save(update_fields=["name", "description", "specs_text"])
+            write_copy(
+                product,
+                name=PRODUCT_NAME_TMPL.format(nm=nm)[:200],
+                description=SERIES_DESCRIPTION,
+                specs_text="",
+            )
             touched_products.add(product.pk)
             summary["products"] += 1
 

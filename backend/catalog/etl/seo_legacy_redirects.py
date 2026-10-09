@@ -24,6 +24,7 @@ from catalog.series_categories import legacy_slug_aliases
 from catalog.urls_paths import catalog_path_for_sku
 from redirects.models import Redirect
 from redirects.pathutils import normalize_path
+from redirects.services import collapse_redirect_chains
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,7 @@ class SeoRedirectSummary:
     tproduct: int
     static: int
     rewritten: int
+    collapsed: int = 0
 
 
 def preferred_sku_for_product(product: Product) -> SKU | None:
@@ -322,12 +324,17 @@ def resolve_legacy_slug_to_sku(slug: str) -> SKU | None:
 
 
 def _upsert_redirect(from_path: str, to_path: str, *, dry_run: bool) -> bool:
-    """Create/update an active 301. Returns True when a write would/did happen."""
+    """Create/update an active 301. Returns True when a write would/did happen.
+
+    Rows edited in Admin (``edited_in_admin``) are never overwritten or re-enabled.
+    """
     src = normalize_path(from_path)
     dst = normalize_path(to_path)
     if src == dst:
         return False
     existing = Redirect.objects.filter(from_path=src).first()
+    if existing is not None and existing.edited_in_admin:
+        return False
     if (
         existing is not None
         and existing.to_path == dst
@@ -536,6 +543,7 @@ def ensure_seo_legacy_redirects(*, dry_run: bool = False) -> SeoRedirectSummary:
     upserted += static
     store = _ensure_store_paths(dry_run=dry_run)
     upserted += store
+    collapsed = collapse_redirect_chains(dry_run=dry_run)
 
     return SeoRedirectSummary(
         upserted=upserted,
@@ -544,6 +552,7 @@ def ensure_seo_legacy_redirects(*, dry_run: bool = False) -> SeoRedirectSummary:
         tproduct=tproduct,
         static=static,
         rewritten=rewritten,
+        collapsed=collapsed,
     )
 
 

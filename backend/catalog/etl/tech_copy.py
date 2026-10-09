@@ -83,7 +83,20 @@ _REPLACEMENTS: tuple[tuple[re.Pattern[str], _Repl], ...] = (
         re.compile(r"(\d)(мА)\b"),
         r"\1 \2",
     ),
+    # Cyrillic «С» after the degree sign splits «°C» chips.
+    (
+        re.compile(r"°\s*С"),
+        "°C",
+    ),
+    # SELV is «безопасное сверхнизкое напряжение» (ГОСТ IEC 61140).
+    (
+        re.compile(r"безопасное\s+низкое\s+напряжение", re.IGNORECASE),
+        "безопасное сверхнизкое напряжение",
+    ),
 )
+
+# Electrical protection class III (SELV) — one spelling across all series.
+PROTECTION_CLASS_III = "III (безопасное сверхнизкое напряжение)"
 
 # Canonical «Управление» facet / EAV labels (four families).
 CONTROL_ON_OFF = "Открыто/закрыто"

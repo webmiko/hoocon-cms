@@ -27,11 +27,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
-from django.db import transaction
 from django.db.models import Q
 
 from catalog.etl.hv_media_webp import default_media_webp_root
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.sku_variant import sku_code_is_thermal
 from catalog.etl.webp import DEFAULT_WEBP_QUALITY, MAX_EDGE_PX, convert_bytes_to_webp
 from catalog.models import SKU, ProductImage
@@ -121,32 +120,16 @@ def _upsert_tile(
     dry_run: bool,
 ) -> str:
     """Create/update a non-hero gallery tile by stable source_url."""
-    source_url = _SOURCE.format(stem=stem)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
-    filename = f"{sku.sku_code.lower()}-{stem}.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=sort_order,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-        existing.alt = alt[:300]
-        existing.sort_order = sort_order
-        existing.is_published = True
-        existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=_SOURCE.format(stem=stem),
+        filename=f"{sku.sku_code.lower()}-{stem}.webp",
+        webp=webp,
+        alt=alt,
+        sort_order=sort_order,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def _demote_tilda_montage(sku: SKU, *, dry_run: bool) -> int:

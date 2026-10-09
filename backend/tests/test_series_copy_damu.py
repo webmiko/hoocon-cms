@@ -15,7 +15,7 @@ def test_instructions_for_damu_sku_scopes_voltage_and_aux() -> None:
     assert "Исполнения 230" not in text
     assert "Вспомогательные переключатели" not in text
     assert "84,8 × 145,6 × 65" in text
-    assert "8…16 мм" in text
+    assert "круглый 6…16 мм / квадратный 8×8…12×12 мм" in text
 
 
 def test_instructions_for_damu_sku_modulating_with_aux() -> None:
@@ -43,6 +43,53 @@ def test_instructions_for_damu_sku_on_off_aux_omits_dip() -> None:
     assert "клеммы 21,22" in text
     assert "Переключатель b" not in text
     assert "DIP-переключатели" not in text
+
+
+_MANUAL_SWITCH_A = (
+    "– 0–10°: клеммы 21,22 замкнуто / клеммы 21,23 разомкнуто.",
+    "– 10–90°: клеммы 21,22 разомкнуто / клеммы 21,23 замкнуто.",
+)
+_MANUAL_SWITCH_B = (
+    "– 0–80°: клеммы 24,25 разомкнуто / клеммы 24,26 замкнуто.",
+    "– 80–90°: клеммы 24,25 замкнуто / клеммы 24,26 разомкнуто.",
+)
+
+
+def _switch_rows(text: str, header: str) -> list[str]:
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(header))
+    return lines[start + 1 : start + 3]
+
+
+def test_damu_aux_switch_table_matches_ru_manual() -> None:
+    """Regression: 0–80° sat under switch a and b was «аналогично a»."""
+    text = instructions_for_damu_sku("DA8MU24-AS")
+    assert text is not None
+    assert tuple(_switch_rows(text, "– Переключатель a")) == _MANUAL_SWITCH_A
+    assert tuple(_switch_rows(text, "– Переключатель b")) == _MANUAL_SWITCH_B
+    assert "аналогично" not in text
+    assert "0–80°: клеммы 21" not in text
+
+
+def test_damu_series_instructions_carry_both_switch_tables() -> None:
+    from catalog.etl.series_copy_damu import SERIES_INSTRUCTIONS
+
+    for row in (*_MANUAL_SWITCH_A, *_MANUAL_SWITCH_B):
+        assert row in SERIES_INSTRUCTIONS
+    assert "аналогично переключателю a" not in SERIES_INSTRUCTIONS
+
+
+def test_damu_specs_match_ru_manual_shaft_and_feedback() -> None:
+    """Regression: DA2/4/6 shaft «8…16» and DIP feedback «0(4)…10 мА»."""
+    from catalog.etl.series_copy_damu import TORQUE_SPECS
+
+    assert TORQUE_SPECS[2]["shaft-diameter"] == "круглый 6…16 мм / квадратный 5×5…12×12 мм"
+    for nm in (4, 6):
+        assert TORQUE_SPECS[nm]["shaft-diameter"] == "круглый 6…16 мм / квадратный 8×8…12×12 мм"
+    text = instructions_for_damu_sku("DA8MU24-AS")
+    assert text is not None
+    assert "ON — 0(4)...20 мА." in text
+    assert "10 мА" not in text
 
 
 def test_instructions_for_damu_sku_rejects_other_series() -> None:

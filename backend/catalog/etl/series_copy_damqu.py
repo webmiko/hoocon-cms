@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any, Final
 
+from django.db import transaction
 from django.db.models import QuerySet
 
 from catalog.etl.attr_groups import (
@@ -24,7 +25,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, torque_nm_from_sku_code
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
@@ -35,10 +36,11 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_LABEL,
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
+    PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
 )
-from catalog.models import SKU, AttributeValue, Product
+from catalog.models import SKU, Product
 
 # Legacy single-product slug (kept for tests / redirects).
 PRODUCT_SLUG = "privod-vozdushniy-da8mqu-8nm"
@@ -421,11 +423,6 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
-def _clear_sku_attributes(sku: SKU) -> None:
-    """Remove all EAV rows for this SKU before rewrite."""
-    AttributeValue.objects.filter(sku=sku).delete()
-
-
 def _enrich_sku(
     sku: SKU,
     *,
@@ -435,12 +432,14 @@ def _enrich_sku(
 ) -> int:
     """Rewrite one SKU; return attribute write count."""
     variant = parse_sku_variant(sku.sku_code)
-    sku.name = title[:300]
-    sku.description = _sku_description(variant, row=row)
-    sku.specs_text = ""
-    sku.save(update_fields=["name", "description", "specs_text"])
+    write_copy(
+        sku,
+        name=title[:300],
+        description=_sku_description(variant, row=row),
+        specs_text="",
+    )
 
-    _clear_sku_attributes(sku)
+    clear_etl_attributes(sku)
     attrs = 0
 
     family_attrs: tuple[AttrRow, ...] = (
@@ -514,7 +513,7 @@ def _enrich_sku(
             "Класс защиты",
             "protection-class",
             "",
-            "III (безопасное сверхнизкое напряжение)",
+            PROTECTION_CLASS_III,
         )
         attrs += 4
     elif variant.voltage == "230":
@@ -596,6 +595,8 @@ def _enrich_sku(
     return attrs
 
 
+@cached_attributes
+@transaction.atomic
 def apply_damqu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Clear and rewrite all DA..MQU product/SKU copy and categorized ТТХ.
 
@@ -629,10 +630,7 @@ def apply_damqu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
         summary["by_nm"].setdefault(sample_nm, 0)
 
         if not dry_run:
-            product.name = title[:200]
-            product.description = SERIES_DESCRIPTION
-            product.specs_text = ""
-            product.save(update_fields=["name", "description", "specs_text"])
+            write_copy(product, name=title[:200], description=SERIES_DESCRIPTION, specs_text="")
 
         for sku in skus:
             nm = parse_damqu_torque_nm(sku.sku_code) or sample_nm

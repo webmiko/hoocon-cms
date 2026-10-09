@@ -10,7 +10,9 @@ from __future__ import annotations
 import re
 from typing import Any, Final, Literal
 
-from catalog.etl.attr_write import set_sku_attribute
+from django.db import transaction
+
+from catalog.etl.attr_write import cached_attributes, set_sku_attribute, write_copy
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
     CONTROL_SIGNAL_Y_CANON,
@@ -21,6 +23,7 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
 from catalog.models import SKU, Category, Product
@@ -350,6 +353,8 @@ def ensure_hva_catalog(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+@cached_attributes
+@transaction.atomic
 def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Ensure catalog rows, then upsert datasheet ТТХ onto HVA std/Q/UQ SKUs."""
     ensure = ensure_hva_catalog(dry_run=dry_run)
@@ -387,13 +392,14 @@ def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
         title = _product_title(torque_nm=nm, speed=speed)
         product = sku.product
         if product is not None:
-            product.name = title[:200]
-            product.description = SERIES_DESCRIPTION
-            product.instructions = SERIES_INSTRUCTIONS
-            product.save(update_fields=["name", "description", "instructions"])
+            write_copy(
+                product,
+                name=title[:200],
+                description=SERIES_DESCRIPTION,
+                instructions=SERIES_INSTRUCTIONS,
+            )
 
-        sku.name = title[:300]
-        sku.save(update_fields=["name"])
+        write_copy(sku, name=title[:300])
 
         for name, slug, unit, value in _SHARED:
             set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
@@ -433,7 +439,7 @@ def apply_hva_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             set_sku_attribute(
                 sku,
                 slug="protection-class",
-                value="III (безопасное низкое напряжение)",
+                value=PROTECTION_CLASS_III,
                 name="Класс защиты",
                 unit="",
             )

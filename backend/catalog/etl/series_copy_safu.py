@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from django.db import transaction
 from django.db.models import QuerySet
 
 from catalog.etl.attr_groups import (
@@ -18,16 +19,17 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
 )
 from catalog.facets import normalize_aux_switch_value
-from catalog.models import SKU, AttributeValue, Product
+from catalog.models import SKU, Product
 
 _SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
 _SAFU_PRODUCT = re.compile(r"(?i)protivopozharn")
@@ -445,10 +447,8 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
-def _clear_sku_attributes(sku: SKU) -> None:
-    AttributeValue.objects.filter(sku=sku).delete()
-
-
+@cached_attributes
+@transaction.atomic
 def apply_safu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Rewrite all SA..FU products/SKUs from the fire/smoke datasheet canon.
 
@@ -475,12 +475,12 @@ def apply_safu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             continue
         title = _product_title(torque_nm)
         if not dry_run:
-            product.name = title[:300]
-            product.description = SERIES_DESCRIPTION
-            product.instructions = SERIES_INSTRUCTIONS
-            product.specs_text = ""
-            product.save(
-                update_fields=["name", "description", "instructions", "specs_text"],
+            write_copy(
+                product,
+                name=title[:300],
+                description=SERIES_DESCRIPTION,
+                instructions=SERIES_INSTRUCTIONS,
+                specs_text="",
             )
 
         category_slug = product.category.slug if product.category_id else ""
@@ -489,11 +489,13 @@ def apply_safu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             row = TORQUE_SPECS.get(nm, spec)
             variant = parse_sku_variant(sku.sku_code)
             if not dry_run:
-                sku.name = title[:300]
-                sku.description = _sku_description(variant, nm, row)
-                sku.specs_text = ""
-                sku.save(update_fields=["name", "description", "specs_text"])
-                _clear_sku_attributes(sku)
+                write_copy(
+                    sku,
+                    name=title[:300],
+                    description=_sku_description(variant, nm, row),
+                    specs_text="",
+                )
+                clear_etl_attributes(sku)
 
             for name, slug, unit, value, _group in SHARED_ATTRS:
                 if not dry_run:
@@ -565,7 +567,7 @@ def apply_safu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "III (безопасное сверхнизкое напряжение)",
+                        PROTECTION_CLASS_III,
                     )
                 attrs += 2
             elif variant.voltage == "230":

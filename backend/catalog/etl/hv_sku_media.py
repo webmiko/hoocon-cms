@@ -28,11 +28,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 from PIL import Image
 
 from catalog.etl.hv_media_webp import _demote_other_product_shots
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.manual_diagrams import CATALOG_HERO_CANVAS, CATALOG_HERO_MARGIN
 from catalog.etl.webp import (
     DEFAULT_WEBP_QUALITY,
@@ -343,35 +343,18 @@ def _upsert_sku_image(
     dry_run: bool,
 ) -> str:
     """Create/update one ProductImage row for a SKU photo."""
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
     with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=sort_order,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            keep_pk = image.pk
-            action = "create"
-        else:
-            existing.alt = alt[:300]
-            existing.sort_order = sort_order
-            existing.is_published = True
-            existing.image.save(filename, ContentFile(webp), save=False)
-            existing.full_clean()
-            existing.save()
-            keep_pk = existing.pk
-            action = "update"
-        if demote_others:
-            _demote_other_product_shots(sku, keep_pk=keep_pk)
+        action, image = upsert_sku_image(
+            sku,
+            source_url=source_url,
+            filename=filename,
+            webp=webp,
+            alt=alt,
+            sort_order=sort_order,
+            dry_run=dry_run,
+        )
+        if demote_others and not dry_run and image is not None:
+            _demote_other_product_shots(sku, keep_pk=image.pk)
     return action
 
 
@@ -512,10 +495,12 @@ def apply_hv_sku_media(
         )
         if action == "create":
             summary["created"] += 1
-        else:
+        elif action == "update":
             summary["updated"] += 1
+        else:
+            summary["unchanged"] = summary.get("unchanged", 0) + 1
         logger.info("hv_sku_media %s %s ← %s", action, code, path.name)
 
     summary["missing_sku"] = sorted(set(summary["missing_sku"]))
-    summary["attached"] = summary["created"] + summary["updated"]
+    summary["attached"] = summary["created"] + summary["updated"] + summary.get("unchanged", 0)
     return summary

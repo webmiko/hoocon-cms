@@ -256,7 +256,7 @@ def test_infer_fire_spring_family() -> None:
 
 
 def test_infer_smoke_control_not_cm() -> None:
-    """SA..MU smoke must infer BEN/BLE/BEE — never CM 2 Нм air compact."""
+    """SA..MU smoke must infer BEN/BEE/BE (not weaker than Hoocon) — never CM 2 Нм air compact."""
     assert infer_belimo_codes(
         purpose="smoke",
         moment_nm=10.0,
@@ -271,7 +271,7 @@ def test_infer_smoke_control_not_cm() -> None:
         control="on_off",
         aux_spdt=2,
         thermal=True,
-    ) == ["BLE230-T"]
+    ) == ["BEN230-T"]
     assert infer_belimo_codes(
         purpose="smoke",
         moment_nm=30.0,
@@ -318,7 +318,7 @@ def test_infer_fast_actuator() -> None:
         voltage="230",
         control="on_off",
         aux_spdt=1,
-    ) == ["GMQ230A-S"]
+    ) == ["SMQ230A-S"]
     assert infer_belimo_codes(
         purpose="fast",
         moment_nm=5.0,
@@ -673,3 +673,52 @@ def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
     )
     assert belimo_codes_for_sku(sku) == ["BF24-S"]
     assert primary_belimo_code_for_sku(sku) is None
+
+
+@pytest.mark.parametrize(
+    ("purpose", "area", "family"),
+    [
+        ("air_no_spring", 0.6, "LM"),  # 0.6 ≥ LM(0.5), < NM(1.0)
+        ("air_no_spring", 2.4, "SM"),  # 2.4 ≥ SM(2.0), < GM(4.0)
+        ("air_no_spring", 4.0, "GM"),  # 4.0 ≥ GM(4.0)
+        ("air_spring", 0.3, "TF"),  # 0.3 ≥ TF(0.25), < LF(0.4)
+        ("air_spring", 0.5, "LF"),  # 0.5 ≥ LF(0.4), < NF(1.0)
+        ("fire_spring", 1.0, "BFN"),  # 1.0 ≥ BFN(0.8), < BF(1.5)
+        ("fire_spring", 1.5, "BF"),  # 1.5 ≥ BF(1.5)
+        ("smoke", 1.5, "BEN"),  # 1.5 ≥ BEN(1.5)
+        ("smoke", 2.0, "BEN"),  # 2.0 ≥ BEN(1.5), < BEE(2.5)
+        ("fast", 0.8, "NMQ"),  # 0.8 ≥ NMQ(0.8)
+        ("fast", 1.0, "NMQ"),  # 1.0 ≥ NMQ(0.8), < SMQ(1.6)
+    ],
+)
+def test_belimo_analogue_area_not_exceeds_hoocon(purpose: str, area: float, family: str) -> None:
+    """Площадь Hoocon ≥ площади Belimo: аналог для заслонки не крупнее нашей."""
+    from catalog.etl.belimo_analogs import BELIMO_FAMILY_AREA, belimo_family_by_area
+
+    assert belimo_family_by_area(purpose, area) == family
+    belimo_area = dict(BELIMO_FAMILY_AREA[purpose])[family]
+    assert area >= belimo_area
+
+
+def test_every_belimo_table_uses_the_shared_area_bands() -> None:
+    """Аналоги выбираются по площади заслонки из одной таблицы BELIMO_FAMILY_AREA."""
+    from catalog.etl import series_copy_spring_analogs as spring
+    from catalog.etl.belimo_analogs import BELIMO_FAMILY_AREA, belimo_family_by_area
+    from catalog.etl.series_copy_damu_analogs import DAMU_BELIMO_NM
+    from catalog.etl.series_copy_major_analogs import belimo_fast_family
+
+    tables = (
+        ("air_spring", spring._DAFU_BELIMO),
+        ("fire_spring", spring._SAFU_BELIMO),
+        ("smoke", {nm: pair[0] for nm, pair in spring._SAMU_BELIMO.items()}),
+        ("fast", {nm: belimo_fast_family(nm) for nm in (5, 8, 10, 16, 20, 24, 40)}),
+    )
+    for purpose, table in tables:
+        for nm, family in table.items():
+            assert family == belimo_family_by_area(purpose, nm / 10), (purpose, nm)
+    # DAMU: Hoocon area ≥ Belimo area for every band.
+    air_area_map = dict(BELIMO_FAMILY_AREA["air_no_spring"])
+    for nm, band in DAMU_BELIMO_NM.items():
+        family = belimo_family_by_area("air_no_spring", nm / 10)
+        assert family is not None
+        assert nm / 10 >= air_area_map[family], (nm, family)

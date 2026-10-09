@@ -52,6 +52,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -60,6 +61,8 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models.functions import Lower
 
+from catalog.etl.file_refresh import refresh_product_file
+from catalog.etl.sku_variant import parse_hva_code
 from catalog.models import SKU, ProductFile
 
 logger = logging.getLogger(__name__)
@@ -99,9 +102,6 @@ _HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
 _HVA_STEM = re.compile(r"(?i)^hva-(?P<token>\d+(?:uq|q)?)$")
 _HVA_P_STEM = re.compile(r"(?i)^hva-(?P<token>\d+p)$")
 _HVA_INSTRUCTION_STEM = re.compile(r"(?i)^hva-5(?:\s+instruction)?$")
-_HVA_SKU_BODY = re.compile(
-    r"(?i)^hva(?:24|230)s?-(?P<body>\d+(?:uq|q|p)?)$",
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,30 +342,26 @@ def _manual_title(match: ManualMatch) -> str:
     return f"Инструкция DA{match.torque_nm}FU ({label})"
 
 
-def attach_dafu_manuals(
-    manuals_dir: Path,
+def _upsert_manual_matches(
+    matches: list[ManualMatch],
+    warnings: list[str],
     *,
-    dry_run: bool = False,
+    title_for: Callable[[ManualMatch], str],
+    dry_run: bool,
+    find_existing: Callable[[SKU, ManualMatch, str], ProductFile | None] | None = None,
 ) -> dict[str, Any]:
-    """Create/update ProductFile datasheets for DAFU SKUs from local PDFs.
+    """One ProductFile upsert loop for every manual series.
 
-    Idempotent by ``(sku, title)``: existing rows keep the file refreshed when
-    the source PDF differs in size; missing rows are created.
-
-    Args:
-        manuals_dir: Path to ``_инструкции-pdf``.
-        dry_run: When True, compute the plan without writing.
-
-    Returns:
-        Summary counters and warning list.
+    Idempotent by ``(sku, title)`` unless ``find_existing`` locates legacy
+    rows (then the title is renamed). Bytes refresh only when sha256 differs;
+    dry-run counts the same plan and rolls back.
     """
-    matches, warnings = discover_dafu_manuals(manuals_dir)
     summary: dict[str, Any] = {
         "manuals": len(matches),
         "created": 0,
         "updated": 0,
         "skipped": 0,
-        "warnings": warnings,
+        "warnings": list(warnings),
         "dry_run": dry_run,
         "by_sku": {},
     }
@@ -382,20 +378,20 @@ def attach_dafu_manuals(
     with transaction.atomic():
         for match in matches:
             payload = match.path.read_bytes()
-            title = _manual_title(match)
+            title = title_for(match)
             basename = _storage_basename(match.path)
             for code in match.sku_codes:
                 sku = code_to_sku.get(code.casefold())
                 if sku is None:
-                    warnings.append(f"SKU missing in DB: {code}")
+                    summary["warnings"].append(f"SKU missing in DB: {code}")
                     continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                if find_existing is None:
+                    existing = ProductFile.objects.filter(sku=sku, title=title).first()
+                else:
+                    existing = find_existing(sku, match, title)
+                summary["by_sku"].setdefault(code, []).append(title)
                 if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    if existing is None:
-                        summary["created"] += 1
-                    else:
-                        summary["updated"] += 1
+                    summary["created" if existing is None else "updated"] += 1
                     continue
                 if existing is None:
                     pf = ProductFile(
@@ -407,28 +403,40 @@ def attach_dafu_manuals(
                     )
                     pf.file.save(basename, ContentFile(payload), save=True)
                     summary["created"] += 1
-                    logger.info(
-                        "manual_pdf_attached sku=%s title=%s",
-                        sku.sku_code,
-                        title,
-                    )
-                else:
-                    # Refresh bytes when the source PDF changed.
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
+                    logger.info("manual_pdf_attached sku=%s title=%s", sku.sku_code, title)
+                    continue
+                changed = False
+                if existing.title != title:
+                    existing.title = title
+                    existing.save(update_fields=["title"])
+                    changed = True
+                if refresh_product_file(existing, basename=basename, payload=payload):
+                    changed = True
+                summary["updated" if changed else "skipped"] += 1
         if dry_run:
             transaction.set_rollback(True)
-
-    summary["warnings"] = warnings
     return summary
 
 
-def ensure_dafu_spring_category(*, dry_run: bool = False) -> dict[str, int]:
+def attach_dafu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for DAFU SKUs from local PDFs.
+
+    Args:
+        manuals_dir: Path to ``_инструкции-pdf``.
+        dry_run: When True, compute the plan without writing.
+
+    Returns:
+        Summary counters and warning list.
+    """
+    matches, warnings = discover_dafu_manuals(manuals_dir)
+    return _upsert_manual_matches(matches, warnings, title_for=_manual_title, dry_run=dry_run)
+
+
+def ensure_dafu_spring_category(*, dry_run: bool = False) -> dict[str, Any]:
     """Move DAFU products under the spring-return category (Tilda / series).
 
     Prefers the Tilda child slug when present; otherwise the series-spec slug.
@@ -451,8 +459,11 @@ def ensure_dafu_spring_category(*, dry_run: bool = False) -> dict[str, int]:
         if target is not None:
             break
     if target is None:
+        if dry_run:
+            moved = Product.objects.filter(slug__icontains="dafu").count()
+            return {"moved": moved, "already": 0, "category": preferred[1]}
         target = Category.objects.create(
-            slug="elektroprivody-s-pruzhinnym-vozvratom",
+            slug=preferred[1],
             name="Электроприводы с пружинным возвратом",
         )
 
@@ -556,71 +567,12 @@ def attach_safu_manuals(
 ) -> dict[str, Any]:
     """Create/update ProductFile datasheets for SAFU SKUs from local PDFs."""
     matches, warnings = discover_safu_manuals(manuals_dir)
-    summary: dict[str, Any] = {
-        "manuals": len(matches),
-        "created": 0,
-        "updated": 0,
-        "skipped": 0,
-        "warnings": warnings,
-        "dry_run": dry_run,
-        "by_sku": {},
-    }
-    if not matches:
-        return summary
-
-    code_to_sku = {
-        s.sku_code.casefold(): s
-        for s in SKU.objects.filter(
-            sku_code__in=[c for m in matches for c in m.sku_codes],
-        )
-    }
-
-    with transaction.atomic():
-        for match in matches:
-            payload = match.path.read_bytes()
-            title = f"Инструкция SA{match.torque_nm}FU (DS/DST)"
-            basename = _storage_basename(match.path)
-            for code in match.sku_codes:
-                sku = code_to_sku.get(code.casefold())
-                if sku is None:
-                    warnings.append(f"SKU missing in DB: {code}")
-                    continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
-                if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    if existing is None:
-                        summary["created"] += 1
-                    else:
-                        summary["updated"] += 1
-                    continue
-                if existing is None:
-                    pf = ProductFile(
-                        sku=sku,
-                        title=title,
-                        file_type=ProductFile.FileType.DATASHEET,
-                        is_published=True,
-                        sort_order=0,
-                    )
-                    pf.file.save(basename, ContentFile(payload), save=True)
-                    summary["created"] += 1
-                    logger.info(
-                        "manual_pdf_attached sku=%s title=%s",
-                        sku.sku_code,
-                        title,
-                    )
-                else:
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
-        if dry_run:
-            transaction.set_rollback(True)
-
-    summary["warnings"] = warnings
-    return summary
+    return _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: f"Инструкция SA{m.torque_nm}FU (DS/DST)",
+        dry_run=dry_run,
+    )
 
 
 def _parse_nm_list(raw: str) -> tuple[int, ...]:
@@ -823,6 +775,20 @@ def discover_damqu_manuals(
     return matches, warnings
 
 
+def _damu_damqu_title(match: ManualMatch) -> str:
+    """Family title from the DAMU/DAMQU PDF stem."""
+    # Fallback attach keeps 230 title semantics but labels 24 V SKUs clearly.
+    if match.kind.endswith("_fallback"):
+        return "Инструкция DA8/16/24MQU (D/DS)"
+    parsed_damu = parse_damu_manual_stem(match.path.name)
+    if parsed_damu is not None:
+        return _damu_family_title(*parsed_damu)
+    parsed_damqu = parse_damqu_manual_stem(match.path.name)
+    if parsed_damqu is not None:
+        return _damqu_family_title(*parsed_damqu)
+    return f"Инструкция ({match.kind})"
+
+
 def _attach_matches(
     matches: list[ManualMatch],
     warnings: list[str],
@@ -830,81 +796,7 @@ def _attach_matches(
     dry_run: bool,
 ) -> dict[str, Any]:
     """Shared ProductFile upsert for DAMU/DAMQU manual matches."""
-    summary: dict[str, Any] = {
-        "manuals": len(matches),
-        "created": 0,
-        "updated": 0,
-        "skipped": 0,
-        "warnings": list(warnings),
-        "dry_run": dry_run,
-        "by_sku": {},
-    }
-    if not matches:
-        return summary
-
-    code_to_sku = {
-        s.sku_code.casefold(): s
-        for s in SKU.objects.filter(
-            sku_code__in=[c for m in matches for c in m.sku_codes],
-        )
-    }
-
-    with transaction.atomic():
-        for match in matches:
-            payload = match.path.read_bytes()
-            parsed_damu = parse_damu_manual_stem(match.path.name)
-            parsed_damqu = parse_damqu_manual_stem(match.path.name)
-            if parsed_damu is not None:
-                nms, kind, volt = parsed_damu
-                title = _damu_family_title(nms, kind, volt)
-            elif parsed_damqu is not None:
-                nms, kind, volt = parsed_damqu
-                title = _damqu_family_title(nms, kind, volt)
-            else:
-                title = f"Инструкция ({match.kind})"
-            # Fallback attach keeps 230 title semantics but labels 24 V SKUs clearly.
-            if match.kind.endswith("_fallback"):
-                title = "Инструкция DA8/16/24MQU (D/DS)"
-            basename = _storage_basename(match.path)
-            for code in match.sku_codes:
-                sku = code_to_sku.get(code.casefold())
-                if sku is None:
-                    summary["warnings"].append(f"SKU missing in DB: {code}")
-                    continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
-                if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    if existing is None:
-                        summary["created"] += 1
-                    else:
-                        summary["updated"] += 1
-                    continue
-                if existing is None:
-                    pf = ProductFile(
-                        sku=sku,
-                        title=title,
-                        file_type=ProductFile.FileType.DATASHEET,
-                        is_published=True,
-                        sort_order=0,
-                    )
-                    pf.file.save(basename, ContentFile(payload), save=True)
-                    summary["created"] += 1
-                    logger.info(
-                        "manual_pdf_attached sku=%s title=%s",
-                        sku.sku_code,
-                        title,
-                    )
-                else:
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
-        if dry_run:
-            transaction.set_rollback(True)
-    return summary
+    return _upsert_manual_matches(matches, warnings, title_for=_damu_damqu_title, dry_run=dry_run)
 
 
 def attach_damu_manuals(
@@ -1001,9 +893,7 @@ def _clone_one_manual(
             )
             pf.file.save(basename, ContentFile(payload), save=True)
             return "create"
-        current_size = existing.file.size if existing.file else 0
-        if current_size != len(payload):
-            existing.file.save(basename, ContentFile(payload), save=True)
+        if refresh_product_file(existing, basename=basename, payload=payload):
             existing.file_type = donor_file.file_type or existing.file_type
             existing.is_published = donor_file.is_published
             existing.sort_order = donor_file.sort_order
@@ -1185,66 +1075,14 @@ def attach_samu_manuals(
 ) -> dict[str, Any]:
     """Create/update ProductFile datasheets for SAMU SKUs."""
     matches, warnings = discover_samu_manuals(manuals_dir)
-    summary: dict[str, Any] = {
-        "manuals": len(matches),
-        "created": 0,
-        "updated": 0,
-        "skipped": 0,
-        "renamed_titles": 0,
-        "warnings": warnings,
-        "dry_run": dry_run,
-        "by_sku": {},
-    }
-    if not matches:
-        summary["renamed_titles"] = rename_legacy_samu_manual_titles(dry_run=dry_run)
-        return summary
-    code_to_sku = {
-        s.sku_code.casefold(): s
-        for s in SKU.objects.filter(
-            sku_code__in=[c for m in matches for c in m.sku_codes],
-        )
-    }
-    with transaction.atomic():
-        for match in matches:
-            payload = match.path.read_bytes()
-            title = _samu_manual_title(match.torque_nm)
-            basename = _storage_basename(match.path)
-            for code in match.sku_codes:
-                sku = code_to_sku.get(code.casefold())
-                if sku is None:
-                    warnings.append(f"SKU missing in DB: {code}")
-                    continue
-                existing = _find_samu_instruction_file(sku, match.torque_nm)
-                if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    summary["created" if existing is None else "updated"] += 1
-                    continue
-                if existing is None:
-                    pf = ProductFile(
-                        sku=sku,
-                        title=title,
-                        file_type=ProductFile.FileType.DATASHEET,
-                        is_published=True,
-                        sort_order=0,
-                    )
-                    pf.file.save(basename, ContentFile(payload), save=True)
-                    summary["created"] += 1
-                else:
-                    changed = False
-                    if existing.title != title:
-                        existing.title = title
-                        existing.save(update_fields=["title"])
-                        changed = True
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        changed = True
-                    summary["updated" if changed else "skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
-        if dry_run:
-            transaction.set_rollback(True)
+    summary = _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: _samu_manual_title(m.torque_nm),
+        find_existing=lambda sku, m, _title: _find_samu_instruction_file(sku, m.torque_nm),
+        dry_run=dry_run,
+    )
     summary["renamed_titles"] = rename_legacy_samu_manual_titles(dry_run=dry_run)
-    summary["warnings"] = warnings
     return summary
 
 
@@ -1331,60 +1169,12 @@ def attach_hvd_manuals(
 ) -> dict[str, Any]:
     """Create/update ProductFile datasheets for matching HVD SKUs."""
     matches, warnings = discover_hvd_manuals(manuals_dir)
-    summary: dict[str, Any] = {
-        "manuals": len(matches),
-        "created": 0,
-        "updated": 0,
-        "skipped": 0,
-        "warnings": warnings,
-        "dry_run": dry_run,
-        "by_sku": {},
-    }
-    if not matches:
-        return summary
-    code_to_sku = {
-        s.sku_code.casefold(): s
-        for s in SKU.objects.filter(
-            sku_code__in=[c for m in matches for c in m.sku_codes],
-        )
-    }
-    with transaction.atomic():
-        for match in matches:
-            payload = match.path.read_bytes()
-            title = f"Инструкция HVD-{match.torque_nm}F (S/ST)"
-            basename = _storage_basename(match.path)
-            for code in match.sku_codes:
-                sku = code_to_sku.get(code.casefold())
-                if sku is None:
-                    warnings.append(f"SKU missing in DB: {code}")
-                    continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
-                if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    summary["created" if existing is None else "updated"] += 1
-                    continue
-                if existing is None:
-                    pf = ProductFile(
-                        sku=sku,
-                        title=title,
-                        file_type=ProductFile.FileType.DATASHEET,
-                        is_published=True,
-                        sort_order=0,
-                    )
-                    pf.file.save(basename, ContentFile(payload), save=True)
-                    summary["created"] += 1
-                else:
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
-        if dry_run:
-            transaction.set_rollback(True)
-    summary["warnings"] = warnings
-    return summary
+    return _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: f"Инструкция HVD-{m.torque_nm}F (S/ST)",
+        dry_run=dry_run,
+    )
 
 
 def parse_hva_manual_token(stem: str) -> str | None:
@@ -1408,11 +1198,10 @@ def sku_codes_for_hva_manual(token: str, sku_codes: list[str]) -> list[str]:
     want = token.casefold()
     out: list[str] = []
     for code in sku_codes:
-        compact = code.strip().casefold().replace(" ", "")
-        match = _HVA_SKU_BODY.fullmatch(compact)
-        if match is None:
+        hva = parse_hva_code(code)
+        if hva is None or hva.suffix == "qx":
             continue
-        if match.group("body").casefold() == want:
+        if hva.token == want:
             out.append(code)
     return out
 
@@ -1490,61 +1279,12 @@ def attach_hva_manuals(
 ) -> dict[str, Any]:
     """Create/update ProductFile datasheets for matching HVA SKUs."""
     matches, warnings = discover_hva_manuals(manuals_dir)
-    summary: dict[str, Any] = {
-        "manuals": len(matches),
-        "created": 0,
-        "updated": 0,
-        "skipped": 0,
-        "warnings": warnings,
-        "dry_run": dry_run,
-        "by_sku": {},
-    }
-    if not matches:
-        return summary
-    code_to_sku = {
-        s.sku_code.casefold(): s
-        for s in SKU.objects.filter(
-            sku_code__in=[c for m in matches for c in m.sku_codes],
-        )
-    }
-    with transaction.atomic():
-        for match in matches:
-            payload = match.path.read_bytes()
-            label = match.kind.upper()
-            title = f"Инструкция HVA-{label}"
-            basename = _storage_basename(match.path)
-            for code in match.sku_codes:
-                sku = code_to_sku.get(code.casefold())
-                if sku is None:
-                    warnings.append(f"SKU missing in DB: {code}")
-                    continue
-                existing = ProductFile.objects.filter(sku=sku, title=title).first()
-                if dry_run:
-                    summary["by_sku"].setdefault(code, []).append(title)
-                    summary["created" if existing is None else "updated"] += 1
-                    continue
-                if existing is None:
-                    pf = ProductFile(
-                        sku=sku,
-                        title=title,
-                        file_type=ProductFile.FileType.DATASHEET,
-                        is_published=True,
-                        sort_order=0,
-                    )
-                    pf.file.save(basename, ContentFile(payload), save=True)
-                    summary["created"] += 1
-                else:
-                    current_size = existing.file.size if existing.file else 0
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=True)
-                        summary["updated"] += 1
-                    else:
-                        summary["skipped"] += 1
-                summary["by_sku"].setdefault(code, []).append(title)
-        if dry_run:
-            transaction.set_rollback(True)
-    summary["warnings"] = warnings
-    return summary
+    return _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: f"Инструкция HVA-{m.kind.upper()}",
+        dry_run=dry_run,
+    )
 
 
 # ─── BR-M / BR-ML adapter tech sheets ───────────────────────────────────────
@@ -1699,21 +1439,15 @@ def attach_br_adapter_manuals(
                         match.title,
                     )
                 else:
-                    current_size = existing.file.size if existing.file else 0
-                    dirty = False
-                    if existing.sort_order != match.sort_order:
-                        existing.sort_order = match.sort_order
-                        dirty = True
-                    if current_size != len(payload):
-                        existing.file.save(basename, ContentFile(payload), save=False)
-                        dirty = True
+                    sort_changed = existing.sort_order != match.sort_order
+                    existing.sort_order = match.sort_order
+                    if refresh_product_file(existing, basename=basename, payload=payload):
                         summary["updated"] += 1
-                    elif dirty:
+                    elif sort_changed:
+                        existing.save()
                         summary["updated"] += 1
                     else:
                         summary["skipped"] += 1
-                    if dirty:
-                        existing.save()
                 summary["by_sku"].setdefault(code, []).append(match.title)
         if dry_run:
             transaction.set_rollback(True)
@@ -1851,9 +1585,7 @@ def attach_product_passports(
                     title,
                 )
             else:
-                current_size = existing.file.size if existing.file else 0
-                if current_size != len(payload):
-                    existing.file.save(basename, ContentFile(payload), save=True)
+                if refresh_product_file(existing, basename=basename, payload=payload):
                     summary["updated"] += 1
                 else:
                     summary["skipped"] += 1

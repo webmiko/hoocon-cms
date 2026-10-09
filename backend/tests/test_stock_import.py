@@ -350,3 +350,10 @@ def test_build_stock_template_xlsx_has_headers() -> None:
     rows = parse_stock_rows(BytesIO(build_stock_template_xlsx()))
     assert rows[0][0] == "DA5FU24-D"
     assert rows[0][1] == 10
+
+
+@pytest.mark.django_db
+def test_apply_stock_reports_unknown_codes_in_stable_order() -> None:
+    """Ключи шли в порядке хэша set: отчёт и запись менялись от запуска к запуску."""
+    report = apply_stock_rows([("ZZ-UNKNOWN", 1), ("AA-UNKNOWN", 2), ("MM-UNKNOWN", 3)])
+    assert report.unknown_codes == ["AA-UNKNOWN", "MM-UNKNOWN", "ZZ-UNKNOWN"]

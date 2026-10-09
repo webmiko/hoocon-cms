@@ -118,3 +118,42 @@ def test_docs_family_zip_404(client) -> None:
         reverse("catalog-docs-family-zip", kwargs={"key": "NOSUCH"}),
     )
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_docs_hub_reads_file_sizes_once_then_from_cache(client, settings, tmp_path) -> None:
+    """Хаб делал stat каждого PDF на каждый запрос; размер кэшируется по pk+updated_at+имени."""
+    from unittest.mock import patch
+
+    from django.core.cache import cache
+
+    from catalog import docs_hub
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    cache.clear()
+    _seed_docs_family()
+    with patch.object(docs_hub, "_file_size", wraps=docs_hub._file_size) as stat:
+        first = client.get(reverse("catalog-docs")).json()
+        calls_first = stat.call_count
+        second = client.get(reverse("catalog-docs")).json()
+    assert calls_first == len(first["files"]) > 0
+    assert stat.call_count == calls_first
+    assert [f["size_bytes"] for f in second["files"]] == [f["size_bytes"] for f in first["files"]]
+    assert all(f["size_bytes"] > 0 for f in second["files"])
+
+
+@pytest.mark.django_db
+def test_sku_detail_files_use_prefetch_and_skip_unpublished(django_assert_num_queries) -> None:
+    """get_files() через .filter() обходил Prefetch — лишний запрос на каждую карточку."""
+    from django.db.models import Prefetch
+
+    from catalog.models import SKU, ProductFile
+    from catalog.serializers import SKUDetailSerializer
+
+    sku_a, _ = _seed_docs_family()
+    ProductFile.objects.filter(sku=sku_a, sort_order=1).update(is_published=False)
+    sku = SKU.objects.prefetch_related(Prefetch("files", queryset=ProductFile.objects.all())).get(pk=sku_a.pk)
+    serializer = SKUDetailSerializer(context={})
+    with django_assert_num_queries(0):
+        files = serializer.get_files(sku)
+    assert [f["title"] for f in files] == ["Инструкция DA2MU (D/DS)"]

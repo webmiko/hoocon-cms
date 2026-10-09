@@ -14,17 +14,18 @@ from catalog.models import SKU, Attribute, AttributeValue, Category, Product
 
 
 @pytest.mark.django_db
-def test_ensure_attribute_creates_and_syncs_name_unit() -> None:
-    """ensure_attribute upserts by slug and syncs drifted name/unit."""
+def test_ensure_attribute_creates_and_syncs_to_registry() -> None:
+    """ensure_attribute upserts by slug; registered slugs keep the canon label."""
     attr = ensure_attribute("moment", "Крутящий момент", "Нм")
     assert attr.slug == "moment"
     assert Attribute.objects.filter(slug="moment").count() == 1
 
+    Attribute.objects.filter(pk=attr.pk).update(name="Момент", unit="Н·м")
     same = ensure_attribute("moment", "Момент", "Н·м")
     assert same.pk == attr.pk
     same.refresh_from_db()
-    assert same.name == "Момент"
-    assert same.unit == "Н·м"
+    assert same.name == "Крутящий момент"
+    assert same.unit == "Нм"
 
 
 @pytest.mark.django_db

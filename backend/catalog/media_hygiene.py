@@ -18,6 +18,7 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist, SuspiciousFileOperation
@@ -31,6 +32,21 @@ MEDIA_URL_RE = re.compile(r"/media/([^\s\"'<>)\\]+)")
 PACK_DIRNAME = "_pack"
 QUARANTINE_DIRNAME = "_quarantine"
 MANIFEST_NAME = "manifest.txt"
+
+
+def media_url_paths(text: str) -> set[str]:
+    """Media-relative paths behind ``/media/…`` URLs in ``text``.
+
+    Rich text stores ``%D1%84.pdf`` and ``?v=2`` while the disk has ``ф.pdf``;
+    without unquoting such live files were quarantined as dead.
+    """
+    paths: set[str] = set()
+    for raw in MEDIA_URL_RE.findall(text):
+        path = raw.split("?", 1)[0].split("#", 1)[0]
+        if path:
+            paths.add(path)
+            paths.add(unquote(path))
+    return paths
 
 
 def collect_referenced_media_paths() -> set[str]:
@@ -60,7 +76,7 @@ def collect_referenced_media_paths() -> set[str]:
                 if not value:
                     continue
                 text = value if isinstance(value, str) else str(value)
-                referenced.update(MEDIA_URL_RE.findall(text))
+                referenced.update(media_url_paths(text))
     return referenced
 
 
@@ -76,7 +92,7 @@ def collect_fixture_media_refs(repo_root: Path) -> set[str]:
         if not path.is_file():
             continue
         try:
-            refs.update(MEDIA_URL_RE.findall(path.read_text(encoding="utf-8", errors="ignore")))
+            refs.update(media_url_paths(path.read_text(encoding="utf-8", errors="ignore")))
         except OSError:
             continue
     return refs

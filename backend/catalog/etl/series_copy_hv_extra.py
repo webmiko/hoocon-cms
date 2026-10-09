@@ -12,10 +12,10 @@ import re
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
 from django.db import transaction
 
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, set_sku_attribute
+from catalog.etl.image_upsert import upsert_sku_image
 from catalog.etl.manual_diagrams import SORT_WIRING
 from catalog.etl.manual_pdfs import attach_hva_manuals, default_manuals_dir
 from catalog.etl.sku_instructions import damper_area_for_nm
@@ -30,10 +30,11 @@ from catalog.etl.tech_copy import (
     FEEDBACK_SIGNAL_U_SLUG,
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_III,
     normalize_tech_copy,
 )
 from catalog.etl.webp import convert_bytes_to_webp
-from catalog.models import SKU, Category, Product, ProductImage
+from catalog.models import SKU, Category, Product
 
 CATEGORY_AIR = "elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata"
 CATEGORY_QX = "elektronnye-otkazoustoychivye-vozdushnye-privody"
@@ -65,6 +66,7 @@ _SHARED_BASE: Final[tuple[AttrRow, ...]] = (
     ("Сечение провода", "wire-cross-section", "мм²", "0,5 мм²"),
 )
 
+# Same bodies as HVA-Q; power follows the RU HVA-Q manual attached to these cards.
 HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     5: {
         "moment": "5 Нм",
@@ -85,7 +87,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
         "shaft-length": "≥ 80 мм",
         "dimensions": "167,8 × 86,2 × 68 мм",
         "weight": "< 1,1 кг",
-        "power": "9 Вт / 0,5 Вт (удержание)",
+        "power": "5 Вт / 1 Вт (удержание)",
         "transformer-va": "12 ВА",
     },
     20: {
@@ -96,7 +98,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
         "shaft-length": "≥ 60 мм",
         "dimensions": "191,8 × 103,4 × 68 мм",
         "weight": "< 1,4 кг",
-        "power": "8 Вт / 0,5 Вт (удержание)",
+        "power": "8 Вт / 1 Вт (удержание)",
         "transformer-va": "18 ВА",
     },
     40: {
@@ -221,7 +223,7 @@ def _set_voltage_attrs(sku: SKU, voltage: str) -> int:
         set_sku_attribute(
             sku,
             slug="protection-class",
-            value="III (безопасное низкое напряжение)",
+            value=PROTECTION_CLASS_III,
             name="Класс защиты",
             unit="",
         )
@@ -254,31 +256,16 @@ def _upsert_image(
     source_url: str,
     dry_run: bool,
 ) -> str:
-    webp = convert_bytes_to_webp(raw, quality=90, max_edge=1600)
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-    filename = f"{sku.sku_code.lower()}-{kind}.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=sort_order,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-        existing.alt = alt[:300]
-        existing.sort_order = sort_order
-        existing.is_published = True
-        existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=source_url,
+        filename=f"{sku.sku_code.lower()}-{kind}.webp",
+        webp=convert_bytes_to_webp(raw, quality=90, max_edge=1600),
+        alt=alt,
+        sort_order=sort_order,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def _attach_hvd_folder_media(
@@ -564,6 +551,8 @@ _HVD_Q_RE = re.compile(r"(?i)^hvd(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)q$")
 _QX_RE = re.compile(r"(?i)^(?P<brand>hva|hvd)(?P<volt>24|230)(?P<aux>s)?-(?P<nm>\d+)qx$")
 
 
+@cached_attributes
+@transaction.atomic
 def apply_hv_extra_enrichment(*, dry_run: bool = False, with_media: bool = False) -> dict[str, Any]:
     """Ensure + enrich HVD-Q and HV*QX families (HVA-P is out of RF scope)."""
     summary: dict[str, Any] = {

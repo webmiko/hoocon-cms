@@ -21,6 +21,8 @@ from catalog.etl.stock_import import (
 )
 from catalog.forms import StockUploadForm
 from catalog.models import (
+    ADMIN_EDIT_FLAG,
+    ETL_COPY_FIELDS,
     SKU,
     AnalogMap,
     Attribute,
@@ -31,6 +33,45 @@ from catalog.models import (
     ProductImage,
 )
 from config.admin_mixins import OpenChangeLinkMixin
+
+
+def mark_admin_edit(obj: Any, changed: list[str], *, change: bool = True) -> None:
+    """Let an Admin save through the ETL locks and set them on manual edits.
+
+    Product/SKU: editing name or texts sets ``copy_locked``. AttributeValue:
+    any edit sets ``is_manual``. ProductImage: unpublishing by hand sets
+    ``hidden_by_editor``, publishing clears it. An explicit checkbox change wins.
+    """
+    obj.__dict__[ADMIN_EDIT_FLAG] = True
+    if isinstance(obj, AttributeValue):
+        if "is_manual" not in changed:
+            obj.is_manual = True
+    elif isinstance(obj, ProductImage):
+        if "is_published" in changed:
+            obj.hidden_by_editor = not obj.is_published
+    elif (
+        isinstance(obj, (Product, SKU))
+        and change
+        and "copy_locked" not in changed
+        and set(changed) & set(ETL_COPY_FIELDS)
+    ):
+        obj.copy_locked = True
+
+
+class AdminEditLockMixin:
+    """Route Admin saves of the model and its inlines through ``mark_admin_edit``."""
+
+    def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
+        mark_admin_edit(obj, list(form.changed_data), change=change)
+        super().save_model(request, obj, form, change)  # type: ignore[misc]
+
+    def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
+        deleted = set(getattr(formset, "deleted_forms", ()))
+        for inline_form in formset.forms:
+            if inline_form in deleted or not inline_form.has_changed():
+                continue
+            mark_admin_edit(inline_form.instance, list(inline_form.changed_data))
+        super().save_formset(request, form, formset, change)  # type: ignore[misc]
 
 
 class InStockListFilter(admin.SimpleListFilter):
@@ -73,7 +114,7 @@ class CategoryAdmin(OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(OpenChangeLinkMixin, ModelAdmin):
+class ProductAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for Product lines (FK Category, PROTECT)."""
 
     list_display = ("name", "slug", "category", "updated_at")
@@ -109,6 +150,7 @@ class ProductAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "instructions",
                     "specs_text",
                     "analogs_text",
+                    "copy_locked",
                 ),
                 "classes": ("collapse",),
             },
@@ -137,12 +179,20 @@ class ProductImageInline(TabularInline):
 
     model = ProductImage
     extra = 0
-    fields = ("image", "image_card", "alt", "source_url", "sort_order", "is_published")
-    readonly_fields = ("image_card",)
+    fields = (
+        "image",
+        "image_card",
+        "alt",
+        "source_url",
+        "sort_order",
+        "is_published",
+        "hidden_by_editor",
+    )
+    readonly_fields = ("image_card", "hidden_by_editor")
 
 
 @admin.register(SKU)
-class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
+class SKUAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for SKU — артикул, slug, цена (скрыта в публичном API)."""
 
     change_list_template = "admin/catalog/sku/change_list.html"
@@ -213,7 +263,7 @@ class SKUAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Тексты издания",
             {
-                "fields": ("description", "specs_text", "analogs_text"),
+                "fields": ("description", "specs_text", "analogs_text", "copy_locked"),
                 "classes": ("collapse",),
             },
         ),
@@ -315,12 +365,12 @@ class AttributeAdmin(OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(AttributeValue)
-class AttributeValueAdmin(OpenChangeLinkMixin, ModelAdmin):
+class AttributeValueAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for AttributeValue (SKU × Attribute)."""
 
-    list_display = ("sku", "attribute", "value", "updated_at")
+    list_display = ("sku", "attribute", "value", "is_manual", "updated_at")
     list_display_links = ("value",)
-    list_filter = ("attribute",)
+    list_filter = ("is_manual", "attribute")
     search_fields = ("sku__sku_code", "attribute__name", "value")
     autocomplete_fields = ("sku", "attribute")
 
@@ -351,12 +401,13 @@ class ProductFileAdmin(OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(ProductImage)
-class ProductImageAdmin(OpenChangeLinkMixin, ModelAdmin):
+class ProductImageAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for ProductImage (WebP gallery)."""
 
-    list_display = ("sku", "alt", "sort_order", "is_published", "updated_at")
+    list_display = ("sku", "alt", "sort_order", "is_published", "hidden_by_editor", "updated_at")
     list_display_links = ("sku",)
-    list_filter = ("is_published",)
+    list_filter = ("is_published", "hidden_by_editor")
+    readonly_fields = ("hidden_by_editor",)
     search_fields = ("alt", "sku__sku_code", "source_url")
     autocomplete_fields = ("sku",)
     ordering = ("sku", "sort_order")

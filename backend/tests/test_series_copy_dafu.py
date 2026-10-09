@@ -49,10 +49,69 @@ def test_shared_attrs_include_manual_none() -> None:
     by_slug = {row[1]: row[3] for row in SHARED_ATTRS}
     assert by_slug["manual-override"] == MANUAL_OVERRIDE_NONE
     assert "–40" in by_slug["storage-temp"] or "−40" in by_slug["storage-temp"]
-    assert "> 50" in by_slug["shaft-length"]
-    assert "10…16" in by_slug["shaft-diameter"]
-    assert "7×7" in by_slug["shaft-diameter"]
     assert by_slug["cable-length"] == "1000 мм"
+    # Shaft and noise differ per Nm / edition in the RU manuals.
+    assert not {"shaft-length", "shaft-diameter", "noise"} & by_slug.keys()
+
+
+# (Nm, edition) → motor time, spring return, shaft Ø, power, weight — RU manuals.
+_RU_MANUAL = {
+    (3, "D"): ("< 75 с", "< 25 с", "квадратный 12×12 мм", "5 Вт под нагрузкой / 2 Вт", "< 1,3 кг"),
+    (5, "D"): ("< 70 с", "< 20 с", "круглый 10…16 мм", "5 Вт под нагрузкой / 3 Вт", "< 1,5 кг"),
+    (5, "A"): ("< 100 с", "< 20 с", "круглый 10…16 мм", "5 Вт под нагрузкой / 3 Вт", "< 1,5 кг"),
+    (10, "D"): ("< 100 с", "< 25 с", "круглый 10…21 мм", "5 Вт под нагрузкой / 3 Вт", "< 2,3 кг"),
+    (10, "A"): ("< 110 с", "< 25 с", "круглый 10…16 мм", "6 Вт под нагрузкой / 1,5 Вт", "< 2,6 кг"),
+    (15, "D"): ("< 150 с", "< 25 с", "круглый 10…21 мм", "10 Вт под нагрузкой / 3 Вт", "< 2,5 кг"),
+    (20, "A"): ("< 150 с", "< 25 с", "круглый 10…16 мм", "10 Вт под нагрузкой / 3 Вт", "< 2,6 кг"),
+}
+
+
+@pytest.mark.parametrize(("key", "expected"), list(_RU_MANUAL.items()))
+def test_dafu_edition_specs_match_ru_manual(
+    key: tuple[int, str],
+    expected: tuple[str, str, str, str, str],
+) -> None:
+    """Regression: «≤ 20/25 с» was the spring return shown as motor time."""
+    from catalog.etl.series_copy_dafu import dafu_spec
+
+    motor, spring, shaft, power, weight = expected
+    row = dafu_spec(*key)
+    assert row is not None
+    assert row["running-time"] == f"{motor} / возврат пружины {spring}"
+    assert row["shaft-diameter"].startswith(shaft)
+    assert row["power"].startswith(power)
+    assert row["weight"] == weight
+
+
+def test_dafu_spec_running_time_never_spring_only() -> None:
+    """Root cause: one row per Nm could not hold D/DS vs A/AS manual values."""
+    from catalog.etl.series_copy_dafu import EDITION_SPECS, TORQUE_SPECS, dafu_spec
+
+    assert all("running-time" not in row for row in TORQUE_SPECS.values())
+    for nm, edition in EDITION_SPECS:
+        row = dafu_spec(nm, edition)
+        assert row is not None
+        assert "возврат пружины" in row["running-time"], (nm, edition)
+        assert not row["running-time"].startswith("≤"), (nm, edition)
+    # DA3FU ships only D/DS; modulating lookup falls back to its table.
+    assert dafu_spec(3, "A") == dafu_spec(3, "D")
+
+
+def test_dafu_sku_instructions_use_edition_shaft() -> None:
+    from catalog.etl.series_copy_dafu import instructions_for_dafu_sku
+
+    da3 = instructions_for_dafu_sku("DA3FU24-D")
+    assert da3 is not None
+    assert "квадратный 12×12 мм" in da3
+    assert "< 75 с / возврат пружины < 25 с" in da3
+    da10 = instructions_for_dafu_sku("DA10FU230-DS")
+    assert da10 is not None
+    assert "> 90 мм" in da10
+    assert "10…21 мм" in da10
+    da10a = instructions_for_dafu_sku("DA10FU24-A")
+    assert da10a is not None
+    assert "< 110 с / возврат пружины < 25 с" in da10a
+    assert "> 50 мм" in da10a
 
 
 def test_da5_dimensions_from_datasheet_drawing() -> None:
@@ -149,9 +208,11 @@ def test_apply_dafu_enrichment_fixes_manual_override() -> None:
     assert by_slug["control"] == "Открыто/закрыто"
     assert by_slug["voltage"] == "AC/DC 24 В, 50/60 Гц"
     assert by_slug["moment"] == TORQUE_SPECS[5]["moment"]
-    assert by_slug["weight"] == TORQUE_SPECS[5]["weight"]
+    assert by_slug["weight"] == "< 1,5 кг"
+    assert by_slug["running-time"] == "< 70 с / возврат пружины < 20 с"
     assert "–40" in by_slug["storage-temp"] or "−40" in by_slug["storage-temp"]
     assert by_slug["shaft-length"] == "> 50 мм"
+    assert "62 дБ" in by_slug["noise"]
     product.refresh_from_db()
     assert product.instructions == SERIES_INSTRUCTIONS
     assert "> 50 мм" in product.instructions
@@ -165,8 +226,9 @@ def test_apply_dafu_enrichment_fixes_manual_override() -> None:
 def test_series_instructions_align_with_shared_attrs() -> None:
     """Install tab numbers stay in sync with Характеристики canon."""
     by_slug = {row[1]: row[3] for row in SHARED_ATTRS}
-    assert by_slug["shaft-length"] in SERIES_INSTRUCTIONS
+    assert "> 50 мм" in SERIES_INSTRUCTIONS and "> 90 мм" in SERIES_INSTRUCTIONS
     assert "10…16" in SERIES_INSTRUCTIONS and "7×7" in SERIES_INSTRUCTIONS
+    assert "12×12" in SERIES_INSTRUCTIONS and "10…21" in SERIES_INSTRUCTIONS
     assert by_slug["cable-length"] in SERIES_INSTRUCTIONS
     assert "0,5 мм²" in SERIES_INSTRUCTIONS
     assert "IP54" in SERIES_INSTRUCTIONS

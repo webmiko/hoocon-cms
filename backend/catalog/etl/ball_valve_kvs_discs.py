@@ -15,10 +15,8 @@ import re
 from pathlib import Path
 from typing import Any, Final
 
-from django.core.files.base import ContentFile
-from django.db import transaction
-
-from catalog.models import SKU, ProductImage
+from catalog.etl.image_upsert import upsert_sku_image
+from catalog.models import SKU
 from catalog.sku_access import sku_attribute_values
 
 logger = logging.getLogger(__name__)
@@ -74,38 +72,18 @@ def _upsert_disc(
     webp: bytes,
     dry_run: bool,
 ) -> str:
-    source_url = _SOURCE_URL.format(dn=dn, letter=letter.casefold())
-    existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
-    if dry_run:
-        return "update" if existing else "create"
-
     kvs = _kvs_label(sku)
     kvs_bit = f" Kvs {kvs}" if kvs else ""
-    alt = f"{sku.sku_code} | фото расходного диска{kvs_bit}"
-    filename = f"{sku.sku_code.lower()}-kvs-disc.webp"
-    with transaction.atomic():
-        if existing is None:
-            image = ProductImage(
-                sku=sku,
-                alt=alt[:300],
-                source_url=source_url,
-                sort_order=_SORT_DISC,
-                is_published=True,
-            )
-            image.image.save(filename, ContentFile(webp), save=False)
-            image.full_clean()
-            image.save()
-            return "create"
-
-        existing.alt = alt[:300]
-        existing.sort_order = _SORT_DISC
-        existing.is_published = True
-        current = existing.image.size if existing.image else 0
-        if current != len(webp):
-            existing.image.save(filename, ContentFile(webp), save=False)
-        existing.full_clean()
-        existing.save()
-        return "update"
+    action, _image = upsert_sku_image(
+        sku,
+        source_url=_SOURCE_URL.format(dn=dn, letter=letter.casefold()),
+        filename=f"{sku.sku_code.lower()}-kvs-disc.webp",
+        webp=webp,
+        alt=f"{sku.sku_code} | фото расходного диска{kvs_bit}",
+        sort_order=_SORT_DISC,
+        dry_run=dry_run,
+    )
+    return action
 
 
 def apply_ball_valve_kvs_discs(*, dry_run: bool = False) -> dict[str, Any]:

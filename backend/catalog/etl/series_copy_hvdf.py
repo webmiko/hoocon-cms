@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from django.db import transaction
 from django.db.models import QuerySet
 
 from catalog.etl.attr_groups import (
@@ -18,17 +19,18 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_OPERATING,
     ATTR_GROUP_SIZE,
 )
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_instructions import damper_area_for_nm
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
+    PROTECTION_CLASS_III,
     normalize_control_attribute_value,
     normalize_tech_copy,
 )
 from catalog.facets import normalize_aux_switch_value
-from catalog.models import SKU, AttributeValue, Category, Product
+from catalog.models import SKU, Category, Product
 
 # HVD24S-3F / HVD24ST-3F / HVD230S-5F …
 _HVDF_CODE = re.compile(
@@ -417,10 +419,6 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
     set_sku_attribute(sku, slug=slug, value=value, name=name, unit=unit)
 
 
-def _clear_sku_attributes(sku: SKU) -> None:
-    AttributeValue.objects.filter(sku=sku).delete()
-
-
 def ensure_hvdf_catalog(*, dry_run: bool = False) -> dict[str, Any]:
     """Create missing HVD-3F / HVD-5F products and four edition SKUs each.
 
@@ -482,6 +480,8 @@ def ensure_hvdf_catalog(*, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+@cached_attributes
+@transaction.atomic
 def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
     """Rewrite HVD-…F products/SKUs from English fire/smoke manuals."""
     ensure = ensure_hvdf_catalog(dry_run=dry_run)
@@ -501,19 +501,13 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
         title = _product_title(torque_nm)
         analogs = _ANALOGS_BY_NM.get(torque_nm, "")
         if not dry_run:
-            product.name = title[:200]
-            product.description = SERIES_DESCRIPTION
-            product.instructions = SERIES_INSTRUCTIONS
-            product.specs_text = ""
-            product.analogs_text = analogs
-            product.save(
-                update_fields=[
-                    "name",
-                    "description",
-                    "instructions",
-                    "specs_text",
-                    "analogs_text",
-                ],
+            write_copy(
+                product,
+                name=title[:200],
+                description=SERIES_DESCRIPTION,
+                instructions=SERIES_INSTRUCTIONS,
+                specs_text="",
+                analogs_text=analogs,
             )
 
         category_slug = product.category.slug if product.category_id else ""
@@ -522,14 +516,14 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
             spec = TORQUE_SPECS.get(nm, row)
             variant = parse_sku_variant(sku.sku_code)
             if not dry_run:
-                sku.name = title[:300]
-                sku.description = _sku_description(variant, spec)
-                sku.specs_text = ""
-                sku.analogs_text = analogs
-                sku.save(
-                    update_fields=["name", "description", "specs_text", "analogs_text"],
+                write_copy(
+                    sku,
+                    name=title[:300],
+                    description=_sku_description(variant, spec),
+                    specs_text="",
+                    analogs_text=analogs,
                 )
-                _clear_sku_attributes(sku)
+                clear_etl_attributes(sku)
 
             for name, slug, unit, value, _g in SHARED_ATTRS:
                 if not dry_run:
@@ -564,7 +558,7 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                         "Класс защиты",
                         "protection-class",
                         "",
-                        "III (безопасное сверхнизкое напряжение)",
+                        PROTECTION_CLASS_III,
                     )
                 attrs += 2
             elif variant.voltage == "230":

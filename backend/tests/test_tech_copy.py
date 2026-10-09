@@ -211,3 +211,29 @@ def test_normalize_running_time_value() -> None:
     assert attribute_display_unit("≤ 100 с", "с") == ""
     assert attribute_display_unit("≤ 100 сек", "с") == ""
     assert attribute_display_unit("100", "с") == "с"
+
+
+def test_normalize_tech_copy_unifies_degree_sign_and_selv_wording() -> None:
+    """M41: «°С» (кириллица) и «безопасное низкое» расщепляли одно значение на два чипа."""
+    from catalog.etl.tech_copy import PROTECTION_CLASS_III
+
+    assert normalize_tech_copy("от -20 °С до +50 °С") == "от -20 °C до +50 °C"
+    assert normalize_tech_copy("III (безопасное низкое напряжение)") == PROTECTION_CLASS_III
+    assert normalize_tech_copy(PROTECTION_CLASS_III) == PROTECTION_CLASS_III
+
+
+def test_series_etl_sources_use_one_spelling_for_shared_values() -> None:
+    """M41: ETL серий пишет класс защиты III и °C одинаково (общая константа)."""
+    from pathlib import Path
+
+    etl_dir = Path(__file__).resolve().parent.parent / "catalog" / "etl"
+    offenders: list[str] = []
+    for path in sorted(etl_dir.glob("series_copy_*.py")):
+        text = path.read_text(encoding="utf-8")
+        if "°С" in text:
+            offenders.append(f"{path.name}: cyrillic °С")
+        if "безопасное низкое" in text:
+            offenders.append(f"{path.name}: безопасное низкое")
+        if '"III (безопасное' in text:
+            offenders.append(f"{path.name}: literal instead of PROTECTION_CLASS_III")
+    assert offenders == []

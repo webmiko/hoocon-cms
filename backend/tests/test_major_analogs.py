@@ -21,19 +21,19 @@ from catalog.models import SKU, Category, Product
 
 
 def test_build_damu_analogs_belimo_bands() -> None:
-    """DAMU 16/32 Нм map to SM/GM — not NM (10 Нм) from old Tilda cards."""
+    """DAMU по площади: 16 → NM (1.6≥1.0), 24 → SM (2.4≥2.0), 32 → SM (3.2≥2.0)."""
     d16 = build_damu_analogs(16)
     assert "DA16MU24-D" in d16
-    assert "Belimo SM24A" in d16
-    assert "Belimo NM24A" not in d16
+    assert "Belimo NM24A" in d16
     assert "16 Нм" in d16.splitlines()[0]
     d24 = build_damu_analogs(24)
     assert "DA.MU 16 Нм" not in d24
     assert "24 Нм" in d24.splitlines()[0]
     assert "Belimo SM24A" in d24
+    d6 = build_damu_analogs(6)
+    assert "Belimo LM24A" in d6
     d32 = build_damu_analogs(32)
-    assert "Belimo GM24A" in d32
-    assert "Belimo SM24A" not in d32
+    assert "Belimo SM24A" in d32  # 3.2 m² ≥ SM(2.0), < GM(4.0)
     d2 = build_damu_analogs(2)
     assert "Belimo TMC24A" in d2
     assert "Belimo TMC230A-SR" in d2
@@ -51,13 +51,12 @@ def test_build_samu_analogs_no_emf_or_cm() -> None:
 
 
 def test_build_dafu_safu_belimo_families() -> None:
-    """DA15FU → SF (not BF/BX); SA20FU → BF (not BFL-20N)."""
+    """DA15FU (1.5 m²) → NF (1.0); SA20FU (2.0 m²) → BF (1.5)."""
     da15 = build_dafu_analogs(15)
-    assert "Belimo SF24A" in da15
+    assert "Belimo NF24A" in da15  # 1.5 ≥ NF(1.0), < SF(2.0)
     assert "BX24" not in da15
-    assert "Belimo BF24" not in da15
     sa20 = build_safu_analogs(20)
-    assert "Belimo BF24" in sa20
+    assert "Belimo BF24" in sa20  # 2.0 ≥ BF(1.5)
     assert "BFL24-20" not in sa20
     assert "BLF230-20" not in sa20
 
@@ -74,17 +73,18 @@ def test_build_damqu_analogs_major_brands_only() -> None:
 
 
 def test_build_damqu_analogs_distinct_belimo_by_nm() -> None:
-    """5/8/16/24 Нм map to LMQ / NMQ / SMQ / GMQ — never share one Belimo family."""
+    """Q-аналог по площади: 5 → LMQ (0.5≥0.4), 8 → NMQ (0.8≥0.8), 16 → SMQ (1.6≥1.6)."""
     from catalog.etl.series_copy_major_analogs import belimo_fast_family
 
+    assert belimo_fast_family(4) == "LMQ"
     assert belimo_fast_family(5) == "LMQ"
     assert belimo_fast_family(8) == "NMQ"
+    assert belimo_fast_family(10) == "NMQ"
     assert belimo_fast_family(16) == "SMQ"
-    assert belimo_fast_family(24) == "GMQ"
+    assert belimo_fast_family(24) == "SMQ"
+    assert belimo_fast_family(40) == "GMQ"
     assert "Belimo SMQ24A-SR" in build_damqu_analogs(16)
-    assert "Belimo GMQ24A-SR" in build_damqu_analogs(24)
-    assert "Belimo NMQ24A-SR" not in build_damqu_analogs(16)
-    assert "Belimo NMQ24A-SR" not in build_damqu_analogs(24)
+    assert "Belimo SMQ24A-SR" in build_damqu_analogs(24)
 
 
 def test_build_sa7mu_and_hvd_include_belimo() -> None:

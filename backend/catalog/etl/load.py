@@ -16,7 +16,7 @@ from typing import Any
 
 from django.db import transaction
 
-from catalog.etl.attr_write import clip_attribute_value, ensure_attribute
+from catalog.etl.attr_write import clip_attribute_value, ensure_attribute, write_copy
 from catalog.etl.normalize import (
     NormalizedCategory,
     NormalizedProduct,
@@ -179,7 +179,7 @@ def load_product(
         )
     category = category_map[np.category_id]
 
-    product, created = Product.objects.update_or_create(
+    product, created = Product.objects.get_or_create(
         slug=np.slug,
         defaults={
             "name": np.name,
@@ -187,10 +187,12 @@ def load_product(
             "category": category,
         },
     )
+    if not created:
+        write_copy(product, name=np.name, description=np.description, category=category)
     stats.products_created += int(created)
 
     for nsku in np.skus:
-        sku, sku_created = SKU.objects.update_or_create(
+        sku, sku_created = SKU.objects.get_or_create(
             sku_code=nsku.sku_code,
             defaults={
                 "product": product,
@@ -200,16 +202,28 @@ def load_product(
                 "description": nsku.description,
             },
         )
+        if not sku_created:
+            write_copy(
+                sku,
+                product=product,
+                name=nsku.name,
+                slug=nsku.slug,
+                price=nsku.price,
+                description=nsku.description,
+            )
         stats.skus_created += int(sku_created)
 
         for nattr in nsku.attributes:
             slug, name, unit = _attribute_identity(nattr.title, nattr.value)
             attr = ensure_attribute(slug, name, unit)
-            _, av_created = AttributeValue.objects.update_or_create(
+            row, av_created = AttributeValue.objects.get_or_create(
                 sku=sku,
                 attribute=attr,
                 defaults={"value": clip_attribute_value(nattr.value)},
             )
+            if not av_created and not row.is_manual:
+                row.value = clip_attribute_value(nattr.value)
+                row.save(update_fields=["value", "updated_at"])
             stats.attribute_values_created += int(av_created)
 
     return stats

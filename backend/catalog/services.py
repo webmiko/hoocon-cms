@@ -13,11 +13,17 @@ def analogs_find(brand: str, code: str) -> QuerySet[AnalogMap]:
     ``foreign_code`` матчится по нормализованному ключу (upper, только
     буквы/цифры) — написания «NM24A-SR» и «nm 24a sr» равнозначны. Пустой
     бренд допустим: тогда матч только по коду (бренд подсказывает в выдаче).
+    Код без букв/цифр («---») ничего не находит, а не отдаёт всю карту;
+    неопубликованные SKU в публичный подбор не попадают.
     """
-    qs = AnalogMap.objects.filter(is_active=True).select_related("sku")
     key = normalize_analog_code(code)
-    if key:
-        qs = qs.filter(foreign_code_key=key)
+    if not key:
+        return AnalogMap.objects.none()
+    qs = AnalogMap.objects.filter(
+        is_active=True,
+        foreign_code_key=key,
+        sku__is_published=True,
+    ).select_related("sku")
     brand_norm = (brand or "").strip().casefold()
     if brand_norm:
         qs = qs.filter(brand__iexact=brand_norm)

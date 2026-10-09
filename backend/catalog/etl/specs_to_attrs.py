@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from catalog.etl.attr_write import set_sku_attribute
+from catalog.etl.attr_write import cached_attributes, set_sku_attribute
 from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.label_to_slug import CANONICAL_ATTRS, canonical_meta, label_to_slug
 from catalog.etl.series_copy_ball_valves import ball_valve_product_slugs
@@ -398,6 +398,7 @@ def maybe_clear_product_specs(product: Product) -> bool:
     return False
 
 
+@cached_attributes
 def enrich_catalog_cards(
     *,
     product_slug: str | None = None,
