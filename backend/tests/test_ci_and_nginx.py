@@ -50,6 +50,18 @@ def test_ci_workflow_has_check_job_with_postgres() -> None:
     assert "pip-audit" in joined
 
 
+def test_ci_service_images_avoid_anonymous_docker_hub_pulls() -> None:
+    """Run #707: «toomanyrequests» on postgres:16-alpine failed the main deploy before tests ran."""
+    import yaml
+
+    data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    images = [service["image"] for job in data["jobs"].values() for service in (job.get("services") or {}).values()]
+    assert images
+    for image in images:
+        registry = image.split("/", 1)[0]
+        assert "." in registry and registry != "docker.io", image
+
+
 def test_e2e_webserver_waits_for_backend_before_vite() -> None:
     """Playwright must not probe Vite until Django accepts /api/health/ (PDP flake)."""
     script = (ROOT / "scripts" / "e2e-webserver.sh").read_text(encoding="utf-8")
