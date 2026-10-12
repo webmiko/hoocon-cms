@@ -182,6 +182,47 @@ def test_seed_wiki_novosystem_guide() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_explains_browser_phone() -> None:
+    """Вики: телефон в браузере — настройка токена, все сообщения окна и запись в журнале 3.0."""
+    import re
+    from io import StringIO
+    from pathlib import Path
+
+    from django.core.management import call_command
+
+    from accounts.forms import StaffVpbxProfileForm
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
+    assert 'id="browser-phone"' in doc.body
+    assert 'href="#browser-phone"' in doc.body
+    assert "Включить телефон" in doc.body
+    # Названия полей в вики — те же, что менеджер увидит в профиле пользователя.
+    fields = StaffVpbxProfileForm.base_fields
+    assert str(fields["uis_webrtc_token"].label) in doc.body
+    assert str(fields["clear_uis_webrtc_token"].label) in doc.body
+
+    # Каждое сообщение окна из кода описано в «Если не работает» (новое сообщение без вики не проходит).
+    window_js = Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-softphone-window.js"
+    # source-lint: сообщения окна живут только в этом файле; обходим их все, а не выбираем по одному.
+    errors_block = window_js.read_text(encoding="utf-8").split("const ERRORS = {", 1)[1].split("};", 1)[0]
+    messages = re.findall(r'"([^"]+)"', errors_block)
+    assert len(messages) >= 7
+    for message in messages:
+        lead = message.split(". ", 1)[0].rstrip(".")
+        assert lead in doc.body, lead
+
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    _body, changelog = guide.body.split('id="changelog"', 1)
+    assert 'id="changelog-browser-phone"' in changelog
+    assert changelog.index("changelog-browser-phone") < changelog.index("changelog-uis-call-order")
+    row = changelog.split('id="changelog-browser-phone"', 1)[1].split("</tr>", 1)[0]
+    assert row.count("<td>") + row.count("<td ") == 3
+    assert "Включить телефон" in row
+    assert "«Телефон»" in doc.summary
+
+
+@pytest.mark.django_db
 def test_seed_wiki_guide_explains_manual_catalog_edits() -> None:
     """Руководство 3.0: ручные правки карточки и галочки блокировки — в каталоге и журнале."""
     from io import StringIO
