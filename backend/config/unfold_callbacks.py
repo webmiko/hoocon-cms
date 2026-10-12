@@ -184,6 +184,20 @@ def admin_desktop_settings_js(request: HttpRequest) -> str:
     return _versioned_static("admin/js/hoocon-admin-desktop-settings.js")
 
 
+def admin_softphone_js(request: HttpRequest) -> str:
+    """Softphone dock for staff who have a browser-phone token; no-op for everyone else.
+
+    Unfold renders every SCRIPTS entry as ``<script src>``, so the gate returns
+    an empty script instead of an empty string.
+    """
+    from crm.softphone import softphone_enabled_for
+
+    user = getattr(request, "user", None)
+    if user is not None and softphone_enabled_for(user):
+        return _versioned_static("admin/js/hoocon-softphone-dock.js")
+    return _versioned_static("admin/js/hoocon-noop.js")
+
+
 def _can_view_leads(request: HttpRequest) -> bool:
     """Staff with leads.view_lead (superuser included via has_perm)."""
     user = getattr(request, "user", None)

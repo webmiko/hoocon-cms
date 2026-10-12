@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Телефон · Hoocon</title>
+  <link rel="stylesheet" href="{{ css_url }}">
+</head>
+<body class="hsp-window">
+  <main id="hsp"
+        data-phase="off"
+        data-blocked="{% if blockers %}1{% else %}0{% endif %}"
+        data-session-url="{{ session_url }}"
+        data-lookup-url="{{ lookup_url }}"
+        data-csrf="{{ csrf_token }}">
+    <header class="hsp-head">
+      <span class="hsp-dot" aria-hidden="true"></span>
+      <div class="hsp-head__text">
+        <strong data-role="status">Телефон выключен</strong>
+        <small data-role="employee"></small>
+      </div>
+    </header>
+
+    {% if blockers %}
+    <section class="hsp-card hsp-card--warn" role="alert">
+      <p>Телефон в браузере пока не может запуститься:</p>
+      <ul>
+        {% for blocker in blockers %}<li>{{ blocker }}</li>{% endfor %}
+      </ul>
+    </section>
+    {% else %}
+    <section class="hsp-card" data-role="start">
+      <p>Телефон работает, пока открыто это окно. Свернуть можно, закрывать не нужно: входящие придут сюда и покажут имя клиента.</p>
+      <p class="hsp-hint">Браузер попросит доступ к микрофону. Программа «Софтфон UIS» при этом должна быть закрыта.</p>
+      <button type="button" class="hsp-btn hsp-btn--primary" data-action="start" autofocus>Включить телефон</button>
+    </section>
+
+    <section class="hsp-card hsp-card--call" data-role="call" hidden aria-live="polite">
+      <p class="hsp-call__dir" data-role="direction"></p>
+      <p class="hsp-call__who" data-role="who"></p>
+      <p class="hsp-call__num" data-role="number" hidden></p>
+      <a class="hsp-call__card" data-role="card" href="#" target="hoocon-admin" hidden>Открыть карточку клиента</a>
+      <p class="hsp-call__timer" data-role="timer" hidden></p>
+      <div class="hsp-actions">
+        <button type="button" class="hsp-btn hsp-btn--ok" data-role="answer" data-action="answer" hidden>Ответить</button>
+        <button type="button" class="hsp-btn hsp-btn--bad" data-role="hangup" data-action="hangup">Завершить</button>
+        <button type="button" class="hsp-btn" data-role="hold" data-action="hold" hidden>Удержать</button>
+        <button type="button" class="hsp-btn" data-role="mute" data-action="mute" hidden>Выключить микрофон</button>
+      </div>
+    </section>
+
+    <section class="hsp-card" data-role="dialer" hidden>
+      <form data-role="dial_form" autocomplete="off">
+        <label class="hsp-label" for="hsp-number">Номер</label>
+        <div class="hsp-dial">
+          <input id="hsp-number" data-role="number_input" type="tel" inputmode="tel" placeholder="+7 …" maxlength="32">
+          <button type="button" class="hsp-btn hsp-btn--icon" data-action="erase" aria-label="Стереть цифру">⌫</button>
+        </div>
+        <button type="submit" class="hsp-btn hsp-btn--ok hsp-btn--wide">Позвонить</button>
+      </form>
+    </section>
+
+    <section class="hsp-keys" data-role="keys" hidden aria-label="Клавиатура">
+      {% for key in "123456789*0#" %}<button type="button" class="hsp-key" data-key="{{ key }}">{{ key }}</button>{% endfor %}
+    </section>
+
+    <p class="hsp-error" data-role="error" role="alert" hidden></p>
+    {% endif %}
+  </main>
+
+  {% if not blockers %}
+  <script src="{{ lib_url }}"></script>
+  {% endif %}
+  <script src="{{ js_url }}"></script>
+</body>
+</html>

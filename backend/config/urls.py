@@ -55,6 +55,8 @@ urlpatterns = [
         AdminPwaServiceWorkerView.as_view(),
         name="admin-pwa-sw",
     ),
+    # Browser softphone window + token/lookup; before admin.site.urls (model-name catch-all).
+    path("admin/crm/softphone/", include("crm.softphone_urls")),
     path("admin/", admin.site.urls),
     path("api/catalog/", include("catalog.urls")),
     path("api/content/", include("content.urls")),

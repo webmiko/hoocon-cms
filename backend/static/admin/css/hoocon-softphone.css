@@ -1,0 +1,416 @@
+/* Softphone: window «Телефон» (.hsp-window) + dock on Admin pages (.hsp-dock).
+ *
+ * Загружается окном телефона через <link> и доком (hoocon-softphone-dock.js
+ * вставляет <link> рядом с собой): Unfold STYLES не нужен, чтобы не тянуть
+ * стили тем, у кого телефона нет. */
+
+:root {
+  --hsp-ok: #16a34a;
+  --hsp-bad: #dc2626;
+  --hsp-warn: #d97706;
+  --hsp-idle: #94a3b8;
+  --hsp-ink: #0f172a;
+  --hsp-ink-soft: #475569;
+  --hsp-surface: #ffffff;
+  --hsp-bg: #f1f5f9;
+  --hsp-line: #e2e8f0;
+  --hsp-radius: 0.75rem;
+}
+
+/* ── Window ─────────────────────────────────────────────── */
+
+.hsp-window {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--hsp-bg);
+  color: var(--hsp-ink);
+  font: 400 0.9375rem/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#hsp {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 100vh;
+  padding: 0.875rem;
+}
+
+.hsp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.25rem 0.25rem 0;
+}
+
+.hsp-head__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hsp-head__text small {
+  color: var(--hsp-ink-soft);
+}
+
+.hsp-dot,
+.hsp-dock__dot {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--hsp-idle);
+}
+
+#hsp[data-phase="ready"] .hsp-dot {
+  background: var(--hsp-ok);
+}
+
+#hsp[data-phase="connecting"] .hsp-dot {
+  background: var(--hsp-warn);
+}
+
+#hsp[data-phase="error"] .hsp-dot {
+  background: var(--hsp-bad);
+}
+
+.hsp-card {
+  padding: 0.875rem;
+  border: 1px solid var(--hsp-line);
+  border-radius: var(--hsp-radius);
+  background: var(--hsp-surface);
+}
+
+.hsp-card p {
+  margin: 0 0 0.625rem;
+}
+
+.hsp-card ul {
+  margin: 0;
+  padding-left: 1.125rem;
+}
+
+.hsp-card--warn {
+  border-color: var(--hsp-warn);
+}
+
+.hsp-hint {
+  color: var(--hsp-ink-soft);
+  font-size: 0.8125rem;
+}
+
+.hsp-call__dir {
+  color: var(--hsp-ink-soft);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hsp-call__who {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.hsp-call__num,
+.hsp-call__timer {
+  color: var(--hsp-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.hsp-call__timer {
+  font-size: 1.5rem;
+  color: var(--hsp-ink);
+}
+
+.hsp-call__card {
+  display: inline-block;
+  margin-bottom: 0.625rem;
+  color: #2563eb;
+}
+
+.hsp-call__card[hidden] {
+  display: none;
+}
+
+.hsp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hsp-btn {
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--hsp-line);
+  border-radius: 0.625rem;
+  background: var(--hsp-surface);
+  color: var(--hsp-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hsp-btn:hover {
+  background: var(--hsp-bg);
+}
+
+.hsp-btn--primary,
+.hsp-btn--ok {
+  border-color: var(--hsp-ok);
+  background: var(--hsp-ok);
+  color: #fff;
+}
+
+.hsp-btn--bad {
+  border-color: var(--hsp-bad);
+  background: var(--hsp-bad);
+  color: #fff;
+}
+
+.hsp-btn--primary:hover,
+.hsp-btn--ok:hover {
+  background: #15803d;
+}
+
+.hsp-btn--bad:hover {
+  background: #b91c1c;
+}
+
+.hsp-btn--wide {
+  width: 100%;
+  margin-top: 0.625rem;
+}
+
+.hsp-btn--icon {
+  min-width: 2.5rem;
+  padding-inline: 0;
+}
+
+.hsp-btn:focus-visible,
+.hsp-key:focus-visible,
+.hsp-dock button:focus-visible,
+.hsp-dial input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.hsp-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--hsp-ink-soft);
+  font-size: 0.8125rem;
+}
+
+.hsp-dial {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.hsp-dial input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--hsp-line);
+  border-radius: 0.625rem;
+  /* 16px: iOS не приближает страницу при фокусе на поле. */
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.hsp-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.hsp-keys[hidden] {
+  display: none;
+}
+
+.hsp-key {
+  min-height: 2.75rem;
+  border: 1px solid var(--hsp-line);
+  border-radius: 0.625rem;
+  background: var(--hsp-surface);
+  color: var(--hsp-ink);
+  font-family: inherit;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hsp-key:hover {
+  background: var(--hsp-bg);
+}
+
+.hsp-error {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.625rem;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hsp-ink: #e2e8f0;
+    --hsp-ink-soft: #94a3b8;
+    --hsp-surface: #1e293b;
+    --hsp-bg: #0f172a;
+    --hsp-line: #334155;
+  }
+
+  .hsp-call__card {
+    color: #93c5fd;
+  }
+
+  .hsp-error {
+    background: #450a0a;
+    color: #fecaca;
+  }
+
+  .hsp-dial input {
+    background: var(--hsp-bg);
+    color: var(--hsp-ink);
+  }
+}
+
+/* ── Dock on Admin pages ────────────────────────────────── */
+
+/* Над липкой панелью «Сохранить» Unfold (lg:sticky bottom-0, ≈65px, z-index 110):
+   ниже 4.5rem док прячется под ней и не нажимается на каждой форме правки. */
+.hsp-dock {
+  position: fixed;
+  right: 1rem;
+  bottom: 5.5rem;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 6px 24px rgb(15 23 42 / 0.35);
+  font: 500 0.875rem/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.hsp-dock button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.hsp-dock__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 18rem;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.875rem 0.25rem 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.hsp-dock__main:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.hsp-dock__main .material-symbols-outlined {
+  font-size: 1.25rem;
+}
+
+.hsp-dock__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hsp-dock__timer {
+  font-variant-numeric: tabular-nums;
+}
+
+.hsp-dock__act {
+  min-height: 2.25rem;
+  padding: 0.25rem 0.875rem;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.hsp-dock__act[hidden] {
+  display: none;
+}
+
+.hsp-dock__act--ok {
+  background: var(--hsp-ok);
+}
+
+.hsp-dock__act--bad {
+  background: var(--hsp-bad);
+}
+
+.hsp-dock[data-state="ready"] .hsp-dock__dot,
+.hsp-dock[data-state="talking"] .hsp-dock__dot {
+  background: var(--hsp-ok);
+}
+
+.hsp-dock[data-state="connecting"] .hsp-dock__dot,
+.hsp-dock[data-state="off"] .hsp-dock__dot {
+  background: var(--hsp-warn);
+}
+
+.hsp-dock[data-state="error"] .hsp-dock__dot {
+  background: var(--hsp-bad);
+}
+
+.hsp-dock[data-state="ringing"] {
+  animation: hsp-ring 1s ease-in-out infinite;
+}
+
+.hsp-dock[data-state="ringing"] .hsp-dock__dot {
+  background: var(--hsp-ok);
+}
+
+@keyframes hsp-ring {
+  0%,
+  100% {
+    box-shadow: 0 6px 24px rgb(15 23 42 / 0.35), 0 0 0 0 rgb(22 163 74 / 0.6);
+  }
+
+  50% {
+    box-shadow: 0 6px 24px rgb(15 23 42 / 0.35), 0 0 0 0.5rem rgb(22 163 74 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hsp-dock[data-state="ringing"] {
+    animation: none;
+  }
+}
+
+/* Скринридер читает live-регион, глазам он не нужен. */
+.hsp-dock__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Телефон в браузере — для компьютера: на телефоне окон-«попапов» нет. */
+@media (max-width: 767px) {
+  .hsp-dock {
+    display: none;
+  }
+}
