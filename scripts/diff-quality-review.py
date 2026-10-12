@@ -154,11 +154,18 @@ class Report:
     kb: list[Finding] = field(default_factory=list)
     bugs: list[Finding] = field(default_factory=list)
     yo: list[Finding] = field(default_factory=list)
+    tests: list[Finding] = field(default_factory=list)
 
     @property
     def total(self) -> int:
         """Count of all findings."""
-        return len(self.security) + len(self.kb) + len(self.bugs) + len(self.yo)
+        return (
+            len(self.security)
+            + len(self.kb)
+            + len(self.bugs)
+            + len(self.yo)
+            + len(self.tests)
+        )
 
 
 def _changed_paths() -> list[str]:
@@ -262,6 +269,63 @@ def _scan_added(path: str, report: Report) -> None:
                     report.yo.append(Finding(code, path, lineno, msg, text.strip()))
 
 
+_READ_TEXT = re.compile(r"\.read_text\(")
+_PY_SOURCE_REF = re.compile(r"""\.py["')]""")
+_SOURCE_LINT_MARK = "# source-lint:"
+
+
+def is_test_path(path: str) -> bool:
+    """Backend pytest module (``tests/`` dir or ``test_*.py``)."""
+    norm = path.replace("\\", "/")
+    name = norm.rsplit("/", 1)[-1]
+    return norm.endswith(".py") and (
+        "/tests/" in f"/{norm}" or name.startswith("test_")
+    )
+
+
+def source_text_asserts(added: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Added ``read_text()`` calls that read a ``.py`` source without a source-lint mark.
+
+    The ``.py`` reference may sit on the same line or up to three added lines above
+    (``path = ROOT / "x.py"`` then ``path.read_text()``).
+    """
+    hits: list[tuple[int, str]] = []
+    for index, (lineno, text) in enumerate(added):
+        if not _READ_TEXT.search(text) or _SOURCE_LINT_MARK in text:
+            continue
+        window = [line for _, line in added[max(0, index - 3) : index + 1]]
+        if any(_PY_SOURCE_REF.search(line) for line in window):
+            hits.append((lineno, text))
+    return hits
+
+
+def _scan_test_quality(path: str, report: Report) -> None:
+    """TST001: new tests must check behaviour, not the text of Python sources."""
+    if _should_skip(path) or not is_test_path(path):
+        return
+    # Fixtures of the rule itself are string literals, not source reads.
+    if path.replace("\\", "/").endswith("tests/test_diff_quality_review.py"):
+        return
+    try:
+        added = _unified_added_lines(path)
+    except subprocess.CalledProcessError:
+        return
+    for lineno, text in source_text_asserts(added):
+        report.tests.append(
+            Finding(
+                "TST001",
+                path,
+                lineno,
+                (
+                    "Тест читает .py-исходник: проверяй поведение (вызов, ответ API, ORM). "
+                    f"Source-lint — только с пометкой «{_SOURCE_LINT_MARK} причина» "
+                    "(.cursor/rules/tests-catch-bugs.mdc)"
+                ),
+                text.strip(),
+            ),
+        )
+
+
 def _scan_admin_views(path: str, report: Report) -> None:
     """Flag custom admin_view handlers that lack an obvious AuthZ check."""
     if not path.endswith(".py") or "/admin" not in path.replace("\\", "/"):
@@ -343,6 +407,7 @@ def main() -> int:
     for path in paths:
         _scan_added(path, report)
         _scan_admin_views(path, report)
+        _scan_test_quality(path, report)
 
     print("Ревью diff: баги · стандарты БЗ · безопасность · буква ё")
     print(f"Файлов в diff: {len(paths)}")
@@ -350,6 +415,7 @@ def main() -> int:
     _print_section("Стандарты БЗ (стиль/типы/ошибки)", report.kb)
     _print_section("Баги / долги в diff", report.bugs)
     _print_section("Русский текст (буква ё)", report.yo)
+    _print_section("Качество тестов", report.tests)
 
     print("")
     if report.total == 0:
@@ -358,7 +424,7 @@ def main() -> int:
     print(f"✗ Статическое ревью: {report.total} замечаний (блокирует checkup)")
     print(
         "  Агент: дополнительно проверь IDOR/AuthZ, N+1, mass assignment "
-        "по .cursor/rules/pre-commit-checkup.mdc §2–4.",
+        "и негативные кейсы тестов (.cursor/rules/tests-catch-bugs.mdc).",
     )
     return 1
 
