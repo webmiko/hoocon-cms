@@ -158,8 +158,14 @@ def test_seed_wiki_novosystem_guide() -> None:
     call_command("seed_wiki", stdout=StringIO())
     doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
     assert doc.category == "Инструкции"
-    for anchor in ("widget", "uis", "employee", "call", "journal", "trouble"):
+    for anchor in ("widget", "uis", "employee", "call", "inbound", "journal", "trouble"):
         assert f'id="{anchor}"' in doc.body
+    assert "8 800 350-58-98" in doc.body
+    assert "15 секунд" in doc.body
+    assert "Переадресация 1" in doc.body
+    assert "кто ответил первым" in doc.body
+    assert "Александра и Ларисы" in doc.body
+    assert "в сценарий не входят" not in doc.body
     assert "ID сотрудника UIS" in doc.body
     assert "call_session_id" in doc.body
     assert "employee_id" in doc.body
@@ -168,6 +174,8 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert "09.10.2026" in guide.body
+    assert 'id="changelog-uis-call-order"' in guide.body
+    assert "12.10.2026" in guide.body
     assert "Телефония Новосистем (UIS)" in guide.body
     mango = WikiDocument.objects.get(slug="mango-telephony-guide")
     assert "настройках сервера" not in mango.body
