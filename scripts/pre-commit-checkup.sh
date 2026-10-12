@@ -73,6 +73,17 @@ else
   fail "pytest — ошибки или coverage ниже порога (cd backend && poetry run pytest -q --cov && poetry run python ../scripts/check-coverage-floors.py)"
 fi
 
+# ── 4б. Red-first: изменённые тесты красные на коде из HEAD ───
+set +e
+RED_FIRST_OUT=$(python3 "$ROOT/scripts/check-red-first.py" 2>&1)
+RED_FIRST_CODE=$?
+set -e
+if [ "$RED_FIRST_CODE" -eq 0 ]; then
+  ok "Red-first — ${RED_FIRST_OUT%%$'\n'*}"
+else
+  fail "Red-first — тесты не ловят изменение:"$'\n'"$RED_FIRST_OUT"
+fi
+
 # ── 5. pip-audit ─────────────────────────────────────────────
 # PyPI advisory API иногда таймаутится; OSV — запасной сервис (тот же --strict).
 if (cd "$BACKEND" && poetry run pip-audit --strict) >/dev/null 2>&1 \
