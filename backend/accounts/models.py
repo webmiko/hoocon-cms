@@ -299,6 +299,16 @@ class StaffVpbxProfile(models.Model):
         default="",
         help_text=_("Числовой id сотрудника в Новосистем (UIS). Нужен для звонка из карточки, когда виджет включён."),
     )
+    uis_webrtc_token = models.CharField(
+        _("токен WebRTC (UIS)"),
+        max_length=1000,
+        blank=True,
+        default="",
+        help_text=_(
+            "Личный токен сотрудника для телефона в браузере. Хранится зашифрованным, "
+            "обратно в форме не показывается. Пустое поле при сохранении не стирает токен."
+        ),
+    )
 
     class Meta:
         verbose_name = _("Добавочный сотрудника (Mango)")
@@ -307,6 +317,20 @@ class StaffVpbxProfile(models.Model):
     def __str__(self) -> str:
         ext = (self.extension or "").strip() or "—"
         return f"VPBX({self.user_id}, {ext})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Encrypt the WebRTC token at rest before persisting."""
+        from accounts.mailbox_secrets import encrypt_mailbox_secret
+
+        self.uis_webrtc_token = encrypt_mailbox_secret(self.uis_webrtc_token or "")
+        super().save(*args, **kwargs)
+
+    @property
+    def uis_webrtc_token_plain(self) -> str:
+        """Plain WebRTC token for the owner's browser (empty if unreadable)."""
+        from accounts.mailbox_secrets import decrypt_mailbox_secret
+
+        return decrypt_mailbox_secret(self.uis_webrtc_token or "")
 
 
 class ClientAuthMode(models.TextChoices):

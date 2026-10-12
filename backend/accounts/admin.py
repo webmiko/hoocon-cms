@@ -19,7 +19,7 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import ActionForm
 
-from accounts.forms import StaffMailboxForm, StaffUserChangeForm, StaffUserCreationForm
+from accounts.forms import StaffMailboxForm, StaffUserChangeForm, StaffUserCreationForm, StaffVpbxProfileForm
 from accounts.models import (
     ClientAccount,
     PasskeyCredential,
@@ -84,13 +84,14 @@ class StaffMailboxInline(admin.StackedInline):
 
 
 class StaffVpbxProfileInline(admin.StackedInline):
-    """Mango VPBX extension — binds inbound/outbound calls to this manager."""
+    """Telephony binding: Mango extension, UIS employee id, browser-phone token."""
 
     model = StaffVpbxProfile
+    form = StaffVpbxProfileForm
     can_delete = False
     extra = 1
     max_num = 1
-    fields = ("extension", "uis_employee_id", "is_enabled")
+    fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token", "clear_uis_webrtc_token")
     verbose_name = "Телефония сотрудника"
     verbose_name_plural = "Телефония сотрудника"
 

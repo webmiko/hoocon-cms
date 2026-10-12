@@ -73,6 +73,7 @@ LATIN_UI_ALLOWLIST: frozenset[str] = frozenset(
         "gigachat",
         "mango",
         "uis",
+        "webrtc",
         "ext",
         "num",
         "call",
