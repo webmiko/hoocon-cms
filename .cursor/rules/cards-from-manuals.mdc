@@ -1,0 +1,46 @@
+---
+description: Новые карточки с мануалами — ТТХ/схемы/фото сразу из PDF инструкции
+alwaysApply: true
+---
+
+# Карточки ← мануалы
+
+Когда заводишь **новые** Product/SKU и для них уже есть инструкция
+(`_инструкции-pdf/RU/` или готовый HTML в `_manuals-ru/{DA,SA,HV}/`) —
+**сразу** бери контент из мануала, не оставляй карточку «голой» до отдельной
+итерации.
+
+## Обязательный порядок
+
+1. **ТТХ / copy** — из RU PDF / HTML мануала (момент, время, мощность, IP,
+   вал, масса, габариты, напряжение, управление). Пиши в
+   `FAMILY_SPECS` / enrich ETL той же серии.
+2. **PDF на SKU** — `attach_manual_pdfs --series …` (локально; на прод —
+   pack `_pack/manuals-pdf/RU/` + та же команда).
+   Паспорт изделия из `_инструкции-pdf/паспорт изделия/` — тем же
+   `attach_manual_pdfs` (`--series all` / `--series passport`), **рядом**
+   с инструкцией, не вместо неё.
+3. **Фото / схемы** — из ассетов мануала, пока нет studio/media-webp:
+   - demo: `{DA,SA,HV}/assets/<stem>/product.png` (+ wiring / dimensions /
+     rotation / unlock / aux при необходимости);
+   - ETL: кроп из PDF (`attach_manual_diagrams` / series media) **или**
+     явная проводка demo→`ProductImage`, если pack ещё пуст.
+4. Не публикуй на сайт (`is_published=False`), если нет остатков/фото по
+   договорённости — но **данные и медиа в Admin уже должны быть**.
+
+## Нельзя
+
+```text
+❌ Seed SKU «пустышка» → PDF/фото «потом».
+❌ ТТХ только из старого EN/каталога, когда RU-мануал уже есть и точнее.
+❌ Ждать media-webp, если в мануале уже есть пригодный product/схемы.
+```
+
+## Можно отложить только
+
+- Студийный WebP / canvas-hero, если demo-PNG уже на карточке.
+- Публикацию на витрине (остатки, SEO) — не наполнение карточки.
+
+Канон серий: [_docs/series-card-templates.md](_docs/series-card-templates.md);
+мануалы: [_manuals-ru/TEMPLATES.md](_manuals-ru/TEMPLATES.md);
+герои: [_docs/catalog-hero-canvas.md](_docs/catalog-hero-canvas.md).

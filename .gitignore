@@ -31,8 +31,9 @@ logs/*
 *.swo
 .DS_Store
 
-# Cursor + вход агента / план — только локально
-.cursor/
+# Cursor + вход агента / план — только локально; правила агента — в git
+.cursor/*
+!.cursor/rules/
 AGENTS.md
 ПЛАН-ПРОЕКТА.md
 

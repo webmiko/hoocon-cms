@@ -1,0 +1,40 @@
+---
+description: Нумерация релизов при новой фиче (канон _docs/releases.md)
+alwaysApply: true
+---
+
+# Релизы: внутренний PATCH, прод — MINOR
+
+Канон: [_docs/releases.md](_docs/releases.md), код —
+`backend/config/release.py` + `frontend/src/release.ts`, бамп —
+`scripts/bump-release.py`.
+
+Сейчас GA (`RELEASE_CHANNEL = ""`): внутри три числа
+`MAJOR.MINOR.PATCH` (`3.2.1`), на сайте и в админке два — `v3.2`.
+
+## Когда поднимать
+
+1. **Новая фича** (Admin или публичный фронт) в `develop` →
+   `python3 scripts/bump-release.py patch` (`3.2.0` → `3.2.1`).
+   Подпись на проде не меняется.
+2. **Релиз на прод** («PR на прод», «деплой», «сведи в main») →
+   перед merge `python3 scripts/bump-release.py minor`
+   (`3.2.4` → `3.3.0`, на проде `v3.3`), если `MAJOR.MINOR` в `develop`
+   ещё как на `main`. Уже впереди — не поднимать повторно.
+   `merge-release-pr.sh` сам откажет, если MINOR не сменился.
+3. **Косметика / docs / только тесты** → версию не трогать.
+4. **MAJOR** → **только по явной команде** («подними major», «v4», …).
+   При MINOR = 99 без команды MAJOR — спросить, не угадывать.
+5. **Beta** (`RELEASE_CHANNEL = "beta"`, историческая эпоха) — вручную,
+   `v0.1.N beta`.
+
+## Что синхронизировать
+
+Скрипт пишет `release.py`, `release.ts`, `pyproject.toml`
+(`[project].version`), `frontend/package.json`; проверка —
+`--check` и `backend/tests/test_release.py`. Вручную — строка в
+changelog [_docs/releases.md](_docs/releases.md).
+
+Бамп — отдельным коммитом после фичи (`atomic-commits.mdc`). Перед
+коммитом — `./scripts/pre-commit-checkup.sh`. Не версионировать
+под оплату/корзину (нет в v1).

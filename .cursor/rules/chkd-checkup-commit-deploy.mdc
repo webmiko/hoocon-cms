@@ -1,0 +1,52 @@
+---
+description: «чкд» = checkup → commit → push develop → release PR; прод = merge PR
+alwaysApply: true
+---
+
+# чкд — checkup · коммит · release PR
+
+Команда **`чкд`** («чек комит деплой» и синонимы):
+
+1. **Checkup** — `./scripts/pre-commit-checkup.sh`. Красный → не коммить.
+   Рукописное ревью по поверхности diff:
+   UI/Lighthouse — **только** если в diff фронт.
+   Diff на границе доверия (checkup печатает список) — независимое ревью
+   другой моделью до коммита (`trust-boundary-review.mdc`).
+2. **Коммит** — atomic (`atomic-commits.mdc`); прошедшее время; без секретов.
+3. **Пуш** — `git push origin develop` (ветка разработки; см. `develop-main.mdc`).
+4. **Release PR** — после пуша, если `develop` впереди `main`:
+   - **нет** открытого PR `develop` → `main` → `./scripts/ensure-release-pr.sh`
+     (создаёт **один** PR на весь накопленный diff);
+   - PR **уже** открыт → новые коммиты **добавляются в тот же PR** автоматически,
+     второй PR не создавать.
+5. Дождаться CI на `develop` / PR (или сообщить красный).
+
+**На `main` напрямую не пушить** (`git push origin main`, локальный merge+push
+запрещены). Прод — только merge release PR.
+
+## Прод (отдельная команда)
+
+Срабатывает по фразам: **PR на прод**, **деплой**, **сведи в main**,
+**выкатываем в main**, **чкд и все на прод** (после шагов чкд, если нужно).
+
+1. Убедиться: последние коммиты на `origin/develop`, checkup/CI зелёные.
+2. Открытый release PR существует (`gh pr list --base main --head develop`);
+ если нет — `./scripts/ensure-release-pr.sh`.
+2а. Если `MAJOR.MINOR` в `develop` такой же, как на `main` —
+ `python3 scripts/bump-release.py minor`, коммит `Bumped release to vX.Y.`,
+ push `develop` (см. `release-version.mdc`).
+3. **Смержить весь PR** в `main` (все коммиты из PR, не один cherry-pick):
+   `./scripts/merge-release-pr.sh`
+   или `gh pr merge <номер> --merge --delete-branch=false`.
+4. Дождаться CI/CD deploy на `main` (или сообщить красный).
+
+| Говорит пользователь | Что делать |
+|----------------------|------------|
+| **чкд** | checkup + commit + push develop + ensure release PR |
+| **PR на прод** / **деплой** / **сведи в main** | merge **весь** открытый release PR → main |
+| **выкатываем** / «вручную» | `./scripts/deploy-to-vps.sh` (после зелёного checkup) |
+
+«чкд» по умолчанию **без** merge в `main`. Merge — только по явной просьбе на прод.
+
+Не force-push / не `--no-verify`. Релиз-бамп — не из «чкд», а по
+`release-version.mdc` при новой фиче.
