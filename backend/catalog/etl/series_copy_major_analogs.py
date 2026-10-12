@@ -15,7 +15,7 @@ import re
 from typing import Any, Final
 
 from catalog.etl.attr_write import write_copy
-from catalog.etl.belimo_analogs import belimo_family_by_area
+from catalog.etl.belimo_analogs import belimo_family_by_area, compose_belimo_article
 from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.tech_copy import normalize_tech_copy
 from catalog.models import SKU, Product
@@ -28,9 +28,9 @@ _FOOTNOTE = normalize_tech_copy(
 )
 
 
-def belimo_fast_family(nm: int) -> str:
+def belimo_fast_family(nm: int) -> str | None:
     """Belimo Q-series by area (LMQ 0.4 / NMQ 0.8 / SMQ 1.6 / GMQ 4.0 м²)."""
-    return belimo_family_by_area("fast", nm / 10) or "GMQ"
+    return belimo_family_by_area("fast", nm / 10)
 
 
 # Siemens OpenAir (on/off base; modulating → …61).
@@ -46,14 +46,12 @@ _SIEMENS_AIR: Final[dict[int, str]] = {
 }
 
 
-def _belimo_air(family: str, voltage: str, *, modulating: bool, aux: bool) -> str:
-    code = f"{family}{voltage}A"
-    if modulating:
-        code += "-SR"
-    # TMC modulating: factory ``…-SR-S`` does not exist (aux = add-on S1A).
-    if aux and not (family == "TMC" and modulating):
-        code += "-S"
-    return f"Belimo {code}"
+def _belimo_air(family: str | None, voltage: str, *, modulating: bool, aux: bool) -> str | None:
+    """«Belimo …» bullet text, or None when Belimo has no direct analog."""
+    if family is None:
+        return None
+    code = compose_belimo_article(family, voltage=voltage, modulating=modulating, aux=aux)
+    return f"Belimo {code}" if code else None
 
 
 def _siemens_air(prefix: str, voltage: str, *, modulating: bool, aux: bool) -> str:
@@ -116,10 +114,11 @@ def _lines_major_air(
     fast: bool,
 ) -> list[str]:
     """Bullet lines for one edition (major brands only)."""
-    family = belimo_family_by_area("fast" if fast else "air_no_spring", nm / 10) or "GM"
+    family = belimo_family_by_area("fast" if fast else "air_no_spring", nm / 10)
     siemens = _SIEMENS_AIR.get(nm, "GLB")
-    lines = [
-        f"– {_belimo_air(family, voltage, modulating=modulating, aux=aux)}",
+    belimo = _belimo_air(family, voltage, modulating=modulating, aux=aux)
+    lines = [f"– {belimo}"] if belimo else []
+    lines += [
         f"– {_siemens_air(siemens, voltage, modulating=modulating, aux=aux)}",
         f"– {_honeywell_air(nm, voltage, modulating=modulating, aux=aux)}",
         f"– {_jci_air(nm, voltage, aux=aux)}",
@@ -177,11 +176,11 @@ def build_damqu_analogs(nm: int) -> str:
 
 
 def build_sa7mu_analogs() -> str:
-    """SA7MU smoke — on/off DS/DST, Belimo BEE/BLE class."""
+    """SA7MU smoke — on/off DS/DST; no Belimo (smallest smoke class BEN/BLE is 15 Нм)."""
     blocks: list[str] = [
         ("Список аналогов для привода заслонки дымоудаления Hoocon серии SA7MU (без возвратной пружины, 7 Нм)"),
         "",
-        "Крупные марки: Belimo, Siemens, Honeywell, Gruner, Johnson Controls.",
+        "Крупные марки: Siemens, Honeywell, Gruner, Johnson Controls.",
         "",
     ]
     for voltage in ("24", "230"):
@@ -193,8 +192,6 @@ def build_sa7mu_analogs() -> str:
             if thermal:
                 blocks.extend(
                     [
-                        f"– Belimo BEE{voltage}ST",
-                        f"– Belimo BLE{voltage}-T",
                         "– Siemens GIB161.1E",
                         f"– Honeywell {hw}",
                         f"– Gruner 340TA-{voltage}-10-S2",
@@ -203,8 +200,6 @@ def build_sa7mu_analogs() -> str:
             else:
                 blocks.extend(
                     [
-                        f"– Belimo BEE{voltage}",
-                        f"– Belimo BLE{voltage}",
                         "– Siemens GIB131.1E",
                         f"– Honeywell {hw}",
                         f"– Johnson Controls M9220-AGA-{voltage}",
@@ -315,10 +310,10 @@ def build_qx_analogs(brand: str, nm: int) -> str:
             s = "S" if aux else ""
             code = f"{brand_u}{voltage}{s}-{nm}QX"
             blocks.append(f"{code} ({voltage} В):")
-            fam = belimo_fast_family(nm)
             # Belimo electronic fail-safe: same family class; confirm SuperCap docs.
-            bel = _belimo_air(fam, voltage, modulating=modulating, aux=aux)
-            blocks.append(f"– {bel} (класс; уточняйте Fail-Safe / SuperCap)")
+            bel = _belimo_air(belimo_fast_family(nm), voltage, modulating=modulating, aux=aux)
+            if bel:
+                blocks.append(f"– {bel} (класс; уточняйте Fail-Safe / SuperCap)")
             siemens = _siemens_air(
                 _SIEMENS_AIR.get(nm, "GLB"),
                 voltage,

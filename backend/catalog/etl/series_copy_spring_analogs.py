@@ -23,93 +23,69 @@ Fire damper (SAFU, spring + 12×12):
 
 from __future__ import annotations
 
-from catalog.etl.belimo_analogs import belimo_family_by_area
+from catalog.etl.belimo_analogs import belimo_family_by_area, compose_belimo_article
 from catalog.etl.series_copy_major_analogs import _FOOTNOTE
 from catalog.etl.tech_copy import normalize_tech_copy
 
+_SAMU_NM = (10, 15, 30)
+_SPRING_NM = (3, 5, 10, 15, 20)
+
 # Hoocon Nm per series → Belimo family, largest whose area ≤ Hoocon area.
-_SAMU_BELIMO: dict[int, tuple[str, str]] = {
-    # (primary, secondary): BLE is the second 15 Нм smoke model next to BEN.
-    nm: (family, "BLE" if family == "BEN" else family)
-    for nm in (10, 15, 30)
-    if (family := belimo_family_by_area("smoke", nm / 10))
-}
-
-_DAFU_BELIMO: dict[int, str] = {
-    nm: family for nm in (3, 5, 10, 15, 20) if (family := belimo_family_by_area("air_spring", nm / 10))
-}
-
+# None: even the smallest Belimo is stronger → no direct analog, no Belimo line.
+_SAMU_BELIMO: dict[int, str | None] = {nm: belimo_family_by_area("smoke", nm / 10) for nm in _SAMU_NM}
+_DAFU_BELIMO: dict[int, str | None] = {nm: belimo_family_by_area("air_spring", nm / 10) for nm in _SPRING_NM}
 # SA20FU: BF 18/12 Нм is the largest compact fire actuator Belimo makes.
-_SAFU_BELIMO: dict[int, str] = {
-    nm: family for nm in (3, 5, 10, 15, 20) if (family := belimo_family_by_area("fire_spring", nm / 10))
-}
+_SAFU_BELIMO: dict[int, str | None] = {nm: belimo_family_by_area("fire_spring", nm / 10) for nm in _SPRING_NM}
 
 
-def _smoke_belimo(family: str, voltage: str, *, thermal: bool) -> str:
-    """Compose Belimo smoke-control article (BEN/BLE/BEE/BE)."""
-    if family == "BEE":
-        return f"Belimo BEE{voltage}{'ST' if thermal else ''}"
-    code = f"Belimo {family}{voltage}"
-    if thermal:
-        code += "-T"
-    return code
-
-
-def _spring_air_belimo(family: str, voltage: str, *, modulating: bool, aux: bool) -> str:
-    """Compose TF/LF/NF/SF article."""
-    if family == "TF":
-        code = f"TF{voltage}"
-        if aux:
-            code += "-S"
-        return f"Belimo {code}"
-    if family == "LF":
-        # LF24 / LF24-S / LF24-RS (modulating)
-        if modulating:
-            code = f"LF{voltage}-RS"
-        else:
-            code = f"LF{voltage}"
-            if aux:
-                code += "-S"
-        return f"Belimo {code}"
-    # NF / SF — modern ``A`` generation
-    code = f"{family}{voltage}A"
-    if modulating:
-        code += "-SR"
-    if aux:
-        code += "-S"
-    return f"Belimo {code}"
-
-
-def _fire_belimo(family: str, voltage: str, *, thermal: bool) -> str:
-    """Compose BFL/BLF/BFN/BF article (2×SPDT built-in)."""
-    code = f"Belimo {family}{voltage}"
-    if thermal:
-        code += "-T"
-    return code
+def _belimo_lines(
+    families: tuple[str | None, ...],
+    voltage: str,
+    *,
+    modulating: bool = False,
+    aux: bool = False,
+    thermal: bool = False,
+) -> list[str]:
+    """«– Belimo …» bullets for families that have a direct analog of this edition."""
+    lines: list[str] = []
+    for family in families:
+        if family is None:
+            continue
+        code = compose_belimo_article(family, voltage=voltage, modulating=modulating, aux=aux, thermal=thermal)
+        if code:
+            lines.append(f"– Belimo {code}")
+    return lines
 
 
 def build_samu_analogs(nm: int) -> str:
     """SA..MU smoke (no spring) — DS / DST × 24/230."""
-    families = _SAMU_BELIMO.get(nm)
-    if not families:
-        raise ValueError(f"No Belimo smoke band for SA{nm}MU")
-    primary, secondary = families
+    if nm not in _SAMU_BELIMO:
+        raise ValueError(f"No SA{nm}MU smoke series")
+    family = _SAMU_BELIMO[nm]
+    # BLE is the second 15 Нм smoke model next to BEN.
+    families = (family, "BLE") if family == "BEN" else (family,)
     blocks: list[str] = [
         (f"Список аналогов для привода заслонки дымоудаления Hoocon серии SA{nm}MU (без возвратной пружины, {nm} Нм)"),
         "",
-        ("Belimo smoke-control (каталог): BEN/BLE ≈ 15 Нм, BEE ≈ 25 Нм, BE ≈ 40 Нм. CM 2 Нм — не класс дымоудаления."),
-        "",
-        "Крупные марки: Belimo, Siemens, Honeywell, Gruner.",
-        "",
     ]
+    if family:
+        blocks += [
+            (
+                "Belimo smoke-control (каталог): BEN/BLE ≈ 15 Нм, BEE ≈ 25 Нм, BE ≈ 40 Нм. "
+                "CM 2 Нм — не класс дымоудаления."
+            ),
+            "",
+            "Крупные марки: Belimo, Siemens, Honeywell, Gruner.",
+        ]
+    else:
+        blocks.append("Крупные марки: Siemens, Honeywell, Gruner.")
+    blocks.append("")
     for voltage in ("24", "230"):
         for thermal, suf in ((False, "DS"), (True, "DST")):
             code = f"SA{nm}MU{voltage}-{suf}"
             note = ", с термодатчиком" if thermal else ""
             blocks.append(f"{code} ({voltage} В, открыто/закрыто{note}):")
-            blocks.append(f"– {_smoke_belimo(primary, voltage, thermal=thermal)}")
-            if secondary != primary:
-                blocks.append(f"– {_smoke_belimo(secondary, voltage, thermal=thermal)}")
+            blocks.extend(_belimo_lines(families, voltage, aux=True, thermal=thermal))
             if thermal:
                 blocks.append("– Siemens GIB161.1E")
                 blocks.append(
@@ -130,9 +106,9 @@ def build_samu_analogs(nm: int) -> str:
 
 def build_dafu_analogs(nm: int) -> str:
     """DA..FU spring-return air — D/DS (+ A/AS when 24 В modulating exists)."""
-    family = _DAFU_BELIMO.get(nm)
-    if not family:
-        raise ValueError(f"No Belimo spring band for DA{nm}FU")
+    if nm not in _DAFU_BELIMO:
+        raise ValueError(f"No DA{nm}FU spring series")
+    family = _DAFU_BELIMO[nm]
     blocks: list[str] = [
         (f"Список аналогов для привода заслонки Hoocon серии DA{nm}FU (с возвратной пружиной, {nm} Нм)"),
         "",
@@ -151,9 +127,7 @@ def build_dafu_analogs(nm: int) -> str:
         ):
             code = f"DA{nm}FU{voltage}-{suf}"
             blocks.append(f"Аналоги для {code} ({voltage} В, 2-/3-позиционное):")
-            blocks.append(
-                f"– {_spring_air_belimo(family, voltage, modulating=False, aux=aux)}",
-            )
+            blocks.extend(_belimo_lines((family,), voltage, aux=aux))
             blocks.append(
                 f"– Siemens {'GCA' if voltage == '230' else 'GDB'}{'126' if aux else '121'}.1E",
             )
@@ -161,13 +135,12 @@ def build_dafu_analogs(nm: int) -> str:
         # Modulating editions exist on 24 В cards for 5/10/15/20 Нм.
         if voltage == "24" and nm >= 5:
             for aux, suf in ((False, "A"), (True, "AS")):
-                code = f"DA{nm}FU24-{suf}"
                 blocks.append(
-                    f"Аналоги для {code} (24 В, пропорциональное 0…10 В):",
+                    f"Аналоги для DA{nm}FU24-{suf} (24 В, пропорциональное 0…10 В):",
                 )
-                blocks.append(
-                    f"– {_spring_air_belimo(family, '24', modulating=True, aux=aux)}",
-                )
+                # Keep the edition block: without it the A block's Belimo would match AS by prefix.
+                lines = _belimo_lines((family,), "24", modulating=True, aux=aux)
+                blocks.extend(lines or ["– Прямого аналога среди крупных марок нет."])
                 blocks.append("")
     blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
@@ -175,9 +148,9 @@ def build_dafu_analogs(nm: int) -> str:
 
 def build_safu_analogs(nm: int) -> str:
     """SA..FU fire damper — DS / DST × 24/230."""
-    family = _SAFU_BELIMO.get(nm)
-    if not family:
-        raise ValueError(f"No Belimo fire band for SA{nm}FU")
+    if nm not in _SAFU_BELIMO:
+        raise ValueError(f"No SA{nm}FU fire series")
+    family = _SAFU_BELIMO[nm]
     blocks: list[str] = [
         (f"Список аналогов для противопожарного привода Hoocon серии SA{nm}FU (пружинный возврат, {nm} Нм)"),
         "",
@@ -191,7 +164,7 @@ def build_safu_analogs(nm: int) -> str:
             code = f"SA{nm}FU{voltage}-{suf}"
             note = ", с термодатчиком" if thermal else ""
             blocks.append(f"{code} ({voltage} В{note}):")
-            blocks.append(f"– {_fire_belimo(family, voltage, thermal=thermal)}")
+            blocks.extend(_belimo_lines((family,), voltage, aux=True, thermal=thermal))
             # Compact US-style FSR/FST only for ~3 Нм.
             if nm <= 3:
                 tag = "FST" if thermal else "FSR"
