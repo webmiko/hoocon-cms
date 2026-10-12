@@ -68,6 +68,18 @@ def head_source(path: str) -> str:
     return git("show", f"HEAD:{path}")
 
 
+def tests_are_red(returncode: int, report_lines: list[str]) -> bool:
+    """Changed tests do not pass on the code before the change.
+
+    Pytest exits 4 when a new test file cannot be collected, usually because
+    it imports a module that does not exist yet. That is still a red result:
+    the tests depend on the change and never reach a passing assert.
+    """
+    if returncode in (1, 2):
+        return True
+    return returncode == 4 and any(line.startswith("ERROR ") for line in report_lines)
+
+
 def venv_python() -> str:
     override = os.environ.get("RED_FIRST_PYTHON", "").strip()
     if override:
@@ -130,7 +142,7 @@ def main() -> int:
     summary = [line for line in result.stdout.splitlines() if line.startswith(("FAILED", "ERROR"))]
     tail = result.stdout.strip().splitlines()[-1:] or [""]
     print(f"Red-first: {len(node_ids)} изменённых тестов на коде из HEAD → {tail[0]}")
-    if result.returncode in (1, 2):
+    if tests_are_red(result.returncode, summary):
         for line in summary[:10]:
             print(f"  красный без правки: {line}")
         return 0

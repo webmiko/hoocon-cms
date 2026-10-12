@@ -82,3 +82,15 @@ def test_new_file_selects_every_test() -> None:
 def test_moving_code_without_changing_it_selects_nothing() -> None:
     red_first = _load()
     assert red_first.changed_tests(OLD, "\n\n" + OLD) == []
+
+
+def test_uncollectable_new_test_counts_as_red_on_old_code() -> None:
+    """Новый тест, который импортирует новый модуль, на HEAD не собирается (pytest код 4).
+
+    Раньше проверка останавливалась с «проверка не выполнена», хотя тест без правки не зелёный.
+    """
+    red_first = _load()
+    assert red_first.tests_are_red(4, ["ERROR tests/test_softphone.py"])
+    assert red_first.tests_are_red(1, ["FAILED tests/test_softphone.py::test_x"])
+    assert not red_first.tests_are_red(4, [])
+    assert not red_first.tests_are_red(0, [])
