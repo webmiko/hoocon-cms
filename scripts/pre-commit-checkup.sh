@@ -233,6 +233,14 @@ if [ -n "$FE_CHANGED" ] && [ -f "$ROOT/frontend/package.json" ]; then
   fi
 fi
 
+# ── 13. Граница доверия: нужно независимое ревью ─────────────
+TRUST_RE='^(backend/(accounts|cabinet|social|staff_api|webpush)/|backend/crm/admin/|backend/leads/admin\.py|backend/config/(admin_otp|settings)\.py|backend/supportchat/(views|serializers)\.py|backend/Dockerfile|backend/\.dockerignore|docker-compose[^/]*\.yml|deploy/nginx/|scripts/(deploy[^/]*|ssh-trust)\.sh|\.github/workflows/)'
+TRUST_CHANGED=$(echo "$STAGED" | grep -E "$TRUST_RE" || true)
+if [ -n "$TRUST_CHANGED" ]; then
+  warn "Граница доверия — до коммита ревью другой моделью (security-review / bugbot):"
+  echo "$TRUST_CHANGED" | sed 's/^/    /'
+fi
+
 # ── Итог ─────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════"
