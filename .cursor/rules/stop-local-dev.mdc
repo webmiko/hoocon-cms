@@ -1,0 +1,21 @@
+---
+description: Stop local dev servers on request
+alwaysApply: true
+---
+
+# Start / Stop local dev servers
+
+Pinned local ports for this repo: **backend `8002`**, **frontend `5174`**
+(Vite proxies `/api` → `http://127.0.0.1:8002`).
+
+If the user says `останови локалку` or clearly asks to stop local dev work:
+
+- Stop only local frontend/backend dev servers.
+- Do not stop or reset Postgres/data unless the user explicitly asks.
+- In this repo, use `./scripts/stop-local-dev.sh`.
+
+If the user says `запусти локалку` or asks to bring local dev back up:
+
+- Use `./scripts/start-local-dev.sh` (ports 8002 / 5174).
+- Do not recreate or wipe Postgres/data unless the user explicitly asks.
+- Do not steal 8000/5173 — those stay free for other projects.

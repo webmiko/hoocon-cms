@@ -1,0 +1,46 @@
+---
+description: Prevent mobile horizontal scroll (100vw, fixed overlays, <16px inputs)
+globs: frontend/**/*.{css,module.css,tsx,jsx}
+alwaysApply: false
+---
+
+# Mobile: без горизонтального скролла
+
+Повторяющийся баг: fixed-оверлеи / формы на телефоне раздувают страницу
+вбок (чат поддержки, фокус в input < 16px → iOS zoom).
+
+## Обязательно
+
+1. **Не `100vw` для ширины fixed/sticky UI.**  
+   `100vw` ≥ layout width на mobile (scrollbar / visual viewport) → overflow.  
+   Паттерн: у корневого fixed задать `left` + `right` (inset), внутри
+   `width: min(….px, 100%)` + `max-width: 100%` + `min-width: 0` +
+   `box-sizing: border-box`.
+
+2. **Flex/grid дети сжимаются:** `min-width: 0` (или
+   `grid-template-columns: minmax(0, 1fr) …`). Длинный текст —
+   `overflow-wrap: anywhere` / `break-word`, не раздувать панель.
+
+3. **Поля ввода ≥ 16px** на touch (`input` / `textarea` / `select`).  
+   Глобально: `frontend/src/styles/global.css` (`!important` на coarse).  
+   В CSS modules **не** ставить `font-size` < 1rem / 16px на эти контролы —
+   иначе снова iOS zoom → горизонтальный скролл (как с формами RFQ).
+
+4. После правки оверлея — проверить **узкий телефон** с открытой панелью
+   и фокусом в textarea: страница не должна ехать вбок.
+
+## Антипаттерны
+
+```css
+/* плохо */
+.panel { width: min(360px, calc(100vw - 32px)); }
+.root { right: 12px; } /* без left — легко промахнуться с gutter */
+.field input { font-size: 0.85rem; } /* zoom на iOS */
+
+/* хорошо */
+.root { left: 12px; right: 12px; }
+.panel { width: min(360px, 100%); max-width: 100%; min-width: 0; }
+.field input { font-size: var(--font-size-base); min-width: 0; width: 100%; }
+```
+
+Канон: [_docs/design-system.md](_docs/design-system.md) (типографика / адаптив).

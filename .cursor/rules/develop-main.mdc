@@ -1,0 +1,66 @@
+---
+description: develop + release PR → main; прямой push в main запрещён
+alwaysApply: true
+---
+
+# Ветки: develop · release PR · main
+
+## Модель
+
+- **Разработка** — только в **`develop`** (одна ветка). По умолчанию
+  **не** заводить `feature/*` и **не** открывать PR в `develop`.
+- **Прод / автодеплой** — только с **`main`**: merge release PR →
+  check + build + deploy (см. `.github/workflows/ci.yml`).
+- Push на `develop` → check + build (verify), **без** автодеплоя.
+- **`develop` → `main` только через один открытый release PR**
+  (`develop` → `main`). Прямой `git push origin main` и локальный
+  `git merge origin/develop && git push origin main` **запрещены**.
+
+## Release PR (обязательный канал на прод)
+
+1. Первый **`чкд`** после последнего прод-мержа, когда `develop` впереди
+   `main`: `./scripts/ensure-release-pr.sh` — один PR на все накопленные
+   коммиты.
+2. Следующие **`чкд`**: push в `develop` → коммиты **попадают в тот же PR**;
+   новый PR не создавать, пока предыдущий не смержен.
+3. **Прод** («PR на прод», «деплой», «сведи в main»): merge **всего PR**
+   `./scripts/merge-release-pr.sh` после зелёного CI на `develop`/PR.
+
+Текущий открытый PR: `gh pr list --base main --head develop --state open`.
+
+## Агент обязан
+
+1. Работать и коммитить на **`develop`**. Перед стартом / checkup /
+   коммитом / пушем: `git fetch origin`, быть на `develop`, не отставать
+   от `origin/develop` (`git pull` / merge при необходимости).
+2. Не создавать `feature/*` и не предлагать PR «фича → develop», если
+   пользователь явно не попросил иначе (исключение: dependabot).
+3. **Не пушить в `main`** и **не мержить в `main` в обход PR**.
+4. При продвижении на прод (по просьбе) — только merge release PR:
+
+   ```bash
+   git fetch origin
+   ./scripts/merge-release-pr.sh
+   git checkout develop
+   ```
+
+   После merge — дождаться CI/CD на `main`. `develop` и `main` должны
+   совпасть по tip (fast-forward через PR).
+
+## «чкд» на develop
+
+1. Checkup → atomic commit(s) на **`develop`**.
+2. Push: `git push origin develop`.
+3. `./scripts/ensure-release-pr.sh` если `develop` впереди `main` и PR ещё нет.
+4. Merge в `main` — только по явной просьбе на прод
+   (см. `chkd-checkup-commit-deploy.mdc`).
+
+Если пользователь сказал «чек комит без пуша» — только checkup + commit,
+без push.
+
+## Исключения
+
+- `feature/*` — только по явной просьбе пользователя.
+- Release PR `develop` → `main` — **не** исключение, а обязательный путь на прод.
+- Rebase — только по явной просьбе.
+- Force-push / `--no-verify` — запрещены.

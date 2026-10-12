@@ -1,0 +1,48 @@
+---
+description: Logo-red CTA fills — белый текст в светлой и тёмной теме
+globs: frontend/**/*.{css,tsx,ts}
+alwaysApply: false
+---
+
+# Красная заливка → белый текст (обе темы)
+
+Повторяющийся баг: в **тёмной теме** `--color-on-brand` = тёмный ink для
+коралловых ссылок, а на **logo-red fill** (`#da0e2b`) подпись становится
+чёрной.
+
+## Инвариант
+
+Заливка logo-red / brand-control → **белая** подпись в light **и** dark.
+
+## Токены (канон)
+
+| Роль | Токен |
+|------|--------|
+| Заливка | `--color-brand-fill`, `--color-brand-control`, `--color-primary-control` |
+| Подпись | **`--color-on-brand-control`** или **`--color-on-brand-fill`** |
+| Hover заливки | `--color-brand-control-hover` / `--color-primary-control-hover` |
+
+## Нельзя на красной заливке
+
+- `--color-on-brand` (в dark = ink `#121214`)
+- `--color-on-primary` без привязки к `--color-on-brand-fill` (legacy)
+
+## Разметка
+
+На submit / ссылки с logo-red — `data-brand-fill` (или `data-brand-cta`).
+Глобальные `:link/:visited/:hover` — `global.css`.
+
+## Чеклист при новой кнопке
+
+```css
+background: var(--color-primary-control);
+color: var(--color-on-brand-control);
+/* hover: оба состояния — белый текст */
+```
+
+Проверить в DevTools: `html[data-theme="dark"]` + `:visited`.
+
+## Где смотреть
+
+- `frontend/src/styles/tokens.css` — `--color-on-brand-control`, dark block
+- `frontend/src/styles/global.css` — `[data-brand-fill]`, `[data-brand-cta]`

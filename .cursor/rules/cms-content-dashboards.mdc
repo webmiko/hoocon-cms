@@ -1,0 +1,55 @@
+---
+description: Статьи/лендинги CMS — графики и дашборды вместо стен текста
+globs: backend/content/fixtures/**/*.html,frontend/src/styles/cms-body-charts.css,frontend/src/pages/ArticlePage.*,frontend/src/pages/PageView.*,frontend/src/pages/NewsPage.*
+alwaysApply: false
+---
+
+# CMS-контент: графики и дашборды
+
+При написании и правке **статей, новостей и лендингов** (HTML в
+`backend/content/fixtures/`, body в Admin) числовые сравнения, доли,
+сроки и KPI передавай **визуально** — дашбордом/графиком, не длинным
+абзацем или голой таблицей, если данные сканируются глазом.
+
+## Обязательно
+
+1. Блок цифр → `.dash` + `.dash-panel` (кольцо, бары, метры, KPI, воронка).
+2. Подпись `.dash-note`, если это ориентиры / не live-данные.
+3. Только **HTML + CSS-классы**. `sanitizeHtml` вырезает `svg`, `style`,
+   `data-*` — ширины/высоты только через модификаторы
+   (`.hbar__fill--70`, `.vbar__col--h72`, `.funnel__bar--2`, …).
+4. Стили: `frontend/src/styles/cms-body-charts.css` (контейнер
+   `.cms-rich-body` на Article / Page / News).
+5. Референс разметки: `backend/content/fixtures/page_zavod.html`
+   («Завод в цифрах»).
+
+## Паттерны
+
+| Задача | Классы |
+|--------|--------|
+| Доли / mix | `.donut` + `.legend` + `.swatch--a…d` |
+| Прогресс / QC | `.meter-list` + `.meter__fill--N` |
+| Сравнение величин | `.hbar` + `.hbar__fill--N` |
+| Динамика / вехи | `.vbar` + `.vbar__col--hN` |
+| Сертификаты / метки | `.kpi-tiles` |
+| Этапы / сроки | `.funnel` + `.funnel__bar--1…4` |
+
+Новый процент/высота → добавь класс в `cms-body-charts.css`, не inline.
+
+Студийные фото со светлым фоном: пара
+`.figure--theme` → `.img-theme--light` + `.img-theme--dark`
+(переключение по `html[data-theme="dark"]`).
+
+## Антипаттерны
+
+```html
+<!-- ❌ стена цифр без визуала -->
+<p>Воздушные 42%, ОЗК 23%, HV 22%, клапаны 13%…</p>
+
+<!-- ❌ SVG / style — санитайзер удалит -->
+<svg>…</svg>
+<span style="width:70%"></span>
+
+<!-- ✅ -->
+<div class="dash">…</div>
+```
