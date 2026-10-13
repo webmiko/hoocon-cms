@@ -27,6 +27,7 @@ from supportchat.gigachat.triage import (
     triage_handoff_reply,
     triage_site_nav_reply,
 )
+from supportchat.gigachat.triage_delivery import triage_delivery_reply
 from supportchat.gigachat.triage_docs import is_document_intent, triage_docs_reply
 from supportchat.gigachat.triage_guard import (
     full_output_blocked,
@@ -175,6 +176,10 @@ def generate_ai_reply(
     quiz_reply = triage_quiz_reply(conversation, user_query, payload, inbound_message=inbound_message)
     if quiz_reply is not None:
         return quiz_reply
+
+    delivery_text = triage_delivery_reply(user_query)
+    if delivery_text:
+        return AiReply(text=delivery_text, escalate=False, escalation_note="")
 
     docs_text = triage_docs_reply(user_query)
     if docs_text:
