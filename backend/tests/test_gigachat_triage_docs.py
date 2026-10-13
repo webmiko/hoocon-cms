@@ -76,3 +76,42 @@ def test_docs_with_sku_works_in_full_mode_without_api(settings) -> None:
 
     assert reply.escalate is False
     assert "/dokumentaciya?q=DA5FU230-D" in reply.text
+
+
+def test_catalog_pdf_asks_manager_for_email() -> None:
+    """Запрос единого PDF-каталога → менеджер и почта, без просьбы артикула."""
+    reply = triage_docs_reply("Прошу предоставить каталог продукции в формате PDF")
+    assert reply is not None
+    assert "Единого PDF-каталога" in reply
+    assert "https://hoocon.ru/dokumentaciya" in reply
+    assert "электронную почту" in reply
+    assert "менеджера" in reply
+    assert "артикул" not in reply.lower()
+
+
+def test_unified_document_uses_same_catalog_reply() -> None:
+    """Уточнение «единый документ» — тот же ответ, не повтор про артикул."""
+    reply = triage_docs_reply("Требуется единый документ")
+    assert reply is not None
+    assert "электронную почту" in reply
+    assert "артикул" not in reply.lower()
+
+
+@pytest.mark.django_db
+def test_catalog_pdf_reply_without_api(settings) -> None:
+    """Каталог PDF в triage не зовёт GigaChat и не эскалирует до почты."""
+    settings.GIGACHAT_MODE = "triage"
+    settings.GIGACHAT_CREDENTIALS = "test-key"
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="docs-catalog")
+    Message.objects.create(
+        conversation=conv,
+        direction=MessageDirection.INBOUND,
+        body="Прошу предоставить каталог продукции в формате PDF",
+    )
+
+    with patch("supportchat.gigachat.reply.chat_completion") as api:
+        reply = generate_ai_reply(conv)
+        api.assert_not_called()
+
+    assert reply.escalate is False
+    assert "электронную почту" in reply.text

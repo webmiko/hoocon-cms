@@ -161,11 +161,13 @@ def test_seed_wiki_novosystem_guide() -> None:
     for anchor in ("widget", "uis", "employee", "call", "inbound", "journal", "trouble"):
         assert f'id="{anchor}"' in doc.body
     assert "8 800 350-58-98" in doc.body
-    assert "15 секунд" in doc.body
+    assert "+7 (499) 995-12-77" in doc.body
     assert "Переадресация 1" in doc.body
     assert "кто ответил первым" in doc.body
     assert "Александра и Ларисы" in doc.body
     assert "в сценарий не входят" not in doc.body
+    assert "Личные мобильные в этот дозвон не входят" in doc.body
+    assert ">201<" in doc.body and ">202<" in doc.body and ">203<" in doc.body
     assert "ID сотрудника UIS" in doc.body
     assert "call_session_id" in doc.body
     assert "employee_id" in doc.body
@@ -174,6 +176,8 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert "09.10.2026" in guide.body
+    assert 'id="changelog-uis-lines"' in guide.body
+    assert "+7 (499) 995-12-77" in guide.body
     assert 'id="changelog-uis-call-order"' in guide.body
     assert "12.10.2026" in guide.body
     assert "Телефония Новосистем (UIS)" in guide.body
@@ -215,6 +219,7 @@ def test_seed_wiki_explains_browser_phone() -> None:
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     _body, changelog = guide.body.split('id="changelog"', 1)
     assert 'id="changelog-browser-phone"' in changelog
+    assert changelog.index("changelog-uis-lines") < changelog.index("changelog-browser-phone")
     assert changelog.index("changelog-browser-phone") < changelog.index("changelog-uis-call-order")
     row = changelog.split('id="changelog-browser-phone"', 1)[1].split("</tr>", 1)[0]
     assert row.count("<td>") + row.count("<td ") == 3
