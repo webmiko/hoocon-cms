@@ -40,11 +40,12 @@ def test_build_damu_analogs_belimo_bands() -> None:
 
 
 def test_build_samu_analogs_no_emf_or_cm() -> None:
-    """SA10/15 smoke use BEN/BLE — not invented EMF / CM 2 Нм."""
+    """SA15 smoke uses BEN/BLE; SA10 has no direct Belimo (BEN 15 Нм > 10) — no EMF / CM 2 Нм either."""
     sa10 = build_samu_analogs(10)
-    assert "Belimo BEN24" in sa10
+    assert "Belimo" not in sa10
     assert "EMF" not in sa10
     assert "CM24" not in sa10
+    assert "Siemens GIB131.1E" in sa10
     sa15 = build_samu_analogs(15)
     assert "Belimo BLE24" in sa15 or "Belimo BEN24" in sa15
     assert "Belimo BLE24-T" in sa15 or "Belimo BEN24-T" in sa15
@@ -88,10 +89,11 @@ def test_build_damqu_analogs_distinct_belimo_by_nm() -> None:
 
 
 def test_build_sa7mu_and_hvd_include_belimo() -> None:
-    """Smoke SA7 and HVD air lists include Belimo BEE / LM families."""
+    """SA7 smoke lists no Belimo (smallest smoke class is 15 Нм); HVD air lists LM…GM."""
     sa = build_sa7mu_analogs()
     assert "SA7MU24-DST" in sa
-    assert "Belimo BEE24ST" in sa
+    assert "Belimo" not in sa
+    assert "Siemens GIB161.1E" in sa
     assert "Nanotek" not in sa
     hvd = build_hvd_air_analogs(40, fast=False)
     assert "HVD24-40" in hvd

@@ -6,9 +6,13 @@ from django.core.management.base import BaseCommand
 
 from catalog.etl.belimo_analogs import (
     _sku_uses_ds_as_control_editions,
+    belimo_code_is_direct_for_sku,
     belimo_code_is_thermal,
     belimo_code_matches_control,
+    belimo_codes_for_sku,
+    normalize_belimo_code,
     primary_belimo_code_for_sku,
+    sku_takes_no_analogs,
 )
 from catalog.etl.sku_variant import parse_sku_variant, sku_code_is_thermal
 from catalog.models import SKU
@@ -47,12 +51,20 @@ class Command(BaseCommand):
         updated = 0
         skipped = 0
         empty = 0
+        cleared = 0
         for sku in qs:
             primary = primary_belimo_code_for_sku(sku)
+            current = (sku.analog_belimo_code or "").strip()
             if not primary:
                 empty += 1
+                # Large-scope facets read the field directly: drop non-direct leftovers.
+                if current and (sku_takes_no_analogs(sku) or not belimo_code_is_direct_for_sku(current, sku.sku_code)):
+                    self.stdout.write(f"  {sku.sku_code}: {current} → ∅ (нет прямого аналога)")
+                    if not dry_run:
+                        sku.analog_belimo_code = ""
+                        sku.save(update_fields=["analog_belimo_code"])
+                    cleared += 1
                 continue
-            current = (sku.analog_belimo_code or "").strip()
             if current and not force:
                 if current.casefold() == primary.casefold():
                     skipped += 1
@@ -71,7 +83,9 @@ class Command(BaseCommand):
                     # Plain DS/… kept a thermal Belimo from a shared voltage list.
                     (not sku_code_is_thermal(sku.sku_code)) and belimo_code_is_thermal(current)
                 )
-                if not control_mismatch and not thermal_mismatch:
+                # Family / aux drift: the card «Аналоги» no longer lists this article.
+                stale = normalize_belimo_code(current) not in belimo_codes_for_sku(sku)
+                if not control_mismatch and not thermal_mismatch and not stale:
                     skipped += 1
                     continue
             if current.casefold() == primary.casefold():
@@ -85,6 +99,6 @@ class Command(BaseCommand):
         prefix = "[dry-run] " if dry_run else ""
         self.stdout.write(
             self.style.SUCCESS(
-                f"{prefix}belimo analogs: updated={updated}, skipped={skipped}, empty={empty}",
+                f"{prefix}belimo analogs: updated={updated}, cleared={cleared}, skipped={skipped}, empty={empty}",
             ),
         )

@@ -213,7 +213,8 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
     ),
 )
 
-# Belimo BFL ≈ 4/3 Нм (HVD-3F); BLF ≈ 6/4 Нм (HVD-5F). ST ↔ Belimo …-T (BAT 72 °C).
+# Belimo BLF ≈ 6/4 Нм (HVD-5F). HVD-3F: no Belimo — the smallest BFL is 4/3 Нм.
+# ST ↔ Belimo …-T (BAT 72 °C).
 _ANALOGS_BY_NM: dict[int, str] = {
     3: normalize_tech_copy(
         """
@@ -221,22 +222,18 @@ _ANALOGS_BY_NM: dict[int, str] = {
 (пружинный возврат, открыто/закрыто, ~3 Нм, 2×SPDT, IP54, вал 12×12 мм)
 
 HVD24S-3F:
-– Belimo BFL24
 – BVM BFL24-03
 – Nanotek BFL 24 B
 
 HVD24ST-3F: (с термодатчиком)
-– Belimo BFL24-T
 – BVM BFL24-03-T
 – Nanotek BFL 24 B-T
 
 HVD230S-3F:
-– Belimo BFL230
 – BVM BFL230-03
 – Nanotek BFL 230 B
 
 HVD230ST-3F: (с термодатчиком)
-– Belimo BFL230-T
 – BVM BFL230-03-T
 – Nanotek BFL 230 B-T
 """.strip(),

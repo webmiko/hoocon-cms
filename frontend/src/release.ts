@@ -4,7 +4,7 @@
  * Beta: ``X.Y.Z``; after GA: ``MAJOR.MINOR.PATCH`` — PATCH is internal,
  * UI shows ``vMAJOR.MINOR`` (see _docs/releases.md).
  */
-export const RELEASE_VERSION = "3.3.0";
+export const RELEASE_VERSION = "3.4.0";
 export const RELEASE_CHANNEL = "";
 
 const VERSION_CORE = /^(\d+)\.(\d+)(?:\.(\d+))?$/;

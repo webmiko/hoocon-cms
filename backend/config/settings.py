@@ -381,6 +381,7 @@ UNFOLD = {
         "config.unfold_callbacks.admin_phone_shell_js",
         "config.unfold_callbacks.admin_phone_settings_js",
         "config.unfold_callbacks.admin_desktop_settings_js",
+        "config.unfold_callbacks.admin_softphone_js",
     ],
     "DASHBOARD_CALLBACK": "config.unfold_callbacks.dashboard_callback",
     # Ctrl+K / Cmd+K command palette: record search via each admin's

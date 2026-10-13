@@ -11,7 +11,7 @@ import re
 from typing import TYPE_CHECKING, Literal
 
 from catalog.etl.html_text import filter_analogs_for_sku
-from catalog.etl.sku_variant import parse_sku_variant, sku_code_is_thermal
+from catalog.etl.sku_variant import parse_hva_code, parse_sku_variant, sku_code_is_thermal
 
 if TYPE_CHECKING:
     from catalog.models import SKU
@@ -51,8 +51,19 @@ BELIMO_FAMILY_AREA: dict[str, tuple[tuple[str, float], ...]] = {
     "fast": (("LMQ", 0.4), ("NMQ", 0.8), ("SMQ", 1.6), ("GMQ", 4.0)),
     "smoke": (("BEN", 1.5), ("BEE", 2.5), ("BE", 4.0)),
 }
-# HVA compact card copy uses BM24-5-05 / BM230-5-05 (≤ 0.5 м²).
-_BM_COMPACT_AREA = 0.5
+# Every family above (+ BLE next to BEN, compact CM next to TMC) → area, м².
+_FAMILY_AREA: dict[str, float] = {family: area for bands in BELIMO_FAMILY_AREA.values() for family, area in bands} | {
+    "BLE": 1.5,
+    "CM": 0.2,
+}
+_FAMILY_PREFIX = re.compile(
+    r"^(" + "|".join(sorted(_FAMILY_AREA, key=len, reverse=True)) + r")(?=\d)",
+)
+# Fire / smoke actuators ship with 2× SPDT built in (no ``-S`` edition).
+_BUILTIN_AUX_FAMILIES = frozenset(
+    {f for f, _ in BELIMO_FAMILY_AREA["fire_spring"]} | {f for f, _ in BELIMO_FAMILY_AREA["smoke"]} | {"BLE"},
+)
+_HOOCON_NM = re.compile(r"(?i)^(?:(?:da|sa)(\d+)(?:fu|mqu|mu)|hv[ad]\d+s?t?-(\d+))")
 
 
 def belimo_family_by_area(purpose: str, area_m2: float) -> str | None:
@@ -61,20 +72,16 @@ def belimo_family_by_area(purpose: str, area_m2: float) -> str | None:
     Belimo selects actuators by damper area.  The Hoocon actuator's area
     must be **not less** than the Belimo's — we list only families the
     customer could replace with our actuator (our damper ≥ theirs).
-    Above the largest family, the result stays the largest.
+    Above the largest family, the result stays the largest.  When even the
+    smallest family is stronger than Hoocon there is no direct analog → None.
     """
-    bands = BELIMO_FAMILY_AREA.get(purpose)
-    if not bands:
-        return None
     result: str | None = None
-    for family, max_area in bands:
+    for family, max_area in BELIMO_FAMILY_AREA.get(purpose, ()):
         if max_area <= area_m2:
             result = family
         else:
             break
-    # If even the smallest Belimo exceeds our area, still return it
-    # (the card at least names the closest family).
-    return result if result is not None else bands[0][0]
+    return result
 
 
 # Category slug fragments → purpose for inference.
@@ -86,7 +93,29 @@ _PURPOSE_BY_CATEGORY: tuple[tuple[str, Purpose], ...] = (
     ("bez-pruzhinnogo", "air_no_spring"),
     ("vozdushn", "air_no_spring"),
     ("sharov", "valve"),
+    ("komplekt", "valve"),
 )
+
+# Kits (H81xx / H8205 actuator + valve) and bare 8100 ball valves get no analogs.
+NO_ANALOG_CATEGORY_FRAGMENTS: tuple[str, ...] = ("komplekt", "sharov")
+# Plain syntax: shared with the Postgres ``iregex`` facet filter.
+NO_ANALOG_SKU_PATTERN = r"^(h81[0-9]{2}-|h8205-|8100-|bv[0-9])"
+_NO_ANALOG_SKU = re.compile(NO_ANALOG_SKU_PATTERN, re.IGNORECASE)
+
+
+def sku_code_takes_no_analogs(sku_code: str | None) -> bool:
+    """Whether the article is a kit or a ball valve (``H8101-BV215A-24AS``, ``8100-bv215a``)."""
+    return bool(_NO_ANALOG_SKU.match((sku_code or "").strip()))
+
+
+def sku_takes_no_analogs(sku: SKU) -> bool:
+    """Kit / ball-valve SKU by category or article: no «Аналоги» and no Belimo."""
+    product = sku.product if sku.product_id else None
+    category = getattr(product, "category", None)
+    slug = (getattr(category, "slug", "") or "").casefold()
+    return any(fragment in slug for fragment in NO_ANALOG_CATEGORY_FRAGMENTS) or sku_code_takes_no_analogs(
+        sku.sku_code,
+    )
 
 
 def normalize_belimo_code(raw: str) -> str:
@@ -197,108 +226,112 @@ def infer_belimo_codes(
     if area is None:
         return []
 
-    modulating = control == "modulating"
-    family = _belimo_family(purpose, area)
+    family = belimo_family_by_area(purpose, area)
     if not family:
         return []
-
-    code = _compose_belimo_article(
-        family=family,
+    code = compose_belimo_article(
+        family,
         voltage=voltage,
-        modulating=modulating,
-        aux_spdt=aux_spdt,
+        modulating=control == "modulating",
+        aux=aux_spdt >= 1,
         thermal=thermal,
-        purpose=purpose,
-        moment_nm=moment_nm or round(area * 10, 1),
     )
     return [code] if code else []
 
 
-def _belimo_family(purpose: Purpose, area_m2: float) -> str | None:
-    """Map purpose + damper area to Belimo series letters."""
-    if purpose == "fast" and area_m2 <= _BM_COMPACT_AREA:
-        return "BM"
-    return belimo_family_by_area(purpose, area_m2)
-
-
-def _compose_belimo_article(
-    *,
+def compose_belimo_article(
     family: str,
+    *,
     voltage: str,
     modulating: bool,
-    aux_spdt: int,
-    thermal: bool,
-    purpose: Purpose,
-    moment_nm: float,
+    aux: bool,
+    thermal: bool = False,
 ) -> str | None:
-    """Build a Belimo-like article string for facet matching."""
-    if purpose == "fast" and family == "BM":
-        # Card copy for HVA uses BM24-5-05 / BM230-5-05.
-        base = f"BM{voltage}-5-05"
-        return base
+    """Belimo article for one Hoocon edition, or None when Belimo has no direct analog.
 
-    if purpose == "smoke":
-        # BEN24 / BLE24-T / BEE24ST / BE230 — not CM…-L/R (air compact).
-        if family == "CM":
-            return f"CM{voltage}-L/R"
+    Shared by ТТХ inference and the curated «Аналоги» generators so both
+    always print the same article for the same edition.
+
+    Args:
+        family: Belimo series letters (``LM``, ``NMQ``, ``LF``, ``BFN``, ``BEN`` …).
+        voltage: ``24`` or ``230``.
+        modulating: Hoocon ``-A/-AS`` (0…10 В) edition.
+        aux: Hoocon edition with auxiliary switches (``-DS/-AS/S``).
+        thermal: Hoocon thermal edition (``DST`` / ``ST``).
+    """
+    if family in _BUILTIN_AUX_FAMILIES:
+        # Fire / smoke: on/off only, 2× SPDT built in, optional thermal.
+        if modulating:
+            return None
         if family == "BEE":
             return f"BEE{voltage}{'ST' if thermal else ''}"
-        code = f"{family}{voltage}"
-        if thermal:
-            code += "-T"
-        return code
-
-    if purpose == "fast" and family in {"LMQ", "NMQ", "SMQ", "GMQ"}:
-        code = f"{family}{voltage}A"
+        return f"{family}{voltage}{'-T' if thermal else ''}"
+    if family == "TF":
+        # TF24 / TF24-S; no proportional edition in the card range.
         if modulating:
-            code += "-SR"
-        if aux_spdt >= 1:
-            code += "-S"
-        return code
-
-    if purpose == "air_spring":
-        # TF24 / LF24-S / NF24A / SF24A-SR patterns from datasheets.
-        if family == "TF":
-            code = f"TF{voltage}"
-            if aux_spdt >= 1:
-                code += "-S"
-            return code
-        if family == "LF":
-            if modulating:
-                return f"LF{voltage}-RS"
-            code = f"LF{voltage}"
-            if aux_spdt >= 1:
-                code += "-S"
-            return code
-        code = f"{family}{voltage}A"
+            return None
+        return f"TF{voltage}{'-S' if aux else ''}"
+    if family == "LF":
+        # LF24 / LF24-S / LF24-RS (proportional, no auxiliary switches).
         if modulating:
-            code += "-SR"
-        if aux_spdt >= 1 and not code.endswith("-S"):
-            code += "-S"
-        return code
-
-    if purpose == "fire_spring":
-        # BFL/BLF/BFN/BF ship with 2× SPDT; optional -T thermal.
-        code = f"{family}{voltage}"
-        if thermal:
-            code += "-T"
-        return code
-
-    # Classic non-spring LM/NM/SM/GM/TMC.
+            return None if aux else f"LF{voltage}-RS"
+        return f"LF{voltage}{'-S' if aux else ''}"
+    if family == "TMC" and modulating and aux:
+        # Belimo ships aux as add-on S1A, not a factory ``…-SR-S``.
+        return None
+    # LM/NM/SM/GM/TMC, LMQ…GMQ, NF/SF — modern ``A`` generation.
     code = f"{family}{voltage}A"
     if modulating:
         code += "-SR"
-    if aux_spdt >= 1:
-        # TMC modulating: Belimo ships aux as add-on S1A, not a factory ``…-SR-S``.
-        if not (family == "TMC" and modulating):
-            code += "-S"
+    if aux:
+        code += "-S"
     return code
+
+
+def _belimo_family_of(code: str) -> str | None:
+    """Belimo series letters of an article (``BFL24-T`` → ``BFL``)."""
+    match = _FAMILY_PREFIX.match(normalize_belimo_code(code))
+    return match.group(1) if match else None
+
+
+def hoocon_torque_nm(sku_code: str | None) -> int | None:
+    """Rated torque from a Hoocon actuator article (``DA16MU24-D`` → 16, ``HVD24S-3F`` → 3)."""
+    match = _HOOCON_NM.match((sku_code or "").strip())
+    if not match:
+        return None
+    return int(match.group(1) or match.group(2))
+
+
+def belimo_code_is_direct_for_sku(code: str | None, sku_code: str | None) -> bool:
+    """Whether a Belimo article is a direct analog of this Hoocon edition.
+
+    Direct means the customer can swap the Belimo for our actuator as is:
+    the Belimo is not stronger (its damper area ≤ Hoocon's, area = Нм / 10),
+    and an edition with auxiliary switches maps to a Belimo that has them
+    (``…-S`` or the fire / smoke built-in 2× SPDT). Unknown articles or
+    non-actuator SKUs are not judged (True); kits and ball valves never
+    have a direct analog.
+    """
+    if sku_code_takes_no_analogs(sku_code):
+        return False
+    family = _belimo_family_of(code or "")
+    if family is None:
+        return True
+    nm = hoocon_torque_nm(sku_code)
+    if nm is not None and _FAMILY_AREA[family] > round(nm / 10, 2):
+        return False
+    variant = parse_sku_variant(sku_code or "")
+    if _resolve_aux_switch(variant.aux_switch, sku_code or "") and family not in _BUILTIN_AUX_FAMILIES:
+        return bool(re.search(r"-S\d?$", normalize_belimo_code(code or "")))
+    return True
 
 
 def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
     """Infer actuator purpose from category slug and SKU code."""
     slug = (category_slug or "").casefold()
     code = (sku_code or "").casefold()
+    if sku_code_takes_no_analogs(code):
+        return "valve"
     # HVD-…F: spring-return smoke/fire compact (same Belimo BFL/BLF class as SA..FU).
     # Must win over category ``…dymoudalen…`` which also hosts SA..MU (no spring).
     if re.search(r"(?i)^hvd\d.*-\d+f(?:$|[^a-z0-9])", code):
@@ -308,6 +341,11 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
         return "fast"
     if re.search(r"(?i)^hvd\d", code):
         return "air_no_spring"
+    # HVA: suffix decides spring / speed regardless of category (QX lives in «отказоустойчивые»).
+    if hva := parse_hva_code(sku_code):
+        if hva.suffix == "p":
+            return "air_spring"
+        return "fast" if hva.suffix in {"q", "uq", "qx"} else "air_no_spring"
     for fragment, purpose in _PURPOSE_BY_CATEGORY:
         if fragment in slug:
             return purpose
@@ -331,6 +369,8 @@ def analogs_plain_text_for_sku(sku: SKU) -> str:
     """Edition-scoped analogs plain text (SKU or product tab)."""
     from catalog.sku_access import sku_section_text
 
+    if sku_takes_no_analogs(sku):
+        return ""
     # Empty SKU analogs_text is intentional (do not re-inherit product block).
     raw = sku_section_text(sku, "analogs_text")
     if not raw.strip():
@@ -346,7 +386,21 @@ def _analogs_text_scoped(raw: str, sku: SKU) -> str:
     if _sku_uses_ds_as_control_editions(sku.sku_code):
         filtered = _drop_belimo_lines_for_control(filtered, variant.control)
     aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
-    return _drop_belimo_lines_for_aux(filtered, aux)
+    filtered = _drop_belimo_lines_for_aux(filtered, aux)
+    return _drop_belimo_lines_not_direct(filtered, sku.sku_code)
+
+
+def _drop_belimo_lines_not_direct(text: str, sku_code: str) -> str:
+    """Drop Belimo bullets that are only a «closest class», not a direct analog."""
+    if not text.strip():
+        return text
+    out: list[str] = []
+    for line in text.splitlines():
+        codes = extract_belimo_codes_from_text(line)
+        if codes and not any(belimo_code_is_direct_for_sku(c, sku_code) for c in codes):
+            continue
+        out.append(line)
+    return "\n".join(out).strip()
 
 
 def _drop_belimo_lines_for_thermal(text: str, thermal_sku: bool) -> str:
@@ -459,6 +513,8 @@ def belimo_codes_for_sku(sku: SKU) -> list[str]:
     Returns:
         Ordered unique Belimo article codes.
     """
+    if sku_takes_no_analogs(sku):
+        return []
     variant = parse_sku_variant(sku.sku_code)
     voltage = variant.voltage
     control = variant.control
@@ -490,7 +546,7 @@ def belimo_codes_for_sku(sku: SKU) -> list[str]:
         thermal_sku = sku_code_is_thermal(sku.sku_code)
         thermal_code = belimo_code_is_thermal(code)
         # Stale fill: thermal Belimo on plain DS (or reverse) must not block inference.
-        if thermal_sku != thermal_code:
+        if thermal_sku != thermal_code or not belimo_code_is_direct_for_sku(code, sku.sku_code):
             pass
         elif not apply_control or belimo_code_matches_control(code, control):
             aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
@@ -616,10 +672,15 @@ def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:
     variant = parse_sku_variant(sku.sku_code)
     volt = voltage or variant.voltage or _voltage_from_attr(attrs.get("voltage", ""))
     control = variant.control or _control_from_attr(attrs.get("control", ""))
-    aux = _aux_spdt_from_attr(attrs.get("aux-switch", ""), sku_code=sku.sku_code)
-    if aux is None:
-        aux = 1 if variant.aux_switch else 0
+    # The edition suffix (D/DS, A/AS, HVD…S) is authoritative; EAV only fills gaps.
+    edition_aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
+    if edition_aux is not None:
+        aux = 1 if edition_aux else 0
+    else:
+        aux = _aux_spdt_from_attr(attrs.get("aux-switch", ""), sku_code=sku.sku_code) or 0
     moment = _parse_float(attrs.get("moment", ""))
+    if moment is None:
+        moment = hoocon_torque_nm(sku.sku_code)
     area = _parse_area(attrs.get("damper-area", ""))
     thermal = sku_code_is_thermal(sku.sku_code)
     return infer_belimo_codes(

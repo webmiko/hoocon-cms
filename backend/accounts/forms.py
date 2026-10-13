@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
@@ -10,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminEmailInputWidget, UnfoldAdminTextInputWidget
 
-from accounts.models import StaffMailbox
+from accounts.models import StaffMailbox, StaffVpbxProfile
 
 
 def admin_email_otp_enabled() -> bool:
@@ -205,3 +207,55 @@ class StaffMailboxForm(forms.ModelForm):
         if not value and self.instance.pk:
             return self.instance.imap_password
         return value
+
+
+class StaffVpbxProfileForm(forms.ModelForm):
+    """Telephony inline: the WebRTC token is write-only.
+
+    The stored value is a Fernet token and is never rendered back. An empty
+    field keeps the saved token; the checkbox removes it. Typing a new token
+    and ticking the checkbox together is rejected as ambiguous.
+    """
+
+    uis_webrtc_token = forms.CharField(
+        label="Токен WebRTC (UIS)",
+        required=False,
+        max_length=500,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}),
+    )
+    clear_uis_webrtc_token = forms.BooleanField(
+        label="Удалить токен WebRTC",
+        required=False,
+        help_text="Телефон в браузере у этого сотрудника перестанет работать.",
+    )
+
+    class Meta:
+        model = StaffVpbxProfile
+        fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token")
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Show whether a token is stored, never the token itself."""
+        super().__init__(*args, **kwargs)
+        field = self.fields["uis_webrtc_token"]
+        state = "сохранён" if self.instance.pk and self.instance.uis_webrtc_token else "не задан"
+        field.help_text = f"Токен WebRTC из кабинета UIS. Сейчас: {state}. Пустое поле оставляет сохранённый."
+
+    def clean_uis_webrtc_token(self) -> str:
+        """Keep the stored token when the field is submitted empty."""
+        value = (self.cleaned_data.get("uis_webrtc_token") or "").strip()
+        if not value and self.instance.pk:
+            return self.instance.uis_webrtc_token
+        return value
+
+    def clean(self) -> dict[str, Any]:
+        """Apply the «delete token» checkbox; refuse a contradictory submit."""
+        cleaned = super().clean() or {}
+        if cleaned.get("clear_uis_webrtc_token"):
+            typed = (self.data.get(self.add_prefix("uis_webrtc_token")) or "").strip()
+            if typed:
+                raise ValidationError(
+                    _("Нельзя одновременно ввести новый токен и удалить токен."),
+                    code="token_conflict",
+                )
+            cleaned["uis_webrtc_token"] = ""
+        return cleaned

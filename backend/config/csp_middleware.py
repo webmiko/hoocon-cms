@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 _CSP_COUNTER_CACHE_KEY = "hoocon:csp:counter_ids"
 _CSP_COUNTER_CACHE_TTL = 60
 
+# Окно «Телефон» (UIS WebRTC): путь = ``reverse("crm_softphone_window")``, тест сверяет.
+SOFTPHONE_PATH = "/admin/crm/softphone/"
+# Библиотека UIS ходит на my.uiscom.ru (https + wss), адрес медиасервера отдаёт UIS.
+# Только окно телефона получает эти хосты; остальная админка — по-прежнему ``'self'``.
+SOFTPHONE_CONNECT_SRC = ("https://*.uiscom.ru", "wss://*.uiscom.ru")
+
 
 def _analytics_counter_ids() -> tuple[str, str]:
     """Resolve Metrika/GA4 IDs from SiteSettings with env fallback.
@@ -54,6 +60,7 @@ def build_csp(
     nonce: str | None = None,
     allow_unsafe_eval: bool = False,
     allow_inline_scripts: bool = False,
+    allow_softphone: bool = False,
 ) -> str:
     """Build CSP directive string.
 
@@ -64,6 +71,8 @@ def build_csp(
             modal overlay stays up and blocks clicks).
         allow_inline_scripts: Allow ``script-src 'unsafe-inline'`` for staff
             Wiki dashboards (bundled HTML with inline Chart.js bootstrap).
+        allow_softphone: Window «Телефон» only: UIS hosts in ``connect-src``
+            and ``media-src`` for the library's built-in ringtones.
 
     Returns:
         Full Content-Security-Policy value.
@@ -76,6 +85,11 @@ def build_csp(
     if allow_inline_scripts:
         script_parts.append("'unsafe-inline'")
     connect_parts = ["'self'"]
+    media_parts = ["'self'"]
+    if allow_softphone:
+        connect_parts.extend(SOFTPHONE_CONNECT_SRC)
+        # Ringtones ship inside the library as data: URLs; remote streams use blob:.
+        media_parts.extend(["data:", "blob:"])
     # data: placeholders / analytics pixels. Product photos are same-origin /media.
     img_parts = ["'self'", "data:"]
 
@@ -102,6 +116,7 @@ def build_csp(
         f"img-src {' '.join(img_parts)}",
         "font-src 'self' data:",
         f"connect-src {' '.join(connect_parts)}",
+        f"media-src {' '.join(media_parts)}",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -163,6 +178,7 @@ class CspMiddleware:
             nonce=use_nonce,
             allow_unsafe_eval=allow_unsafe_eval,
             allow_inline_scripts=allow_inline_scripts,
+            allow_softphone=request.path == SOFTPHONE_PATH,
         )
         if getattr(settings, "DEBUG", False):
             response.headers["Content-Security-Policy-Report-Only"] = value

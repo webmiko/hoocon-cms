@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from django.db.models import Count, QuerySet
+from django.db.models import Count, Q, QuerySet
 
 from catalog.facets.aux import AUX_SWITCH_NONE
 from catalog.facets.defs import (
@@ -250,6 +250,16 @@ def _collect_simple_facet_counts(
     return counts
 
 
+def _without_no_analog_skus(queryset: QuerySet[SKU]) -> QuerySet[SKU]:
+    """Drop kits / ball valves: a hand-typed field there must not reach the facet."""
+    from catalog.etl.belimo_analogs import NO_ANALOG_CATEGORY_FRAGMENTS, NO_ANALOG_SKU_PATTERN
+
+    no_analogs = Q(sku_code__iregex=NO_ANALOG_SKU_PATTERN)
+    for fragment in NO_ANALOG_CATEGORY_FRAGMENTS:
+        no_analogs |= Q(product__category__slug__contains=fragment)
+    return queryset.exclude(no_analogs)
+
+
 def _filter_skus_by_belimo_analog(
     queryset: QuerySet[SKU],
     value: str,
@@ -264,7 +274,7 @@ def _filter_skus_by_belimo_analog(
         return queryset.none()
     # Fast path: persisted primary code.
     direct_ids = set(
-        queryset.filter(analog_belimo_code__iexact=needle).values_list("id", flat=True),
+        _without_no_analog_skus(queryset.filter(analog_belimo_code__iexact=needle)).values_list("id", flat=True),
     )
     # Same rule as the «Аналоги» facet: inference only on small scopes.
     if queryset.count() > _ANALOG_INFERENCE_SKU_CAP:
@@ -301,7 +311,7 @@ def _collect_analog_facet_options(
 
     if len(sku_ids) > _ANALOG_INFERENCE_SKU_CAP:
         for sku_id, code in (
-            SKU.objects.filter(id__in=sku_ids)
+            _without_no_analog_skus(SKU.objects.filter(id__in=sku_ids))
             .exclude(analog_belimo_code__isnull=True)
             .exclude(analog_belimo_code="")
             .values_list("id", "analog_belimo_code")
