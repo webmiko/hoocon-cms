@@ -1072,7 +1072,7 @@ def test_admin_login_css_prevents_ios_input_zoom() -> None:
 
 
 def test_admin_same_roles_share_metric_tokens() -> None:
-    """Count pills, chips, text buttons, and page titles use one metric per role."""
+    """Count badges are one circle size; chips, buttons, and titles share their metrics."""
     extras = _EXTRAS_CSS.read_text(encoding="utf-8")
     os27 = _OS27_CSS.read_text(encoding="utf-8")
     root = extras.split(":root {", 1)[1].split("}", 1)[0]
@@ -1089,7 +1089,8 @@ def test_admin_same_roles_share_metric_tokens() -> None:
 
     sticker = extras.split(".hoocon-admin-lead-sticker__count {", 1)[1].split("}", 1)[0]
     assert "var(--hoocon-count-size)" in sticker
-    assert "var(--hoocon-radius-pill)" in sticker
+    assert "border-radius: 50%" in sticker
+    assert "aspect-ratio: 1" in sticker
 
     status = extras.split(".hoocon-lead-status {", 1)[1].split("}", 1)[0]
     assert "var(--hoocon-chip-pad)" in status
@@ -1120,6 +1121,11 @@ def test_admin_same_roles_share_metric_tokens() -> None:
     assert "var(--hoocon-count-size)" in badge
     assert "1.2rem" not in badge
     assert "0.6875rem" not in badge
+
+    nav_count = os27.split("body.hoocon-os27 .hoocon-nav-sections__badge {", 1)[1].split("}", 1)[0]
+    assert "aspect-ratio: 1" in nav_count
+    assert "border-radius: 50%" in nav_count
+    assert "padding: 0" in nav_count
 
 
 def test_desktop_sidebar_stops_above_lead_action_bar() -> None:

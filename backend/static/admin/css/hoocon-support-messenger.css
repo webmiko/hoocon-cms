@@ -800,10 +800,15 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
   min-width: var(--hoocon-count-size);
-  height: var(--hoocon-count-size);
-  padding: var(--hoocon-count-pad);
-  border-radius: var(--hoocon-radius-pill);
+  min-height: var(--hoocon-count-size);
+  width: max-content;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
   background: var(--hm-brand, var(--hoocon-primary, #dc1313));
   color: var(--hoocon-on-primary, #fff);
   font-size: var(--hoocon-count-font);
@@ -816,7 +821,12 @@ body.hoocon-chat-info-open .hoocon-chat-info-close {
   color: var(--hoocon-quiet, #6f6f6f);
   font-weight: 600;
   min-width: 0;
+  min-height: 0;
+  width: auto;
+  height: auto;
+  aspect-ratio: auto;
   padding: 0;
+  border-radius: 0;
 }
 
 .hoocon-messenger__back {
