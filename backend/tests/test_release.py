@@ -24,22 +24,22 @@ _VERSION_CORE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
 
 def test_release_label_ga_format() -> None:
-    """Internal ``MAJOR.MINOR.PATCH``; prod label is ``vMAJOR.MINOR`` only."""
+    """GA label shows all three numbers, ``vMAJOR.MINOR.PATCH``."""
     assert RELEASE_CHANNEL == ""
     assert re.fullmatch(r"\d+\.\d+\.\d+", RELEASE_VERSION), RELEASE_VERSION
-    major, minor, _patch = RELEASE_VERSION.split(".")
-    assert release_label() == f"v{major}.{minor}"
-    assert release_label(with_v=False) == f"{major}.{minor}"
+    assert release_label() == f"v{RELEASE_VERSION}"
+    assert release_label(with_v=False) == RELEASE_VERSION
 
 
-def test_patch_bump_keeps_prod_label_minor_bump_changes_it() -> None:
-    """PATCH is internal (label unchanged); MINOR is the prod release."""
+def test_patch_is_a_fix_minor_is_a_new_feature() -> None:
+    """PATCH keeps MINOR; MINOR is only a new feature; MAJOR is explicit."""
     assert bump_version("1.1.0", "patch") == "1.1.1"
     assert bump_version("1.1.1", "minor") == "1.2.0"
     assert bump_version("1.17.4", "major") == "2.0.0"
     assert bump_version("3.2", "patch") == "3.2.1"
-    assert display_version("1.1.1", channel="") == display_version("1.1.0", channel="")
-    assert display_version("1.2.0", channel="") == "1.2"
+    assert display_version("1.1.1", channel="") == "1.1.1"
+    assert display_version("1.1.0", channel="") == "1.1.0"
+    assert display_version("1.2.0", channel="") == "1.2.0"
 
 
 def test_bump_version_rejects_minor_past_limit_and_unknown_part() -> None:
@@ -62,13 +62,14 @@ def test_bump_release_script_check_passes_on_repo() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_merge_release_pr_requires_new_prod_minor() -> None:
-    """Prod merge refuses when develop still has prod's ``MAJOR.MINOR``."""
+def test_merge_release_pr_requires_a_version_change() -> None:
+    """Prod merge refuses an unchanged version; a fix may keep MINOR."""
     script = (_REPO_ROOT / "scripts" / "merge-release-pr.sh").read_text(encoding="utf-8")
-    guard = script.index('"${prod_public}" == "${next_public}"')
+    guard = script.index('"${prod_version}" == "${next_version}"')
     assert guard < script.index("gh pr merge")
-    assert "RELEASE_ALLOW_SAME_MINOR" in script
+    assert "bump-release.py patch" in script
     assert "bump-release.py minor" in script
+    assert "([0-9]+\\.[0-9]+\\.[0-9]+)" in script
 
 
 def test_unfold_environment_badge_is_full_label_tuple() -> None:
@@ -85,11 +86,12 @@ def test_package_version_pads_two_part() -> None:
     assert package_version("0.1.0") == "0.1.0"
 
 
-def test_display_version_drops_patch_after_ga() -> None:
-    """Stable channel shows two-part ``MAJOR.MINOR``."""
-    assert display_version("1.0", channel="") == "1.0"
-    assert display_version("1.0.0", channel="") == "1.0"
+def test_display_version_keeps_three_numbers() -> None:
+    """Stable and beta labels both keep PATCH; a two-part core gets ``.0``."""
+    assert display_version("1.0", channel="") == "1.0.0"
+    assert display_version("1.0.0", channel="") == "1.0.0"
     assert display_version("0.1.0", channel="beta") == "0.1.0"
+    assert display_version("1.2", channel="beta") == "1.2.0"
 
 
 def test_package_version_rejects_invalid() -> None:
@@ -101,7 +103,7 @@ def test_package_version_rejects_invalid() -> None:
 def test_display_version_edge_cases() -> None:
     """Invalid raw passthrough; two-part with channel; GA label without channel."""
     assert display_version("weird", channel="beta") == "weird"
-    assert display_version("1.2", channel="beta") == "1.2"
+    assert display_version("1.2.3", channel="beta") == "1.2.3"
     import config.release as release_mod
 
     previous = release_mod.RELEASE_CHANNEL

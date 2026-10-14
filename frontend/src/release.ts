@@ -1,10 +1,10 @@
 /** App release label (keep in sync with backend/config/release.py). */
 
 /**
- * Beta: ``X.Y.Z``; after GA: ``MAJOR.MINOR.PATCH`` — PATCH is internal,
- * UI shows ``vMAJOR.MINOR`` (see _docs/releases.md).
+ * Beta and GA both show ``MAJOR.MINOR.PATCH`` (``v3.6.0``).
+ * MINOR is a new feature; PATCH is a fix; MAJOR is manual.
  */
-export const RELEASE_VERSION = "3.6.0";
+export const RELEASE_VERSION = "3.6.1";
 export const RELEASE_CHANNEL = "";
 
 const VERSION_CORE = /^(\d+)\.(\d+)(?:\.(\d+))?$/;
@@ -22,25 +22,16 @@ export function packageVersion(version: string = RELEASE_VERSION): string {
 }
 
 /**
- * Public version core without channel (two-part after GA).
+ * Public version core: always three numbers. A missing patch becomes ``0``.
  */
-export function displayVersion(
-  version: string = RELEASE_VERSION,
-  channel: string = RELEASE_CHANNEL,
-): string {
+export function displayVersion(version: string = RELEASE_VERSION): string {
   const match = VERSION_CORE.exec(version.trim());
   if (!match) return version.trim();
   const [, major, minor, patch] = match;
-  if (!channel.trim()) {
-    return `${major}.${minor}`;
-  }
-  if (patch === undefined) {
-    return `${major}.${minor}`;
-  }
-  return `${major}.${minor}.${patch}`;
+  return `${major}.${minor}.${patch ?? "0"}`;
 }
 
-/** Display string, e.g. ``v0.1.0 beta`` or ``v1.0``. */
+/** Display string, e.g. ``v0.1.0 beta`` or ``v3.6.0``. */
 export function releaseLabel(withV = true): string {
   const prefix = withV ? "v" : "";
   const core = `${prefix}${displayVersion()}`;

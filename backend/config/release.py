@@ -5,8 +5,8 @@ Canonical version lives here; keep ``backend/pyproject.toml`` and
 
 - Beta: ``RELEASE_VERSION`` = ``X.Y.Z``, channel ``beta`` → ``v0.1.0 beta``.
 - After GA: ``RELEASE_VERSION`` = ``MAJOR.MINOR.PATCH``, channel ``""``.
-  PATCH is the internal build counter (feature on ``develop``); public
-  display is ``vMAJOR.MINOR`` and changes only with a prod release (MINOR).
+  The site and Admin show all three numbers (``v3.6.0``). MINOR is a new
+  feature; PATCH is a fix of a feature already shipped; MAJOR is manual.
 
 Policy: _docs/releases.md. Bump: ``scripts/bump-release.py``.
 """
@@ -17,7 +17,7 @@ import re
 from typing import Literal
 
 # Beta: three-part + channel; after GA: MAJOR.MINOR.PATCH (see _docs/releases.md).
-RELEASE_VERSION = "3.6.0"
+RELEASE_VERSION = "3.6.1"
 
 # Pre-release channel: "beta" | "rc" | "" (stable / GA).
 RELEASE_CHANNEL = ""
@@ -56,8 +56,9 @@ def package_version(version: str | None = None) -> str:
 def bump_version(version: str, part: BumpPart) -> str:
     """Next ``MAJOR.MINOR.PATCH`` after GA.
 
-    ``patch`` — internal build (prod label unchanged); ``minor`` — prod
-    release (patch reset to 0); ``major`` — only on explicit command.
+    ``patch`` — fix of a feature already shipped (``3.6.0`` → ``3.6.1``);
+    ``minor`` — a new feature (``3.6.1`` → ``3.7.0``); ``major`` — only
+    on an explicit command or a global change.
 
     Raises:
         ValueError: Malformed version, unknown part, or MINOR past ``MINOR_MAX``.
@@ -77,25 +78,21 @@ def bump_version(version: str, part: BumpPart) -> str:
 
 
 def display_version(version: str | None = None, *, channel: str | None = None) -> str:
-    """Public version core without channel (two-part after GA).
+    """Public version core: always ``MAJOR.MINOR.PATCH``.
 
     Args:
         version: Override (default ``RELEASE_VERSION``).
-        channel: Override (default ``RELEASE_CHANNEL``). Empty → GA display.
+        channel: Accepted for callers; it does not drop a digit.
 
     Returns:
-        ``0.1.0`` in beta; ``1.2`` after GA (internal PATCH hidden).
+        Three numbers. A missing patch is ``0`` (``1.2`` → ``1.2.0``).
     """
+    del channel  # channel is appended by release_label, not by hiding PATCH
     raw = (version if version is not None else RELEASE_VERSION).strip()
-    ch = (RELEASE_CHANNEL if channel is None else channel).strip()
     match = _VERSION_CORE.fullmatch(raw)
     if match is None:
         return raw
-    major, minor, patch = match.group(1), match.group(2), match.group(3)
-    if not ch:
-        return f"{major}.{minor}"
-    if patch is None:
-        return f"{major}.{minor}"
+    major, minor, patch = match.group(1), match.group(2), match.group(3) or "0"
     return f"{major}.{minor}.{patch}"
 
 
@@ -112,10 +109,10 @@ def release_label(*, with_v: bool = True) -> str:
     """Human-readable release string for Admin / footer / docs.
 
     Args:
-        with_v: Prefix with ``v`` (``v0.1.0 beta`` / ``v1.0``).
+        with_v: Prefix with ``v`` (``v0.1.0 beta`` / ``v3.6.0``).
 
     Returns:
-        Label such as ``v0.1.0 beta`` or ``v1.0`` when channel is empty.
+        Label such as ``v0.1.0 beta`` or ``v3.6.0`` when channel is empty.
     """
     prefix = "v" if with_v else ""
     core = f"{prefix}{display_version()}"
