@@ -167,6 +167,14 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Александра и Ларисы" in doc.body
     assert "в сценарий не входят" not in doc.body
     assert "Личные мобильные в этот дозвон не входят" in doc.body
+    assert "Схема выше — прежний способ" not in doc.body
+    assert "Окно «Телефон» и кнопка «Позвонить клиенту» звонят через UIS" in doc.body
+    assert "Mango не используется" in doc.body
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert 'id="changelog-uis-only"' in guide.body
+    assert guide.body.index("changelog-uis-only") < guide.body.index("changelog-email-order-tag")
+    assert "74999951277" in doc.body
+    assert "Базовые отраслевые решения" in doc.body
     assert ">201<" in doc.body and ">202<" in doc.body and ">203<" in doc.body
     assert "ID сотрудника UIS" in doc.body
     assert "call_session_id" in doc.body
@@ -174,7 +182,6 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "именно на этот номер" not in doc.body
     assert "?token=" in doc.body
     assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
-    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert "09.10.2026" in guide.body
     assert 'id="changelog-email-order-tag"' in guide.body
     assert 'id="changelog-uis-lines"' in guide.body

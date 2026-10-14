@@ -9,9 +9,10 @@ alwaysApply: true
 `backend/content/fixtures/wiki/admin-3-0-manager-guide.html`
 (slug `admin-3-0-manager-guide`, сид `seed_wiki`).
 
-Телефония Mango подробно — отдельная страница
-`mango-telephony-guide.html`. В общем руководстве только ежедневные
-шаги и ссылка на неё.
+Рабочая телефония — Новосистем (UIS), страница
+`novosystem-telephony-guide.html`. Mango не используется: страница
+`mango-telephony-guide.html` остаётся справкой по старому виджету.
+В общем руководстве — ежедневные шаги и ссылка на Новосистем.
 
 ## Когда обновлять
 
