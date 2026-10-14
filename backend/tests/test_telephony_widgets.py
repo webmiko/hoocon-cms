@@ -272,6 +272,49 @@ def test_uis_click_to_call_skips_short_extension_and_mango(
 
 
 @pytest.mark.django_db
+def test_uis_click_to_call_wins_over_mango_when_extension_is_uis(
+    client: Any,
+    django_user_model: Any,
+    settings: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Добавочный 201 — номер UIS: при включённом Mango звонок всё равно идёт в Новосистем."""
+    import io
+    import urllib.request
+
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Client
+
+    settings.MANGO_VPBX_API_KEY = "env-key"
+    settings.MANGO_VPBX_API_SALT = "env-salt"
+    _enable_uis()
+    admin = django_user_model.objects.create_superuser(
+        username="uis-ext",
+        email="uis-ext@example.com",
+        password="password12",
+    )
+    StaffVpbxProfile.objects.create(user=admin, extension="201", uis_employee_id="55")
+    crm_client = Client.objects.create(email="ext@example.com", name="E", phone="79161112233")
+    seen: dict[str, Any] = {}
+
+    def _urlopen(req: Any, timeout: int = 0) -> Any:
+        del timeout
+        seen["url"] = req.full_url
+        seen["body"] = req.data
+        payload = b'{"jsonrpc":"2.0","result":{"data":{"call_session_id":42}}}'
+        return io.BytesIO(payload)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _urlopen)
+    client.force_login(admin)
+    response = client.post(reverse("admin:crm_client_call_client", args=[crm_client.pk]))
+    assert response.status_code == 302
+    assert "callapi.uiscom.ru" in seen["url"]
+    assert "mango" not in seen["url"].casefold()
+    sent = json.loads(seen["body"].decode())
+    assert sent["params"]["employee"] == {"id": 55}
+
+
+@pytest.mark.django_db
 def test_uis_http_error_surfaces_api_message() -> None:
     """Ответ UIS с JSON-ошибкой попадает в текст RuntimeError, а не в общий «недоступен»."""
     import io
