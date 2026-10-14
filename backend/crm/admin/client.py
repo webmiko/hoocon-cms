@@ -553,7 +553,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         request: HttpRequest,
         object_id: str,
     ) -> HttpResponse:
-        """Click-to-call: Mango callback менеджер (добавочный) → клиент."""
+        """Click-to-call: Новосистем по ID сотрудника, Mango только если UIS нет."""
         if not self.has_change_permission(request):
             raise PermissionDenied
         client = get_object_or_404(self.get_queryset(request), pk=object_id)
@@ -594,14 +594,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
 
         if request.method == "POST" and not blockers:
             try:
-                if can_mango and mango_configured():
-                    result = initiate_callback(extension, client.phone)
-                    via = "Mango"
-                elif can_mango:
-                    initiate_callback_webhook(extension, client.phone)
-                    result = {}
-                    via = "Mango"
-                else:
+                if can_uis:
                     result = {
                         "call_session_id": initiate_employee_call(
                             employee_id=uis_employee_id,
@@ -610,6 +603,13 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                         )
                     }
                     via = "Новосистем"
+                elif can_mango and mango_configured():
+                    result = initiate_callback(extension, client.phone)
+                    via = "Mango"
+                else:
+                    initiate_callback_webhook(extension, client.phone)
+                    result = {}
+                    via = "Mango"
             except RuntimeError as exc:
                 self.message_user(request, str(exc), messages.ERROR)
             else:
