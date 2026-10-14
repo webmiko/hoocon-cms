@@ -32,8 +32,10 @@ alwaysApply: true
 1. Убедиться: последние коммиты на `origin/develop`, checkup/CI зелёные.
 2. Открытый release PR существует (`gh pr list --base main --head develop`);
  если нет — `./scripts/ensure-release-pr.sh`.
-2а. Если `MAJOR.MINOR` в `develop` такой же, как на `main` —
- `python3 scripts/bump-release.py minor`, коммит `Bumped release to vX.Y.`,
+2а. Если полная версия `X.Y.Z` в `develop` такая же, как на `main`:
+ правка готовой фичи → `python3 scripts/bump-release.py patch`;
+ новая фича, вторая цифра ещё не поднята → `minor`.
+ MAJOR не трогать. Коммит `Bumped release to vX.Y.Z.`,
  push `develop` (см. `release-version.mdc`).
 3. **Смержить весь PR** в `main` (все коммиты из PR, не один cherry-pick):
    `./scripts/merge-release-pr.sh`

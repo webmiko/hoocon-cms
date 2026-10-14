@@ -13,21 +13,25 @@ if [[ -z "${number}" ]]; then
   exit 1
 fi
 
-# Prod shows MAJOR.MINOR; PATCH is internal. A prod release must change MINOR.
-public_version() {
+# Prod shows MAJOR.MINOR.PATCH. A release must change the full version.
+# PATCH — a fix of a feature already shipped. MINOR — a new feature.
+# MAJOR — only by hand. Same version as prod is refused.
+full_version() {
   git show "origin/$1:backend/config/release.py" \
-    | sed -nE 's/^RELEASE_VERSION = "([0-9]+\.[0-9]+)(\.[0-9]+)?"$/\1/p'
+    | sed -nE 's/^RELEASE_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p'
 }
 git fetch origin "${BASE}" "${HEAD}" --quiet
-prod_public="$(public_version "${BASE}")"
-next_public="$(public_version "${HEAD}")"
-if [[ "${prod_public}" == "${next_public}" && "${RELEASE_ALLOW_SAME_MINOR:-}" != "1" ]]; then
-  echo "Prod already shows v${prod_public}; develop is still v${next_public}.x." >&2
-  echo "Run: python3 scripts/bump-release.py minor  (commit + push develop), then retry." >&2
-  echo "Hotfix without a new prod label: RELEASE_ALLOW_SAME_MINOR=1 $0" >&2
+prod_version="$(full_version "${BASE}")"
+next_version="$(full_version "${HEAD}")"
+allow_same="${RELEASE_ALLOW_SAME_VERSION:-${RELEASE_ALLOW_SAME_MINOR:-}}"
+if [[ "${prod_version}" == "${next_version}" && "${allow_same}" != "1" ]]; then
+  echo "Prod is already v${prod_version}; develop is still v${next_version}." >&2
+  echo "Fix of a shipped feature: python3 scripts/bump-release.py patch" >&2
+  echo "New feature: python3 scripts/bump-release.py minor" >&2
+  echo "Then commit, push develop, and retry. MAJOR only by hand." >&2
   exit 1
 fi
-echo "Prod release v${prod_public} → v${next_public}"
+echo "Prod release v${prod_version} → v${next_version}"
 
 echo "Waiting for checks on PR #${number}…"
 gh pr checks "${number}" --watch --fail-fast
