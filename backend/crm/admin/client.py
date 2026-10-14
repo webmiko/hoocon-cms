@@ -409,7 +409,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             if template is not None:
                 initial["subject"], initial["body"] = render_email_template(
                     template,
-                    context=email_template_context_for_client(client),
+                    context=email_template_context_for_client(client, request.user),
                 )
             form = ComposeEmailForm(initial=initial)
 

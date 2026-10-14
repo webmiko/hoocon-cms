@@ -176,6 +176,7 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Укажите ID сотрудника UIS в профиле пользователя" in doc.body
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert "09.10.2026" in guide.body
+    assert 'id="changelog-email-order-tag"' in guide.body
     assert 'id="changelog-uis-lines"' in guide.body
     assert "+7 (499) 995-12-77" in guide.body
     assert 'id="changelog-uis-call-order"' in guide.body
