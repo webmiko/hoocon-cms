@@ -315,6 +315,43 @@ def test_uis_click_to_call_wins_over_mango_when_extension_is_uis(
 
 
 @pytest.mark.django_db
+def test_call_client_page_names_the_line_that_will_call(
+    client: Any,
+    django_user_model: Any,
+    settings: Any,
+) -> None:
+    """Страница подтверждения описывает Новосистем, если звонок пойдёт через UIS."""
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Client
+
+    _enable_uis(phone="74951234567")
+    admin = django_user_model.objects.create_superuser(
+        username="uis-copy",
+        email="uis-copy@example.com",
+        password="password12",
+    )
+    StaffVpbxProfile.objects.create(user=admin, extension="201", uis_employee_id="55")
+    crm_client = Client.objects.create(email="copy@example.com", name="C", phone="79161112233")
+    client.force_login(admin)
+    html = client.get(reverse("admin:crm_client_call_client", args=[crm_client.pk])).content.decode()
+    assert "Новосистем сначала позвонит вам в приложение UIS" in html
+    assert "+7 (495) 123-45-67" in html
+    assert "Mango сначала позвонит" not in html
+
+    settings.MANGO_VPBX_API_KEY = "env-key"
+    settings.MANGO_VPBX_API_SALT = "env-salt"
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.novosystem_enabled = False
+    site.mango_enabled = True
+    site.save()
+    StaffVpbxProfile.objects.filter(user=admin).update(uis_employee_id="")
+    mango_html = client.get(reverse("admin:crm_client_call_client", args=[crm_client.pk])).content.decode()
+    assert "Mango сначала позвонит на ваш добавочный 201" in mango_html
+
+
+@pytest.mark.django_db
 def test_uis_http_error_surfaces_api_message() -> None:
     """Ответ UIS с JSON-ошибкой попадает в текст RuntimeError, а не в общий «недоступен»."""
     import io

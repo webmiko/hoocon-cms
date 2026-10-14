@@ -48,6 +48,16 @@ from leads.services import lead_visible_to_manager
 logger = logging.getLogger(__name__)
 
 
+def _ru_company_phone() -> str:
+    """Virtual UIS number as the client sees it, from the Novosystem widget."""
+    from sitesettings.telephony import novosystem_settings
+
+    digits = "".join(ch for ch in novosystem_settings()[2] if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("7"):
+        return f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:9]}-{digits[9:11]}"
+    return digits
+
+
 @admin.register(Client)
 class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
     """CRM client card: contacts, assignee, leads, timeline, send email.
@@ -633,6 +643,9 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "title": _("Позвонить клиенту: %(name)s") % {"name": client.name or client.email},
             "blockers": blockers,
             "extension": extension,
+            "uis_employee_id": uis_employee_id,
+            "call_via": "uis" if can_uis else "mango",
+            "company_phone": _ru_company_phone() if can_uis else "",
             "client_change_url": change_url,
         }
         return render(request, "admin/crm/call_client.html", context)

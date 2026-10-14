@@ -102,6 +102,57 @@ def test_manager_cannot_open_foreign_client_card() -> None:
 
 
 @pytest.mark.django_db
+def test_manager_cannot_call_foreign_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Чужая карточка: страница звонка не открывается и вызов в UIS не уходит."""
+    from accounts.models import StaffVpbxProfile
+    from sitesettings.models import SiteSettings
+
+    mgr = _staff_with_perms(
+        username="crm-call-scope",
+        codenames=("view_client", "change_client"),
+    )
+    StaffVpbxProfile.objects.create(user=mgr, extension="201", uis_employee_id="55", is_enabled=True)
+    site = SiteSettings.load()
+    site.novosystem_enabled = True
+    site.novosystem_access_token = "uis-token"
+    site.novosystem_virtual_phone = "74999951277"
+    site.novosystem_webhook_secret = "hook-secret"
+    site.save()
+    other = User.objects.create_user(
+        username="crm-call-other",
+        email="crm-call-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    foreign = CrmClient.objects.create(
+        name="Foreign Call",
+        email="foreign-call@example.com",
+        phone="79160000001",
+        assignee=other,
+    )
+    Lead.objects.create(
+        name="Foreign Call Lead",
+        email="foreign-call@example.com",
+        message="x" * 20,
+        status=Lead.LeadStatus.IN_PROGRESS,
+        assignee=other,
+        client=foreign,
+    )
+
+    def _urlopen(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("UIS must not be called for a foreign client")
+
+    monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+    client = Client()
+    client.force_login(mgr)
+    url = reverse("admin:crm_client_call_client", args=[foreign.pk])
+    for response in (client.get(url), client.post(url)):
+        assert response.status_code in (302, 403, 404)
+        if response.status_code == 302:
+            assert response.url.startswith("/admin/")
+
+
+@pytest.mark.django_db
 def test_activity_author_does_not_unlock_foreign_lead() -> None:
     """Creating an activity on a foreign lead must not add it to lead scope."""
     from leads.services import scope_leads_for_manager

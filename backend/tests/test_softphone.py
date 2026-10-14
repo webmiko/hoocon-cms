@@ -472,6 +472,45 @@ def _form(profile: StaffVpbxProfile, **data: Any) -> StaffVpbxProfileForm:
 
 
 @pytest.mark.django_db
+def test_one_uis_employee_id_per_staff_user(django_user_model: Any) -> None:
+    """Один ID UIS нельзя записать двум сотрудникам; пустой ID можно нескольким."""
+    from django.db import IntegrityError
+
+    owner = django_user_model.objects.create_user(
+        username="uis-owner",
+        email="uis-owner@example.test",
+        password="password12",
+    )
+    other = django_user_model.objects.create_user(
+        username="uis-other",
+        email="uis-other@example.test",
+        password="password12",
+    )
+    blank = django_user_model.objects.create_user(
+        username="uis-blank",
+        email="uis-blank@example.test",
+        password="password12",
+    )
+    StaffVpbxProfile.objects.create(user=owner, uis_employee_id="3853967")
+    StaffVpbxProfile.objects.create(user=blank, uis_employee_id="")
+    StaffVpbxProfile.objects.create(
+        user=django_user_model.objects.create_user(
+            username="uis-blank-2",
+            email="uis-blank-2@example.test",
+            password="password12",
+        ),
+        uis_employee_id="",
+    )
+
+    form = _form(StaffVpbxProfile(user=other), uis_employee_id="3853967")
+    assert not form.is_valid()
+    assert "uis_employee_taken" in [error.code for error in form.errors["uis_employee_id"].as_data()]
+
+    with pytest.raises(IntegrityError):
+        StaffVpbxProfile.objects.create(user=other, uis_employee_id="3853967")
+
+
+@pytest.mark.django_db
 def test_profile_form_keeps_token_when_field_left_empty(django_user_model: Any) -> None:
     """Пустое поле токена при сохранении карточки сотрудника не стирает сохранённый токен."""
     user = _staff(django_user_model, "agent", token="keep-me")

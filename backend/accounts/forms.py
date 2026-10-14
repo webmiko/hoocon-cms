@@ -240,6 +240,23 @@ class StaffVpbxProfileForm(forms.ModelForm):
         state = "сохранён" if self.instance.pk and self.instance.uis_webrtc_token else "не задан"
         field.help_text = f"Токен WebRTC из кабинета UIS. Сейчас: {state}. Пустое поле оставляет сохранённый."
 
+    def clean_uis_employee_id(self) -> str:
+        """One UIS employee id belongs to one staff profile; blanks may repeat."""
+        raw = (self.cleaned_data.get("uis_employee_id") or "").strip()
+        if raw and not raw.isdigit():
+            raise ValidationError(_("ID сотрудника UIS — только цифры."), code="uis_employee_digits")
+        if not raw:
+            return ""
+        clash = StaffVpbxProfile.objects.filter(uis_employee_id=raw)
+        if self.instance.pk:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise ValidationError(
+                _("Этот ID сотрудника UIS уже записан у другого сотрудника."),
+                code="uis_employee_taken",
+            )
+        return raw
+
     def clean_uis_webrtc_token(self) -> str:
         """Keep the stored token when the field is submitted empty."""
         value = (self.cleaned_data.get("uis_webrtc_token") or "").strip()
