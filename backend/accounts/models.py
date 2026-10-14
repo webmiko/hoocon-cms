@@ -297,7 +297,10 @@ class StaffVpbxProfile(models.Model):
         max_length=20,
         blank=True,
         default="",
-        help_text=_("Числовой id сотрудника в Новосистем (UIS). Нужен для звонка из карточки, когда виджет включён."),
+        help_text=_(
+            "Числовой id сотрудника в Новосистем (UIS). Один id — один сотрудник. "
+            "Нужен для звонка из карточки, когда виджет включён."
+        ),
     )
     uis_webrtc_token = models.CharField(
         _("токен WebRTC (UIS)"),
@@ -313,6 +316,13 @@ class StaffVpbxProfile(models.Model):
     class Meta:
         verbose_name = _("Добавочный сотрудника (Mango)")
         verbose_name_plural = _("Добавочные сотрудников (Mango)")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("uis_employee_id",),
+                condition=~models.Q(uis_employee_id=""),
+                name="accounts_staffvpbx_uis_employee_uniq",
+            ),
+        ]
 
     def __str__(self) -> str:
         ext = (self.extension or "").strip() or "—"
