@@ -154,14 +154,23 @@ body.hoocon-os27 .hoocon-nav-sections__link-title {
 }
 
 body.hoocon-os27 .hoocon-nav-sections__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
   min-width: var(--hoocon-count-size);
-  height: var(--hoocon-count-size);
-  padding: var(--hoocon-count-pad);
-  border-radius: var(--hoocon-radius-pill);
+  min-height: var(--hoocon-count-size);
+  width: max-content;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
   background: var(--os27-danger, #ff3b30);
   color: #fff;
   font-size: var(--hoocon-count-font);
   font-weight: 600;
+  line-height: 1;
   text-align: center;
 }
 
@@ -602,10 +611,15 @@ body.hoocon-os27.change-form .selector select {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
+    flex-shrink: 0;
     min-width: var(--hoocon-count-size);
-    height: var(--hoocon-count-size);
-    padding: var(--hoocon-count-pad);
-    border-radius: var(--hoocon-radius-pill);
+    min-height: var(--hoocon-count-size);
+    width: max-content;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 0;
+    border-radius: 50%;
     background: var(--os27-accent);
     color: #fff;
     font-size: var(--hoocon-count-font);

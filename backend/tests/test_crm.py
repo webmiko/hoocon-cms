@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -350,6 +351,42 @@ def test_compose_email_view_creates_queued_message(
     assert msg.subject == "КП"
     assert msg.status == EmailStatus.QUEUED
     delay_mock.assert_called_once_with(msg.pk)
+
+
+@pytest.mark.django_db
+def test_compose_email_rejects_body_over_character_limit(client, django_user_model) -> None:
+    """Текст длиннее 20 000 символов не уходит: форма показывает, что лимит исчерпан."""
+    user = django_user_model.objects.create_user(
+        username="crm-mailer-limit",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Buyer", email="limit@example.com")
+    client.force_login(user)
+    url = reverse("admin:crm_client_compose_email", args=[crm_client.pk])
+
+    response = client.post(
+        url,
+        {
+            "to_email": "limit@example.com",
+            "subject": "КП",
+            "body": "а" * 20001,
+            "send_now": "on",
+        },
+    )
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Лимит 20 000 символов исчерпан" in html
+    assert not EmailMessage.objects.filter(client=crm_client).exists()
+    # source-lint: страница грузит этот скрипт; он же не даёт отправить текст сверх maxlength.
+    script = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-mail-compose.js").read_text(
+        encoding="utf-8"
+    )
+    assert "refreshLimit" in script
+    assert 'setAttribute("role", over ? "alert"' in script
+    assert "event.preventDefault()" in script
 
 
 @pytest.mark.django_db

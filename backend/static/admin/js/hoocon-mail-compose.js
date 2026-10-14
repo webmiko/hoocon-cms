@@ -91,6 +91,35 @@
     textarea.value = html === "<br>" ? "" : html;
   }
 
+  const help = form.querySelector("#hoocon-mail-compose-limit");
+  const helpDefault = help ? help.textContent : "";
+  const sendButton = form.querySelector(".hoocon-mail-compose__send");
+
+  function bodyLimit() {
+    return textarea.maxLength > 0 ? textarea.maxLength : 20000;
+  }
+
+  function formatCount(value) {
+    return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  }
+
+  function refreshLimit() {
+    const limit = bodyLimit();
+    const length = textarea.value.length;
+    const over = length > limit;
+    if (help) {
+      help.classList.toggle("is-over-limit", over);
+      help.setAttribute("role", over ? "alert" : "status");
+      help.textContent = over
+        ? "Лимит " + formatCount(limit) + " символов исчерпан. Сейчас " + formatCount(length) + ". Сократите текст письма."
+        : helpDefault;
+    }
+    if (sendButton) {
+      sendButton.disabled = over;
+    }
+    return over;
+  }
+
   function refreshToolbarState() {
     form.querySelectorAll("[data-format]").forEach(function (button) {
       const command = button.getAttribute("data-format");
@@ -114,6 +143,7 @@
     renderInitial(textarea.value);
   }
   syncToTextarea();
+  refreshLimit();
 
   editor.addEventListener("paste", function (event) {
     const data = event.clipboardData;
@@ -142,18 +172,23 @@
       selection.addRange(range);
     }
     syncToTextarea();
+    refreshLimit();
   });
 
   editor.addEventListener("input", function () {
     syncToTextarea();
+    refreshLimit();
     refreshToolbarState();
   });
 
   editor.addEventListener("keyup", refreshToolbarState);
   editor.addEventListener("mouseup", refreshToolbarState);
 
-  form.addEventListener("submit", function () {
+  form.addEventListener("submit", function (event) {
     syncToTextarea();
+    if (refreshLimit()) {
+      event.preventDefault();
+    }
   });
 
   form.querySelectorAll("[data-format]").forEach(function (button) {
@@ -170,6 +205,7 @@
         document.execCommand(command, false, null);
       }
       syncToTextarea();
+      refreshLimit();
       refreshToolbarState();
     });
   });

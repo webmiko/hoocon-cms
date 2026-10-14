@@ -54,7 +54,7 @@
   --hoocon-group-divider: var(--hoocon-hairline);
   /* One metric per role — pages reuse these instead of a local size. */
   --hoocon-count-size: 1.35rem;
-  --hoocon-count-pad: 0 0.35rem;
+  --hoocon-count-pad: 0;
   --hoocon-count-font: 0.75rem;
   --hoocon-chip-pad: 0.2rem 0.55rem;
   --hoocon-chip-font: 0.75rem;
@@ -274,10 +274,15 @@ body.hoocon-os27 :is(
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
   min-width: var(--hoocon-count-size);
-  height: var(--hoocon-count-size);
-  padding: var(--hoocon-count-pad);
-  border-radius: var(--hoocon-radius-pill);
+  min-height: var(--hoocon-count-size);
+  width: max-content;
+  height: auto;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
   background: color-mix(in srgb, var(--hoocon-quiet) 14%, transparent);
   font-size: var(--hoocon-count-font);
   font-variant-numeric: tabular-nums;

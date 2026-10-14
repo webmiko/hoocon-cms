@@ -523,24 +523,49 @@ def get_active_email_template(template_id: str | int | None) -> EmailTemplate | 
     return EmailTemplate.objects.filter(pk=int(raw), is_active=True).first()
 
 
-def email_template_context_for_client(client: Client) -> dict[str, str]:
-    """Placeholder values for template substitution from a Client card."""
+def email_template_context_for_client(client: Client, user: Any | None = None) -> dict[str, str]:
+    """Placeholder values for template substitution from a Client card.
+
+    ``{заказ}`` is the latest lead of this card that ``user`` may see:
+    the client's message and SKU lines. Without ``user``, every lead on the
+    card is eligible (tests and callers that already checked access).
+    """
+    leads = client.leads.all()
+    if user is not None:
+        from leads.services import scope_leads_for_manager
+
+        leads = scope_leads_for_manager(leads, user)
+    lead = leads.order_by("-created_at", "-pk").first()
     return {
         "имя": client.name or "",
         "компания": client.company or "",
         "почта": client.email or "",
         "телефон": client.phone or "",
+        "заказ": _email_template_order_text(lead),
     }
 
 
 def email_template_context_for_lead(lead: Lead) -> dict[str, str]:
-    """Placeholder values for template substitution from a Lead contact."""
+    """Placeholder values for template substitution from a Lead contact.
+
+    ``{заказ}`` is this lead: the message and SKU lines.
+    """
     return {
         "имя": lead.name or "",
         "компания": lead.company or "",
         "почта": lead.email or "",
         "телефон": lead.phone or "",
+        "заказ": _email_template_order_text(lead),
     }
+
+
+def _email_template_order_text(lead: Lead | None) -> str:
+    """Plain text of a lead's request for the ``{заказ}`` placeholder."""
+    if lead is None:
+        return ""
+    from crm.mail_links import format_lead_reply_body
+
+    return format_lead_reply_body(lead).strip()
 
 
 def render_email_template(
@@ -548,10 +573,11 @@ def render_email_template(
     *,
     context: dict[str, str],
 ) -> tuple[str, str]:
-    """Substitute ``{имя}``/``{компания}``/``{почта}``/``{телефон}`` placeholders.
+    """Substitute ``{имя}``/``{компания}``/``{почта}``/``{телефон}``/``{заказ}`` placeholders.
 
     Plain ``str.replace`` — unknown placeholders and stray braces are kept
-    as-is (no ``format()`` crash on user-edited text).
+    as-is (no ``format()`` crash on user-edited text). An empty value drops
+    the tag and a line that held only that tag, so the letter has no blank hole.
 
     Args:
         template: EmailTemplate with subject/body.
@@ -565,9 +591,49 @@ def render_email_template(
     body_is_html = bool(_HTML_TAG_RE.search(body))
     for key, value in context.items():
         token = "{" + key + "}"
-        subject = subject.replace(token, value)
-        body = body.replace(token, html.escape(value) if body_is_html else value)
-    return subject.strip(), body.strip()
+        raw = str(value or "").strip()
+        if not raw:
+            subject = subject.replace(token, "")
+            body = body.replace(token, "")
+            continue
+        subject = subject.replace(token, " ".join(raw.split()))
+        body = body.replace(token, html.escape(raw) if body_is_html else raw)
+    return _tidy_placeholder_text(subject), _tidy_placeholder_text(body, html_body=body_is_html)
+
+
+_EMPTY_FIELD_LINE = re.compile(
+    r"^(?:почта|телефон|имя|компания|заказ)\s*[—–:-]\s*$",
+    re.IGNORECASE,
+)
+_HTML_EMPTY_BLOCK = re.compile(
+    r"<(p|div)\b[^>]*>(.*?)</\1>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _tidy_placeholder_text(text: str, *, html_body: bool = False) -> str:
+    """Drop lines left empty after an omitted placeholder."""
+    if html_body:
+        text = _HTML_EMPTY_BLOCK.sub(_drop_empty_html_block, text)
+        return text.strip()
+    kept: list[str] = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped or _EMPTY_FIELD_LINE.match(stripped):
+            kept.append("")
+            continue
+        kept.append(line.rstrip())
+    cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(kept))
+    return cleaned.strip()
+
+
+def _drop_empty_html_block(match: re.Match[str]) -> str:
+    """Remove a paragraph whose text was only an empty placeholder."""
+    inner = re.sub(r"<[^>]+>", "", match.group(2))
+    inner = inner.replace("&nbsp;", " ").strip()
+    if not inner or _EMPTY_FIELD_LINE.match(inner):
+        return ""
+    return match.group(0)
 
 
 def create_quote_from_lead(lead: Lead, *, author: Any) -> tuple[Quote, bool]:
