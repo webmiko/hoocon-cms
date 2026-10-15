@@ -451,6 +451,7 @@ def test_company_requisites_hidden_until_manager_confirms_member() -> None:
 
     data = api.get("/api/account/company/").json()
     assert data["confirmed"] is False
+    assert data["needs_confirmation"] is True
     assert data["inn"] == ""
     assert data["legal_address"] == ""
     assert data["members"] == []
@@ -899,6 +900,12 @@ def test_summary_counts_own_objects() -> None:
     assert summary.json()["active_leads"] == 1
     assert summary.json()["quotes_pending"] == 1
     assert summary.json()["orders_in_work"] == 1
+    assert summary.json()["quotes_total"] == 1
+    assert summary.json()["orders_total"] == 1
+    assert summary.json()["documents_total"] == 1
+    assert summary.json()["specs_total"] == 0
+    assert summary.json()["conversations_total"] == 0
+    assert summary.json()["rma_total"] == 0
 
 
 @pytest.mark.django_db
@@ -1050,3 +1057,108 @@ def test_session_mutation_requires_csrf() -> None:
         HTTP_X_CSRFTOKEN=token.value,
     )
     assert ok.status_code == 200
+
+
+@pytest.mark.django_db
+def test_done_lead_with_quote_shows_quote_status_and_manager_name(settings) -> None:
+    """Клиент видит «КП отправлено» и имя из подписи, а не логин менеджера."""
+    settings.MANAGER_SIGNATURE_CONTACTS = {
+        "anna@hoocon.test": {"name": "Анна Смирнова", "phone": "+7 495 111-22-33", "company": "Hoocon"},
+    }
+    User.objects.create_user(username="anna@hoocon.test", email="anna@hoocon.test", first_name="", is_staff=True)
+    client = _client_with_data("label@acme.test")
+    lead = client.leads.get()
+    lead.status = Lead.LeadStatus.DONE
+    lead.assignee = User.objects.get(email="anna@hoocon.test")
+    lead.save(update_fields=["status", "assignee"])
+
+    api = APIClient()
+    _register(api, "label@acme.test")
+    row = api.get("/api/account/leads/").json()["results"][0]
+    assert row["status"] == "done"
+    assert row["status_label"] == "КП отправлено"
+    assert row["manager_name"] == "Анна Смирнова"
+    assert row["manager_phone"] == "+7 495 111-22-33"
+    assert "anna@hoocon.test" not in row["manager_name"]
+
+
+@pytest.mark.django_db
+def test_sole_company_member_sees_own_requisites_without_confirmation() -> None:
+    """Единственный контакт компании видит ИНН без галочки «подтверждён» и без списка коллег."""
+    from crm.models import CompanyMember
+
+    api = _register(APIClient(), "solo@acme.test")
+    client = Client.objects.get(email="solo@acme.test")
+    client.company = "Только мы"
+    client.save()
+    client.refresh_from_db()
+    org = client.company_ref
+    assert org is not None
+    org.inn = "7707083893"
+    org.legal_address = "Москва, ул. Складская, 1"
+    org.save()
+    assert CompanyMember.objects.get(company=org, client=client).is_confirmed is False
+
+    data = api.get("/api/account/company/").json()
+    assert data["inn"] == "7707083893"
+    assert data["legal_address"] == "Москва, ул. Складская, 1"
+    assert data["needs_confirmation"] is False
+    assert data["members"] == []
+
+
+@pytest.mark.django_db
+def test_done_lead_labels_follow_the_quote_and_the_card_owner() -> None:
+    """Согласованное, отклонённое и заявка без КП читаются по-разному. Имя берётся с карточки."""
+    owner = User.objects.create_user(
+        username="boris@hoocon.test",
+        email="boris@hoocon.test",
+        first_name="Борис",
+        is_staff=True,
+    )
+    client = _client_with_data("outcomes@acme.test")
+    client.assignee = owner
+    client.save(update_fields=["assignee"])
+    sent = client.leads.get()
+    sent.status = Lead.LeadStatus.DONE
+    sent.save(update_fields=["status"])
+
+    accepted = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Владелец",
+        email=client.email,
+        client=client,
+        contact_verified=True,
+        status=Lead.LeadStatus.DONE,
+        message="Согласовали",
+    )
+    Quote.objects.create(client=client, lead=accepted, status=QuoteStatus.ACCEPTED)
+    rejected = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="Владелец",
+        email=client.email,
+        client=client,
+        contact_verified=True,
+        status=Lead.LeadStatus.DONE,
+        message="Не то",
+    )
+    Quote.objects.create(client=client, lead=rejected, status=QuoteStatus.REJECTED)
+    plain = Lead.objects.create(
+        lead_type=Lead.LeadType.CONSULTATION,
+        name="Владелец",
+        email=client.email,
+        client=client,
+        contact_verified=True,
+        status=Lead.LeadStatus.DONE,
+        message="Просто вопрос",
+    )
+
+    api = APIClient()
+    _register(api, "outcomes@acme.test")
+    rows = {row["id"]: row for row in api.get("/api/account/leads/").json()["results"]}
+    assert rows[sent.pk]["status_label"] == "КП отправлено"
+    assert rows[sent.pk]["manager_name"] == "Борис"
+    assert rows[sent.pk]["manager_phone"] == ""
+    assert "boris@hoocon.test" not in rows[sent.pk]["manager_name"]
+    assert rows[accepted.pk]["status_label"] == "КП согласовано"
+    assert rows[rejected.pk]["status_label"] == "КП отклонено"
+    assert rows[plain.pk]["status_label"] == "Завершена"

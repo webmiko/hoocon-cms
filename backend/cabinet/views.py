@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -344,6 +344,12 @@ class AccountSummaryView(ClientApiView):
                 "quotes_pending": client.quotes.filter(status=QuoteStatus.SENT).count(),
                 "orders_in_work": client.orders.exclude(status__in=("done", "cancelled")).count(),
                 "unread_conversations": _scoped_conversations(client).filter(status=ConversationStatus.OPEN).count(),
+                "quotes_total": client.quotes.exclude(status=QuoteStatus.DRAFT).count(),
+                "orders_total": client.orders.count(),
+                "documents_total": client.documents.count(),
+                "specs_total": client.account.spec_lists.count() if client.account is not None else 0,
+                "conversations_total": _scoped_conversations(client).count(),
+                "rma_total": client.rma_cases.count(),
             }
         )
 
@@ -355,7 +361,12 @@ def _scoped_leads(client: Client) -> QuerySet[Lead]:
     into work proves nothing about the sender, so only an explicit
     confirmation (cabinet, manager link, sent quote) surfaces it.
     """
-    return client.leads.filter(contact_verified=True).prefetch_related("items__sku").order_by("-created_at")
+    return (
+        client.leads.filter(contact_verified=True)
+        .select_related("assignee", "client__assignee")
+        .prefetch_related("items__sku", "quotes")
+        .order_by("-created_at")
+    )
 
 
 def _scoped_conversations(client: Client) -> QuerySet[Any]:
@@ -369,15 +380,46 @@ def _scoped_conversations(client: Client) -> QuerySet[Any]:
     return Conversation.objects.filter(client=client, contact_verified=True)
 
 
+def _client_lead_status_label(lead: Lead) -> str:
+    """What the client reads. Internal «Завершена» after a quote is the quote."""
+    if lead.status != Lead.LeadStatus.DONE:
+        return lead.get_status_display()
+    visible = [quote for quote in lead.quotes.all() if quote.status != QuoteStatus.DRAFT]
+    if any(quote.status == QuoteStatus.ACCEPTED for quote in visible):
+        return "КП согласовано"
+    if any(quote.status == QuoteStatus.SENT for quote in visible):
+        return "КП отправлено"
+    if any(quote.status == QuoteStatus.REJECTED for quote in visible):
+        return "КП отклонено"
+    return lead.get_status_display()
+
+
+def _lead_manager(lead: Lead) -> dict[str, str]:
+    """Name and phone of the assignee. The login email is not a name."""
+    from crm.manager_signatures import manager_public_contact
+
+    user = None
+    card = cast(Client | None, lead.client)
+    if lead.assignee_id:
+        user = lead.assignee
+    elif card is not None and card.assignee_id:
+        user = card.assignee
+    contact = manager_public_contact(user)
+    return {"manager_name": contact["name"], "manager_phone": contact["phone"]}
+
+
 def _lead_payload(lead: Lead) -> dict[str, Any]:
+    manager = _lead_manager(lead)
     return {
         "id": lead.pk,
         "type": lead.lead_type,
         "type_label": lead.get_lead_type_display(),
         "status": lead.status,
-        "status_label": lead.get_status_display(),
+        "status_label": _client_lead_status_label(lead),
         "company": lead.company,
         "message": lead.message,
+        "manager_name": manager["manager_name"],
+        "manager_phone": manager["manager_phone"],
         "created_at": lead.created_at,
         "items": [
             {
@@ -740,22 +782,32 @@ class AccountCompanyView(ClientApiView):
         """
         client = _client_for(request)
         company = getattr(client, "company_ref", None)
-        if company is None or not company.members.filter(client=client, is_confirmed=True).exists():
-            return Response(
-                {
-                    "name": client.company,
-                    "inn": "",
-                    "legal_address": "",
-                    "members": [],
-                    "confirmed": False,
-                }
-            )
+        hidden = {
+            "name": client.company,
+            "inn": "",
+            "legal_address": "",
+            "members": [],
+            "confirmed": False,
+            "needs_confirmation": False,
+        }
+        if company is None:
+            return Response(hidden)
+        membership = company.members.filter(client=client)
+        confirmed = membership.filter(is_confirmed=True).exists()
+        # A card that is the only member is this client's own company: show
+        # the requisites the manager typed. A second, unconfirmed person
+        # must not read a colleague's INN.
+        others = company.members.exclude(client=client).exists()
+        if not confirmed and others:
+            hidden["needs_confirmation"] = True
+            return Response(hidden)
         return Response(
             {
                 "name": company.name,
                 "inn": company.inn,
                 "legal_address": company.legal_address,
-                "confirmed": True,
+                "confirmed": confirmed,
+                "needs_confirmation": False,
                 "members": [
                     {
                         "id": m.pk,
@@ -764,7 +816,9 @@ class AccountCompanyView(ClientApiView):
                         "client": m.client_id,
                     }
                     for m in company.members.all()
-                ],
+                ]
+                if confirmed
+                else [],
             }
         )
 

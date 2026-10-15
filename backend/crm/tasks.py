@@ -8,7 +8,7 @@ from typing import Any, cast
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMessage as DjangoEmailMessage
-from django.core.mail import EmailMultiAlternatives, get_connection
+from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 
 from config.logging_utils import setup_logger
 from crm.email_body import html_email_to_plain, is_html_email_body
@@ -43,6 +43,25 @@ def _smtp_connection_for(msg: EmailMessage) -> Any | None:
         timeout=settings.EMAIL_TIMEOUT,
         fail_silently=False,
     )
+
+
+@shared_task
+def send_quote_reply_mail(subject: str, body: str, recipient: str) -> None:
+    """Tell the manager a client accepted a quote or asked for changes.
+
+    Queued from the public reply page so a slow SMTP server does not hold
+    the HTTP response after the status is already saved.
+    """
+    try:
+        send_mail(
+            subject,
+            body,
+            settings.DEFAULT_FROM_EMAIL,
+            [recipient],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.exception("quote_reply_notify_failed type=%s", type(exc).__name__)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

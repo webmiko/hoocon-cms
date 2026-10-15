@@ -630,3 +630,108 @@ def test_settings_save_keeps_round_robin_cursor(django_user_model: Any) -> None:
     row = SiteSettings.load()
     assert row.mango_enabled is True
     assert row.lead_rr_last_user_id == picked.pk
+
+
+@pytest.mark.django_db
+def test_unknown_finished_call_opens_one_card_and_reuses_it(django_user_model: Any) -> None:
+    """Незнакомый номер после разговора — одна карточка менеджера, повтор не плодит вторую и не шлёт письмо."""
+    from unittest.mock import patch
+
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Client
+    from crm.novosystem import handle_novosystem_event
+    from leads.models import Lead
+
+    _enable_uis()
+    manager = django_user_model.objects.create_user(
+        username="caller",
+        email="caller@hoocon.test",
+        is_staff=True,
+    )
+    StaffVpbxProfile.objects.create(user=manager, uis_employee_id="55", extension="201")
+
+    def event(session: str) -> dict[str, str]:
+        return {
+            "id": session,
+            "direction": "in",
+            "contact_phone_number": "79001112233",
+            "employee_id": "55",
+            "finish_time": "2024-03-01T10:05:00+03:00",
+        }
+
+    with (
+        patch("leads.tasks.send_lead_notification.delay") as staff_mail,
+        patch("leads.tasks.send_lead_client_confirmation.delay") as client_mail,
+    ):
+        assert handle_novosystem_event(event("1")) == "created"
+        assert handle_novosystem_event(event("2")) == "created"
+        staff_mail.assert_not_called()
+        client_mail.assert_not_called()
+
+    stub = Client.objects.get(email="79001112233@call.invalid")
+    assert stub.assignee_id == manager.pk
+    assert Lead.objects.filter(client=stub).count() == 1
+    assert Lead.objects.get(client=stub).assignee_id == manager.pk
+    assert Call.objects.filter(client=stub).count() == 2
+
+
+@pytest.mark.django_db
+def test_ringing_call_and_company_number_do_not_open_a_card() -> None:
+    """Пока трубку не положили и на номер компании карточку не заводим."""
+    from crm.models import Client
+    from crm.novosystem import handle_novosystem_event
+
+    _enable_uis(phone="74951234567")
+    assert handle_novosystem_event({"id": "ring", "contact_phone_number": "79002223344"}) == "created"
+    assert Client.objects.count() == 0
+    assert (
+        handle_novosystem_event(
+            {
+                "id": "office",
+                "contact_phone_number": "74951234567",
+                "finish_time": "2024-03-01T10:05:00+03:00",
+            },
+        )
+        == "created"
+    )
+    assert Client.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_real_card_wins_over_call_stub_and_click_to_call_binds_session(django_user_model: Any) -> None:
+    """Живая карточка важнее заглушки; звонок из карточки садится на неё, даже если UIS прислал другой номер."""
+    from accounts.models import StaffVpbxProfile
+    from crm.call_cards import remember_uis_session
+    from crm.models import Client
+    from crm.novosystem import handle_novosystem_event
+
+    _enable_uis()
+    manager = django_user_model.objects.create_user(username="bind", email="bind@hoocon.test", is_staff=True)
+    StaffVpbxProfile.objects.create(user=manager, uis_employee_id="77")
+    Client.objects.create(email="79003334455@call.invalid", name="Звонок", phone="79003334455")
+    real = Client.objects.create(email="real@acme.test", name="Реальный", phone="79003334455")
+
+    handle_novosystem_event(
+        {
+            "id": "match",
+            "contact_phone_number": "79003334455",
+            "finish_time": "2024-03-01T10:05:00+03:00",
+            "employee_id": "77",
+        },
+    )
+    assert Call.objects.get(entry_id="uis:match").client_id == real.pk
+
+    opened = Client.objects.create(email="opened@acme.test", name="Из карточки", phone="79004445566")
+    remember_uis_session(4242, client_id=opened.pk, manager_id=manager.pk)
+    handle_novosystem_event(
+        {
+            "id": "4242",
+            "direction": "out",
+            "contact_phone_number": "79005556677",
+            "finish_time": "2024-03-01T11:00:00+03:00",
+            "employee_id": "77",
+        },
+    )
+    bound = Call.objects.get(entry_id="uis:4242")
+    assert bound.client_id == opened.pk
+    assert not Client.objects.filter(email="79005556677@call.invalid").exists()

@@ -64,6 +64,7 @@ export default function LeadsPage() {
               <th>#</th>
               <th>Тип</th>
               <th>Статус</th>
+              <th>Менеджер</th>
               <th>Позиций</th>
               <th>Дата</th>
               <th />
@@ -78,6 +79,13 @@ export default function LeadsPage() {
                   <span className={lead.status === "done" ? styles.badge : styles.badgeAccent}>
                     {lead.status_label}
                   </span>
+                </td>
+                <td>
+                  {lead.manager_name
+                    ? lead.manager_phone
+                      ? `${lead.manager_name}, ${lead.manager_phone}`
+                      : lead.manager_name
+                    : "—"}
                 </td>
                 <td>{lead.items.length}</td>
                 <td>{fmtDate(lead.created_at)}</td>

@@ -282,6 +282,15 @@ def handle_novosystem_event(payload: dict[str, Any]) -> str:
         if call.client_id and call.lead_id is None:
             call.lead = _latest_open_lead(cast(Client | None, call.client))
         call.save()
+    from crm.call_cards import attach_call_client
+
+    attach_call_client(
+        call,
+        contact_digits=contact,
+        session_id=session,
+        create=state == CallState.DISCONNECTED,
+    )
+    call.save()
     if state == CallState.DISCONNECTED and not previously_finished:
         _log_call_activity(call)
     return "created" if created else "updated"

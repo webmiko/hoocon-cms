@@ -172,6 +172,8 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Mango не используется" in doc.body
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert 'id="changelog-uis-only"' in guide.body
+    assert 'id="changelog-client-reply"' in guide.body
+    assert guide.body.index("changelog-client-reply") < guide.body.index("changelog-call-confirm")
     assert guide.body.index("changelog-call-confirm") < guide.body.index("changelog-uis-only")
     assert guide.body.index("changelog-uis-only") < guide.body.index("changelog-email-order-tag")
     assert "74999951277" in doc.body

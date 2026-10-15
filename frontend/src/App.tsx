@@ -52,6 +52,7 @@ const SearchPage = lazyWithChunkReload(() =>
 const LeadPage = lazyWithChunkReload(() =>
   import("./pages/LeadPage").then((m) => ({ default: m.LeadPage })),
 );
+const QuoteReplyPage = lazyWithChunkReload(() => import("./pages/QuoteReplyPage"));
 const NotFoundPage = lazyWithChunkReload(() =>
   import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
 );
@@ -196,6 +197,7 @@ export default function App() {
             <Route path="terms" element={<PageView slug="terms" />} />
             <Route path="o-kompanii" element={<Navigate to="/company" replace />} />
             <Route path="privacy" element={<Navigate to="/privacy-policy" replace />} />
+            <Route path="kp" element={<QuoteReplyPage />} />
             <Route path=":slug" element={<SkuLegacyRedirect />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

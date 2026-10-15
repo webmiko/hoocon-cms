@@ -605,13 +605,19 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         if request.method == "POST" and not blockers:
             try:
                 if can_uis:
-                    result = {
-                        "call_session_id": initiate_employee_call(
-                            employee_id=uis_employee_id,
-                            employee_phone="",
-                            contact=client.phone,
-                        )
-                    }
+                    session_id = initiate_employee_call(
+                        employee_id=uis_employee_id,
+                        employee_phone="",
+                        contact=client.phone,
+                    )
+                    from crm.call_cards import remember_uis_session
+
+                    remember_uis_session(
+                        session_id,
+                        client_id=client.pk,
+                        manager_id=request.user.pk,
+                    )
+                    result = {"call_session_id": session_id}
                     via = "Новосистем"
                 elif can_mango and mango_configured():
                     result = initiate_callback(extension, client.phone)

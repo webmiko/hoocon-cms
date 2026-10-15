@@ -8,24 +8,39 @@
 import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 
 import { Seo } from "../components/Seo";
+import { useAsync } from "../hooks/useAsync";
 import styles from "./Account.module.css";
+import { accountApi, type AccountSummary } from "./api";
 import { useAccountAuth } from "./AuthContext";
 
-const SECTIONS: Array<{ to: string; label: string }> = [
+const CORE_START: Array<{ to: string; label: string }> = [
   { to: "/account", label: "Сводка" },
   { to: "/account/leads", label: "Заявки" },
-  { to: "/account/quotes", label: "КП" },
-  { to: "/account/orders", label: "Заказы" },
-  { to: "/account/documents", label: "Документы" },
-  { to: "/account/specs", label: "Спецификации" },
-  { to: "/account/conversations", label: "Диалоги" },
-  { to: "/account/rma", label: "Рекламации" },
-  { to: "/account/profile", label: "Профиль" },
 ];
+
+const OPTIONAL: Array<{ to: string; label: string; key: keyof AccountSummary }> = [
+  { to: "/account/quotes", label: "КП", key: "quotes_total" },
+  { to: "/account/orders", label: "Заказы", key: "orders_total" },
+  { to: "/account/documents", label: "Документы", key: "documents_total" },
+  { to: "/account/specs", label: "Спецификации", key: "specs_total" },
+  { to: "/account/conversations", label: "Диалоги", key: "conversations_total" },
+  { to: "/account/rma", label: "Рекламации", key: "rma_total" },
+];
+
+const PROFILE = { to: "/account/profile", label: "Профиль" };
 
 export default function AccountShell() {
   const { session, loading, logout } = useAccountAuth();
   const navigate = useNavigate();
+  const { data: summary } = useAsync(
+    () => (session ? accountApi.summary() : Promise.resolve(null)),
+    session?.email ?? "",
+  );
+  const sections = [
+    ...CORE_START,
+    ...OPTIONAL.filter((item) => (summary?.[item.key] ?? 0) > 0),
+    PROFILE,
+  ];
 
   if (loading) {
     return <div className={styles.page}>Загрузка…</div>;
@@ -51,7 +66,7 @@ export default function AccountShell() {
         </button>
       </div>
       <ul className={styles.tabs}>
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <li key={s.to} className={styles.tab}>
             <NavLink to={s.to} end={s.to === "/account"}>
               {s.label}
