@@ -39,17 +39,6 @@
         <span class="hoocon-pbx__state hoocon-pbx__state--partial">Не полностью</span>
         <span class="hoocon-pbx__state hoocon-pbx__state--on">Виджет включён</span>
       </label>
-      {% if widget.provider == "mango" %}
-        <label class="hoocon-pbx__field">Ключ API
-          <input type="password" name="mango_api_key" form="telephony-mango" autocomplete="new-password" placeholder="{% if widget.key_set %}сохранён{% else %}не задан{% endif %}">
-        </label>
-        <label class="hoocon-pbx__field">Соль API
-          <input type="password" name="mango_api_salt" form="telephony-mango" autocomplete="new-password" placeholder="{% if widget.salt_set %}сохранена{% else %}не задана{% endif %}">
-        </label>
-        <label class="hoocon-pbx__field">URL исходящего звонка
-          <input type="text" name="mango_callback_webhook_url" form="telephony-mango" value="{{ widget.callback }}" placeholder="{ext} и {num}">
-        </label>
-      {% else %}
         <label class="hoocon-pbx__field">Ключ API
           <input type="password" name="novosystem_access_token" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.token_set %}сохранён{% else %}не задан{% endif %}">
         </label>
@@ -67,7 +56,6 @@
         {% else %}
         <p class="hoocon-pbx__url">URL для ЛК UIS: {{ widget.webhook_url }}</p>
         {% endif %}
-      {% endif %}
       <p class="hoocon-integrations__hint">{{ widget.hint }}</p>
       <button type="submit" class="hoocon-pbx__save" form="telephony-{{ widget.provider }}">Сохранить</button>
     </article>

@@ -563,7 +563,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
         request: HttpRequest,
         object_id: str,
     ) -> HttpResponse:
-        """Click-to-call: Новосистем по ID сотрудника, Mango только если UIS нет."""
+        """Click-to-call through the Novosystem widget from a saved client card."""
         if not self.has_change_permission(request):
             raise PermissionDenied
         client = get_object_or_404(self.get_queryset(request), pk=object_id)
@@ -571,74 +571,50 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             raise PermissionDenied
         change_url = reverse("admin:crm_client_change", args=[client.pk])
 
-        from crm.mango import (
-            initiate_callback,
-            initiate_callback_webhook,
-            mango_configured,
-            webhook_callback_configured,
-        )
         from crm.novosystem import initiate_employee_call, novosystem_configured
 
-        extension = ""
         uis_employee_id = ""
         profile = getattr(request.user, "vpbx_profile", None)
         if profile is not None and profile.is_enabled:
-            extension = profile.extension
             uis_employee_id = (profile.uis_employee_id or "").strip()
         blockers: list[str] = []
-        use_mango = mango_configured() or webhook_callback_configured()
         use_uis = novosystem_configured()
-        can_mango = bool(use_mango and extension)
         can_uis = bool(use_uis and uis_employee_id)
-        if not use_mango and not use_uis:
-            blockers.append(str(_("Телефония выключена: включите виджет Mango или Новосистем в интеграциях.")))
-        elif not can_mango and not can_uis:
-            if use_mango:
-                blockers.append(
-                    str(_("У вас не задан добавочный — укажите его в профиле пользователя («Телефония сотрудника»)."))
-                )
-            if use_uis:
-                blockers.append(str(_("Укажите ID сотрудника UIS в профиле пользователя («Телефония сотрудника»).")))
+        if not use_uis:
+            blockers.append(str(_("Телефония выключена: включите виджет Новосистем в интеграциях.")))
+        elif not can_uis:
+            blockers.append(str(_("Укажите ID сотрудника UIS в профиле пользователя («Телефония сотрудника»).")))
         if not client.phone:
             blockers.append(str(_("У клиента не заполнен телефон.")))
 
         if request.method == "POST" and not blockers:
             try:
-                if can_uis:
-                    session_id = initiate_employee_call(
-                        employee_id=uis_employee_id,
-                        employee_phone="",
-                        contact=client.phone,
-                    )
-                    from crm.call_cards import remember_uis_session
+                session_id = initiate_employee_call(
+                    employee_id=uis_employee_id,
+                    employee_phone="",
+                    contact=client.phone,
+                )
+                from crm.call_cards import remember_uis_session
 
-                    remember_uis_session(
-                        session_id,
-                        client_id=client.pk,
-                        manager_id=request.user.pk,
-                    )
-                    result = {"call_session_id": session_id}
-                    via = "Новосистем"
-                elif can_mango and mango_configured():
-                    result = initiate_callback(extension, client.phone)
-                    via = "Mango"
-                else:
-                    initiate_callback_webhook(extension, client.phone)
-                    result = {}
-                    via = "Mango"
+                remember_uis_session(
+                    session_id,
+                    client_id=client.pk,
+                    manager_id=request.user.pk,
+                )
+                result = {"call_session_id": session_id}
             except RuntimeError as exc:
                 self.message_user(request, str(exc), messages.ERROR)
             else:
                 self.message_user(
                     request,
-                    _("Вызов инициирован: %(via)s соединит вас с %(phone)s.") % {"via": via, "phone": client.phone},
+                    _("Вызов инициирован: Новосистем соединит вас с %(phone)s.") % {"phone": client.phone},
                     messages.SUCCESS,
                 )
                 logger.info(
-                    "mango_callback_initiated user=%s client=%s result=%s",
+                    "uis_callback_initiated user=%s client=%s session=%s",
                     request.user.pk,
                     client.pk,
-                    result.get("result"),
+                    result.get("call_session_id"),
                 )
             return HttpResponseRedirect(change_url)
 
@@ -648,9 +624,7 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             "original": client,
             "title": _("Позвонить клиенту: %(name)s") % {"name": client.name or client.email},
             "blockers": blockers,
-            "extension": extension,
             "uis_employee_id": uis_employee_id,
-            "call_via": "uis" if can_uis else "mango",
             "company_phone": _ru_company_phone() if can_uis else "",
             "client_change_url": change_url,
         }

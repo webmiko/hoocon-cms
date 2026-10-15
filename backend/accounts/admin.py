@@ -84,7 +84,7 @@ class StaffMailboxInline(admin.StackedInline):
 
 
 class StaffVpbxProfileInline(admin.StackedInline):
-    """Telephony binding: Mango extension, UIS employee id, browser-phone token."""
+    """Telephony binding: extension, UIS employee id, browser-phone token."""
 
     model = StaffVpbxProfile
     form = StaffVpbxProfileForm

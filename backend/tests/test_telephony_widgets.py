@@ -121,7 +121,7 @@ def test_novosystem_webhook_stores_call_only_when_enabled(client: Any) -> None:
 
 @pytest.mark.django_db
 def test_integrations_page_renders_telephony_widgets(client: Any, django_user_model: Any) -> None:
-    """Страница интеграций содержит формы Mango и Новосистем."""
+    """Страница интеграций показывает только виджет Новосистем."""
     from sitesettings.models import SiteSettings
 
     SiteSettings.load()
@@ -132,20 +132,33 @@ def test_integrations_page_renders_telephony_widgets(client: Any, django_user_mo
     )
     client.force_login(user)
     html = client.get(reverse("admin:sitesettings_sitesettings_changelist")).content.decode()
-    assert 'id="telephony-mango"' in html
     assert 'id="telephony-novosystem"' in html
-    assert html.count("hoocon-pbx__widget hoocon-integrations__card") == 2
+    assert 'id="telephony-mango"' not in html
+    assert "Mango" not in html
+    assert html.count("hoocon-pbx__widget hoocon-integrations__card") == 1
     assert '<form class="hoocon-pbx__widget' not in html
-    assert html.count('hoocon-pbx__state--on">Виджет включён') == 2
-    assert html.count('hoocon-pbx__state--off">Виджет выключен') == 2
-    assert html.count('hoocon-pbx__state--partial">Не полностью') == 2
-    assert html.count('type="checkbox" class="hoocon-toggle"') == 2
+    assert html.count('hoocon-pbx__state--on">Виджет включён') == 1
+    assert html.count('hoocon-pbx__state--off">Виджет выключен') == 1
+    assert html.count('hoocon-pbx__state--partial">Не полностью') == 1
+    assert html.count('type="checkbox" class="hoocon-toggle"') == 1
     assert "/api/telephony/novosystem/events/" in html
     assert "hoocon-pbx__save" in html
+    site = SiteSettings.load()
+    change = client.get(reverse("admin:sitesettings_sitesettings_change", args=[site.pk])).content.decode()
+    assert "Mango" not in change
+    assert "mango_" not in change
+    from crm.models import Call
+
+    call = Call.objects.create(entry_id="uis:admin-label", from_number="74950000000", to_number="74950000001")
+    call_html = client.get(reverse("admin:crm_call_change", args=[call.pk])).content.decode()
+    assert "Mango" not in call_html
+    assert "ID вызова" in call_html
+    user_html = client.get(reverse("admin:auth_user_change", args=[user.pk])).content.decode()
+    assert "Mango" not in user_html
 
 
 def test_telephony_save_buttons_pinned_to_card_bottom() -> None:
-    """Кнопки «Сохранить» Mango и Новосистем стоят на одной линии внизу карточек."""
+    """Кнопка «Сохранить» виджета телефонии стоит внизу карточки."""
     css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
         encoding="utf-8"
     )
@@ -338,8 +351,6 @@ def test_call_client_page_names_the_line_that_will_call(
     assert "+7 (495) 123-45-67" in html
     assert "Mango сначала позвонит" not in html
 
-    settings.MANGO_VPBX_API_KEY = "env-key"
-    settings.MANGO_VPBX_API_SALT = "env-salt"
     from sitesettings.models import SiteSettings
 
     site = SiteSettings.load()
@@ -347,8 +358,9 @@ def test_call_client_page_names_the_line_that_will_call(
     site.mango_enabled = True
     site.save()
     StaffVpbxProfile.objects.filter(user=admin).update(uis_employee_id="")
-    mango_html = client.get(reverse("admin:crm_client_call_client", args=[crm_client.pk])).content.decode()
-    assert "Mango сначала позвонит на ваш добавочный 201" in mango_html
+    off_html = client.get(reverse("admin:crm_client_call_client", args=[crm_client.pk])).content.decode()
+    assert "Mango" not in off_html
+    assert "включите виджет Новосистем" in off_html
 
 
 @pytest.mark.django_db
@@ -434,7 +446,8 @@ def test_uis_recording_label_is_not_mango() -> None:
     uis = Call(entry_id="uis:1", recording_id="rec-uis")
     mango = Call(entry_id="mango-1", recording_id="rec-mango")
     assert "личном кабинете Новосистем" in labels.recording_link(uis)
-    assert "Mango" in labels.recording_link(mango)
+    assert "Mango" not in labels.recording_link(mango)
+    assert "ещё не скачана" in labels.recording_link(mango)
 
 
 def _fake_urlopen(monkeypatch: pytest.MonkeyPatch, *, body: bytes = b"", exc: Exception | None = None) -> None:
@@ -595,8 +608,33 @@ def test_novosystem_event_updates_open_call_and_logs_once(django_user_model: Any
 
 
 @pytest.mark.django_db
-def test_mango_widget_rejects_non_https_callback(client: Any, django_user_model: Any) -> None:
-    """Форма виджета сохраняла file:// и http://внутренний-хост как URL вебхука."""
+def test_staff_telephony_permission_names_drop_retired_label() -> None:
+    """Старое имя права оставалось в списке прав пользователя после смены подписи."""
+    import importlib
+
+    from django.apps import apps
+    from django.contrib.auth.models import Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    from accounts.models import StaffVpbxProfile
+
+    rename = importlib.import_module(
+        "accounts.migrations.0019_rename_staff_telephony_permissions"
+    ).rename_staff_telephony_permissions
+
+    content_type = ContentType.objects.get_for_model(StaffVpbxProfile)
+    perm = Permission.objects.get(content_type=content_type, codename="view_staffvpbxprofile")
+    perm.name = "Can view Добавочный сотрудника (Mango)"
+    perm.save(update_fields=["name"])
+    rename(apps, None)
+    perm.refresh_from_db()
+    assert perm.name == "Can view Телефония сотрудника"
+    assert "Mango" not in perm.name
+
+
+@pytest.mark.django_db
+def test_admin_telephony_widget_ignores_retired_provider(client: Any, django_user_model: Any) -> None:
+    """Админка не сохраняет снятый виджет: ни file://, ни обычный https-шаблон."""
     from sitesettings.models import SiteSettings
 
     user = django_user_model.objects.create_superuser(
@@ -605,13 +643,21 @@ def test_mango_widget_rejects_non_https_callback(client: Any, django_user_model:
         password="password12",
     )
     client.force_login(user)
+    site = SiteSettings.load()
+    site.mango_enabled = False
+    site.mango_callback_webhook_url = "https://kept.example/hook"
+    site.save()
     url = reverse("admin:sitesettings_telephony_widget")
-    client.post(url, {"provider": "mango", "mango_callback_webhook_url": "file:///etc/passwd"})
-    assert SiteSettings.load().mango_callback_webhook_url == ""
+    client.post(url, {"provider": "mango", "mango_callback_webhook_url": "file:///etc/passwd", "mango_enabled": "on"})
+    site.refresh_from_db()
+    assert site.mango_callback_webhook_url == "https://kept.example/hook"
+    assert site.mango_enabled is False
 
-    ok = "https://integration-webhook.mango-office.ru/webhookapp/common?EmployeeNUM={ext}&TelNumbr={num}"
-    client.post(url, {"provider": "mango", "mango_callback_webhook_url": ok})
-    assert SiteSettings.load().mango_callback_webhook_url == ok
+    ok = "https://integration-webhook.example.test/hook?EmployeeNUM={ext}&TelNumbr={num}"
+    client.post(url, {"provider": "mango", "mango_callback_webhook_url": ok, "mango_enabled": "on"})
+    site.refresh_from_db()
+    assert site.mango_callback_webhook_url == "https://kept.example/hook"
+    assert site.mango_enabled is False
 
 
 @pytest.mark.django_db
