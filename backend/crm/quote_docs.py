@@ -65,22 +65,43 @@ def notify_quote_issued(
         with document.file.open("rb") as fh:
             pdf_bytes = fh.read()
         attachments = [(document.title or f"{quote.number}.pdf", "application/pdf", pdf_bytes)]
-    body = (
-        f"Здравствуйте!\n\n"
-        f"Коммерческое предложение {quote.number} сформировано — PDF во "
-        f"вложении, копия доступна в личном кабинете (раздел «КП и "
-        f"документы»).\n\n"
-        f"Если у вас ещё нет доступа в кабинет — войдите по этой почте "
-        f"на hoocon.ru (одноразовый код придёт на email).\n\n"
-        f"По вопросам отвечайте на это письмо — ответ попадёт вашему "
-        f"персональному менеджеру."
+    from crm.manager_signatures import manager_public_contact
+    from crm.quote_reply import quote_reply_urls
+
+    manager = author or quote.created_by or client.assignee
+    contact = manager_public_contact(manager)
+    accept_url, revise_url = quote_reply_urls(quote.pk)
+    lines = [
+        "Здравствуйте!",
+        "",
+        f"Коммерческое предложение {quote.number} — PDF во вложении.",
+    ]
+    if quote.valid_until:
+        lines.append(f"Действует до {quote.valid_until:%d.%m.%Y}.")
+    if contact["name"] or contact["phone"] or contact["email"]:
+        lines.extend(["", "Ваш менеджер:"])
+        if contact["name"]:
+            lines.append(contact["name"])
+        if contact["phone"]:
+            lines.append(f"Телефон: {contact['phone']}")
+        if contact["email"]:
+            lines.append(f"Почта: {contact['email']}")
+    lines.extend(
+        [
+            "",
+            f"Согласовать: {accept_url}",
+            f"Нужны правки: {revise_url}",
+            "",
+            "Ссылки открываются без входа в кабинет.",
+        ],
     )
     return create_outbound_email(
         client=client,
         subject=f"{quote.number} — коммерческое предложение Hoocon",
-        body=body,
+        body="\n".join(lines),
         lead=lead,
         author=author,
         send_now=send_now,
         attachments=attachments,
+        reply_to_email=contact["email"],
     )

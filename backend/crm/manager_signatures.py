@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from html import escape
+from typing import Any
 
 from django.conf import settings
 
@@ -36,6 +37,27 @@ def manager_signature_contacts(manager_email: str) -> dict[str, str] | None:
         "phone": contact.get("phone", ""),
         "email": key,
     }
+
+
+def manager_public_contact(user: Any) -> dict[str, str]:
+    """Name, phone and reply address a client may see.
+
+    The staff login is not a name: without a signature or a first name the
+    name stays empty, so the cabinet does not print ``ivan@hoocon.ru`` as
+    the person.
+    """
+    from crm.mail_links import staff_reply_to_email
+
+    email = staff_reply_to_email(user)
+    contact = manager_signature_contacts(email) if email else None
+    name = ""
+    phone = ""
+    if contact is not None:
+        name = (contact.get("name") or "").strip()
+        phone = (contact.get("phone") or "").strip()
+    if not name and user is not None:
+        name = (getattr(user, "first_name", "") or "").strip()
+    return {"name": name, "phone": phone, "email": email}
 
 
 def manager_reply_signature(manager_email: str) -> str:

@@ -69,9 +69,9 @@ export default function ProfilePage() {
           {company.members.length > 0 && (
             <p className={styles.muted}>Сотрудников: {company.members.length}</p>
           )}
-          {!company.confirmed && (
+          {company.needs_confirmation && (
             <p className={styles.muted}>
-              Реквизиты появятся, когда менеджер подтвердит, что вы сотрудник компании.
+              Реквизиты компании откроются, когда менеджер подтвердит, что вы сотрудник.
             </p>
           )}
         </div>

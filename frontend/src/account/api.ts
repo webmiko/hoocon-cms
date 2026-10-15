@@ -33,6 +33,8 @@ export type AccountLead = {
   status_label: string;
   company: string;
   message: string;
+  manager_name: string;
+  manager_phone: string;
   created_at: string;
   items: LeadItem[];
   quotes?: AccountQuote[];
@@ -117,6 +119,23 @@ export type AccountSummary = {
   quotes_pending: number;
   orders_in_work: number;
   unread_conversations: number;
+  quotes_total: number;
+  orders_total: number;
+  documents_total: number;
+  specs_total: number;
+  conversations_total: number;
+  rma_total: number;
+};
+
+export type QuoteReplyPreview = {
+  number: string;
+  valid_until: string | null;
+  status: string;
+  status_label: string;
+  expired: boolean;
+  can_accept: boolean;
+  manager_name: string;
+  manager_phone: string;
 };
 
 export type AccountCompany = {
@@ -124,8 +143,10 @@ export type AccountCompany = {
   inn: string;
   legal_address: string;
   members: Array<{ id: number; role: string; role_label: string; client: number | null }>;
-  /** Requisites and members are shown only after a manager confirms the link. */
+  /** This person was confirmed as a colleague. Members are listed only then. */
   confirmed: boolean;
+  /** Another company's requisites stay hidden until a manager confirms. */
+  needs_confirmation: boolean;
 };
 
 export class AccountApiError extends Error {
@@ -300,6 +321,20 @@ export const accountApi = {
   },
   company(): Promise<AccountCompany> {
     return call("/api/account/company/");
+  },
+  quoteReply(token: string): Promise<QuoteReplyPreview> {
+    const qs = new URLSearchParams({ token });
+    return call(`/api/quotes/reply/?${qs.toString()}`);
+  },
+  submitQuoteReply(
+    token: string,
+    action: "accept" | "revise",
+    comment = "",
+  ): Promise<QuoteReplyPreview> {
+    return call("/api/quotes/reply/", {
+      method: "POST",
+      body: JSON.stringify({ token, action, comment }),
+    });
   },
   rmaCases(): Promise<RmaCase[]> {
     return call("/api/account/rma/");
