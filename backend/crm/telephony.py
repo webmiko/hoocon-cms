@@ -108,11 +108,10 @@ def _client_and_extension(payload: dict[str, Any]) -> tuple[str, str]:
 
 
 def _resolve_client(client_number: str) -> Client | None:
-    """Active CRM card by normalized phone digits (merged duplicates are inactive)."""
-    digits = normalize_phone_digits(client_number)
-    if len(digits) < 5:
-        return None
-    return Client.objects.filter(is_active=True, phone_digits=digits).order_by("id").first()
+    """Active CRM card by phone. A real card wins over a call-created stub."""
+    from crm.call_cards import client_for_phone
+
+    return client_for_phone(client_number)
 
 
 def _resolve_manager(extension: str) -> Any:
@@ -200,13 +199,17 @@ def _handle_call_event(payload: dict[str, Any]) -> str:
             call.extension = extension[:20] or call.extension
             call.last_seq = seq or call.last_seq
 
-        if call.client_id is None:
-            call.client = _resolve_client(client_number)  # type: ignore[assignment]
         if call.manager_id is None:
             call.manager = _resolve_manager(extension)  # type: ignore[assignment]
-        if call.lead_id is None:
-            resolved_client = cast(Client | None, call.client)
-            call.lead = _latest_open_lead(resolved_client)
+        if call.client_id is None:
+            call.client = _resolve_client(client_number)  # type: ignore[assignment]
+        from crm.call_cards import attach_call_client
+
+        attach_call_client(
+            call,
+            contact_digits=client_number,
+            create=state == CallState.DISCONNECTED and not was_finished,
+        )
 
         if state == CallState.CONNECTED and call.connected_at is None:
             call.connected_at = ts
