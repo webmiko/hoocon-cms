@@ -896,13 +896,13 @@ class Call(models.Model):
     """
 
     entry_id: models.CharField = models.CharField(
-        "ID вызова Mango",
+        "ID вызова",
         max_length=128,
         unique=True,
         db_index=True,
     )
     call_id: models.CharField = models.CharField(
-        "ID звонка Mango",
+        "ID звонка",
         max_length=200,
         blank=True,
         default="",
@@ -962,7 +962,7 @@ class Call(models.Model):
         default=0,
     )
     recording_id: models.CharField = models.CharField(
-        "ID записи Mango",
+        "ID записи",
         max_length=200,
         blank=True,
         default="",
@@ -977,7 +977,7 @@ class Call(models.Model):
     last_seq: models.PositiveIntegerField = models.PositiveIntegerField(
         "№ последнего события",
         default=0,
-        help_text="События Mango идут по порядку; устаревшие отбрасываем.",
+        help_text="События идут по порядку; устаревшие отбрасываем.",
     )
     created_at: models.DateTimeField = models.DateTimeField("создан", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлён", auto_now=True)

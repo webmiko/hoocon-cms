@@ -10,9 +10,10 @@ alwaysApply: true
 (slug `admin-3-0-manager-guide`, сид `seed_wiki`).
 
 Рабочая телефония — Новосистем (UIS), страница
-`novosystem-telephony-guide.html`. Mango не используется: страница
-`mango-telephony-guide.html` остаётся справкой по старому виджету.
+`novosystem-telephony-guide.html`. Страницу старой АТС в вики не держим:
+сид выключает `mango-telephony-guide`, файл инструкции удалён.
 В общем руководстве — ежедневные шаги и ссылка на Новосистем.
+История версий для менеджеров — `admin-releases.html`.
 
 ## Когда обновлять
 

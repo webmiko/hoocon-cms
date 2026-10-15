@@ -1092,7 +1092,7 @@ def test_admin_same_roles_share_metric_tokens() -> None:
     assert "border-radius: 50%" in sticker
     assert "aspect-ratio: 1" in sticker
 
-    status = extras.split(".hoocon-lead-status {", 1)[1].split("}", 1)[0]
+    status = extras.split(".hoocon-lead-status,\n.hoocon-lead-origin {", 1)[1].split("}", 1)[0]
     assert "var(--hoocon-chip-pad)" in status
     assert "var(--hoocon-chip-font)" in status
 

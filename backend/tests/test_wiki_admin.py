@@ -152,6 +152,7 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
 def test_seed_wiki_novosystem_guide() -> None:
     """Вики Новосистем: виджет, ЛК UIS, ID сотрудника; ссылка в руководстве 3.0."""
     from io import StringIO
+    from pathlib import Path
 
     from django.core.management import call_command
 
@@ -169,10 +170,39 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Личные мобильные в этот дозвон не входят" in doc.body
     assert "Схема выше — прежний способ" not in doc.body
     assert "Окно «Телефон» и кнопка «Позвонить клиенту» звонят через UIS" in doc.body
-    assert "Mango не используется" in doc.body
+    assert "Mango" not in doc.body
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "Mango" not in guide.body
+    assert 'id="playbooks"' in guide.body
+    shots = Path(__file__).resolve().parents[1] / "static" / "wiki" / "admin-3-0"
+    for name in (
+        "lead-form.png",
+        "lead-call.png",
+        "lead-call-open.png",
+        "client.png",
+        "templates.png",
+        "quote.png",
+        "order.png",
+    ):
+        assert (shots / name).is_file()
+        assert f"/static/wiki/admin-3-0/{name}" in guide.body
+    assert 'id="outgoing-call"' in doc.body
+    assert 'id="outgoing-call"' in guide.body
+    outgoing = guide.body.split('id="outgoing-call"', 1)[1].split("<ol", 1)[1].split("</ol>", 1)[0]
+    assert outgoing.index("Добавить") < outgoing.index("Ответственный") < outgoing.index("Позвонить клиенту")
+    phone_steps = doc.body.split('id="outgoing-call"', 1)[1].split("<ol", 1)[1].split("</ol>", 1)[0]
+    assert phone_steps.index("Добавить") < phone_steps.index("Ответственный") < phone_steps.index("Сохранить")
+    assert 'id="changelog-mango-gone"' in guide.body
+    assert guide.body.index("changelog-mango-gone") < guide.body.index("changelog-outgoing-call")
+    assert 'id="changelog-outgoing-call"' in guide.body
+    assert guide.body.index("changelog-outgoing-call") < guide.body.index("changelog-wiki-playbooks")
+    assert 'id="changelog-wiki-playbooks"' in guide.body
     assert 'id="changelog-uis-only"' in guide.body
+    assert 'id="changelog-lead-origin"' in guide.body
+    assert guide.body.index("changelog-wiki-playbooks") < guide.body.index("changelog-lead-origin")
+    assert 'id="unknown-call"' in guide.body
     assert 'id="changelog-client-reply"' in guide.body
+    assert guide.body.index("changelog-lead-origin") < guide.body.index("changelog-client-reply")
     assert guide.body.index("changelog-client-reply") < guide.body.index("changelog-call-confirm")
     assert guide.body.index("changelog-call-confirm") < guide.body.index("changelog-uis-only")
     assert guide.body.index("changelog-uis-only") < guide.body.index("changelog-email-order-tag")
@@ -192,8 +222,11 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert 'id="changelog-uis-call-order"' in guide.body
     assert "12.10.2026" in guide.body
     assert "Телефония Новосистем (UIS)" in guide.body
-    mango = WikiDocument.objects.get(slug="mango-telephony-guide")
-    assert "настройках сервера" not in mango.body
+    releases = WikiDocument.objects.get(slug="admin-releases")
+    assert releases.is_active is True
+    assert "v3.7.0" in releases.body
+    assert "Что появилось" in releases.body
+    assert "Mango" not in releases.body
 
 
 @pytest.mark.django_db
@@ -317,7 +350,7 @@ def test_seed_wiki_guide_explains_pdn_consent_and_kept_manual_edits() -> None:
 
 @pytest.mark.django_db
 def test_seed_wiki_guide_explains_chat_and_telephony_guards() -> None:
-    """Руководство 3.0: одна оценка, «Передать» только менеджерам, скрытый токен вебхука, https для Mango."""
+    """Руководство 3.0: одна оценка, «Передать» только менеджерам, скрытый токен вебхука UIS."""
     from io import StringIO
 
     from django.core.management import call_command
@@ -363,7 +396,7 @@ def test_seed_wiki_keeps_admin_edits_and_deactivation() -> None:
     from django.core.management import call_command
 
     call_command("seed_wiki", stdout=StringIO())
-    doc = WikiDocument.objects.get(slug="mango-telephony-guide")
+    doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
     assert doc.seed_hash
     doc.body = "<p>Правка менеджера</p>"
     doc.is_active = False
@@ -374,7 +407,7 @@ def test_seed_wiki_keeps_admin_edits_and_deactivation() -> None:
     doc.refresh_from_db()
     assert doc.body == "<p>Правка менеджера</p>"
     assert doc.is_active is False
-    assert "Skipped Wiki: mango-telephony-guide" in out.getvalue()
+    assert "Skipped Wiki: novosystem-telephony-guide" in out.getvalue()
 
     call_command("seed_wiki", "--force", stdout=StringIO())
     doc.refresh_from_db()
@@ -450,14 +483,25 @@ def test_seed_wiki_guide_explains_contact_verified_only_visibility() -> None:
 
 
 @pytest.mark.django_db
-def test_seed_wiki_mango_guide_has_webhook_address_and_rejected_call() -> None:
-    """Гайд Mango: адрес внешней системы для событий и ошибка «Mango отклонил звонок»."""
+def test_seed_wiki_retires_mango_guide() -> None:
+    """Старая страница АТС не в сиде: если она осталась включённой, seed_wiki её выключает."""
     from io import StringIO
 
     from django.core.management import call_command
 
+    from content.management.commands.seed_wiki import WIKI_SEEDS
+
+    WikiDocument.objects.create(
+        slug="mango-telephony-guide",
+        title="Телефония Mango · звонки из CRM",
+        body="<p>Mango</p>",
+        is_active=True,
+    )
     call_command("seed_wiki", stdout=StringIO())
     guide = WikiDocument.objects.get(slug="mango-telephony-guide")
-    assert 'id="trouble-journal-empty"' in guide.body
-    assert "/api/telephony/mango" in guide.body
-    assert 'id="trouble-rejected"' in guide.body
+    assert guide.is_active is False
+    assert "Mango" not in guide.title
+    assert "Mango" not in guide.body
+    assert "mango-telephony-guide" not in {str(seed["slug"]) for seed in WIKI_SEEDS}
+    manager = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "Mango" not in manager.body

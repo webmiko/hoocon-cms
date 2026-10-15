@@ -3,6 +3,9 @@
 
 {% block form_top %}
   {{ block.super }}
+  {% if lead_call_card_hint %}
+    {{ lead_call_card_hint }}
+  {% endif %}
   {% if lead_dossier_html %}
     <div class="hoocon-lead-dossier">
       {{ lead_dossier_html }}

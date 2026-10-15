@@ -638,7 +638,8 @@ def test_call_client_view_blockers_without_mango(
     resp = client.get(reverse("admin:crm_client_call_client", args=[crm_client.pk]))
     assert resp.status_code == 200
     html = resp.content.decode()
-    assert "Mango" in html
+    assert "Mango" not in html
+    assert "Новосистем" in html
     # Unfold-разметка: карточка/кнопки, а не голый stock-админский submit-row.
     assert "rounded-default" in html
     assert "submit-row" not in html

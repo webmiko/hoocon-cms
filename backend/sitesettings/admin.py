@@ -18,14 +18,17 @@ from config.admin_mixins import OpenChangeLinkMixin
 from sitesettings.credentials import token_source_label
 from sitesettings.integration_dashboard import build_integration_dashboard
 from sitesettings.models import SiteSettings
-from sitesettings.telephony import mango_settings, novosystem_settings
+from sitesettings.telephony import novosystem_settings
 
 logger = logging.getLogger(__name__)
 
 
 def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[str, Any]]:
-    """Context for the Mango and Novosystem forms on the integrations page."""
-    mango_on, mango_key, mango_salt, mango_callback = mango_settings(site)
+    """Context for the telephony widget cards on the integrations page.
+
+    One dict per widget. A retired provider is omitted here, not left as a
+    hidden card: the template and the save view only know this list.
+    """
     uis_on, uis_token, uis_phone, uis_secret = novosystem_settings(site)
     webhook_base = request.build_absolute_uri(reverse("novosystem-events"))
     webhook = f"{webhook_base}?token={quote(uis_secret, safe='')}" if uis_secret else webhook_base
@@ -38,27 +41,9 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
             return "partial", "Не полностью"
         return "off", "Выключен"
 
-    mango_ready = bool(mango_key and mango_salt) or bool(mango_callback)
     uis_ready = bool(uis_token and uis_phone and uis_secret)
-    mango_status, mango_label = status(mango_on, mango_ready)
     uis_status, uis_label = status(uis_on, uis_ready)
     return [
-        {
-            "provider": "mango",
-            "name": "Mango",
-            "status": mango_status,
-            "status_label": mango_label,
-            "ready": mango_ready,
-            "enabled": mango_on,
-            "callback": mango_callback,
-            "key_set": bool(mango_key),
-            "salt_set": bool(mango_salt),
-            "hint": (
-                "Адрес внешней системы в ЛК Mango: https://<сайт>/api/telephony/mango — "
-                "Mango сам допишет /events/call, /events/summary, /events/recording. Ключ и соль из ЛК Mango. "
-                "Пустые поля секретов не стирают сохранённые."
-            ),
-        },
         {
             "provider": "novosystem",
             "name": "Новосистем",
@@ -85,6 +70,12 @@ class SiteSettingsAdminForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
         fields = "__all__"
+        exclude = (
+            "mango_enabled",
+            "mango_api_key",
+            "mango_api_salt",
+            "mango_callback_webhook_url",
+        )
         widgets = {
             "telegram_bot_token": forms.PasswordInput(
                 render_value=False,
@@ -495,25 +486,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             return HttpResponseRedirect(reverse("admin:sitesettings_sitesettings_changelist"))
         site = SiteSettings.load()
         provider = (request.POST.get("provider") or "").strip()
-        if provider == "mango":
-            site.mango_enabled = request.POST.get("mango_enabled") == "on"
-            key = (request.POST.get("mango_api_key") or "").strip()
-            salt = (request.POST.get("mango_api_salt") or "").strip()
-            if key:
-                site.mango_api_key = key
-            if salt:
-                site.mango_api_salt = salt
-            callback = (request.POST.get("mango_callback_webhook_url") or "").strip()
-            from crm.mango import callback_template_error
-
-            problem = callback_template_error(callback) if callback else ""
-            if problem:
-                messages.error(request, problem)
-                return HttpResponseRedirect(reverse("admin:sitesettings_sitesettings_changelist"))
-            site.mango_callback_webhook_url = callback
-            site.save()
-            messages.success(request, "Виджет Mango сохранён.")
-        elif provider == "novosystem":
+        if provider == "novosystem":
             site.novosystem_enabled = request.POST.get("novosystem_enabled") == "on"
             token = (request.POST.get("novosystem_access_token") or "").strip()
             secret = (request.POST.get("novosystem_webhook_secret") or "").strip()

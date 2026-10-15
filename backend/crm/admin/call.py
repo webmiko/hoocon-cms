@@ -102,7 +102,7 @@ class CallAdmin(ScopedForeignKeyMixin, ModelAdmin):
             if obj.recording_id:
                 if (obj.entry_id or "").startswith("uis:"):
                     return str(_("Запись есть в UIS. Слушать её можно в личном кабинете Новосистем."))
-                return str(_("Запись есть в Mango, ещё не скачана"))
+                return str(_("Запись ещё не скачана"))
             return "—"
         url = reverse("admin:crm_call_recording_download", args=[obj.pk])
         return format_html('<a href="{}">Скачать запись</a>', url)

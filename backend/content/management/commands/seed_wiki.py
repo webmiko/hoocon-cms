@@ -17,21 +17,21 @@ WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
         "title": "Панель управления 3.0 · инструкция для менеджеров",
         "category": "Инструкции",
         "summary": (
-            "Полное руководство CRM 3.0: заявки, клиенты, почта, звонки, КП, "
-            "заказы, диалоги, отчёт РОП и журнал изменений."
+            "По шагам: заявка, звонок, клиент, шаблоны, КП и заказ. "
+            "Также почта, диалоги, отчёт РОП и журнал изменений."
         ),
         "fixture": "admin-3-0-manager-guide.html",
         "sort_order": 1,
     },
     {
-        "slug": "mango-telephony-guide",
-        "title": "Телефония Mango · звонки из CRM",
+        "slug": "admin-releases",
+        "title": "Что вышло в релизах",
         "category": "Инструкции",
         "summary": (
-            "Не используется. Рабочие звонки — Новосистем (UIS): окно «Телефон», "
-            "номер +7 (499) 995-12-77. Эта страница — справка по старому виджету Mango."
+            "Для менеджеров: что появилось или перестало работать в каждой версии "
+            "админки и кабинета, от текущей v3.7.0."
         ),
-        "fixture": "mango-telephony-guide.html",
+        "fixture": "admin-releases.html",
         "sort_order": 2,
     },
     {
@@ -71,6 +71,13 @@ WIKI_SEEDS: tuple[dict[str, str | int], ...] = (
 )
 
 
+# Slugs that used to be seeded. seed_wiki turns them off so managers
+# do not keep opening a retired page after a container start.
+RETIRED_WIKI_SLUGS: tuple[str, ...] = ("mango-telephony-guide",)
+RETIRED_WIKI_TITLE = "Снято: старая телефония"
+RETIRED_WIKI_BODY = "<p>Страница выключена. Рабочая инструкция — «Телефония Новосистем (UIS)».</p>"
+
+
 def body_hash(body: str) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -80,8 +87,9 @@ class Command(BaseCommand):
 
     Runs on every web container start, so it must never undo staff work:
     a page whose HTML no longer matches the last seed was edited in Admin
-    and is skipped (``--force`` overwrites), and ``is_active`` is only set
-    when the page is created.
+    and is skipped (``--force`` overwrites). ``is_active`` is set only when
+    the page is created. Retired slugs are turned off even if someone
+    switched them back on.
     """
 
     help = "Seed staff Wiki pages (HTML dashboards) from content/fixtures/wiki/."
@@ -121,3 +129,18 @@ class Command(BaseCommand):
                 setattr(obj, name, value)
             obj.save(update_fields=[*fields, "updated_at"])
             self.stdout.write(f"Updated Wiki: {obj.slug} ({len(body):,} bytes HTML)")
+        for obj in WikiDocument.objects.filter(slug__in=RETIRED_WIKI_SLUGS):
+            changed: list[str] = []
+            if obj.is_active:
+                obj.is_active = False
+                changed.append("is_active")
+            if obj.title != RETIRED_WIKI_TITLE:
+                obj.title = RETIRED_WIKI_TITLE
+                changed.append("title")
+            if obj.body != RETIRED_WIKI_BODY:
+                obj.body = RETIRED_WIKI_BODY
+                changed.append("body")
+            if not changed:
+                continue
+            obj.save(update_fields=[*changed, "updated_at"])
+            self.stdout.write(f"Retired Wiki: {obj.slug}")

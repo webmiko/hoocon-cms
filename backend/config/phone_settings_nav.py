@@ -135,7 +135,7 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
             "title": "Звонки",
             "icon": "call",
             "section": "work",
-            "description": "Телефония Mango: журнал вызовов и записи разговоров.",
+            "description": "Журнал вызовов и записи разговоров.",
         },
         {
             "model": "quote",

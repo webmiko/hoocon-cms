@@ -271,7 +271,7 @@ class StaffMailbox(models.Model):
 
 
 class StaffVpbxProfile(models.Model):
-    """Mango VPBX binding of a staff user — internal extension + toggle."""
+    """Staff telephony binding: extension, UIS employee id, browser-phone token."""
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -285,7 +285,7 @@ class StaffVpbxProfile(models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text=_("Внутренний номер в Mango АТС — по нему звонок привязывается к менеджеру."),
+        help_text=_("Добавочный в АТС Новосистем. По нему входящий звонок привязывается к менеджеру."),
     )
     is_enabled = models.BooleanField(
         _("включён"),
@@ -314,8 +314,8 @@ class StaffVpbxProfile(models.Model):
     )
 
     class Meta:
-        verbose_name = _("Добавочный сотрудника (Mango)")
-        verbose_name_plural = _("Добавочные сотрудников (Mango)")
+        verbose_name = _("Телефония сотрудника")
+        verbose_name_plural = _("Телефония сотрудников")
         constraints = [
             models.UniqueConstraint(
                 fields=("uis_employee_id",),
