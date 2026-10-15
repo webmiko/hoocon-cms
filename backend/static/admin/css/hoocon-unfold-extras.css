@@ -339,7 +339,8 @@ body.hoocon-os27 :is(
   color: #93c5fd !important;
 }
 
-.hoocon-lead-status {
+.hoocon-lead-status,
+.hoocon-lead-origin {
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
@@ -422,6 +423,73 @@ body.hoocon-os27 :is(
 
 .dark .hoocon-lead-status--rejected {
   color: #fdba74;
+}
+
+.hoocon-lead-origin--site {
+  color: #1e3a8a;
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #2563eb 32%, transparent);
+}
+
+.hoocon-lead-origin--answered {
+  color: #166534;
+  background: color-mix(in srgb, #16a34a 14%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #16a34a 36%, transparent);
+}
+
+.hoocon-lead-origin--missed {
+  color: #991b1b;
+  background: color-mix(in srgb, #dc2626 14%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #dc2626 40%, transparent);
+}
+
+.dark .hoocon-lead-origin--site {
+  color: #93c5fd;
+}
+
+.dark .hoocon-lead-origin--answered {
+  color: #86efac;
+}
+
+.dark .hoocon-lead-origin--missed {
+  color: #fca5a5;
+}
+
+a.hoocon-lead-origin-hint {
+  flex: 1 0 100%;
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  color: #92400e;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.dark a.hoocon-lead-origin-hint {
+  color: #fcd34d;
+}
+
+.hoocon-lead-call-hint {
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, #d97706 45%, transparent);
+  border-radius: var(--hoocon-radius);
+  background: color-mix(in srgb, #d97706 12%, var(--hoocon-surface));
+  color: #92400e;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.hoocon-lead-call-hint a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.dark .hoocon-lead-call-hint {
+  color: #fcd34d;
 }
 
 a.hoocon-admin-open,
@@ -2473,7 +2541,15 @@ body:not(.hoocon-support-inbox) #changelist
 body:not(.hoocon-support-inbox) #changelist
   table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
   tbody
+  td.field-contact_name,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
   th.field-name,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-contact_name,
 body:not(.hoocon-support-inbox) #changelist
   table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
   tbody
@@ -2594,7 +2670,15 @@ body:not(.hoocon-support-inbox) #changelist
 body:not(.hoocon-support-inbox) #changelist
   table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
   tbody
+  td.field-contact_name::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
   th.field-name::before,
+body:not(.hoocon-support-inbox) #changelist
+  table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
+  tbody
+  th.field-contact_name::before,
 body:not(.hoocon-support-inbox) #changelist
   table.hoocon-admin-card-table.hoocon-admin-table-stacked:not(.hoocon-lead-kanban-source)
   tbody

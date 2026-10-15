@@ -136,3 +136,7 @@ def attach_call_client(
         call.client = _ensure_stub(digits, call.manager)
     if call.client_id and call.lead_id is None:
         call.lead = _latest_open_lead(cast(Client | None, call.client))
+    if create and call.client_id:
+        from leads.channel import remember_temporary_call_name
+
+        remember_temporary_call_name(call)

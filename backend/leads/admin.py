@@ -27,6 +27,7 @@ from django.db.models import (
     Count,
     IntegerField,
     OuterRef,
+    Prefetch,
     Q,
     QuerySet,
     Subquery,
@@ -39,6 +40,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
@@ -59,6 +61,18 @@ from crm.services import (
     get_active_email_template,
     render_email_template,
 )
+from leads.channel import (
+    CALL_ANSWERED_LABEL,
+    CALL_MISSED_LABEL,
+    SITE_LABEL,
+    STUB_CARD_DETAIL,
+    STUB_CARD_HINT,
+    is_call_stub_email,
+    lead_channel,
+    name_is_call_placeholder,
+    phone_label_for_lead,
+    temporary_call_name,
+)
 from leads.models import CompanyManagerRule, Lead, LeadItem
 from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
@@ -75,8 +89,10 @@ from leads.services import (
 _LEAD_EDIT_QUERY = "edit"
 
 # Changelist sort UI: (label, list_display column name).
+# «Имя» is contact_name, not the model field: Django's lookup_field
+# prints a concrete field and skips a ModelAdmin method of the same name.
 _LEAD_SORT_COLUMNS: tuple[tuple[str, str | None], ...] = (
-    ("Имя", "name"),
+    ("Имя", "contact_name"),
     ("Компания", "company"),
     ("Email", "email_id"),
     ("Статус", "status_badge"),
@@ -148,7 +164,7 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     list_display = (
         "status_badge",
         "email_id",
-        "name",
+        "contact_name",
         "company",
         "lead_type",
         "rfq_thread_badge",
@@ -156,7 +172,7 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         "processed_by",
         "created_at",
     )
-    list_display_links = ("email_id", "name")
+    list_display_links = ("email_id", "contact_name")
     list_filter = (
         "lead_type",
         "status",
@@ -310,24 +326,83 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
 
     @admin.display(description="ID", ordering="email")
     def email_id(self, obj: Lead) -> str:
-        """Lead contact ID (= CRM client email)."""
+        """Contact id. A call stub shows a temporary name until the card is filled in."""
+        if is_call_stub_email(obj.email):
+            phone_label = phone_label_for_lead(obj)
+            if name_is_call_placeholder(obj.name, phone_label):
+                return temporary_call_name(obj)
+            return phone_label
         return obj.email
+
+    @admin.display(description="Имя", ordering="name")
+    def contact_name(self, obj: Lead) -> str:
+        """Person name. A call stub keeps the number here; the temporary name is the title.
+
+        The method is not called ``name``: that is a model field, and the
+        changelist would print the stored value and ignore this method.
+        """
+        if is_call_stub_email(obj.email) and name_is_call_placeholder(obj.name, phone_label_for_lead(obj)):
+            return phone_label_for_lead(obj)
+        return obj.name
 
     @admin.display(description="Статус", ordering="status")
     def status_badge(self, obj: Lead) -> str:
-        """Colored status tag; «Новая» stands out on cards and table rows.
+        """Status chip plus where the lead came from (form or a call).
 
         Args:
             obj: Lead row.
 
         Returns:
-            Safe HTML span with status label.
+            Safe HTML: status, origin chips, and a stub-card hint when needed.
         """
-        return format_html(
-            '<span class="hoocon-lead-status hoocon-lead-status--{}">{}</span>',
-            obj.status,
-            obj.get_status_display(),
-        )
+        channel = lead_channel(obj)
+        parts: list[str] = [
+            str(
+                format_html(
+                    '<span class="hoocon-lead-status hoocon-lead-status--{}">{}</span>',
+                    obj.status,
+                    obj.get_status_display(),
+                )
+            )
+        ]
+        if channel.site:
+            parts.append(
+                str(
+                    format_html(
+                        '<span class="hoocon-lead-origin hoocon-lead-origin--site">{}</span>',
+                        SITE_LABEL,
+                    )
+                )
+            )
+        if channel.call == "answered":
+            parts.append(
+                str(
+                    format_html(
+                        '<span class="hoocon-lead-origin hoocon-lead-origin--answered">{}</span>',
+                        CALL_ANSWERED_LABEL,
+                    )
+                )
+            )
+        elif channel.call == "missed":
+            parts.append(
+                str(
+                    format_html(
+                        '<span class="hoocon-lead-origin hoocon-lead-origin--missed">{}</span>',
+                        CALL_MISSED_LABEL,
+                    )
+                )
+            )
+        if channel.stub and obj.client_id:
+            parts.append(
+                str(
+                    format_html(
+                        '<a class="hoocon-lead-origin-hint" href="{}">{}</a>',
+                        reverse("admin:crm_client_change", args=[obj.client_id]),
+                        STUB_CARD_HINT,
+                    )
+                )
+            )
+        return mark_safe("".join(parts))
 
     @admin.display(description="Нить")
     def rfq_thread_badge(self, obj: Lead) -> str:
@@ -503,11 +578,18 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             return ""
         from django.utils.safestring import mark_safe
 
-        head = format_html(
-            '<p><a href="{}"><strong>Карточка клиента ({}) →</strong></a></p>',
-            reverse("admin:crm_client_change", args=[client.pk]),
-            client.email,
-        )
+        card_url = reverse("admin:crm_client_change", args=[client.pk])
+        if is_call_stub_email(client.email):
+            head = format_html(
+                '<p><a href="{}"><strong>Карточка клиента ещё не заполнена →</strong></a></p>',
+                card_url,
+            )
+        else:
+            head = format_html(
+                '<p><a href="{}"><strong>Карточка клиента ({}) →</strong></a></p>',
+                card_url,
+                client.email,
+            )
         leads_qs = client.leads.exclude(pk=obj.pk).order_by("-created_at")
         leads_qs = scope_leads_for_manager(leads_qs, request.user)
         lead_rows = [
@@ -611,10 +693,16 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             extra["lead_view_mode"] = not edit_mode
             if obj is not None:
                 change_url = reverse("admin:leads_lead_change", args=[obj.pk])
-                if obj.email:
+                if obj.email and not is_call_stub_email(obj.email):
                     extra["lead_compose_reply_url"] = reverse(
                         "admin:leads_lead_compose_reply",
                         args=[obj.pk],
+                    )
+                if lead_channel(obj).stub and obj.client_id:
+                    extra["lead_call_card_hint"] = format_html(
+                        '<p class="hoocon-lead-call-hint">{} <a href="{}">Открыть карточку клиента</a></p>',
+                        STUB_CARD_DETAIL,
+                        reverse("admin:crm_client_change", args=[obj.client_id]),
                     )
                 if edit_mode:
                     extra["lead_view_url"] = change_url
@@ -800,6 +888,14 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
                 return HttpResponseRedirect(view_url)
         return response
 
+    def _lead_calls_for_channel(self) -> QuerySet[Any]:
+        """Calls newest-first so the board label follows the latest one."""
+        from django.db.models import F
+
+        from crm.models import Call
+
+        return Call.objects.order_by(F("started_at").desc(nulls_last=True), "-pk")
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[Lead]:
         """Annotate status rank; scope rows for non-superuser managers.
 
@@ -828,7 +924,13 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         qs = (
             self.model._default_manager.get_queryset()
             .select_related("client", "sku", "assignee", "processed_by", "rfq_bundle_root")
-            .prefetch_related("items")
+            .prefetch_related(
+                "items",
+                Prefetch(
+                    "calls",
+                    queryset=self._lead_calls_for_channel(),
+                ),
+            )
             .annotate(
                 _status_rank=Case(
                     When(status=Lead.LeadStatus.NEW, then=0),
