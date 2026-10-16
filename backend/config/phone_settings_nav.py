@@ -26,6 +26,7 @@ _APP_ICON_STYLES: dict[str, tuple[str, str]] = {
     "django_celery_beat": ("#ff9500", "#ffffff"),
     "redirects": ("#64d2ff", "#1c1c1e"),
     "social": ("#ff6482", "#ffffff"),
+    "staffrequests": ("#0a84ff", "#ffffff"),
 }
 
 _APP_DESCRIPTIONS: dict[str, str] = {
@@ -36,6 +37,7 @@ _APP_DESCRIPTIONS: dict[str, str] = {
     "supportchat": "FAQ чата, расписание и служебные настройки поддержки.",
     "supportchat-messages": "Входящие диалоги с сайта, Telegram и мессенджеров.",
     "analytics": "Посещаемость, страницы и сводки сайта.",
+    "staffrequests": "Баги, доработки, вопросы и просьбы к администратору.",
     "sitesettings": "Контакты, SEO и глобальные настройки витрины.",
     "webpush": "Подписки Web Push и рассылки.",
     "content": "Страницы, блоки и контент сайта.",
@@ -62,6 +64,7 @@ _APP_ICONS: dict[str, str] = {
     "django_celery_beat": "schedule",
     "redirects": "sync_alt",
     "social": "campaign",
+    "staffrequests": "assignment",
 }
 
 # Logical iOS-style section buckets for grouped inset lists.
@@ -88,6 +91,7 @@ _APP_SECTIONS: dict[str, str] = {
     "redirects": "site",
     "social": "site",
     "webpush": "site",
+    "staffrequests": "work",
     "axes": "system",
     "auth": "system",
     "django_celery_beat": "system",
@@ -173,6 +177,15 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
             "icon": "report",
             "section": "work",
             "description": "RMA-обращения клиентов из кабинета.",
+        },
+    ),
+    "staffrequests": (
+        {
+            "model": "staffrequest",
+            "title": "Техподдержка",
+            "icon": "assignment",
+            "section": "work",
+            "description": "Баги, доработки, вопросы и просьбы к администратору.",
         },
     ),
     "catalog": (
@@ -344,7 +357,7 @@ _EXTRA_LINK_ROWS: dict[str, tuple[dict[str, str], ...]] = {
             "url_name": "admin:crm_client_sales_report",
             "perm": "crm.view_client",
             "section": "work",
-            "description": "Воронка менеджеров: заявки, КП, заказы, звонки.",
+            "description": "Воронка, звонки, первое касание и конверсия.",
         },
     ),
 }
@@ -355,6 +368,7 @@ _ROW_ORDER: dict[str, tuple[str, ...]] = {
         "leads-lead",
         "leads-stats",
         "crm-sales-report",
+        "staffrequests-staffrequest",
         "supportchat-messages",
         "crm-client",
         "crm-emailmessage",

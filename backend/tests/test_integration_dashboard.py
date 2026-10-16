@@ -54,6 +54,8 @@ def test_sitesettings_changelist_shows_integration_dashboard(
     assert response.status_code == 200
     html = response.content.decode()
     assert "hoocon-integrations" in html
+    assert "hoocon-integrations__tile hoocon-integrations__card" in html
+    assert "hoocon-lead-stats__cards hoocon-integrations__cards" not in html
     assert "Telegram" in html
     assert "Подключён" in html
     assert "Уведомления персоналу" in html

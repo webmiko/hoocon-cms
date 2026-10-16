@@ -1,0 +1,26 @@
+<article class="hoocon-staffreq hoocon-integrations__card hoocon-integrations__card--{{ widget.status }}">
+  {% if widget.can_toggle %}
+  <div class="hoocon-staffreq__form">
+    <div class="hoocon-integrations__card-top">
+      <p class="hoocon-lead-stats__label">{{ widget.name }}</p>
+      <span class="hoocon-integrations__badge hoocon-integrations__badge--{{ widget.status }}">{{ widget.status_label }}</span>
+    </div>
+    <label class="hoocon-staffreq__toggle">
+      <input type="checkbox" class="hoocon-toggle" name="enabled" form="{{ widget.form_id }}" {% if widget.enabled %}checked{% endif %}>
+      <span class="hoocon-staffreq__state hoocon-staffreq__state--off">Выключен</span>
+      <span class="hoocon-staffreq__state hoocon-staffreq__state--on">Включён</span>
+    </label>
+    <p class="hoocon-integrations__hint">{{ widget.hint }}</p>
+    {% if widget.open_url %}
+      <a class="hoocon-integrations__link" href="{{ widget.open_url }}">Открыть очередь</a>
+    {% endif %}
+    <button type="submit" class="hoocon-staffreq__save" form="{{ widget.form_id }}">Сохранить</button>
+  </div>
+  {% else %}
+  <div class="hoocon-integrations__card-top">
+    <p class="hoocon-lead-stats__label">{{ widget.name }}</p>
+    <span class="hoocon-integrations__badge hoocon-integrations__badge--{{ widget.status }}">{{ widget.status_label }}</span>
+  </div>
+  <p class="hoocon-integrations__hint">{{ widget.hint }}</p>
+  {% endif %}
+</article>
