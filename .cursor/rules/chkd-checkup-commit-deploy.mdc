@@ -33,10 +33,11 @@ alwaysApply: true
 2. Открытый release PR существует (`gh pr list --base main --head develop`);
  если нет — `./scripts/ensure-release-pr.sh`.
 2а. Если полная версия `X.Y.Z` в `develop` такая же, как на `main`:
- правка готовой фичи → `python3 scripts/bump-release.py patch`;
- новая фича, вторая цифра ещё не поднята → `minor`.
+ `python3 scripts/bump-release.py patch`.
+ Вторую цифру не поднимать. Minor — только если пользователь уже
+ явно согласился в этом разговоре (`release-version.mdc`).
  MAJOR не трогать. Коммит `Bumped release to vX.Y.Z.`,
- push `develop` (см. `release-version.mdc`).
+ push `develop`.
 3. **Смержить весь PR** в `main` (все коммиты из PR, не один cherry-pick):
    `./scripts/merge-release-pr.sh`
    или `gh pr merge <номер> --merge --delete-branch=false`.
@@ -51,4 +52,4 @@ alwaysApply: true
 «чкд» по умолчанию **без** merge в `main`. Merge — только по явной просьбе на прод.
 
 Не force-push / не `--no-verify`. Релиз-бамп — не из «чкд», а по
-`release-version.mdc` при новой фиче.
+`release-version.mdc`. Вторую цифру из «чкд» и «на прод» не поднимать.

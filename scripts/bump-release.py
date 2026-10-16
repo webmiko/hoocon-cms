@@ -4,7 +4,7 @@
 Usage (repo root)::
 
     python3 scripts/bump-release.py patch   # fix of a shipped feature: 3.6.0 → 3.6.1
-    python3 scripts/bump-release.py minor   # new feature: 3.6.1 → 3.7.0 (UI v3.7.0)
+    python3 scripts/bump-release.py minor   # second digit, only after explicit agreement
     python3 scripts/bump-release.py major   # only on explicit command: → 4.0.0
     python3 scripts/bump-release.py --check # files agree with release.py
 

@@ -14,8 +14,8 @@ if [[ -z "${number}" ]]; then
 fi
 
 # Prod shows MAJOR.MINOR.PATCH. A release must change the full version.
-# PATCH — a fix of a feature already shipped. MINOR — a new feature.
-# MAJOR — only by hand. Same version as prod is refused.
+# If develop matches prod, bump patch. The second digit only after the
+# user explicitly agrees — do not suggest it here. MAJOR — only by hand.
 full_version() {
   git show "origin/$1:backend/config/release.py" \
     | sed -nE 's/^RELEASE_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p'
@@ -26,8 +26,8 @@ next_version="$(full_version "${HEAD}")"
 allow_same="${RELEASE_ALLOW_SAME_VERSION:-${RELEASE_ALLOW_SAME_MINOR:-}}"
 if [[ "${prod_version}" == "${next_version}" && "${allow_same}" != "1" ]]; then
   echo "Prod is already v${prod_version}; develop is still v${next_version}." >&2
-  echo "Fix of a shipped feature: python3 scripts/bump-release.py patch" >&2
-  echo "New feature: python3 scripts/bump-release.py minor" >&2
+  echo "Bump the third digit: python3 scripts/bump-release.py patch" >&2
+  echo "Do not bump the second digit unless the user explicitly agreed." >&2
   echo "Then commit, push develop, and retry. MAJOR only by hand." >&2
   exit 1
 fi
