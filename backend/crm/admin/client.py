@@ -450,10 +450,12 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             days = 7
         if days not in {7, 30, 0}:
             days = 7
+        raw_manager = request.GET.get("manager", "")
+        manager_id = int(raw_manager) if raw_manager.isdigit() else None
         since = None if days <= 0 else timezone.now() - timedelta(days=days)
         from crm.reports import build_sales_report
 
-        report = build_sales_report(since=since, user=request.user)
+        report = build_sales_report(since=since, user=request.user, manager_id=manager_id)
         context = {
             **self.admin_site.each_context(request),
             "title": "Отчёт по менеджерам",

@@ -16,7 +16,7 @@ from django.utils import timezone
 from django_celery_beat.models import PeriodicTask
 
 from accounts.models import ClientAccount
-from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
+from accounts.roles import GROUP_ADMIN, GROUP_ANALYST, GROUP_MANAGER
 from cabinet.models import Order, SpecList, SpecListItem
 from crm.company import colleague_clients, merge_companies
 from crm.models import Client, Company, Quote, QuoteItem, QuoteStatus
@@ -182,11 +182,20 @@ def test_sales_report_counts_manager_funnel() -> None:
 
 @pytest.mark.django_db
 def test_sales_report_admin_page_and_weekly_mail(settings) -> None:
-    """Страница отчёта открывается; beat-задача шлёт письмо на LEAD_NOTIFY_EMAIL."""
+    """Страница отчёта открывается; письмо уходит аналитику, не на ящик отдела."""
     settings.LEAD_NOTIFY_EMAIL = "rop-inbox@example.com"
     admin = _superuser()
     Group.objects.get_or_create(name=GROUP_ADMIN)
     admin.groups.add(Group.objects.get(name=GROUP_ADMIN))
+    analyst = User.objects.create_user(
+        username="rop-analyst",
+        email="analyst-rop@example.com",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    )
+    Group.objects.get_or_create(name=GROUP_ANALYST)
+    analyst.groups.add(Group.objects.get(name=GROUP_ANALYST))
     page = DjClient()
     page.force_login(admin)
     response = page.get(reverse("admin:crm_client_sales_report"))
@@ -195,8 +204,76 @@ def test_sales_report_admin_page_and_weekly_mail(settings) -> None:
 
     send_weekly_sales_report()
     assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == ["rop-inbox@example.com"]
+    assert mail.outbox[0].to == ["analyst-rop@example.com"]
+    assert "rop-inbox@example.com" not in mail.outbox[0].to
     assert "Отчёт по работе менеджеров" in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_weekly_sales_report_skips_inactive_and_non_analysts(settings) -> None:
+    """Письмо получают только активные сотрудники группы «Аналитик» с адресом."""
+    from sitesettings.models import SiteSettings
+
+    settings.LEAD_NOTIFY_EMAIL = "sales@hoocon.ru"
+    site = SiteSettings.load()
+    site.rop_report_email = "old-rop@example.com"
+    site.save(update_fields=["rop_report_email"])
+    group, _created = Group.objects.get_or_create(name=GROUP_ANALYST)
+    User.objects.create_user(
+        username="analyst-a",
+        email="a.analyst@example.com",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    ).groups.add(group)
+    User.objects.create_user(
+        username="analyst-b",
+        email="B.Analyst@example.com",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    ).groups.add(group)
+    User.objects.create_user(
+        username="analyst-off",
+        email="off.analyst@example.com",
+        password="password12",
+        is_staff=True,
+        is_active=False,
+    ).groups.add(group)
+    User.objects.create_user(
+        username="analyst-nostaff",
+        email="nostaff.analyst@example.com",
+        password="password12",
+        is_staff=False,
+        is_active=True,
+    ).groups.add(group)
+    User.objects.create_user(
+        username="analyst-blank",
+        email="",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    ).groups.add(group)
+    manager_group, _created = Group.objects.get_or_create(name=GROUP_MANAGER)
+    User.objects.create_user(
+        username="analyst-manager",
+        email="manager.only@example.com",
+        password="password12",
+        is_staff=True,
+        is_active=True,
+    ).groups.add(manager_group)
+
+    send_weekly_sales_report()
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ["a.analyst@example.com", "B.Analyst@example.com"]
+
+
+@pytest.mark.django_db
+def test_weekly_sales_report_skips_when_no_analyst_email(settings) -> None:
+    """Нет активного аналитика с почтой — письмо не уходит, даже если ящик отдела задан."""
+    settings.LEAD_NOTIFY_EMAIL = "sales@hoocon.ru"
+    send_weekly_sales_report()
+    assert mail.outbox == []
 
 
 @pytest.mark.django_db
