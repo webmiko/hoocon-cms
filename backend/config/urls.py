@@ -25,6 +25,7 @@ from config.seo_views import (
     RobotsTxtView,
     SitemapXmlView,
 )
+from staffrequests.admin import app_home as staffrequests_home
 
 
 def _openapi_access(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
@@ -57,6 +58,7 @@ urlpatterns = [
     ),
     # Browser softphone window + token/lookup; before admin.site.urls (model-name catch-all).
     path("admin/crm/softphone/", include("crm.softphone_urls")),
+    path("admin/staffrequests/", admin.site.admin_view(staffrequests_home), name="staffrequests-home"),
     path("admin/", admin.site.urls),
     path("api/catalog/", include("catalog.urls")),
     path("api/content/", include("content.urls")),

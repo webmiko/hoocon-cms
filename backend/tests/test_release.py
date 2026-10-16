@@ -63,12 +63,14 @@ def test_bump_release_script_check_passes_on_repo() -> None:
 
 
 def test_merge_release_pr_requires_a_version_change() -> None:
-    """Prod merge refuses an unchanged version; a fix may keep MINOR."""
+    """Prod merge refuses an unchanged version and tells to bump patch, not the second digit."""
     script = (_REPO_ROOT / "scripts" / "merge-release-pr.sh").read_text(encoding="utf-8")
     guard = script.index('"${prod_version}" == "${next_version}"')
     assert guard < script.index("gh pr merge")
-    assert "bump-release.py patch" in script
-    assert "bump-release.py minor" in script
+    refusal = script[guard : script.index("gh pr merge")]
+    assert "bump-release.py patch" in refusal
+    assert "bump-release.py minor" not in refusal
+    assert "second digit" in refusal
     assert "([0-9]+\\.[0-9]+\\.[0-9]+)" in script
 
 

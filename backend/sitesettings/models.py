@@ -86,10 +86,7 @@ class SiteSettings(models.Model):
         max_length=500,
         blank=True,
         default="",
-        help_text=(
-            "Куда слать еженедельный отчёт по работе менеджеров. Несколько "
-            "адресов через запятую. Пусто — LEAD_NOTIFY_EMAIL (общий ящик отдела)."
-        ),
+        help_text=("Не используется. Письмо отчёта уходит на почту активных сотрудников группы «Аналитик»."),
     )
 
     # ── Staff browser notifications (Admin only; not in public API) ──

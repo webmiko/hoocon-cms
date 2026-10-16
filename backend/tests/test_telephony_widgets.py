@@ -95,6 +95,42 @@ def test_telephony_widget_save_keeps_blank_secret(client: Any, django_user_model
 
 
 @pytest.mark.django_db
+def test_saved_telephony_secrets_look_filled_but_stay_hidden(client: Any, django_user_model: Any) -> None:
+    """Заданные ключ и секрет рисуются точками. Повтор точек не подменяет сохранённое."""
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.novosystem_access_token = "live-api-token"
+    site.novosystem_webhook_secret = "live-hook-secret"
+    site.novosystem_virtual_phone = "74951234567"
+    site.save()
+    user = django_user_model.objects.create_superuser(
+        username="pbx-dots",
+        email="pbx-dots@example.com",
+        password="password12",
+    )
+    client.force_login(user)
+    html = client.get(reverse("admin:sitesettings_sitesettings_changelist")).content.decode()
+    assert html.count('value="••••••••••••"') == 2
+    assert 'value="live-api-token"' not in html
+    assert 'value="live-hook-secret"' not in html
+    assert "не задан" in html
+    response = client.post(
+        reverse("admin:sitesettings_telephony_widget"),
+        {
+            "provider": "novosystem",
+            "novosystem_access_token": "••••••••••••",
+            "novosystem_webhook_secret": "••••••••••••",
+            "novosystem_virtual_phone": "74951234567",
+        },
+    )
+    assert response.status_code == 302
+    site.refresh_from_db()
+    assert site.novosystem_access_token == "live-api-token"
+    assert site.novosystem_webhook_secret == "live-hook-secret"
+
+
+@pytest.mark.django_db
 def test_novosystem_webhook_stores_call_only_when_enabled(client: Any) -> None:
     """Вебхук UIS создаёт звонок только у включённого виджета с верным секретом."""
     from sitesettings.models import SiteSettings
@@ -140,7 +176,7 @@ def test_integrations_page_renders_telephony_widgets(client: Any, django_user_mo
     assert html.count('hoocon-pbx__state--on">Виджет включён') == 1
     assert html.count('hoocon-pbx__state--off">Виджет выключен') == 1
     assert html.count('hoocon-pbx__state--partial">Не полностью') == 1
-    assert html.count('type="checkbox" class="hoocon-toggle"') == 1
+    assert html.count('type="checkbox" class="hoocon-toggle" name="novosystem_enabled"') == 1
     assert "/api/telephony/novosystem/events/" in html
     assert "hoocon-pbx__save" in html
     site = SiteSettings.load()
@@ -168,7 +204,11 @@ def test_telephony_save_buttons_pinned_to_card_bottom() -> None:
         assert match, selector
         return match.group(1)
 
-    assert "align-items: stretch" in rule(".hoocon-pbx")
+    assert "align-items: stretch" in rule(".hoocon-widget-grid")
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in css.split(".hoocon-widget-grid {", 2)[2]
+    joined = css.split(".hoocon-pbx,", 1)[1].split("}", 1)[0]
+    assert "display: contents" in joined
+    assert ".hoocon-staffreq-list" in joined
     widget = rule(".hoocon-pbx__widget")
     assert "display: flex" in widget
     assert "flex-direction: column" in widget

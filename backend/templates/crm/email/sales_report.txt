@@ -10,6 +10,14 @@
 - заказов: {{ report.totals.orders_created }}
 - писем отправлено: {{ report.totals.emails_sent }}
 - звонков с разговором: {{ report.totals.calls_talked }}
+- входящие с разговором: {{ report.totals.calls_inbound_talked }}
+- исходящие с разговором: {{ report.totals.calls_outbound_talked }}
+- пропущенные входящие: {{ report.totals.calls_missed }}
+- звонки без клиента и заявки: {{ report.totals.calls_unlinked }}
+- средний разговор: {{ report.totals.avg_talk_label }}
+- первое касание (медиана): {{ report.totals.first_touch_label }}
+- заявка → выданное КП: {{ report.totals.cohort_quote_label }}
+- заявка → заказ: {{ report.totals.cohort_order_label }}
 - активностей: {{ report.totals.activities }}
 - просрочен следующий контакт: {{ report.totals.overdue_next_contact }}
 
@@ -19,6 +27,8 @@
   заявки: +{{ row.leads_new }} / закрыто {{ row.leads_done }}
   КП: +{{ row.quotes_created }} / выдано {{ row.quotes_sent }} / согласовано {{ row.quotes_accepted }} / открыто {{ row.open_quotes }}
   заказы {{ row.orders_created }} · письма {{ row.emails_sent }} · звонки {{ row.calls_talked }} · активности {{ row.activities }}
+  входящие {{ row.calls_inbound_talked }} · исходящие {{ row.calls_outbound_talked }} · пропущенные {{ row.calls_missed }} · без привязки {{ row.calls_unlinked }}
+  средний разговор {{ row.avg_talk_label }} · первое касание {{ row.first_touch_label }} · в КП {{ row.cohort_quote_label }} · в заказ {{ row.cohort_order_label }}
   просрочен контакт: {{ row.overdue_next_contact }}
 {% empty %}
 Нет строк за период.

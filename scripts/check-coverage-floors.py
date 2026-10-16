@@ -33,6 +33,7 @@ APP_FLOORS: dict[str, float] = {
     "sitesettings": 89.5,
     "social": 63.5,
     "staff_api": 73.0,
+    "staffrequests": 95.0,
     "supportchat": 78.5,
     "webpush": 72.5,
 }

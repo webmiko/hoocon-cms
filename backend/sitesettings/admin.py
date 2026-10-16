@@ -22,6 +22,9 @@ from sitesettings.telephony import novosystem_settings
 
 logger = logging.getLogger(__name__)
 
+# Shown in a password input when a secret is already stored. Not the secret.
+_SAVED_FIELD_MASK = "••••••••••••"
+
 
 def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[str, Any]]:
     """Context for the telephony widget cards on the integrations page.
@@ -54,6 +57,8 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
             "virtual_phone": uis_phone,
             "token_set": bool(uis_token),
             "secret_set": bool(uis_secret),
+            "token_mask": _SAVED_FIELD_MASK if uis_token else "",
+            "secret_mask": _SAVED_FIELD_MASK if uis_secret else "",
             "webhook_url": webhook,
             "webhook_url_masked": webhook_masked,
             "hint": (
@@ -172,7 +177,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         (
             "Заявки с сайта",
             {
-                "fields": ("lead_routing_mode", "lead_rr_last_user", "rop_report_email"),
+                "fields": ("lead_routing_mode", "lead_rr_last_user"),
                 "description": (
                     "Куда слать уведомление о новой заявке и назначать ли "
                     "ответственного менеджера. В очередь попадают только "
@@ -490,9 +495,9 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             site.novosystem_enabled = request.POST.get("novosystem_enabled") == "on"
             token = (request.POST.get("novosystem_access_token") or "").strip()
             secret = (request.POST.get("novosystem_webhook_secret") or "").strip()
-            if token:
+            if token and token != _SAVED_FIELD_MASK:
                 site.novosystem_access_token = token
-            if secret:
+            if secret and secret != _SAVED_FIELD_MASK:
                 site.novosystem_webhook_secret = secret
             site.novosystem_virtual_phone = (request.POST.get("novosystem_virtual_phone") or "").strip()
             site.save()
@@ -516,6 +521,9 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         context["integration_dashboard"] = dash
         context["telephony_widgets"] = widgets
         context["telephony_widget_url"] = reverse("admin:sitesettings_telephony_widget")
+        from config.admin_widget_registry import admin_widget_cards
+
+        context["admin_widgets"] = admin_widget_cards(request)
         return super().changelist_view(request, extra_context=context)
 
     def has_add_permission(self, request: HttpRequest) -> bool:

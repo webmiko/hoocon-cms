@@ -1,0 +1,8 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+{% if request_stats %}
+<p class="hoocon-lead-stats__hint">{{ request_stats }}</p>
+{% endif %}
+{{ block.super }}
+{% endblock %}

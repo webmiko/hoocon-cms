@@ -49,10 +49,10 @@ else
 fi
 
 # ── 3. mypy ──────────────────────────────────────────────────
-if (cd "$BACKEND" && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api supportchat webpush manage.py) >/dev/null 2>&1; then
+if (cd "$BACKEND" && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api staffrequests supportchat webpush manage.py) >/dev/null 2>&1; then
   ok "mypy — чисто"
 else
-  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api supportchat webpush manage.py)"
+  fail "mypy — ошибки типов (cd backend && poetry run mypy config leads crm catalog content accounts analytics cabinet redirects search sitesettings social staff_api staffrequests supportchat webpush manage.py)"
 fi
 
 # ── 4. pytest + coverage (общий порог в pyproject + пороги по приложениям) ───

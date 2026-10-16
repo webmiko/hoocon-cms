@@ -192,6 +192,18 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert outgoing.index("Добавить") < outgoing.index("Ответственный") < outgoing.index("Позвонить клиенту")
     phone_steps = doc.body.split('id="outgoing-call"', 1)[1].split("<ol", 1)[1].split("</ol>", 1)[0]
     assert phone_steps.index("Добавить") < phone_steps.index("Ответственный") < phone_steps.index("Сохранить")
+    assert 'id="changelog-tech-support"' in guide.body
+    section = guide.body.split('id="staff-requests"', 1)[1].split("</section>", 1)[0]
+    assert ">Техподдержка</h2>" in section
+    assert "Обращения" not in section
+    assert guide.body.index("changelog-tech-support") < guide.body.index("changelog-pbx-mask")
+    assert 'id="changelog-pbx-mask"' in guide.body
+    assert guide.body.index("changelog-pbx-mask") < guide.body.index("changelog-rop-mail")
+    assert 'id="changelog-rop-mail"' in guide.body
+    assert guide.body.index("changelog-rop-mail") < guide.body.index("changelog-staff-requests")
+    assert 'id="changelog-staff-requests"' in guide.body
+    assert guide.body.index("changelog-staff-requests") < guide.body.index("changelog-rop-kpi")
+    assert guide.body.index("changelog-rop-kpi") < guide.body.index("changelog-mango-gone")
     assert 'id="changelog-mango-gone"' in guide.body
     assert guide.body.index("changelog-mango-gone") < guide.body.index("changelog-outgoing-call")
     assert 'id="changelog-outgoing-call"' in guide.body

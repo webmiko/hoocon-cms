@@ -160,6 +160,7 @@ INSTALLED_APPS = [
     "webpush.apps.WebpushConfig",
     "analytics.apps.AnalyticsConfig",
     "staff_api.apps.StaffApiConfig",
+    "staffrequests.apps.StaffRequestsConfig",
 ]
 
 MIDDLEWARE = [
@@ -461,6 +462,12 @@ UNFOLD = {
                         "icon": "groups",
                         "link": reverse_lazy("admin:crm_client_changelist"),
                         "permission": "config.unfold_callbacks.perm_view_client",
+                    },
+                    {
+                        "title": _("Техподдержка"),
+                        "icon": "assignment",
+                        "link": reverse_lazy("admin:staffrequests_staffrequest_changelist"),
+                        "permission": "staffrequests.widget.menu_visible",
                     },
                     {
                         "title": _("Артикулы"),

@@ -26,6 +26,7 @@
     </nav>
   </header>
 
+  <div class="hoocon-widget-grid">
   <section class="hoocon-pbx" aria-label="Телефония">
     {% for widget in telephony_widgets %}
     <article class="hoocon-pbx__widget hoocon-integrations__card hoocon-integrations__card--{{ widget.status }}{% if widget.ready %} hoocon-pbx__widget--ready{% endif %}">
@@ -40,13 +41,13 @@
         <span class="hoocon-pbx__state hoocon-pbx__state--on">Виджет включён</span>
       </label>
         <label class="hoocon-pbx__field">Ключ API
-          <input type="password" name="novosystem_access_token" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.token_set %}сохранён{% else %}не задан{% endif %}">
+          <input type="password" name="novosystem_access_token" form="telephony-novosystem" autocomplete="new-password" value="{{ widget.token_mask }}" placeholder="не задан">
         </label>
         <label class="hoocon-pbx__field">Виртуальный номер
           <input type="text" name="novosystem_virtual_phone" form="telephony-novosystem" value="{{ widget.virtual_phone }}" placeholder="74951234567">
         </label>
         <label class="hoocon-pbx__field">Секрет вебхука
-          <input type="password" name="novosystem_webhook_secret" form="telephony-novosystem" autocomplete="new-password" placeholder="{% if widget.secret_set %}сохранён{% else %}не задан{% endif %}">
+          <input type="password" name="novosystem_webhook_secret" form="telephony-novosystem" autocomplete="new-password" value="{{ widget.secret_mask }}" placeholder="не задан">
         </label>
         {% if widget.secret_set %}
         <details class="hoocon-pbx__url">
@@ -62,9 +63,18 @@
     {% endfor %}
   </section>
 
-  <section class="hoocon-lead-stats__cards hoocon-integrations__cards" aria-label="Каналы">
+  {% if admin_widgets %}
+  <section class="hoocon-staffreq-list" aria-label="Виджеты админки">
+    {% for widget in admin_widgets %}
+      {% include widget.template_name %}
+    {% endfor %}
+  </section>
+  {% endif %}
+  </div>
+
+  <section class="hoocon-integrations__cards" aria-label="Каналы">
     {% for card in dash.cards %}
-    <article class="hoocon-lead-stats__card hoocon-integrations__card hoocon-integrations__card--{{ card.status }}">
+    <article class="hoocon-integrations__tile hoocon-integrations__card hoocon-integrations__card--{{ card.status }}">
       <div class="hoocon-integrations__card-top">
         <p class="hoocon-lead-stats__label">{{ card.name }}</p>
         <span class="hoocon-integrations__badge hoocon-integrations__badge--{{ card.status }}">
@@ -88,5 +98,13 @@
   {% csrf_token %}
   <input type="hidden" name="provider" value="{{ widget.provider }}">
 </form>
+{% endfor %}
+{# Outside #changelist-form: a nested form is dropped, and Save would leave the switch off. #}
+{% for widget in admin_widgets %}
+{% if widget.form_id %}
+<form id="{{ widget.form_id }}" method="post" action="{{ widget.save_url }}">
+  {% csrf_token %}
+</form>
+{% endif %}
 {% endfor %}
 {% endblock %}
