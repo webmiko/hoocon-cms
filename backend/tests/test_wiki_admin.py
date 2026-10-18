@@ -495,6 +495,29 @@ def test_seed_wiki_guide_explains_contact_verified_only_visibility() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_admin_toggles_leave_checkboxes_for_rows_and_token() -> None:
+    """Переключатели заменили галочки полей; выбор строк и удаление токена остались галочками."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert changelog.index("changelog-admin-toggles") < changelog.index("changelog-tech-support")
+    row = changelog.split('id="changelog-admin-toggles"', 1)[1].split("</tr>", 1)[0]
+    assert "снимают права" not in row
+    assert "удалении токена телефона" in row
+    assert "списках групп и прав" in row
+    assert "Черновик" in row
+    assert "Отправить сразу" in row
+    assert "Подтверждён" in row
+    assert "Рабочий день / Выходной" in row
+    assert "Из мануала / Правлены вручную" in row
+    assert "Только закреплённые" in row
+
+
+@pytest.mark.django_db
 def test_seed_wiki_retires_mango_guide() -> None:
     """Старая страница АТС не в сиде: если она осталась включённой, seed_wiki её выключает."""
     from io import StringIO
