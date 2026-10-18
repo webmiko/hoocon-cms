@@ -6,6 +6,8 @@ from typing import Any
 
 from django import forms
 
+from config.admin_toggle import HooconToggleInput
+
 
 class ComposeEmailForm(forms.Form):
     """Staff form: write and optionally queue an email to a Client."""
@@ -29,7 +31,7 @@ class ComposeEmailForm(forms.Form):
         label="Отправить сразу",
         required=False,
         initial=True,
-        widget=forms.CheckboxInput(attrs={"class": "hoocon-toggle"}),
+        widget=HooconToggleInput(),
         help_text="Если выключить — сохранится черновик без отправки.",
     )
 

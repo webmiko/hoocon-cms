@@ -4015,6 +4015,44 @@ html.dark input[type="checkbox"].hoocon-toggle:checked {
   background: #16a34a !important;
 }
 
+/* Boolean field: same switch as integrations, caption follows the state.
+   The wrapper is a <label>: caption click toggles the box.
+   Specificity beats Django admin `.inline-group .aligned label` (160px)
+   and `.inline-group[data-inline-type="stacked"] .aligned label` (100%),
+   so the rule holds whichever stylesheet loads last. */
+label.hoocon-bool-toggle,
+.aligned label.hoocon-bool-toggle,
+.inline-group .aligned label.hoocon-bool-toggle,
+.inline-group[data-inline-type="stacked"] .aligned label.hoocon-bool-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  float: none;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.hoocon-bool-toggle__state {
+  display: none;
+}
+
+.hoocon-bool-toggle__state--off {
+  display: inline;
+}
+
+.hoocon-bool-toggle:has(input:checked) .hoocon-bool-toggle__state--off {
+  display: none;
+}
+
+.hoocon-bool-toggle:has(input:checked) .hoocon-bool-toggle__state--on {
+  display: inline;
+}
+
 /* Client card — inline «Написать»/«Позвонить» next to email/phone inputs. */
 .hoocon-field-action {
   display: flex;

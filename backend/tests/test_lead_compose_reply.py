@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -57,8 +58,12 @@ def test_compose_reply_send_now_renders_as_toggle(django_user_model) -> None:
     client.force_login(user)
     url = reverse("admin:leads_lead_compose_reply", args=[lead.pk])
     html = client.get(url).content.decode()
-    assert 'type="checkbox"' in html
-    assert 'class="hoocon-toggle"' in html
+    send_now = re.search(
+        r'name="send_now"[\s\S]{0,500}?hoocon-bool-toggle__state--off">Черновик</span>'
+        r'[\s\S]{0,200}?hoocon-bool-toggle__state--on">Отправить сразу</span>',
+        html,
+    )
+    assert send_now is not None
 
 
 @pytest.mark.django_db

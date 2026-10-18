@@ -16,7 +16,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
 from unfold.forms import ActionForm
 
 from accounts.forms import StaffMailboxForm, StaffUserChangeForm, StaffUserCreationForm, StaffVpbxProfileForm
@@ -34,7 +34,7 @@ from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code
 from config.admin_mixins import OpenChangeLinkMixin
 
 
-class StaffTelegramProfileInline(admin.StackedInline):
+class StaffTelegramProfileInline(StackedInline):
     """Personal Telegram chat id for staff alerts."""
 
     model = StaffTelegramProfile
@@ -46,7 +46,7 @@ class StaffTelegramProfileInline(admin.StackedInline):
     verbose_name_plural = "Telegram сотрудника"
 
 
-class StaffMaxProfileInline(admin.StackedInline):
+class StaffMaxProfileInline(StackedInline):
     """Personal MAX user_id for staff alerts."""
 
     model = StaffMaxProfile
@@ -58,7 +58,7 @@ class StaffMaxProfileInline(admin.StackedInline):
     verbose_name_plural = "MAX сотрудника"
 
 
-class StaffMailboxInline(admin.StackedInline):
+class StaffMailboxInline(StackedInline):
     """Personal IMAP mailbox: CRM-mail fetch source for this manager."""
 
     model = StaffMailbox
@@ -83,7 +83,7 @@ class StaffMailboxInline(admin.StackedInline):
     verbose_name_plural = "Почта менеджера (IMAP/SMTP)"
 
 
-class StaffVpbxProfileInline(admin.StackedInline):
+class StaffVpbxProfileInline(StackedInline):
     """Telephony binding: extension, UIS employee id, browser-phone token."""
 
     model = StaffVpbxProfile
