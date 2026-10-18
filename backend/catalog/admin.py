@@ -33,6 +33,7 @@ from catalog.models import (
     ProductImage,
 )
 from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_toggle import LabeledToggleMixin
 
 
 def mark_admin_edit(obj: Any, changed: list[str], *, change: bool = True) -> None:
@@ -114,8 +115,10 @@ class CategoryAdmin(OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
+class ProductAdmin(LabeledToggleMixin, AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for Product lines (FK Category, PROTECT)."""
+
+    toggle_labels = {"copy_locked": ("Из мануала", "Правлены вручную")}
 
     list_display = ("name", "slug", "category", "updated_at")
     list_display_links = ("name",)
@@ -158,12 +161,13 @@ class ProductAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     )
 
 
-class AttributeValueInline(TabularInline):
+class AttributeValueInline(LabeledToggleMixin, TabularInline):
     """Inline ТТХ on SKU change form."""
 
     model = AttributeValue
     extra = 0
     autocomplete_fields = ("attribute",)
+    toggle_labels = {"is_manual": ("Из мануала", "Правлено вручную")}
 
 
 class ProductFileInline(TabularInline):
@@ -192,8 +196,10 @@ class ProductImageInline(TabularInline):
 
 
 @admin.register(SKU)
-class SKUAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
+class SKUAdmin(LabeledToggleMixin, AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for SKU — артикул, slug, цена (скрыта в публичном API)."""
+
+    toggle_labels = {"copy_locked": ("Из мануала", "Правлены вручную")}
 
     change_list_template = "admin/catalog/sku/change_list.html"
     list_display = (
@@ -417,8 +423,10 @@ class ProductImageAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(AnalogMap)
-class AnalogMapAdmin(OpenChangeLinkMixin, ModelAdmin):
+class AnalogMapAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
     """Карта аналогов (ЛК-10): сторонний артикул → Hoocon SKU + параметры."""
+
+    toggle_labels = {"spring_return": ("Нет", "Есть")}
 
     list_display = ("brand", "foreign_code", "sku", "torque_nm", "spring_return", "is_active")
     list_display_links = ("brand", "foreign_code")

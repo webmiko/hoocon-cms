@@ -32,6 +32,7 @@ from accounts.models import (
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
 from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_toggle import LabeledToggleMixin
 
 
 class StaffTelegramProfileInline(StackedInline):
@@ -58,11 +59,12 @@ class StaffMaxProfileInline(StackedInline):
     verbose_name_plural = "MAX сотрудника"
 
 
-class StaffMailboxInline(StackedInline):
+class StaffMailboxInline(LabeledToggleMixin, StackedInline):
     """Personal IMAP mailbox: CRM-mail fetch source for this manager."""
 
     model = StaffMailbox
     form = StaffMailboxForm
+    toggle_labels = {"smtp_use_ssl": ("STARTTLS", "SSL")}
     can_delete = False
     extra = 1
     max_num = 1

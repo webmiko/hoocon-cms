@@ -15,6 +15,7 @@ from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_toggle import LabeledToggleMixin
 from supportchat.models import (
     Conversation,
     ConversationStatus,
@@ -140,8 +141,10 @@ class HasMessagesFilter(SimpleListFilter):
 
 
 @admin.register(Conversation)
-class ConversationAdmin(OpenChangeLinkMixin, ModelAdmin):
+class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
     """Unified support inbox with messenger change view."""
+
+    toggle_labels = {"contact_verified": ("Не подтверждён", "Подтверждён")}
 
     list_display = (
         "unread_badge",
@@ -555,9 +558,10 @@ class SupportScheduleIntervalInline(TabularInline):
     fields = ("start_time", "end_time")
 
 
-class SupportScheduleDayInline(TabularInline):
+class SupportScheduleDayInline(LabeledToggleMixin, TabularInline):
     model = SupportScheduleDay
     extra = 0
+    toggle_labels = {"is_closed": ("Рабочий день", "Выходной")}
     fields = ("weekday", "is_closed")
     show_change_link = True
     # Intervals edited on day change — keep day list simple.
@@ -565,7 +569,8 @@ class SupportScheduleDayInline(TabularInline):
 
 
 @admin.register(SupportScheduleDay)
-class SupportScheduleDayAdmin(ModelAdmin):
+class SupportScheduleDayAdmin(LabeledToggleMixin, ModelAdmin):
+    toggle_labels = {"is_closed": ("Рабочий день", "Выходной")}
     list_display = ("__str__", "weekday", "is_closed", "schedule")
     list_filter = ("is_closed", "weekday")
     inlines = (SupportScheduleIntervalInline,)
