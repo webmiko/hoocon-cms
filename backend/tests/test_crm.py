@@ -13,6 +13,7 @@ from django.urls import reverse
 from crm.models import Activity, ActivityType, Client, EmailMessage, EmailStatus
 from crm.services import create_outbound_email, get_or_create_client_from_lead
 from leads.models import Lead
+from tests.mail_compose_helpers import assert_send_now_is_one_label
 
 
 @pytest.mark.django_db
@@ -497,7 +498,7 @@ def test_anon_cannot_compose_email(client) -> None:
 
 @pytest.mark.django_db
 def test_compose_email_send_now_renders_as_toggle(client, django_user_model) -> None:
-    """CRM compose uses the same hoocon-toggle switch skin for send_now."""
+    """Client compose shows Черновик/Отправить сразу once, inside the switch label only."""
     user = django_user_model.objects.create_superuser(
         username="crm-toggle",
         email="mgr@hoocon.ru",
@@ -507,8 +508,7 @@ def test_compose_email_send_now_renders_as_toggle(client, django_user_model) -> 
     client.force_login(user)
     url = reverse("admin:crm_client_compose_email", args=[crm_client.pk])
     html = client.get(url).content.decode()
-    assert 'type="checkbox"' in html
-    assert 'class="hoocon-toggle"' in html
+    assert_send_now_is_one_label(html)
 
 
 @pytest.mark.django_db

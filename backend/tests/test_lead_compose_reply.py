@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +14,7 @@ from crm.models import Client as CrmClient
 from crm.models import EmailMessage, EmailStatus
 from crm.services import create_lead_reply_email
 from leads.models import Lead, LeadItem
+from tests.mail_compose_helpers import assert_send_now_is_one_label
 
 _MAIL_COMPOSE_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-mail-compose.css"
 _EXTRAS_CSS = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
@@ -43,7 +43,7 @@ def test_hoocon_toggle_css_replaces_checkmark_with_switch() -> None:
 
 @pytest.mark.django_db
 def test_compose_reply_send_now_renders_as_toggle(django_user_model) -> None:
-    """send_now checkbox carries hoocon-toggle class for the switch skin."""
+    """Reply compose shows Черновик/Отправить сразу once, inside the switch label only."""
     user = django_user_model.objects.create_superuser(
         username="lead-toggle",
         email="mgr@hoocon.ru",
@@ -58,12 +58,7 @@ def test_compose_reply_send_now_renders_as_toggle(django_user_model) -> None:
     client.force_login(user)
     url = reverse("admin:leads_lead_compose_reply", args=[lead.pk])
     html = client.get(url).content.decode()
-    send_now = re.search(
-        r'name="send_now"[\s\S]{0,500}?hoocon-bool-toggle__state--off">Черновик</span>'
-        r'[\s\S]{0,200}?hoocon-bool-toggle__state--on">Отправить сразу</span>',
-        html,
-    )
-    assert send_now is not None
+    assert_send_now_is_one_label(html)
 
 
 @pytest.mark.django_db
