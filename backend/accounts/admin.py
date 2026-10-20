@@ -16,7 +16,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
 from unfold.forms import ActionForm
 
 from accounts.forms import StaffMailboxForm, StaffUserChangeForm, StaffUserCreationForm, StaffVpbxProfileForm
@@ -32,9 +32,10 @@ from accounts.models import (
 from accounts.passkeys import admin_passkey_enabled
 from accounts.recovery_codes import replace_recovery_codes, unused_recovery_code_count
 from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_toggle import LabeledToggleMixin
 
 
-class StaffTelegramProfileInline(admin.StackedInline):
+class StaffTelegramProfileInline(StackedInline):
     """Personal Telegram chat id for staff alerts."""
 
     model = StaffTelegramProfile
@@ -46,7 +47,7 @@ class StaffTelegramProfileInline(admin.StackedInline):
     verbose_name_plural = "Telegram сотрудника"
 
 
-class StaffMaxProfileInline(admin.StackedInline):
+class StaffMaxProfileInline(StackedInline):
     """Personal MAX user_id for staff alerts."""
 
     model = StaffMaxProfile
@@ -58,11 +59,12 @@ class StaffMaxProfileInline(admin.StackedInline):
     verbose_name_plural = "MAX сотрудника"
 
 
-class StaffMailboxInline(admin.StackedInline):
+class StaffMailboxInline(LabeledToggleMixin, StackedInline):
     """Personal IMAP mailbox: CRM-mail fetch source for this manager."""
 
     model = StaffMailbox
     form = StaffMailboxForm
+    toggle_labels = {"smtp_use_ssl": ("STARTTLS", "SSL")}
     can_delete = False
     extra = 1
     max_num = 1
@@ -83,7 +85,7 @@ class StaffMailboxInline(admin.StackedInline):
     verbose_name_plural = "Почта менеджера (IMAP/SMTP)"
 
 
-class StaffVpbxProfileInline(admin.StackedInline):
+class StaffVpbxProfileInline(StackedInline):
     """Telephony binding: extension, UIS employee id, browser-phone token."""
 
     model = StaffVpbxProfile
@@ -91,7 +93,7 @@ class StaffVpbxProfileInline(admin.StackedInline):
     can_delete = False
     extra = 1
     max_num = 1
-    fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token", "clear_uis_webrtc_token")
+    fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token")
     verbose_name = "Телефония сотрудника"
     verbose_name_plural = "Телефония сотрудника"
 

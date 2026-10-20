@@ -125,10 +125,9 @@
     {% endif %}
 
     <div class="hoocon-mail-compose__footer">
-      <label class="hoocon-mail-compose__send-now" for="{{ form.send_now.id_for_label }}">
+      <div class="hoocon-mail-compose__send-now">
         {{ form.send_now }}
-        <span>{{ form.send_now.label }}</span>
-      </label>
+      </div>
       {% if form.body.help_text %}
         <p class="hoocon-mail-compose__help" id="hoocon-mail-compose-limit" aria-live="polite">{{ form.body.help_text }}</p>
       {% endif %}

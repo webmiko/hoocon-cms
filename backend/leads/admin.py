@@ -46,6 +46,7 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.models import SKU
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin, filter_autocomplete_by_client
+from config.admin_toggle import LabeledToggleMixin
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -151,7 +152,7 @@ def _scoped_leads(request: HttpRequest) -> QuerySet[Lead]:
 
 
 @admin.register(Lead)
-class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
+class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for customer inquiries (RFQ / consultation / replacement).
 
     PII (email/phone) is visible to staff in Admin — that's the only
@@ -160,6 +161,8 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
 
     Existing leads open read-only; enable changes via «Редактировать».
     """
+
+    toggle_labels = {"contact_verified": ("Не подтверждён", "Подтверждён")}
 
     list_display = (
         "status_badge",
@@ -1399,13 +1402,15 @@ class LeadAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
 
 
 @admin.register(CompanyManagerRule)
-class CompanyManagerRuleAdmin(ModelAdmin):
+class CompanyManagerRuleAdmin(LabeledToggleMixin, ModelAdmin):
     """Pinned company → manager rules for lead routing.
 
     Заявка от закреплённой компании назначается выбранному менеджеру
     в обход общей очереди (и даже при выключенной ротации). Флаг
     «только закреплённые компании» убирает менеджера из общей очереди.
     """
+
+    toggle_labels = {"exclusive": ("В общей очереди", "Только закреплённые")}
 
     list_display = ("company_label", "assignee", "exclusive", "is_active", "updated_at")
     list_filter = ("is_active", "exclusive")

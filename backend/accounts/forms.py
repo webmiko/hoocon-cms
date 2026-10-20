@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminEmailInputWidget, UnfoldAdminTextInputWidget
 
@@ -209,24 +211,54 @@ class StaffMailboxForm(forms.ModelForm):
         return value
 
 
+class WebRtcTokenInput(forms.PasswordInput):
+    """Token field with the delete action on the same row, not a second field."""
+
+    def __init__(self, *args: Any, clear_name: str = "", **kwargs: Any) -> None:
+        self.clear_name = clear_name
+        super().__init__(*args, **kwargs)
+
+    def render(
+        self,
+        name: str,
+        value: Any,
+        attrs: dict[str, Any] | None = None,
+        renderer: Any = None,
+    ) -> SafeString:
+        password = super().render(name, value, attrs, renderer)
+        if not self.clear_name:
+            return password
+        clear_id = f"id_{self.clear_name}"
+        return format_html(
+            '<div class="hoocon-token-field">{}'
+            '<label class="hoocon-token-clear" for="{}">'
+            '<input type="checkbox" name="{}" id="{}" class="hoocon-token-clear__input">'
+            "<span>Удалить токен WebRTC</span>"
+            '<span class="hoocon-token-clear__hint">телефон в браузере перестанет работать</span>'
+            "</label></div>",
+            password,
+            clear_id,
+            self.clear_name,
+            clear_id,
+        )
+
+
 class StaffVpbxProfileForm(forms.ModelForm):
     """Telephony inline: the WebRTC token is write-only.
 
     The stored value is a Fernet token and is never rendered back. An empty
-    field keeps the saved token; the checkbox removes it. Typing a new token
-    and ticking the checkbox together is rejected as ambiguous.
+    field keeps the saved token; the checkbox under the field removes it.
+    Typing a new token and ticking the checkbox together is rejected as ambiguous.
     """
 
     uis_webrtc_token = forms.CharField(
         label="Токен WebRTC (UIS)",
         required=False,
         max_length=500,
-        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}),
     )
     clear_uis_webrtc_token = forms.BooleanField(
         label="Удалить токен WebRTC",
         required=False,
-        help_text="Телефон в браузере у этого сотрудника перестанет работать.",
     )
 
     class Meta:
@@ -239,6 +271,11 @@ class StaffVpbxProfileForm(forms.ModelForm):
         field = self.fields["uis_webrtc_token"]
         state = "сохранён" if self.instance.pk and self.instance.uis_webrtc_token else "не задан"
         field.help_text = f"Токен WebRTC из кабинета UIS. Сейчас: {state}. Пустое поле оставляет сохранённый."
+        field.widget = WebRtcTokenInput(
+            render_value=False,
+            attrs={"autocomplete": "new-password"},
+            clear_name=self.add_prefix("clear_uis_webrtc_token"),
+        )
 
     def clean_uis_employee_id(self) -> str:
         """One UIS employee id belongs to one staff profile; blanks may repeat."""

@@ -9,14 +9,16 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_toggle import LabeledToggleMixin
 from crm.models import Company, CompanyMember
 
 
-class CompanyMemberInline(TabularInline):
+class CompanyMemberInline(LabeledToggleMixin, TabularInline):
     """Members of a company card (CRM-x)."""
 
     model = CompanyMember
     extra = 1
+    toggle_labels = {"is_confirmed": ("Не подтверждён", "Подтверждён")}
     fields = ("client", "account", "role", "is_confirmed")
     autocomplete_fields = ("client",)
 

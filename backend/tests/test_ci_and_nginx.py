@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CI_YML = ROOT / ".github" / "workflows" / "ci.yml"
+MIRROR_YML = ROOT / ".github" / "workflows" / "mirror-postgres.yml"
 NGINX_CONF = ROOT / "deploy" / "nginx" / "hoocon.conf"
 NGINX_SITE_INC = ROOT / "deploy" / "nginx" / "hoocon-site.inc"
 REDIRECTS_MAP = ROOT / "deploy" / "nginx" / "redirects.map"
@@ -51,15 +52,43 @@ def test_ci_workflow_has_check_job_with_postgres() -> None:
 
 
 def test_ci_service_images_avoid_anonymous_docker_hub_pulls() -> None:
-    """Run #707: «toomanyrequests» on postgres:16-alpine failed the main deploy before tests ran."""
+    """Runs 707, 810, 811: ECR public still died with toomanyrequests before pytest."""
     import yaml
 
     data = yaml.safe_load(CI_YML.read_text(encoding="utf-8"))
+    check = data["jobs"]["check"]
+    postgres = check["services"]["postgres"]
+    assert postgres["image"] == "ghcr.io/${{ github.repository }}/postgres:16-alpine"
+    assert postgres["credentials"]["username"] == "${{ github.actor }}"
+    assert postgres["credentials"]["password"] == "${{ secrets.GITHUB_TOKEN }}"
+    assert check["permissions"]["packages"] == "read"
+    assert check["permissions"]["actions"] == "write"
+    assert check["permissions"]["contents"] == "read"
     images = [service["image"] for job in data["jobs"].values() for service in (job.get("services") or {}).values()]
     assert images
     for image in images:
-        registry = image.split("/", 1)[0]
-        assert "." in registry and registry != "docker.io", image
+        assert image.startswith("ghcr.io/"), image
+
+
+def test_postgres_mirror_publishes_ci_image_without_running_every_push() -> None:
+    """The GHCR copy refreshes on a schedule; a failed refresh must not block check."""
+    import yaml
+
+    text = MIRROR_YML.read_text(encoding="utf-8")
+    data = yaml.safe_load(text)
+    triggers = data.get(True) or data.get("on")
+    assert "push" not in triggers
+    assert "workflow_dispatch" in triggers
+    assert "schedule" in triggers
+    assert data["permissions"]["packages"] == "write"
+    assert "cancel-in-progress: false" in text
+    assert "--platform linux/amd64" in text
+    dest = "ghcr.io/$(echo \"${GITHUB_REPOSITORY}\" | tr '[:upper:]' '[:lower:]')/postgres:16-alpine"
+    assert dest in text
+    assert 'org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"' in text
+    assert "mirror.gcr.io/library/postgres:16-alpine" in text
+    assert "public.ecr.aws/docker/library/postgres:16-alpine" in text
+    assert "docker.io/library/postgres:16-alpine" in text
 
 
 def test_e2e_webserver_waits_for_backend_before_vite() -> None:

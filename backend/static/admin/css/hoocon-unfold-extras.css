@@ -1990,6 +1990,37 @@ kbd.hoocon-sidebar-shortcut > span {
   cursor: pointer;
 }
 
+/* Delete-token sits on the token row: one line, checkbox plus the action. */
+.hoocon-token-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.hoocon-token-clear {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hoocon-token-clear__input {
+  margin: 0;
+  flex: none;
+  align-self: center;
+}
+
+.hoocon-token-clear__hint {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
 /* Admin text fields: frosted glass fill, brand border when active.
    Explicit [type=…] so :focus beats the base rule (long :not() chains win specificity). */
 #content-main form .field-line input[type="text"],
@@ -4013,6 +4044,44 @@ html.dark input[type="checkbox"].hoocon-toggle {
 .dark input[type="checkbox"].hoocon-toggle:checked,
 html.dark input[type="checkbox"].hoocon-toggle:checked {
   background: #16a34a !important;
+}
+
+/* Boolean field: same switch as integrations, caption follows the state.
+   The wrapper is a <label>: caption click toggles the box.
+   Specificity beats Django admin `.inline-group .aligned label` (160px)
+   and `.inline-group[data-inline-type="stacked"] .aligned label` (100%),
+   so the rule holds whichever stylesheet loads last. */
+label.hoocon-bool-toggle,
+.aligned label.hoocon-bool-toggle,
+.inline-group .aligned label.hoocon-bool-toggle,
+.inline-group[data-inline-type="stacked"] .aligned label.hoocon-bool-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  float: none;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.hoocon-bool-toggle__state {
+  display: none;
+}
+
+.hoocon-bool-toggle__state--off {
+  display: inline;
+}
+
+.hoocon-bool-toggle:has(input:checked) .hoocon-bool-toggle__state--off {
+  display: none;
+}
+
+.hoocon-bool-toggle:has(input:checked) .hoocon-bool-toggle__state--on {
+  display: inline;
 }
 
 /* Client card — inline «Написать»/«Позвонить» next to email/phone inputs. */

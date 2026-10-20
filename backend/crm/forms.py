@@ -6,6 +6,8 @@ from typing import Any
 
 from django import forms
 
+from config.admin_toggle import HooconToggleInput
+
 
 class ComposeEmailForm(forms.Form):
     """Staff form: write and optionally queue an email to a Client."""
@@ -29,7 +31,11 @@ class ComposeEmailForm(forms.Form):
         label="Отправить сразу",
         required=False,
         initial=True,
-        widget=forms.CheckboxInput(attrs={"class": "hoocon-toggle"}),
+        # The caption flips with the state, so the field name stays in aria-label.
+        widget=HooconToggleInput(
+            attrs={"aria-label": "Отправить сразу"},
+            labels=("Черновик", "Отправить сразу"),
+        ),
         help_text="Если выключить — сохранится черновик без отправки.",
     )
 
