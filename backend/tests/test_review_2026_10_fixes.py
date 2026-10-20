@@ -38,6 +38,13 @@ def test_public_lead_rejects_call_stub_email(client) -> None:
 
 
 @pytest.mark.django_db
+def test_search_nul_is_bad_request_not_server_error(client) -> None:
+    """NUL в поиске — 400, а не 500 с алертом в Telegram."""
+    response = client.get("/api/search/", {"q": "\x00"})
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
 def test_stale_queued_email_is_handed_back_to_the_broker() -> None:
     """QUEUED старше окна отправки ставится в брокер снова. Свежая отправка — нет."""
     from crm.models import Client, EmailMessage, EmailStatus

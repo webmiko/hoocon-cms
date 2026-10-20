@@ -189,6 +189,9 @@ MIDDLEWARE.extend(
         "catalog.middleware.CatalogHttpCacheMiddleware",
         "config.csp_middleware.CspMiddleware",
         "config.middleware.ops_telegram_alert.OpsTelegramAlertMiddleware",
+        # After the alert middleware so a rejected NUL becomes 400 and
+        # does not page Telegram (process_exception runs last-first).
+        "config.middleware.bad_input.RejectNulMiddleware",
     ],
 )
 
