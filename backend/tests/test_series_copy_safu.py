@@ -50,6 +50,12 @@ def test_sa3_specs_from_manual() -> None:
     assert "> 50" in row["shaft-length"]
 
 
+def test_sa10_holding_power_matches_factory_manual() -> None:
+    """SA10FU EN от 2026-06: удержание 3,5 Вт, ход 5 Вт."""
+    assert TORQUE_SPECS[10]["power"] == ("5 Вт под нагрузкой / 3,5 Вт в режиме удержания")
+    assert "< 100 с" in TORQUE_SPECS[10]["running-time"]
+
+
 def test_sa5_shaft_and_noise_differ_from_sa3() -> None:
     assert "< 90" in TORQUE_SPECS[5]["shaft-length"]
     assert "62 дБ" in TORQUE_SPECS[5]["noise"]
