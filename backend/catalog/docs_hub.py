@@ -7,8 +7,8 @@ Family manuals are attached to many SKUs; list/zip must unique-by-title.
 from __future__ import annotations
 
 import hashlib
-import io
 import re
+import tempfile
 import zipfile
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -499,9 +499,31 @@ def family_zip_etag(files: list[ProductFile]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
-def build_family_zip_bytes(files: list[ProductFile]) -> bytes:
-    """Build an in-memory zip of unique family PDFs."""
-    buf = io.BytesIO()
+# Uncompressed sum of the family's files. H8101 and H8102 were measured at
+# 254 MB and 247 MB (audit 2026-10); a 200 MB cap answered 413 for them.
+# These are PDFs, so a zip is about the same size — a lower cap does not
+# appear after compression. The spool still keeps the archive off the heap.
+# 512 MiB covers those families and still rejects a multi-gigabyte set.
+FAMILY_ZIP_MAX_BYTES = 512 * 1024 * 1024
+_ZIP_SPOOL_BYTES = 8 * 1024 * 1024
+
+
+def family_zip_total_bytes(files: list[ProductFile]) -> int:
+    """Sum of stored sizes. Missing files count as zero."""
+    total = 0
+    for pf in files:
+        try:
+            total += int(pf.file.size)
+        except (OSError, ValueError, FileNotFoundError):
+            continue
+    return total
+
+
+def build_family_zip(files: list[ProductFile]) -> tempfile.SpooledTemporaryFile[bytes]:
+    """Zip family PDFs into a spooled file. Callers must not read it all into RAM."""
+    import shutil
+
+    buf = tempfile.SpooledTemporaryFile(max_size=_ZIP_SPOOL_BYTES)  # noqa: SIM115
     used_names: set[str] = set()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for pf in files:
@@ -509,10 +531,11 @@ def build_family_zip_bytes(files: list[ProductFile]) -> bytes:
             if name in used_names:
                 stem = name[:-4] if name.lower().endswith(".pdf") else name
                 name = f"{stem}-{pf.id}.pdf"
-            used_names.add(name)
             try:
-                with pf.file.open("rb") as src:
-                    zf.writestr(name, src.read())
+                with pf.file.open("rb") as src, zf.open(name, "w") as out:
+                    shutil.copyfileobj(src, out, 1024 * 1024)
             except (OSError, ValueError, FileNotFoundError):
                 continue
-    return buf.getvalue()
+            used_names.add(name)
+    buf.seek(0)
+    return buf

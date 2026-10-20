@@ -620,6 +620,8 @@ REST_FRAMEWORK = {
         "client_repeat": "10/min",
         # Whole-cabinet documents ZIP (heavy: reads every file).
         "client_zip": "10/hour",
+        # Public family ZIP. Same weight as the cabinet archive.
+        "docs_zip": "10/hour",
         # Public quote accept/revise links from the client email.
         "quote_reply": "30/hour",
     },

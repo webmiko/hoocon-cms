@@ -104,12 +104,50 @@ def test_docs_family_zip_unique_and_etag(client) -> None:
     etag = response["ETag"].strip('"')
     assert etag
 
-    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+    body = b"".join(response.streaming_content)
+    with zipfile.ZipFile(io.BytesIO(body)) as zf:
         names = zf.namelist()
     assert len(names) == 3
 
     cached = client.get(url, HTTP_IF_NONE_MATCH=f'"{etag}"')
     assert cached.status_code == 304
+
+
+@pytest.mark.django_db
+def test_docs_family_zip_allows_the_measured_h81_size(client, monkeypatch) -> None:
+    """H8101 и H8102 весят 254 и 247 МБ. Такая сумма не должна отвечать 413."""
+    import tempfile
+
+    from catalog.docs_hub import FAMILY_ZIP_MAX_BYTES
+
+    # Аудит 2026-10: сумма файлов семейства, не вывод этого теста.
+    assert FAMILY_ZIP_MAX_BYTES >= 254 * 1024 * 1024
+
+    _seed_docs_family()
+    monkeypatch.setattr(
+        "catalog.docs_views.family_zip_total_bytes",
+        lambda files: 250 * 1024 * 1024,
+    )
+    buf = tempfile.SpooledTemporaryFile()  # noqa: SIM115
+    buf.write(b"PK\x05\x06" + b"\x00" * 18)
+    buf.seek(0)
+    monkeypatch.setattr("catalog.docs_views.build_family_zip", lambda files: buf)
+    response = client.get(reverse("catalog-docs-family-zip", kwargs={"key": "DA2MU"}))
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_docs_family_zip_rejects_an_archive_over_the_cap(client, monkeypatch) -> None:
+    """Семейство больше лимита не собирается в память: 413, как у ZIP кабинета."""
+    from catalog import docs_hub
+    from catalog.docs_views import DocsFamilyZipView
+
+    _seed_docs_family()
+    monkeypatch.setattr(docs_hub, "FAMILY_ZIP_MAX_BYTES", 1)
+    monkeypatch.setattr("catalog.docs_views.FAMILY_ZIP_MAX_BYTES", 1)
+    response = client.get(reverse("catalog-docs-family-zip", kwargs={"key": "DA2MU"}))
+    assert response.status_code == 413
+    assert DocsFamilyZipView.throttle_scope == "docs_zip"
 
 
 @pytest.mark.django_db

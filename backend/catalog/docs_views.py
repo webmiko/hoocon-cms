@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from catalog.docs_hub import (
+    FAMILY_ZIP_MAX_BYTES,
     OTHER_FAMILY,
-    build_family_zip_bytes,
+    build_family_zip,
     collect_hub_payload,
     family_zip_etag,
+    family_zip_total_bytes,
     unique_product_files_for_family,
 )
 
@@ -39,9 +42,11 @@ class DocsFamilyZipView(APIView):
     """GET /api/catalog/docs/families/{key}/zip/ — unique PDFs as ZIP."""
 
     permission_classes = (AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "docs_zip"
     http_method_names = ["get", "head", "options"]
 
-    def get(self, request: Request, key: str) -> HttpResponse | Response:
+    def get(self, request: Request, key: str) -> HttpResponse | FileResponse | Response:
         """Stream a zip of deduped family documents; support ETag / 304."""
         family_key = (key or "").strip().upper()
         if not family_key or family_key == OTHER_FAMILY:
@@ -56,10 +61,14 @@ class DocsFamilyZipView(APIView):
         if if_none and if_none == etag:
             return HttpResponse(status=304)
 
-        payload = build_family_zip_bytes(files)
-        response = HttpResponse(payload, content_type="application/zip")
-        response["Content-Disposition"] = f'attachment; filename="{family_key}-docs.zip"'
+        if family_zip_total_bytes(files) > FAMILY_ZIP_MAX_BYTES:
+            return Response(
+                {"detail": "Документов слишком много для одного архива — скачайте их по отдельности."},
+                status=413,
+            )
+
+        buf = build_family_zip(files)
+        response = FileResponse(buf, as_attachment=True, filename=f"{family_key}-docs.zip")
         response["ETag"] = f'"{etag}"'
         response["Cache-Control"] = "public, max-age=300"
-        response["Content-Length"] = str(len(payload))
         return response
