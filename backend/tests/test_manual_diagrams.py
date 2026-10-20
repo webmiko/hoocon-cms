@@ -187,6 +187,21 @@ def test_find_hvdf_manual_pdf_matches_tuple_stem_torque(tmp_path: Path) -> None:
     assert find_hvdf_manual_pdf(series_nm=3, manuals_dir=tmp_path) is None
 
 
+@pytest.mark.django_db
+def test_find_hvdf_manual_pdf_picks_st_or_sx_by_thermal_kind(tmp_path: Path) -> None:
+    """10F: both ``hvd-10f-s_st`` and ``hvd-10f-s_sx`` on disk — kind must match."""
+    from catalog.etl.manual_diagrams import find_hvdf_manual_pdf
+
+    ru = tmp_path / "RU"
+    ru.mkdir()
+    (ru / "hvd-10f-s_sx.pdf").write_bytes(b"%PDF-1.4\n")
+    (ru / "hvd-10f-s_st.pdf").write_bytes(b"%PDF-1.4\n")
+    st = find_hvdf_manual_pdf(series_nm=10, thermal_kind="st", manuals_dir=tmp_path)
+    sx = find_hvdf_manual_pdf(series_nm=10, thermal_kind="sx", manuals_dir=tmp_path)
+    assert st is not None and st.name.casefold() == "hvd-10f-s_st.pdf"
+    assert sx is not None and sx.name.casefold() == "hvd-10f-s_sx.pdf"
+
+
 def test_crop_safu_uses_right_column() -> None:
     page = Image.new("RGB", (1682, 1191), color=(255, 255, 255))
     wiring, dims = crop_safu_diagrams(page)

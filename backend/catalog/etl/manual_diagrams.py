@@ -1424,7 +1424,7 @@ def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     return summary
 
 
-_HVDF_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
+_HVDF_CODE = re.compile(r"(?i)^hvd(?:24|230)(?:s|st|sx)-(?P<nm>\d+)f$")
 _HVDF_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/hvd-{nm}f-{kind}.webp"
 
 
@@ -1634,14 +1634,26 @@ def diagrams_from_hvdf_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCro
     ]
 
 
-def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> Path | None:
-    """Locate ``hvd-{nm}f-s_st.pdf`` from ProductFile or manuals dir."""
+def find_hvdf_manual_pdf(
+    *,
+    series_nm: int,
+    thermal_kind: str = "st",
+    manuals_dir: Path | None = None,
+) -> Path | None:
+    """Locate ``hvd-{nm}f-s_{st|sx}.pdf`` from ProductFile or manuals dir."""
     from catalog.etl.manual_pdfs import parse_hvd_f_manual_stem
 
+    kind = thermal_kind.casefold()
+    if kind not in {"st", "sx"}:
+        return None
     manuals_dir = manuals_dir or default_manuals_dir()
+    if kind == "sx":
+        sku_re = rf"(?i)^hvd(24|230)sx-{series_nm}f$"
+    else:
+        sku_re = rf"(?i)^hvd(24|230)st?-{series_nm}f$"
     file_qs = ProductFile.objects.filter(
         is_published=True,
-        sku__sku_code__iregex=rf"(?i)^hvd(24|230)st?-{series_nm}f$",
+        sku__sku_code__iregex=sku_re,
         title__icontains="Инструкция",
     ).exclude(file="")
     for pf in file_qs.select_related("sku")[:3]:
@@ -1651,14 +1663,14 @@ def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
         return None
     for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
         parsed = parse_hvd_f_manual_stem(path.name)
-        if parsed is not None and parsed[0] == series_nm:
+        if parsed is not None and parsed[0] == series_nm and parsed[1] == kind:
             return path
     return None
 
 
 def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     """Attach photos + wiring + dimensions for every HVD-…F SKU."""
-    from catalog.etl.sku_variant import sku_code_is_thermal
+    from catalog.etl.sku_variant import hvdf_manual_thermal_kind, sku_code_is_thermal
 
     summary: dict[str, Any] = {
         "created": 0,
@@ -1668,23 +1680,30 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         "dry_run": dry_run,
     }
     skus = list(
-        SKU.objects.filter(sku_code__iregex=r"(?i)^hvd(24|230)st?-\d+f$").order_by(
+        SKU.objects.filter(
+            sku_code__iregex=r"(?i)^hvd(24|230)(?:s|st|sx)-\d+f$",
+        ).order_by(
             "sku_code",
         ),
     )
-    crop_cache: dict[int, list[DiagramCrop] | None] = {}
+    crop_cache: dict[tuple[int, str], list[DiagramCrop] | None] = {}
     for sku in skus:
         series_nm = parse_hvdf_series_nm(sku.sku_code)
         if series_nm is None:
             summary["skipped"] += 1
             continue
-        if series_nm not in crop_cache:
-            pdf_path = find_hvdf_manual_pdf(series_nm=series_nm)
+        manual_kind = hvdf_manual_thermal_kind(sku.sku_code)
+        cache_key = (series_nm, manual_kind)
+        if cache_key not in crop_cache:
+            pdf_path = find_hvdf_manual_pdf(
+                series_nm=series_nm,
+                thermal_kind=manual_kind,
+            )
             if pdf_path is None:
-                crop_cache[series_nm] = None
+                crop_cache[cache_key] = None
             else:
                 try:
-                    crop_cache[series_nm] = diagrams_from_hvdf_pdf(
+                    crop_cache[cache_key] = diagrams_from_hvdf_pdf(
                         pdf_path,
                         series_nm=series_nm,
                     )
@@ -1694,8 +1713,8 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
                         pdf_path,
                         type(exc).__name__,
                     )
-                    crop_cache[series_nm] = None
-        crops = crop_cache[series_nm]
+                    crop_cache[cache_key] = None
+        crops = crop_cache[cache_key]
         if not crops:
             summary["skipped"] += 1
             continue

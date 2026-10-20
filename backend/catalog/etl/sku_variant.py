@@ -490,6 +490,11 @@ def sku_code_is_hvdf_sx(sku_code: str | None) -> bool:
     return bool(_HVDF_SX.fullmatch(code))
 
 
+def hvdf_manual_thermal_kind(sku_code: str | None) -> str:
+    """Manual stem kind for HVD-…F: ``st`` (S/ST) or ``sx`` (duct TS2)."""
+    return "sx" if sku_code_is_hvdf_sx(sku_code) else "st"
+
+
 def sku_code_is_thermal(sku_code: str | None) -> bool:
     """True when the Hoocon article is a thermal edition.
 
