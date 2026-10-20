@@ -794,11 +794,7 @@ class AccountCompanyView(ClientApiView):
             return Response(hidden)
         membership = company.members.filter(client=client)
         confirmed = membership.filter(is_confirmed=True).exists()
-        # A card that is the only member is this client's own company: show
-        # the requisites the manager typed. A second, unconfirmed person
-        # must not read a colleague's INN.
-        others = company.members.exclude(client=client).exists()
-        if not confirmed and others:
+        if not confirmed:
             hidden["needs_confirmation"] = True
             return Response(hidden)
         return Response(

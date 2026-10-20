@@ -1082,9 +1082,11 @@ def test_done_lead_with_quote_shows_quote_status_and_manager_name(settings) -> N
     assert "anna@hoocon.test" not in row["manager_name"]
 
 
+
+
 @pytest.mark.django_db
 def test_sole_company_member_sees_own_requisites_without_confirmation() -> None:
-    """Единственный контакт компании видит ИНН без галочки «подтверждён» и без списка коллег."""
+    """Неподтверждённый единственный участник видит только название, которое сам вписал."""
     from crm.models import CompanyMember
 
     api = _register(APIClient(), "solo@acme.test")
@@ -1100,10 +1102,17 @@ def test_sole_company_member_sees_own_requisites_without_confirmation() -> None:
     assert CompanyMember.objects.get(company=org, client=client).is_confirmed is False
 
     data = api.get("/api/account/company/").json()
-    assert data["inn"] == "7707083893"
-    assert data["legal_address"] == "Москва, ул. Складская, 1"
-    assert data["needs_confirmation"] is False
+    assert data["name"] == "Только мы"
+    assert data["inn"] == ""
+    assert data["legal_address"] == ""
+    assert data["needs_confirmation"] is True
     assert data["members"] == []
+
+    CompanyMember.objects.filter(company=org, client=client).update(is_confirmed=True)
+    confirmed = api.get("/api/account/company/").json()
+    assert confirmed["inn"] == "7707083893"
+    assert confirmed["legal_address"] == "Москва, ул. Складская, 1"
+    assert confirmed["confirmed"] is True
 
 
 @pytest.mark.django_db
