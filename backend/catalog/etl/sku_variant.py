@@ -468,7 +468,7 @@ _NM_IN_ALT = re.compile(r"(?i)(\d+)\s*нм")
 _NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa)(\d+)")
 # HVA24-5 / HVA24S-5Q / HVD24ST-3F — voltage first, torque after the hyphen.
 _NM_FROM_HV_SKU = re.compile(
-    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st?|s)?-(\d+)(?:q|f)?$",
+    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st|sx|s)?-(\d+)(?:q|f)?$",
 )
 # Fallback: any leading digits after an optional short alpha prefix.
 _NM_FROM_SKU_FALLBACK = re.compile(r"(?i)^(?:[a-z]{1,4})?(\d+)")
@@ -481,6 +481,13 @@ _SA_CODE = re.compile(r"(?i)^sa\d")
 _THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
 # HVD24ST-3F / HVD24SX-10F — thermal is ``ST`` or ``SX`` before ``-{nm}F``.
 _THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)(?:st|sx)-\d+f$")
+_HVDF_SX = re.compile(r"(?i)^hvd(?:24|230)sx-\d+f$")
+
+
+def sku_code_is_hvdf_sx(sku_code: str | None) -> bool:
+    """True for HVD-…F SX (duct TS2 only, not SAF72 TS1+TS2 package)."""
+    code = (sku_code or "").casefold().replace(" ", "")
+    return bool(_HVDF_SX.fullmatch(code))
 
 
 def sku_code_is_thermal(sku_code: str | None) -> bool:

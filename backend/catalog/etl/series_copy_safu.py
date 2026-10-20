@@ -32,7 +32,7 @@ from catalog.etl.tech_copy import (
 from catalog.facets import normalize_aux_switch_value
 from catalog.models import SKU, Product
 
-_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?!q)")
 _SAFU_PRODUCT = re.compile(r"(?i)protivopozharn")
 
 AttrRow = tuple[str, str, str, str, str]

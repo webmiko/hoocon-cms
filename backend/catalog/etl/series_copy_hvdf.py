@@ -21,7 +21,12 @@ from catalog.etl.attr_groups import (
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_instructions import damper_area_for_nm
-from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
+from catalog.etl.sku_variant import (
+    SkuVariant,
+    parse_sku_variant,
+    sku_code_is_hvdf_sx,
+    sku_code_is_thermal,
+)
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
@@ -155,6 +160,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
 
 TEMP_SENSOR_NONE = "Нет"
 TEMP_SENSOR_SAF72 = "SAF72"
+TEMP_SENSOR_TS2 = "TS2"
 
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
@@ -631,7 +637,12 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 )
             attrs += 2
 
-            temp_value = TEMP_SENSOR_SAF72 if sku_code_is_thermal(sku.sku_code) else TEMP_SENSOR_NONE
+            if sku_code_is_hvdf_sx(sku.sku_code):
+                temp_value = TEMP_SENSOR_TS2
+            elif sku_code_is_thermal(sku.sku_code):
+                temp_value = TEMP_SENSOR_SAF72
+            else:
+                temp_value = TEMP_SENSOR_NONE
             if not dry_run:
                 _set_attr(sku, "Датчик температуры", "temp-sensor", "", temp_value)
             attrs += 1

@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from catalog.etl.series_copy_hvdf import (
+    TEMP_SENSOR_SAF72,
+    TEMP_SENSOR_TS2,
     TORQUE_SPECS,
     apply_hvdf_enrichment,
     ensure_hvdf_catalog,
@@ -54,6 +56,9 @@ def test_hvdf_10f_specs_match_en_manual() -> None:
     assert "249,6" in row["dimensions"]
     area = AttributeValue.objects.get(sku=sku, attribute__slug="damper-area").value
     assert area == damper_area_for_nm(10)
+    assert AttributeValue.objects.get(sku=sku, attribute__slug="temp-sensor").value == TEMP_SENSOR_TS2
+    st = SKU.objects.get(sku_code="HVD24ST-10F")
+    assert AttributeValue.objects.get(sku=st, attribute__slug="temp-sensor").value == TEMP_SENSOR_SAF72
 
 
 def test_hvdf_code_helpers() -> None:

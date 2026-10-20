@@ -70,10 +70,10 @@ logger = logging.getLogger(__name__)
 # Trailing NBSP / spaces appear in some Disk exports (e.g. da5fu-d:ds\\xa0.pdf).
 _ON_OFF_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fu-d[:_\-]ds?$")
 _MOD_24_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fu24-a[:_\-]as?$")
-_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
+_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu(?!q)")
 # sa5fu-ds_dst | SA5FU-DS_DST | sa5fu-ds (RU DS-only)
 _SAFU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?:-ds(?P<dst>[_-]?dst)?)?$")
-_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?!q)")
 # da2mu-a_as | da4_6mu-d_ds | da8_16_24_32mu24-a_as | da8_16_24mqu230-d_ds
 _DAMU_STEM = re.compile(
     r"(?i)^da(?P<nms>\d+(?:_\d+)*)mu(?P<volt>24|230)?-(?P<kind>a_as|d_ds)$",

@@ -36,7 +36,7 @@ from catalog.etl.tech_copy import (
 )
 from catalog.models import SKU, Product
 
-_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
+_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu(?!q)")
 _DAFU_PRODUCT = re.compile(r"(?i)dafu")
 
 AttrRow = tuple[str, str, str, str, str]

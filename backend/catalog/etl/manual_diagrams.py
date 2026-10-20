@@ -48,8 +48,8 @@ DiagramKind = Literal[
 ]
 Edition = Literal["on_off", "modulating_24"]
 
-_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
-_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu(?!q)")
+_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?!q)")
 _RENDER_SCALE = 3.0
 
 # Idempotent CDN-style keys (URLField-valid); files are local media, not fetched.
@@ -228,37 +228,102 @@ def crop_modulating_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Imag
     return _trim_near_white(wiring), _trim_near_white(dimensions)
 
 
+def _skip_hanging_rule(
+    page: Image.Image,
+    *,
+    left: int,
+    right: int,
+    top: int,
+) -> int:
+    """Move ``top`` below a solid black underline sitting under a section title.
+
+    SA7MU / SA10MU draw a second, shorter bar under «Габаритные размеры».
+    It is too narrow to count as a section title, so a crop that starts a few
+    pixels under the title still includes it. A 1–2 px dimension line stays.
+    """
+    width, height = page.size
+    right = min(right, width)
+    if right - left < 40 or top >= height - 4:
+        return top
+    window = max(24, int(height * 0.04))
+    min_thick = max(8, int(height * 0.008))
+    near = max(6, int(height * 0.012))
+    y1 = min(height, top + window)
+    column = page.crop((left, top, right, y1))
+    col_w, col_h = column.size
+    if col_h < min_thick:
+        return top
+    pixels = cast(Any, column.load())
+    min_run = int(col_w * 0.18)
+    stray = max(4, int(col_w * 0.02))
+    rule_rows: list[int] = []
+    for y in range(col_h):
+        run = best = dark = 0
+        for x in range(col_w):
+            red, green, blue = pixels[x, y][:3]
+            if red < 40 and green < 40 and blue < 40:
+                dark += 1
+                run += 1
+                if run > best:
+                    best = run
+            else:
+                run = 0
+        if best >= min_run and dark - best <= stray:
+            rule_rows.append(y)
+    if not rule_rows or rule_rows[0] > near:
+        return top
+    end = rule_rows[0]
+    for y in rule_rows[1:]:
+        if y <= end + 2:
+            end = y
+        else:
+            break
+    if end - rule_rows[0] + 1 < min_thick:
+        return top
+    return min(height - 1, top + end + 2)
+
+
 def crop_safu_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
     """Crop wiring + dimensions from the right column of an SA..FU/MU page-2.
 
     Layout (landscape): left = ТТХ table; right = Wiring → Dimensions → next.
     Black section titles are detected and excluded so crops do not keep a
     sliced banner at the bottom (EN) or the following section title (RU).
+    A short underline under the title (SA7MU / SA10MU) is dropped too.
     Left cut at 50% clears the ТТХ table edge that leaks at 48%.
+    Leftover paper is trimmed to the ink.
     """
     width, height = page.size
     left = int(width * 0.50)
     right = width - 10
 
+    def _pack(
+        wiring_top: int,
+        wiring_bot: int,
+        dims_top: int,
+        dims_bot: int,
+    ) -> tuple[Image.Image, Image.Image]:
+        wiring = page.crop((left, wiring_top, right, wiring_bot))
+        dimensions = page.crop((left, dims_top, right, dims_bot))
+        return _trim_near_white(wiring), _trim_near_white(dimensions)
+
     def _fallback() -> tuple[Image.Image, Image.Image]:
-        wiring = page.crop((left, int(0.12 * height), right, int(0.318 * height)))
-        dimensions = page.crop((left, int(0.37 * height), right, int(0.618 * height)))
-        return wiring, dimensions
+        wiring_top = _skip_hanging_rule(page, left=left, right=right, top=int(0.12 * height))
+        dims_top = _skip_hanging_rule(page, left=left, right=right, top=int(0.37 * height))
+        return _pack(wiring_top, int(0.318 * height), dims_top, int(0.618 * height))
 
     # Title bars are ~40px; ignore thinner ink runs in the drawing.
     bands = _right_column_black_bands(page, left=left, min_band_px=36)
     if len(bands) >= 2:
-        wiring_top = bands[0][1] + 6
+        wiring_top = _skip_hanging_rule(page, left=left, right=right, top=bands[0][1] + 6)
         wiring_bot = max(wiring_top + 40, bands[1][0] - 4)
-        dims_top = bands[1][1] + 6
+        dims_top = _skip_hanging_rule(page, left=left, right=right, top=bands[1][1] + 6)
         if len(bands) >= 3:
             dims_bot = max(dims_top + 40, bands[2][0] - 4)
         else:
             dims_bot = int(0.62 * height)
         if wiring_bot > wiring_top + 20 and dims_bot > dims_top + 20:
-            wiring = page.crop((left, wiring_top, right, wiring_bot))
-            dimensions = page.crop((left, dims_top, right, dims_bot))
-            return wiring, dimensions
+            return _pack(wiring_top, wiring_bot, dims_top, dims_bot)
 
     return _fallback()
 
@@ -1585,8 +1650,8 @@ def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
     if not manuals_dir.is_dir():
         return None
     for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
-        nm = parse_hvd_f_manual_stem(path.name)
-        if nm == series_nm:
+        parsed = parse_hvd_f_manual_stem(path.name)
+        if parsed is not None and parsed[0] == series_nm:
             return path
     return None
 

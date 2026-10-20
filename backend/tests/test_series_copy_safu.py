@@ -22,6 +22,7 @@ def test_parse_safu_torque_nm() -> None:
     assert parse_safu_torque_nm("SA5FU24-DS") == 5
     assert parse_safu_torque_nm("sa10fu230-dst") == 10
     assert parse_safu_torque_nm("DA5FU24-D") is None
+    assert parse_safu_torque_nm("SA10FQU24-DS") is None
 
 
 def test_safu_aux_spdt_is_two() -> None:
