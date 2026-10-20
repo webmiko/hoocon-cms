@@ -59,8 +59,9 @@ else
 fi
 
 echo "${STAMP}" > "${DEST}/COMPLETED"
-echo "==> prune older than ${RETENTION_DAYS} days"
-find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" \
-  -exec rm -rf {} +
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup-retention.sh"
+echo "==> prune backups older than ${RETENTION_DAYS} days (keep newest complete)"
+hoocon_prune_backups "${BACKUP_ROOT}" "${RETENTION_DAYS}" 3
 
 echo "Backup finished: ${DEST}"

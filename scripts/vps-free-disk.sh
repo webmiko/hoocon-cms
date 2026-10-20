@@ -26,8 +26,10 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ssh-trust.sh"
 hoocon_ssh_trust
 
 echo "Free disk on ${SSH_TARGET} (need >= ${DISK_MIN_FREE_MB} MiB free on /)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s <<EOF
 set -euo pipefail
+$(cat "${SCRIPT_DIR}/backup-retention.sh")
 MIN_MB=${DISK_MIN_FREE_MB}
 DEPLOY_PATH="${DEPLOY_PATH}"
 BACKUP_ROOT="\${DEPLOY_PATH}/backups"
@@ -50,13 +52,11 @@ journalctl --vacuum-size=200M 2>/dev/null || true
 find /var/log -type f -name '*.gz' -mtime +14 -delete 2>/dev/null || true
 apt-get clean 2>/dev/null || true
 
-# Old nginx site backups and local DB/media backups (safe retention).
+# Old nginx site backups and local DB/media backups.
+# Incomplete dirs older than the window go; the newest complete copies stay.
 find /etc/nginx/sites-available -maxdepth 1 -name 'hoocon.bak.*' -mtime +7 \
   -delete 2>/dev/null || true
-if [[ -d "\${BACKUP_ROOT}" ]]; then
-  find "\${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+\${RETENTION_DAYS}" \
-    -exec rm -rf {} + 2>/dev/null || true
-fi
+hoocon_prune_backups "\${BACKUP_ROOT}" "\${RETENTION_DAYS}" 3
 
 echo "=== df after ==="
 df -h /

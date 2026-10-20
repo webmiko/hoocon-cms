@@ -10,6 +10,9 @@
 #      DEPLOY_PATH, BACKUP_ROOT, RETENTION_DAYS, MONITOR_LOG_MAX_MB
 set -euo pipefail
 
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup-retention.sh"
+
 MODE="${1:-light}"
 DISK_PATH="${DISK_PATH:-/}"
 DISK_TIGHT_PCT="${DISK_TIGHT_PCT:-90}"
@@ -67,11 +70,8 @@ run_aggressive_cleanup() {
   find /etc/nginx/sites-available -maxdepth 1 -name 'hoocon.bak.*' -mtime +7 \
     -delete 2>/dev/null || true
 
-  echo "==> backup retention (${RETENTION_DAYS}d)"
-  if [[ -d "${BACKUP_ROOT}" ]]; then
-    find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" \
-      -exec rm -rf {} + 2>/dev/null || true
-  fi
+  echo "==> backup retention (${RETENTION_DAYS}d, keep newest complete)"
+  hoocon_prune_backups "${BACKUP_ROOT}" "${RETENTION_DAYS}" 3
 
   if [[ -f "${MONITOR_LOG}" ]]; then
     local max_bytes=$((MONITOR_LOG_MAX_MB * 1024 * 1024))
