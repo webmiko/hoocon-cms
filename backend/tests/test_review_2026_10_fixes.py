@@ -44,6 +44,15 @@ def test_search_nul_is_bad_request_not_server_error(client) -> None:
     assert response.status_code == 400
 
 
+def test_query_int_rejects_unicode_digits() -> None:
+    """«²».isdigit() истинно, int() падает. Идентификатор из query так не разбирается."""
+    from config.query_int import query_int
+
+    assert query_int("²") is None
+    assert query_int("12") == 12
+    assert query_int("12\x00") is None
+
+
 @pytest.mark.django_db
 def test_stale_queued_email_is_handed_back_to_the_broker() -> None:
     """QUEUED старше окна отправки ставится в брокер снова. Свежая отправка — нет."""
@@ -319,3 +328,25 @@ def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:
     assert not drop_old.exists()
     assert not drop_partial.exists()
     assert fresh.is_dir()
+
+
+@pytest.mark.django_db
+def test_admin_message_poll_accepts_a_unicode_digit(client, django_user_model) -> None:
+    """?after=² в опросе чата — пустой хвост, не 500."""
+    from django.contrib.auth.models import Permission
+
+    from supportchat.models import Channel, Conversation
+
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="after-superscript")
+    staff = django_user_model.objects.create_user(
+        username="chat-poll",
+        password="test-pass-not-secret",
+        is_staff=True,
+    )
+    staff.user_permissions.add(
+        Permission.objects.get(codename="view_conversation", content_type__app_label="supportchat"),
+    )
+    client.force_login(staff)
+    response = client.get(f"/admin/supportchat/conversation/{conv.pk}/messages/?after=²")
+    assert response.status_code == 200
+    assert response.json()["messages"] == []
