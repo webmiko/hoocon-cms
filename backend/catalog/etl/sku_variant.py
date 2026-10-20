@@ -479,8 +479,8 @@ _IMAGE_THERMAL = re.compile(
 _ALT_SKU_IN_PARENS = re.compile(r"\(([a-z0-9._-]+)\)\s*$", re.IGNORECASE)
 _SA_CODE = re.compile(r"(?i)^sa\d")
 _THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
-# HVD24ST-3F / HVD24SX-10F — thermal is ``ST`` or ``SX`` before ``-{nm}F``.
-_THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)(?:st|sx)-\d+f$")
+# HVD24ST-3F — SAF72 TS1+TS2 pack; SX is duct TS2 only (see sku_code_is_hvdf_sx).
+_THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)st-\d+f$")
 _HVDF_SX = re.compile(r"(?i)^hvd(?:24|230)sx-\d+f$")
 
 
@@ -498,8 +498,9 @@ def hvdf_manual_thermal_kind(sku_code: str | None) -> str:
 def sku_code_is_thermal(sku_code: str | None) -> bool:
     """True when the Hoocon article is a thermal edition.
 
-    Recognizes ``DST`` / ``-T`` suffixes and HVD-…F ``ST`` editions
-    (``HVD24ST-3F``).
+    Recognizes ``DST`` / ``-T`` suffixes and HVD-…F ``ST`` (SAF72) editions
+    (``HVD24ST-3F``). ``SX`` (duct TS2) is not thermal here — manual gallery
+    and SAF72 tiles use the plain body photo.
 
     Args:
         sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``, ``HVD230ST-5F``).

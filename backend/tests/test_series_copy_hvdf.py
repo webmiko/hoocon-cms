@@ -70,6 +70,7 @@ def test_hvdf_code_helpers() -> None:
     assert hvdf_sku_code(voltage="24", aux="SX", torque_nm=10) == "HVD24SX-10F"
     assert 3 in TORQUE_SPECS and 5 in TORQUE_SPECS and 10 in TORQUE_SPECS
     assert sku_code_is_thermal("HVD24ST-3F") is True
+    assert sku_code_is_thermal("HVD24SX-10F") is False
     assert sku_code_is_thermal("HVD24S-3F") is False
     assert aux_spdt_count_from_sku("HVD24ST-3F") == 2
     assert aux_spdt_count_from_sku("HVD230S-5F") == 2

@@ -606,6 +606,7 @@ def test_sku_code_is_thermal_suffix_only() -> None:
     assert sku_code_is_thermal("SA5FU24DST") is True
     assert sku_code_is_thermal("HVD24ST-3F") is True
     assert sku_code_is_thermal("HVD230ST-5F") is True
+    assert sku_code_is_thermal("HVD24SX-10F") is False
     assert sku_code_is_thermal("HVD24S-3F") is False
     assert sku_code_is_thermal("DSTXXX") is False
     assert sku_code_is_thermal("XDSTX") is False
