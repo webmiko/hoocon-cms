@@ -59,10 +59,21 @@ jobs:
   check:
     name: check (pytest + lint)
     runs-on: ubuntu-latest
+    # Explicit permissions replace the repo default (read). actions:write keeps
+    # the setup/cache steps; packages:read lets this job pull the private mirror.
+    permissions:
+      actions: write
+      contents: read
+      packages: read
     services:
       postgres:
-        # Docker Hub rate-limits anonymous pulls from shared runner IPs.
-        image: public.ecr.aws/docker/library/postgres:16-alpine
+        # Runs 707, 810, 811: anonymous pulls of postgres:16-alpine, including
+        # public.ecr.aws, die with «toomanyrequests» before pytest starts.
+        # mirror-postgres.yml publishes this tag; a failed refresh keeps the old one.
+        image: ghcr.io/${{ github.repository }}/postgres:16-alpine
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: hoocon
           POSTGRES_PASSWORD: ci-db-password

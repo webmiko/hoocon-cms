@@ -1,0 +1,72 @@
+# Copy postgres:16-alpine into this repo's GHCR so CI check never pulls Docker Hub.
+#
+# Shared GitHub runner IPs hit «toomanyrequests: Data limit exceeded» on
+# docker.io and on public.ecr.aws (runs 707, 810, 811). A failed refresh
+# leaves the previous tag in place, so check keeps using the last good copy.
+name: Mirror Postgres image
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monthly. Public repo: Actions minutes are not billed.
+    - cron: "17 5 1 * *"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: mirror-postgres
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: mirror postgres:16-alpine to GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull upstream postgres:16-alpine
+        id: pull
+        run: |
+          set -euo pipefail
+          sources=(
+            mirror.gcr.io/library/postgres:16-alpine
+            public.ecr.aws/docker/library/postgres:16-alpine
+            docker.io/library/postgres:16-alpine
+          )
+          src=""
+          for image in "${sources[@]}"; do
+            for attempt in 1 2 3; do
+              if docker pull "$image"; then
+                src="$image"
+                break 2
+              fi
+              echo "pull failed: ${image} attempt ${attempt}" >&2
+              sleep $((attempt * 20))
+            done
+          done
+          if [[ -z "${src}" ]]; then
+            echo "Could not pull postgres:16-alpine from any registry" >&2
+            exit 1
+          fi
+          echo "src=${src}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push mirror
+        env:
+          SRC: ${{ steps.pull.outputs.src }}
+        run: |
+          set -euo pipefail
+          dest="ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')/postgres:16-alpine"
+          docker build --pull=false --provenance=false --sbom=false -t "${dest}" - <<EOF
+          FROM ${SRC}
+          LABEL org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"
+          LABEL org.opencontainers.image.description="CI mirror of postgres:16-alpine"
+          EOF
+          docker push "${dest}"
+          echo "Pushed ${dest} from ${SRC}"
