@@ -39,7 +39,8 @@ class Command(BaseCommand):
             f"{prefix}montage={summary['montage']} emergency={summary['emergency']} "
             f"saf72_photo={summary['saf72_photo']} saf72_schema={summary['saf72_schema']} "
             f"demoted_tilda={summary['demoted_tilda_montage']} "
-            f"demoted_emergency_non_qa={summary['demoted_emergency_non_qa']}",
+            f"demoted_emergency_non_qa={summary['demoted_emergency_non_qa']} "
+            f"unpublished_hvdf_montage={summary['unpublished_hvdf_montage']}",
         )
         if summary.get("missing"):
             self.stdout.write(f"missing: {', '.join(summary['missing'])}")

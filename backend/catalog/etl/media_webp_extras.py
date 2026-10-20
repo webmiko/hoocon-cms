@@ -132,6 +132,29 @@ def _upsert_tile(
     return action
 
 
+def _unpublish_hvdf_montage(*, dry_run: bool) -> int:
+    """Hide montage tiles on HVD-F cards. The HVA sheet is the wrong diagram."""
+    from catalog.etl.series_copy_hvdf import parse_hvdf_torque_nm
+
+    qs = (
+        ProductImage.objects.filter(is_published=True)
+        .filter(
+            Q(source_url__icontains="montazhnaya_sxema")
+            | Q(alt__icontains="монтажная схема")
+            | Q(alt__icontains="схема монтажная"),
+        )
+        .select_related("sku")
+    )
+    ids = [row.pk for row in qs if parse_hvdf_torque_nm(row.sku.sku_code) is not None]
+    if ids and not dry_run:
+        # hidden_by_editor blocks a later media upsert from publishing the tile again.
+        ProductImage.objects.filter(pk__in=ids).update(
+            is_published=False,
+            hidden_by_editor=True,
+        )
+    return len(ids)
+
+
 def _demote_tilda_montage(sku: SKU, *, dry_run: bool) -> int:
     """Unpublish Tilda montage tiles once a local montage exists.
 
@@ -219,8 +242,16 @@ def _scan_montages(root: Path) -> list[_MontageShot]:
 
 
 def _pick_montage(sku_code: str, shots: list[_MontageShot]) -> _MontageShot | None:
-    """Match HV or DA/SA montage; apply Nm / series neighbour fallbacks."""
+    """Match HV or DA/SA montage; apply Nm / series neighbour fallbacks.
+
+    HVD-F (spring-return smoke) has no HVA mounting sheet. ``hv-ms`` shows a
+    CW/CCW slider those actuators do not have.
+    """
+    from catalog.etl.series_copy_hvdf import parse_hvdf_torque_nm
+
     code = (sku_code or "").strip().casefold().replace(" ", "")
+    if parse_hvdf_torque_nm(code) is not None:
+        return None
     if re.match(r"hv[ad]", code):
         for shot in shots:
             if shot.kind == "hv":
@@ -282,6 +313,7 @@ def apply_media_webp_extras(
         "saf72_schema": 0,
         "demoted_tilda_montage": 0,
         "demoted_emergency_non_qa": 0,
+        "unpublished_hvdf_montage": 0,
         "dry_run": dry_run,
         "photo_root": str(root) if root else "",
         "missing": [],
@@ -381,4 +413,5 @@ def apply_media_webp_extras(
                 summary["saf72_schema"] += 1
 
     summary["demoted_emergency_non_qa"] = _demote_emergency_on_non_qa(dry_run=dry_run)
+    summary["unpublished_hvdf_montage"] = _unpublish_hvdf_montage(dry_run=dry_run)
     return summary
