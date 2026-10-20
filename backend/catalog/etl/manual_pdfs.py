@@ -96,8 +96,12 @@ _RU_PASSPORT_SUFFIX = re.compile(
 )
 _PASSPORT_SKU_RE = re.compile(r"(?i)^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+$")
 PASSPORT_SUBDIR: Final[str] = "паспорт изделия"
-_HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?st$")
-_HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
+_HVD_F_STEM = re.compile(r"(?i)^hvd-(?P<nm>\d+)f-s[_-]?(?P<kind>st|sx)$")
+_HVD_F_CODE = re.compile(r"(?i)^hvd(?:24|230)(?P<aux>s|st|sx)-(?P<nm>\d+)f$")
+_SAFQU_STEM = re.compile(r"(?i)^sa(?P<nm>\d+)fqu(?:-ds(?P<dst>[_-]?dst)?)?$")
+_SAFQU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fqu")
+_DAFQU_STEM = re.compile(r"(?i)^da(?P<nm>\d+)fqu-d[:_\-]ds?$")
+_DAFQU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fqu")
 # hva-5 | hva-5q | hva-5uq | «HVA-5 instruction» (not hva-*p — RF-excluded)
 _HVA_STEM = re.compile(r"(?i)^hva-(?P<token>\d+(?:uq|q)?)$")
 _HVA_P_STEM = re.compile(r"(?i)^hva-(?P<token>\d+p)$")
@@ -576,6 +580,173 @@ def attach_safu_manuals(
         matches,
         warnings,
         title_for=lambda m: f"Инструкция SA{m.torque_nm}FU (DS/DST)",
+        dry_run=dry_run,
+    )
+
+
+def parse_safqu_manual_stem(stem: str) -> tuple[int, bool] | None:
+    """Parse ``sa3fqu-ds_dst`` → ``(3, True)``."""
+    clean = normalize_manual_stem(stem)
+    match = _SAFQU_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    return int(match.group("nm")), bool(match.group("dst"))
+
+
+def sku_codes_for_safqu_manual(
+    torque_nm: int,
+    sku_codes: list[str],
+    *,
+    covers_dst: bool = True,
+) -> list[str]:
+    """Filter catalog SKU codes that a SAFQU DS[/DST] manual covers."""
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _SAFQU_CODE.match(compact)
+        if match is None or int(match.group("nm")) != torque_nm:
+            continue
+        if compact.endswith("-dst"):
+            if covers_dst:
+                out.append(code)
+        elif compact.endswith("-ds"):
+            out.append(code)
+    return out
+
+
+def discover_safqu_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan for SA..FQU (fast spring-return fire) PDFs."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^sa[0-9]+fqu").values_list(
+                "sku_code",
+                flat=True,
+            ),
+        )
+    by_nm: dict[int, ManualMatch] = {}
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return [], warnings
+
+    for path in iter_manual_pdfs(manuals_dir):
+        parsed = parse_safqu_manual_stem(path.name)
+        if parsed is None:
+            if re.search(r"(?i)sa\d+fqu", path.name):
+                warnings.append(f"unrecognized SAFQU filename: {path.name!r}")
+            continue
+        torque_nm, covers_dst = parsed
+        if torque_nm in by_nm:
+            continue
+        codes = sku_codes_for_safqu_manual(
+            torque_nm,
+            sku_codes,
+            covers_dst=covers_dst,
+        )
+        if not codes:
+            warnings.append(f"no SKU for {path.name!r} (nm={torque_nm} safqu)")
+            continue
+        by_nm[torque_nm] = ManualMatch(
+            path=path,
+            torque_nm=torque_nm,
+            kind="safqu_ds_dst" if covers_dst else "safqu_ds",
+            sku_codes=tuple(codes),
+        )
+    return list(by_nm.values()), warnings
+
+
+def attach_safqu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for SAFQU SKUs from local PDFs."""
+    matches, warnings = discover_safqu_manuals(manuals_dir)
+    return _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: f"Инструкция SA{m.torque_nm}FQU (DS/DST)",
+        dry_run=dry_run,
+    )
+
+
+def parse_dafqu_manual_stem(stem: str) -> int | None:
+    """Parse ``da10fqu-d_ds`` → ``10``."""
+    clean = normalize_manual_stem(stem)
+    match = _DAFQU_STEM.fullmatch(clean)
+    if match is None:
+        return None
+    return int(match.group("nm"))
+
+
+def sku_codes_for_dafqu_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
+    """Filter DAFQU on/off D/DS articles for one Nm."""
+    out: list[str] = []
+    for code in sku_codes:
+        compact = code.strip().casefold().replace(" ", "")
+        match = _DAFQU_CODE.match(compact)
+        if match is None or int(match.group("nm")) != torque_nm:
+            continue
+        if compact.endswith("-ds") or compact.endswith("-d"):
+            out.append(code)
+    return out
+
+
+def discover_dafqu_manuals(
+    manuals_dir: Path,
+    *,
+    sku_codes: list[str] | None = None,
+) -> tuple[list[ManualMatch], list[str]]:
+    """Scan for DA..FQU (fast spring-return) PDFs."""
+    if sku_codes is None:
+        sku_codes = list(
+            SKU.objects.filter(sku_code__iregex=r"(?i)^da[0-9]+fqu").values_list(
+                "sku_code",
+                flat=True,
+            ),
+        )
+    by_nm: dict[int, ManualMatch] = {}
+    warnings: list[str] = []
+    if not manuals_dir.is_dir():
+        warnings.append(f"manuals dir missing: {manuals_dir}")
+        return [], warnings
+
+    for path in iter_manual_pdfs(manuals_dir):
+        torque_nm = parse_dafqu_manual_stem(path.name)
+        if torque_nm is None:
+            if re.search(r"(?i)da\d+fqu", path.name):
+                warnings.append(f"unrecognized DAFQU filename: {path.name!r}")
+            continue
+        if torque_nm in by_nm:
+            continue
+        codes = sku_codes_for_dafqu_manual(torque_nm, sku_codes)
+        if not codes:
+            warnings.append(f"no SKU for {path.name!r} (nm={torque_nm} dafqu)")
+            continue
+        by_nm[torque_nm] = ManualMatch(
+            path=path,
+            torque_nm=torque_nm,
+            kind="dafqu_d_ds",
+            sku_codes=tuple(codes),
+        )
+    return list(by_nm.values()), warnings
+
+
+def attach_dafqu_manuals(
+    manuals_dir: Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create/update ProductFile datasheets for DAFQU SKUs from local PDFs."""
+    matches, warnings = discover_dafqu_manuals(manuals_dir)
+    return _upsert_manual_matches(
+        matches,
+        warnings,
+        title_for=lambda m: f"Инструкция DA{m.torque_nm}FQU (D/DS)",
         dry_run=dry_run,
     )
 
@@ -1091,24 +1262,36 @@ def attach_samu_manuals(
     return summary
 
 
-def parse_hvd_f_manual_stem(stem: str) -> int | None:
-    """Parse ``hvd-5f-s_st`` → ``5``."""
+def parse_hvd_f_manual_stem(stem: str) -> tuple[int, str] | None:
+    """Parse ``hvd-5f-s_st`` → ``(5, "st")``; ``hvd-10f-s_sx`` → ``(10, "sx")``."""
     clean = normalize_manual_stem(stem)
     match = _HVD_F_STEM.fullmatch(clean)
     if match is None:
         return None
-    return int(match.group("nm"))
+    return int(match.group("nm")), match.group("kind").casefold()
 
 
-def sku_codes_for_hvd_f_manual(torque_nm: int, sku_codes: list[str]) -> list[str]:
-    """Map HVD *F manuals onto catalog ``HVD*S-{nm}F`` / ``HVD*ST-{nm}F`` only."""
+def sku_codes_for_hvd_f_manual(
+    torque_nm: int,
+    sku_codes: list[str],
+    *,
+    thermal_kind: str = "st",
+) -> list[str]:
+    """Map HVD *F manuals onto catalog ``HVD*S/ST/SX-{nm}F`` editions."""
+    kind = thermal_kind.casefold()
     out: list[str] = []
     for code in sku_codes:
         compact = code.strip().casefold().replace(" ", "")
         match = _HVD_F_CODE.fullmatch(compact)
         if match is None:
             continue
-        if int(match.group("nm")) == torque_nm:
+        if int(match.group("nm")) != torque_nm:
+            continue
+        aux = match.group("aux").casefold()
+        if kind == "sx":
+            if aux == "sx":
+                out.append(code)
+        elif aux in {"s", "st"}:
             out.append(code)
     return out
 
@@ -1121,7 +1304,9 @@ def discover_hvd_manuals(
     """Scan for HVD *F English PDFs and map to HVD-…F catalog SKUs."""
     if sku_codes is None:
         sku_codes = list(
-            SKU.objects.filter(sku_code__iregex=r"(?i)^hvd(24|230)st?-\d+f$").values_list(
+            SKU.objects.filter(
+                sku_code__iregex=r"(?i)^hvd(24|230)(?:s|st|sx)-\d+f$",
+            ).values_list(
                 "sku_code",
                 flat=True,
             ),
@@ -1138,29 +1323,35 @@ def discover_hvd_manuals(
         "HVD-*.pdf",
     )
     hvd_paths.sort(key=lambda p: (_manual_lang_rank(p), p.name.casefold()))
-    seen_nm: set[int] = set()
+    seen_keys: set[tuple[int, str]] = set()
     for path in hvd_paths:
-        torque_nm = parse_hvd_f_manual_stem(path.name)
-        if torque_nm is None:
+        parsed = parse_hvd_f_manual_stem(path.name)
+        if parsed is None:
             warnings.append(f"unrecognized HVD filename: {path.name!r}")
             continue
-        if torque_nm in seen_nm:
+        torque_nm, thermal_kind = parsed
+        key = (torque_nm, thermal_kind)
+        if key in seen_keys:
             warnings.append(
-                f"duplicate HVD manual for {torque_nm}F, skip {path.name!r}",
+                f"duplicate HVD manual for {torque_nm}F ({thermal_kind}), skip {path.name!r}",
             )
             continue
-        codes = sku_codes_for_hvd_f_manual(torque_nm, sku_codes)
+        codes = sku_codes_for_hvd_f_manual(
+            torque_nm,
+            sku_codes,
+            thermal_kind=thermal_kind,
+        )
         if not codes:
             warnings.append(
-                f"no catalog SKU for {path.name!r} (expected HVD*S-{torque_nm}F / HVD*ST-{torque_nm}F)",
+                f"no catalog SKU for {path.name!r} (expected HVD*S/ST/SX-{torque_nm}F for kind={thermal_kind})",
             )
             continue
-        seen_nm.add(torque_nm)
+        seen_keys.add(key)
         matches.append(
             ManualMatch(
                 path=path,
                 torque_nm=torque_nm,
-                kind="hvd_f_s_st",
+                kind=f"hvd_f_s_{thermal_kind}",
                 sku_codes=tuple(codes),
             ),
         )
@@ -1177,7 +1368,10 @@ def attach_hvd_manuals(
     return _upsert_manual_matches(
         matches,
         warnings,
-        title_for=lambda m: f"Инструкция HVD-{m.torque_nm}F (S/ST)",
+        title_for=lambda m: (
+            f"Инструкция HVD-{m.torque_nm}F "
+            f"({'SX' if m.kind.endswith('sx') else 'S/ST'})"
+        ),
         dry_run=dry_run,
     )
 

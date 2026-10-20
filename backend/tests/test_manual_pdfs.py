@@ -126,9 +126,10 @@ def test_sku_codes_for_hvd_f_manual_only_f_editions() -> None:
         sku_codes_for_hvd_f_manual,
     )
 
-    assert parse_hvd_f_manual_stem("hvd-5f-s_st.pdf") == 5
-    assert parse_hvd_f_manual_stem("hvd-3f-s_st.pdf") == 3
-    assert parse_hvd_f_manual_stem("HVD-5F-S_ST.pdf") == 5
+    assert parse_hvd_f_manual_stem("hvd-5f-s_st.pdf") == (5, "st")
+    assert parse_hvd_f_manual_stem("hvd-3f-s_st.pdf") == (3, "st")
+    assert parse_hvd_f_manual_stem("HVD-5F-S_ST.pdf") == (5, "st")
+    assert parse_hvd_f_manual_stem("hvd-10f-s_sx.pdf") == (10, "sx")
     codes = [
         "HVD24-5",
         "HVD24S-5",
@@ -146,6 +147,15 @@ def test_sku_codes_for_hvd_f_manual_only_f_editions() -> None:
         "HVD230ST-5F",
     ]
     assert sku_codes_for_hvd_f_manual(3, codes) == ["HVD24S-3F"]
+    sx_codes = ["HVD24SX-10F", "HVD230SX-10F", "HVD24S-10F", "HVD24ST-10F"]
+    assert sku_codes_for_hvd_f_manual(10, sx_codes, thermal_kind="sx") == [
+        "HVD24SX-10F",
+        "HVD230SX-10F",
+    ]
+    assert sku_codes_for_hvd_f_manual(10, sx_codes, thermal_kind="st") == [
+        "HVD24S-10F",
+        "HVD24ST-10F",
+    ]
 
 
 def test_discover_hvd_prefers_ru_uppercase(tmp_path: Path) -> None:

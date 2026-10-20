@@ -20,15 +20,15 @@ from catalog.models import SKU, AttributeValue, Category, Product
 
 
 @pytest.mark.django_db
-def test_ensure_hvdf_catalog_creates_eight_skus() -> None:
-    """Two products × four editions (24/230 × S/ST)."""
+def test_ensure_hvdf_catalog_creates_edition_skus() -> None:
+    """3F/5F: four editions; 10F: six (adds SX duct thermal)."""
     Category.objects.create(
         name="Дымоудаление",
         slug="elektroprivody-dlya-klapanov-dymoudaleniya",
     )
     stats = ensure_hvdf_catalog(dry_run=False)
-    assert stats["products_created"] == 2
-    assert stats["skus_created"] == 8
+    assert stats["products_created"] == 3
+    assert stats["skus_created"] == 14
     assert SKU.objects.filter(sku_code="HVD24S-3F").exists()
     assert SKU.objects.filter(sku_code="HVD230ST-5F").exists()
     product = Product.objects.get(slug=product_slug_for_nm(3))
@@ -39,13 +39,31 @@ def test_ensure_hvdf_catalog_creates_eight_skus() -> None:
     assert again["skus_created"] == 0
 
 
+@pytest.mark.django_db
+def test_hvdf_10f_specs_match_en_manual() -> None:
+    """HVD-10F EN: 100 s stroke, 5/3,5 W, large body 249,6×101,2×60,6."""
+    Category.objects.create(
+        name="Дымоудаление",
+        slug="elektroprivody-dlya-klapanov-dymoudaleniya",
+    )
+    apply_hvdf_enrichment(dry_run=False)
+    sku = SKU.objects.get(sku_code="HVD24SX-10F")
+    row = TORQUE_SPECS[10]
+    assert "100" in row["running-time"]
+    assert "3,5" in row["power"]
+    assert "249,6" in row["dimensions"]
+    area = AttributeValue.objects.get(sku=sku, attribute__slug="damper-area").value
+    assert area == damper_area_for_nm(10)
+
+
 def test_hvdf_code_helpers() -> None:
     """Parsing and edition builders match manual article codes."""
     assert parse_hvdf_torque_nm("HVD24ST-3F") == 3
     assert parse_hvdf_torque_nm("HVD24-5") is None
     assert is_hvdf_sku("HVD230S-5F") is True
-    assert hvdf_sku_code(voltage="24", thermal=True, torque_nm=5) == "HVD24ST-5F"
-    assert 3 in TORQUE_SPECS and 5 in TORQUE_SPECS
+    assert hvdf_sku_code(voltage="24", aux="ST", torque_nm=5) == "HVD24ST-5F"
+    assert hvdf_sku_code(voltage="24", aux="SX", torque_nm=10) == "HVD24SX-10F"
+    assert 3 in TORQUE_SPECS and 5 in TORQUE_SPECS and 10 in TORQUE_SPECS
     assert sku_code_is_thermal("HVD24ST-3F") is True
     assert sku_code_is_thermal("HVD24S-3F") is False
     assert aux_spdt_count_from_sku("HVD24ST-3F") == 2

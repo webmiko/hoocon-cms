@@ -161,8 +161,8 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
             aux = ctrl == "ds"
         return SkuVariant(voltage=voltage, control=control, aux_switch=aux, code=code)
 
-    # HVD24S-3F / HVD230ST-5F — fire/smoke spring-return (S / ST + NmF).
-    if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
+    # HVD24S-3F / HVD230ST-5F / HVD24SX-10F — fire/smoke spring-return.
+    if re.fullmatch(r"hvd(?:24|230)(?:s|st|sx)-\d+f", code):
         control = "on_off"
         aux = True
     # HVD/HVA …QX — capacitor fail-safe (before bare Q / std patterns).
@@ -479,8 +479,8 @@ _IMAGE_THERMAL = re.compile(
 _ALT_SKU_IN_PARENS = re.compile(r"\(([a-z0-9._-]+)\)\s*$", re.IGNORECASE)
 _SA_CODE = re.compile(r"(?i)^sa\d")
 _THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
-# HVD24ST-3F — thermal is ``ST`` before ``-{nm}F`` (not a trailing -T).
-_THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)st-\d+f$")
+# HVD24ST-3F / HVD24SX-10F — thermal is ``ST`` or ``SX`` before ``-{nm}F``.
+_THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)(?:st|sx)-\d+f$")
 
 
 def sku_code_is_thermal(sku_code: str | None) -> bool:
