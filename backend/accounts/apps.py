@@ -36,10 +36,12 @@ class AccountsConfig(AppConfig):
         from accounts.passkey_views import install_admin_passkeys
         from config.admin_otp_views import install_admin_email_otp
         from config.admin_toggle import install_admin_boolean_toggles
+        from config.client_ip import install_rate_limit_identity
 
         install_admin_boolean_toggles()
         install_admin_email_otp()
         install_admin_passkeys()
+        install_rate_limit_identity()
         post_migrate.connect(
             _resync_staff_groups_on_post_migrate,
             dispatch_uid="accounts.resync_staff_groups",

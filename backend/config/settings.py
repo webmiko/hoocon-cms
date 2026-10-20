@@ -211,7 +211,7 @@ ADMIN_RECOVERY_LOCK_SECONDS = int(os.getenv("ADMIN_RECOVERY_LOCK_SECONDS", "900"
 # Proxies that append to X-Forwarded-For (host nginx). Shared by axes,
 # DRF throttles and OTP quotas via config.client_ip.
 TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "1"))
-AXES_CLIENT_IP_CALLABLE = "config.client_ip.client_ip"
+AXES_CLIENT_IP_CALLABLE = "config.client_ip.client_rate_key"
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
