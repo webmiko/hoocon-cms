@@ -63,7 +63,9 @@ jobs:
         run: |
           set -euo pipefail
           dest="ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')/postgres:16-alpine"
-          docker build --pull=false --provenance=false --sbom=false -t "${dest}" - <<EOF
+          # ubuntu-latest is amd64. A Mac seed of this tag is arm64 and dies
+          # in CI with «exec format error».
+          docker build --pull=false --platform linux/amd64 --provenance=false --sbom=false -t "${dest}" - <<EOF
           FROM ${SRC}
           LABEL org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"
           LABEL org.opencontainers.image.description="CI mirror of postgres:16-alpine"

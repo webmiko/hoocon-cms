@@ -82,6 +82,7 @@ def test_postgres_mirror_publishes_ci_image_without_running_every_push() -> None
     assert "schedule" in triggers
     assert data["permissions"]["packages"] == "write"
     assert "cancel-in-progress: false" in text
+    assert "--platform linux/amd64" in text
     dest = "ghcr.io/$(echo \"${GITHUB_REPOSITORY}\" | tr '[:upper:]' '[:lower:]')/postgres:16-alpine"
     assert dest in text
     assert 'org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"' in text
