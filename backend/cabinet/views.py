@@ -689,6 +689,8 @@ class AccountDocumentsZipView(ClientApiView):
         import tempfile
         import zipfile
 
+        from django.core.exceptions import ValidationError
+
         from catalog.validators import sanitize_upload_filename
 
         client = _client_for(request)
@@ -709,7 +711,10 @@ class AccountDocumentsZipView(ClientApiView):
         used_names: set[str] = set()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for doc in docs:
-                base = sanitize_upload_filename(doc.title or f"document-{doc.pk}")
+                try:
+                    base = sanitize_upload_filename(doc.title or f"document-{doc.pk}")
+                except ValidationError:
+                    base = f"document-{doc.pk}"
                 name = base
                 n = 2
                 while name in used_names:

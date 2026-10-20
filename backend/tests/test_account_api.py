@@ -924,9 +924,6 @@ def test_quote_pdf_endpoint_owner_only() -> None:
 
 
 @pytest.mark.django_db
-
-
-@pytest.mark.django_db
 def test_account_quote_pdf_hides_prices_when_the_cabinet_flag_is_off(settings) -> None:
     """Живой PDF кабинета передаёт CABINET_SHOW_PRICES в генератор, не только JSON."""
     from decimal import Decimal
@@ -947,6 +944,8 @@ def test_account_quote_pdf_hides_prices_when_the_cabinet_flag_is_off(settings) -
     assert response.status_code == 200
     assert render.call_args.kwargs["include_prices"] is False
 
+
+@pytest.mark.django_db
 def test_documents_zip_owner_only() -> None:
     """ZIP export streams own documents under their titles."""
     import io
@@ -999,6 +998,30 @@ def test_documents_zip_is_bounded_and_skips_missing_files(monkeypatch: pytest.Mo
     too_big = api.get("/api/account/documents/zip/")
     assert too_big.status_code == 413
     assert "по отдельности" in too_big.json()["detail"]
+
+
+@pytest.mark.django_db
+def test_documents_zip_survives_a_dotdot_title() -> None:
+    """Заголовок «../» не роняет скачивание архива кабинета."""
+    import io
+    import zipfile
+
+    from django.core.files.base import ContentFile
+
+    person = _client_with_data("zipname@acme.test")
+    doc = person.documents.first()
+    assert doc is not None
+    doc.file.save("invoice.pdf", ContentFile(b"%PDF-1.4\n"), save=True)
+    doc.title = "../secret.pdf"
+    doc.save(update_fields=["title"])
+    api = APIClient()
+    _register(api, "zipname@acme.test")
+    response = api.get("/api/account/documents/zip/")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content))) as zf:
+        names = zf.namelist()
+    assert names
+    assert all(".." not in name and "/" not in name for name in names)
 
 
 def test_documents_zip_has_own_throttle() -> None:
@@ -1103,8 +1126,6 @@ def test_done_lead_with_quote_shows_quote_status_and_manager_name(settings) -> N
     assert row["manager_name"] == "Анна Смирнова"
     assert row["manager_phone"] == "+7 495 111-22-33"
     assert "anna@hoocon.test" not in row["manager_name"]
-
-
 
 
 @pytest.mark.django_db
