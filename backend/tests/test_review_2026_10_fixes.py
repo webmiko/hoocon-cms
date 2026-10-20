@@ -53,6 +53,14 @@ def test_query_int_rejects_unicode_digits() -> None:
     assert query_int("12\x00") is None
 
 
+def test_uis_infinite_talk_duration_is_zero() -> None:
+    """int(float('inf')) — OverflowError, вебхук UIS не должен отвечать 500."""
+    from crm.novosystem import _talk_seconds
+
+    assert _talk_seconds(float("inf")) == 0
+    assert _talk_seconds("inf") == 0
+
+
 @pytest.mark.django_db
 def test_stale_queued_email_is_handed_back_to_the_broker() -> None:
     """QUEUED старше окна отправки ставится в брокер снова. Свежая отправка — нет."""
