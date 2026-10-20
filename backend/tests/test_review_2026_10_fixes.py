@@ -222,6 +222,24 @@ def test_cabinet_pdf_hides_prices_when_the_flag_is_off(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_rma_photo_requires_view_permission(client, django_user_model) -> None:
+    """Скачивание фото рекламации без view_rmacase — 403, как у соседних файлов."""
+    from cabinet.models import RmaCase
+    from crm.models import Client
+
+    person = Client.objects.create(name="Клиент", email="rma-photo@acme.test")
+    case = RmaCase.objects.create(client=person, subject="Гудит")
+    staff = django_user_model.objects.create_user(
+        username="rma-outsider",
+        password="test-pass-not-secret",
+        is_staff=True,
+    )
+    client.force_login(staff)
+    response = client.get(f"/admin/cabinet/rmacase/{case.pk}/photo/")
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_manual_refresh_does_not_publish_a_non_pdf() -> None:
     """ETL не кладёт на сайт файл без PDF-magic, даже если имя заканчивается на .pdf."""
     from catalog.etl.file_refresh import publishable_pdf, refresh_product_file

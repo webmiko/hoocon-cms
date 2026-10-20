@@ -187,7 +187,9 @@ class RmaCaseAdmin(OpenChangeLinkMixin, ModelAdmin):
         return custom + urls
 
     def photo_view(self, request: HttpRequest, pk: int) -> FileResponse:
-        """Serve the photo only when the client is in manager scope."""
+        """Serve the photo only with view permission and the client in scope."""
+        if not request.user.has_perm("cabinet.view_rmacase"):
+            raise PermissionDenied
         obj = get_object_or_404(RmaCase, pk=pk)
         if not obj.photo:
             raise Http404
