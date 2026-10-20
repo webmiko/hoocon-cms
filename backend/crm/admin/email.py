@@ -143,20 +143,25 @@ class EmailMessageAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         request: HttpRequest,
         queryset: Any,
     ) -> None:
-        """Enqueue draft/failed messages (skip already queued/sent).
+        """Enqueue drafts, failures, and QUEUED rows whose send went stale.
 
         Uses transaction.on_commit so Celery never races the DB commit.
         """
         from crm.services import enqueue_crm_email
+        from crm.tasks import email_send_is_stale
 
-        allowed = queryset.filter(
-            status__in=(EmailStatus.DRAFT, EmailStatus.FAILED),
-        )
         count = 0
-        for msg in allowed:
+        for msg in queryset:
+            statuses: tuple[str, ...] = (EmailStatus.DRAFT, EmailStatus.FAILED)
+            if msg.status == EmailStatus.QUEUED and email_send_is_stale(msg.pk):
+                statuses = (EmailStatus.QUEUED,)
+            elif msg.status == EmailStatus.SENDING and email_send_is_stale(msg.pk):
+                statuses = (EmailStatus.SENDING,)
+            elif msg.status not in statuses:
+                continue
             updated = EmailMessage.objects.filter(
                 pk=msg.pk,
-                status__in=(EmailStatus.DRAFT, EmailStatus.FAILED),
+                status__in=statuses,
             ).update(status=EmailStatus.QUEUED)
             if not updated:
                 continue

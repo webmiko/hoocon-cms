@@ -589,6 +589,12 @@ def test_email_admin_queue_send_skips_already_queued(
         body="Body",
         status=EmailStatus.QUEUED,
     )
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    from crm.tasks import _EMAIL_SEND_STAMP
+
+    cache.set(_EMAIL_SEND_STAMP.format(pk=queued.pk), timezone.now().timestamp(), timeout=3600)
     client.force_login(user)
     with patch("crm.tasks.send_crm_email.delay") as delay_mock:
         response = client.post(

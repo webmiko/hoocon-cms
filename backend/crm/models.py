@@ -213,6 +213,7 @@ class EmailStatus(models.TextChoices):
 
     DRAFT = "draft", "Черновик"
     QUEUED = "queued", "В очереди"
+    SENDING = "sending", "Отправка"
     SENT = "sent", "Отправлено"
     FAILED = "failed", "Ошибка"
     RECEIVED = "received", "Получено"

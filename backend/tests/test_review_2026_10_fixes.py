@@ -38,6 +38,125 @@ def test_public_lead_rejects_call_stub_email(client) -> None:
 
 
 @pytest.mark.django_db
+def test_stale_queued_email_is_handed_back_to_the_broker() -> None:
+    """QUEUED старше окна отправки ставится в брокер снова. Свежая отправка — нет."""
+    from crm.models import Client, EmailMessage, EmailStatus
+    from crm.tasks import _EMAIL_SEND_STAMP, requeue_stale_crm_emails, send_crm_email
+
+    assert send_crm_email.acks_late is True
+    person = Client.objects.create(name="Анна", email="anna@client.test")
+    stuck = EmailMessage.objects.create(
+        client=person,
+        to_email="anna@client.test",
+        subject="КП",
+        body="Текст",
+        status=EmailStatus.QUEUED,
+    )
+    cache.set(
+        _EMAIL_SEND_STAMP.format(pk=stuck.pk),
+        (timezone.now() - timedelta(hours=1)).timestamp(),
+        timeout=3600,
+    )
+    with patch("crm.tasks.send_crm_email.delay") as delay:
+        assert requeue_stale_crm_emails() == 1
+    delay.assert_called_once_with(stuck.pk)
+
+    cache.set(_EMAIL_SEND_STAMP.format(pk=stuck.pk), timezone.now().timestamp(), timeout=3600)
+    with patch("crm.tasks.send_crm_email.delay") as delay:
+        assert requeue_stale_crm_emails() == 0
+    delay.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_crash_after_smtp_does_not_send_a_second_copy(settings) -> None:
+    """Воркер умер после SMTP и до «отправлено» — второе письмо не уходит, очередь его не ставит."""
+    from django.core import mail
+
+    from crm.models import Client, EmailMessage, EmailStatus
+    from crm.tasks import _EMAIL_SEND_STAMP, requeue_stale_crm_emails, send_crm_email
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    person = Client.objects.create(name="Анна", email="anna-once@client.test")
+    msg = EmailMessage.objects.create(
+        client=person,
+        to_email="anna-once@client.test",
+        subject="КП",
+        body="Текст",
+        status=EmailStatus.QUEUED,
+    )
+    cache.set(
+        _EMAIL_SEND_STAMP.format(pk=msg.pk),
+        (timezone.now() - timedelta(hours=1)).timestamp(),
+        timeout=3600,
+    )
+
+    def _die(self: object) -> None:
+        raise RuntimeError("worker lost after smtp")
+
+    with patch("crm.models.EmailMessage.mark_sent", _die):
+        with pytest.raises(RuntimeError, match="worker lost after smtp"):
+            send_crm_email.run(msg.pk)
+
+    msg.refresh_from_db()
+    assert msg.status == EmailStatus.SENDING
+    assert len(mail.outbox) == 1
+    with patch("crm.tasks.send_crm_email.delay") as delay:
+        assert requeue_stale_crm_emails() == 0
+    delay.assert_not_called()
+    send_crm_email.run(msg.pk)
+    assert len(mail.outbox) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_manager_can_requeue_a_stale_sending_row(client, django_user_model) -> None:
+    """Кнопка снова ставит «Отправку» старше окна и не трогает ту, что ещё в пути."""
+    from django.urls import reverse
+
+    from crm.models import Client, EmailMessage, EmailStatus
+    from crm.tasks import _EMAIL_SEND_STAMP
+
+    user = django_user_model.objects.create_user(
+        username="crm-resend",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    person = Client.objects.create(name="Борис", email="boris-send@client.test")
+    stuck = EmailMessage.objects.create(
+        client=person,
+        to_email="boris-send@client.test",
+        subject="Застряло",
+        body="Текст",
+        status=EmailStatus.SENDING,
+    )
+    fresh = EmailMessage.objects.create(
+        client=person,
+        to_email="boris-send@client.test",
+        subject="В пути",
+        body="Текст",
+        status=EmailStatus.SENDING,
+    )
+    cache.set(
+        _EMAIL_SEND_STAMP.format(pk=stuck.pk),
+        (timezone.now() - timedelta(hours=1)).timestamp(),
+        timeout=3600,
+    )
+    cache.set(_EMAIL_SEND_STAMP.format(pk=fresh.pk), timezone.now().timestamp(), timeout=3600)
+    client.force_login(user)
+    with patch("crm.tasks.send_crm_email.delay") as delay:
+        response = client.post(
+            reverse("admin:crm_emailmessage_changelist"),
+            {"action": "queue_send", "_selected_action": [str(stuck.pk), str(fresh.pk)]},
+        )
+    assert response.status_code in {200, 302}
+    delay.assert_called_once_with(stuck.pk)
+    stuck.refresh_from_db()
+    fresh.refresh_from_db()
+    assert stuck.status == EmailStatus.QUEUED
+    assert fresh.status == EmailStatus.SENDING
+
+
+@pytest.mark.django_db
 def test_cabinet_pdf_hides_prices_when_the_flag_is_off(settings) -> None:
     """Генератор PDF не рисует цену и «Итого», когда кабинет просит скрыть цены."""
     from decimal import Decimal
