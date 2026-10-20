@@ -375,11 +375,16 @@ def _upsert_manual_matches(
         )
     }
 
+    from catalog.etl.file_refresh import publishable_pdf
+
     with transaction.atomic():
         for match in matches:
             payload = match.path.read_bytes()
             title = title_for(match)
             basename = _storage_basename(match.path)
+            if not publishable_pdf(basename, payload):
+                summary["warnings"].append(f"PDF rejected: {basename}")
+                continue
             for code in match.sku_codes:
                 sku = code_to_sku.get(code.casefold())
                 if sku is None:

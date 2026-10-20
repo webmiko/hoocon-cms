@@ -205,6 +205,23 @@ def test_cabinet_pdf_hides_prices_when_the_flag_is_off(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_manual_refresh_does_not_publish_a_non_pdf() -> None:
+    """ETL не кладёт на сайт файл без PDF-magic, даже если имя заканчивается на .pdf."""
+    from catalog.etl.file_refresh import publishable_pdf, refresh_product_file
+    from catalog.models import SKU, Category, Product, ProductFile
+
+    assert publishable_pdf("note.pdf", b"not a pdf") is False
+    category = Category.objects.create(name="Воздух", slug="air-pdf-guard")
+    product = Product.objects.create(name="HVA", slug="hva-pdf-guard", category=category)
+    sku = SKU.objects.create(product=product, name="HVA", slug="hva-pdf-guard-sku", sku_code="HVA-PDF-GUARD")
+    row = ProductFile(sku=sku, title="Инструкция", file_type=ProductFile.FileType.DATASHEET, is_published=True)
+    row.file.save("manual.pdf", ContentFile(b"%PDF-1.4\n"), save=True)
+    assert refresh_product_file(row, basename="manual.pdf", payload=b"not a pdf") is False
+    with row.file.open("rb") as handle:
+        assert handle.read().startswith(b"%PDF")
+
+
+@pytest.mark.django_db
 def test_mask_copied_production_secrets_clears_tokens() -> None:
     """Копия продовой базы не оставляет боевые токены бота и АТС на ноутбуке."""
     from django.contrib.sessions.models import Session
