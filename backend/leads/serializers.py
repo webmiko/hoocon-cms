@@ -121,6 +121,15 @@ class LeadSerializer(serializers.ModelSerializer):
             "phone": {"write_only": True},
         }
 
+    def validate_email(self, value: str) -> str:
+        """A telephony stub address is not a site-form contact."""
+        from crm.call_cards import STUB_EMAIL_SUFFIX
+
+        email = (value or "").strip()
+        if email.casefold().endswith(STUB_EMAIL_SUFFIX):
+            raise serializers.ValidationError("Укажите рабочую почту.")
+        return email
+
     def validate_message(self, value: str) -> str:
         """Reject too-short (spam) and too-long (DoS) messages."""
         length = len(value)

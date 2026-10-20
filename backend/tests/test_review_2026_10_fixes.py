@@ -17,6 +17,26 @@ from django.utils import timezone
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.django_db
+def test_public_lead_rejects_call_stub_email(client) -> None:
+    """Форма сайта с @call.invalid не становится карточкой «Звонок пропущен»."""
+    from crm.models import Client
+
+    response = client.post(
+        "/api/leads/",
+        data={
+            "pdn_consent": True,
+            "name": "Бот",
+            "email": "79991234567@call.invalid",
+            "company": "Пустышка",
+            "message": "Это не звонок, это форма.",
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    assert not Client.objects.filter(email__iendswith="@call.invalid").exists()
+
+
 def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:
     """Уборка не стирает последние полные копии и не трогает незавершённый свежий каталог."""
     root = tmp_path / "backups"
