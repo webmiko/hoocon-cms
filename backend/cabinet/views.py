@@ -11,6 +11,7 @@ import logging
 from datetime import timedelta
 from typing import Any, cast
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import FileResponse, Http404
@@ -644,7 +645,7 @@ class AccountQuotePdfView(ClientApiView):
         quote = get_object_or_404(client.quotes.exclude(status=QuoteStatus.DRAFT), pk=pk)
         from crm.quote_pdf import render_quote_pdf
 
-        pdf = render_quote_pdf(quote)
+        pdf = render_quote_pdf(quote, include_prices=bool(settings.CABINET_SHOW_PRICES))
         return FileResponse(pdf, content_type="application/pdf", filename=f"{quote.number}.pdf")
 
 

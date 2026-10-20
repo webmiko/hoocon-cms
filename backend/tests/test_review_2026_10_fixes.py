@@ -37,6 +37,47 @@ def test_public_lead_rejects_call_stub_email(client) -> None:
     assert not Client.objects.filter(email__iendswith="@call.invalid").exists()
 
 
+@pytest.mark.django_db
+def test_cabinet_pdf_hides_prices_when_the_flag_is_off(settings) -> None:
+    """Генератор PDF не рисует цену и «Итого», когда кабинет просит скрыть цены."""
+    from decimal import Decimal
+
+    from reportlab.pdfgen.canvas import Canvas
+
+    from crm.models import Client, Quote, QuoteItem, QuoteStatus
+    from crm.quote_pdf import render_quote_pdf
+
+    settings.CABINET_SHOW_PRICES = False
+    person = Client.objects.create(name="Клиент", email="pdf-price@acme.test", company="Акме")
+    quote = Quote.objects.create(client=person, status=QuoteStatus.SENT, number="КП-9")
+    QuoteItem.objects.create(quote=quote, sku_code="DA-1", quantity=1, unit_price=Decimal("1234.50"))
+    drawn: list[str] = []
+    orig_string = Canvas.drawString
+    orig_right = Canvas.drawRightString
+
+    def _keep(text: object) -> None:
+        drawn.append(str(text))
+
+    def _string(self: object, x: float, y: float, text: object, *args: object, **kwargs: object) -> object:
+        _keep(text)
+        return orig_string(self, x, y, text, *args, **kwargs)
+
+    def _right(self: object, x: float, y: float, text: object, *args: object, **kwargs: object) -> object:
+        _keep(text)
+        return orig_right(self, x, y, text, *args, **kwargs)
+
+    with patch.object(Canvas, "drawString", _string), patch.object(Canvas, "drawRightString", _right):
+        render_quote_pdf(quote, include_prices=False)
+    assert "1234.50" not in drawn
+    assert not any("Итого" in line for line in drawn)
+
+    drawn.clear()
+    with patch.object(Canvas, "drawString", _string), patch.object(Canvas, "drawRightString", _right):
+        render_quote_pdf(quote, include_prices=True)
+    assert "1234.50" in drawn
+    assert any("Итого" in line for line in drawn)
+
+
 def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:
     """Уборка не стирает последние полные копии и не трогает незавершённый свежий каталог."""
     root = tmp_path / "backups"

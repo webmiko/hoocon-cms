@@ -61,12 +61,13 @@ def _wrap(text: str, width: int = 90) -> list[str]:
     return lines
 
 
-def render_quote_pdf(quote: Quote) -> io.BytesIO:
+def render_quote_pdf(quote: Quote, *, include_prices: bool | None = None) -> io.BytesIO:
     """Render the quote as a one-page-ish PDF (A4) and return a buffer.
 
-    Prices appear only when at least one item has ``unit_price`` set —
-    matching the «цены только в счёте» decision: a priceless quote shows
-    just positions and quantities.
+    Prices appear only when at least one item has ``unit_price`` set.
+    ``include_prices=False`` hides them anyway: the cabinet flag
+    ``CABINET_SHOW_PRICES`` must cover ``/api/account/*``, including this PDF.
+    ``None`` keeps the stored-document behaviour (show a price that is set).
     """
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -99,7 +100,8 @@ def render_quote_pdf(quote: Quote) -> io.BytesIO:
     y -= 10 * mm
 
     items = list(quote.items.select_related("sku").order_by("sort_order", "id"))
-    show_prices = any(item.unit_price is not None for item in items)
+    priced = any(item.unit_price is not None for item in items)
+    show_prices = priced if include_prices is None else bool(include_prices) and priced
 
     # Table header
     pdf.setFont(font_bold, 9)

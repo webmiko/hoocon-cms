@@ -924,6 +924,29 @@ def test_quote_pdf_endpoint_owner_only() -> None:
 
 
 @pytest.mark.django_db
+
+
+@pytest.mark.django_db
+def test_account_quote_pdf_hides_prices_when_the_cabinet_flag_is_off(settings) -> None:
+    """Живой PDF кабинета передаёт CABINET_SHOW_PRICES в генератор, не только JSON."""
+    from decimal import Decimal
+    from io import BytesIO
+    from unittest.mock import patch
+
+    from crm.models import QuoteItem
+
+    settings.CABINET_SHOW_PRICES = False
+    person = _client_with_data("pdf-hidden@acme.test")
+    quote = person.quotes.first()
+    assert quote is not None
+    QuoteItem.objects.create(quote=quote, sku_code="DA-1", quantity=1, unit_price=Decimal("1234.50"))
+    api = APIClient()
+    _register(api, "pdf-hidden@acme.test")
+    with patch("crm.quote_pdf.render_quote_pdf", return_value=BytesIO(b"%PDF-1.4")) as render:
+        response = api.get(f"/api/account/quotes/{quote.pk}/pdf/")
+    assert response.status_code == 200
+    assert render.call_args.kwargs["include_prices"] is False
+
 def test_documents_zip_owner_only() -> None:
     """ZIP export streams own documents under their titles."""
     import io
