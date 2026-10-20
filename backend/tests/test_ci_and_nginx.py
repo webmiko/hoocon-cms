@@ -478,6 +478,15 @@ def test_ssh_trust_local_run_keeps_trust_on_first_use(tmp_path: Path) -> None:
     assert "StrictHostKeyChecking=accept-new" in opts
 
 
+def test_gunicorn_access_log_omits_the_query_string() -> None:
+    """Токен КП и вебхука не должен попадать в docker logs: формат без query."""
+    text = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "--access-logformat" in text
+    assert "%(U)s" in text
+    assert "%(r)s" not in text
+    assert "%(q)s" not in text
+
+
 def test_telephony_webhook_token_not_in_access_log() -> None:
     """UIS sends ?token=<secret>; the default access log wrote it to disk."""
     conf = NGINX_CONF.read_text(encoding="utf-8")

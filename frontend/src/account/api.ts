@@ -323,8 +323,7 @@ export const accountApi = {
     return call("/api/account/company/");
   },
   quoteReply(token: string): Promise<QuoteReplyPreview> {
-    const qs = new URLSearchParams({ token });
-    return call(`/api/quotes/reply/?${qs.toString()}`);
+    return call("/api/quotes/reply/", { headers: { "X-Quote-Token": token } });
   },
   submitQuoteReply(
     token: string,
