@@ -16,6 +16,82 @@ from crm.models import EmailMessage, EmailStatus
 
 logger = setup_logger("hoocon.crm")
 
+# A QUEUED row still inside this window is in flight. Older QUEUED rows are
+# re-queued: the worker died before it claimed the send. SENDING is left
+# alone — SMTP may already have accepted the message.
+_EMAIL_SEND_STAMP = "crm:email-send:{pk}"
+_EMAIL_SEND_STAMP_TTL = 24 * 60 * 60
+_EMAIL_SEND_STALE_SECONDS = 20 * 60
+
+
+def note_email_enqueued(email_id: int) -> None:
+    """Remember when this QUEUED row was handed to the broker."""
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    cache.set(
+        _EMAIL_SEND_STAMP.format(pk=email_id),
+        timezone.now().timestamp(),
+        timeout=_EMAIL_SEND_STAMP_TTL,
+    )
+
+
+def email_send_is_stale(email_id: int) -> bool:
+    """True when nobody enqueued this id inside the in-flight window."""
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    stamped = cache.get(_EMAIL_SEND_STAMP.format(pk=email_id))
+    if stamped is None:
+        return True
+    return timezone.now().timestamp() - float(stamped) >= _EMAIL_SEND_STALE_SECONDS
+
+
+def requeue_stale_crm_emails() -> int:
+    """Hand QUEUED rows older than the in-flight window back to the broker.
+
+    The first time a row is seen without a stamp, stamp it and wait. That
+    avoids a second copy while a send that failed to stamp is still running.
+    """
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    now = timezone.now().timestamp()
+    cutoff = now - _EMAIL_SEND_STALE_SECONDS
+    sent = 0
+    queued_ids = EmailMessage.objects.filter(status=EmailStatus.QUEUED).values_list("pk", flat=True)[:100]
+    for email_id in queued_ids:
+        key = _EMAIL_SEND_STAMP.format(pk=email_id)
+        stamped = cache.get(key)
+        if stamped is None:
+            cache.set(key, now, timeout=_EMAIL_SEND_STAMP_TTL)
+            continue
+        if float(stamped) > cutoff:
+            continue
+        if not EmailMessage.objects.filter(pk=email_id, status=EmailStatus.QUEUED).exists():
+            continue
+        cache.set(key, now, timeout=_EMAIL_SEND_STAMP_TTL)
+        send_crm_email.delay(email_id)
+        sent += 1
+    return sent
+
+
+def claim_crm_email_send(email_id: int) -> bool:
+    """Move the row to SENDING before SMTP. Only one worker's update matches.
+
+    A redelivery after this returns False, so a crash between SMTP and
+    mark_sent does not send a second copy. FAILED stays claimable: an SMTP
+    error marks the row failed and the Celery retry must be able to send.
+    """
+    updated = EmailMessage.objects.filter(
+        pk=email_id,
+        status__in=(EmailStatus.DRAFT, EmailStatus.QUEUED, EmailStatus.FAILED),
+    ).update(status=EmailStatus.SENDING)
+    if not updated:
+        return False
+    note_email_enqueued(email_id)
+    return True
+
 
 def _smtp_connection_for(msg: EmailMessage) -> Any | None:
     """Personal SMTP connection for outbound tied to a staff mailbox.
@@ -45,12 +121,19 @@ def _smtp_connection_for(msg: EmailMessage) -> Any | None:
     )
 
 
-@shared_task
-def send_quote_reply_mail(subject: str, body: str, recipient: str) -> None:
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def send_quote_reply_mail(self: object, subject: str, body: str, recipient: str) -> None:
     """Tell the manager a client accepted a quote or asked for changes.
 
     Queued from the public reply page so a slow SMTP server does not hold
-    the HTTP response after the status is already saved.
+    the HTTP response after the status is already saved. A failed send is
+    retried: swallowing it left the manager unaware.
     """
     try:
         send_mail(
@@ -62,9 +145,16 @@ def send_quote_reply_mail(subject: str, body: str, recipient: str) -> None:
         )
     except Exception as exc:
         logger.exception("quote_reply_notify_failed type=%s", type(exc).__name__)
+        raise self.retry(exc=exc)  # type: ignore[attr-defined]
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def send_crm_email(self: object, email_id: int) -> None:
     """Send a queued CRM EmailMessage via Django SMTP.
 
@@ -81,7 +171,7 @@ def send_crm_email(self: object, email_id: int) -> None:
         logger.warning("crm_email_missing id=%s", email_id)
         return
 
-    if msg.status == EmailStatus.SENT:
+    if msg.status in (EmailStatus.SENT, EmailStatus.SENDING):
         return
 
     try:
@@ -146,6 +236,9 @@ def send_crm_email(self: object, email_id: int) -> None:
                 and reply_to.casefold() != sender.casefold()
             ):
                 django_msg.bcc = [reply_to]
+        if not claim_crm_email_send(email_id):
+            logger.info("crm_email_send_skipped id=%s", email_id)
+            return
         if connection is not None:
             connection.send_messages([django_msg])
         else:
@@ -183,6 +276,9 @@ def fetch_inbound_email(self: object) -> str:
 
     from crm.imap_fetch import fetch_inbound_email as _fetch
     from crm.models import InboundMailboxState
+
+    # Stuck QUEUED mail is independent of whether IMAP has anything to fetch.
+    requeue_stale_crm_emails()
 
     # Beat fires every few minutes; a slow run must not overlap the next one
     # (same UIDs fetched twice, both workers busy).

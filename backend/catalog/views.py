@@ -2,7 +2,8 @@
 
 Spec: docs/readiness-backend-ux.md §2.3; security — AllowAny GET only,
 prices gated in serializers via SiteSettings. ProductFile upload is
-staff-only (IsAdminUser).
+staff with ``catalog.add_productfile`` (group «Админ»), not every
+``is_staff`` account.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from typing import cast
 from django.db.models import Count, Prefetch, Q, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny, BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -398,20 +399,32 @@ class AnalogLookupView(APIView):
         )
 
 
+class CanAddProductFile(BasePermission):
+    """POST a manual only with the catalog permission, not bare ``is_staff``.
+
+    «Менеджер» and «Аналитик» have ``view_productfile`` only. ``IsAdminUser``
+    treated every staff login as allowed to publish a PDF on the site.
+    """
+
+    def has_permission(self, request: Request, view: object) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated and user.has_perm("catalog.add_productfile"))
+
+
 class ProductFileViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
     viewsets.GenericViewSet,
 ):
-    """GET (public) + POST (staff) /api/catalog/skus/{sku_slug}/files/."""
+    """GET (public) + POST (catalog.add_productfile) /api/catalog/skus/{sku_slug}/files/."""
 
     serializer_class = ProductFileUploadSerializer
     http_method_names = ["get", "post", "head", "options"]
 
     def get_permissions(self) -> list:
-        """GET is public (AllowAny); POST requires staff (IsAdminUser)."""
+        """GET is public; POST requires ``catalog.add_productfile``."""
         if self.action == "create":
-            return [IsAdminUser()]
+            return [CanAddProductFile()]
         return [AllowAny()]
 
     def get_queryset(self) -> QuerySet[ProductFile]:

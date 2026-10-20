@@ -59,8 +59,10 @@ jobs:
   check:
     name: check (pytest + lint)
     runs-on: ubuntu-latest
-    # Explicit permissions replace the repo default (read). actions:write keeps
-    # the setup/cache steps; packages:read lets this job pull the private mirror.
+    # Explicit permissions replace the repo default (read). packages:read lets
+    # this job pull the private mirror. actions:write is not what actions/cache
+    # uses to save or restore (that is the runner token); it is still set here
+    # until a real workflow run shows the job is green without it.
     permissions:
       actions: write
       contents: read

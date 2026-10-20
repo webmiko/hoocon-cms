@@ -345,8 +345,9 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
             Conversation.objects.select_related("assignee"),
             pk=object_id,
         )
-        after_raw = (request.GET.get("after") or "").strip()
-        after_id = int(after_raw) if after_raw.isdigit() else 0
+        from config.query_int import query_int
+
+        after_id = query_int(request.GET.get("after")) or 0
         payload = _chat_messages_for_admin(conversation, after_id=after_id)
         # Read-only poll — do not clear unread on GET (change_view marks read).
         response = JsonResponse({"messages": payload})

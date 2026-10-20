@@ -1,15 +1,26 @@
 /**
  * /kp — client accepts a quote or asks for changes, without a cabinet login.
- * The token in the query is the credential from the quote email.
+ * The token lives in the URL fragment so it is not sent to the server or
+ * to analytics. Old emails still put it in the query; those keep working.
  */
 
 import { useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
 
 import { AccountApiError, accountApi, type QuoteReplyPreview } from "../account/api";
 import styles from "../account/Account.module.css";
 import { Seo } from "../components/Seo";
 import { useAsync } from "../hooks/useAsync";
+
+function replyLink(): { token: string; action: "accept" | "revise" } {
+  if (typeof window === "undefined") {
+    return { token: "", action: "accept" };
+  }
+  const hashed = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search);
+  const token = hashed.get("t") || query.get("t") || "";
+  const action = (hashed.get("action") || query.get("action")) === "revise" ? "revise" : "accept";
+  return { token, action };
+}
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "";
@@ -19,9 +30,7 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function QuoteReplyPage() {
-  const [params] = useSearchParams();
-  const token = params.get("t") ?? "";
-  const action = params.get("action") === "revise" ? "revise" : "accept";
+  const { token, action } = replyLink();
   const { data, loading, error } = useAsync(
     () =>
       token

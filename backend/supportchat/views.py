@@ -180,8 +180,11 @@ class CurrentMessagesView(APIView):
             .exclude(direction=MessageDirection.NOTE)
             .order_by("created_at", "id")
         )
-        if after and str(after).isdigit():
-            qs = qs.filter(id__gt=int(after))
+        from config.query_int import query_int
+
+        after_id = query_int(after)
+        if after_id is not None:
+            qs = qs.filter(id__gt=after_id)
         response = Response(
             {
                 "messages": MessageSerializer(qs, many=True, context={"request": request}).data,

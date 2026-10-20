@@ -28,15 +28,32 @@ def stored_sha256(field: FieldFile) -> str | None:
         return None
 
 
+def publishable_pdf(basename: str, payload: bytes) -> bool:
+    """False when the bytes would not pass the catalog PDF upload validator."""
+    from django.core.exceptions import ValidationError
+
+    from catalog.validators import validate_pdf_upload
+
+    name = basename if basename.lower().endswith(".pdf") else f"{basename}.pdf"
+    try:
+        validate_pdf_upload(ContentFile(payload, name=name))
+    except ValidationError:
+        return False
+    return True
+
+
 def refresh_product_file(existing: ProductFile, *, basename: str, payload: bytes) -> bool:
     """Re-upload ``payload`` when the stored PDF differs or is missing.
 
     Same-size edits are detected (sha256, not size), and a row whose file
     vanished from storage is repaired instead of aborting the batch.
+    A payload that fails the PDF validator is left untouched.
 
     Returns:
         True when the file was rewritten.
     """
+    if not publishable_pdf(basename, payload):
+        return False
     if stored_sha256(existing.file) == hashlib.sha256(payload).hexdigest():
         return False
     existing.file.save(basename, ContentFile(payload), save=True)

@@ -924,6 +924,80 @@ def test_quote_pdf_endpoint_owner_only() -> None:
 
 
 @pytest.mark.django_db
+def test_account_quote_pdf_hides_prices_when_the_cabinet_flag_is_off(settings) -> None:
+    """Живой PDF кабинета передаёт CABINET_SHOW_PRICES в генератор, не только JSON."""
+    from decimal import Decimal
+    from io import BytesIO
+    from unittest.mock import patch
+
+    from crm.models import QuoteItem
+
+    settings.CABINET_SHOW_PRICES = False
+    person = _client_with_data("pdf-hidden@acme.test")
+    quote = person.quotes.first()
+    assert quote is not None
+    QuoteItem.objects.create(quote=quote, sku_code="DA-1", quantity=1, unit_price=Decimal("1234.50"))
+    api = APIClient()
+    _register(api, "pdf-hidden@acme.test")
+    with patch("crm.quote_pdf.render_quote_pdf", return_value=BytesIO(b"%PDF-1.4")) as render:
+        response = api.get(f"/api/account/quotes/{quote.pk}/pdf/")
+    assert response.status_code == 200
+    assert render.call_args.kwargs["include_prices"] is False
+
+
+@pytest.mark.django_db
+def test_documents_zip_does_not_reuse_a_name_after_a_partial_write(settings, tmp_path) -> None:
+    """Сбой чтения после открытия записи не даёт второму документу то же имя в ZIP."""
+    import io
+    import zipfile
+    from unittest.mock import patch
+
+    from django.core.files.base import ContentFile
+    from django.db.models.fields.files import FieldFile
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    person = _client_with_data("zipdup@acme.test")
+    first = person.documents.first()
+    assert first is not None
+    first.file.save("boom.pdf", ContentFile(b"%PDF-boom"), save=True)
+    first.title = "Schet.pdf"
+    first.save(update_fields=["title"])
+    second = person.documents.create(title="Schet.pdf", kind=first.kind)
+    second.file.save("good.pdf", ContentFile(b"%PDF-ok"), save=True)
+
+    class _Broken:
+        def __enter__(self) -> _Broken:
+            return self
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+        def read(self, size: int = -1) -> bytes:
+            raise OSError("disk")
+
+        def close(self) -> None:
+            return None
+
+    real_open = FieldFile.open
+
+    def open_first_breaks(self: FieldFile, mode: str = "rb") -> object:
+        if str(self.name).endswith("boom.pdf"):
+            return _Broken()
+        return real_open(self, mode)
+
+    api = APIClient()
+    _register(api, "zipdup@acme.test")
+    with patch.object(FieldFile, "open", open_first_breaks):
+        response = api.get("/api/account/documents/zip/")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content))) as zf:
+        names = zf.namelist()
+        payloads = [zf.read(name) for name in names]
+    assert len(names) == len(set(names))
+    assert payloads.count(b"%PDF-ok") == 1
+
+
+@pytest.mark.django_db
 def test_documents_zip_owner_only() -> None:
     """ZIP export streams own documents under their titles."""
     import io
@@ -976,6 +1050,30 @@ def test_documents_zip_is_bounded_and_skips_missing_files(monkeypatch: pytest.Mo
     too_big = api.get("/api/account/documents/zip/")
     assert too_big.status_code == 413
     assert "по отдельности" in too_big.json()["detail"]
+
+
+@pytest.mark.django_db
+def test_documents_zip_survives_a_dotdot_title() -> None:
+    """Заголовок «../» не роняет скачивание архива кабинета."""
+    import io
+    import zipfile
+
+    from django.core.files.base import ContentFile
+
+    person = _client_with_data("zipname@acme.test")
+    doc = person.documents.first()
+    assert doc is not None
+    doc.file.save("invoice.pdf", ContentFile(b"%PDF-1.4\n"), save=True)
+    doc.title = "../secret.pdf"
+    doc.save(update_fields=["title"])
+    api = APIClient()
+    _register(api, "zipname@acme.test")
+    response = api.get("/api/account/documents/zip/")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content))) as zf:
+        names = zf.namelist()
+    assert names
+    assert all(".." not in name and "/" not in name for name in names)
 
 
 def test_documents_zip_has_own_throttle() -> None:
@@ -1084,7 +1182,7 @@ def test_done_lead_with_quote_shows_quote_status_and_manager_name(settings) -> N
 
 @pytest.mark.django_db
 def test_sole_company_member_sees_own_requisites_without_confirmation() -> None:
-    """Единственный контакт компании видит ИНН без галочки «подтверждён» и без списка коллег."""
+    """Неподтверждённый единственный участник видит только название, которое сам вписал."""
     from crm.models import CompanyMember
 
     api = _register(APIClient(), "solo@acme.test")
@@ -1100,10 +1198,17 @@ def test_sole_company_member_sees_own_requisites_without_confirmation() -> None:
     assert CompanyMember.objects.get(company=org, client=client).is_confirmed is False
 
     data = api.get("/api/account/company/").json()
-    assert data["inn"] == "7707083893"
-    assert data["legal_address"] == "Москва, ул. Складская, 1"
-    assert data["needs_confirmation"] is False
+    assert data["name"] == "Только мы"
+    assert data["inn"] == ""
+    assert data["legal_address"] == ""
+    assert data["needs_confirmation"] is True
     assert data["members"] == []
+
+    CompanyMember.objects.filter(company=org, client=client).update(is_confirmed=True)
+    confirmed = api.get("/api/account/company/").json()
+    assert confirmed["inn"] == "7707083893"
+    assert confirmed["legal_address"] == "Москва, ул. Складская, 1"
+    assert confirmed["confirmed"] is True
 
 
 @pytest.mark.django_db

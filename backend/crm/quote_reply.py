@@ -37,16 +37,20 @@ class QuoteReplyError(Exception):
 
 
 def sign_quote_token(quote_id: int) -> str:
-    """Signed token for the public reply page. Not a secret in logs."""
+    """Signed token for the public reply page. It is the only credential."""
     return signing.TimestampSigner(salt=_SALT).sign(str(quote_id))
 
 
 def quote_reply_urls(quote_id: int) -> tuple[str, str]:
-    """Absolute accept and revise links for the quote email."""
+    """Absolute accept and revise links for the quote email.
+
+    The token sits in the fragment. The browser does not send the fragment
+    to nginx, gunicorn or the Referer of the next request.
+    """
     token = sign_quote_token(quote_id)
     base = settings.SITE_URL.rstrip("/")
-    accept = f"{base}/kp?{urlencode({'t': token, 'action': 'accept'})}"
-    revise = f"{base}/kp?{urlencode({'t': token, 'action': 'revise'})}"
+    accept = f"{base}/kp#{urlencode({'t': token, 'action': 'accept'})}"
+    revise = f"{base}/kp#{urlencode({'t': token, 'action': 'revise'})}"
     return accept, revise
 
 

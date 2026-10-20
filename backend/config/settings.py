@@ -189,6 +189,9 @@ MIDDLEWARE.extend(
         "catalog.middleware.CatalogHttpCacheMiddleware",
         "config.csp_middleware.CspMiddleware",
         "config.middleware.ops_telegram_alert.OpsTelegramAlertMiddleware",
+        # After the alert middleware so a rejected NUL becomes 400 and
+        # does not page Telegram (process_exception runs last-first).
+        "config.middleware.bad_input.RejectNulMiddleware",
     ],
 )
 
@@ -211,7 +214,7 @@ ADMIN_RECOVERY_LOCK_SECONDS = int(os.getenv("ADMIN_RECOVERY_LOCK_SECONDS", "900"
 # Proxies that append to X-Forwarded-For (host nginx). Shared by axes,
 # DRF throttles and OTP quotas via config.client_ip.
 TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "1"))
-AXES_CLIENT_IP_CALLABLE = "config.client_ip.client_ip"
+AXES_CLIENT_IP_CALLABLE = "config.client_ip.client_rate_key"
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -620,6 +623,8 @@ REST_FRAMEWORK = {
         "client_repeat": "10/min",
         # Whole-cabinet documents ZIP (heavy: reads every file).
         "client_zip": "10/hour",
+        # Public family ZIP. Same weight as the cabinet archive.
+        "docs_zip": "10/hour",
         # Public quote accept/revise links from the client email.
         "quote_reply": "30/hour",
     },

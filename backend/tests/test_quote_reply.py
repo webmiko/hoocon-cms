@@ -48,9 +48,10 @@ def test_quote_email_names_manager_deadline_and_reply_links(settings) -> None:
     assert "+7 495 000-00-00" in message.body
     assert "anna@hoocon.test" in message.body
     assert f"Действует до {quote.valid_until:%d.%m.%Y}." in message.body
-    assert "Согласовать: https://hoocon.test/kp?" in message.body
+    assert "Согласовать: https://hoocon.test/kp#" in message.body
+    assert "https://hoocon.test/kp?" not in message.body
     assert "action=accept" in message.body
-    assert "Нужны правки: https://hoocon.test/kp?" in message.body
+    assert "Нужны правки: https://hoocon.test/kp#" in message.body
     assert "action=revise" in message.body
     assert "без входа в кабинет" in message.body
     assert "одноразовый код" not in message.body
@@ -80,6 +81,7 @@ def test_accept_link_is_once_and_a_bad_token_changes_nothing(settings) -> None:
     missed = api.post("/api/quotes/reply/", {"token": "nope", "action": "accept"}, format="json")
     assert missed.status_code == 404
     assert api.get("/api/quotes/reply/", {"token": "nope"}).status_code == 404
+    assert api.get("/api/quotes/reply/", HTTP_X_QUOTE_TOKEN="nope").status_code == 404
     quote.refresh_from_db()
     assert quote.status == QuoteStatus.ACCEPTED
 
@@ -212,5 +214,5 @@ def test_accept_survives_a_missing_manager_and_a_dead_mail_queue() -> None:
     assert quote.status == QuoteStatus.ACCEPTED
     assert Activity.objects.filter(client=quote.client, subject__contains="согласовал").count() == 1
 
-    with patch("crm.tasks.send_mail", side_effect=OSError("smtp down")):
+    with patch("crm.tasks.send_mail", side_effect=OSError("smtp down")), pytest.raises(OSError, match="smtp down"):
         send_quote_reply_mail("Тема", "Текст", "anna@hoocon.test")

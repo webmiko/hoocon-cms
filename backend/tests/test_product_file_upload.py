@@ -40,12 +40,18 @@ def _make_sku():
 
 
 def _staff_user(django_user_model):
-    """Create a staff user for authenticated uploads."""
-    return django_user_model.objects.create_user(
+    """Staff user who is allowed to publish a PDF (catalog.add_productfile)."""
+    from django.contrib.auth.models import Permission
+
+    user = django_user_model.objects.create_user(
         username="uploader",
         password="test-pass-not-secret",
         is_staff=True,
     )
+    user.user_permissions.add(
+        Permission.objects.get(codename="add_productfile", content_type__app_label="catalog"),
+    )
+    return user
 
 
 # ── AuthN / AuthZ ────────────────────────────────────────────────────
@@ -82,8 +88,46 @@ def test_upload_non_staff_forbidden(client, django_user_model) -> None:
 
 
 @pytest.mark.django_db
+def test_upload_staff_without_add_permission_forbidden(client, django_user_model) -> None:
+    """«Аналитик» и голый is_staff не публикуют PDF: IsAdminUser смотрел только на флаг."""
+    from django.contrib.auth.models import Group
+
+    from accounts.roles import GROUP_ANALYST
+    from accounts.services import ensure_staff_groups
+
+    ensure_staff_groups()
+    sku = _make_sku()
+    analyst = django_user_model.objects.create_user(
+        username="analyst-upload",
+        password="test-pass-not-secret",
+        is_staff=True,
+    )
+    analyst.groups.add(Group.objects.get(name=GROUP_ANALYST))
+    bare = django_user_model.objects.create_user(
+        username="bare-staff",
+        password="test-pass-not-secret",
+        is_staff=True,
+    )
+    url = reverse("catalog-sku-file-list", kwargs={"sku_slug": sku.slug})
+
+    def _post() -> object:
+        return client.post(
+            url,
+            {"title": "T", "file": BytesIO(_pdf_bytes()), "file_type": "datasheet"},
+        )
+
+    client.force_login(analyst)
+    assert _post().status_code == 403
+    client.force_login(bare)
+    assert _post().status_code == 403
+    from catalog.models import ProductFile
+
+    assert ProductFile.objects.filter(sku=sku).count() == 0
+
+
+@pytest.mark.django_db
 def test_upload_staff_accepted(client, django_user_model) -> None:
-    """Staff user can upload a valid PDF (201)."""
+    """A user with catalog.add_productfile can upload a valid PDF (201)."""
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     sku = _make_sku()

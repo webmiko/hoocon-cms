@@ -7,12 +7,28 @@
 #   ./scripts/sync-db-from-vps.sh hoocon-prod
 #   ./scripts/sync-db-from-vps.sh --from-backup   # latest /opt/hoocon/backups/*/hoocon.dump
 #   ./scripts/sync-db-from-vps.sh --with-media    # also rsync VPS media → backend/media
+#   ./scripts/sync-db-from-vps.sh --keep-secrets  # leave bot/PBX tokens in the local DB
 #
 # Local target (auto):
 #   - Homebrew Postgres when DB_HOST is 127.0.0.1/localhost (default .env)
 #   - else docker compose service ``db``
 #
 # After a DB-only sync, media paths may 404 until --with-media (or a manual rsync).
+# The dump stays in .deploy-tmp and contains personal data. It is gitignored.
+
+# Loopback only. The compose service name ``db`` is also the production
+# hostname, so a restore or a secret wipe must not treat it as local.
+hoocon_db_host_is_local() {
+  case "${1:-}" in
+    127.0.0.1|localhost|::1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,11 +37,13 @@ DUMP="${TMP}/hoocon-from-vps.dump"
 HOST="hoocon-prod"
 FROM_BACKUP=0
 WITH_MEDIA=0
+KEEP_SECRETS=0
 
 for arg in "$@"; do
   case "$arg" in
     --from-backup) FROM_BACKUP=1 ;;
     --with-media) WITH_MEDIA=1 ;;
+    --keep-secrets) KEEP_SECRETS=1 ;;
     -h|--help)
       sed -n '2,22p' "$0"
       exit 0
@@ -70,7 +88,7 @@ fi
 
 use_compose=0
 case "${DB_HOST}" in
-  127.0.0.1|localhost) use_compose=0 ;;
+  127.0.0.1|localhost|::1) use_compose=0 ;;
   db) use_compose=1 ;;
   *)
     if docker compose -f "${ROOT}/docker-compose.yml" ps --status running -q db 2>/dev/null | grep -q .; then
@@ -78,6 +96,11 @@ case "${DB_HOST}" in
     fi
     ;;
 esac
+
+if [[ "${use_compose}" -eq 0 ]] && ! hoocon_db_host_is_local "${DB_HOST}"; then
+  echo "ERROR: refusing to restore onto non-local DB_HOST=${DB_HOST}" >&2
+  exit 1
+fi
 
 echo "==> remote dump (${HOST})"
 if [[ "${FROM_BACKUP}" -eq 1 ]]; then
@@ -148,6 +171,29 @@ fi
 if [[ "${RC}" -gt 1 ]]; then
   echo "pg_restore failed with exit ${RC}" >&2
   exit "${RC}"
+fi
+
+if [[ "${KEEP_SECRETS}" -eq 0 ]]; then
+  # Compose publishes Postgres on the laptop's loopback. Mask that host,
+  # not the name ``db`` from .env: the same name is production.
+  MASK_HOST="${DB_HOST}"
+  MASK_PORT="${DB_PORT}"
+  if [[ "${use_compose}" -eq 1 ]]; then
+    MASK_HOST="127.0.0.1"
+    MASK_PORT="${DB_PORT:-5432}"
+  fi
+  if ! hoocon_db_host_is_local "${MASK_HOST}"; then
+    echo "ERROR: refusing to mask secrets on DB_HOST=${MASK_HOST}" >&2
+    exit 1
+  fi
+  echo "==> mask integration tokens and sessions in the local copy"
+  (
+    cd "${ROOT}/backend" && \
+    DB_HOST="${MASK_HOST}" DB_PORT="${MASK_PORT}" \
+    poetry run python -c "from sitesettings.mask_synced_secrets import mask_copied_production_secrets; print(mask_copied_production_secrets())"
+  )
+else
+  echo "WARN: --keep-secrets left production tokens in the local database" >&2
 fi
 
 if [[ "${WITH_MEDIA}" -eq 1 ]]; then

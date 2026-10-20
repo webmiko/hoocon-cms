@@ -179,7 +179,7 @@ def _talk_seconds(value: Any) -> int:
         return 0
     try:
         return max(0, int(float(value)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

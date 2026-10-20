@@ -7,6 +7,7 @@
  */
 
 import { isAnalyticsAllowed, readCookieConsent } from "./cookieConsent";
+import { urlWithoutCredentials } from "./yandexMetrikaInit";
 
 export type LeadTrackType = "rfq" | "consultation" | "replacement";
 
@@ -73,7 +74,7 @@ export function resetSpaHitTracking(): void {
  *   title: Optional document title override.
  */
 export function trackSpaHit(path: string, title?: string): void {
-  const normalized = path || "/";
+  const normalized = urlWithoutCredentials(path || "/");
   if (lastSpaHitPath === null) {
     lastSpaHitPath = normalized;
     return;

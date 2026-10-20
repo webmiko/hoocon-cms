@@ -28,7 +28,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 
-from config.client_ip import client_ip
+from config.client_ip import client_rate_key
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +268,7 @@ def consume_otp_request_quota(
     """Count OTP send/resend for this IP; raise if over limit."""
     resolved_limit = otp_request_limit() if limit is None else limit
     resolved_window = otp_request_window_seconds() if window is None else window
-    key = f"{cache_prefix}{client_ip(request)}"
+    key = f"{cache_prefix}{client_rate_key(request)}"
     try:
         count = int(cache.incr(key))
     except ValueError:

@@ -381,8 +381,11 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
         conv = get_object_or_404(Conversation, pk=pk)
         qs = conv.messages.order_by("created_at", "id")
         after = request.query_params.get("after")
-        if after and str(after).isdigit():
-            qs = qs.filter(id__gt=int(after))
+        from config.query_int import query_int
+
+        after_id = query_int(after)
+        if after_id is not None:
+            qs = qs.filter(id__gt=after_id)
         data = [serialize_message(m) for m in qs[:200]]
         resp = Response(data)
         resp["Cache-Control"] = "no-store"

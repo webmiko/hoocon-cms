@@ -504,6 +504,8 @@ def test_seed_wiki_admin_toggles_leave_checkboxes_for_rows_and_token() -> None:
     call_command("seed_wiki", stdout=StringIO())
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     changelog = guide.body.split('id="changelog"', 1)[1]
+    assert changelog.index("changelog-email-send-once") < changelog.index("changelog-email-queue")
+    assert changelog.index("changelog-email-queue") < changelog.index("changelog-admin-toggles")
     assert changelog.index("changelog-admin-toggles") < changelog.index("changelog-tech-support")
     row = changelog.split('id="changelog-admin-toggles"', 1)[1].split("</tr>", 1)[0]
     assert "снимают права" not in row

@@ -236,7 +236,9 @@ def enqueue_crm_email(email_id: int) -> None:
     Args:
         email_id: EmailMessage primary key.
     """
-    from crm.tasks import send_crm_email
+    from crm.tasks import note_email_enqueued, send_crm_email
+
+    note_email_enqueued(email_id)
 
     def _enqueue() -> None:
         send_crm_email.delay(email_id)

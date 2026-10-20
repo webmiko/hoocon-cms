@@ -22,7 +22,9 @@ class QuoteReplyView(APIView):
     throttle_scope = "quote_reply"
 
     def get(self, request: Request) -> Response:
-        quote = load_reply_quote(str(request.query_params.get("token") or ""))
+        header = str(request.headers.get("X-Quote-Token") or "")
+        query = str(request.query_params.get("token") or "")
+        quote = load_reply_quote(header or query)
         if quote is None:
             return Response({"detail": "Ссылка недействительна."}, status=404)
         return Response(reply_preview(quote))

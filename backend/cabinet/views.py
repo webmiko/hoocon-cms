@@ -11,6 +11,7 @@ import logging
 from datetime import timedelta
 from typing import Any, cast
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import FileResponse, Http404
@@ -644,7 +645,7 @@ class AccountQuotePdfView(ClientApiView):
         quote = get_object_or_404(client.quotes.exclude(status=QuoteStatus.DRAFT), pk=pk)
         from crm.quote_pdf import render_quote_pdf
 
-        pdf = render_quote_pdf(quote)
+        pdf = render_quote_pdf(quote, include_prices=bool(settings.CABINET_SHOW_PRICES))
         return FileResponse(pdf, content_type="application/pdf", filename=f"{quote.number}.pdf")
 
 
@@ -688,6 +689,8 @@ class AccountDocumentsZipView(ClientApiView):
         import tempfile
         import zipfile
 
+        from django.core.exceptions import ValidationError
+
         from catalog.validators import sanitize_upload_filename
 
         client = _client_for(request)
@@ -708,20 +711,25 @@ class AccountDocumentsZipView(ClientApiView):
         used_names: set[str] = set()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for doc in docs:
-                base = sanitize_upload_filename(doc.title or f"document-{doc.pk}")
+                try:
+                    base = sanitize_upload_filename(doc.title or f"document-{doc.pk}")
+                except ValidationError:
+                    base = f"document-{doc.pk}"
                 name = base
                 n = 2
                 while name in used_names:
                     stem, dot, ext = base.rpartition(".")
                     name = f"{stem}-{n}.{ext}" if dot else f"{base}-{n}"
                     n += 1
+                # ZipFile keeps the entry when the copy fails. Reserve the name
+                # first so the next file cannot open that same name again.
+                used_names.add(name)
                 try:
                     with doc.file.open("rb") as fh, zf.open(name, "w") as out:
                         shutil.copyfileobj(fh, out, 1024 * 1024)
                 except (FileNotFoundError, OSError):
                     logger.warning("account_zip_missing_file document_id=%s", doc.pk)
                     continue
-                used_names.add(name)
         buf.seek(0)
         filename = f"hoocon-docs-{client.pk}.zip"
         return FileResponse(buf, as_attachment=True, filename=filename)
@@ -794,11 +802,7 @@ class AccountCompanyView(ClientApiView):
             return Response(hidden)
         membership = company.members.filter(client=client)
         confirmed = membership.filter(is_confirmed=True).exists()
-        # A card that is the only member is this client's own company: show
-        # the requisites the manager typed. A second, unconfirmed person
-        # must not read a colleague's INN.
-        others = company.members.exclude(client=client).exists()
-        if not confirmed and others:
+        if not confirmed:
             hidden["needs_confirmation"] = True
             return Response(hidden)
         return Response(

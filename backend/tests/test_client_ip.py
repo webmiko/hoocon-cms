@@ -59,9 +59,27 @@ def test_otp_quota_cannot_be_bypassed_by_rotating_forwarded_for() -> None:
         consume_otp_request_quota(_request("10.9.9.9, 198.51.100.9"), limit=3, window=60)
 
 
+def test_ipv6_prefix_shares_one_rate_limit_bucket() -> None:
+    """Пять адресов одной /64 не дают пять отдельных квот OTP."""
+    from config.client_ip import client_rate_key
+
+    one = client_rate_key(_request("2001:db8:1:2::1", remote="2001:db8:1:2::1"))
+    two = client_rate_key(_request("2001:db8:1:2::abcd", remote="2001:db8:1:2::abcd"))
+    other = client_rate_key(_request("2001:db8:1:3::1", remote="2001:db8:1:3::1"))
+    assert one == two == "2001:db8:1:2::"
+    assert other != one
+    assert AnonRateThrottle().get_ident(Request(_request("2001:db8:1:2::5"))) == one
+
+    cache.clear()
+    for n in range(3):
+        consume_otp_request_quota(_request(f"2001:db8:9:9::{n}"), limit=3, window=60)
+    with pytest.raises(AdminOtpDeliveryError):
+        consume_otp_request_quota(_request("2001:db8:9:9::ffff"), limit=3, window=60)
+
+
 def test_axes_uses_shared_client_ip_resolver() -> None:
     """django-ipware не установлен: axes видел IP шлюза Docker и блокировал вход всем сотрудникам."""
-    assert settings.AXES_CLIENT_IP_CALLABLE == "config.client_ip.client_ip"
+    assert settings.AXES_CLIENT_IP_CALLABLE == "config.client_ip.client_rate_key"
 
 
 @pytest.mark.django_db
