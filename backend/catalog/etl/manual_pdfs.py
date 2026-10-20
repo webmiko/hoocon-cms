@@ -1368,10 +1368,7 @@ def attach_hvd_manuals(
     return _upsert_manual_matches(
         matches,
         warnings,
-        title_for=lambda m: (
-            f"Инструкция HVD-{m.torque_nm}F "
-            f"({'SX' if m.kind.endswith('sx') else 'S/ST'})"
-        ),
+        title_for=lambda m: f"Инструкция HVD-{m.torque_nm}F ({'SX' if m.kind.endswith('sx') else 'S/ST'})",
         dry_run=dry_run,
     )
 
