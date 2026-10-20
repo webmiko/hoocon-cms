@@ -22,6 +22,7 @@ def test_parse_safu_torque_nm() -> None:
     assert parse_safu_torque_nm("SA5FU24-DS") == 5
     assert parse_safu_torque_nm("sa10fu230-dst") == 10
     assert parse_safu_torque_nm("DA5FU24-D") is None
+    assert parse_safu_torque_nm("SA10FQU24-DS") is None
 
 
 def test_safu_aux_spdt_is_two() -> None:
@@ -48,6 +49,12 @@ def test_sa3_specs_from_manual() -> None:
     assert "50 дБ" in row["noise"]
     assert row["dimensions"] == "132 × 87 × 59 мм"
     assert "> 50" in row["shaft-length"]
+
+
+def test_sa10_holding_power_matches_factory_manual() -> None:
+    """SA10FU EN от 2026-06: удержание 3,5 Вт, ход 5 Вт."""
+    assert TORQUE_SPECS[10]["power"] == ("5 Вт под нагрузкой / 3,5 Вт в режиме удержания")
+    assert "< 100 с" in TORQUE_SPECS[10]["running-time"]
 
 
 def test_sa5_shaft_and_noise_differ_from_sa3() -> None:

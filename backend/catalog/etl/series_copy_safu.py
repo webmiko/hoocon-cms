@@ -32,7 +32,7 @@ from catalog.etl.tech_copy import (
 from catalog.facets import normalize_aux_switch_value
 from catalog.models import SKU, Product
 
-_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?!q)")
 _SAFU_PRODUCT = re.compile(r"(?i)protivopozharn")
 
 AttrRow = tuple[str, str, str, str, str]
@@ -141,7 +141,7 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
     10: {
         "moment": "10 Нм",
         "damper-area": "до 1,0 м²",
-        "power": "5 Вт под нагрузкой / 3 Вт в режиме удержания",
+        "power": "5 Вт под нагрузкой / 3,5 Вт в режиме удержания",
         "running-time": "< 100 с / возврат пружины < 25 с",
         "weight": "< 2,5 кг",
         "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),

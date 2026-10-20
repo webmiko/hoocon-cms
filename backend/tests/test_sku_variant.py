@@ -285,6 +285,7 @@ def test_torque_nm_from_hva_uses_trailing_nm_not_voltage() -> None:
     assert torque_nm_from_sku_code("HVA24S-5") == 5
     assert torque_nm_from_sku_code("HVA230-5Q") == 5
     assert torque_nm_from_sku_code("HVD24ST-3F") == 3
+    assert torque_nm_from_sku_code("HVD24SX-10F") == 10
     assert torque_nm_from_sku_code("DA5FU24-D") == 5
 
 

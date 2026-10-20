@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from catalog.etl.media_webp_extras import apply_media_webp_extras, sku_code_is_hv_qa
+from catalog.etl.media_webp_extras import _MontageShot, _pick_montage, apply_media_webp_extras, sku_code_is_hv_qa
 from catalog.models import SKU, Category, Product, ProductImage
 
 
@@ -148,6 +148,63 @@ def test_media_webp_extras_emergency_only_on_qa(tmp_path: Path) -> None:
     assert not ProductImage.objects.filter(
         sku=plain_s,
         source_url__icontains="avariynaya",
+        is_published=True,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_hvdf_cards_drop_the_hva_montage(tmp_path: Path) -> None:
+    """HVD-F не показывает монтажную схему HVA; воздушный HVD её сохраняет."""
+    pack = tmp_path / "media-webp"
+    pack.mkdir()
+    (pack / "montazhnaya_sxema_hv.webp").write_bytes(_png((10, 10, 10)))
+
+    cat = Category.objects.create(name="Smoke", slug="hvdf-no-montage")
+    product = Product.objects.create(name="HVD-F", slug="hvdf-no-montage-p", category=cat)
+    hvdf = SKU.objects.create(
+        product=product,
+        sku_code="HVD24S-5F",
+        name="HVD24S-5F",
+        slug="hvd24s-5f-no-montage",
+        is_published=True,
+    )
+    air = SKU.objects.create(
+        product=product,
+        sku_code="HVD24-5",
+        name="HVD24-5",
+        slug="hvd24-5-keeps-montage",
+        is_published=True,
+    )
+    ProductImage.objects.create(
+        sku=hvdf,
+        image=SimpleUploadedFile("old.png", _png((2, 2, 2)), content_type="image/png"),
+        alt="HVD24S-5F | Монтажная схема",
+        source_url="https://hoocon.ru/.local-assets/media-webp/montazhnaya_sxema_hv.webp",
+        sort_order=4,
+        is_published=True,
+    )
+
+    hv_shot = _MontageShot(
+        stem="montazhnaya_sxema_hv",
+        path=pack / "montazhnaya_sxema_hv.webp",
+        kind="hv",
+        family=None,
+        nms=frozenset(),
+        series=None,
+    )
+    assert _pick_montage("HVD24S-5F", [hv_shot]) is None
+    assert _pick_montage("HVD230ST-3F", [hv_shot]) is None
+    assert _pick_montage("HVD24-5", [hv_shot]) is hv_shot
+    assert _pick_montage("HVA24S-5", [hv_shot]) is hv_shot
+
+    summary = apply_media_webp_extras(dry_run=False, photo_root=pack)
+    assert summary["unpublished_hvdf_montage"] == 1
+    hidden = ProductImage.objects.get(sku=hvdf)
+    assert hidden.is_published is False
+    assert hidden.hidden_by_editor is True
+    assert ProductImage.objects.filter(
+        sku=air,
+        source_url__contains="montazhnaya_sxema_hv",
         is_published=True,
     ).exists()
 

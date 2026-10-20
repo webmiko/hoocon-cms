@@ -161,8 +161,8 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
             aux = ctrl == "ds"
         return SkuVariant(voltage=voltage, control=control, aux_switch=aux, code=code)
 
-    # HVD24S-3F / HVD230ST-5F — fire/smoke spring-return (S / ST + NmF).
-    if re.fullmatch(r"hvd(?:24|230)st?-\d+f", code):
+    # HVD24S-3F / HVD230ST-5F / HVD24SX-10F — fire/smoke spring-return.
+    if re.fullmatch(r"hvd(?:24|230)(?:s|st|sx)-\d+f", code):
         control = "on_off"
         aux = True
     # HVD/HVA …QX — capacitor fail-safe (before bare Q / std patterns).
@@ -468,7 +468,7 @@ _NM_IN_ALT = re.compile(r"(?i)(\d+)\s*нм")
 _NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa)(\d+)")
 # HVA24-5 / HVA24S-5Q / HVD24ST-3F — voltage first, torque after the hyphen.
 _NM_FROM_HV_SKU = re.compile(
-    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st?|s)?-(\d+)(?:q|f)?$",
+    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st|sx|s)?-(\d+)(?:q|f)?$",
 )
 # Fallback: any leading digits after an optional short alpha prefix.
 _NM_FROM_SKU_FALLBACK = re.compile(r"(?i)^(?:[a-z]{1,4})?(\d+)")
@@ -479,15 +479,28 @@ _IMAGE_THERMAL = re.compile(
 _ALT_SKU_IN_PARENS = re.compile(r"\(([a-z0-9._-]+)\)\s*$", re.IGNORECASE)
 _SA_CODE = re.compile(r"(?i)^sa\d")
 _THERMAL_SKU_SUFFIX = re.compile(r"(?i)dst$|-t$")
-# HVD24ST-3F — thermal is ``ST`` before ``-{nm}F`` (not a trailing -T).
+# HVD24ST-3F — SAF72 TS1+TS2 pack; SX is duct TS2 only (see sku_code_is_hvdf_sx).
 _THERMAL_HVDF = re.compile(r"(?i)^hvd(?:24|230)st-\d+f$")
+_HVDF_SX = re.compile(r"(?i)^hvd(?:24|230)sx-\d+f$")
+
+
+def sku_code_is_hvdf_sx(sku_code: str | None) -> bool:
+    """True for HVD-…F SX (duct TS2 only, not SAF72 TS1+TS2 package)."""
+    code = (sku_code or "").casefold().replace(" ", "")
+    return bool(_HVDF_SX.fullmatch(code))
+
+
+def hvdf_manual_thermal_kind(sku_code: str | None) -> str:
+    """Manual stem kind for HVD-…F: ``st`` (S/ST) or ``sx`` (duct TS2)."""
+    return "sx" if sku_code_is_hvdf_sx(sku_code) else "st"
 
 
 def sku_code_is_thermal(sku_code: str | None) -> bool:
     """True when the Hoocon article is a thermal edition.
 
-    Recognizes ``DST`` / ``-T`` suffixes and HVD-…F ``ST`` editions
-    (``HVD24ST-3F``).
+    Recognizes ``DST`` / ``-T`` suffixes and HVD-…F ``ST`` (SAF72) editions
+    (``HVD24ST-3F``). ``SX`` (duct TS2) is not thermal here — manual gallery
+    and SAF72 tiles use the plain body photo.
 
     Args:
         sku_code: Hoocon SKU article (e.g. ``SA5FU24-DST``, ``HVD230ST-5F``).

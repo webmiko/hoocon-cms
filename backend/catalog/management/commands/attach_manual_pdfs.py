@@ -17,12 +17,14 @@ from django.core.management.base import BaseCommand, CommandError
 from catalog.etl.h81_catalog_media import apply_h81_instruction_pdfs
 from catalog.etl.manual_pdfs import (
     attach_br_adapter_manuals,
+    attach_dafqu_manuals,
     attach_dafu_manuals,
     attach_damqu_manuals,
     attach_damu_manuals,
     attach_hva_manuals,
     attach_hvd_manuals,
     attach_product_passports,
+    attach_safqu_manuals,
     attach_safu_manuals,
     attach_samu_manuals,
     default_manuals_dir,
@@ -59,6 +61,8 @@ class Command(BaseCommand):
                 "all",
                 "dafu",
                 "safu",
+                "safqu",
+                "dafqu",
                 "damu",
                 "damqu",
                 "samu",
@@ -95,6 +99,10 @@ class Command(BaseCommand):
             summaries.append(("DAFU", attach_dafu_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "safu"}:
             summaries.append(("SAFU", attach_safu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "safqu"}:
+            summaries.append(("SAFQU", attach_safqu_manuals(manuals_dir, dry_run=dry_run)))
+        if series in {"all", "dafqu"}:
+            summaries.append(("DAFQU", attach_dafqu_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "damu"}:
             summaries.append(("DAMU", attach_damu_manuals(manuals_dir, dry_run=dry_run)))
         if series in {"all", "damqu"}:

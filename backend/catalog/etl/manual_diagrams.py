@@ -48,8 +48,8 @@ DiagramKind = Literal[
 ]
 Edition = Literal["on_off", "modulating_24"]
 
-_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu")
-_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu")
+_DAFU_CODE = re.compile(r"(?i)^da(?P<nm>\d+)fu(?!q)")
+_SAFU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)fu(?!q)")
 _RENDER_SCALE = 3.0
 
 # Idempotent CDN-style keys (URLField-valid); files are local media, not fetched.
@@ -228,37 +228,102 @@ def crop_modulating_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Imag
     return _trim_near_white(wiring), _trim_near_white(dimensions)
 
 
+def _skip_hanging_rule(
+    page: Image.Image,
+    *,
+    left: int,
+    right: int,
+    top: int,
+) -> int:
+    """Move ``top`` below a solid black underline sitting under a section title.
+
+    SA7MU / SA10MU draw a second, shorter bar under «Габаритные размеры».
+    It is too narrow to count as a section title, so a crop that starts a few
+    pixels under the title still includes it. A 1–2 px dimension line stays.
+    """
+    width, height = page.size
+    right = min(right, width)
+    if right - left < 40 or top >= height - 4:
+        return top
+    window = max(24, int(height * 0.04))
+    min_thick = max(8, int(height * 0.008))
+    near = max(6, int(height * 0.012))
+    y1 = min(height, top + window)
+    column = page.crop((left, top, right, y1))
+    col_w, col_h = column.size
+    if col_h < min_thick:
+        return top
+    pixels = cast(Any, column.load())
+    min_run = int(col_w * 0.18)
+    stray = max(4, int(col_w * 0.02))
+    rule_rows: list[int] = []
+    for y in range(col_h):
+        run = best = dark = 0
+        for x in range(col_w):
+            red, green, blue = pixels[x, y][:3]
+            if red < 40 and green < 40 and blue < 40:
+                dark += 1
+                run += 1
+                if run > best:
+                    best = run
+            else:
+                run = 0
+        if best >= min_run and dark - best <= stray:
+            rule_rows.append(y)
+    if not rule_rows or rule_rows[0] > near:
+        return top
+    end = rule_rows[0]
+    for y in rule_rows[1:]:
+        if y <= end + 2:
+            end = y
+        else:
+            break
+    if end - rule_rows[0] + 1 < min_thick:
+        return top
+    return min(height - 1, top + end + 2)
+
+
 def crop_safu_diagrams(page: Image.Image) -> tuple[Image.Image, Image.Image]:
     """Crop wiring + dimensions from the right column of an SA..FU/MU page-2.
 
     Layout (landscape): left = ТТХ table; right = Wiring → Dimensions → next.
     Black section titles are detected and excluded so crops do not keep a
     sliced banner at the bottom (EN) or the following section title (RU).
+    A short underline under the title (SA7MU / SA10MU) is dropped too.
     Left cut at 50% clears the ТТХ table edge that leaks at 48%.
+    Leftover paper is trimmed to the ink.
     """
     width, height = page.size
     left = int(width * 0.50)
     right = width - 10
 
+    def _pack(
+        wiring_top: int,
+        wiring_bot: int,
+        dims_top: int,
+        dims_bot: int,
+    ) -> tuple[Image.Image, Image.Image]:
+        wiring = page.crop((left, wiring_top, right, wiring_bot))
+        dimensions = page.crop((left, dims_top, right, dims_bot))
+        return _trim_near_white(wiring), _trim_near_white(dimensions)
+
     def _fallback() -> tuple[Image.Image, Image.Image]:
-        wiring = page.crop((left, int(0.12 * height), right, int(0.318 * height)))
-        dimensions = page.crop((left, int(0.37 * height), right, int(0.618 * height)))
-        return wiring, dimensions
+        wiring_top = _skip_hanging_rule(page, left=left, right=right, top=int(0.12 * height))
+        dims_top = _skip_hanging_rule(page, left=left, right=right, top=int(0.37 * height))
+        return _pack(wiring_top, int(0.318 * height), dims_top, int(0.618 * height))
 
     # Title bars are ~40px; ignore thinner ink runs in the drawing.
     bands = _right_column_black_bands(page, left=left, min_band_px=36)
     if len(bands) >= 2:
-        wiring_top = bands[0][1] + 6
+        wiring_top = _skip_hanging_rule(page, left=left, right=right, top=bands[0][1] + 6)
         wiring_bot = max(wiring_top + 40, bands[1][0] - 4)
-        dims_top = bands[1][1] + 6
+        dims_top = _skip_hanging_rule(page, left=left, right=right, top=bands[1][1] + 6)
         if len(bands) >= 3:
             dims_bot = max(dims_top + 40, bands[2][0] - 4)
         else:
             dims_bot = int(0.62 * height)
         if wiring_bot > wiring_top + 20 and dims_bot > dims_top + 20:
-            wiring = page.crop((left, wiring_top, right, wiring_bot))
-            dimensions = page.crop((left, dims_top, right, dims_bot))
-            return wiring, dimensions
+            return _pack(wiring_top, wiring_bot, dims_top, dims_bot)
 
     return _fallback()
 
@@ -1359,7 +1424,7 @@ def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     return summary
 
 
-_HVDF_CODE = re.compile(r"(?i)^hvd(?:24|230)st?-(?P<nm>\d+)f$")
+_HVDF_CODE = re.compile(r"(?i)^hvd(?:24|230)(?:s|st|sx)-(?P<nm>\d+)f$")
 _HVDF_SOURCE_URL = "https://hoocon.ru/.local-assets/manual-diagrams/hvd-{nm}f-{kind}.webp"
 
 
@@ -1569,14 +1634,26 @@ def diagrams_from_hvdf_pdf(pdf_path: Path, *, series_nm: int) -> list[DiagramCro
     ]
 
 
-def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> Path | None:
-    """Locate ``hvd-{nm}f-s_st.pdf`` from ProductFile or manuals dir."""
+def find_hvdf_manual_pdf(
+    *,
+    series_nm: int,
+    thermal_kind: str = "st",
+    manuals_dir: Path | None = None,
+) -> Path | None:
+    """Locate ``hvd-{nm}f-s_{st|sx}.pdf`` from ProductFile or manuals dir."""
     from catalog.etl.manual_pdfs import parse_hvd_f_manual_stem
 
+    kind = thermal_kind.casefold()
+    if kind not in {"st", "sx"}:
+        return None
     manuals_dir = manuals_dir or default_manuals_dir()
+    if kind == "sx":
+        sku_re = rf"(?i)^hvd(24|230)sx-{series_nm}f$"
+    else:
+        sku_re = rf"(?i)^hvd(24|230)st?-{series_nm}f$"
     file_qs = ProductFile.objects.filter(
         is_published=True,
-        sku__sku_code__iregex=rf"(?i)^hvd(24|230)st?-{series_nm}f$",
+        sku__sku_code__iregex=sku_re,
         title__icontains="Инструкция",
     ).exclude(file="")
     for pf in file_qs.select_related("sku")[:3]:
@@ -1585,15 +1662,15 @@ def find_hvdf_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
     if not manuals_dir.is_dir():
         return None
     for path in iter_manual_pdfs(manuals_dir, "hvd-*.pdf"):
-        nm = parse_hvd_f_manual_stem(path.name)
-        if nm == series_nm:
+        parsed = parse_hvd_f_manual_stem(path.name)
+        if parsed is not None and parsed[0] == series_nm and parsed[1] == kind:
             return path
     return None
 
 
 def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     """Attach photos + wiring + dimensions for every HVD-…F SKU."""
-    from catalog.etl.sku_variant import sku_code_is_thermal
+    from catalog.etl.sku_variant import hvdf_manual_thermal_kind, sku_code_is_thermal
 
     summary: dict[str, Any] = {
         "created": 0,
@@ -1603,23 +1680,30 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         "dry_run": dry_run,
     }
     skus = list(
-        SKU.objects.filter(sku_code__iregex=r"(?i)^hvd(24|230)st?-\d+f$").order_by(
+        SKU.objects.filter(
+            sku_code__iregex=r"(?i)^hvd(24|230)(?:s|st|sx)-\d+f$",
+        ).order_by(
             "sku_code",
         ),
     )
-    crop_cache: dict[int, list[DiagramCrop] | None] = {}
+    crop_cache: dict[tuple[int, str], list[DiagramCrop] | None] = {}
     for sku in skus:
         series_nm = parse_hvdf_series_nm(sku.sku_code)
         if series_nm is None:
             summary["skipped"] += 1
             continue
-        if series_nm not in crop_cache:
-            pdf_path = find_hvdf_manual_pdf(series_nm=series_nm)
+        manual_kind = hvdf_manual_thermal_kind(sku.sku_code)
+        cache_key = (series_nm, manual_kind)
+        if cache_key not in crop_cache:
+            pdf_path = find_hvdf_manual_pdf(
+                series_nm=series_nm,
+                thermal_kind=manual_kind,
+            )
             if pdf_path is None:
-                crop_cache[series_nm] = None
+                crop_cache[cache_key] = None
             else:
                 try:
-                    crop_cache[series_nm] = diagrams_from_hvdf_pdf(
+                    crop_cache[cache_key] = diagrams_from_hvdf_pdf(
                         pdf_path,
                         series_nm=series_nm,
                     )
@@ -1629,8 +1713,8 @@ def apply_hvdf_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
                         pdf_path,
                         type(exc).__name__,
                     )
-                    crop_cache[series_nm] = None
-        crops = crop_cache[series_nm]
+                    crop_cache[cache_key] = None
+        crops = crop_cache[cache_key]
         if not crops:
             summary["skipped"] += 1
             continue

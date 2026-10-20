@@ -31,6 +31,8 @@ from catalog.etl.manual_diagrams import (
 
 def test_parse_series_and_edition() -> None:
     assert parse_dafu_series_nm("da10fu24-ds") == 10
+    assert parse_dafu_series_nm("da10fqu24-ds") is None
+    assert parse_safu_series_nm("sa10fqu24-ds") is None
     assert edition_for_sku("da10fu24-ds") == "on_off"
     assert edition_for_sku("da5fu24-as") == "modulating_24"
     assert edition_for_sku("da5fu24") is None
@@ -171,6 +173,35 @@ def test_relabel_samu_diagram_crops_for_borrowed_pdf() -> None:
     assert labeled[0].png_bytes == b"png"
 
 
+@pytest.mark.django_db
+def test_find_hvdf_manual_pdf_matches_tuple_stem_torque(tmp_path: Path) -> None:
+    """HVD-F PDF fallback: stem parser returns (nm, kind), not int."""
+    from catalog.etl.manual_diagrams import find_hvdf_manual_pdf
+
+    ru = tmp_path / "RU"
+    ru.mkdir()
+    (ru / "hvd-5f-s_st.pdf").write_bytes(b"%PDF-1.4\n")
+    found = find_hvdf_manual_pdf(series_nm=5, manuals_dir=tmp_path)
+    assert found is not None
+    assert found.name.casefold() == "hvd-5f-s_st.pdf"
+    assert find_hvdf_manual_pdf(series_nm=3, manuals_dir=tmp_path) is None
+
+
+@pytest.mark.django_db
+def test_find_hvdf_manual_pdf_picks_st_or_sx_by_thermal_kind(tmp_path: Path) -> None:
+    """10F: both ``hvd-10f-s_st`` and ``hvd-10f-s_sx`` on disk — kind must match."""
+    from catalog.etl.manual_diagrams import find_hvdf_manual_pdf
+
+    ru = tmp_path / "RU"
+    ru.mkdir()
+    (ru / "hvd-10f-s_sx.pdf").write_bytes(b"%PDF-1.4\n")
+    (ru / "hvd-10f-s_st.pdf").write_bytes(b"%PDF-1.4\n")
+    st = find_hvdf_manual_pdf(series_nm=10, thermal_kind="st", manuals_dir=tmp_path)
+    sx = find_hvdf_manual_pdf(series_nm=10, thermal_kind="sx", manuals_dir=tmp_path)
+    assert st is not None and st.name.casefold() == "hvd-10f-s_st.pdf"
+    assert sx is not None and sx.name.casefold() == "hvd-10f-s_sx.pdf"
+
+
 def test_crop_safu_uses_right_column() -> None:
     page = Image.new("RGB", (1682, 1191), color=(255, 255, 255))
     wiring, dims = crop_safu_diagrams(page)
@@ -178,6 +209,103 @@ def test_crop_safu_uses_right_column() -> None:
     assert dims.size[0] == wiring.size[0]
     assert wiring.size[1] > 0
     assert dims.size[1] > wiring.size[1]
+
+
+def _solid_black_rule(image: Image.Image) -> bool:
+    """True when a thick solid black bar sits inside the crop (title underline)."""
+    width, height = image.size
+    if width < 40 or height < 8:
+        return False
+    pixels = image.load()
+    assert pixels is not None
+    min_run = int(width * 0.18)
+    min_thick = 8
+    run_rows = 0
+    for y in range(height):
+        run = best = 0
+        for x in range(width):
+            red, green, blue = pixels[x, y][:3]
+            if red < 40 and green < 40 and blue < 40:
+                run += 1
+                best = max(best, run)
+            else:
+                run = 0
+        if best >= min_run:
+            run_rows += 1
+            if run_rows >= min_thick:
+                return True
+        else:
+            run_rows = 0
+    return False
+
+
+def test_crop_safu_drops_short_underline_under_dimensions_title() -> None:
+    """SA7/SA10: короткая чёрная линейка под заголовком габаритов не входит в чертёж."""
+    width, height = 2000, 1600
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    left = int(width * 0.50)
+    for y0, y1 in ((160, 200), (560, 600), (1100, 1140)):
+        for y in range(y0, y1):
+            for x in range(left, width):
+                page.putpixel((x, y), (0, 0, 0))
+    # Shorter than the title, so band detection ignores it. Sits in the crop.
+    for y in range(612, 640):
+        for x in range(int(width * 0.62), int(width * 0.88)):
+            page.putpixel((x, y), (0, 0, 0))
+    mark = (78, 90, 12)
+    page.putpixel((int(width * 0.70), 700), mark)
+    page.putpixel((int(width * 0.78), 760), mark)
+
+    _wiring, dims = crop_safu_diagrams(page)
+    colors = set(dims.get_flattened_data())
+    assert mark in colors
+    assert not _solid_black_rule(dims)
+    # Side paper is trimmed: the drawing is not a speck in the full column.
+    assert dims.size[0] < (width - left) * 0.4
+
+
+def test_crop_safu_keeps_thin_dimension_line_under_title() -> None:
+    """A 2 px dimension line just under the title is the drawing, not an underline."""
+    width, height = 2000, 1600
+    page = Image.new("RGB", (width, height), color=(255, 255, 255))
+    left = int(width * 0.50)
+    for y0, y1 in ((160, 200), (560, 600), (1100, 1140)):
+        for y in range(y0, y1):
+            for x in range(left, width):
+                page.putpixel((x, y), (0, 0, 0))
+    for y in range(608, 610):
+        for x in range(int(width * 0.55), int(width * 0.90)):
+            page.putpixel((x, y), (0, 0, 0))
+    mark = (12, 34, 56)
+    page.putpixel((int(width * 0.70), 640), mark)
+
+    _wiring, dims = crop_safu_diagrams(page)
+    colors = set(dims.get_flattened_data())
+    assert mark in colors
+    assert (0, 0, 0) in colors
+
+
+def test_sa7mu_dimensions_crop_has_no_title_rule_and_fills_frame() -> None:
+    """SA7MU-DS.pdf: габариты без линейки заголовка и без пустой правой колонки."""
+    from catalog.etl.manual_diagrams import default_manuals_dir, render_pdf_page
+
+    pdf = default_manuals_dir() / "RU" / "SA7MU-DS.pdf"
+    if not pdf.is_file():
+        pytest.skip("SA7MU manual PDF is not in this checkout")
+    page = render_pdf_page(pdf, 1)
+    _wiring, dims = crop_safu_diagrams(page)
+    assert not _solid_black_rule(dims)
+    mask = dims.convert("L").point(lambda pixel: 255 if pixel < 245 else 0)
+    bbox = mask.getbbox()
+    assert bbox is not None
+    x0, y0, x1, y1 = bbox
+    assert x0 <= 16
+    assert y0 <= 16
+    assert dims.size[0] - x1 <= 16
+    assert dims.size[1] - y1 <= 16
+    # Both views (front + side) survive: ink spans most of the trimmed frame.
+    assert (x1 - x0) > dims.size[0] * 0.7
+    assert (y1 - y0) > dims.size[1] * 0.7
 
 
 def test_crop_safu_skips_black_section_titles() -> None:

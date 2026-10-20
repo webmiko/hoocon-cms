@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from catalog.etl.sku_variant import sku_code_is_thermal
+from catalog.etl.sku_variant import sku_code_is_hvdf_sx, sku_code_is_thermal
 
 TEMP_SENSOR_NONE = "Нет"
 TEMP_SENSOR_SAF72 = "SAF72"
@@ -50,7 +50,12 @@ def normalize_temp_sensor_value(
     if low in _NONE or low.startswith("без датчик"):
         return TEMP_SENSOR_NONE
     if not raw and sku_code is not None:
+        if sku_code_is_hvdf_sx(sku_code):
+            return "TS2"
         return TEMP_SENSOR_SAF72 if sku_code_is_thermal(sku_code) else TEMP_SENSOR_NONE
+    if sku_code is not None and sku_code_is_hvdf_sx(sku_code):
+        if low in {"да", "yes", "true", "1", "есть"}:
+            return "TS2"
     if sku_code is not None and sku_code_is_thermal(sku_code):
         # Prefer edition when EAV is a vague «да» / marketing note.
         if low in {"да", "yes", "true", "1", "есть"}:

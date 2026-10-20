@@ -21,7 +21,12 @@ from catalog.etl.attr_groups import (
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
 from catalog.etl.sku_instructions import damper_area_for_nm
-from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
+from catalog.etl.sku_variant import (
+    SkuVariant,
+    parse_sku_variant,
+    sku_code_is_hvdf_sx,
+    sku_code_is_thermal,
+)
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
     MANUAL_SAFETY_ATTENTION_LINES,
@@ -33,9 +38,9 @@ from catalog.etl.tech_copy import (
 from catalog.facets import normalize_aux_switch_value
 from catalog.models import SKU, Category, Product
 
-# HVD24S-3F / HVD24ST-3F / HVD230S-5F …
+# HVD24S-3F / HVD24ST-3F / HVD24SX-10F …
 _HVDF_CODE = re.compile(
-    r"(?i)^hvd(?P<volt>24|230)(?P<aux>s(?:t)?)-(?P<nm>\d+)f$",
+    r"(?i)^hvd(?P<volt>24|230)(?P<aux>s(?:t|x)?)-(?P<nm>\d+)f$",
 )
 
 AttrRow = tuple[str, str, str, str, str]
@@ -118,6 +123,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
 _TorqueSpec = dict[str, str]
 _HVDF_3_DIMENSIONS = "132 × 88 × 59 мм"
 _HVDF_5_DIMENSIONS = "158 × 102 × 59 мм"
+_HVDF_10_DIMENSIONS = "249,6 × 101,2 × 60,6 мм"
 
 TORQUE_SPECS: dict[int, _TorqueSpec] = {
     3: {
@@ -140,10 +146,21 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
         "shaft-length": "< 90 мм",
         "dimensions": _HVDF_5_DIMENSIONS,
     },
+    10: {
+        "moment": "10 Нм",
+        "damper-area": damper_area_for_nm(10),
+        "power": "5 Вт под нагрузкой / 3,5 Вт в режиме удержания",
+        "running-time": "< 100 с / возврат пружины < 25 с",
+        "weight": "< 2,5 кг",
+        "noise": ("макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины"),
+        "shaft-length": "< 90 мм",
+        "dimensions": _HVDF_10_DIMENSIONS,
+    },
 }
 
 TEMP_SENSOR_NONE = "Нет"
 TEMP_SENSOR_SAF72 = "SAF72"
+TEMP_SENSOR_TS2 = "TS2"
 
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
@@ -274,13 +291,20 @@ HVD230ST-5F: (с термодатчиком)
     ),
 }
 
-# (voltage, thermal) → sku_code suffix pattern already full code
-_EDITIONS: tuple[tuple[str, bool], ...] = (
-    ("24", False),
-    ("24", True),
-    ("230", False),
-    ("230", True),
+# (voltage, aux suffix on article)
+_HVDF_AUX_EDITIONS: tuple[tuple[str, str], ...] = (
+    ("24", "S"),
+    ("24", "ST"),
+    ("230", "S"),
+    ("230", "ST"),
 )
+
+
+def _editions_for_torque(torque_nm: int) -> tuple[tuple[str, str], ...]:
+    """S/ST for all Nm; SX only on HVD-10F (duct thermal, factory EN 2026)."""
+    if torque_nm == 10:
+        return _HVDF_AUX_EDITIONS + (("24", "SX"), ("230", "SX"))
+    return _HVDF_AUX_EDITIONS
 
 
 def parse_hvdf_torque_nm(sku_code: str) -> int | None:
@@ -337,7 +361,18 @@ def instructions_for_hvdf_sku(sku_code: str) -> str | None:
         ("– Две группы SPDT (S1–S3 и S4–S6); настройте угол срабатывания по таблице в инструкции."),
     ]
     next_ch = 5
-    if thermal:
+    code_cf = (sku_code or "").casefold().replace(" ", "")
+    if re.search(r"(?i)^hvd(?:24|230)sx-\d+f$", code_cf):
+        lines.extend(
+            [
+                "",
+                f"{next_ch}. Термодатчик (исполнение SX)",
+                "",
+                "– Канальный датчик (TS2), срабатывание при 72 °C.",
+            ],
+        )
+        next_ch += 1
+    elif thermal:
         lines.extend(
             [
                 "",
@@ -363,10 +398,9 @@ def is_hvdf_sku(sku_code: str) -> bool:
     return parse_hvdf_torque_nm(sku_code) is not None
 
 
-def hvdf_sku_code(*, voltage: str, thermal: bool, torque_nm: int) -> str:
-    """Build catalog article ``HVD24S-3F`` / ``HVD230ST-5F``."""
-    aux = "ST" if thermal else "S"
-    return f"HVD{voltage}{aux}-{torque_nm}F"
+def hvdf_sku_code(*, voltage: str, aux: str, torque_nm: int) -> str:
+    """Build catalog article ``HVD24S-3F`` / ``HVD230ST-5F`` / ``HVD24SX-10F``."""
+    return f"HVD{voltage}{aux.upper()}-{torque_nm}F"
 
 
 def product_slug_for_nm(torque_nm: int) -> str:
@@ -382,7 +416,7 @@ def sku_slug_for(code: str, torque_nm: int) -> str:
 def hvdf_product_queryset() -> QuerySet[Product]:
     """Products that own at least one HVD-…F SKU."""
     return Product.objects.filter(
-        skus__sku_code__iregex=r"(?i)^hvd(24|230)st?-\d+f$",
+        skus__sku_code__iregex=r"(?i)^hvd(24|230)(s|st|sx)-\d+f$",
     ).distinct()
 
 
@@ -400,7 +434,12 @@ def _sku_description(variant: SkuVariant, row: _TorqueSpec) -> str:
         "Управление: открыто/закрыто.",
         "Вспомогательные переключатели: 2 SPDT (исполнение S / ST).",
     ]
-    if sku_code_is_thermal(variant.code):
+    code_cf = (variant.code or "").casefold()
+    if re.search(r"(?i)^hvd(?:24|230)sx-\d+f$", code_cf):
+        lines.append(
+            "Термодатчик: канальный (TS2), срабатывание при 72 °C (исполнение SX).",
+        )
+    elif sku_code_is_thermal(variant.code):
         lines.append(
             "Термодатчик: SAF72 (TS1 — окружающая среда, TS2 — канал, срабатывание при 72 °C).",
         )
@@ -418,7 +457,7 @@ def _set_attr(sku: SKU, name: str, slug: str, unit: str, value: str) -> None:
 
 
 def ensure_hvdf_catalog(*, dry_run: bool = False) -> dict[str, Any]:
-    """Create missing HVD-3F / HVD-5F products and four edition SKUs each.
+    """Create missing HVD-…F products and edition SKUs (4× for 3/5 Нм, 6× for 10 Нм).
 
     Returns:
         Counters: products_created, skus_created, dry_run.
@@ -452,8 +491,8 @@ def ensure_hvdf_catalog(*, dry_run: bool = False) -> dict[str, Any]:
                 products_created += 1
         assert product is not None or dry_run
 
-        for voltage, thermal in _EDITIONS:
-            code = hvdf_sku_code(voltage=voltage, thermal=thermal, torque_nm=torque_nm)
+        for voltage, aux in _editions_for_torque(torque_nm):
+            code = hvdf_sku_code(voltage=voltage, aux=aux, torque_nm=torque_nm)
             if SKU.objects.filter(sku_code__iexact=code).exists():
                 continue
             if dry_run:
@@ -467,7 +506,7 @@ def ensure_hvdf_catalog(*, dry_run: bool = False) -> dict[str, Any]:
                 slug=sku_slug_for(code, torque_nm),
                 sku_code=code,
                 description="",
-                is_published=True,
+                is_published=False,
             )
             skus_created += 1
 
@@ -598,7 +637,12 @@ def apply_hvdf_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                 )
             attrs += 2
 
-            temp_value = TEMP_SENSOR_SAF72 if sku_code_is_thermal(sku.sku_code) else TEMP_SENSOR_NONE
+            if sku_code_is_hvdf_sx(sku.sku_code):
+                temp_value = TEMP_SENSOR_TS2
+            elif sku_code_is_thermal(sku.sku_code):
+                temp_value = TEMP_SENSOR_SAF72
+            else:
+                temp_value = TEMP_SENSOR_NONE
             if not dry_run:
                 _set_attr(sku, "Датчик температуры", "temp-sensor", "", temp_value)
             attrs += 1
