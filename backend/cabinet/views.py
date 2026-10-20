@@ -721,13 +721,15 @@ class AccountDocumentsZipView(ClientApiView):
                     stem, dot, ext = base.rpartition(".")
                     name = f"{stem}-{n}.{ext}" if dot else f"{base}-{n}"
                     n += 1
+                # ZipFile keeps the entry when the copy fails. Reserve the name
+                # first so the next file cannot open that same name again.
+                used_names.add(name)
                 try:
                     with doc.file.open("rb") as fh, zf.open(name, "w") as out:
                         shutil.copyfileobj(fh, out, 1024 * 1024)
                 except (FileNotFoundError, OSError):
                     logger.warning("account_zip_missing_file document_id=%s", doc.pk)
                     continue
-                used_names.add(name)
         buf.seek(0)
         filename = f"hoocon-docs-{client.pk}.zip"
         return FileResponse(buf, as_attachment=True, filename=filename)

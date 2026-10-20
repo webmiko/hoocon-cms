@@ -946,6 +946,58 @@ def test_account_quote_pdf_hides_prices_when_the_cabinet_flag_is_off(settings) -
 
 
 @pytest.mark.django_db
+def test_documents_zip_does_not_reuse_a_name_after_a_partial_write(settings, tmp_path) -> None:
+    """Сбой чтения после открытия записи не даёт второму документу то же имя в ZIP."""
+    import io
+    import zipfile
+    from unittest.mock import patch
+
+    from django.core.files.base import ContentFile
+    from django.db.models.fields.files import FieldFile
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    person = _client_with_data("zipdup@acme.test")
+    first = person.documents.first()
+    assert first is not None
+    first.file.save("boom.pdf", ContentFile(b"%PDF-boom"), save=True)
+    first.title = "Schet.pdf"
+    first.save(update_fields=["title"])
+    second = person.documents.create(title="Schet.pdf", kind=first.kind)
+    second.file.save("good.pdf", ContentFile(b"%PDF-ok"), save=True)
+
+    class _Broken:
+        def __enter__(self) -> _Broken:
+            return self
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+        def read(self, size: int = -1) -> bytes:
+            raise OSError("disk")
+
+        def close(self) -> None:
+            return None
+
+    real_open = FieldFile.open
+
+    def open_first_breaks(self: FieldFile, mode: str = "rb") -> object:
+        if str(self.name).endswith("boom.pdf"):
+            return _Broken()
+        return real_open(self, mode)
+
+    api = APIClient()
+    _register(api, "zipdup@acme.test")
+    with patch.object(FieldFile, "open", open_first_breaks):
+        response = api.get("/api/account/documents/zip/")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(b"".join(response.streaming_content))) as zf:
+        names = zf.namelist()
+        payloads = [zf.read(name) for name in names]
+    assert len(names) == len(set(names))
+    assert payloads.count(b"%PDF-ok") == 1
+
+
+@pytest.mark.django_db
 def test_documents_zip_owner_only() -> None:
     """ZIP export streams own documents under their titles."""
     import io
