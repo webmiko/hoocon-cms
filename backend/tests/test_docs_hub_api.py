@@ -151,6 +151,60 @@ def test_docs_family_zip_rejects_an_archive_over_the_cap(client, monkeypatch) ->
 
 
 @pytest.mark.django_db
+def test_family_zip_does_not_reuse_a_name_after_a_partial_write(settings, tmp_path) -> None:
+    """Сбой чтения после открытия записи в ZIP не даёт второму файлу то же имя."""
+    from catalog.docs_hub import build_family_zip
+    from catalog.models import SKU, Category, Product, ProductFile
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    category = Category.objects.create(name="ZIP", slug="zip-name-guard")
+    product = Product.objects.create(name="ZIP", slug="zip-name-guard-p", category=category)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA2MU24-D",
+        name="DA2MU",
+        slug="zip-name-guard-sku",
+        is_published=True,
+    )
+
+    class _Broken:
+        def __enter__(self) -> _Broken:
+            return self
+
+        def __exit__(self, *args: object) -> bool:
+            return False
+
+        def read(self, size: int = -1) -> bytes:
+            raise OSError("disk")
+
+        def close(self) -> None:
+            return None
+
+    broken = ProductFile(
+        sku=sku,
+        title="Manual One",
+        file_type=ProductFile.FileType.DATASHEET,
+        is_published=True,
+    )
+    broken.file.save("broken.pdf", ContentFile(b"%PDF-broken"), save=True)
+    good = ProductFile(
+        sku=sku,
+        title="manual-one",
+        file_type=ProductFile.FileType.DATASHEET,
+        is_published=True,
+    )
+    good.file.save("good.pdf", ContentFile(b"%PDF-ok"), save=True)
+    broken.file.open = lambda mode="rb": _Broken()  # type: ignore[method-assign]
+
+    archive = build_family_zip([broken, good])
+    with zipfile.ZipFile(archive) as zf:
+        names = zf.namelist()
+        payloads = [zf.read(name) for name in names]
+    assert len(names) == len(set(names))
+    assert payloads.count(b"%PDF-ok") == 1
+
+
+@pytest.mark.django_db
 def test_docs_family_zip_404(client) -> None:
     response = client.get(
         reverse("catalog-docs-family-zip", kwargs={"key": "NOSUCH"}),

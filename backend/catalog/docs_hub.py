@@ -531,11 +531,13 @@ def build_family_zip(files: list[ProductFile]) -> tempfile.SpooledTemporaryFile[
             if name in used_names:
                 stem = name[:-4] if name.lower().endswith(".pdf") else name
                 name = f"{stem}-{pf.id}.pdf"
+            # ZipFile keeps the entry when the copy fails. Reserve the name
+            # first so the next file cannot open that same name again.
+            used_names.add(name)
             try:
                 with pf.file.open("rb") as src, zf.open(name, "w") as out:
                     shutil.copyfileobj(src, out, 1024 * 1024)
             except (OSError, ValueError, FileNotFoundError):
                 continue
-            used_names.add(name)
     buf.seek(0)
     return buf
