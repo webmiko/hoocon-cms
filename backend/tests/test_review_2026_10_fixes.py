@@ -197,6 +197,68 @@ def test_cabinet_pdf_hides_prices_when_the_flag_is_off(settings) -> None:
     assert any("Итого" in line for line in drawn)
 
 
+@pytest.mark.django_db
+def test_mask_copied_production_secrets_clears_tokens() -> None:
+    """Копия продовой базы не оставляет боевые токены бота и АТС на ноутбуке."""
+    from django.contrib.sessions.models import Session
+
+    from sitesettings.mask_synced_secrets import mask_copied_production_secrets
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.telegram_bot_token = "123456:live"
+    site.novosystem_webhook_secret = "uis-secret"
+    site.mango_api_key = "mango-live-key"
+    site.mango_api_salt = "mango-live-salt"
+    site.save()
+    Session.objects.create(session_key="a" * 32, session_data="x", expire_date=timezone.now() + timedelta(days=1))
+    report = mask_copied_production_secrets()
+    site.refresh_from_db()
+    assert site.telegram_bot_token == ""
+    assert site.novosystem_webhook_secret == ""
+    assert site.mango_api_key == ""
+    assert site.mango_api_salt == ""
+    assert report["sessions"] == 1
+    assert Session.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_mask_copied_production_secrets_refuses_a_remote_database() -> None:
+    """Зачистка токенов не запускается, если Django смотрит не на локальную базу."""
+    from sitesettings.mask_synced_secrets import mask_copied_production_secrets
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.telegram_bot_token = "123456:live"
+    site.save()
+    with (
+        patch("sitesettings.mask_synced_secrets.copied_database_host", return_value="db"),
+        pytest.raises(RuntimeError, match="not local"),
+    ):
+        mask_copied_production_secrets()
+    site.refresh_from_db()
+    assert site.telegram_bot_token == "123456:live"
+
+
+def test_sync_from_vps_treats_only_loopback_as_local() -> None:
+    """Скрипт восстановления не считает хост docker-сервиса «db» локальным."""
+    script = ROOT / "scripts" / "sync-db-from-vps.sh"
+    completed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{script}"; '
+            "hoocon_db_host_is_local 127.0.0.1 && hoocon_db_host_is_local localhost && "
+            "hoocon_db_host_is_local ::1 && ! hoocon_db_host_is_local db && "
+            "! hoocon_db_host_is_local 203.0.113.10",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:
     """Уборка не стирает последние полные копии и не трогает незавершённый свежий каталог."""
     root = tmp_path / "backups"
