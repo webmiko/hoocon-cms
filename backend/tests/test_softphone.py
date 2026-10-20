@@ -558,4 +558,14 @@ def test_user_admin_page_never_renders_token(client: Any, django_user_model: Any
     assert "plain-secret-777" not in html
     assert stored not in html
     assert "Сейчас: сохранён" in html
-    assert "clear_uis_webrtc_token" in html
+    assert "field-clear_uis_webrtc_token" not in html
+    token = html.split("hoocon-token-field", 1)[1].split("</label>", 1)[0]
+    assert "clear_uis_webrtc_token" in token
+    assert "Удалить токен WebRTC" in token
+    assert "телефон в браузере перестанет работать" in token
+    css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8"
+    )
+    action = css.split(".hoocon-token-clear {", 1)[1].split("}", 1)[0]
+    assert "display: inline-flex" in action
+    assert "align-items: baseline" in action

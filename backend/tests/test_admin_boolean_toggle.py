@@ -13,7 +13,7 @@ from django.test import Client
 from django.urls import reverse
 
 from catalog.models import SKU, AnalogMap, Attribute, AttributeValue, Category, Product
-from config.admin_toggle import HooconToggleInput
+from config.admin_toggle import HooconToggleInput, toggle_function_label
 from crm.models import Company, CompanyMember
 from leads.models import CompanyManagerRule, Lead
 from supportchat.models import (
@@ -248,9 +248,31 @@ def test_staff_profile_booleans_are_toggles_with_captions() -> None:
     assert "Включено" in html
     assert "STARTTLS" in html
     assert ">SSL<" in html
+
+    def field_label(field_id: str) -> str:
+        match = re.search(rf'<label[^>]*\bfor="{field_id}"[^>]*>\s*([^<]+?)\s*</label>', html)
+        assert match is not None, field_id
+        return match.group(1)
+
+    # Default switch already says Выключено/Включено, so the field name is the function.
+    assert field_label("id_max_profile-0-max_alerts_enabled") == "Уведомления в MAX"
+    assert field_label("id_telegram_profile-0-telegram_alerts_enabled") == "Уведомления в Telegram"
+    assert field_label("id_vpbx_profile-0-is_enabled") == "Телефония сотрудника"
+    assert field_label("id_mailbox-0-is_enabled") == "Почта сотрудника (IMAP)"
+    assert field_label("id_mailbox-0-smtp_use_ssl") == "SMTP по SSL"
+    max_input = re.search(r'<input(?=[^>]*id="id_max_profile-0-max_alerts_enabled")[^>]*>', html)
+    assert max_input is not None
+    assert 'aria-label="Уведомления в MAX"' in max_input.group(0)
     clear = re.search(r"<input\b[^>]*clear_uis_webrtc_token[^>]*>", html)
     assert clear is not None
     assert "hoocon-toggle" not in clear.group(0)
+
+
+def test_toggle_function_label_drops_only_the_status_word() -> None:
+    """«… включены» теряет хвост, голое «Включён» берёт имя модели, прочие подписи не трогаем."""
+    assert toggle_function_label("Уведомления в MAX включены", fallback="MAX") == "Уведомления в MAX"
+    assert toggle_function_label("Включён", fallback="Телефония сотрудника") == "Телефония сотрудника"
+    assert toggle_function_label("SMTP по SSL", fallback="почта") == "SMTP по SSL"
 
 
 @pytest.mark.django_db

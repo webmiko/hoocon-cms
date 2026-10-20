@@ -1990,6 +1990,37 @@ kbd.hoocon-sidebar-shortcut > span {
   cursor: pointer;
 }
 
+/* Delete-token sits on the token row: one line, checkbox plus the action. */
+.hoocon-token-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.hoocon-token-clear {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hoocon-token-clear__input {
+  margin: 0;
+  flex: none;
+  align-self: center;
+}
+
+.hoocon-token-clear__hint {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
 /* Admin text fields: frosted glass fill, brand border when active.
    Explicit [type=…] so :focus beats the base rule (long :not() chains win specificity). */
 #content-main form .field-line input[type="text"],

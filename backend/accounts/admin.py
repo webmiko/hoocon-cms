@@ -93,7 +93,7 @@ class StaffVpbxProfileInline(StackedInline):
     can_delete = False
     extra = 1
     max_num = 1
-    fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token", "clear_uis_webrtc_token")
+    fields = ("extension", "uis_employee_id", "is_enabled", "uis_webrtc_token")
     verbose_name = "Телефония сотрудника"
     verbose_name_plural = "Телефония сотрудника"
 
