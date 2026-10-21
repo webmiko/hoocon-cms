@@ -459,9 +459,20 @@
 
 .compare:hover {
   background: var(--color-brand-control-hover);
-  text-decoration: none;
-  color: var(--color-on-brand-control);
   transform: scale(0.98);
+}
+
+/*
+ * Beat global a:visited (#9a1a6a / #d08aba). That lilac fails on the red fill
+ * after the dock link (/catalog, /consultation, /rfq) has been opened.
+ */
+.compare:link,
+.compare:visited,
+.compare:hover,
+.compare:active,
+.compare:visited:hover {
+  color: var(--color-on-brand-control);
+  text-decoration: none;
 }
 
 .compareFull {
