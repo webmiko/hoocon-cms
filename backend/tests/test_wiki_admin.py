@@ -156,6 +156,8 @@ def test_seed_wiki_novosystem_guide() -> None:
 
     from django.core.management import call_command
 
+    from config.release import RELEASE_VERSION
+
     call_command("seed_wiki", stdout=StringIO())
     doc = WikiDocument.objects.get(slug="novosystem-telephony-guide")
     assert doc.category == "Инструкции"
@@ -236,9 +238,33 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Телефония Новосистем (UIS)" in guide.body
     releases = WikiDocument.objects.get(slug="admin-releases")
     assert releases.is_active is True
+    # Бейдж и строка таблицы совпадают с номером продукта в release.py.
+    assert f"Сейчас v{RELEASE_VERSION}" in releases.body
+    assert f"<b>v{RELEASE_VERSION}</b>" in releases.body
+    assert f"текущей v{RELEASE_VERSION}" in releases.summary
     assert "v3.7.0" in releases.body
     assert "Что появилось" in releases.body
     assert "Mango" not in releases.body
+
+
+@pytest.mark.django_db
+def test_seed_wiki_guide_explains_current_workplace() -> None:
+    """Руководство 3.0: очередь, чужая компания и зависшее письмо описаны в шагах."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, _changelog = guide.body.split('id="changelog"', 1)
+    assert 'id="workplace"' in body
+    assert 'id="mail-stuck"' in body
+    assert "Для чего эта страница" in body
+    assert "только для чтения" in body
+    assert "сохраняются оба" in body
+    assert "Отправить выбранные (очередь)" in body
+    assert "статус «Отправка»" in body
+    assert "Назначить меня ответственным" in body
 
 
 @pytest.mark.django_db
