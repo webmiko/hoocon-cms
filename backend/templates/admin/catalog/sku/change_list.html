@@ -1,5 +1,49 @@
 {% extends "admin/change_list.html" %}
 
+{% block content %}
+  {% if stock_movement %}
+  <section class="hoocon-lead-stats" aria-label="Движение остатков" style="margin-bottom: 1.25rem;">
+    <section class="hoocon-lead-stats__cards" aria-label="Остаток и заказы по периодам">
+      <article class="hoocon-lead-stats__card">
+        <p class="hoocon-lead-stats__label">Сейчас на складе</p>
+        <p class="hoocon-lead-stats__value">
+          {% if stock_movement.filtering %}
+            <a href="{{ stock_movement.list_url }}">{{ stock_movement.on_hand }}</a>
+          {% else %}
+            {{ stock_movement.on_hand }}
+          {% endif %}
+        </p>
+        <p class="hoocon-lead-stats__label">{{ stock_movement.on_hand_positions }} поз. с остатком</p>
+      </article>
+      {% for period in stock_movement.periods %}
+      <article class="hoocon-lead-stats__card{% if period.move_active or period.idle_active %} hoocon-lead-stats__card--accent{% endif %}">
+        <p class="hoocon-lead-stats__label">{{ period.months }} мес.</p>
+        {% if stock_movement.include_orders %}
+        <p class="hoocon-lead-stats__value">
+          <a href="{{ period.move_url }}">{{ period.ordered_qty }}</a>
+        </p>
+        <p class="hoocon-lead-stats__label">
+          <a href="{{ period.move_url }}">в заказах · {{ period.moved_positions }} поз.</a>
+        </p>
+        <p class="hoocon-lead-stats__label">
+          <a href="{{ period.idle_url }}">без движения: {{ period.idle_in_stock }}</a>
+        </p>
+        {% else %}
+        <p class="hoocon-lead-stats__value">—</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% if stock_movement.include_orders %}
+    <p class="hoocon-lead-stats__label">
+      Штуки в заказах за скользящие 1, 3, 6 и 12 месяцев. Отменённые не входят.
+    </p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
 {% block object-tools-items %}
   {% if stock_upload_url %}
   <li>
