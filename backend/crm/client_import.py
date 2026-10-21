@@ -534,6 +534,7 @@ def _apply_row(
     report: ClientImportReport,
     seen_emails: set[str],
     index: _CompanyIndex,
+    assignee: Any | None = None,
 ) -> None:
     """Insert contacts and fill the company card. An existing email is left as-is."""
     emails = row.emails
@@ -557,6 +558,7 @@ def _apply_row(
         with transaction.atomic():
             org, created_company = _company_for_row(row, index)
             _fill_company(org, row, report)
+            _claim_company(org, assignee)
             touches = apply_company_profile(org, _profile_from_row(row))
             index.add(org)
             for email in fresh:
@@ -566,6 +568,7 @@ def _apply_row(
                     phone=_client_phone(row.phone),
                     company=org.name,
                     notes=row.notes,
+                    assignee=assignee,
                 )
                 client.save()
                 CompanyMember.objects.filter(company=org, client=client, is_confirmed=False).update(
@@ -604,6 +607,20 @@ def _refresh_existing_company(row: _ClientRow, report: ClientImportReport, index
         report.companies_created += 1
     else:
         report.companies_reused += 1
+
+
+def _claim_company(org: Company, assignee: Any | None) -> None:
+    """A manager who uploads the row owns the company until someone else does.
+
+    Contacts that already belong to another manager keep the company unclaimed,
+    so the upload does not take over their queue.
+    """
+    if assignee is None or org.assignee_id is not None:
+        return
+    others = Client.objects.filter(company_ref=org).exclude(assignee_id=None)
+    if others.exclude(assignee_id=assignee.pk).exists():
+        return
+    org.assignee = assignee
 
 
 def _company_for_row(row: _ClientRow, index: _CompanyIndex) -> tuple[Company, bool]:
@@ -660,15 +677,22 @@ def _fill_company(org: Company, row: _ClientRow, report: ClientImportReport) -> 
         org.save()
 
 
-def import_clients_xlsx(file_obj: BinaryIO | BytesIO) -> ClientImportReport:
+def import_clients_xlsx(
+    file_obj: BinaryIO | BytesIO,
+    *,
+    assignee: Any | None = None,
+) -> ClientImportReport:
     """Create client and company cards from the first worksheet.
 
     The client template (email optional) and the niche workbook are both
     accepted. Companies that differ only by «ООО» and quotes land on one card.
-    Existing emails are not updated.
+    Existing emails are not updated. ``assignee`` is the manager who uploaded
+    the file: new contacts are set to them. An empty company owner is set to
+    them only when no contact on that company already belongs to someone else.
 
     Args:
         file_obj: Binary ``.xlsx`` stream.
+        assignee: Staff user who should own the new cards. None leaves them free.
 
     Returns:
         Counters and per-row messages.
@@ -681,7 +705,7 @@ def import_clients_xlsx(file_obj: BinaryIO | BytesIO) -> ClientImportReport:
     seen: set[str] = set()
     index = _CompanyIndex()
     for row in rows:
-        _apply_row(row, report, seen, index)
+        _apply_row(row, report, seen, index, assignee)
     return report
 
 

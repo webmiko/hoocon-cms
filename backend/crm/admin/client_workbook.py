@@ -58,7 +58,10 @@ class ClientWorkbookMixin:
             if form.is_valid():
                 uploaded = form.cleaned_data["file"]
                 try:
-                    report = import_clients_xlsx(uploaded)
+                    from accounts.roles import staff_sees_all_leads
+
+                    owner = None if staff_sees_all_leads(request.user) else request.user
+                    report = import_clients_xlsx(uploaded, assignee=owner)
                 except ClientImportError as exc:
                     self.message_user(request, str(exc), messages.ERROR)
                 else:

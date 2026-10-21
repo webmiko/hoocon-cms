@@ -299,7 +299,8 @@ def test_import_admin_post_creates_cards_and_offers_template(client) -> None:
     response = client.post(reverse("admin:crm_client_import_clients"), {"file": upload})
     assert response.status_code == 302
     assert response.url == reverse("admin:crm_client_changelist")
-    assert Client.objects.filter(email="anna@example.com").exists()
+    created = Client.objects.get(email="anna@example.com")
+    assert created.assignee_id is None
 
     template = client.get(reverse("admin:crm_client_import_clients_template"))
     assert template.status_code == 200
@@ -312,6 +313,57 @@ def test_import_admin_post_creates_cards_and_offers_template(client) -> None:
     company_html = companies.content.decode()
     assert reverse("admin:crm_client_import_clients") in company_html
     assert reverse("admin:crm_client_export_clients") in company_html
+
+
+@pytest.mark.django_db
+def test_manager_upload_keeps_the_new_client_on_their_list(client) -> None:
+    """A manager only sees assigned cards, so the upload must assign the new ones."""
+    from crm.services import scope_clients_for_manager
+
+    manager = User.objects.create_user("mgr-imp", password="x", is_staff=True)
+    view_perm = Permission.objects.get(content_type__app_label="crm", codename="view_client")
+    add_perm = Permission.objects.get(content_type__app_label="crm", codename="add_client")
+    manager.user_permissions.add(view_perm, add_perm)
+    upload = _upload([HEADERS, ["ООО Ромашка", "", "", "Анна", "anna-mgr@example.com", "", ""]])
+    client.force_login(manager)
+    response = client.post(reverse("admin:crm_client_import_clients"), {"file": upload})
+    assert response.status_code == 302
+    created = Client.objects.get(email="anna-mgr@example.com")
+    assert created.assignee_id == manager.pk
+    assert created.company_ref is not None
+    assert created.company_ref.assignee_id == manager.pk
+    listing = client.get(reverse("admin:crm_client_changelist"))
+    assert "anna-mgr@example.com" in listing.content.decode()
+    stranger = User.objects.create_user("mgr-other-imp", password="x", is_staff=True)
+    visible = scope_clients_for_manager(Client.objects.all(), stranger)
+    assert visible.filter(pk=created.pk).count() == 0
+
+
+@pytest.mark.django_db
+def test_import_does_not_claim_a_company_whose_contacts_belong_to_someone_else(client) -> None:
+    """A new row must not make the uploader the owner of another manager's company."""
+    owner = User.objects.create_user("imp-owner", password="x", is_staff=True)
+    uploader = User.objects.create_user("imp-uploader", password="x", is_staff=True)
+    for codename in ("view_client", "add_client"):
+        uploader.user_permissions.add(
+            Permission.objects.get(content_type__app_label="crm", codename=codename),
+        )
+    Client.objects.create(
+        name="Уже есть",
+        email="kept@example.com",
+        company="ООО Ромашка",
+        assignee=owner,
+    )
+    upload = _upload([HEADERS, ["ООО Ромашка", "", "", "Новый", "new-row@example.com", "", ""]])
+    client.force_login(uploader)
+    response = client.post(reverse("admin:crm_client_import_clients"), {"file": upload})
+    assert response.status_code == 302
+    created = Client.objects.get(email="new-row@example.com")
+    assert created.assignee_id == uploader.pk
+    assert created.company_ref is not None
+    assert created.company_ref.assignee_id is None
+    kept = Client.objects.get(email="kept@example.com")
+    assert kept.assignee_id == owner.pk
 
 
 @pytest.mark.django_db
@@ -395,6 +447,7 @@ def test_export_admin_hides_another_managers_clients(client) -> None:
     finally:
         book.close()
     assert emails == ["mine@example.com"]
+
 
 @pytest.mark.django_db
 def test_lead_client_and_company_lists_show_a_memo(client) -> None:

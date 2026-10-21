@@ -139,6 +139,8 @@ def _absorb_outreach(target: Company, source: Company) -> None:
             setattr(target, field_name, getattr(source, field_name))
     if source.comment and source.comment not in (target.comment or ""):
         target.comment = f"{target.comment}\n\n{source.comment}".strip()
+    if target.assignee_id is None and source.assignee_id:
+        target.assignee = source.assignee
     if target.next_contact_at is None:
         target.next_contact_at = source.next_contact_at
     target.work_labels.add(*source.work_labels.all())
