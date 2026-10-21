@@ -1187,13 +1187,26 @@ def test_lead_dossier_keeps_the_fieldset_stack_gap() -> None:
 
 
 def test_desktop_rows_view_is_a_table_and_phones_keep_cards() -> None:
-    """«Строки» is a table from 768px. The toggle is hidden on a phone, which stays cards."""
+    """«Строки» fills the list column. The phone toggle stays hidden and the list stays cards."""
     extras = _EXTRAS_CSS.read_text(encoding="utf-8")
     phone = extras.split("@media (max-width: 767px) {\n  .hoocon-list-view-toggle {", 1)[1].split("}", 1)[0]
     assert "display: none" in phone
-    desktop = extras.split('@media (min-width: 768px) {\n  html[data-hoocon-list-view="rows"]', 1)[1]
-    table = desktop.split("display: table !important", 1)[0]
-    assert "overflow-x: auto" in table
+    marker = 'html[data-hoocon-list-view="rows"] body.hoocon-os27 #content-main'
+    assert marker in extras
+    desktop = extras.split(marker, 1)[1]
+    rows = desktop.split("table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr.selected", 1)[0]
+    assert "overflow-x: clip" in rows
+    assert "max-width: none !important" in rows
+    assert "width: 100% !important" in rows
+    assert "max-width: 100% !important" in rows
+    assert "table-layout: fixed" in rows
+    assert "max-content" not in rows
+    assert "text-overflow: ellipsis" in rows
+    assert "white-space: nowrap !important" in rows
+    assert "overflow-wrap: anywhere" not in rows
+    assert "th.action-checkbox-column" in rows
+    assert "max-width: 2.75rem !important" in rows
+    assert "padding: 0.5rem 0.75rem !important" in rows
     assert "display: table-cell !important" in desktop
     assert "display: table-header-group !important" in desktop
     assert "content: none !important" in desktop
@@ -1206,3 +1219,10 @@ def test_desktop_rows_view_is_a_table_and_phones_keep_cards() -> None:
     assert "listViewIsRows()" in stack
     assert "!phone && listViewIsRows()" in stack
     assert "classList.remove(STACKED_CLASS)" in stack
+    assert "applyProportionalColumns(table)" in stack
+    widths = js.split("function isCheckboxColumn", 1)[1].split("function updateStackMode", 1)[0]
+    assert "action-checkbox-column" in widths
+    assert "field-open_link" in widths
+    assert "Math.min(Math.max(longest, 8), 48)" in widths
+    assert 'setAttribute("title", text)' in widths
+    assert "colgroup.hoocon-rows-cols" in widths
