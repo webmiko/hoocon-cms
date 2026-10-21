@@ -203,3 +203,58 @@ def test_company_and_call_actions_assign_and_merge(client: Any) -> None:
     loose = PlannedTouch(starts_at=timezone.now(), title="Без компании")
     model_admin.save_model(request, loose, None, False)
     assert loose.dedupe_key.startswith("manual:")
+
+
+@pytest.mark.django_db
+def test_company_card_gives_each_new_planned_call_its_own_key(client: Any) -> None:
+    """Two calls added on the company card both save, and the workbook day key is taken.
+
+    The inline does not run PlannedTouchAdmin.save_model. An empty dedupe_key
+    made the second insert hit the unique constraint and let a later file
+    create the same company-day again.
+    """
+    from datetime import datetime
+
+    from django.utils import timezone
+
+    from crm.models import PlannedTouch
+    from crm.outreach import touch_dedupe_key
+    from tests.test_admin_scope_hardening import _admin_change_post
+
+    user = get_user_model().objects.create_superuser("call-key", "call-key@example.com", "password12")
+    org = Company.objects.create(name="Карточка звонков")
+    client.force_login(user)
+    url = reverse("admin:crm_company_change", args=[org.pk])
+    day = datetime(2026, 10, 22).date()
+
+    def add_call(title: str, hour: int) -> Any:
+        posted = _admin_change_post(client, url)
+        index = int(posted["planned_touches-TOTAL_FORMS"])
+        posted["planned_touches-TOTAL_FORMS"] = str(index + 1)
+        posted[f"planned_touches-{index}-id"] = ""
+        posted[f"planned_touches-{index}-company"] = str(org.pk)
+        posted[f"planned_touches-{index}-starts_at_0"] = day.isoformat()
+        posted[f"planned_touches-{index}-starts_at_1"] = f"{hour:02d}:00:00"
+        posted[f"planned_touches-{index}-status"] = "planned"
+        posted[f"planned_touches-{index}-assignee"] = ""
+        posted[f"planned_touches-{index}-title"] = title
+        response = client.post(url, posted)
+        if response.status_code != 302:
+            form_errors = [f"status={response.status_code}"]
+            if response.context is not None:
+                form_errors.append(str(response.context["adminform"].form.errors))
+                for formset in response.context["inline_admin_formsets"]:
+                    forms = formset.formset
+                    form_errors.append(f"{forms.prefix} {forms.non_form_errors()} {forms.errors}")
+            raise AssertionError(" | ".join(form_errors))
+        return response
+
+    add_call("Первый", 10)
+    add_call("Второй", 10)
+    saved = list(PlannedTouch.objects.filter(company=org).order_by("pk"))
+    assert [row.title for row in saved] == ["Первый", "Второй"]
+    canonical = touch_dedupe_key(org.pk, saved[0].kind, day)
+    assert saved[0].dedupe_key == canonical
+    assert saved[1].dedupe_key != canonical
+    assert saved[1].dedupe_key.startswith(f"{canonical}:")
+    assert timezone.localtime(saved[0].starts_at).date() == day

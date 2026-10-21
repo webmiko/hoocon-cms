@@ -1226,3 +1226,33 @@ class PlannedTouch(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Give a hand-made call a unique key so a later import does not copy that day."""
+        update_fields = kwargs.get("update_fields")
+        if not self.dedupe_key:
+            self.dedupe_key = self._unused_dedupe_key()
+            if update_fields is not None and "dedupe_key" not in update_fields:
+                kwargs["update_fields"] = [*update_fields, "dedupe_key"]
+        super().save(*args, **kwargs)
+
+    def _unused_dedupe_key(self) -> str:
+        """Company-day key from the workbook, or the next free suffix on that day."""
+        from crm.outreach import touch_dedupe_key
+
+        day = timezone.localtime(self.starts_at).date()
+        if self.company_id:
+            base = touch_dedupe_key(self.company_id, self.kind, day)
+        else:
+            owner = self.client_id or 0
+            stamp = self.starts_at.strftime("%H%M%S")
+            base = f"manual:{owner}:{self.kind}:{day.isoformat()}:{stamp}"
+        taken = self.__class__.objects.all()
+        if self.pk:
+            taken = taken.exclude(pk=self.pk)
+        key = base
+        extra = 2
+        while taken.filter(dedupe_key=key).exists():
+            key = f"{base}:{extra}"
+            extra += 1
+        return key

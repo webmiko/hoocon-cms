@@ -152,18 +152,5 @@ class PlannedTouchAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, ModelAdmin):
         self.message_user(request, f"Назначено событий: {updated}.", messages.SUCCESS)
 
     def save_model(self, request: HttpRequest, obj: PlannedTouch, form: Any, change: bool) -> None:
-        """A hand-made event needs a dedupe key so a later import does not copy it."""
-        if not obj.dedupe_key:
-            from django.utils import timezone
-
-            from crm.outreach import touch_dedupe_key
-
-            day = timezone.localtime(obj.starts_at).date()
-            if obj.company_id:
-                obj.dedupe_key = touch_dedupe_key(obj.company_id, obj.kind, day)
-            else:
-                owner = obj.client_id or 0
-                obj.dedupe_key = f"manual:{owner}:{obj.kind}:{day.isoformat()}:{obj.starts_at:%H%M%S}"
-            if PlannedTouch.objects.filter(dedupe_key=obj.dedupe_key).exists():
-                obj.dedupe_key = f"{obj.dedupe_key}:{obj.starts_at:%H%M%S}"
+        """Persist the row. PlannedTouch.save fills dedupe_key for this form and for inlines."""
         super().save_model(request, obj, form, change)
