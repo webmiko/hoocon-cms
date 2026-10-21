@@ -49,6 +49,7 @@ class StockMovementReport:
     on_hand_positions: int
     periods: list[StockPeriod] = field(default_factory=list)
     include_orders: bool = True
+    orders_scoped: bool = False
 
     def period(self, months: int) -> StockPeriod | None:
         """Return the window labelled ``months``, or None."""
@@ -62,12 +63,17 @@ def build_stock_movement_report(
     *,
     now: datetime | None = None,
     include_orders: bool = True,
+    user: Any | None = None,
 ) -> StockMovementReport:
     """Sum on-hand stock and order quantities for 1/3/6/12 months.
+
+    Order lines follow ``scope_orders_for_manager`` for ``user``. No viewer
+    yields no order lines. Admin, analyst, and superuser stay unscoped.
 
     Args:
         now: Clock for the rolling windows. Defaults to ``timezone.now()``.
         include_orders: When False, only the current stock totals are filled.
+        user: Staff viewer. None counts no orders.
 
     Returns:
         Report with per-period order quantity, moved SKU ids and idle ids.
@@ -82,10 +88,13 @@ def build_stock_movement_report(
     if not include_orders:
         return report
 
+    from accounts.roles import staff_sees_all_leads
+
+    report.orders_scoped = not staff_sees_all_leads(user)
     in_stock_ids = frozenset(
         _in_stock_ids(),
     )
-    lines = _order_lines_since(moment - timedelta(days=PERIODS[-1][1]))
+    lines = _order_lines_since(moment - timedelta(days=PERIODS[-1][1]), user)
     for months, days in PERIODS:
         cutoff = moment - timedelta(days=days)
         qty = 0
@@ -113,13 +122,17 @@ def build_stock_movement_report(
 
 
 def stock_report_for_request(request: HttpRequest) -> StockMovementReport:
-    """Build the report once per request. Orders require ``cabinet.view_order``."""
+    """Build the report once per request.
+
+    Orders require ``cabinet.view_order`` and the same client scope as the
+    order changelist (``scope_orders_for_manager``).
+    """
     cached = getattr(request, _REQUEST_CACHE, None)
     if isinstance(cached, StockMovementReport):
         return cached
     user = getattr(request, "user", None)
     include_orders = bool(user and user.has_perm("cabinet.view_order"))
-    report = build_stock_movement_report(include_orders=include_orders)
+    report = build_stock_movement_report(include_orders=include_orders, user=user)
     setattr(request, _REQUEST_CACHE, report)
     return report
 
@@ -156,6 +169,7 @@ def movement_template(report: StockMovementReport, request: HttpRequest) -> dict
         "on_hand": report.on_hand,
         "on_hand_positions": report.on_hand_positions,
         "include_orders": report.include_orders,
+        "orders_scoped": report.orders_scoped,
         "periods": periods,
         "list_url": base,
         "filtering": selected is not None,
@@ -182,16 +196,18 @@ def _in_stock_ids() -> list[int]:
     )
 
 
-def _order_lines_since(cutoff: datetime) -> list[tuple[int | None, datetime, int]]:
+def _order_lines_since(cutoff: datetime, user: Any | None) -> list[tuple[int | None, datetime, int]]:
     """Non-cancelled order lines since ``cutoff`` as ``(sku_id, created_at, qty)``.
 
-    A line whose SKU link was cleared is attached by article code when that
-    code still exists in the catalog.
+    Lines are limited to orders ``user`` may open. A line whose SKU link was
+    cleared is attached by article code when that code still exists in the catalog.
     """
-    from cabinet.models import OrderItem, OrderStatus
+    from cabinet.models import Order, OrderItem, OrderStatus
+    from crm.services import scope_orders_for_manager
 
+    visible = scope_orders_for_manager(Order.objects.all(), user)
     rows = list(
-        OrderItem.objects.filter(order__created_at__gte=cutoff)
+        OrderItem.objects.filter(order__in=visible.filter(created_at__gte=cutoff))
         .exclude(order__status=OrderStatus.CANCELLED)
         .values_list("sku_id", "sku_code", "quantity", "order__created_at"),
     )

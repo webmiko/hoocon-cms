@@ -10,6 +10,7 @@ from django.contrib.auth.models import Permission
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.roles import GROUP_ANALYST, GROUP_MANAGER
 from cabinet.models import Order, OrderItem, OrderStatus
 from catalog.stock_movement import build_stock_movement_report
 from crm.models import Client
@@ -55,7 +56,8 @@ def test_stock_movement_counts_orders_inside_each_window() -> None:
     Order.objects.filter(pk=orphan.pk).update(created_at=now - timedelta(days=3))
     OrderItem.objects.create(order=orphan, sku=None, sku_code="move-code", quantity=8)
 
-    report = build_stock_movement_report(now=now)
+    viewer = User.objects.create_superuser(username="stock-windows", email="windows@example.com", password="x")
+    report = build_stock_movement_report(now=now, user=viewer)
     month = report.period(1)
     quarter = report.period(3)
     year = report.period(12)
@@ -122,3 +124,93 @@ def test_sku_changelist_cards_filter_movers_and_hide_orders_without_perm(client)
     listing = unfiltered.content.decode()
     assert "UI-MOVED" in listing
     assert "UI-IDLE" in listing
+
+
+def _staff(username: str, group_name: str):
+    from django.contrib.auth.models import Group
+
+    from accounts.services import ensure_staff_groups
+
+    ensure_staff_groups()
+    user = User.objects.create_user(
+        username=username,
+        email=f"{username}@example.com",
+        password="x",
+        is_staff=True,
+    )
+    user.groups.add(Group.objects.get(name=group_name))
+    return user
+
+
+@pytest.mark.django_db
+def test_scoped_manager_stock_cards_hide_other_managers_orders(client) -> None:
+    """Менеджер видит штуки и артикулы только своих заказов; аналитик видит оба.
+
+    Карточки «в заказах» и фильтр stock_flow не должны обходить
+    scope_orders_for_manager: чужое количество и чужой артикул в «в заказах»
+    выдают продажи другого менеджера.
+    """
+    now = timezone.now()
+    manager = _staff("stock-scope-mgr", GROUP_MANAGER)
+    other = _staff("stock-scope-other", GROUP_MANAGER)
+    analyst = _staff("stock-scope-analyst", GROUP_ANALYST)
+    own_client = Client.objects.create(name="Свой", email="stock-own@example.com", assignee=manager)
+    foreign_client = Client.objects.create(
+        name="Чужой",
+        email="stock-foreign@example.com",
+        assignee=other,
+    )
+    own = _sku(code="SCOPE-OWN", stock=2)
+    foreign = _sku(code="SCOPE-FOREIGN", stock=4)
+    _order(client=own_client, number="З-свой", sku=own, qty=7, days_ago=2, status=OrderStatus.SHIPPED, now=now)
+    _order(
+        client=foreign_client,
+        number="З-чужой",
+        sku=foreign,
+        qty=13,
+        days_ago=2,
+        status=OrderStatus.SHIPPED,
+        now=now,
+    )
+
+    scoped = build_stock_movement_report(now=now, user=manager)
+    month = scoped.period(1)
+    assert month is not None
+    assert scoped.orders_scoped is True
+    assert month.ordered_qty == 7
+    assert own.pk in month.moved_ids
+    assert foreign.pk not in month.moved_ids
+    assert foreign.pk in month.idle_ids
+    blind = build_stock_movement_report(now=now)
+    blind_month = blind.period(1)
+    assert blind_month is not None
+    assert blind_month.ordered_qty == 0
+    wide_report = build_stock_movement_report(now=now, user=analyst)
+    wide_month = wide_report.period(1)
+    assert wide_month is not None
+    assert wide_report.orders_scoped is False
+    assert wide_month.ordered_qty == 20
+    assert foreign.pk in wide_month.moved_ids
+
+    url = reverse("admin:catalog_sku_changelist")
+    client.force_login(manager)
+    page = client.get(url)
+    assert page.status_code == 200
+    html = page.content.decode()
+    assert ">7<" in html
+    assert ">20<" not in html
+    assert "ваших клиентов" in html
+    movers = client.get(url, {"stock_flow": "move-1"}).content.decode()
+    assert "SCOPE-OWN" in movers
+    assert "SCOPE-FOREIGN" not in movers
+    idle = client.get(url, {"stock_flow": "idle-1"}).content.decode()
+    assert "SCOPE-FOREIGN" in idle
+    assert "SCOPE-OWN" not in idle
+
+    client.force_login(analyst)
+    wide = client.get(url).content.decode()
+    assert ">20<" in wide
+    assert "ваших клиентов" not in wide
+    analyst_movers = client.get(url, {"stock_flow": "move-1"}).content.decode()
+    assert "SCOPE-OWN" in analyst_movers
+    assert "SCOPE-FOREIGN" in analyst_movers
