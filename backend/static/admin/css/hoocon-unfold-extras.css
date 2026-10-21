@@ -3642,6 +3642,68 @@ body:not(.hoocon-support-inbox) #changelist
   background: var(--hoocon-primary);
 }
 
+/* Phone keeps cards. The toggle is a desktop choice. */
+@media (max-width: 767px) {
+  .hoocon-list-view-toggle {
+    display: none;
+  }
+}
+
+/* Desktop «Строки»: a real table even if the card class is still on the node.
+ * Stacked card rules use !important, so the table parts are set the same way. */
+@media (min-width: 768px) {
+  html[data-hoocon-list-view="rows"] #changelist .results {
+    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table {
+    display: table !important;
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked thead,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table thead {
+    display: table-header-group !important;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody {
+    display: table-row-group !important;
+    width: auto;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody tr {
+    display: table-row !important;
+    flex-direction: row;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody td,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody th {
+    display: table-cell !important;
+    width: auto !important;
+    max-width: none;
+    grid-template-columns: none;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody td::before,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody th::before {
+    content: none !important;
+    display: none !important;
+  }
+}
+
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr.selected,
 table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody tr:has(.action-select:checked) {
   background: var(--hoocon-surface-muted);

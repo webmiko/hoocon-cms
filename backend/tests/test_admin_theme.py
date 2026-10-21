@@ -1184,3 +1184,25 @@ def test_lead_dossier_keeps_the_fieldset_stack_gap() -> None:
     assert "gap: var(--hoocon-section-gap)" in block
     reset = extras.split(".hoocon-lead-dossier p,\n.hoocon-lead-dossier ul {", 1)[1].split("}", 1)[0]
     assert "margin: 0" in reset
+
+
+def test_desktop_rows_view_is_a_table_and_phones_keep_cards() -> None:
+    """«Строки» is a table from 768px. The toggle is hidden on a phone, which stays cards."""
+    extras = _EXTRAS_CSS.read_text(encoding="utf-8")
+    phone = extras.split("@media (max-width: 767px) {\n  .hoocon-list-view-toggle {", 1)[1].split("}", 1)[0]
+    assert "display: none" in phone
+    desktop = extras.split('@media (min-width: 768px) {\n  html[data-hoocon-list-view="rows"]', 1)[1]
+    table = desktop.split("display: table !important", 1)[0]
+    assert "overflow-x: auto" in table
+    assert "display: table-cell !important" in desktop
+    assert "display: table-header-group !important" in desktop
+    assert "content: none !important" in desktop
+    js = (_EXTRAS_CSS.parents[1] / "js/hoocon-admin-tables.js").read_text(encoding="utf-8")
+    # source-lint: the class that makes a changelist a card grid is removed only for this choice.
+    choice = js.split("function listViewIsRows()", 1)[1].split("function updateStackMode", 1)[0]
+    assert 'document.documentElement.getAttribute("data-hoocon-list-view")' in choice
+    assert 'toggle.getAttribute("data-hoocon-list-view") === "rows"' in choice
+    stack = js.split("function updateStackMode", 1)[1].split("function watchTable", 1)[0]
+    assert "listViewIsRows()" in stack
+    assert "!phone && listViewIsRows()" in stack
+    assert "classList.remove(STACKED_CLASS)" in stack

@@ -466,3 +466,33 @@ def test_lead_client_and_company_lists_show_a_memo(client) -> None:
     dark = css.split(".dark .hoocon-page-memo {", 1)[1].split("}", 1)[0]
     assert "background:" in dark
     assert "#f5f5f4" in dark
+
+
+@pytest.mark.django_db
+def test_company_and_client_lists_keep_cards_or_rows(client) -> None:
+    """Desktop lists remember cards or rows. An unknown view does not replace it."""
+    admin = User.objects.create_superuser("list-view", "list-view@example.com", "password12")
+    client.force_login(admin)
+    companies = reverse("admin:crm_company_changelist")
+    clients = reverse("admin:crm_client_changelist")
+
+    page = client.get(companies)
+    html = page.content.decode()
+    assert 'data-hoocon-list-view="cards"' in html
+    assert "Карточки" in html
+    assert "Строки" in html
+    assert "view=rows" in html
+
+    chosen = client.get(f"{companies}?view=rows&q=атом")
+    body = chosen.content.decode()
+    assert 'data-hoocon-list-view="rows"' in body
+    assert "view=cards" in body
+    assert "q=%D0%B0%D1%82%D0%BE%D0%BC" in body or "q=атом" in body
+
+    again = client.get(companies)
+    assert 'data-hoocon-list-view="rows"' in again.content.decode()
+    people = client.get(clients)
+    assert 'data-hoocon-list-view="rows"' in people.content.decode()
+
+    junk = client.get(f"{companies}?view=kanban")
+    assert 'data-hoocon-list-view="rows"' in junk.content.decode()
