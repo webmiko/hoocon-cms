@@ -199,6 +199,15 @@
     return Math.max(headerNeeded, floor);
   }
 
+  function listViewIsRows() {
+    const root = document.documentElement.getAttribute("data-hoocon-list-view");
+    if (root === "rows") {
+      return true;
+    }
+    const toggle = document.querySelector(".hoocon-list-view-toggle");
+    return toggle !== null && toggle.getAttribute("data-hoocon-list-view") === "rows";
+  }
+
   /**
    * Stack into cards when the full table cannot fit the container width.
    *
@@ -214,8 +223,14 @@
     }
 
     const isChangelist = Boolean(table.closest("#changelist"));
+    const phone = window.matchMedia(STACK_MQ).matches;
+    /* Desktop «Строки» is a table. A phone stays cards even if that choice is saved. */
+    if (isChangelist && !phone && listViewIsRows()) {
+      table.classList.remove(STACKED_CLASS);
+      return;
+    }
 
-    if (isChangelist || window.matchMedia(STACK_MQ).matches) {
+    if (isChangelist || phone) {
       table.classList.add(STACKED_CLASS);
       return;
     }

@@ -31,6 +31,7 @@ from crm.admin.inlines import (
     QuoteInline,
     RmaCaseInline,
 )
+from crm.admin.list_view import remember_list_view
 from crm.admin.scope import OverdueNextContactFilter
 from crm.forms import ComposeEmailForm, SpecImportForm
 from crm.mail_links import staff_reply_to_email
@@ -397,6 +398,7 @@ class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
             extra["client_import_url"] = reverse("admin:crm_client_import_clients")
         if self.has_view_permission(request):
             extra["client_export_url"] = reverse("admin:crm_client_export_clients")
+        extra.update(remember_list_view(request))
         return super().changelist_view(request, extra_context=extra)
 
     def compose_email_view(

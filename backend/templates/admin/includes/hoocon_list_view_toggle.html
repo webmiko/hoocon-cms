@@ -1,0 +1,17 @@
+<span
+  class="hoocon-lead-view-toggle hoocon-list-view-toggle"
+  role="group"
+  aria-label="Вид списка"
+  data-hoocon-list-view="{{ hoocon_list_view|default:'cards' }}"
+>
+  <a
+    href="{{ hoocon_list_view_cards_url }}"
+    class="{% if hoocon_list_view != 'rows' %}is-active{% endif %}"
+    {% if hoocon_list_view != 'rows' %}aria-current="page"{% endif %}
+  >Карточки</a>
+  <a
+    href="{{ hoocon_list_view_rows_url }}"
+    class="{% if hoocon_list_view == 'rows' %}is-active{% endif %}"
+    {% if hoocon_list_view == 'rows' %}aria-current="page"{% endif %}
+  >Строки</a>
+</span>

@@ -1,6 +1,17 @@
 {% extends "admin/change_list.html" %}
 
+{% block extrahead %}
+  {{ block.super }}
+  <script>
+    document.documentElement.dataset.hooconListView =
+      "{{ hoocon_list_view|default:'cards'|escapejs }}";
+  </script>
+{% endblock %}
+
 {% block object-tools-items %}
+  <li class="hoocon-list-view-tool">
+    {% include "admin/includes/hoocon_list_view_toggle.html" %}
+  </li>
   {% if client_import_url %}
   <li>
     <a href="{{ client_import_url }}" class="addlink">Загрузить клиентов</a>

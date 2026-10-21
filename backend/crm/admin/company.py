@@ -16,6 +16,7 @@ from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
+from crm.admin.list_view import remember_list_view
 from crm.models import Client, Company, CompanyMember, PlannedTouch
 from crm.phone_widget import MultiPhoneWidget
 
@@ -135,6 +136,7 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
             extra["client_import_url"] = reverse("admin:crm_client_import_clients")
         if client_admin.has_view_permission(request):
             extra["client_export_url"] = reverse("admin:crm_client_export_clients")
+        extra.update(remember_list_view(request))
         return super().changelist_view(request, extra_context=extra)
 
     def has_merge_permission(self, request: HttpRequest) -> bool:
