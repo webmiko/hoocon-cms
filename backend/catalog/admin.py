@@ -19,6 +19,7 @@ from catalog.etl.stock_import import (
     build_stock_template_xlsx,
     import_stock_xlsx,
 )
+from catalog.etl.stock_snapshots import snapshot_drop_filter, snapshot_report_for_request, snapshot_template
 from catalog.forms import StockUploadForm
 from catalog.models import (
     ADMIN_EDIT_FLAG,
@@ -105,6 +106,33 @@ class StockFlowListFilter(admin.SimpleListFilter):
         if not ids:
             return queryset.none()
         return queryset.filter(pk__in=ids)
+
+
+class StockDropListFilter(admin.SimpleListFilter):
+    """Changelist filter for articles whose free stock fell between 1C exports."""
+
+    title = "уменьшение остатка"
+    parameter_name = "stock_drop"
+
+    def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin) -> list[tuple[str, str]]:
+        return [
+            ("7", "Меньше · 7 дн."),
+            ("30", "Меньше · 1 мес."),
+            ("91", "Меньше · 3 мес."),
+            ("182", "Меньше · 6 мес."),
+            ("365", "Меньше · 12 мес."),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: Any) -> Any:
+        key = snapshot_drop_filter(request)
+        if key is None:
+            return queryset
+        window = snapshot_report_for_request(request).window(key)
+        if window is None:
+            return queryset
+        if not window.sku_ids:
+            return queryset.none()
+        return queryset.filter(pk__in=window.sku_ids)
 
 
 class InStockListFilter(admin.SimpleListFilter):
@@ -254,6 +282,7 @@ class SKUAdmin(LabeledToggleMixin, AdminEditLockMixin, OpenChangeLinkMixin, Mode
         "is_published",
         InStockListFilter,
         StockFlowListFilter,
+        StockDropListFilter,
         "product__category",
         "product",
     )
@@ -351,6 +380,7 @@ class SKUAdmin(LabeledToggleMixin, AdminEditLockMixin, OpenChangeLinkMixin, Mode
             extra["stock_upload_url"] = reverse("admin:catalog_sku_import_stock")
         if self.has_view_permission(request):
             extra["stock_movement"] = movement_template(stock_report_for_request(request), request)
+            extra["stock_snapshots"] = snapshot_template(request)
         return super().changelist_view(request, extra_context=extra)
 
     def stock_template_view(self, request: HttpRequest) -> HttpResponse:
@@ -377,7 +407,7 @@ class SKUAdmin(LabeledToggleMixin, AdminEditLockMixin, OpenChangeLinkMixin, Mode
             if form.is_valid():
                 uploaded = form.cleaned_data["file"]
                 try:
-                    report = import_stock_xlsx(uploaded)
+                    report = import_stock_xlsx(uploaded, source_name=getattr(uploaded, "name", "") or "")
                 except StockImportError as exc:
                     self.message_user(request, str(exc), messages.ERROR)
                 else:

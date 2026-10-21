@@ -41,6 +41,39 @@
     {% endif %}
   </section>
   {% endif %}
+  {% if stock_snapshots %}
+  <section class="hoocon-lead-stats" aria-label="Остатки по выгрузкам" style="margin-bottom: 1.25rem;">
+    <section class="hoocon-lead-stats__cards" aria-label="На сколько уменьшился остаток">
+      {% if stock_snapshots.ready %}
+        {% for period in stock_snapshots.windows %}
+        <article class="hoocon-lead-stats__card{% if period.active %} hoocon-lead-stats__card--accent{% endif %}">
+          <p class="hoocon-lead-stats__label">{{ period.label }}{% if period.partial %} · с {{ period.baseline_on }}{% endif %}</p>
+          <p class="hoocon-lead-stats__value">
+            <a href="{{ period.url }}">{{ period.dropped_qty }}</a>
+          </p>
+          <p class="hoocon-lead-stats__label">
+            <a href="{{ period.url }}">стало меньше · {{ period.dropped_positions }} арт.</a>
+          </p>
+          <p class="hoocon-lead-stats__label">{{ period.baseline_on }} → {{ period.latest_on }}</p>
+        </article>
+        {% endfor %}
+      {% else %}
+        <article class="hoocon-lead-stats__card">
+          <p class="hoocon-lead-stats__label">По выгрузкам</p>
+          <p class="hoocon-lead-stats__value">—</p>
+          <p class="hoocon-lead-stats__label">нужна вторая загрузка Excel</p>
+        </article>
+      {% endif %}
+    </section>
+    <p class="hoocon-lead-stats__label">
+      На сколько свободный остаток стал меньше между выгрузками 1С.
+      Если за срок был и приход, и расход, виден только итог.
+      {% if stock_snapshots.filtering %}
+        <a href="{{ stock_snapshots.list_url }}">Сбросить фильтр</a>
+      {% endif %}
+    </p>
+  </section>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 

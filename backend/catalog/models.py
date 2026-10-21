@@ -783,3 +783,47 @@ class AnalogMap(models.Model):
 def normalize_analog_code(raw: str) -> str:
     """Normalize a foreign article code for matching (upper, alnum only)."""
     return "".join(ch for ch in (raw or "").upper() if ch.isalnum())
+
+
+class StockSnapshot(models.Model):
+    """One 1C stock export. A later file with the same date replaces the lines."""
+
+    taken_on = models.DateField("дата выгрузки", unique=True, db_index=True)
+    source_name = models.CharField("файл", max_length=300, blank=True, default="")
+    created_at = models.DateTimeField("записано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "снимок остатков"
+        verbose_name_plural = "снимки остатков"
+        ordering = ("-taken_on",)
+
+    def __str__(self) -> str:
+        return f"Остатки {self.taken_on:%d.%m.%Y}"
+
+
+class StockSnapshotLine(models.Model):
+    """Free quantity of one article in one export, including the 4–20 mA bucket."""
+
+    snapshot = models.ForeignKey(
+        StockSnapshot,
+        verbose_name="снимок",
+        related_name="lines",
+        on_delete=models.CASCADE,
+    )
+    article_key = models.CharField("ключ артикула", max_length=300)
+    article = models.CharField("артикул", max_length=300)
+    qty = models.IntegerField("остаток", default=0)
+    qty_ma = models.IntegerField("остаток 4–20 мА", default=0)
+
+    class Meta:
+        verbose_name = "строка снимка остатков"
+        verbose_name_plural = "строки снимка остатков"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("snapshot", "article_key"),
+                name="catalog_stocksnapshotline_snapshot_key_uniq",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.article} · {self.qty}"

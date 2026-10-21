@@ -344,6 +344,10 @@ def test_import_stock_xlsx_end_to_end() -> None:
     assert sku.in_stock is True
     assert report.updated == 1
     assert report.ignored_unknown == 1
+    from catalog.models import StockSnapshotLine
+
+    line = StockSnapshotLine.objects.get(article_key="HVD-1")
+    assert line.qty == 4
 
 
 def test_build_stock_template_xlsx_has_headers() -> None:
