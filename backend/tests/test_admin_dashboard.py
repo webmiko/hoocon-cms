@@ -197,6 +197,8 @@ def test_today_list_sits_above_sections_and_assign_claims_the_call() -> None:
 
     call_command("seed_wiki", stdout=StringIO())
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide").body
+    assert guide.index("changelog-own-cards") < guide.index("changelog-page-memos")
+    assert guide.index("changelog-planned-touch-status") < guide.index("changelog-today-board")
     assert guide.index("changelog-today-board") < guide.index("changelog-company-phones")
     assert "Взять" in guide
 
