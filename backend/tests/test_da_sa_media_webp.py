@@ -498,3 +498,64 @@ def test_damqu_removebg_cutout_stays_transparent(tmp_path: Path) -> None:
     assert rgba.getpixel((8, 8))[3] == 255
     red = rgba.getpixel((rgba.width // 2, rgba.height // 2))
     assert red[0] > 150 and red[1] < 80 and red[3] == 255
+
+
+@pytest.mark.django_db
+def test_damqu_manual_heroes_run_without_media_pack(tmp_path: Path) -> None:
+    """RU cutout replaces the labeled da10:20mqu shot when the pack is missing or empty.
+
+    ``apply_da_sa_media_webp`` used to return before ``apply_damqu_manual_heroes``.
+    The cutout lives under ``_manuals-ru`` and does not need the pack.
+    """
+    assets = tmp_path / "assets"
+    body = assets / "da8-16-24mqu24-a-as"
+    body.mkdir(parents=True)
+    (body / "product.png").write_bytes(_png(color=(180, 20, 20)))
+    cat = Category.objects.create(name="MQU nopack", slug="mqu-nopack")
+    product = Product.objects.create(name="DA MQU", slug="da-mqu-nopack", category=cat)
+
+    def labeled(code: str) -> SKU:
+        sku = SKU.objects.create(
+            product=product,
+            sku_code=code,
+            name=code,
+            slug=code.lower(),
+            is_published=True,
+        )
+        ProductImage.objects.create(
+            sku=sku,
+            image=SimpleUploadedFile("old.webp", _png(color=(1, 1, 1)), content_type="image/webp"),
+            alt="DA8MQU24-A | фото привода",
+            source_url="https://hoocon.ru/.local-assets/media-webp/da10:20mqu-a:as-product.webp",
+            sort_order=0,
+            is_published=True,
+        )
+        return sku
+
+    missing_sku = labeled("DA16MQU24-A")
+    summary = apply_da_sa_media_webp(dry_run=False, photo_root=tmp_path / "absent-pack", assets_root=assets)
+    assert summary["missing_root"] is True
+    assert summary["manual_heroes"]["heroes"] >= 1
+    assert not ProductImage.objects.filter(
+        sku=missing_sku,
+        source_url__contains="da10:20mqu",
+        is_published=True,
+    ).exists()
+    assert ProductImage.objects.filter(
+        sku=missing_sku,
+        source_url__contains="da8-16-24mqu24-a-as-product",
+        is_published=True,
+    ).exists()
+
+    empty_sku = labeled("DA24MQU24-A")
+    empty = tmp_path / "empty-pack"
+    empty.mkdir()
+    empty_summary = apply_da_sa_media_webp(dry_run=False, photo_root=empty, assets_root=assets)
+    assert "missing_root" not in empty_summary
+    assert empty_summary["skipped"] == 1
+    assert empty_summary["manual_heroes"]["heroes"] >= 1
+    assert not ProductImage.objects.filter(
+        sku=empty_sku,
+        source_url__contains="da10:20mqu",
+        is_published=True,
+    ).exists()

@@ -237,15 +237,21 @@ def apply_da_sa_media_webp(
     *,
     dry_run: bool = False,
     photo_root: Path | None = None,
+    assets_root: Path | None = None,
 ) -> dict[str, Any]:
     """Attach media-webp product heroes to matching DA/SA SKUs.
+
+    The RU DA8/16/24 MQU cutouts live under ``_manuals-ru`` and are attached
+    even when the media-webp pack is missing or empty.
 
     Args:
         dry_run: Count only.
         photo_root: Override pack directory.
+        assets_root: Override ``_manuals-ru/DA/assets``. Default is the repo tree.
 
     Returns:
-        Counters: created, updated, skipped, unmatched, missing_root, by_stem.
+        Counters: created, updated, skipped, unmatched, missing_root, by_stem,
+        manual_heroes.
     """
     root = photo_root or default_media_webp_root()
     summary: dict[str, Any] = {
@@ -257,15 +263,23 @@ def apply_da_sa_media_webp(
         "photo_root": str(root) if root else "",
         "by_stem": {},
     }
+    shots: list[_PackShot] = []
     if root is None or not root.is_dir():
         summary["missing_root"] = True
-        return summary
+    else:
+        shots = _scan_pack(root)
+        if not shots:
+            summary["skipped"] = 1
 
-    shots = _scan_pack(root)
-    if not shots:
-        summary["skipped"] = 1
-        return summary
+    if shots:
+        _attach_pack_shots(summary, shots, dry_run=dry_run)
 
+    summary["manual_heroes"] = apply_damqu_manual_heroes(dry_run=dry_run, assets_root=assets_root)
+    return summary
+
+
+def _attach_pack_shots(summary: dict[str, Any], shots: list[_PackShot], *, dry_run: bool) -> None:
+    """Write pack heroes onto published DA/SA SKUs. Mutates ``summary``."""
     webp_cache: dict[Path, bytes] = {}
     skus = list(
         SKU.objects.filter(sku_code__iregex=r"(?i)^(?:da|sa)\d", is_published=True).order_by(
@@ -311,9 +325,6 @@ def apply_da_sa_media_webp(
         else:
             summary["unchanged"] = summary.get("unchanged", 0) + 1
         logger.info("da_sa_media_webp %s %s ← %s", action, sku.sku_code, shot.stem)
-
-    summary["manual_heroes"] = apply_damqu_manual_heroes(dry_run=dry_run)
-    return summary
 
 
 def _damqu_alt_for_target(alt: str, sku_code: str) -> str:
