@@ -70,3 +70,44 @@ def localize_third_party_admin() -> None:
 
 
 localize_third_party_admin()
+
+
+def install_admin_choice_labels() -> None:
+    """Show admin_choice_label in autocomplete and in the selected option.
+
+    Model.__str__ stays short so logs do not carry the contact's name.
+    """
+    if getattr(admin.site, "_hoocon_choice_labels", False):
+        return
+    from django.contrib.admin.options import ModelAdmin
+    from django.contrib.admin.views.autocomplete import AutocompleteJsonView
+
+    class HooconAutocompleteJsonView(AutocompleteJsonView):
+        def serialize_result(self, obj: object, to_field_name: str) -> dict[str, str]:
+            label = getattr(obj, "admin_choice_label", None)
+            text = label() if callable(label) else str(obj)
+            return {"id": str(getattr(obj, to_field_name)), "text": text}
+
+    def autocomplete_view(request):  # type: ignore[no-untyped-def]
+        return HooconAutocompleteJsonView.as_view(admin_site=admin.site)(request)
+
+    admin.site.autocomplete_view = autocomplete_view  # type: ignore[method-assign]
+
+    original = ModelAdmin.formfield_for_foreignkey
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):  # type: ignore[no-untyped-def]
+        formfield = original(self, db_field, request, **kwargs)
+        if formfield is not None and db_field.name == "lead":
+
+            def label_from_instance(obj: object) -> str:
+                choice = getattr(obj, "admin_choice_label", None)
+                return choice() if callable(choice) else str(obj)
+
+            formfield.label_from_instance = label_from_instance
+        return formfield
+
+    ModelAdmin.formfield_for_foreignkey = formfield_for_foreignkey  # type: ignore[method-assign]
+    admin.site._hoocon_choice_labels = True  # type: ignore[attr-defined]
+
+
+install_admin_choice_labels()

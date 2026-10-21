@@ -182,6 +182,29 @@ class Lead(PdnConsentFields):
         """Return Заявка #pk and type — no contact PII (safe for logs)."""
         return f"Заявка #{self.pk} ({self.get_lead_type_display()})"
 
+    def admin_choice_label(self) -> str:
+        """Company, contact, and the request, for the admin dropdown only."""
+        company = (self.company or "").strip() or "без компании"
+        who = (self.name or "").strip() or "без имени"
+        ask = self._choice_ask()
+        parts = [company, who]
+        if ask:
+            parts.append(ask)
+        parts.append(f"#{self.pk}")
+        return " · ".join(parts)
+
+    def _choice_ask(self) -> str:
+        codes = [code for item in self.items.all() if (code := (item.sku_code or "").strip())]
+        if codes:
+            shown = ", ".join(codes[:3])
+            if len(codes) > 3:
+                shown = f"{shown} +{len(codes) - 3}"
+            return shown
+        text = " ".join((self.message or "").split())
+        if len(text) > 60:
+            return text[:59].rstrip() + "…"
+        return text
+
 
 class LeadItem(models.Model):
     """One SKU line on a lead (multi-SKU RFQ)."""

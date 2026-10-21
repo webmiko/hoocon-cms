@@ -210,6 +210,27 @@ def test_lead_str() -> None:
     assert "rfq" in s.lower() or "RFQ" in s or "КП" in s
 
 
+@pytest.mark.django_db
+def test_lead_admin_choice_label_names_company_contact_and_request() -> None:
+    """The dropdown says who asked and for what. The log line stays short."""
+    from leads.models import Lead, LeadItem
+
+    lead = Lead.objects.create(
+        name="Иван",
+        email="ivan-choice@example.com",
+        company='ООО "Ромашка"',
+        message="Нужен шаровой кран DN50 на склад",
+        lead_type=Lead.LeadType.RFQ,
+    )
+    LeadItem.objects.create(lead=lead, sku_code="DA24-NS", quantity=2)
+    label = lead.admin_choice_label()
+    assert 'ООО "Ромашка"' in label
+    assert "Иван" in label
+    assert "DA24-NS" in label
+    assert f"#{lead.pk}" in label
+    assert "Иван" not in str(lead)
+
+
 # ── Serializer ────────────────────────────────────────────────────────
 
 
