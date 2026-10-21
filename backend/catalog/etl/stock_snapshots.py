@@ -91,6 +91,26 @@ def _buckets(rows: list[tuple[str, int | None]]) -> dict[str, tuple[str, int, in
     return lines
 
 
+def snapshot_rows_are_partial(rows: list[tuple[str, int | None]], *, taken_on: date) -> bool:
+    """True when ``rows`` are too short to replace the stored warehouse picture.
+
+    A correction or the stock template lists a handful of articles. A weekly
+    1C file lists the warehouse. Fewer than half the lines of the snapshot for
+    ``taken_on`` (or of the latest snapshot, when that date is new) is not a
+    new export. With no snapshot stored yet, the file is the first picture.
+    """
+    new_count = len(_buckets(rows))
+    same_day = StockSnapshot.objects.filter(taken_on=taken_on).first()
+    if same_day is not None:
+        old_count = same_day.lines.count()
+    else:
+        latest = StockSnapshot.objects.order_by("-taken_on").first()
+        if latest is None:
+            return False
+        old_count = latest.lines.count()
+    return old_count > 0 and new_count * 2 < old_count
+
+
 def record_stock_snapshot(
     rows: list[tuple[str, int | None]],
     *,

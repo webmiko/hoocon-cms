@@ -350,6 +350,79 @@ def test_import_stock_xlsx_end_to_end() -> None:
     assert line.qty == 4
 
 
+@pytest.mark.django_db
+def test_partial_stock_upload_keeps_snapshot_and_updates_live_qty() -> None:
+    """A one-row fix and the template must not become the latest warehouse picture.
+
+    Drop cards treat an article missing from the latest snapshot as quantity
+    zero. Fewer than half the lines of the stored export (here 1 or 3 against
+    8) updates live stock only. A full file of the same day still replaces
+    that snapshot. ``force_snapshot`` stores a short historical file.
+    """
+    from datetime import date
+
+    from catalog.etl.stock_snapshots import build_snapshot_drop_report, record_stock_snapshot
+    from catalog.models import SKU, Category, Product, StockSnapshot, StockSnapshotLine
+
+    cat = Category.objects.create(name="Частичный", slug="stock-partial-cat")
+    product = Product.objects.create(name="Склад", slug="stock-partial-p", category=cat)
+    codes = [f"PART-{index}" for index in range(8)]
+    skus = [
+        SKU.objects.create(
+            product=product,
+            name=code,
+            slug=code.lower(),
+            sku_code=code,
+            stock_qty=10,
+        )
+        for code in codes
+    ]
+    full = [(code, 10) for code in codes]
+    record_stock_snapshot(full, taken_on=date(2026, 8, 1))
+    record_stock_snapshot(full, taken_on=date(2026, 10, 1))
+
+    report = import_stock_xlsx(
+        _xlsx_bytes([["Артикул", "Свободно"], ["PART-0", 1]]),
+        taken_on=date(2026, 10, 21),
+        source_name="правка.xlsx",
+    )
+    skus[0].refresh_from_db()
+    skus[1].refresh_from_db()
+    assert skus[0].stock_qty == 1
+    assert skus[1].stock_qty == 10
+    assert report.snapshot_kept is True
+    assert "Снимок склада не заменён." in report.summary()
+    assert StockSnapshot.objects.count() == 2
+
+    template = import_stock_xlsx(BytesIO(build_stock_template_xlsx()), source_name="ostatki-shablon.xlsx")
+    assert template.snapshot_kept is True
+    assert StockSnapshot.objects.count() == 2
+    week = build_snapshot_drop_report().window("7")
+    assert week is not None
+    assert week.latest_on == date(2026, 10, 1)
+    assert week.dropped_qty == 0
+    assert skus[1].pk not in week.sku_ids
+
+    replaced = import_stock_xlsx(
+        _xlsx_bytes([["Артикул", "Свободно"], *[[code, 7] for code in codes]]),
+        taken_on=date(2026, 10, 1),
+        source_name="Остатки товаров на 1 октября 2026.xlsx",
+    )
+    assert replaced.snapshot_kept is False
+    kept = StockSnapshotLine.objects.get(snapshot__taken_on=date(2026, 10, 1), article_key="PART-1")
+    assert kept.qty == 7
+    assert StockSnapshotLine.objects.filter(snapshot__taken_on=date(2026, 10, 1)).count() == 8
+
+    forced = import_stock_xlsx(
+        _xlsx_bytes([["Артикул", "Свободно"], ["PART-0", 2]]),
+        taken_on=date(2026, 7, 1),
+        source_name="Остатки товаров 1 июля 2026.xlsx",
+        force_snapshot=True,
+    )
+    assert forced.snapshot_kept is False
+    assert StockSnapshotLine.objects.filter(snapshot__taken_on=date(2026, 7, 1)).count() == 1
+
+
 def test_build_stock_template_xlsx_has_headers() -> None:
     rows = parse_stock_rows(BytesIO(build_stock_template_xlsx()))
     assert rows[0][0] == "DA5FU24-D"

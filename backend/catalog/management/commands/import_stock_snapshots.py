@@ -49,6 +49,7 @@ class Command(BaseCommand):
                         taken_on=taken_on,
                         source_name=path.name,
                         apply_live=apply_live,
+                        force_snapshot=True,
                     )
             except StockImportError as exc:
                 raise CommandError(f"{path.name}: {exc}") from exc
