@@ -6,7 +6,7 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -15,8 +15,47 @@ from unfold.admin import ModelAdmin, TabularInline
 from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
-from crm.models import Client, Company, CompanyMember
+from crm.models import Client, Company, CompanyMember, PlannedTouch
 from crm.phone_widget import MultiPhoneWidget
+
+
+class CompanyClientInline(TabularInline):
+    """People of this company. The contact card opens from the row link."""
+
+    model = Client
+    fk_name = "company_ref"
+    extra = 0
+    fields = ("name", "email", "phone", "assignee")
+    autocomplete_fields = ("assignee",)
+    show_change_link = True
+    can_delete = False
+    verbose_name = "контакт"
+    verbose_name_plural = "контакты"
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Client]:
+        """A manager edits only the contacts already on their own list."""
+        from crm.services import scope_clients_for_manager
+
+        return scope_clients_for_manager(super().get_queryset(request), request.user)
+
+
+class CompanyCallInline(TabularInline):
+    """Planned calls live on the company, not in a separate daily section."""
+
+    model = PlannedTouch
+    fk_name = "company"
+    extra = 0
+    fields = ("starts_at", "status", "assignee", "title")
+    autocomplete_fields = ("assignee",)
+    show_change_link = True
+    verbose_name = "плановый звонок"
+    verbose_name_plural = "плановые звонки"
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[PlannedTouch]:
+        """Another manager's calls are not on this card and are not saved from it."""
+        from crm.services import scope_planned_touches_for_manager
+
+        return scope_planned_touches_for_manager(super().get_queryset(request), request.user)
 
 
 class CompanyMemberInline(LabeledToggleMixin, TabularInline):
@@ -27,6 +66,22 @@ class CompanyMemberInline(LabeledToggleMixin, TabularInline):
     toggle_labels = {"is_confirmed": ("Не подтверждён", "Подтверждён")}
     fields = ("client", "account", "role", "is_confirmed")
     autocomplete_fields = ("client",)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CompanyMember]:
+        """Hide members whose contact card the manager cannot open."""
+        from crm.services import scope_clients_for_manager
+
+        qs = super().get_queryset(request)
+        scoped = scope_clients_for_manager(Client.objects.all(), request.user)
+        return qs.filter(Q(client_id__isnull=True) | Q(client_id__in=scoped.values("pk")))
+
+    def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        """A posted client pk must be one this manager may already see."""
+        if db_field.name == "client":
+            from crm.services import scope_clients_for_manager
+
+            kwargs["queryset"] = scope_clients_for_manager(Client.objects.all(), request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class CompanyAdminForm(forms.ModelForm):
@@ -43,6 +98,7 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
     """Карточка юрлица: реквизиты + члены (целевая схема CRM-x)."""
 
     form = CompanyAdminForm
+    list_before_template = "admin/includes/hoocon_page_memo.html"
 
     list_display = ("name", "inn", "city", "relevance", "work_label_list", "next_contact_at", "assignee")
     list_display_links = ("name",)
@@ -51,7 +107,7 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
     autocomplete_fields = ("assignee",)
     filter_horizontal = ("work_labels",)
     readonly_fields = ("company_key", "created_at", "updated_at")
-    inlines = (CompanyMemberInline,)
+    inlines = (CompanyClientInline, CompanyCallInline, CompanyMemberInline)
     actions = ("merge_companies_action", "assign_to_me")
     fieldsets = (
         (None, {"fields": ("name", "inn", "legal_address", "city", "region")}),
@@ -149,6 +205,10 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
 
     @admin.action(description="Назначить меня ответственным", permissions=["change"])
     def assign_to_me(self, request: HttpRequest, queryset: QuerySet[Company]) -> None:
-        """Reminders for planned calls use the company assignee when the event has none."""
-        updated = queryset.update(assignee=request.user)
+        """Claim a company with no manager. One that already has an owner stays theirs."""
+        mine = getattr(request.user, "pk", None)
+        claimable = queryset.none()
+        if mine is not None:
+            claimable = queryset.filter(Q(assignee_id=None) | Q(assignee_id=mine))
+        updated = claimable.update(assignee=request.user)
         self.message_user(request, f"Назначено компаний: {updated}.", messages.SUCCESS)

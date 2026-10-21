@@ -395,3 +395,21 @@ def test_export_admin_hides_another_managers_clients(client) -> None:
     finally:
         book.close()
     assert emails == ["mine@example.com"]
+
+@pytest.mark.django_db
+def test_lead_client_and_company_lists_show_a_memo(client) -> None:
+    """Each daily list says what the page is for before the table."""
+    from pathlib import Path
+
+    admin = User.objects.create_superuser("memo-admin", "memo-admin@example.com", "password12")
+    client.force_login(admin)
+    leads = client.get(reverse("admin:leads_lead_changelist")).content.decode()
+    people = client.get(reverse("admin:crm_client_changelist")).content.decode()
+    firms = client.get(reverse("admin:crm_company_changelist")).content.decode()
+    assert "Новые обращения с сайта" in leads
+    assert "Карточка человека" in people
+    assert "Карточка фирмы" in firms
+    css = Path("static/admin/css/hoocon-unfold-extras.css").read_text(encoding="utf-8")
+    dark = css.split(".dark .hoocon-page-memo {", 1)[1].split("}", 1)[0]
+    assert "background:" in dark
+    assert "#f5f5f4" in dark

@@ -164,6 +164,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
     """
 
     toggle_labels = {"contact_verified": ("Не подтверждён", "Подтверждён")}
+    list_before_template = "admin/includes/hoocon_page_memo.html"
 
     list_display = (
         "status_badge",

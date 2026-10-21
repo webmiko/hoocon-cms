@@ -764,6 +764,35 @@ a.hoocon-leads-stats-link {
   background: var(--hoocon-primary);
 }
 
+.hoocon-page-memo {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.9rem;
+  max-width: 46rem;
+  border: 1px solid color-mix(in srgb, #2563eb 40%, transparent);
+  border-radius: var(--hoocon-radius-btn, 8px);
+  background: color-mix(in srgb, #2563eb 12%, var(--hoocon-surface));
+}
+
+.hoocon-page-memo__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.hoocon-page-memo p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.dark .hoocon-page-memo {
+  color: #f5f5f4;
+  background: color-mix(in srgb, #60a5fa 18%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #93c5fd 55%, transparent);
+}
+
 .hoocon-lead-stats__label {
   margin: 0 0 0.45rem;
   color: var(--hoocon-quiet);

@@ -67,6 +67,7 @@ class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
     карточку. Поиск/фильтры: email (ID), имя, компания.
     """
 
+    list_before_template = "admin/includes/hoocon_page_memo.html"
     list_display = (
         "email_id",
         "name",

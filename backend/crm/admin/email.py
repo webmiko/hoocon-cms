@@ -16,7 +16,7 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
-from crm.admin.scope import _CLIENT_AND_LEAD
+from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
 from crm.models import Client, EmailAttachment, EmailMessage, EmailStatus, EmailTemplate, InboundMailboxState
 from crm.services import scope_emails_for_manager
 from leads.models import Lead
@@ -50,7 +50,7 @@ class EmailAttachmentInline(TabularInline):
 
 
 @admin.register(EmailMessage)
-class EmailMessageAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
+class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Outbound/inbound email log; staff can resend failed/draft.
 
     ID = email клиента (или to_email); одинаковые ID группируются.
