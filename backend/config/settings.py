@@ -425,7 +425,7 @@ UNFOLD = {
                         "link": reverse_lazy("admin:index"),
                     },
                     {
-                        "title": _("Заявки"),
+                        "title": _("Лиды"),
                         "icon": "inbox",
                         "link": reverse_lazy("admin:leads_lead_changelist"),
                         "badge": "config.unfold_callbacks.badge_new_leads",

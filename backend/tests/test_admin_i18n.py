@@ -26,7 +26,7 @@ _EXPECTED_APP_NAMES = {
     "accounts": "Учётные записи / роли",
     "catalog": "Каталог",
     "content": "Контент",
-    "leads": "Заявки",
+    "leads": "Лиды",
     "crm": "CRM / клиенты",
     "redirects": "Редиректы",
     "sitesettings": "Настройки сайта",
@@ -56,7 +56,7 @@ def test_admin_index_has_no_english_app_headings() -> None:
 
     assert "Каталог" in html
     assert "Контент" in html
-    assert "Заявки" in html
+    assert "Лиды" in html
     assert "Редиректы" in html
     assert "Настройки сайта" in html
     assert "Защита входа" in html

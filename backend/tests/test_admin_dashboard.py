@@ -33,7 +33,7 @@ def test_admin_index_shows_dashboard_for_superuser() -> None:
     html = response.content.decode()
     assert "hoocon-dash" in html or "Панель управления" in html
     assert "Оповещения" in html
-    assert "Заявки по статусам" in html
+    assert "Лиды по статусам" in html
     assert "Последние заявки" in html
     assert "Dash Lead" in html
     assert "Изменения в админке" in html

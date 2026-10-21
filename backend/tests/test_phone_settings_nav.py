@@ -52,7 +52,7 @@ def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
     leads = next(group for group in nav["groups"] if group["id"] == "leads-lead")
     assert leads["action"] == "link"
     assert leads["url"].endswith("/admin/leads/lead/")
-    assert leads["title"] == "Заявки"
+    assert leads["title"] == "Лиды"
     section_ids = {section["id"] for section in nav["sections"]}
     assert "work" in section_ids
     assert "catalog" in section_ids

@@ -144,7 +144,7 @@ def test_lead_sticker_visible_on_changelist_not_only_index() -> None:
 
 @pytest.mark.django_db
 def test_sidebar_hides_leads_without_view_permission() -> None:
-    """Staff without leads.view_lead must not see Заявки in Unfold sidebar."""
+    """Staff without leads.view_lead must not see Лиды in Unfold sidebar."""
     staff = User.objects.create_user(
         username="staff-noperm-nav",
         email="staff-noperm-nav@example.com",

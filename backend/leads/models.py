@@ -167,8 +167,8 @@ class Lead(PdnConsentFields):
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "заявка"
-        verbose_name_plural = "заявки"
+        verbose_name = "лид"
+        verbose_name_plural = "лиды"
         ordering = ("-created_at",)
 
     def __str__(self) -> str:

@@ -105,10 +105,10 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
     "leads": (
         {
             "model": "lead",
-            "title": "Заявки",
+            "title": "Лиды",
             "icon": "inbox",
             "section": "work",
-            "description": "Заявки с сайта, статусы и ответственные.",
+            "description": "Лиды с сайта, статусы и ответственные.",
             "badge": "leads",
         },
     ),

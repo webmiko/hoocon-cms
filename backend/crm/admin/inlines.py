@@ -76,8 +76,8 @@ class LeadInline(TabularInline):
     show_change_link = True
     can_delete = False
     ordering = ("-created_at",)
-    verbose_name = "заявка"
-    verbose_name_plural = "заявки клиента"
+    verbose_name = "лид"
+    verbose_name_plural = "лиды клиента"
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         """Leads arrive via public API / signal — not manual add on the card."""
