@@ -556,12 +556,19 @@ def test_scoped_fk_keeps_value_linked_by_automation() -> None:
 
 @pytest.mark.django_db
 def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
-    """Quote/Call/ClientDocument/Activity/Email принимали чужие client/lead/quote/order."""
+    """Quote/Call/Activity/Email/Document/PlannedTouch принимали чужие client/lead на POST."""
     from django.core.exceptions import ValidationError
 
     from cabinet.models import Order
-    from crm.admin import ActivityAdmin, CallAdmin, ClientDocumentAdmin, EmailMessageAdmin, QuoteAdmin
-    from crm.models import Call, ClientDocument, EmailMessage, Quote
+    from crm.admin import (
+        ActivityAdmin,
+        CallAdmin,
+        ClientDocumentAdmin,
+        EmailMessageAdmin,
+        PlannedTouchAdmin,
+        QuoteAdmin,
+    )
+    from crm.models import Call, ClientDocument, EmailMessage, PlannedTouch, Quote
 
     mgr, _other, mine, foreign = _foreign_client_pair()
     foreign_lead = Lead.objects.get(client=foreign)
@@ -573,6 +580,7 @@ def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
         (ActivityAdmin, Activity),
         (EmailMessageAdmin, EmailMessage),
         (ClientDocumentAdmin, ClientDocument),
+        (PlannedTouchAdmin, PlannedTouch),
     ):
         client_field = _fk_field(admin_cls, model, "client", mgr)
         assert client_field.clean(mine.pk) == mine
@@ -585,6 +593,17 @@ def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
         _fk_field(ClientDocumentAdmin, ClientDocument, "quote", mgr).clean(foreign_quote.pk)
     with pytest.raises(ValidationError):
         _fk_field(ClientDocumentAdmin, ClientDocument, "order", mgr).clean(foreign_order.pk)
+    # Уже привязанный чужой клиент остаётся в форме: общий календарь иначе не сохранить.
+    from django.utils import timezone
+
+    linked = PlannedTouch.objects.create(
+        client=foreign,
+        title="Чужой звонок",
+        starts_at=timezone.now(),
+        dedupe_key="scope-fk-planned",
+    )
+    kept = _fk_field(PlannedTouchAdmin, PlannedTouch, "client", mgr, linked.pk)
+    assert kept.clean(foreign.pk) == foreign
 
 
 def test_activity_author_is_read_only_in_admin() -> None:
@@ -616,3 +635,4 @@ def test_manager_cannot_open_foreign_spec_list() -> None:
     assert response.status_code in (302, 403, 404)
     list_html = page.get(reverse("admin:cabinet_speclist_changelist")).content.decode()
     assert "Чужая спецификация" not in list_html
+

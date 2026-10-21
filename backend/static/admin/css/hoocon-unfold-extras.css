@@ -410,7 +410,9 @@ body.hoocon-os27 :is(
 }
 
 .dark .hoocon-lead-status--draft {
-  color: #d6d3d1;
+  color: #f5f5f4;
+  background: color-mix(in srgb, #a8a29e 36%, var(--hoocon-surface));
+  border-color: color-mix(in srgb, #e7e5e4 62%, transparent);
 }
 
 .dark .hoocon-lead-status--sent {

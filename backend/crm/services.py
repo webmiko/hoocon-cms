@@ -501,6 +501,27 @@ def scope_calls_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]
     ).distinct()
 
 
+def planned_touch_owner_q(user_id: int) -> Q:
+    """Calls this user may take: already theirs, or still free.
+
+    The owner is the company assignee when the company has one, otherwise
+    the event assignee. Same rule as the dashboard «Взять» button.
+    """
+    return (
+        Q(company__assignee_id=user_id)
+        | Q(company__assignee__isnull=True, assignee_id=user_id)
+        | Q(company__assignee__isnull=True, assignee__isnull=True)
+    )
+
+
+def scope_planned_touches_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]:
+    """Hide another manager's planned calls. The free queue stays shared."""
+    fast = _scoped_or_none(queryset, user)
+    if fast is not None:
+        return fast
+    return queryset.filter(planned_touch_owner_q(user.pk))
+
+
 def scope_spec_lists_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet[Any]:
     """Limit cabinet spec templates to accounts linked to visible CRM cards."""
     fast = _scoped_or_none(queryset, user)

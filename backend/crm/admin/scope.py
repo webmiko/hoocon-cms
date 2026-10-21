@@ -17,6 +17,26 @@ from leads.models import Lead
 from leads.services import scope_leads_for_manager
 
 
+class ManagerUsesTheCard:
+    """Managers do not get a separate section for this list.
+
+    Админ and аналитик still see the registry. A manager opens the same
+    records from the client or company card, and today's calls from the panel.
+    """
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        user = getattr(request, "user", None)
+        if user is None or not getattr(user, "is_authenticated", False):
+            return False
+        if user.is_superuser:
+            return True
+        from accounts.roles import staff_sees_all_leads
+
+        if staff_sees_all_leads(user):
+            return super().has_module_permission(request)  # type: ignore[misc]
+        return False
+
+
 def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
     """Leads the current manager may attach to CRM rows."""
     return scope_leads_for_manager(Lead.objects.all(), request.user)

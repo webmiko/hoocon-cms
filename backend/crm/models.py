@@ -1128,6 +1128,17 @@ class PlannedTouchKind(models.TextChoices):
     OTHER = "other", "Прочее"
 
 
+class PlannedTouchStatus(models.TextChoices):
+    """Manual progress of a planned call. The manager sets it on the card."""
+
+    PLANNED = "planned", "Запланирован"
+    IN_PROGRESS = "in_progress", "В работе"
+    REACHED = "reached", "Дозвонились"
+    NO_ANSWER = "no_answer", "Не дозвонились"
+    RESCHEDULED = "rescheduled", "Перенесён"
+    DONE = "done", "Закрыт"
+
+
 class PlannedTouch(models.Model):
     """Dated event on a company, client, or lead.
 
@@ -1174,6 +1185,13 @@ class PlannedTouch(models.Model):
         max_length=20,
         choices=PlannedTouchKind.choices,
         default=PlannedTouchKind.CALL,
+        db_index=True,
+    )
+    status: models.CharField = models.CharField(
+        "статус",
+        max_length=20,
+        choices=PlannedTouchStatus.choices,
+        default=PlannedTouchStatus.PLANNED,
         db_index=True,
     )
     starts_at: models.DateTimeField = models.DateTimeField("когда", db_index=True)
