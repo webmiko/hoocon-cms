@@ -62,6 +62,8 @@ describe("collapseH81CatalogSkus", () => {
       { slug: "hvd-air", product_slug: "privod-vozdushniy-hvd-40q" },
       { slug: "qx-a", product_slug: "privod-vozdushniy-kondensator-hvd-5qx" },
       { slug: "qx-b", product_slug: "privod-vozdushniy-kondensator-hvd-5qx" },
+      { slug: "hvd-p", product_slug: "privod-vozdushniy-pruzhina-hvd-3p" },
+      { slug: "hvd-p-b", product_slug: "privod-vozdushniy-pruzhina-hvd-3p" },
       { slug: "other", product_slug: "da5fu" },
     ];
     const out = collapseH81CatalogSkus(rows);
@@ -76,6 +78,7 @@ describe("collapseH81CatalogSkus", () => {
       "hvd-a",
       "hvd-air",
       "qx-a",
+      "hvd-p",
       "other",
     ]);
   });

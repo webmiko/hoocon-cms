@@ -57,6 +57,16 @@ def test_parse_sku_variant_voltage_and_control() -> None:
     assert hvdf_s.control == "on_off"
     assert hvdf_s.aux_switch is True
 
+    hvdp = parse_sku_variant("HVD24-3P")
+    assert hvdp.voltage == "24"
+    assert hvdp.control == "on_off"
+    assert hvdp.aux_switch is False
+
+    hvdp_s = parse_sku_variant("HVD230S-5P")
+    assert hvdp_s.voltage == "230"
+    assert hvdp_s.control == "on_off"
+    assert hvdp_s.aux_switch is True
+
     hvd_air = parse_sku_variant("HVD24-5")
     assert hvd_air.voltage == "24"
     assert hvd_air.control == "on_off"
@@ -286,6 +296,7 @@ def test_torque_nm_from_hva_uses_trailing_nm_not_voltage() -> None:
     assert torque_nm_from_sku_code("HVA230-5Q") == 5
     assert torque_nm_from_sku_code("HVD24ST-3F") == 3
     assert torque_nm_from_sku_code("HVD24SX-10F") == 10
+    assert torque_nm_from_sku_code("HVD24S-3P") == 3
     assert torque_nm_from_sku_code("DA5FU24-D") == 5
 
 

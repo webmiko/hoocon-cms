@@ -173,6 +173,10 @@ def parse_sku_variant(sku_code: str) -> SkuVariant:
     elif (hva := parse_hva_code(code)) is not None:
         control = "modulating"
         aux = hva.aux
+    # HVD24-3P / HVD230S-5P — air spring-return on/off (S = aux). Not fire F.
+    elif re.fullmatch(r"hvd(?:24|230)s?-\d+p", code):
+        control = "on_off"
+        aux = bool(re.match(r"hvd(?:24|230)s-", code))
     # HVD24-5 / HVD24S-10 / HVD230S-40Q — air on/off (+ optional aux S). Not QX.
     elif re.fullmatch(r"hvd(?:24|230)s?-\d+q?", code):
         control = "on_off"
@@ -468,7 +472,7 @@ _NM_IN_ALT = re.compile(r"(?i)(\d+)\s*нм")
 _NM_FROM_SKU = re.compile(r"(?i)^(?:da|sa)(\d+)")
 # HVA24-5 / HVA24S-5Q / HVD24ST-3F — voltage first, torque after the hyphen.
 _NM_FROM_HV_SKU = re.compile(
-    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st|sx|s)?-(\d+)(?:q|f)?$",
+    r"(?i)^(?:hva|hvd|hvq)(?:24|230)(?:st|sx|s)?-(\d+)(?:q|f|p)?$",
 )
 # Fallback: any leading digits after an optional short alpha prefix.
 _NM_FROM_SKU_FALLBACK = re.compile(r"(?i)^(?:[a-z]{1,4})?(\d+)")

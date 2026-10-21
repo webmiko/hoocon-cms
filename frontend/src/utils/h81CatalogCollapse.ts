@@ -15,6 +15,7 @@ const HVA_PRODUCT_SLUG_RE =
 const HVD_AIR_PRODUCT_SLUG_RE =
   /^privod-vozdushniy-hvd-(?:\d+nm|\d+q)$|^privod-vozdushniy-kondensator-hvd-\d+qx$/i;
 const HVD_SMOKE_PRODUCT_SLUG_RE = /^privod-dimoudaleniya-hvd-\d+f$/i;
+const HVD_SPRING_PRODUCT_SLUG_RE = /^privod-vozdushniy-pruzhina-hvd-\d+p$/i;
 
 export function isH81FamilyProductSlug(productSlug: string | undefined | null): boolean {
   return H81_PRODUCT_SLUG_RE.test((productSlug || "").trim());
@@ -58,7 +59,11 @@ export function isHvaFamilyProductSlug(productSlug: string | undefined | null): 
 
 export function isHvdFamilyProductSlug(productSlug: string | undefined | null): boolean {
   const slug = (productSlug || "").trim();
-  return HVD_AIR_PRODUCT_SLUG_RE.test(slug) || HVD_SMOKE_PRODUCT_SLUG_RE.test(slug);
+  return (
+    HVD_AIR_PRODUCT_SLUG_RE.test(slug) ||
+    HVD_SMOKE_PRODUCT_SLUG_RE.test(slug) ||
+    HVD_SPRING_PRODUCT_SLUG_RE.test(slug)
+  );
 }
 
 function isCollapsibleFamilyProductSlug(
