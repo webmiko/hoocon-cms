@@ -1,6 +1,6 @@
 """Canonical copy + ТТХ for Hoocon SA..MU (smoke damper, no spring return).
 
-Source: English manuals ``sa{n}mu-ds_dst.pdf`` (Nm 10/15/30) + Belimo RU glossary.
+Source: RU manuals ``sa{n}mu-ds-dst.html`` (2026-10). DS only — no SAF72 edition.
 SA7 shares the SA..MU manuals family; catalog SKUs include 7/10/15/30 Нм.
 """
 
@@ -18,7 +18,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
-from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
+from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import (
     MANUAL_SAFETY_ATTENTION_LINES,
     PROTECTION_CLASS_II,
@@ -27,7 +27,7 @@ from catalog.etl.tech_copy import (
     normalize_tech_copy,
 )
 from catalog.facets import normalize_aux_switch_value
-from catalog.facets.temp_sensor import TEMP_SENSOR_NONE, TEMP_SENSOR_SAF72
+from catalog.facets.temp_sensor import TEMP_SENSOR_NONE
 from catalog.models import SKU, Product
 
 _SAMU_CODE = re.compile(r"(?i)^sa(?P<nm>\d+)mu")
@@ -88,7 +88,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "Относительная влажность",
         "humidity",
         "",
-        "95 %, без конденсации (EN 60730-1)",
+        "5…95 % относительной влажности, без конденсата / EN 60730-1",
         ATTR_GROUP_OPERATING,
     ),
     (
@@ -133,11 +133,11 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
         "moment": "15 Нм",
         "damper-area": "до 1,5 м²",
         "running-time": "< 30 с (95°)",
-        "shaft-length": "≥ 50",
+        "shaft-length": "≥ 90",
         "weight": "≈ 1,7 кг",
         "dimensions": _SAMU_DIMS_15,
-        "power_24": "7 Вт (работа) / 1,5 Вт (удержание)",
-        "power_230": "7 Вт (работа) / 1,5 Вт (удержание)",
+        "power_24": "5 Вт (работа) / 1 Вт (удержание)",
+        "power_230": "5 Вт (работа) / 1 Вт (удержание)",
         "noise": "макс. 50 дБ(А)",
     },
     30: {
@@ -160,8 +160,7 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 
 Назначение и особенности серии SA..MU:
 – Управление: открыто/закрыто, 2-/3-позиционное.
-– Вспомогательные переключатели: 2 SPDT (исполнения -DS / -DST).
-– Исполнение -DST: термодатчик SAF72 (окружающая среда TS1 и канал TS2, 72 °C).
+– Вспомогательные переключатели: 2 SPDT (исполнение -DS).
 – Степень защиты корпуса: IP54.
 – Температура окружающей среды: –30…+50 °C.
 """.strip(),
@@ -195,10 +194,9 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
             "– Сечение провода: 0,5 мм².",
             "– Схемы — в галерее и PDF инструкции.",
             "",
-            "4. Вспомогательные переключатели (-DS / -DST)",
+            "4. Вспомогательные переключатели (-DS)",
             "",
             "– 2 группы SPDT; настройте угол срабатывания по таблице в инструкции.",
-            "– Исполнение -DST: термодатчик — см. комплектность артикула.",
         ],
     ),
 )
@@ -223,7 +221,6 @@ def instructions_for_samu_sku(sku_code: str) -> str | None:
     if row is None:
         return None
     variant = parse_sku_variant(sku_code)
-    thermal = sku_code_is_thermal(sku_code)
     series = f"SA{torque_nm}MU"
     shaft_len = row["shaft-length"]
     if "мм" not in shaft_len:
@@ -262,16 +259,6 @@ def instructions_for_samu_sku(sku_code: str) -> str | None:
                 "– 2 группы SPDT; настройте угол срабатывания по таблице в инструкции.",
             ],
         )
-        next_ch += 1
-    if thermal:
-        lines.extend(
-            [
-                "",
-                f"{next_ch}. Термодатчик",
-                "",
-                "– Исполнение с термодатчиком — см. комплектность артикула и PDF инструкции.",
-            ],
-        )
     return normalize_tech_copy("\n".join(lines))
 
 
@@ -300,13 +287,8 @@ def _sku_description(variant: SkuVariant, row: dict[str, str]) -> str:
         f"Время поворота: {row['running-time']}.",
         "Управление: открыто/закрыто, 2-/3-позиционное.",
         "Вспомогательные переключатели: 2 SPDT.",
+        "Термодатчик: без датчика (исполнение -DS).",
     ]
-    if sku_code_is_thermal(variant.code):
-        lines.append(
-            "Термодатчик: SAF72 (TS1 — окружающая среда, TS2 — канал, срабатывание при 72 °C).",
-        )
-    else:
-        lines.append("Термодатчик: без датчика (исполнение -DS).")
     if variant.voltage == "24":
         lines.append("Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
     elif variant.voltage == "230":
@@ -463,8 +445,9 @@ def apply_samu_enrichment(*, dry_run: bool = False) -> dict[str, Any]:
                     "",
                     normalize_aux_switch_value("SPDT-2", sku_code=sku.sku_code),
                 )
-                temp_value = TEMP_SENSOR_SAF72 if sku_code_is_thermal(sku.sku_code) else TEMP_SENSOR_NONE
-                _set_attr(sku, "Датчик температуры", "temp-sensor", "", temp_value)
+                # RU SA..MU manuals (2026-10) describe DS only. DST codes stay
+                # unpublished and must not pick up SAF72 from the article suffix.
+                _set_attr(sku, "Датчик температуры", "temp-sensor", "", TEMP_SENSOR_NONE)
             attrs += 3
             skus_done += 1
 
