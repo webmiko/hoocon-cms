@@ -60,7 +60,7 @@ def _phone_label(digits: str) -> str:
     return f"+{digits}"
 
 
-def _ensure_stub(digits: str, manager: Any) -> Client:
+def _ensure_stub(digits: str, manager: Any, company: Any | None = None) -> Client:
     """One card per unknown number. No client email and no round-robin."""
     from leads.models import Lead
     from leads.services import assign_lead_to_user
@@ -75,10 +75,14 @@ def _ensure_stub(digits: str, manager: Any) -> Client:
                     "name": _phone_label(digits),
                     "phone": digits,
                     "assignee": staff,
+                    "company": company.name if company is not None else "",
                 },
             )
         except IntegrityError:
             client = Client.objects.get(email=email)
+        if company is not None and not client.company_ref_id:
+            client.company = company.name
+            client.save()
         if not client.leads.exists():
             lead = Lead.objects.create(
                 lead_type=Lead.LeadType.CONSULTATION,
@@ -133,7 +137,9 @@ def attach_call_client(
         call.client = client_for_phone(contact_digits)
     digits = normalize_phone_digits(contact_digits)
     if call.client_id is None and create and len(digits) >= 10 and digits != _company_number():
-        call.client = _ensure_stub(digits, call.manager)
+        from crm.phones import company_for_phone
+
+        call.client = _ensure_stub(digits, call.manager, company=company_for_phone(contact_digits))
     if call.client_id and call.lead_id is None:
         call.lead = _latest_open_lead(cast(Client | None, call.client))
     if create and call.client_id:

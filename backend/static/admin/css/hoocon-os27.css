@@ -103,6 +103,87 @@ body.hoocon-os27 .hoocon-nav-sections {
   margin-bottom: 1.25rem;
 }
 
+body.hoocon-os27 .hoocon-today {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem 0.35rem;
+  border-radius: var(--os27-group-radius);
+  border: 1px solid var(--os27-hairline);
+  background: var(--os27-surface);
+}
+
+body.hoocon-os27 .hoocon-today__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+body.hoocon-os27 .hoocon-today__head a,
+body.hoocon-os27 .hoocon-today__call,
+body.hoocon-os27 .hoocon-today__assign button {
+  color: var(--os27-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+body.hoocon-os27 .hoocon-today__owner {
+  color: var(--os27-quiet);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+body.hoocon-os27 .hoocon-today__group {
+  margin: 0.85rem 0 0;
+  font-size: var(--os27-section-size);
+  font-weight: 600;
+  color: var(--os27-quiet);
+}
+
+body.hoocon-os27 .hoocon-today__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.hoocon-os27 .hoocon-today__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--os27-row-min-h);
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--os27-hairline);
+}
+
+body.hoocon-os27 .hoocon-today__time {
+  flex: 0 0 5.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+body.hoocon-os27 .hoocon-today__name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+body.hoocon-os27 .hoocon-today__assign {
+  margin: 0;
+}
+
+body.hoocon-os27 .hoocon-today__empty,
+body.hoocon-os27 .hoocon-today__more {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--os27-quiet);
+  font-size: 0.875rem;
+}
+
 body.hoocon-os27 .hoocon-nav-sections__grid {
   /* Masonry: group height follows its content, no stretched rows. */
   columns: 15rem;

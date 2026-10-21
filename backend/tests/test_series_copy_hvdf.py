@@ -57,6 +57,12 @@ def test_hvdf_10f_specs_match_en_manual() -> None:
     area = AttributeValue.objects.get(sku=sku, attribute__slug="damper-area").value
     assert area == damper_area_for_nm(10)
     assert AttributeValue.objects.get(sku=sku, attribute__slug="temp-sensor").value == TEMP_SENSOR_TS2
+    assert "канальный" in (sku.description or "")
+    assert "SAF72" not in (sku.description or "")
+    assert (
+        AttributeValue.objects.get(sku=sku, attribute__slug="humidity").value
+        == "5…95 % относительной влажности, без конденсата / EN 60730-1"
+    )
     st = SKU.objects.get(sku_code="HVD24ST-10F")
     assert AttributeValue.objects.get(sku=st, attribute__slug="temp-sensor").value == TEMP_SENSOR_SAF72
 

@@ -36,6 +36,11 @@ def test_safqu_torque_from_manual_tables() -> None:
     row10 = TORQUE_SPECS[10]
     assert "35" in row3["running-time"]
     assert "15 Вт" in row10["power"]
+    # RU sa3fqu / sa10fqu: motor 55 dB(A), spring return 62 dB(A).
+    assert row3["noise"].startswith("макс. 55 дБ(А)")
+    assert "62 дБ(А)" in row3["noise"]
+    assert row10["noise"].startswith("макс. 55 дБ(А)")
+    assert "62 дБ(А)" in row10["noise"]
 
 
 @pytest.mark.django_db
@@ -47,6 +52,10 @@ def test_safqu_enrichment_writes_running_time() -> None:
     apply_safqu_enrichment(dry_run=False)
     sku = SKU.objects.get(sku_code="SA3FQU24-DS")
     rt = AttributeValue.objects.get(sku=sku, attribute__slug="running-time").value
+    noise = AttributeValue.objects.get(sku=sku, attribute__slug="noise").value
+    humidity = AttributeValue.objects.get(sku=sku, attribute__slug="humidity").value
     assert "35" in rt
+    assert noise.startswith("макс. 55 дБ(А)")
+    assert humidity.startswith("5…95 %")
     product = Product.objects.get(slug="privod-protivopozharniy-safqu-3nm")
     assert product.skus.count() == 4

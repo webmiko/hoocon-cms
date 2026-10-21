@@ -68,6 +68,7 @@ class StockImportReport:
     bad_rows: int = 0
     skipped_blank: int = 0
     unknown_codes: list[str] = field(default_factory=list)
+    snapshot_kept: bool = False
 
     def summary(self) -> str:
         """Human-readable one-line report for Admin messages."""
@@ -78,11 +79,12 @@ class StockImportReport:
             if more > 0:
                 sample = f"{sample}… (+{more})"
             unknown_hint = f" (примеры: {sample})"
+        kept = " Снимок склада не заменён." if self.snapshot_kept else ""
         return (
             f"Обновлено: {self.updated}; "
             f"неизвестных артикулов: {self.ignored_unknown}{unknown_hint}; "
             f"битых строк: {self.bad_rows}; "
-            f"пустых: {self.skipped_blank}."
+            f"пустых: {self.skipped_blank}.{kept}"
         )
 
 
@@ -432,19 +434,82 @@ def _resolve_stock_target_skus(
     return [sku] if sku is not None else []
 
 
-def import_stock_xlsx(file_obj: BinaryIO | BytesIO) -> StockImportReport:
-    """Parse an XLSX stream and apply stock quantities to catalog SKUs.
+def sku_ids_by_stock_key(keys: Any) -> dict[str, list[int]]:
+    """Map normalized stock keys to the catalog SKUs an export would update.
+
+    Bare H81 / H8205 articles fan out to every electrical edition, the same
+    way :func:`apply_stock_rows` writes live quantity.
+    """
+    wanted = {key for key in keys if key}
+    if not wanted:
+        return {}
+    skus = list(SKU.objects.only("id", "sku_code"))
+    sku_by_key: dict[str, SKU] = {}
+    skus_by_bare: dict[str, list[SKU]] = {}
+    for sku in skus:
+        key = normalize_stock_article_key(sku.sku_code)
+        if not key:
+            continue
+        sku_by_key.setdefault(key, sku)
+        for bare_fn in (h81_kit_bare_stock_key, h8205_lav_bare_stock_key):
+            bare = bare_fn(key)
+            if bare is not None and bare != key:
+                skus_by_bare.setdefault(bare, []).append(sku)
+    found: dict[str, list[int]] = {}
+    for key in wanted:
+        targets = _resolve_stock_target_skus(key, sku_by_key, skus_by_bare)
+        if targets:
+            found[key] = [sku.pk for sku in targets]
+    return found
+
+
+def import_stock_xlsx(
+    file_obj: BinaryIO | BytesIO,
+    *,
+    taken_on: Any = None,
+    source_name: str = "",
+    apply_live: bool = True,
+    force_snapshot: bool = False,
+) -> StockImportReport:
+    """Parse an XLSX stream, store a dated snapshot, and update live stock.
+
+    A workbook with fewer than half the articles of the stored export updates
+    live quantity only. ``force_snapshot`` stores it anyway (historical 1C files).
 
     Args:
         file_obj: Binary workbook (``.xlsx``).
+        taken_on: Export date. Filename date, then today, when omitted.
+        source_name: Original file name, used for the date and the snapshot label.
+        apply_live: When False, only the snapshot is stored.
+        force_snapshot: Store the file even when it is shorter than the last export.
 
     Returns:
-        Import report.
+        Import report. ``updated`` is 0 when live stock is left unchanged.
+        ``snapshot_kept`` is True when a short file did not replace the snapshot.
 
     Raises:
         StockImportError: invalid workbook / headers.
     """
-    return apply_stock_rows(parse_stock_rows(file_obj))
+    from datetime import date
+
+    from django.utils import timezone
+
+    from catalog.etl.stock_snapshots import (
+        record_stock_snapshot,
+        snapshot_rows_are_partial,
+        stock_date_from_filename,
+    )
+
+    rows = parse_stock_rows(file_obj)
+    report = apply_stock_rows(rows) if apply_live else StockImportReport()
+    when = taken_on or stock_date_from_filename(source_name) or timezone.localdate()
+    if not isinstance(when, date):
+        raise StockImportError("Дата выгрузки должна быть календарной датой.")
+    if force_snapshot or not snapshot_rows_are_partial(rows, taken_on=when):
+        record_stock_snapshot(rows, taken_on=when, source_name=source_name)
+    else:
+        report.snapshot_kept = True
+    return report
 
 
 def build_stock_template_xlsx() -> bytes:

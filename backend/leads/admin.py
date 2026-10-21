@@ -47,6 +47,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from catalog.models import SKU
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin, filter_autocomplete_by_client
 from config.admin_toggle import LabeledToggleMixin
+from crm.admin.filters import WorkQueueFilter
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -163,6 +164,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
     """
 
     toggle_labels = {"contact_verified": ("Не подтверждён", "Подтверждён")}
+    list_before_template = "admin/includes/hoocon_page_memo.html"
 
     list_display = (
         "status_badge",
@@ -185,6 +187,8 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         ("rfq_bundle_root", admin.EmptyFieldListFilter),
         ("seen_at", admin.EmptyFieldListFilter),
         OverdueLeadFilter,
+        "work_labels",
+        WorkQueueFilter,
         "created_at",
     )
     search_fields = (
@@ -262,7 +266,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         (
             "Менеджеры",
             {
-                "fields": ("assignee", "processed_by", "processed_at"),
+                "fields": ("assignee", "processed_by", "processed_at", "work_labels"),
                 "description": (
                     "«В работе у» — кто ведёт заявку сейчас. «Обработал» заполняется при статусе «Завершена»."
                 ),
@@ -929,6 +933,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             .select_related("client", "sku", "assignee", "processed_by", "rfq_bundle_root")
             .prefetch_related(
                 "items",
+                "work_labels",
                 Prefetch(
                     "calls",
                     queryset=self._lead_calls_for_channel(),

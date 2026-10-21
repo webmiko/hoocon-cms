@@ -40,6 +40,7 @@ def test_shared_attrs_manual_override_button() -> None:
     by_slug = {row[1]: row[3] for row in SHARED_ATTRS}
     assert by_slug["manual-override"] == MANUAL_OVERRIDE_BUTTON_SELF_RESET
     assert "12×12" in by_slug["shaft-diameter"]
+    assert by_slug["humidity"] == "5…95 % относительной влажности, без конденсата / EN 60730-1"
 
 
 def test_sa3_specs_from_manual() -> None:

@@ -29,6 +29,11 @@ def test_dafqu_enrichment_power_from_en_manual() -> None:
     )
     apply_dafqu_enrichment(dry_run=False)
     sku = SKU.objects.get(sku_code="DA10FQU230-D")
-    power = AttributeValue.objects.get(sku=sku, attribute__slug="power-consumption").value
-    assert "15 Вт" in power
-    assert "3 Вт" in power
+    by_slug = {
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")
+    }
+    assert "15 Вт" in by_slug["power-consumption"]
+    assert "3 Вт" in by_slug["power-consumption"]
+    # RU da10fqu-d-ds.html: motor 55 dB(A), round shaft from 8 mm, square from 6×6.
+    assert by_slug["noise"].startswith("макс. 55 дБ(А)")
+    assert by_slug["shaft-diameter"] == "круглый 8…21 мм, квадратный 6×6…15×15 мм"

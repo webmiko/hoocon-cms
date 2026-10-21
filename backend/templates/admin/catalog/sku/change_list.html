@@ -1,5 +1,86 @@
 {% extends "admin/change_list.html" %}
 
+{% block content %}
+  {% if stock_movement %}
+  <section class="hoocon-lead-stats" aria-label="Движение остатков" style="margin-bottom: 1.25rem;">
+    <section class="hoocon-lead-stats__cards" aria-label="Остаток и заказы по периодам">
+      <article class="hoocon-lead-stats__card">
+        <p class="hoocon-lead-stats__label">Сейчас на складе</p>
+        <p class="hoocon-lead-stats__value">
+          {% if stock_movement.filtering %}
+            <a href="{{ stock_movement.list_url }}">{{ stock_movement.on_hand }}</a>
+          {% else %}
+            {{ stock_movement.on_hand }}
+          {% endif %}
+        </p>
+        <p class="hoocon-lead-stats__label">{{ stock_movement.on_hand_positions }} поз. с остатком</p>
+      </article>
+      {% for period in stock_movement.periods %}
+      <article class="hoocon-lead-stats__card{% if period.move_active or period.idle_active %} hoocon-lead-stats__card--accent{% endif %}">
+        <p class="hoocon-lead-stats__label">{{ period.months }} мес.</p>
+        {% if stock_movement.include_orders %}
+        <p class="hoocon-lead-stats__value">
+          <a href="{{ period.move_url }}">{{ period.ordered_qty }}</a>
+        </p>
+        <p class="hoocon-lead-stats__label">
+          <a href="{{ period.move_url }}">в заказах · {{ period.moved_positions }} поз.</a>
+        </p>
+        <p class="hoocon-lead-stats__label">
+          <a href="{{ period.idle_url }}">без движения: {{ period.idle_in_stock }}</a>
+        </p>
+        {% else %}
+        <p class="hoocon-lead-stats__value">—</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% if stock_movement.include_orders %}
+    <p class="hoocon-lead-stats__label">
+      {% if stock_movement.orders_scoped %}
+      Штуки в заказах ваших клиентов за скользящие 1, 3, 6 и 12 месяцев. Отменённые не входят.
+      {% else %}
+      Штуки в заказах за скользящие 1, 3, 6 и 12 месяцев. Отменённые не входят.
+      {% endif %}
+    </p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% if stock_snapshots %}
+  <section class="hoocon-lead-stats" aria-label="Остатки по выгрузкам" style="margin-bottom: 1.25rem;">
+    <section class="hoocon-lead-stats__cards" aria-label="На сколько уменьшился остаток">
+      {% if stock_snapshots.ready %}
+        {% for period in stock_snapshots.windows %}
+        <article class="hoocon-lead-stats__card{% if period.active %} hoocon-lead-stats__card--accent{% endif %}">
+          <p class="hoocon-lead-stats__label">{{ period.label }}{% if period.partial %} · с {{ period.baseline_on }}{% endif %}</p>
+          <p class="hoocon-lead-stats__value">
+            <a href="{{ period.url }}">{{ period.dropped_qty }}</a>
+          </p>
+          <p class="hoocon-lead-stats__label">
+            <a href="{{ period.url }}">стало меньше · {{ period.dropped_positions }} арт.</a>
+          </p>
+          <p class="hoocon-lead-stats__label">{{ period.baseline_on }} → {{ period.latest_on }}</p>
+        </article>
+        {% endfor %}
+      {% else %}
+        <article class="hoocon-lead-stats__card">
+          <p class="hoocon-lead-stats__label">По выгрузкам</p>
+          <p class="hoocon-lead-stats__value">—</p>
+          <p class="hoocon-lead-stats__label">нужна вторая загрузка Excel</p>
+        </article>
+      {% endif %}
+    </section>
+    <p class="hoocon-lead-stats__label">
+      На сколько свободный остаток стал меньше между выгрузками 1С.
+      Если за срок был и приход, и расход, виден только итог.
+      {% if stock_snapshots.filtering %}
+        <a href="{{ stock_snapshots.list_url }}">Сбросить фильтр</a>
+      {% endif %}
+    </p>
+  </section>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
 {% block object-tools-items %}
   {% if stock_upload_url %}
   <li>

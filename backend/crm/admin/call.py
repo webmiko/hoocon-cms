@@ -17,13 +17,13 @@ from unfold.admin import ModelAdmin
 from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import ScopedForeignKeyMixin, filter_autocomplete_by_client
 from config.unfold_callbacks import _versioned_static
-from crm.admin.scope import _CLIENT_AND_LEAD
+from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
 from crm.models import Call, Client
 from crm.services import scope_calls_for_manager, scope_clients_for_manager
 
 
 @admin.register(Call)
-class CallAdmin(ScopedForeignKeyMixin, ModelAdmin):
+class CallAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, ModelAdmin):
     """Mango VPBX call journal — rows arrive via telephony webhook.
 
     Звонки без привязанного клиента видны всем менеджерам (общий

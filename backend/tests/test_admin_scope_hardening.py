@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -556,12 +558,19 @@ def test_scoped_fk_keeps_value_linked_by_automation() -> None:
 
 @pytest.mark.django_db
 def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
-    """Quote/Call/ClientDocument/Activity/Email принимали чужие client/lead/quote/order."""
+    """Quote/Call/Activity/Email/Document/PlannedTouch принимали чужие client/lead на POST."""
     from django.core.exceptions import ValidationError
 
     from cabinet.models import Order
-    from crm.admin import ActivityAdmin, CallAdmin, ClientDocumentAdmin, EmailMessageAdmin, QuoteAdmin
-    from crm.models import Call, ClientDocument, EmailMessage, Quote
+    from crm.admin import (
+        ActivityAdmin,
+        CallAdmin,
+        ClientDocumentAdmin,
+        EmailMessageAdmin,
+        PlannedTouchAdmin,
+        QuoteAdmin,
+    )
+    from crm.models import Call, ClientDocument, EmailMessage, PlannedTouch, Quote
 
     mgr, _other, mine, foreign = _foreign_client_pair()
     foreign_lead = Lead.objects.get(client=foreign)
@@ -573,6 +582,7 @@ def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
         (ActivityAdmin, Activity),
         (EmailMessageAdmin, EmailMessage),
         (ClientDocumentAdmin, ClientDocument),
+        (PlannedTouchAdmin, PlannedTouch),
     ):
         client_field = _fk_field(admin_cls, model, "client", mgr)
         assert client_field.clean(mine.pk) == mine
@@ -585,6 +595,17 @@ def test_crm_admins_scope_client_lead_quote_order_pickers() -> None:
         _fk_field(ClientDocumentAdmin, ClientDocument, "quote", mgr).clean(foreign_quote.pk)
     with pytest.raises(ValidationError):
         _fk_field(ClientDocumentAdmin, ClientDocument, "order", mgr).clean(foreign_order.pk)
+    # Уже привязанный чужой клиент остаётся в форме: общий календарь иначе не сохранить.
+    from django.utils import timezone
+
+    linked = PlannedTouch.objects.create(
+        client=foreign,
+        title="Чужой звонок",
+        starts_at=timezone.now(),
+        dedupe_key="scope-fk-planned",
+    )
+    kept = _fk_field(PlannedTouchAdmin, PlannedTouch, "client", mgr, linked.pk)
+    assert kept.clean(foreign.pk) == foreign
 
 
 def test_activity_author_is_read_only_in_admin() -> None:
@@ -616,3 +637,270 @@ def test_manager_cannot_open_foreign_spec_list() -> None:
     assert response.status_code in (302, 403, 404)
     list_html = page.get(reverse("admin:cabinet_speclist_changelist")).content.decode()
     assert "Чужая спецификация" not in list_html
+
+
+def _put_admin_value(data: dict[str, Any], key: str, value: Any) -> None:
+    """Copy one admin field into a POST body. An unchecked box stays absent."""
+    if value is None or value is False:
+        return
+    if value is True:
+        data[key] = "on"
+        return
+    if isinstance(value, list | tuple):
+        data[key] = ["" if item is None else str(item) for item in value]
+        return
+    data[key] = str(value)
+
+
+def _put_bound_field(data: dict[str, Any], bound: Any) -> None:
+    """Copy a bound field, including split date widgets, into the POST body."""
+    widget = bound.field.widget
+    value = bound.value()
+    if hasattr(widget, "decompress"):
+        parts = widget.decompress(value)
+        for index, part in enumerate(parts):
+            _put_admin_value(data, f"{bound.html_name}_{index}", part)
+        return
+    _put_admin_value(data, bound.html_name, value)
+
+
+def _admin_change_post(page: Client, url: str) -> dict[str, Any]:
+    """Replay the rendered change form so a tampered inline is the only delta."""
+    response = page.get(url)
+    assert response.status_code == 200, response.status_code
+    data: dict[str, Any] = {}
+    for fieldset in response.context["adminform"]:
+        for line in fieldset:
+            for admin_field in line:
+                if getattr(admin_field, "is_readonly", False):
+                    continue
+                _put_bound_field(data, admin_field.field)
+    for formset in response.context["inline_admin_formsets"]:
+        forms = formset.formset
+        data[f"{forms.prefix}-TOTAL_FORMS"] = str(forms.total_form_count())
+        data[f"{forms.prefix}-INITIAL_FORMS"] = str(forms.initial_form_count())
+        data[f"{forms.prefix}-MIN_NUM_FORMS"] = str(forms.min_num)
+        data[f"{forms.prefix}-MAX_NUM_FORMS"] = str(forms.max_num)
+        for form in forms.forms:
+            for name in form.fields:
+                _put_bound_field(data, form[name])
+    return data
+
+
+@pytest.mark.django_db
+def test_manager_does_not_see_or_take_another_managers_company_card() -> None:
+    """Company card, call list, and «Назначить меня» stay inside the manager's own queue."""
+    from django.utils import timezone
+
+    from crm.models import Company, CompanyMember, PlannedTouch
+
+    manager = _staff_with_perms(
+        username="scope-card-mgr",
+        codenames=(
+            "view_company",
+            "change_company",
+            "view_client",
+            "change_client",
+            "view_plannedtouch",
+            "change_plannedtouch",
+            "view_companymember",
+            "change_companymember",
+        ),
+    )
+    other = User.objects.create_user(
+        username="scope-card-other",
+        email="scope-card-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    org = Company.objects.create(name="Общая фирма")
+    mine = CrmClient.objects.create(
+        name="Мой контакт",
+        email="scope-card-mine@example.com",
+        company=org.name,
+        phone="111",
+        assignee=manager,
+    )
+    foreign = CrmClient.objects.create(
+        name="Чужой контакт",
+        email="scope-card-foreign@example.com",
+        company=org.name,
+        phone="222",
+        assignee=other,
+    )
+    outsider = CrmClient.objects.create(
+        name="Вне фирмы",
+        email="scope-card-out@example.com",
+        company="Другая фирма",
+        assignee=other,
+    )
+    owned_touch = PlannedTouch.objects.create(
+        company=org,
+        assignee=other,
+        title="Чужой звонок",
+        starts_at=timezone.now(),
+        dedupe_key="scope-card-owned",
+    )
+    free_touch = PlannedTouch.objects.create(
+        company=org,
+        title="Свободный звонок",
+        starts_at=timezone.now(),
+        dedupe_key="scope-card-free",
+    )
+    owned_company = Company.objects.create(name="Уже с менеджером", assignee=other)
+    free_company = Company.objects.create(name="Без менеджера")
+
+    page = Client()
+    page.force_login(manager)
+    card = page.get(reverse("admin:crm_company_change", args=[org.pk]))
+    assert card.status_code == 200
+    html = card.content.decode()
+    assert mine.email in html
+    assert foreign.email not in html
+    assert owned_touch.title not in html
+    assert free_touch.title in html
+
+    calls = page.get(reverse("admin:crm_plannedtouch_changelist")).content.decode()
+    assert free_touch.title in calls
+    assert owned_touch.title not in calls
+    hidden = page.get(reverse("admin:crm_plannedtouch_change", args=[owned_touch.pk]))
+    assert hidden.status_code == 302
+    assert hidden.url == reverse("admin:index")
+
+    stolen = page.post(
+        reverse("admin:crm_company_changelist"),
+        {"action": "assign_to_me", "_selected_action": [str(owned_company.pk), str(free_company.pk)]},
+    )
+    assert stolen.status_code == 302
+    owned_company.refresh_from_db()
+    free_company.refresh_from_db()
+    assert owned_company.assignee_id == other.pk
+    assert free_company.assignee_id == manager.pk
+
+    stolen_call = page.post(
+        reverse("admin:crm_plannedtouch_changelist"),
+        {"action": "assign_to_me", "_selected_action": [str(owned_touch.pk), str(free_touch.pk)]},
+    )
+    assert stolen_call.status_code == 302
+    owned_touch.refresh_from_db()
+    free_touch.refresh_from_db()
+    assert owned_touch.assignee_id == other.pk
+    assert free_touch.assignee_id == manager.pk
+
+    admin_user = User.objects.create_superuser("scope-card-admin", "scope-card-admin@example.com", "password12")
+    admin_page = Client()
+    admin_page.force_login(admin_user)
+    visible = admin_page.get(reverse("admin:crm_plannedtouch_changelist")).content.decode()
+    assert owned_touch.title in visible
+    blocked = admin_page.post(
+        reverse("admin:crm_plannedtouch_changelist"),
+        {"action": "assign_to_me", "_selected_action": [str(owned_touch.pk)]},
+    )
+    assert blocked.status_code == 302
+    owned_touch.refresh_from_db()
+    assert owned_touch.assignee_id == other.pk
+
+    change_url = reverse("admin:crm_company_change", args=[org.pk])
+    posted = _admin_change_post(page, change_url)
+    for key, value in list(posted.items()):
+        if not key.startswith("clients-") or not key.endswith("-id"):
+            continue
+        phone_key = key.replace("-id", "-phone")
+        if value == str(foreign.pk):
+            posted[phone_key] = "999"
+        if value == str(mine.pk):
+            posted[phone_key] = "333"
+    saved = page.post(change_url, posted)
+    if saved.status_code != 302:
+        form_errors = [f"status={saved.status_code}"]
+        if saved.context is not None:
+            form_errors.append(str(saved.context["adminform"].form.errors))
+            for formset in saved.context["inline_admin_formsets"]:
+                forms = formset.formset
+                form_errors.append(f"{forms.prefix} {forms.non_form_errors()} {forms.errors}")
+        raise AssertionError(" | ".join(form_errors))
+    mine.refresh_from_db()
+    foreign.refresh_from_db()
+    assert mine.phone == "333"
+    assert foreign.phone == "222"
+
+    linked = _admin_change_post(page, change_url)
+    own_member = CompanyMember.objects.get(company=org, client=mine)
+    linked["members-0-client"] = str(outsider.pk)
+    refused = page.post(change_url, linked)
+    own_member.refresh_from_db()
+    assert refused.status_code == 200
+    assert own_member.client_id == mine.pk
+
+
+@pytest.mark.django_db
+def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
+    """Saving the company card does not rewrite an owner the «Назначить меня» action would keep."""
+    from django.utils import timezone
+
+    from crm.models import Company, PlannedTouch
+
+    manager = _staff_with_perms(
+        username="scope-owner-mgr",
+        codenames=("view_company", "change_company", "view_plannedtouch", "change_plannedtouch"),
+    )
+    other = User.objects.create_user(
+        username="scope-owner-other",
+        email="scope-owner-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    owned = Company.objects.create(name="Чужая фирма", assignee=other, comment="было")
+    free = Company.objects.create(name="Свободная фирма")
+    owned_touch = PlannedTouch.objects.create(
+        company=owned,
+        assignee=other,
+        title="Звонок чужой фирмы",
+        starts_at=timezone.now(),
+        dedupe_key="scope-owner-touch",
+    )
+
+    page = Client()
+    page.force_login(manager)
+    owned_url = reverse("admin:crm_company_change", args=[owned.pk])
+    card = page.get(owned_url)
+    assert card.status_code == 200
+
+    stolen = _admin_change_post(page, owned_url)
+    stolen["assignee"] = str(manager.pk)
+    stolen["comment"] = "попытка забрать"
+    saved = page.post(owned_url, stolen)
+    assert saved.status_code == 302
+    owned.refresh_from_db()
+    assert owned.assignee_id == other.pk
+    assert owned.comment == "попытка забрать"
+    assert 'name="assignee"' not in card.content.decode()
+    calls = page.get(reverse("admin:crm_plannedtouch_changelist")).content.decode()
+    assert owned_touch.title not in calls
+
+    cleared = _admin_change_post(page, owned_url)
+    cleared["assignee"] = ""
+    page.post(owned_url, cleared)
+    owned.refresh_from_db()
+    assert owned.assignee_id == other.pk
+
+    free_url = reverse("admin:crm_company_change", args=[free.pk])
+    free_card = page.get(free_url)
+    assert free_card.status_code == 200
+    assert 'name="assignee"' in free_card.content.decode()
+    claim = _admin_change_post(page, free_url)
+    claim["assignee"] = str(manager.pk)
+    claimed = page.post(free_url, claim)
+    assert claimed.status_code == 302
+    free.refresh_from_db()
+    assert free.assignee_id == manager.pk
+
+    admin_user = User.objects.create_superuser("scope-owner-admin", "scope-owner-admin@example.com", "password12")
+    admin_page = Client()
+    admin_page.force_login(admin_user)
+    reassign = _admin_change_post(admin_page, owned_url)
+    reassign["assignee"] = str(manager.pk)
+    moved = admin_page.post(owned_url, reassign)
+    assert moved.status_code == 302
+    owned.refresh_from_db()
+    assert owned.assignee_id == manager.pk

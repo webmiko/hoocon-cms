@@ -52,7 +52,7 @@ def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
     leads = next(group for group in nav["groups"] if group["id"] == "leads-lead")
     assert leads["action"] == "link"
     assert leads["url"].endswith("/admin/leads/lead/")
-    assert leads["title"] == "Заявки"
+    assert leads["title"] == "Лиды"
     section_ids = {section["id"] for section in nav["sections"]}
     assert "work" in section_ids
     assert "catalog" in section_ids
@@ -77,24 +77,25 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     # «Работа» — one tap to every daily section, in fixed order.
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:9] == [
+    assert work_ids[:7] == [
         "leads-lead",
         "leads-stats",
         "crm-sales-report",
         "supportchat-messages",
         "crm-client",
-        "crm-emailmessage",
-        "crm-activity",
-        "crm-call",
         "crm-quote",
+        "crm-company",
     ]
+    assert "crm-activity" not in work_ids
+    assert "crm-emailmessage" not in work_ids
+    assert "crm-plannedtouch" not in work_ids
     assert groups["leads-stats"]["action"] == "link"
     assert groups["leads-stats"]["url"].endswith("/admin/leads/lead/stats/")
     assert groups["crm-sales-report"]["action"] == "link"
     assert groups["crm-sales-report"]["url"].endswith("/admin/crm/client/sales-report/")
     assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
-    assert groups["crm-emailmessage"]["url"].endswith("/admin/crm/emailmessage/")
     assert groups["crm-quote"]["url"].endswith("/admin/crm/quote/")
+    assert groups["crm-company"]["url"].endswith("/admin/crm/company/")
 
     # Остальные модели crm (шаблоны писем, вложения, состояние ящика) —
     # в drill-строке «crm», не плоско.
@@ -436,15 +437,21 @@ def test_manager_nav_shows_only_permitted_sections() -> None:
         "leads-lead",
         "supportchat-messages",
         "crm-client",
-        "crm-emailmessage",
-        "crm-activity",
         "crm-quote",
-        "crm-clientdocument",
         "crm-company",
         "cabinet-order",
         "cabinet-rmacase",
         "cabinet-speclist",
     } <= ids
+    hidden = {
+        "crm-emailmessage",
+        "crm-activity",
+        "crm-call",
+        "crm-clientdocument",
+        "crm-plannedtouch",
+        "crm-worklabel",
+    }
+    assert not (hidden & ids)
     # Шаблоны писем — единственный непиннед остаток CRM у менеджера:
     # рендерится плоской строкой, а не drill-разделом.
     assert "crm-emailtemplate" in ids

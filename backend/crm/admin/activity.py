@@ -13,7 +13,7 @@ from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
-from crm.admin.scope import _CLIENT_AND_LEAD
+from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
 from crm.models import Activity, Client
 from crm.services import scope_activities_for_manager
 from leads.models import Lead
@@ -21,7 +21,7 @@ from leads.services import lead_visible_to_manager
 
 
 @admin.register(Activity)
-class ActivityAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
+class ActivityAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Standalone activity list (also edited via Client inline).
 
     ID = email клиента; строки с одним email идут группой.

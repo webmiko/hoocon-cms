@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from django import forms
+from unfold.widgets import UnfoldAdminFileFieldWidget
 
+from catalog.validators import validate_stock_xlsx_upload
 from config.admin_toggle import HooconToggleInput
 
 
@@ -59,3 +61,23 @@ class SpecImportForm(forms.Form):
         if not (f.name or "").lower().endswith(".xlsx"):
             raise forms.ValidationError("Поддерживается только .xlsx.")
         return f
+
+
+class ClientCardsUploadForm(forms.Form):
+    """Staff form: .xlsx of company contacts → client and company cards."""
+
+    file = forms.FileField(
+        label="Файл клиентов (.xlsx)",
+        help_text=(
+            "Лист «Клиенты»: колонки «Компания», «Контакт», «Эл. почта». "
+            "Необязательно: «ИНН», «Юридический адрес», «Телефон», «Заметки»."
+        ),
+        allow_empty_file=False,
+        widget=UnfoldAdminFileFieldWidget,
+    )
+
+    def clean_file(self) -> Any:
+        """Validate extension, size, and ZIP magic bytes."""
+        uploaded = self.cleaned_data["file"]
+        validate_stock_xlsx_upload(uploaded)
+        return uploaded

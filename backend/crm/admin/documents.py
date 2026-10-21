@@ -15,13 +15,18 @@ from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
-from crm.admin.scope import _scoped_client_queryset, _scoped_order_queryset, _scoped_quote_queryset
+from crm.admin.scope import (
+    ManagerUsesTheCard,
+    _scoped_client_queryset,
+    _scoped_order_queryset,
+    _scoped_quote_queryset,
+)
 from crm.models import Client, ClientDocument
 from crm.services import scope_clients_for_manager
 
 
 @admin.register(ClientDocument)
-class ClientDocumentAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
+class ClientDocumentAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Документы клиента: upload в карточке или здесь; private download."""
 
     list_display = ("title", "client", "kind", "edo_status", "created_at")

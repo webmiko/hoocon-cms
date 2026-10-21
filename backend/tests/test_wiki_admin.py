@@ -520,6 +520,45 @@ def test_seed_wiki_admin_toggles_leave_checkboxes_for_rows_and_token() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_admin_section_is_called_leads() -> None:
+    """Меню админки в руководстве называется «Лиды», кабинет клиента — «Заявки»."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert "«Работа» → «Лиды»" in guide.body
+    assert "В кабинете клиента по-прежнему «Заявки»" in guide.body
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert changelog.index("changelog-leads-label") < changelog.index("changelog-stock-movement")
+
+
+@pytest.mark.django_db
+def test_seed_wiki_stock_movement_cards_on_sku_page() -> None:
+    """Журнал и раздел каталога описывают карточки движения остатков на «Артикулах»."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert 'id="catalog-stock-movement"' in body
+    assert "по выгрузкам" in body
+    assert "своих клиентов" in body
+    assert "без движения" in body.lower() or "Без движения" in body
+    assert "не заменяет снимок склада" in body
+    assert changelog.index("changelog-short-stock-file") < changelog.index("changelog-sku-order-scope")
+    assert changelog.index("changelog-sku-order-scope") < changelog.index("changelog-stock-snapshots")
+    assert changelog.index("changelog-stock-snapshots") < changelog.index("changelog-leads-label")
+    assert changelog.index("changelog-stock-movement") < changelog.index("changelog-email-send-once")
+    row = changelog.split('id="changelog-stock-movement"', 1)[1].split("</tr>", 1)[0]
+    assert "1, 3, 6 и 12" in row
+    assert "Отменённые" in row
+
+
+@pytest.mark.django_db
 def test_seed_wiki_retires_mango_guide() -> None:
     """Старая страница АТС не в сиде: если она осталась включённой, seed_wiki её выключает."""
     from io import StringIO

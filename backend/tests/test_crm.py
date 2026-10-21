@@ -114,7 +114,7 @@ def test_client_change_form_lists_leads_inline(client, django_user_model) -> Non
     html = client.get(url).content.decode()
     assert "Заявка А" in html
     assert "Заявка Б" in html
-    assert "заявки клиента" in html.lower() or "Заявки" in html
+    assert "лиды клиента" in html.lower()
     # Unfold action_list (e.g. История) — phone shell relocates into «Ещё» via JS.
     assert "data-hoocon-phone-action-list" in html
     assert "/history/" in html

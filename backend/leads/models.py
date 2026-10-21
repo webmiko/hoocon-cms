@@ -163,17 +163,47 @@ class Lead(PdnConsentFields):
         db_index=True,
         help_text=("Когда менеджер открыл заявку в админке (стикер считает непросмотренные)."),
     )
+    work_labels: models.ManyToManyField = models.ManyToManyField(
+        "crm.WorkLabel",
+        blank=True,
+        related_name="leads",
+        verbose_name="отметки",
+        help_text="Те же отметки, что на карточке компании: очередь, «не звонить», ниша.",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "заявка"
-        verbose_name_plural = "заявки"
+        verbose_name = "лид"
+        verbose_name_plural = "лиды"
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
         """Return Заявка #pk and type — no contact PII (safe for logs)."""
         return f"Заявка #{self.pk} ({self.get_lead_type_display()})"
+
+    def admin_choice_label(self) -> str:
+        """Company, contact, and the request, for the admin dropdown only."""
+        company = (self.company or "").strip() or "без компании"
+        who = (self.name or "").strip() or "без имени"
+        ask = self._choice_ask()
+        parts = [company, who]
+        if ask:
+            parts.append(ask)
+        parts.append(f"#{self.pk}")
+        return " · ".join(parts)
+
+    def _choice_ask(self) -> str:
+        codes = [code for item in self.items.all() if (code := (item.sku_code or "").strip())]
+        if codes:
+            shown = ", ".join(codes[:3])
+            if len(codes) > 3:
+                shown = f"{shown} +{len(codes) - 3}"
+            return shown
+        text = " ".join((self.message or "").split())
+        if len(text) > 60:
+            return text[:59].rstrip() + "…"
+        return text
 
 
 class LeadItem(models.Model):

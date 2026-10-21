@@ -271,7 +271,8 @@ def test_apply_damqu_enrichment_manual_aligned_da8_and_da16() -> None:
     assert by8["power-consumption"] == "12 Вт (работа) / 1 Вт (удержание)"
     assert "95°" in by8["running-time"]
     assert "95°" in by8["rotation-angle"]
-    assert by8["weight"] == "1,2…1,3"
+    assert by8["weight"] == "1,3"
+    assert by8["humidity"] == "5…95 % относительной влажности, без конденсата / EN 60730-1"
     assert "DIP" in by8["rotation-direction"]
     assert by16["moment"] == "16 Нм"
     assert by16["damper-area"] == "до 1,6"

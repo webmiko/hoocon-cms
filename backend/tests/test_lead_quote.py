@@ -242,9 +242,14 @@ def test_quote_lead_autocomplete_filters_by_client() -> None:
     )
 
     assert response.status_code == 200
-    ids = {row["id"] for row in response.json()["results"]}
+    rows = response.json()["results"]
+    ids = {row["id"] for row in rows}
     assert str(lead_a.pk) in ids
     assert str(lead_b.pk) not in ids
+    text = next(row["text"] for row in rows if row["id"] == str(lead_a.pk))
+    assert "Ромашка" in text
+    assert "Покупатель" in text
+    assert f"#{lead_a.pk}" in text
 
 
 @pytest.mark.django_db

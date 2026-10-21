@@ -11,6 +11,7 @@ from crm.admin.documents import ClientDocumentAdmin
 from crm.admin.email import EmailAttachmentAdmin, EmailMessageAdmin, EmailTemplateAdmin, InboundMailboxStateAdmin
 from crm.admin.inlines import ActivityInline
 from crm.admin.quote import QuoteAdmin, QuoteAdminForm
+from crm.admin.work import PlannedTouchAdmin, WorkLabelAdmin
 
 __all__ = [
     "ActivityAdmin",
@@ -25,4 +26,6 @@ __all__ = [
     "InboundMailboxStateAdmin",
     "QuoteAdmin",
     "QuoteAdminForm",
+    "PlannedTouchAdmin",
+    "WorkLabelAdmin",
 ]

@@ -69,6 +69,10 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
         recent_clients = _recent_clients(user)
         recent_activities = _recent_activities(user)
 
+    from crm.today import build_today_board
+
+    today = build_today_board(user)
+
     admin_log = _recent_admin_log(user)
 
     links: dict[str, str] = {}
@@ -89,6 +93,7 @@ def build_admin_dashboard(request: HttpRequest) -> dict[str, Any]:
             "recent_activities": recent_activities,
             "admin_log": admin_log,
             "links": links,
+            "today": today,
         },
     }
 

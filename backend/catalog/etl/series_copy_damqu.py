@@ -95,7 +95,7 @@ _POS_INDICATION: Final[str] = "механический указатель"
 _ANGLE_95: Final[str] = "макс. 95°, регулируется механическими упорами"
 _POWER_12_1: Final[str] = "12 Вт (работа) / 1 Вт (удержание)"
 _SHAFT_8_24: Final[str] = "○ 10…20 / □ 10×10…16×16"
-_WEIGHT_8_24: Final[str] = "1,2…1,3"
+_WEIGHT_8_24: Final[str] = "1,3"
 
 _SHARED_BASE: tuple[AttrRow, ...] = (
     (
@@ -151,7 +151,7 @@ _SHARED_BASE: tuple[AttrRow, ...] = (
         "Относительная влажность",
         "humidity",
         "",
-        "95 % относительной влажности, без конденсации / согласно EN 60730-1",
+        "5…95 % относительной влажности, без конденсата / EN 60730-1",
         ATTR_GROUP_OPERATING,
     ),
     (
@@ -312,7 +312,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "Относительная влажность",
         "humidity",
         "",
-        "95 % относительной влажности, без конденсации / согласно EN 60730-1",
+        "5…95 % относительной влажности, без конденсата / EN 60730-1",
         ATTR_GROUP_OPERATING,
     ),
     (
@@ -336,7 +336,7 @@ SHARED_ATTRS: tuple[AttrRow, ...] = (
         "○ 10…20 / □ 10×10…16×16",
         ATTR_GROUP_SIZE,
     ),
-    ("Масса", "weight", "кг", "1,2…1,3", ATTR_GROUP_SIZE),
+    ("Масса", "weight", "кг", "1,3", ATTR_GROUP_SIZE),
     (
         "Сечение провода",
         "wire-cross-section",

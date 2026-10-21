@@ -67,7 +67,8 @@ _MONTAGE_SERIES_FALLBACK: Final[dict[tuple[str, str], str]] = {
 _MONTAGE_NM_FALLBACK: Final[dict[tuple[str, str], dict[int, int]]] = {
     ("sa", "fu"): {3: 5},
     ("da", "fu"): {3: 5},
-    ("sa", "mu"): {7: 10, 15: 10},
+    # SA7 and SA10 share the 160×102×62 body. SA15 is 156×98×59 — no SA10 sheet.
+    ("sa", "mu"): {7: 10},
     ("da", "mu"): {32: 24},
     # After series→mu: DA5MQU≈DA4/6; DA8/16/24MQU≈da8:16:24mu montage (10/20 legacy→8/24).
     ("da", "mqu"): {5: 6, 10: 8, 20: 24},
@@ -414,4 +415,18 @@ def apply_media_webp_extras(
 
     summary["demoted_emergency_non_qa"] = _demote_emergency_on_non_qa(dry_run=dry_run)
     summary["unpublished_hvdf_montage"] = _unpublish_hvdf_montage(dry_run=dry_run)
+    summary["unpublished_sa15_sa10_montage"] = unpublish_sa15_borrowed_sa10_montage(dry_run=dry_run)
     return summary
+
+
+def unpublish_sa15_borrowed_sa10_montage(*, dry_run: bool = False) -> int:
+    """Hide the SA10 mounting sheet on SA15 (different body: 156×98×59 vs 160×102×62)."""
+    qs = ProductImage.objects.filter(
+        is_published=True,
+        sku__sku_code__iregex=r"(?i)^sa15mu",
+        source_url__icontains="montazhnaya_sxema_sa10mu",
+    )
+    count = qs.count()
+    if count and not dry_run:
+        qs.update(is_published=False)
+    return count

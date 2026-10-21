@@ -60,6 +60,8 @@ _CRM_MODELS: Final[tuple[str, ...]] = (
     "clientdocument",
     "company",
     "companymember",
+    "worklabel",
+    "plannedtouch",
 )
 
 # Кабинет клиента: заказы/спеки/рекламации (аккаунты — только «Админ»/сервисы).

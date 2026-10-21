@@ -153,7 +153,8 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
     )
 
     summary = apply_da_sa_media_webp(dry_run=False, photo_root=pack)
-    assert summary["created"] == 9
+    # DA8/16/24 MQU no longer takes the labeled da10:20mqu pack shot.
+    assert summary["created"] == 8
 
     for sku in skus[:2] + skus[4:]:
         assert ProductImage.objects.filter(
@@ -178,9 +179,9 @@ def test_apply_da_sa_media_webp_colon_editions(tmp_path: Path) -> None:
         source_url__contains="media-webp/da8:16:24mu24-d:ds-product",
         is_published=True,
     ).exists()
-    assert ProductImage.objects.filter(
+    assert not ProductImage.objects.filter(
         sku=da8,
-        source_url__contains="media-webp/da10:20mqu-d:ds-product",
+        source_url__contains="media-webp/da10:20mqu",
         is_published=True,
     ).exists()
 
@@ -263,7 +264,7 @@ def test_clone_damqu_images_from_da8_to_16_24() -> None:
         img = ProductImage(
             sku=skus[code],
             alt=f"{code} hero",
-            source_url=f"https://hoocon.ru/.local-assets/media-webp/da10:20mqu-{code[-1].lower()}-product.webp",
+            source_url=(f"https://hoocon.ru/.local-assets/manuals-ru/da8-16-24mqu24-{code[-1].lower()}-product.webp"),
             sort_order=0,
             is_published=True,
         )
@@ -275,17 +276,37 @@ def test_clone_damqu_images_from_da8_to_16_24() -> None:
         img.full_clean()
         img.save()
 
+    labeled = ProductImage(
+        sku=skus["DA8MQU24-A"],
+        alt="DA8MQU24-A | фото привода",
+        source_url="https://hoocon.ru/.local-assets/media-webp/da10:20mqu-a:as-product.webp",
+        sort_order=1,
+        is_published=True,
+    )
+    labeled.image.save(
+        "labeled.webp",
+        SimpleUploadedFile("labeled.webp", png, content_type="image/webp"),
+        save=False,
+    )
+    labeled.full_clean()
+    labeled.save()
+
     stats = clone_damqu_images_from_donor()
     assert stats["targets"] == 4
     assert stats["created"] == 4
     for nm in (16, 24):
         for ed in ("24-A", "24-D"):
             target = skus[f"DA{nm}MQU{ed}"]
-            assert ProductImage.objects.filter(sku=target, sort_order=0, is_published=True).exists()
+            cloned = ProductImage.objects.get(sku=target, sort_order=0, is_published=True)
+            assert cloned.alt == f"DA{nm}MQU{ed} hero"
+            assert not ProductImage.objects.filter(
+                sku=target,
+                source_url__contains="da10:20mqu",
+            ).exists()
 
     files_before = {img.pk: img.image.name for img in ProductImage.objects.filter(sku__product__in=products.values())}
     again = clone_damqu_images_from_donor()
-    assert (again["created"], again["updated"], again["skipped"]) == (0, 0, 4)
+    assert (again["created"], again["updated"], again["skipped"]) == (0, 0, 6)
     files_after = {img.pk: img.image.name for img in ProductImage.objects.filter(sku__product__in=products.values())}
     assert files_after == files_before
 
@@ -315,34 +336,226 @@ def test_clone_damqu_skips_unpublished_donor_and_keeps_empty_source_idempotent()
 
 
 @pytest.mark.django_db
-def test_damqu_16_24_pack_fallback_uses_da10_mask(tmp_path: Path) -> None:
-    """DA16/DA24 heroes resolve to the same da10:20mqu pack as DA8."""
+def test_damqu_16_24_manual_hero_replaces_labeled_da10_pack(tmp_path: Path) -> None:
+    """DA16/DA24 must not keep the da10:20mqu cutout that is labeled 8 Нм."""
+    from catalog.etl.da_sa_media_webp import apply_damqu_manual_heroes
+
     pack = tmp_path / "media-webp"
     pack.mkdir()
     (pack / "da10:20mqu-a:as.webp").write_bytes(_png(color=(85, 85, 85)))
     (pack / "da10:20mqu-d:ds.webp").write_bytes(_png(color=(80, 80, 80)))
+    assets = tmp_path / "assets"
+    body = assets / "da8-16-24mqu24-a-as"
+    body.mkdir(parents=True)
+    (body / "product.png").write_bytes(_png(color=(180, 20, 20)))
+    (body / "wiring.png").write_bytes(_png(color=(20, 20, 20)))
+    (body / "dimensions.png").write_bytes(_png(color=(20, 20, 180)))
 
     cat = Category.objects.create(name="MQU pack", slug="mqu-pack")
-    skus: list[tuple[SKU, str]] = []
-    for nm, ed, stem in (
-        (16, "A", "da10:20mqu-a:as"),
-        (24, "D", "da10:20mqu-d:ds"),
-    ):
-        product = Product.objects.create(name=f"DA{nm}", slug=f"da{nm}mqu-pack", category=cat)
+    product = Product.objects.create(name="DA16", slug="da16mqu-pack", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA16MQU24-A",
+        name="DA16MQU24-A",
+        slug="da16mqu24-a-pack",
+        is_published=True,
+    )
+    ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile("old.webp", _png(color=(1, 1, 1)), content_type="image/webp"),
+        alt="DA8MQU24-A | фото привода",
+        source_url="https://hoocon.ru/.local-assets/media-webp/da10:20mqu-a:as-product.webp",
+        sort_order=0,
+        is_published=True,
+    )
+
+    apply_da_sa_media_webp(dry_run=False, photo_root=pack)
+    apply_damqu_manual_heroes(dry_run=False, assets_root=assets)
+
+    hero = ProductImage.objects.get(
+        sku=sku,
+        source_url__contains="da8-16-24mqu24-a-as-product",
+        is_published=True,
+    )
+    assert hero.alt == "DA16MQU24-A | фото привода"
+    assert "da8-16-24mqu-da8-16-24mqu" not in hero.source_url
+    assert not ProductImage.objects.filter(
+        sku=sku,
+        source_url__contains="da10:20mqu",
+        is_published=True,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_damqu_manual_hero_drops_studio_white(tmp_path: Path) -> None:
+    """Studio white and the grey halo become transparent; diagrams stay paper.
+
+    DA16MQU24-D reuses this same 230 В D cutout. The 230 В card is the one
+    that also stores wiring from that folder.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    from catalog.etl.da_sa_media_webp import apply_damqu_manual_heroes
+
+    img = Image.new("RGB", (120, 100), (255, 255, 255))
+    for y in range(30, 70):
+        for x in range(30, 90):
+            img.putpixel((x, y), (180, 20, 20))
+    for y in range(4, 10):
+        for x in range(4, 10):
+            img.putpixel((x, y), (160, 156, 154))
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    product_png = buf.getvalue()
+
+    assets = tmp_path / "assets"
+    body = assets / "da8-16-24mqu230-d-ds"
+    body.mkdir(parents=True)
+    (body / "product.png").write_bytes(product_png)
+    (body / "wiring.png").write_bytes(_png(size=(80, 60), color=(255, 255, 255)))
+    (body / "dimensions.png").write_bytes(_png(size=(80, 60), color=(255, 255, 255)))
+
+    cat = Category.objects.create(name="MQU wash", slug="mqu-wash")
+    product = Product.objects.create(name="DA16 D", slug="da16mqu-wash", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA16MQU230-D",
+        name="DA16MQU230-D",
+        slug="da16mqu230-d-wash",
+        is_published=True,
+    )
+
+    apply_damqu_manual_heroes(dry_run=False, assets_root=assets)
+
+    hero = ProductImage.objects.get(sku=sku, sort_order=0, is_published=True)
+    with Image.open(hero.image) as opened:
+        opened.load()
+        rgba = opened.convert("RGBA")
+    assert rgba.getpixel((0, 0))[3] == 0
+    assert rgba.getpixel((6, 6))[3] == 0
+    assert rgba.getpixel((rgba.width // 2, rgba.height // 2))[3] == 255
+
+    wiring = ProductImage.objects.get(sku=sku, sort_order=5, is_published=True)
+    with Image.open(wiring.image) as opened:
+        opened.load()
+        paper = opened.convert("RGBA")
+    assert paper.getpixel((0, 0))[3] == 255
+
+
+@pytest.mark.django_db
+def test_damqu_removebg_cutout_stays_transparent(tmp_path: Path) -> None:
+    """A shared remove.bg PNG is the hero and is not punched again.
+
+    The grey block sits on the clear backdrop. The studio punch would delete it;
+    this file is already a cut-out, so the block and the red body stay.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    from catalog.etl.da_sa_media_webp import apply_damqu_manual_heroes
+
+    cut = Image.new("RGBA", (80, 60), (0, 0, 0, 0))
+    for y in range(20, 45):
+        for x in range(25, 60):
+            cut.putpixel((x, y), (200, 30, 30, 255))
+    for y in range(4, 12):
+        for x in range(4, 12):
+            cut.putpixel((x, y), (160, 156, 154, 255))
+    buf = BytesIO()
+    cut.save(buf, format="PNG")
+
+    assets = tmp_path / "assets"
+    shared = assets / "da8-16-24mqu-cutout"
+    shared.mkdir(parents=True)
+    (shared / "product.png").write_bytes(buf.getvalue())
+    studio = assets / "da8-16-24mqu230-d-ds"
+    studio.mkdir()
+    (studio / "product.png").write_bytes(_png(size=(80, 60), color=(0, 180, 0)))
+    (studio / "wiring.png").write_bytes(_png(size=(40, 30), color=(255, 255, 255)))
+    (studio / "dimensions.png").write_bytes(_png(size=(40, 30), color=(255, 255, 255)))
+
+    cat = Category.objects.create(name="MQU cut", slug="mqu-cut")
+    product = Product.objects.create(name="DA16 D", slug="da16mqu-cut", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="DA16MQU230-D",
+        name="DA16MQU230-D",
+        slug="da16mqu230-d-cut",
+        is_published=True,
+    )
+
+    apply_damqu_manual_heroes(dry_run=False, assets_root=assets)
+
+    hero = ProductImage.objects.get(sku=sku, sort_order=0, is_published=True)
+    assert "da8-16-24mqu-cutout-product" in hero.source_url
+    with Image.open(hero.image) as opened:
+        opened.load()
+        rgba = opened.convert("RGBA")
+    assert rgba.getpixel((0, 0))[3] == 0
+    assert rgba.getpixel((8, 8))[3] == 255
+    red = rgba.getpixel((rgba.width // 2, rgba.height // 2))
+    assert red[0] > 150 and red[1] < 80 and red[3] == 255
+
+
+@pytest.mark.django_db
+def test_damqu_manual_heroes_run_without_media_pack(tmp_path: Path) -> None:
+    """RU cutout replaces the labeled da10:20mqu shot when the pack is missing or empty.
+
+    ``apply_da_sa_media_webp`` used to return before ``apply_damqu_manual_heroes``.
+    The cutout lives under ``_manuals-ru`` and does not need the pack.
+    """
+    assets = tmp_path / "assets"
+    body = assets / "da8-16-24mqu24-a-as"
+    body.mkdir(parents=True)
+    (body / "product.png").write_bytes(_png(color=(180, 20, 20)))
+    cat = Category.objects.create(name="MQU nopack", slug="mqu-nopack")
+    product = Product.objects.create(name="DA MQU", slug="da-mqu-nopack", category=cat)
+
+    def labeled(code: str) -> SKU:
         sku = SKU.objects.create(
             product=product,
-            sku_code=f"DA{nm}MQU24-{ed}",
-            name=f"DA{nm}MQU24-{ed}",
-            slug=f"da{nm}mqu24-{ed.lower()}-pack",
+            sku_code=code,
+            name=code,
+            slug=code.lower(),
             is_published=True,
         )
-        skus.append((sku, stem))
-
-    summary = apply_da_sa_media_webp(dry_run=False, photo_root=pack)
-    assert summary["created"] == 2
-    for sku, stem in skus:
-        assert ProductImage.objects.filter(
+        ProductImage.objects.create(
             sku=sku,
-            source_url__contains=f"media-webp/{stem}-product",
+            image=SimpleUploadedFile("old.webp", _png(color=(1, 1, 1)), content_type="image/webp"),
+            alt="DA8MQU24-A | фото привода",
+            source_url="https://hoocon.ru/.local-assets/media-webp/da10:20mqu-a:as-product.webp",
+            sort_order=0,
             is_published=True,
-        ).exists()
+        )
+        return sku
+
+    missing_sku = labeled("DA16MQU24-A")
+    summary = apply_da_sa_media_webp(dry_run=False, photo_root=tmp_path / "absent-pack", assets_root=assets)
+    assert summary["missing_root"] is True
+    assert summary["manual_heroes"]["heroes"] >= 1
+    assert not ProductImage.objects.filter(
+        sku=missing_sku,
+        source_url__contains="da10:20mqu",
+        is_published=True,
+    ).exists()
+    assert ProductImage.objects.filter(
+        sku=missing_sku,
+        source_url__contains="da8-16-24mqu24-a-as-product",
+        is_published=True,
+    ).exists()
+
+    empty_sku = labeled("DA24MQU24-A")
+    empty = tmp_path / "empty-pack"
+    empty.mkdir()
+    empty_summary = apply_da_sa_media_webp(dry_run=False, photo_root=empty, assets_root=assets)
+    assert "missing_root" not in empty_summary
+    assert empty_summary["skipped"] == 1
+    assert empty_summary["manual_heroes"]["heroes"] >= 1
+    assert not ProductImage.objects.filter(
+        sku=empty_sku,
+        source_url__contains="da10:20mqu",
+        is_published=True,
+    ).exists()

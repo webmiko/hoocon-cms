@@ -21,6 +21,47 @@ def _png(color: tuple[int, int, int] = (30, 30, 30)) -> bytes:
     return buf.getvalue()
 
 
+def test_sa15_montage_is_not_the_sa10_sheet() -> None:
+    """SA7 shares the SA10 body; SA15 is 156×98×59 and must not take that sheet."""
+    shot = _MontageShot(
+        stem="montazhnaya_sxema_sa10mu",
+        path=Path("montazhnaya_sxema_sa10mu.webp"),
+        kind="da_sa",
+        family="sa",
+        nms=frozenset({10}),
+        series="mu",
+    )
+    assert _pick_montage("SA7MU24-DS", [shot]) is shot
+    assert _pick_montage("SA15MU24-DS", [shot]) is None
+
+
+@pytest.mark.django_db
+def test_sa15_borrowed_sa10_montage_is_unpublished() -> None:
+    """A published SA10 mounting row on SA15 is hidden."""
+    from catalog.etl.media_webp_extras import unpublish_sa15_borrowed_sa10_montage
+
+    cat = Category.objects.create(name="SA", slug="sa-montage")
+    product = Product.objects.create(name="SA15", slug="sa15", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        sku_code="SA15MU230-DS",
+        name="SA15MU230-DS",
+        slug="sa15mu230-ds",
+        is_published=True,
+    )
+    image = ProductImage.objects.create(
+        sku=sku,
+        image=SimpleUploadedFile("m.webp", _png(), content_type="image/webp"),
+        alt="SA15MU230-DS | Монтажная схема",
+        source_url="https://hoocon.ru/.local-assets/media-webp/montazhnaya_sxema_sa10mu.webp",
+        sort_order=4,
+        is_published=True,
+    )
+    assert unpublish_sa15_borrowed_sa10_montage() == 1
+    image.refresh_from_db()
+    assert image.is_published is False
+
+
 def test_sku_code_is_hv_qa() -> None:
     """Only HVA/HVD *QA editions match emergency-feedback wiring."""
     assert sku_code_is_hv_qa("HVD24S-20QA")

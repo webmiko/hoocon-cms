@@ -42,7 +42,10 @@ def normalize_phone_digits(phone: str) -> str:
     ``+7 (495) 123-45-67`` and ``8 495 1234567`` → ``74951234567``;
     короткие добавочные возвращаем как есть.
     """
-    digits = _DIGITS_RE.sub("", phone or "")
+    # Several numbers in one cell ("…; офис …") must not glue into one key:
+    # phone_digits is a single lookup value, varchar(20).
+    first = (phone or "").split(";", 1)[0]
+    digits = _DIGITS_RE.sub("", first)
     if len(digits) == 11 and digits.startswith("8"):
         digits = "7" + digits[1:]
     elif len(digits) == 10:

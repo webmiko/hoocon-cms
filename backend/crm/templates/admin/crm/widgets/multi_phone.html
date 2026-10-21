@@ -1,0 +1,24 @@
+<div class="hoocon-phones">
+  {% for row in rows %}
+  <div class="hoocon-phones__row hoocon-field-action">
+    <input
+      type="text"
+      name="{{ widget.name }}"
+      {% if row.is_first %}id="{{ widget.attrs.id }}"{% endif %}
+      value="{{ row.number }}"
+      maxlength="50"
+      autocomplete="tel"
+      class="{{ widget.attrs.class }}"
+    >
+    <a
+      class="hoocon-field-action__btn"
+      href="{% if row.tel %}tel:{{ row.tel }}{% else %}#{% endif %}"
+      {% if not row.tel %}hidden{% endif %}
+      aria-label="Позвонить"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">call</span>
+    </a>
+  </div>
+  {% endfor %}
+  <button type="button" class="hoocon-phones__add" data-add-phone>Добавить телефон</button>
+</div>

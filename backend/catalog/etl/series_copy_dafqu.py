@@ -1,6 +1,6 @@
 """Canonical copy + ТТХ for Hoocon DA..FQU (fast spring-return damper actuators).
 
-Source: English manual ``da10fqu-d_ds.pdf`` (factory EN drop 2026).
+Source: RU manual ``da10fqu-d-ds.html`` (2026-10).
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ _ON_OFF_SPEC: dict[str, str] = {
     "power": "15 Вт под нагрузкой / 3 Вт в режиме удержания",
     "weight": "< 2,6 кг",
     "shaft-length": "> 90 мм",
-    "shaft-diameter": "круглый 10…21 мм, квадратный 9×9…15×15 мм",
-    "noise": "макс. 45 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины",
+    "shaft-diameter": "круглый 8…21 мм, квадратный 6×6…15×15 мм",
+    "noise": "макс. 55 дБ(А) при работе двигателя, макс. 62 дБ(А) при возврате пружины",
 }
 
 TORQUE_NMS: tuple[int, ...] = (10,)

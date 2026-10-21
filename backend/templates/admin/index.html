@@ -18,6 +18,44 @@
       </div>
     </header>
 
+    {% if hoocon_dashboard.today %}
+    <section class="hoocon-today" aria-label="Сегодня">
+      <div class="hoocon-today__head">
+        <h2 class="hoocon-dash__h2">Сегодня</h2>
+        <a href="{{ hoocon_dashboard.today.all_url }}">Все плановые</a>
+      </div>
+      {% if hoocon_dashboard.today.empty %}
+        <p class="hoocon-today__empty">На сегодня звонков нет.</p>
+      {% else %}
+        {% for group in hoocon_dashboard.today.groups %}
+        <h3 class="hoocon-today__group">{{ group.title }}</h3>
+        <ul class="hoocon-today__list">
+          {% for item in group.items %}
+          <li class="hoocon-today__item">
+            <time class="hoocon-today__time">{{ item.when }}</time>
+            <a class="hoocon-today__name" href="{{ item.url }}">{{ item.name }}</a>
+            {% if item.tel %}
+              <a class="hoocon-today__call" href="tel:{{ item.tel }}">Позвонить</a>
+            {% endif %}
+            {% if item.owner %}
+              <span class="hoocon-today__owner">{{ item.owner }}</span>
+            {% elif item.assign_url %}
+            <form method="post" action="{{ item.assign_url }}" class="hoocon-today__assign">
+              {% csrf_token %}
+              <button type="submit">Взять</button>
+            </form>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% if group.more %}
+          <p class="hoocon-today__more">Ещё {{ group.more }} — в «Все плановые».</p>
+        {% endif %}
+        {% endfor %}
+      {% endif %}
+    </section>
+    {% endif %}
+
     {% if hoocon_phone_settings %}
     <nav class="hoocon-nav-sections" aria-label="Разделы">
       <h2 class="hoocon-dash__h2">Разделы</h2>
@@ -86,7 +124,7 @@
 
     {% if hoocon_dashboard.chart %}
     <section class="hoocon-dash__chart" aria-label="Инфографика заявок">
-      <h2 class="hoocon-dash__h2">Заявки по статусам</h2>
+      <h2 class="hoocon-dash__h2">Лиды по статусам</h2>
       <ul class="hoocon-dash__bars">
         {% for bar in hoocon_dashboard.chart %}
         <li class="hoocon-dash__bar hoocon-dash__bar--{{ bar.key }}">

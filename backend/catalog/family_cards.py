@@ -55,6 +55,7 @@ _HVD_AIR_SLUG = (
     r"|privod-vozdushniy-kondensator-hvd-\d+qx"
 )
 _HVD_SMOKE_SLUG = r"privod-dimoudaleniya-hvd-\d+f"
+_HVD_SPRING_SLUG = r"privod-vozdushniy-pruzhina-hvd-\d+p"
 
 _FAMILY_PRODUCT_SLUG_RE = re.compile(
     rf"(?i)^(?:{_H81_SLUG}"
@@ -69,6 +70,7 @@ _FAMILY_PRODUCT_SLUG_RE = re.compile(
     rf"|{_HVA_SLUG}"
     rf"|{_HVD_AIR_SLUG}"
     rf"|{_HVD_SMOKE_SLUG}"
+    rf"|{_HVD_SPRING_SLUG}"
     r")$",
 )
 

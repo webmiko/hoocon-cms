@@ -76,6 +76,25 @@ def test_merge_companies_moves_clients() -> None:
 
 
 @pytest.mark.django_db
+def test_merge_keeps_the_source_manager_when_the_target_has_none() -> None:
+    """The surviving company keeps an owner, and does not replace one it already has."""
+    user_model = get_user_model()
+    owner = user_model.objects.create_user("merge-owner", password="x", is_staff=True)
+    other = user_model.objects.create_user("merge-keep", password="x", is_staff=True)
+    left = Company.objects.create(name="Альфа Плюс")
+    right = Company.objects.create(name="Альфа Дубль", assignee=owner)
+    merge_companies(left, [right])
+    left.refresh_from_db()
+    assert left.assignee_id == owner.pk
+
+    kept = Company.objects.create(name="Бета", assignee=other)
+    extra = Company.objects.create(name="Бета дубль", assignee=owner)
+    merge_companies(kept, [extra])
+    kept.refresh_from_db()
+    assert kept.assignee_id == other.pk
+
+
+@pytest.mark.django_db
 def test_duplicate_quote_copies_lines_as_draft() -> None:
     """Копия КП — новый номер, черновик, позиции сохранены."""
     admin = _superuser()
