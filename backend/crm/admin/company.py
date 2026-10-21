@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
+from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
@@ -184,6 +185,23 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
         if count is not None:
             return int(count)
         return obj.clients.count()
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Company | None = None) -> tuple[str, ...]:
+        """The assignee of someone else's company is not a field a manager can post."""
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        if obj is None or obj.pk is None or staff_sees_all_leads(request.user):
+            return readonly
+        if obj.assignee_id not in (None, request.user.pk):
+            return (*readonly, "assignee")
+        return readonly
+
+    def save_model(self, request: HttpRequest, obj: Company, form: Any, change: bool) -> None:
+        """Keep the stored owner when a manager saves a company that is not theirs."""
+        if change and obj.pk and not staff_sees_all_leads(request.user):
+            stored_id = Company.objects.filter(pk=obj.pk).values_list("assignee_id", flat=True).first()
+            if stored_id not in (None, request.user.pk):
+                obj.assignee_id = stored_id
+        super().save_model(request, obj, form, change)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Company]:
         from django.db.models import Count

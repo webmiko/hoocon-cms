@@ -831,3 +831,76 @@ def test_manager_does_not_see_or_take_another_managers_company_card() -> None:
     own_member.refresh_from_db()
     assert refused.status_code == 200
     assert own_member.client_id == mine.pk
+
+
+@pytest.mark.django_db
+def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
+    """Saving the company card does not rewrite an owner the «Назначить меня» action would keep."""
+    from django.utils import timezone
+
+    from crm.models import Company, PlannedTouch
+
+    manager = _staff_with_perms(
+        username="scope-owner-mgr",
+        codenames=("view_company", "change_company", "view_plannedtouch", "change_plannedtouch"),
+    )
+    other = User.objects.create_user(
+        username="scope-owner-other",
+        email="scope-owner-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    owned = Company.objects.create(name="Чужая фирма", assignee=other, comment="было")
+    free = Company.objects.create(name="Свободная фирма")
+    owned_touch = PlannedTouch.objects.create(
+        company=owned,
+        assignee=other,
+        title="Звонок чужой фирмы",
+        starts_at=timezone.now(),
+        dedupe_key="scope-owner-touch",
+    )
+
+    page = Client()
+    page.force_login(manager)
+    owned_url = reverse("admin:crm_company_change", args=[owned.pk])
+    card = page.get(owned_url)
+    assert card.status_code == 200
+
+    stolen = _admin_change_post(page, owned_url)
+    stolen["assignee"] = str(manager.pk)
+    stolen["comment"] = "попытка забрать"
+    saved = page.post(owned_url, stolen)
+    assert saved.status_code == 302
+    owned.refresh_from_db()
+    assert owned.assignee_id == other.pk
+    assert owned.comment == "попытка забрать"
+    assert 'name="assignee"' not in card.content.decode()
+    calls = page.get(reverse("admin:crm_plannedtouch_changelist")).content.decode()
+    assert owned_touch.title not in calls
+
+    cleared = _admin_change_post(page, owned_url)
+    cleared["assignee"] = ""
+    page.post(owned_url, cleared)
+    owned.refresh_from_db()
+    assert owned.assignee_id == other.pk
+
+    free_url = reverse("admin:crm_company_change", args=[free.pk])
+    free_card = page.get(free_url)
+    assert free_card.status_code == 200
+    assert 'name="assignee"' in free_card.content.decode()
+    claim = _admin_change_post(page, free_url)
+    claim["assignee"] = str(manager.pk)
+    claimed = page.post(free_url, claim)
+    assert claimed.status_code == 302
+    free.refresh_from_db()
+    assert free.assignee_id == manager.pk
+
+    admin_user = User.objects.create_superuser("scope-owner-admin", "scope-owner-admin@example.com", "password12")
+    admin_page = Client()
+    admin_page.force_login(admin_user)
+    reassign = _admin_change_post(admin_page, owned_url)
+    reassign["assignee"] = str(manager.pk)
+    moved = admin_page.post(owned_url, reassign)
+    assert moved.status_code == 302
+    owned.refresh_from_db()
+    assert owned.assignee_id == manager.pk
