@@ -208,6 +208,101 @@
     return toggle !== null && toggle.getAttribute("data-hoocon-list-view") === "rows";
   }
 
+  function isCheckboxColumn(cell) {
+    return (
+      cell.classList.contains("action-checkbox-column") ||
+      cell.classList.contains("action-checkbox")
+    );
+  }
+
+  /** Checkbox and the open button are controls, not text columns. */
+  function fixedColumnPx(cell) {
+    if (isCheckboxColumn(cell)) {
+      return 44;
+    }
+    if (
+      cell.classList.contains("field-open_link") ||
+      cell.classList.contains("field-open_lead")
+    ) {
+      return 112;
+    }
+    return 0;
+  }
+
+  function cellTextLength(cell) {
+    return (cell.textContent || "").replace(/\s+/g, " ").trim().length;
+  }
+
+  /**
+   * Share the list width by how much text a column holds.
+   * The checkbox stays a fixed sliver. table-layout:fixed keeps the sum at 100%.
+   *
+   * @param {HTMLTableElement} table
+   */
+  function applyProportionalColumns(table) {
+    const previous = table.querySelector("colgroup.hoocon-rows-cols");
+    const phone = window.matchMedia(STACK_MQ).matches;
+    if (!table.closest("#changelist") || phone || !listViewIsRows()) {
+      previous?.remove();
+      return;
+    }
+
+    const header = table.tHead?.rows[0];
+    const available = table.clientWidth;
+    if (!header || available < 240) {
+      return;
+    }
+
+    const count = header.cells.length;
+    const sample = table.tBodies[0]?.rows[0];
+    const weights = new Array(count).fill(0);
+    const fixedPx = new Array(count).fill(0);
+    Array.from(header.cells).forEach((cell, index) => {
+      const body = sample?.cells[index];
+      const locked = fixedColumnPx(cell) || (body ? fixedColumnPx(body) : 0);
+      if (locked) {
+        fixedPx[index] = locked;
+        return;
+      }
+      let longest = cellTextLength(cell);
+      forEachBodyRow(table, (row) => {
+        const body = row.cells[index];
+        if (!body) {
+          return;
+        }
+        const text = (body.textContent || "").replace(/\s+/g, " ").trim();
+        longest = Math.max(longest, text.length);
+        if (text && !body.getAttribute("title")) {
+          body.setAttribute("title", text);
+        }
+      });
+      /* Floor keeps a short header readable. Cap stops one note taking the row. */
+      weights[index] = Math.min(Math.max(longest, 8), 48);
+    });
+
+    const fixedTotalPx = fixedPx.reduce((sum, value) => sum + value, 0);
+    const fixedTotal = Math.min(0.28, fixedTotalPx / available);
+    const textWeight = weights.reduce((sum, value) => sum + value, 0) || 1;
+    const textTotal = 1 - fixedTotal;
+
+    let colgroup = previous;
+    if (!colgroup) {
+      colgroup = document.createElement("colgroup");
+      colgroup.className = "hoocon-rows-cols";
+      table.insertBefore(colgroup, table.firstChild);
+    }
+    const cols = [];
+    for (let index = 0; index < count; index += 1) {
+      const col = document.createElement("col");
+      const share = fixedPx[index]
+        ? (fixedPx[index] / fixedTotalPx) * fixedTotal
+        : (weights[index] / textWeight) * textTotal;
+      col.style.width = `${(share * 100).toFixed(2)}%`;
+      cols.push(col);
+    }
+    colgroup.replaceChildren(...cols);
+  }
+
   /**
    * Stack into cards when the full table cannot fit the container width.
    *
@@ -227,8 +322,10 @@
     /* Desktop «Строки» is a table. A phone stays cards even if that choice is saved. */
     if (isChangelist && !phone && listViewIsRows()) {
       table.classList.remove(STACKED_CLASS);
+      applyProportionalColumns(table);
       return;
     }
+    table.querySelector("colgroup.hoocon-rows-cols")?.remove();
 
     if (isChangelist || phone) {
       table.classList.add(STACKED_CLASS);

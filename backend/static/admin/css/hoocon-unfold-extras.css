@@ -3649,11 +3649,28 @@ body:not(.hoocon-support-inbox) #changelist
   }
 }
 
-/* Desktop «Строки»: a real table even if the card class is still on the node.
+/* Desktop «Строки»: fill the list column up to the filter, and do not scroll sideways.
  * Stacked card rules use !important, so the table parts are set the same way. */
 @media (min-width: 768px) {
-  html[data-hoocon-list-view="rows"] #changelist .results {
-    overflow-x: auto;
+  /* The settings column is 48rem. Rows use the whole list pane, up to the filter. */
+  html[data-hoocon-list-view="rows"] body.hoocon-os27 #content-main,
+  html[data-hoocon-list-view="rows"] #changelist,
+  html[data-hoocon-list-view="rows"] #changelist .changelist-form-container {
+    max-width: none !important;
+    width: 100% !important;
+    margin-inline: 0;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist .changelist-form-container > .grow {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist .overflow-x-auto:has(table#result_list) {
+    overflow-x: clip;
+    width: 100%;
     max-width: 100%;
     min-width: 0;
   }
@@ -3661,9 +3678,10 @@ body:not(.hoocon-support-inbox) #changelist
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked,
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table {
     display: table !important;
-    width: max-content;
-    min-width: 100%;
-    max-width: none;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed;
   }
 
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked thead,
@@ -3687,14 +3705,53 @@ body:not(.hoocon-support-inbox) #changelist
     margin: 0;
   }
 
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked thead th,
+  html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table thead th {
+    display: table-cell !important;
+    min-width: 0 !important;
+    grid-template-columns: none;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody td,
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table.hoocon-admin-table-stacked tbody th,
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody td,
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody th {
     display: table-cell !important;
-    width: auto !important;
+    min-width: 0 !important;
     max-width: none;
     grid-template-columns: none;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist th.action-checkbox-column,
+  html[data-hoocon-list-view="rows"] #changelist td.action-checkbox {
+    width: 2.75rem !important;
+    max-width: 2.75rem !important;
+    white-space: nowrap !important;
+    overflow: visible;
+    text-overflow: clip;
+    vertical-align: middle;
+  }
+
+  html[data-hoocon-list-view="rows"] #changelist th.field-open_link,
+  html[data-hoocon-list-view="rows"] #changelist td.field-open_link,
+  html[data-hoocon-list-view="rows"] #changelist th.field-open_lead,
+  html[data-hoocon-list-view="rows"] #changelist td.field-open_lead {
+    /* Same inset as the checkbox cell: py-2 and pl-3. */
+    width: 7rem !important;
+    max-width: 7rem !important;
+    padding: 0.5rem 0.75rem !important;
+    white-space: nowrap !important;
+    overflow: visible;
+    text-overflow: clip;
+    vertical-align: top;
   }
 
   html[data-hoocon-list-view="rows"] #changelist table.hoocon-admin-card-table tbody td::before,
