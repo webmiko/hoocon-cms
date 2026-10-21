@@ -335,6 +335,15 @@ def fetch_mango_recording(self: object, entry_id: str) -> str:
     return "saved"
 
 
+@shared_task(name="crm.notify_planned_touches")
+def notify_planned_touches() -> str:
+    """Remind assignees about planned calls by email and in MAX."""
+    from crm.outreach import notify_due_touches
+
+    delivered = notify_due_touches()
+    return f"sent:{delivered}"
+
+
 @shared_task(name="crm.send_weekly_sales_report")
 def send_weekly_sales_report() -> str:
     """Monday digest: manager funnel for the previous 7 days → РОП inbox."""

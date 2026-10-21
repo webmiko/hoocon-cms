@@ -1,0 +1,15 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if client_import_url %}
+  <li>
+    <a href="{{ client_import_url }}" class="addlink">Загрузить клиентов</a>
+  </li>
+  {% endif %}
+  {% if client_export_url %}
+  <li>
+    <a href="{{ client_export_url }}">Выгрузить клиентов</a>
+  </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

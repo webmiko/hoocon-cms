@@ -111,6 +111,7 @@ def merge_companies(
             moved["members"] += CompanyMember.objects.filter(company=source).update(
                 company=target,
             )
+            _absorb_outreach(target, source)
             source.delete()
         seen: set[tuple[int | None, int | None]] = set()
         for member in CompanyMember.objects.filter(company=target).order_by("pk"):
@@ -120,3 +121,34 @@ def merge_companies(
                 continue
             seen.add(key)
     return moved
+
+
+def _absorb_outreach(target: Company, source: Company) -> None:
+    """Keep marks, the comment, and planned calls when two companies collapse."""
+    from django.utils import timezone
+
+    from crm.models import PlannedTouch
+    from crm.outreach import touch_dedupe_key
+
+    if source.phone:
+        from crm.phones import join_phone_numbers
+
+        target.phone = join_phone_numbers(target.phone, source.phone)
+    for field_name in ("contact_name", "email", "website", "city", "region", "niche", "relevance"):
+        if not getattr(target, field_name) and getattr(source, field_name):
+            setattr(target, field_name, getattr(source, field_name))
+    if source.comment and source.comment not in (target.comment or ""):
+        target.comment = f"{target.comment}\n\n{source.comment}".strip()
+    if target.next_contact_at is None:
+        target.next_contact_at = source.next_contact_at
+    target.work_labels.add(*source.work_labels.all())
+    target.save()
+    for touch in PlannedTouch.objects.filter(company=source):
+        day = timezone.localtime(touch.starts_at).date()
+        new_key = touch_dedupe_key(target.pk, touch.kind, day)
+        if PlannedTouch.objects.filter(dedupe_key=new_key).exclude(pk=touch.pk).exists():
+            touch.delete()
+            continue
+        touch.company = target
+        touch.dedupe_key = new_key
+        touch.save(update_fields=["company", "dedupe_key"])

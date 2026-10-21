@@ -163,6 +163,13 @@ class Lead(PdnConsentFields):
         db_index=True,
         help_text=("Когда менеджер открыл заявку в админке (стикер считает непросмотренные)."),
     )
+    work_labels: models.ManyToManyField = models.ManyToManyField(
+        "crm.WorkLabel",
+        blank=True,
+        related_name="leads",
+        verbose_name="отметки",
+        help_text="Те же отметки, что на карточке компании: очередь, «не звонить», ниша.",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 

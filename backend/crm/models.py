@@ -789,6 +789,58 @@ class Company(models.Model):
         default="",
     )
     comment: models.TextField = models.TextField("комментарий", blank=True, default="")
+    contact_name: models.CharField = models.CharField(
+        "контакт",
+        max_length=200,
+        blank=True,
+        default="",
+    )
+    phone: models.CharField = models.CharField("телефон", max_length=300, blank=True, default="")
+    email: models.CharField = models.CharField(
+        "эл. почта",
+        max_length=300,
+        blank=True,
+        default="",
+        help_text="Один или несколько адресов через точку с запятой. Карточка клиента создаётся по каждому адресу.",
+    )
+    website: models.CharField = models.CharField("сайт", max_length=200, blank=True, default="")
+    city: models.CharField = models.CharField("город", max_length=80, blank=True, default="")
+    region: models.CharField = models.CharField("регион", max_length=40, blank=True, default="")
+    niche: models.CharField = models.CharField("ниша", max_length=120, blank=True, default="")
+    relevance: models.CharField = models.CharField(
+        "релевантность",
+        max_length=10,
+        blank=True,
+        default="",
+        choices=(
+            ("high", "Высокая"),
+            ("medium", "Средняя"),
+            ("low", "Низкая"),
+        ),
+        db_index=True,
+    )
+    next_contact_at: models.DateTimeField | None = models.DateTimeField(
+        "следующий контакт",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Плановый звонок. Пустая дата — напоминание не ставится.",
+    )
+    assignee: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="crm_companies",
+        verbose_name="ответственный",
+        limit_choices_to={"is_staff": True},
+    )
+    work_labels: models.ManyToManyField = models.ManyToManyField(
+        "crm.WorkLabel",
+        blank=True,
+        related_name="companies",
+        verbose_name="отметки",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
@@ -801,11 +853,50 @@ class Company(models.Model):
         return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Normalize company_key from the display name."""
+        """Normalize company_key and index each phone number for call lookup."""
         from leads.services import normalize_company_label
 
+        update_fields = kwargs.get("update_fields")
         self.company_key = normalize_company_label(self.name)
+        if update_fields is not None and "company_key" not in update_fields:
+            kwargs["update_fields"] = [*update_fields, "company_key"]
         super().save(*args, **kwargs)
+        if update_fields is None or "phone" in update_fields:
+            from crm.phones import sync_company_phones
+
+            sync_company_phones(self)
+
+
+class CompanyPhone(models.Model):
+    """One dialable number of a company. Several numbers are several rows."""
+
+    company: models.ForeignKey = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="phones",
+        verbose_name="компания",
+    )
+    number: models.CharField = models.CharField("номер", max_length=50)
+    phone_digits: models.CharField = models.CharField(
+        "цифры",
+        max_length=20,
+        db_index=True,
+    )
+    sort: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField("порядок", default=0)
+
+    class Meta:
+        verbose_name = "телефон"
+        verbose_name_plural = "телефоны"
+        ordering = ("sort", "pk")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("company", "phone_digits"),
+                name="crm_companyphone_company_digits",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.number
 
 
 class CompanyMemberRole(models.TextChoices):
@@ -997,3 +1088,123 @@ class Call(models.Model):
         arrow = "→" if self.direction == CallDirection.OUTBOUND else "←"
         when = timezone.localtime(self.started_at or self.created_at)
         return f"{self.from_number or '?'} {arrow} {self.to_number or '?'} · {when:%d.%m %H:%M}"
+
+
+class WorkLabel(models.Model):
+    """Global mark shared by company cards and leads."""
+
+    class Kind(models.TextChoices):
+        QUEUE = "queue", "Очередь"
+        FLAG = "flag", "Флаг"
+        SEGMENT = "segment", "Сегмент"
+
+    code: models.CharField = models.CharField("код", max_length=80, unique=True)
+    name: models.CharField = models.CharField("название", max_length=80)
+    kind: models.CharField = models.CharField(
+        "вид",
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.FLAG,
+        db_index=True,
+    )
+    sort: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField("порядок", default=100)
+    is_active: models.BooleanField = models.BooleanField("активна", default=True)
+
+    class Meta:
+        verbose_name = "отметка"
+        verbose_name_plural = "отметки"
+        ordering = ("sort", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class PlannedTouchKind(models.TextChoices):
+    """What the manager scheduled."""
+
+    CALL = "call", "Звонок"
+    MEETING = "meeting", "Встреча"
+    EMAIL = "email", "Письмо"
+    OTHER = "other", "Прочее"
+
+
+class PlannedTouch(models.Model):
+    """Dated event on a company, client, or lead.
+
+    A reminder goes to the assignee (or the company assignee) by email and
+    in MAX one hour before ``starts_at``, when that channel is set up.
+    Unassigned events stay on the calendar and do not fan out.
+    """
+
+    company: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        Company,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="planned_touches",
+        verbose_name="компания",
+    )
+    client: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        Client,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="planned_touches",
+        verbose_name="клиент",
+    )
+    lead: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        "leads.Lead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planned_touches",
+        verbose_name="лид",
+    )
+    assignee: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planned_touches",
+        verbose_name="ответственный",
+        limit_choices_to={"is_staff": True},
+    )
+    kind: models.CharField = models.CharField(
+        "тип",
+        max_length=20,
+        choices=PlannedTouchKind.choices,
+        default=PlannedTouchKind.CALL,
+        db_index=True,
+    )
+    starts_at: models.DateTimeField = models.DateTimeField("когда", db_index=True)
+    title: models.CharField = models.CharField("тема", max_length=200)
+    note: models.TextField = models.TextField("заметка", blank=True, default="")
+    remind_before_minutes: models.PositiveIntegerField = models.PositiveIntegerField(
+        "напомнить за, минут",
+        default=60,
+    )
+    dedupe_key: models.CharField = models.CharField(
+        "ключ повтора",
+        max_length=80,
+        unique=True,
+        help_text="Один и тот же плановый звонок из файла не создаётся второй раз.",
+    )
+    email_notified_at: models.DateTimeField | None = models.DateTimeField(
+        "письмо отправлено",
+        null=True,
+        blank=True,
+    )
+    max_notified_at: models.DateTimeField | None = models.DateTimeField(
+        "MAX отправлен",
+        null=True,
+        blank=True,
+    )
+    created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "плановый звонок"
+        verbose_name_plural = "плановые звонки"
+        ordering = ("starts_at", "pk")
+
+    def __str__(self) -> str:
+        return self.title

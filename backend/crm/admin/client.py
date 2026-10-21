@@ -19,6 +19,7 @@ from unfold.admin import ModelAdmin
 
 from config.admin_mixins import OpenChangeLinkMixin
 from config.unfold_callbacks import _versioned_static
+from crm.admin.client_workbook import ClientWorkbookMixin
 from crm.admin.inlines import (
     ActivityInline,
     CallInline,
@@ -59,7 +60,7 @@ def _ru_company_phone() -> str:
 
 
 @admin.register(Client)
-class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
+class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
     """CRM client card: contacts, assignee, leads, timeline, send email.
 
     ID клиента = email. Несколько заявок с одним email попадают в одну
@@ -318,6 +319,21 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
                 name=f"{info[0]}_{info[1]}_sales_report",
             ),
             path(
+                "import-clients/",
+                self.admin_site.admin_view(self.import_clients_view),
+                name=f"{info[0]}_{info[1]}_import_clients",
+            ),
+            path(
+                "import-clients/template.xlsx",
+                self.admin_site.admin_view(self.import_clients_template_view),
+                name=f"{info[0]}_{info[1]}_import_clients_template",
+            ),
+            path(
+                "export-clients.xlsx",
+                self.admin_site.admin_view(self.export_clients_view),
+                name=f"{info[0]}_{info[1]}_export_clients",
+            ),
+            path(
                 "<path:object_id>/compose-email/",
                 self.admin_site.admin_view(self.compose_email_view),
                 name=f"{info[0]}_{info[1]}_compose_email",
@@ -368,6 +384,19 @@ class ClientAdmin(OpenChangeLinkMixin, ModelAdmin):
             form_url,
             extra_context=extra_context,
         )
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Show the Excel import link to staff who may add client cards."""
+        extra = dict(extra_context or {})
+        if self.has_add_permission(request):
+            extra["client_import_url"] = reverse("admin:crm_client_import_clients")
+        if self.has_view_permission(request):
+            extra["client_export_url"] = reverse("admin:crm_client_export_clients")
+        return super().changelist_view(request, extra_context=extra)
 
     def compose_email_view(
         self,

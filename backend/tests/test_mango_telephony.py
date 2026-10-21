@@ -682,3 +682,4 @@ def test_normalize_phone_digits() -> None:
     assert normalize_phone_digits("9151112233") == "79151112233"
     assert normalize_phone_digits("101") == "101"
     assert normalize_phone_digits("") == ""
+    assert normalize_phone_digits("+7 963 232-85-50; офис +7 927 244-63-31") == "79632328550"
