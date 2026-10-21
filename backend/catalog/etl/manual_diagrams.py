@@ -126,6 +126,8 @@ def punch_near_white_background(
     image: Image.Image,
     *,
     luma_min: int = 220,
+    shadow_luma: int | None = None,
+    shadow_chroma: int = 18,
 ) -> Image.Image:
     """Make edge-connected near-white pixels transparent (studio cutout).
 
@@ -133,9 +135,17 @@ def punch_near_white_background(
     face stay opaque. Soft grey vignette from PDF pages is treated as backdrop
     when luminance is high enough and connected to the edge.
 
+    ``shadow_luma`` also removes the neutral studio ramp (the light grey halo
+    around a product shot). On the DA8/16/24 manual photo the black housing
+    sits near luma 75–110 and the ramp is chroma 1–10; the red cover's
+    antialiased edge jumps to chroma 28, so it stays. Diagrams leave
+    ``shadow_luma`` unset.
+
     Args:
         image: RGB/RGBA crop.
-        luma_min: Minimum average channel value to treat as backdrop.
+        luma_min: Minimum average channel value to treat as paper backdrop.
+        shadow_luma: Also treat neutral pixels at least this bright as backdrop.
+        shadow_chroma: Max channel spread for that neutral ramp.
 
     Returns:
         RGBA image with transparent backdrop.
@@ -152,7 +162,10 @@ def punch_near_white_background(
         r, g, b, a = pixels[x, y]
         if a < 16:
             return True
-        return (r + g + b) / 3 >= luma_min and min(r, g, b) >= luma_min - 15
+        luma = (r + g + b) / 3
+        if shadow_luma is not None and luma >= shadow_luma and max(r, g, b) - min(r, g, b) <= shadow_chroma:
+            return True
+        return luma >= luma_min and min(r, g, b) >= luma_min - 15
 
     seen = bytearray(width * height)
     queue: deque[tuple[int, int]] = deque()

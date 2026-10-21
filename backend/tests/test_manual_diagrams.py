@@ -533,3 +533,32 @@ def test_punch_near_white_background_keeps_interior() -> None:
     assert out.getpixel((0, 0))[3] == 0
     assert out.getpixel((40, 30))[3] == 255
     assert out.getpixel((35, 25))[3] == 255
+
+
+def test_punch_studio_shadow_drops_grey_halo_and_keeps_housing() -> None:
+    """Neutral studio ramp goes transparent; the darker housing face and red cover stay.
+
+    Default punch (diagrams) still keeps that grey: only the product-shot
+    threshold removes it.
+    """
+    from catalog.etl.manual_diagrams import punch_near_white_background
+
+    img = Image.new("RGB", (40, 30), color=(255, 255, 255))
+    for y in range(8, 23):
+        for x in range(12, 29):
+            img.putpixel((x, y), (70, 72, 74))
+    img.putpixel((11, 15), (160, 156, 154))  # halo, connected to the white edge
+    img.putpixel((13, 12), (105, 102, 100))  # lit housing, below the ramp
+    img.putpixel((20, 15), (190, 40, 40))  # red cover
+    img.putpixel((18, 14), (255, 255, 255))  # dial, not connected to the edge
+
+    kept = punch_near_white_background(img)
+    assert kept.getpixel((11, 15))[3] == 255
+
+    out = punch_near_white_background(img, shadow_luma=115)
+    assert out.getpixel((0, 0))[3] == 0
+    assert out.getpixel((11, 15))[3] == 0
+    assert out.getpixel((13, 12))[3] == 255
+    assert out.getpixel((16, 14))[3] == 255
+    assert out.getpixel((20, 15))[3] == 255
+    assert out.getpixel((18, 14))[3] == 255
