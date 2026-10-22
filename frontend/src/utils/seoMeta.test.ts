@@ -6,6 +6,8 @@ import {
   categorySeoDescription,
   metaDescription,
   skuNotFoundSeoTitle,
+  skuSeoDescription,
+  skuSeoTitlePartial,
 } from "./seoMeta";
 
 describe("metaDescription", () => {
@@ -56,6 +58,38 @@ describe("catalogListingSeoTitle", () => {
 
   it("uses root title only for /catalog", () => {
     expect(catalogListingSeoTitle()).toContain("Каталог электроприводов");
+  });
+});
+
+describe("skuSeoTitlePartial", () => {
+  it("keeps torque and the Belimo code inside the snippet budget", () => {
+    const title = skuSeoTitlePartial(
+      "DA5FU24-DS",
+      [
+        { key: "moment", value: "5 Нм" },
+        { key: "voltage", value: "AC/DC 24 В, 50/60 Гц" },
+      ],
+      "LF24",
+      "Электроприводы с пружинным возвратом",
+    );
+    expect(title).toBe("DA5FU24-DS привод 5 Нм 24 В, аналог LF24");
+    expect(title.length).toBeLessThanOrEqual(51);
+  });
+});
+
+describe("skuSeoDescription", () => {
+  it("differs when torque differs inside one category", () => {
+    const left = skuSeoDescription("H8101-A", "Комплекты", [{ key: "moment", value: "5 Нм" }]);
+    const right = skuSeoDescription("H8101-B", "Комплекты", [{ key: "moment", value: "10 Нм" }]);
+    expect(left).not.toBe(right);
+    expect(left).toContain("5 Нм");
+    expect(right).toContain("10 Нм");
+  });
+});
+
+describe("categorySeoDescription", () => {
+  it("lengthens a one-word category blurb", () => {
+    expect(categorySeoDescription("Адаптеры", "Адаптеры")).toContain("паспорта PDF");
   });
 });
 

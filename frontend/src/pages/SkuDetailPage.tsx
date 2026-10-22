@@ -349,6 +349,7 @@ export function SkuDetailPage() {
     in_stock: Boolean(displayInStock),
     category_name: sku.category_name || sku.category_slug,
     category_slug: sku.category_slug,
+    image: galleryImages[0]?.src,
   });
 
   const descriptionBody = overlayCopyForSibling(
@@ -527,10 +528,17 @@ export function SkuDetailPage() {
   return (
     <div className={styles.detail} aria-busy={isSoftRefreshing || undefined}>
       <Seo
-        title={skuSeoTitlePartial(displaySkuCode || sku.sku_code, displayHighlights)}
+        title={skuSeoTitlePartial(
+          displaySkuCode || sku.sku_code,
+          displayHighlights,
+          sku.analog_belimo_code,
+          sku.category_name,
+        )}
         description={skuSeoDescription(
           displaySkuCode || sku.sku_code,
           sku.category_name,
+          displayHighlights,
+          sku.analog_belimo_code,
         )}
         path={canonicalPath}
         jsonLd={[

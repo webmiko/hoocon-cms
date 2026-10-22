@@ -77,7 +77,7 @@ def test_absolute_media_url_and_og_fallback() -> None:
         description="d",
         noindex=False,
     )
-    assert _og_image_url(default_ctx).endswith("/og-image.svg")
+    assert _og_image_url(default_ctx).endswith("/og-image.png")
     custom = SeoHeadContext(
         canonical_path="/x",
         page_title="t",

@@ -64,23 +64,19 @@ def _organization(site_url: str) -> dict[str, Any]:
         "name": SITE_NAME,
         "url": site_url,
         "description": DEFAULT_DESCRIPTION,
+        "logo": f"{site_url}/og-image.png",
+        "email": "sales@hoocon.ru",
+        "telephone": "+78003505898",
     }
 
 
 def _website(site_url: str) -> dict[str, Any]:
+    # No SearchAction: /search is noindex and disallowed in robots.txt.
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": SITE_NAME,
         "url": site_url,
-        "potentialAction": {
-            "@type": "SearchAction",
-            "target": {
-                "@type": "EntryPoint",
-                "urlTemplate": f"{site_url}/search?q={{search_term_string}}",
-            },
-            "query-input": "required name=search_term_string",
-        },
     }
 
 
@@ -102,7 +98,7 @@ def _faq_page(site_url: str, items: tuple[tuple[str, str], ...]) -> dict[str, An
 
 def _article(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
     headline = context.page_title.split(" — ")[0]
-    return {
+    block = {
         "@context": "https://schema.org",
         "@type": "Article",
         "headline": headline,
@@ -112,24 +108,13 @@ def _article(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
         "author": {"@type": "Organization", "name": SITE_NAME, "url": site_url},
         "publisher": {"@type": "Organization", "name": SITE_NAME, "url": site_url},
     }
+    if context.og_image_url:
+        block["image"] = context.og_image_url
+    return block
 
 
 def _product(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
     name = context.page_title.split(" — ")[0]
-    # Storefront: zero stock = made-to-order (never «out of stock» UX).
-    availability = "https://schema.org/InStock" if context.in_stock else "https://schema.org/PreOrder"
-    offer: dict[str, Any] = {
-        "@type": "Offer",
-        "availability": availability,
-    }
-    if context.sku_price and not context.price_on_request:
-        offer["price"] = context.sku_price
-        offer["priceCurrency"] = "RUB"
-    else:
-        offer["priceSpecification"] = {
-            "@type": "PriceSpecification",
-            "priceCurrency": "RUB",
-        }
     product: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "Product",
@@ -137,8 +122,19 @@ def _product(site_url: str, context: SeoHeadContext) -> dict[str, Any]:
         "sku": context.sku_code,
         "description": context.description,
         "url": f"{site_url}{context.canonical_path}",
-        "offers": offer,
+        "brand": {"@type": "Brand", "name": SITE_NAME},
     }
+    if context.og_image_url:
+        product["image"] = context.og_image_url
+    # An Offer without price is an invalid product rich result. «Цена по запросу» omits it.
+    if context.sku_price and not context.price_on_request:
+        availability = "https://schema.org/InStock" if context.in_stock else "https://schema.org/PreOrder"
+        product["offers"] = {
+            "@type": "Offer",
+            "price": context.sku_price,
+            "priceCurrency": "RUB",
+            "availability": availability,
+        }
     if context.category_name:
         product["category"] = context.category_name
     return product

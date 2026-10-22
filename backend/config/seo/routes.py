@@ -19,7 +19,7 @@ DEFAULT_DESCRIPTION = (
     "Электроприводы для вентиляции и ОВК. Подбор модели за минуту на главной, "
     "каталог по параметрам, паспорта PDF, аналоги Belimo, запрос КП."
 )
-OG_IMAGE_PATH = "/og-image.svg"
+OG_IMAGE_PATH = "/og-image.png"
 # Яндекс.Вебмастер — meta-тег подтверждения домена (публичный, не секрет).
 YANDEX_VERIFICATION_CONTENT = "4b0c304eeaf471e0"
 SLUG_RE = r"^[a-z0-9][a-z0-9-]{0,298}[a-z0-9]$|^[a-z0-9]$"
