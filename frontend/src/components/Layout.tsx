@@ -324,6 +324,9 @@ export function Layout() {
             <Link to="/catalog" className={styles.navMobileLink} onClick={closeMenu}>
               Каталог
             </Link>
+            <Link to="/dokumentaciya" className={styles.navMobileLink} onClick={closeMenu}>
+              Документация
+            </Link>
             <Link to="/zavod" className={styles.navMobileLink} onClick={closeMenu}>
               Завод · OEM напрямую
             </Link>
