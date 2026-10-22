@@ -11,9 +11,11 @@ from typing import cast
 from django.conf import settings
 
 from config.seo.meta_text import (
+    DESCRIPTION_MAX_LEN,
     TITLE_PARTIAL_MAX,
     format_branded_title,
     format_meta_description,
+    sku_kind_for_title,
     sku_meta_description,
     sku_meta_title_partial,
 )
@@ -47,9 +49,12 @@ class SeoHeadContext:
     og_image_url: str | None = None
     # 410 when the address has no live page and no redirect. 200 for real routes.
     http_status: int = 200
-    # Facts rendered in the first HTML of a product page, before the script runs.
+    # Facts and links in the first HTML, inside #root, before the script runs.
     crawl_heading: str = ""
     crawl_lines: tuple[str, ...] = ()
+    crawl_links: tuple[tuple[str, str], ...] = ()
+    # Absolute path for a 301 when the request address is not canonical.
+    redirect_to: str = ""
 
 
 def _absolute_media_url(file_field: object | None) -> str | None:
@@ -79,6 +84,47 @@ def _is_noindex_path(path: str) -> bool:
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in NOINDEX_PREFIXES)
 
 
+_CRAWL_NAV: tuple[tuple[str, str], ...] = (
+    ("/catalog", "Каталог"),
+    ("/dokumentaciya", "Документация"),
+    ("/statyi", "Статьи"),
+    ("/faq", "FAQ"),
+    ("/kontakty", "Контакты"),
+)
+_HOME_CRAWL_HEADING = "Электроприводы для вентиляции и кондиционирования"
+_HOME_CRAWL_LINE = (
+    "Подбор модели за минуту. Укажите тип продукции и параметры из проекта: привод на заслонку, "
+    "шаровой кран, комплект кран+привод или кронштейн BR-M/BR-ML под привод Hoocon. "
+    "Сервис покажет подходящие позиции в каталоге."
+)
+_SHORT_DESCRIPTION_MIN = 80
+
+
+def lengthen_listing_description(text: str) -> str:
+    """Stretch a one-word category blurb into a snippet a search result can use."""
+    clean = plain_text_for_meta(text, max_len=DESCRIPTION_MAX_LEN)
+    if len(clean) >= _SHORT_DESCRIPTION_MIN:
+        return format_meta_description(clean)
+    return format_meta_description(
+        f"{clean}. Подбор Hoocon по моменту и напряжению, паспорта PDF, запрос КП.",
+    )
+
+
+def news_mirrors_article(slug: str) -> str | None:
+    """Return the article path when a news slug is ``article-{article slug}``."""
+    if not slug.startswith("article-"):
+        return None
+    article_slug = slug.removeprefix("article-")
+    if not article_slug:
+        return None
+    from content.models import Article
+    from content.views import publicly_visible
+
+    if publicly_visible(Article).filter(slug=article_slug).exists():
+        return f"/statyi/{article_slug}"
+    return None
+
+
 def _resolve_article(path: str) -> SeoHeadContext | None:
     if not path.startswith("/statyi/") or path == "/statyi":
         return None
@@ -91,6 +137,7 @@ def _resolve_article(path: str) -> SeoHeadContext | None:
         return None
     published = article.published_at.isoformat() if article.published_at else None
     desc_src = article.excerpt or article.body or article.title
+    body_text = plain_text_for_meta(article.excerpt or article.body or "", max_len=480)
     return SeoHeadContext(
         canonical_path=f"/statyi/{slug}",
         page_title=_format_page_title(
@@ -106,6 +153,9 @@ def _resolve_article(path: str) -> SeoHeadContext | None:
             (f"/statyi/{slug}", article.title),
         ),
         og_image_url=_absolute_media_url(article.cover),
+        crawl_heading=plain_text_for_meta(article.title, max_len=180),
+        crawl_lines=(body_text,) if body_text else (),
+        crawl_links=(("/statyi", "Статьи"), ("/catalog", "Каталог")),
     )
 
 
@@ -120,21 +170,27 @@ def _resolve_news(path: str) -> SeoHeadContext | None:
     if news is None:
         return None
     published = news.published_at.isoformat() if news.published_at else None
+    mirror = news_mirrors_article(slug)
+    body_text = plain_text_for_meta(news.body or news.title, max_len=480)
+    canonical = mirror or f"/novosti/{slug}"
     return SeoHeadContext(
-        canonical_path=f"/novosti/{slug}",
+        canonical_path=canonical,
         page_title=_format_page_title(
             plain_text_for_meta(news.title, max_len=TITLE_PARTIAL_MAX),
         ),
         description=format_meta_description(news.body or news.title),
-        noindex=False,
+        noindex=mirror is not None,
         og_type="article",
         article_published_at=published,
         breadcrumb=(
             ("/", "Главная"),
             ("/novosti", "Новости"),
-            (f"/novosti/{slug}", news.title),
+            (canonical, news.title),
         ),
         og_image_url=_absolute_media_url(news.cover),
+        crawl_heading=plain_text_for_meta(news.title, max_len=180),
+        crawl_lines=(body_text,) if body_text else (),
+        crawl_links=((canonical, "Статья"), ("/catalog", "Каталог")) if mirror else _CRAWL_NAV,
     )
 
 
@@ -160,6 +216,9 @@ def _resolve_page(path: str) -> SeoHeadContext | None:
         description=format_meta_description(desc),
         noindex=False,
         breadcrumb=(("/", "Главная"), (path, page.title)),
+        crawl_heading=plain_text_for_meta(title, max_len=180),
+        crawl_lines=(plain_text_for_meta(desc, max_len=480),),
+        crawl_links=_CRAWL_NAV,
     )
 
 
@@ -233,6 +292,8 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         sku.sku_code or sku.slug,
         moment=by_key.get("moment", ""),
         voltage=by_key.get("voltage", ""),
+        analog=(sku.analog_belimo_code or ""),
+        kind=sku_kind_for_title(cat_name),
     )
     from sitesettings.models import SiteSettings
 
@@ -262,12 +323,23 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
             continue
         shown = f"{value} {unit}".strip() if unit and unit not in value else value
         crawl_lines.append(f"{label}: {shown}" if label else shown)
+    analog_code = (sku.analog_belimo_code or "").strip()
+    if analog_code:
+        crawl_lines.append(f"Аналог Belimo: {analog_code}")
+    redirect_to = ""
+    http_status = 200
+    if path.startswith("/catalog/") and path != canonical:
+        redirect_to = canonical
+        http_status = 301
     return SeoHeadContext(
         canonical_path=canonical,
         page_title=_format_page_title(title_partial),
         description=sku_meta_description(
             sku.sku_code or sku.slug,
             category_name=cat_name,
+            moment=by_key.get("moment", ""),
+            voltage=by_key.get("voltage", ""),
+            analog=(sku.analog_belimo_code or ""),
         ),
         noindex=False,
         og_type="product",
@@ -282,6 +354,9 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         ),
         crawl_heading=display_name or sku.sku_code or sku.slug,
         crawl_lines=tuple(crawl_lines),
+        crawl_links=tuple(crumbs[:-1]),
+        redirect_to=redirect_to,
+        http_status=http_status,
     )
 
 
@@ -334,20 +409,32 @@ def _resolve_catalog_category(path: str) -> SeoHeadContext | None:
     if cat is None:
         return None
     canonical = catalog_category_path(cat.slug)
-    desc = plain_text_for_meta(cat.description or cat.name, max_len=160)
+    desc = lengthen_listing_description(cat.description or cat.name or DEFAULT_DESCRIPTION)
     name = plain_text_for_meta(cat.name, max_len=TITLE_PARTIAL_MAX)
     if len(name) < 24:
         name = f"{name} для электроприводов"
+    from catalog.models import SKU
+    from catalog.urls_paths import catalog_path_for_sku
+
+    sku_links = tuple(
+        (catalog_path_for_sku(sku), sku.sku_code or sku.slug)
+        for sku in SKU.objects.filter(is_published=True, product__category_id=cat.pk)
+        .select_related("product__category")
+        .order_by("sku_code")[:24]
+    )
     return SeoHeadContext(
         canonical_path=canonical,
         page_title=_format_page_title(name),
-        description=format_meta_description(desc or DEFAULT_DESCRIPTION),
+        description=desc,
         noindex=False,
         breadcrumb=(
             ("/", "Главная"),
             ("/catalog", "Каталог"),
             (canonical, cat.name),
         ),
+        crawl_heading=cat.name,
+        crawl_lines=(desc,),
+        crawl_links=(("/", "Главная"), ("/catalog", "Каталог"), *sku_links),
     )
 
 
@@ -380,14 +467,34 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
         else:
             title = static.get("title") or path
             crumbs = (("/", "Главная"), (path, title))
+        description = format_meta_description(static.get("description", DEFAULT_DESCRIPTION))
+        if path == "/":
+            crawl_heading = _HOME_CRAWL_HEADING
+            crawl_lines = (_HOME_CRAWL_LINE,)
+            crawl_links = _CRAWL_NAV
+        elif path == "/catalog":
+            from catalog.models import Category
+            from catalog.urls_paths import catalog_category_path
+
+            crawl_heading = static.get("title") or "Каталог"
+            crawl_lines = (description,)
+            crawl_links = (
+                tuple((catalog_category_path(cat.slug), cat.name) for cat in Category.objects.order_by("name"))
+                or _CRAWL_NAV
+            )
+        else:
+            crawl_heading = static.get("title") or ""
+            crawl_lines = (description,)
+            crawl_links = _CRAWL_NAV
         return SeoHeadContext(
             canonical_path=path,
             page_title=_format_page_title(static.get("title")),
-            description=format_meta_description(
-                static.get("description", DEFAULT_DESCRIPTION),
-            ),
+            description=description,
             noindex=False,
             breadcrumb=crumbs,
+            crawl_heading=crawl_heading,
+            crawl_lines=crawl_lines,
+            crawl_links=crawl_links,
         )
 
     if _is_noindex_path(path):
@@ -422,7 +529,7 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
 
     return SeoHeadContext(
         canonical_path=path,
-        page_title=_format_page_title("Страница не найдена — 404"),
+        page_title=_format_page_title("Страница не найдена"),
         description=DEFAULT_DESCRIPTION,
         noindex=True,
         http_status=410,

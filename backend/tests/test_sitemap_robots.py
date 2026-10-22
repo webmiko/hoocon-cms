@@ -174,6 +174,10 @@ def test_sitemap_has_valid_xml_structure(client) -> None:
         loc = url.find("sm:loc", ns)
         assert loc is not None
         assert loc.text and loc.text.startswith("http")
+    sku_url = next(url for url in urls if url.find("sm:loc", ns).text.endswith("/privod-hva-5nm-sm"))
+    lastmod = sku_url.find("sm:lastmod", ns)
+    assert lastmod is not None and lastmod.text
+    assert len(lastmod.text) == 10 and lastmod.text[4] == "-"
 
 
 @pytest.mark.django_db

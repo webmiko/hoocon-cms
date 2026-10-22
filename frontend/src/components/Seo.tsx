@@ -8,7 +8,7 @@ import {
 } from "../utils/seoMeta";
 
 const SITE_NAME = "Hoocon";
-const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.svg`;
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 interface SeoProps {
   title: string;
@@ -25,7 +25,7 @@ interface SeoProps {
   preloadImage?: string;
   /**
    * Absolute or site-relative image for og:image / twitter:image.
-   * Falls back to site-wide ``/og-image.svg``.
+   * Falls back to site-wide ``/og-image.png``.
    */
   image?: string | null;
 }

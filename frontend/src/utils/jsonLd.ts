@@ -5,6 +5,7 @@
  */
 
 import { catalogPathForSku } from "./catalogPaths";
+import { absoluteOgImageUrl } from "./seoMeta";
 
 const SITE_NAME = "Hoocon";
 const SITE_URL = "https://hoocon.ru";
@@ -19,6 +20,7 @@ interface SkuForJsonLd {
   in_stock?: boolean;
   category_name?: string;
   category_slug?: string | null;
+  image?: string | null;
 }
 
 interface ArticleForJsonLd {
@@ -53,7 +55,12 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
     name: sku.name,
     sku: sku.sku_code ?? sku.slug,
     url: `${SITE_URL}${path}`,
+    brand: { "@type": "Brand", name: SITE_NAME },
   };
+  const image = absoluteOgImageUrl(sku.image);
+  if (image) {
+    ld.image = image;
+  }
 
   if (sku.description) {
     ld.description = sku.description;
@@ -78,7 +85,7 @@ export function buildProductJsonLd(sku: SkuForJsonLd): Record<string, unknown> {
   return ld;
 }
 
-/** Organization + WebSite (+ SearchAction) for the home page. */
+/** Organization + WebSite for the home page. Search lives on / and is not a public URL. */
 export function buildHomeJsonLd(
   faqItems: FaqJsonLdItem[] = [],
 ): Record<string, unknown>[] {
@@ -88,20 +95,15 @@ export function buildHomeJsonLd(
       "@type": "Organization",
       name: SITE_NAME,
       url: SITE_URL,
+      logo: `${SITE_URL}/og-image.png`,
+      email: "sales@hoocon.ru",
+      telephone: "+78003505898",
     },
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
       name: SITE_NAME,
       url: SITE_URL,
-      potentialAction: {
-        "@type": "SearchAction",
-        target: {
-          "@type": "EntryPoint",
-          urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
-        },
-        "query-input": "required name=search_term_string",
-      },
     },
   ];
   if (faqItems.length) {

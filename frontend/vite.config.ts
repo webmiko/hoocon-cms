@@ -29,6 +29,7 @@ export default defineConfig({
         "pwa-512.png",
         "pwa-512-maskable.png",
         "og-image.svg",
+        "og-image.png",
       ],
       manifest: {
         name: "Hoocon — электроприводы вентиляции и кондиционирования",

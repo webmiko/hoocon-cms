@@ -41,31 +41,74 @@ def format_meta_description(value: str, *, max_len: int = DESCRIPTION_MAX_LEN) -
     return plain_text_for_meta(value, max_len=max_len)
 
 
+def sku_kind_for_title(category_name: str | None) -> str:
+    """One searchable noun for a SERP title: кран, комплект, адаптер or привод."""
+    name = (category_name or "").casefold()
+    if "кран" in name:
+        return "кран"
+    if "адаптер" in name:
+        return "адаптер"
+    if "комплект" in name:
+        return "комплект"
+    if "кронштейн" in name:
+        return "кронштейн"
+    return "привод"
+
+
 def sku_meta_title_partial(
     sku_code: str,
     *,
     moment: str = "",
     voltage: str = "",
+    analog: str = "",
+    kind: str = "",
 ) -> str:
-    """Short PDP title body (before brand): артикул + напряжение.
+    """PDP title body: код, тип, момент, напряжение и аналог Belimo, если влезает.
 
-    Torque (``Нм``) is omitted: it already lives in the article family and in
-    on-page highlights — repeating it in ``<title>`` only wastes snippet space.
+    Google переписывал короткий ``код — 230 В``. Момент и аналог отличают
+    соседние исполнения в сниппете. Хвост отбрасывается, если не входит в
+    ``TITLE_PARTIAL_MAX``.
 
     Args:
         sku_code: Public article code.
-        moment: Ignored (kept for call-site compatibility).
-        voltage: Optional voltage highlight (e.g. ``230 В``).
+        moment: Torque highlight (e.g. ``5 Нм``).
+        voltage: Voltage highlight, shortened to ``24 В`` / ``230 В``.
+        analog: Belimo code, without the word Belimo.
+        kind: Short noun from :func:`sku_kind_for_title`.
 
     Returns:
         Partial title without brand suffix.
     """
-    _ = moment  # call-site compat; do not echo Нм in <title>
     code = (sku_code or "").strip() or "SKU"
     volt = _short_voltage_for_title(voltage)
+    moment_bit = " ".join((moment or "").split())
+    if len(moment_bit) > 12:
+        moment_bit = ""
+    analog_bit = " ".join((analog or "").split())
+    kind_bit = (kind or "").strip()
+    parts = [code]
+    if kind_bit:
+        parts.append(kind_bit)
+    if moment_bit:
+        parts.append(moment_bit)
     if volt:
-        return f"{code} — {volt}"
-    return f"{code} — электропривод вентиляции"
+        parts.append(volt)
+    partial = " ".join(parts)
+    if analog_bit:
+        with_analog = f"{partial}, аналог {analog_bit}"
+        if len(with_analog) <= TITLE_PARTIAL_MAX:
+            partial = with_analog
+    if len(partial) <= TITLE_PARTIAL_MAX:
+        return partial
+    shorter = [code]
+    if moment_bit:
+        shorter.append(moment_bit)
+    if volt:
+        shorter.append(volt)
+    partial = " ".join(shorter)
+    if len(partial) <= TITLE_PARTIAL_MAX:
+        return partial
+    return partial[:TITLE_PARTIAL_MAX]
 
 
 def _short_voltage_for_title(voltage: str) -> str:
@@ -90,15 +133,39 @@ def sku_meta_description(
     sku_code: str,
     *,
     category_name: str | None = None,
+    moment: str = "",
+    voltage: str = "",
+    analog: str = "",
 ) -> str:
-    """Compact unique description for product SERP snippet."""
+    """Snippet that differs by torque, voltage and Belimo code, not only the article.
+
+    Args:
+        sku_code: Public article code.
+        category_name: Category label.
+        moment: Torque highlight.
+        voltage: Voltage highlight.
+        analog: Belimo code.
+
+    Returns:
+        Description within ``DESCRIPTION_MAX_LEN``.
+    """
     code = (sku_code or "").strip() or "SKU"
+    bits = [f"{code}:"]
     if category_name and category_name.strip():
-        cat = plain_text_for_meta(category_name, max_len=60)
-        body = f"{code}: {cat}. Паспорт PDF, подбор аналогов Belimo, запрос КП у Hoocon."
+        bits.append(f"{plain_text_for_meta(category_name, max_len=60)}.")
     else:
-        body = (
-            f"{code}: электропривод вентиляции Hoocon. Паспорт PDF, "
-            "фильтры по характеристикам, запрос коммерческого предложения."
-        )
-    return format_meta_description(body)
+        bits.append("электропривод вентиляции Hoocon.")
+    facts: list[str] = []
+    moment_bit = " ".join((moment or "").split())
+    if moment_bit:
+        facts.append(moment_bit)
+    volt = _short_voltage_for_title(voltage)
+    if volt:
+        facts.append(volt)
+    if facts:
+        bits.append(f"{' '.join(facts)}.")
+    analog_bit = " ".join((analog or "").split())
+    if analog_bit:
+        bits.append(f"Аналог Belimo {analog_bit}.")
+    bits.append("Паспорт PDF, запрос КП у Hoocon.")
+    return format_meta_description(" ".join(bits))

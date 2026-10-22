@@ -6,8 +6,11 @@ Spec: ПЛАН §6 Iter 2; БЗ SEO-индексация-SPA.md; docs/seo-url-mi
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
+from django.utils import timezone
 from django.views import View
 
 from catalog.models import SKU, Category
@@ -108,6 +111,12 @@ def _build_llms_txt(base: str) -> str:
         f"- [Полный контекст]({base}/llms-full.txt): расширенное описание продукта и URL",
         f"- [Краткий индекс (алиас)]({base}/llm.txt): то же, что /llms.txt",
         "",
+        "## Разделы каталога",
+        *_category_lines(base),
+        "",
+        "## Аналоги Belimo",
+        *_analog_lines(base),
+        "",
         "## Optional",
         f"- [Sitemap]({base}/sitemap.xml): полный список индексируемых URL",
         "",
@@ -143,6 +152,13 @@ def _build_llms_full_txt(base: str) -> str:
         f"- {base}/faq — FAQ",
         f"- {base}/kontakty — контакты",
         "",
+        "## Разделы каталога",
+        *_category_lines(base),
+        "",
+        "## Аналоги Belimo",
+        "Один пример на код Belimo. Остальные исполнения — в sitemap.",
+        *_analog_lines(base),
+        "",
         "## Файлы для LLM",
         f"- {base}/llms.txt — краткий индекс (llmstxt.org)",
         f"- {base}/llm.txt — алиас краткого индекса",
@@ -150,6 +166,45 @@ def _build_llms_full_txt(base: str) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _category_lines(base: str) -> list[str]:
+    """One markdown link per catalog section."""
+    return [f"- [{cat.name}]({base}{catalog_category_path(cat.slug)})" for cat in Category.objects.order_by("name")]
+
+
+def _analog_lines(base: str, *, limit: int = 60) -> list[str]:
+    """One published SKU per Belimo code, so an agent can answer a model question."""
+    seen: set[str] = set()
+    lines: list[str] = []
+    skus = (
+        SKU.objects.filter(is_published=True)
+        .exclude(analog_belimo_code="")
+        .exclude(analog_belimo_code__isnull=True)
+        .select_related("product__category")
+        .order_by("analog_belimo_code", "sku_code")
+    )
+    for sku in skus:
+        code = (sku.analog_belimo_code or "").strip()
+        key = code.casefold()
+        if not code or key in seen:
+            continue
+        seen.add(key)
+        lines.append(f"- {code} → {sku.sku_code or sku.slug} ({base}{catalog_path_for_sku(sku)})")
+        if len(lines) >= limit:
+            break
+    if not lines:
+        lines.append("- Коды аналогов указаны на карточках товаров.")
+    return lines
+
+
+def _lastmod(moment: datetime | None) -> str | None:
+    """Sitemap date in the site timezone."""
+    if moment is None:
+        return None
+    if timezone.is_aware(moment):
+        moment = timezone.localtime(moment)
+    return moment.date().isoformat()
 
 
 class SitemapXmlView(View):
@@ -160,50 +215,56 @@ class SitemapXmlView(View):
     def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         """Return sitemap.xml with canonical public URLs."""
         base = _site_base_url(request)
-        urls: list[str] = []
+        urls: list[tuple[str, str | None]] = []
 
         for path in sorted(PUBLIC_STATIC_ROUTES.keys()):
-            urls.append(f"{base}{path}" if path != "/" else f"{base}/")
+            urls.append((f"{base}{path}" if path != "/" else f"{base}/", None))
 
         for cat in Category.objects.order_by("slug"):
-            urls.append(f"{base}{catalog_category_path(cat.slug)}")
+            urls.append((f"{base}{catalog_category_path(cat.slug)}", _lastmod(cat.updated_at)))
 
         for sku in SKU.objects.filter(is_published=True).select_related("product__category").order_by("slug"):
-            urls.append(f"{base}{catalog_path_for_sku(sku)}")
+            urls.append((f"{base}{catalog_path_for_sku(sku)}", _lastmod(sku.updated_at)))
 
         for page in publicly_visible(Page).order_by("slug"):
             path = f"/{page.slug}"
             if path in PUBLIC_STATIC_ROUTES or path in CANONICAL_REPLACEMENTS:
                 continue
-            urls.append(f"{base}{path}")
+            urls.append((f"{base}{path}", _lastmod(page.updated_at)))
 
-        for art in publicly_visible(Article).order_by("slug"):
-            urls.append(f"{base}/statyi/{art.slug}")
+        articles = list(publicly_visible(Article).order_by("slug"))
+        article_slugs = {art.slug for art in articles}
+        for art in articles:
+            urls.append((f"{base}/statyi/{art.slug}", _lastmod(art.updated_at)))
 
         for news in publicly_visible(News).order_by("slug"):
-            urls.append(f"{base}/novosti/{news.slug}")
+            mirrored = news.slug.removeprefix("article-") if news.slug.startswith("article-") else ""
+            if mirrored and mirrored in article_slugs:
+                continue
+            urls.append((f"{base}/novosti/{news.slug}", _lastmod(news.updated_at)))
 
-        # Deduplicate while preserving order.
         seen: set[str] = set()
-        unique: list[str] = []
-        for url in urls:
-            if url not in seen:
-                seen.add(url)
-                unique.append(url)
+        unique: list[tuple[str, str | None]] = []
+        for item in urls:
+            if item[0] not in seen:
+                seen.add(item[0])
+                unique.append(item)
 
         body = self._render_xml(unique)
         return HttpResponse(body, content_type="application/xml; charset=utf-8")
 
     @staticmethod
-    def _render_xml(urls: list[str]) -> str:
-        """Render the sitemap XML from a list of canonical URLs."""
+    def _render_xml(urls: list[tuple[str, str | None]]) -> str:
+        """Render the sitemap XML from canonical URLs and optional lastmod dates."""
         lines = [
             '<?xml version="1.0" encoding="UTF-8"?>',
             f'<urlset xmlns="{_SITEMAP_NS}">',
         ]
-        for url in urls:
+        for url, lastmod in urls:
             lines.append("  <url>")
             lines.append(f"    <loc>{url}</loc>")
+            if lastmod:
+                lines.append(f"    <lastmod>{lastmod}</lastmod>")
             lines.append("  </url>")
         lines.append("</urlset>")
         return "\n".join(lines) + "\n"

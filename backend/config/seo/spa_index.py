@@ -10,7 +10,7 @@ from html import escape
 from pathlib import Path
 
 from django.conf import settings
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanentRedirect
 
 from config.seo.head import apply_seo_head, inject_json_ld, resolve_seo_context
 from config.seo.json_ld import build_json_ld
@@ -87,34 +87,18 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
     return html
 
 
-def _home_podbor_noscript() -> str:
-    """Crawler/no-JS fallback for the home product picker (React mounts inside #root)."""
-    heading = escape("Подбор модели за минуту")
-    body = escape(
-        "Укажите тип продукции и параметры из проекта: привод на заслонку, "
-        "шаровой кран, комплект кран+привод или кронштейн BR-M/BR-ML под привод Hoocon. "
-        "Сервис покажет подходящие позиции в каталоге.",
-    )
-    return (
-        f'<noscript><section id="podbor-noscript" aria-labelledby="podbor-noscript-h">'
-        f'<h2 id="podbor-noscript-h">{heading}</h2>'
-        f"<p>{body}</p>"
-        f'<p><a href="/catalog">Каталог электроприводов</a></p>'
-        f"</section></noscript>"
-    )
-
-
 def inject_home_lcp_hints(html: str, raw_path: str) -> str:
-    """Preload home hero LCP image and inject noscript podbor fallback.
+    """Preload home hero LCP image.
 
-    React paints the hero after entry JS — no SSR overlay (UX over lab LCP tricks).
+    The picker text lives in the crawl block inside #root. React replaces
+    #root; there is no second noscript copy and no SSR overlay.
 
     Args:
         html: SPA shell HTML.
         raw_path: Request path.
 
     Returns:
-        HTML with home LCP preload + noscript, or unchanged for other routes.
+        HTML with home LCP preload, or unchanged for other routes.
     """
     path = (raw_path or "/").split("?", 1)[0]
     if path not in ("/", ""):
@@ -131,36 +115,50 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
         else:
             html = html.replace("</head>", f"    {preload}\n  </head>", 1)
 
-    if 'id="podbor-noscript"' not in html:
-        html = html.replace(
-            '<div id="root"></div>',
-            f'<div id="root"></div>{_home_podbor_noscript()}',
-            1,
-        )
-
     return html
 
 
-def inject_sku_crawl_block(html: str, heading: str, lines: tuple[str, ...]) -> str:
-    """Put the product heading and specs in the first HTML, before the script runs.
+def inject_crawl_block(
+    html: str,
+    heading: str,
+    lines: tuple[str, ...],
+    links: tuple[tuple[str, str], ...] = (),
+) -> str:
+    """Put the heading, facts and links inside #root before the script runs.
 
-    The block is hidden so the React page does not show a second heading.
-    The same facts are on the card after the script loads.
+    React replaces #root on startup, so visitors do not keep a second copy.
+    Crawlers that do not run scripts still see the title, the text and the
+    links. The block is not ``hidden``: a hidden article is skipped.
 
     Args:
         html: SPA shell.
-        heading: Product name for the h1.
-        lines: Short spec lines, including the article code.
+        heading: Page h1.
+        lines: Short fact lines.
+        links: ``(href, label)`` pairs.
 
     Returns:
         HTML with the crawl block, or unchanged when there is nothing to say.
     """
-    if not heading or 'id="sku-crawl"' in html:
+    if 'id="seo-crawl"' in html:
         return html
-    items = "".join(f"<li>{escape(line)}</li>" for line in lines)
-    spec = f"<ul>{items}</ul>" if items else ""
-    block = f'<article id="sku-crawl" hidden><h1>{escape(heading)}</h1>{spec}</article>'
-    return html.replace('<div id="root"></div>', f'<div id="root"></div>{block}', 1)
+    if not heading and not lines and not links:
+        return html
+    parts: list[str] = []
+    if heading:
+        parts.append(f"<h1>{escape(heading)}</h1>")
+    if lines:
+        items = "".join(f"<li>{escape(line)}</li>" for line in lines)
+        parts.append(f"<ul>{items}</ul>")
+    if links:
+        anchors = "".join(
+            f'<a href="{escape(href, quote=True)}">{escape(label)}</a>' for href, label in links if href and label
+        )
+        if anchors:
+            parts.append(f"<nav>{anchors}</nav>")
+    if not parts:
+        return html
+    block = f'<article id="seo-crawl">{"".join(parts)}</article>'
+    return html.replace('<div id="root"></div>', f'<div id="root">{block}</div>', 1)
 
 
 def render_spa_index_html(
@@ -179,6 +177,11 @@ def render_spa_index_html(
         HttpResponse with text/html body.
     """
     context = resolve_seo_context(raw_path)
+    if context.http_status == 301 and context.redirect_to:
+        target = context.redirect_to
+        if target.startswith("/"):
+            target = f"{settings.SITE_URL.rstrip('/')}{target}"
+        return HttpResponsePermanentRedirect(target)
     if _catalog_query_is_a_filter(raw_path, query_string):
         context = replace(context, noindex=True)
     site_url = settings.SITE_URL.rstrip("/")
@@ -187,8 +190,13 @@ def render_spa_index_html(
     html = load_index_html()
     html = apply_seo_head(html, context, canonical_url=canonical_url)
     html = inject_json_ld(html, build_json_ld(context), nonce=nonce)
+    html = inject_crawl_block(
+        html,
+        context.crawl_heading,
+        context.crawl_lines,
+        context.crawl_links,
+    )
     html = inject_home_lcp_hints(html, raw_path)
-    html = inject_sku_crawl_block(html, context.crawl_heading, context.crawl_lines)
     if nonce:
         html = inject_csp_nonce(html, nonce)
 

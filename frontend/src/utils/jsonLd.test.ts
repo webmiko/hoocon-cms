@@ -16,6 +16,12 @@ describe("buildProductJsonLd offers", () => {
     expect(buildProductJsonLd({ ...base, price: "1000", price_on_request: true })).not.toHaveProperty("offers");
   });
 
+  it("names the brand and the photo when the card has one", () => {
+    const ld = buildProductJsonLd({ ...base, image: "/media/da.webp" });
+    expect(ld.brand).toMatchObject({ "@type": "Brand", name: "Hoocon" });
+    expect(ld.image).toBe("https://hoocon.ru/media/da.webp");
+  });
+
   it("marks availability from in_stock instead of always InStock", () => {
     const onHand = buildProductJsonLd({ ...base, price: "1000", in_stock: true }).offers as Record<string, string>;
     const toOrder = buildProductJsonLd({ ...base, price: "1000", in_stock: false }).offers as Record<string, string>;

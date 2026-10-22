@@ -21,35 +21,45 @@ def test_branded_title_within_snippet_limit() -> None:
 
 
 def test_sku_meta_title_puts_code_first() -> None:
-    """PDP title starts with article code; omits Нм (shown in highlights)."""
-    partial = sku_meta_title_partial("DA8MQU230-A", moment="8 Нм", voltage="230 В")
-    assert partial.startswith("DA8MQU230-A")
-    assert "Нм" not in partial
-    assert "230 В" in partial
+    """PDP title keeps the code and the torque so neighbouring cards differ in the SERP."""
+    partial = sku_meta_title_partial(
+        "DA8MQU230-A",
+        moment="8 Нм",
+        voltage="230 В",
+        analog="SM230A",
+        kind="привод",
+    )
+    assert partial == "DA8MQU230-A привод 8 Нм 230 В, аналог SM230A"
     full = format_branded_title(partial)
     assert len(full) <= TITLE_MAX_LEN
     assert "Нет" not in full
 
 
 def test_sku_meta_title_shortens_long_voltage_canon() -> None:
-    """Long Belimo voltage canon collapses to ``24 В`` in the title."""
+    """Long Belimo voltage canon collapses to ``24 В`` and the torque stays."""
     partial = sku_meta_title_partial(
         "DA5FU24-DS",
         moment="5 Нм",
         voltage="AC/DC 24 В, 50/60 Гц",
+        analog="LF24",
+        kind="привод",
     )
-    assert partial == "DA5FU24-DS — 24 В"
-    assert "Нм" not in partial
+    assert partial == "DA5FU24-DS привод 5 Нм 24 В, аналог LF24"
 
 
 def test_sku_meta_description_capped() -> None:
-    """Description stays within 160 characters."""
+    """Description stays within 160 characters and keeps torque and the Belimo code."""
     desc = sku_meta_description(
         "DA8MQU230-A",
         category_name="Электроприводы воздушные ускоренного срабатывания без пружины",
+        moment="8 Нм",
+        voltage="AC 100…240 В",
+        analog="SM230A-SR",
     )
     assert len(desc) <= 160
     assert "DA8MQU230-A" in desc
+    assert "8 Нм" in desc
+    assert "SM230A-SR" in desc
 
 
 def test_default_description_within_limit() -> None:
@@ -78,9 +88,19 @@ def test_sku_meta_title_unknown_long_voltage() -> None:
     partial = sku_meta_title_partial(
         "DA8-X",
         voltage="AC 400 В трёхфазный нестандарт",
+        kind="привод",
     )
-    assert partial.startswith("DA8-X — ")
+    assert partial.startswith("DA8-X привод ")
     assert "400" in partial or "AC" in partial
+
+
+def test_sku_meta_descriptions_differ_by_torque() -> None:
+    """Two cards in one category must not share a description tail."""
+    left = sku_meta_description("H8101-A", category_name="Комплекты", moment="5 Нм", voltage="24 В")
+    right = sku_meta_description("H8101-B", category_name="Комплекты", moment="10 Нм", voltage="230 В")
+    assert left != right
+    assert "5 Нм" in left
+    assert "10 Нм" in right
 
 
 def test_sku_meta_description_without_category() -> None:

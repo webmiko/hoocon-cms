@@ -69,6 +69,12 @@ export function categorySeoDescription(
   if (!source) {
     return CATALOG_FALLBACK_DESCRIPTION;
   }
+  if (source.length < 80) {
+    return truncateAtWord(
+      `${source}. Подбор Hoocon по моменту и напряжению, паспорта PDF, запрос КП.`,
+      DESC_MAX,
+    );
+  }
   return truncateAtWord(source, DESC_MAX);
 }
 
@@ -116,17 +122,44 @@ export function brandedTitle(partial: string): string {
   return truncateAtWord(`${body} — ${SITE_NAME}`, TITLE_MAX);
 }
 
+function skuKindForTitle(categoryName?: string | null): string {
+  const name = (categoryName ?? "").toLocaleLowerCase("ru");
+  if (name.includes("кран")) return "кран";
+  if (name.includes("адаптер")) return "адаптер";
+  if (name.includes("комплект")) return "комплект";
+  if (name.includes("кронштейн")) return "кронштейн";
+  return "привод";
+}
+
+/** Same shape as backend ``sku_meta_title_partial``: code, kind, torque, voltage, analog. */
 export function skuSeoTitlePartial(
   skuCode: string,
   highlights?: Array<{ key: string; value: string }>,
+  analog?: string | null,
+  categoryName?: string | null,
 ): string {
-  // Skip moment (Нм): already in article / on-page ТТХ — do not duplicate in <title>.
   const voltage = highlights?.find((h) => h.key === "voltage")?.value ?? "";
+  const momentRaw = highlights?.find((h) => h.key === "moment")?.value ?? "";
+  const moment = momentRaw.replace(/\s+/g, " ").trim();
   const volt = shortVoltageForTitle(voltage);
-  if (volt) {
-    return `${skuCode} — ${volt}`;
+  const analogBit = (analog ?? "").replace(/\s+/g, " ").trim();
+  const kind = skuKindForTitle(categoryName);
+  const parts = [skuCode, kind];
+  if (moment && moment.length <= 12) parts.push(moment);
+  if (volt) parts.push(volt);
+  let partial = parts.join(" ");
+  if (analogBit) {
+    const withAnalog = `${partial}, аналог ${analogBit}`;
+    if (withAnalog.length <= TITLE_PARTIAL_MAX) partial = withAnalog;
   }
-  return `${skuCode} — электропривод вентиляции`;
+  if (partial.length <= TITLE_PARTIAL_MAX) return partial;
+  const shorter = [skuCode];
+  if (moment && moment.length <= 12) shorter.push(moment);
+  if (volt) shorter.push(volt);
+  partial = shorter.join(" ");
+  return partial.length <= TITLE_PARTIAL_MAX
+    ? partial
+    : partial.slice(0, TITLE_PARTIAL_MAX);
 }
 
 /** Collapse long voltage strings to ``24 В`` / ``230 В`` for SERP titles. */
@@ -145,17 +178,23 @@ function shortVoltageForTitle(voltage: string): string {
 export function skuSeoDescription(
   skuCode: string,
   categoryName?: string | null,
+  highlights?: Array<{ key: string; value: string }>,
+  analog?: string | null,
 ): string {
+  const bits = [`${skuCode}:`];
   if (categoryName?.trim()) {
-    const cat = truncateAtWord(categoryName, 60);
-    return truncateAtWord(
-      `${skuCode}: ${cat}. Паспорт PDF, подбор аналогов Belimo, запрос КП у Hoocon.`,
-      DESC_MAX,
-    );
+    bits.push(`${truncateAtWord(categoryName, 60)}.`);
+  } else {
+    bits.push("электропривод вентиляции Hoocon.");
   }
-  return truncateAtWord(
-    `${skuCode}: электропривод вентиляции Hoocon. Паспорт PDF, фильтры по ` +
-      "характеристикам, запрос коммерческого предложения.",
-    DESC_MAX,
+  const moment = highlights?.find((h) => h.key === "moment")?.value?.replace(/\s+/g, " ").trim() ?? "";
+  const volt = shortVoltageForTitle(
+    highlights?.find((h) => h.key === "voltage")?.value ?? "",
   );
+  const facts = [moment, volt].filter(Boolean);
+  if (facts.length) bits.push(`${facts.join(" ")}.`);
+  const analogBit = (analog ?? "").replace(/\s+/g, " ").trim();
+  if (analogBit) bits.push(`Аналог Belimo ${analogBit}.`);
+  bits.push("Паспорт PDF, запрос КП у Hoocon.");
+  return truncateAtWord(bits.join(" "), DESC_MAX);
 }

@@ -31,16 +31,20 @@ def test_spa_home_has_unique_title_and_canonical(client) -> None:
 
 @pytest.mark.django_db
 def test_spa_home_preloads_lcp_hero(client) -> None:
-    """GET / preloads hero LCP image and noscript podbor; no SSR overlay."""
+    """GET / preloads the hero and puts picker text plus catalog links in the first HTML."""
     from config.seo.spa_index import HOME_LCP_IMAGE
 
     response = client.get("/")
     assert response.status_code == 200
     body = response.content.decode()
     assert f'rel="preload" as="image" href="{HOME_LCP_IMAGE}"' in body
-    assert 'id="podbor-noscript"' in body
+    assert 'id="seo-crawl"' in body
+    assert "hidden" not in body.split('id="seo-crawl"', 1)[1].split("</article>", 1)[0]
     assert "Подбор модели за минуту" in body
-    assert '<div id="root"></div>' in body
+    assert 'href="/catalog"' in body
+    assert "SearchAction" not in body
+    assert "+78003505898" in body
+    assert "/og-image.png" in body
     assert "hoocon-ssr-hero" not in body
     assert "hoocon-lcp-boot" not in body
     assert 'type="module" src="/assets/index.js"' in body
@@ -182,6 +186,7 @@ def test_spa_article_json_ld(client) -> None:
     assert "Подбор момента" in body
 
 
+@pytest.mark.django_db
 def test_llms_txt(client) -> None:
     """GET /llms.txt returns llmstxt.org-shaped plain text summary."""
     response = client.get("/llms.txt")
@@ -193,6 +198,7 @@ def test_llms_txt(client) -> None:
     assert "/llms-full.txt" in body
 
 
+@pytest.mark.django_db
 def test_llm_txt_alias(client) -> None:
     """GET /llm.txt mirrors /llms.txt."""
     response = client.get("/llm.txt")
@@ -200,6 +206,7 @@ def test_llm_txt_alias(client) -> None:
     assert "Hoocon" in response.content.decode()
 
 
+@pytest.mark.django_db
 def test_llms_full_txt(client) -> None:
     """GET /llms-full.txt returns expanded LLM context."""
     response = client.get("/llms-full.txt")
@@ -311,9 +318,13 @@ def test_spa_sku_html_contains_heading_and_article(client) -> None:
     response = client.get("/catalog/vozdushnie-facts/privod-hva-facts")
     assert response.status_code == 200
     body = response.content.decode()
-    assert '<article id="sku-crawl" hidden>' in body
+    assert '<article id="seo-crawl">' in body
+    assert 'id="sku-crawl" hidden' not in body
     assert "<h1>" in body
     assert "HVA-FACTS-1" in body
+    assert 'href="/catalog/vozdushnie-facts"' in body
+    assert "priceSpecification" not in body
+    assert '"Brand"' in body or '"@type": "Brand"' in body
 
 
 @pytest.mark.django_db
@@ -371,3 +382,111 @@ def test_sitemap_skips_replaced_pages(client) -> None:
     assert "<loc>https://hoocon.ru/privacy</loc>" not in body
     assert "<loc>https://hoocon.ru/company</loc>" in body
     assert "<loc>https://hoocon.ru/privacy-policy</loc>" in body
+
+
+@pytest.mark.django_db
+def test_wrong_category_sku_redirects_to_canonical(client) -> None:
+    """A live SKU under the wrong section is 301, not a second indexable page."""
+    from catalog.models import SKU, Category, Product
+
+    air = Category.objects.create(name="Воздушные", slug="vozdushnie-redir")
+    other = Category.objects.create(name="Адаптеры", slug="adaptery-redir")
+    prod = Product.objects.create(name="DA", slug="da-redir", category=air)
+    SKU.objects.create(
+        product=prod,
+        name="DA3",
+        slug="privod-da3-redir",
+        sku_code="DA3-REDIR",
+        is_published=True,
+    )
+    response = client.get(f"/catalog/{other.slug}/privod-da3-redir")
+    assert response.status_code == 301
+    assert response["Location"].endswith("/catalog/vozdushnie-redir/privod-da3-redir")
+
+
+@pytest.mark.django_db
+def test_catalog_and_article_first_html_have_text_and_links(client) -> None:
+    """Catalog and an article name themselves and link onward before the script runs."""
+    from django.utils import timezone
+
+    from catalog.models import SKU, Category, Product
+    from content.models import Article
+
+    cat = Category.objects.create(name="Адаптеры", slug="adaptery-crawl", description="Адаптеры")
+    prod = Product.objects.create(name="BR", slug="br-crawl", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="BR-M",
+        slug="adapter-br-m",
+        sku_code="BR-M-1",
+        is_published=True,
+    )
+    Article.objects.create(
+        title="Замена Belimo",
+        slug="zamena-belimo-crawl",
+        body="<p>Таблица соответствий серий.</p>",
+        excerpt="Как подбирать аналог Belimo.",
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    catalog = client.get("/catalog").content.decode()
+    assert 'id="seo-crawl"' in catalog
+    assert 'href="/catalog/adaptery-crawl"' in catalog
+    category = client.get("/catalog/adaptery-crawl").content.decode()
+    assert 'href="/catalog/adaptery-crawl/adapter-br-m"' in category
+    assert "паспорта PDF" in category
+    article = client.get("/statyi/zamena-belimo-crawl").content.decode()
+    assert "Как подбирать аналог Belimo." in article
+    assert 'href="/catalog"' in article
+
+
+@pytest.mark.django_db
+def test_news_that_repeats_an_article_is_not_a_second_index_url(client) -> None:
+    """A news item slug article-{slug} points canonical at the article and stays noindex."""
+    from django.utils import timezone
+
+    from content.models import Article, News
+
+    Article.objects.create(
+        title="Суффиксы",
+        slug="suffiksy-crawl",
+        body="<p>Текст статьи.</p>",
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    News.objects.create(
+        title="Новая статья: Суффиксы",
+        slug="article-suffiksy-crawl",
+        body="<p>Анонс.</p>",
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    page = client.get("/novosti/article-suffiksy-crawl")
+    assert page.status_code == 200
+    body = page.content.decode()
+    assert 'rel="canonical" href="https://hoocon.ru/statyi/suffiksy-crawl"' in body
+    assert 'name="robots" content="noindex, nofollow"' in body
+    sitemap = client.get("/sitemap.xml").content.decode()
+    assert "/novosti/article-suffiksy-crawl" not in sitemap
+    assert "/statyi/suffiksy-crawl" in sitemap
+
+
+@pytest.mark.django_db
+def test_llms_txt_lists_a_belimo_analog(client) -> None:
+    """llms.txt names a Belimo code and the Hoocon card, not only the section list."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnie-llms")
+    prod = Product.objects.create(name="HVD", slug="hvd-llms", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="HVD",
+        slug="privod-hvd-llms",
+        sku_code="HVD230S-5",
+        analog_belimo_code="LM230A-S",
+        is_published=True,
+    )
+    body = client.get("/llms.txt").content.decode()
+    assert "LM230A-S" in body
+    assert "HVD230S-5" in body
+    assert "/catalog/vozdushnie-llms" in body
