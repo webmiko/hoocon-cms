@@ -151,6 +151,7 @@ def test_resolve_seo_missing_catalog_sku_has_unique_title() -> None:
         "/catalog/komplekty-seo-miss/h8102-bv215c-24ds",
     )
     assert ctx.noindex is True
+    assert ctx.http_status == 410
     assert "h8102-bv215c-24ds" in ctx.page_title
     assert "Товар не найден" in ctx.page_title
 

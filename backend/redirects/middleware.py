@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.http import HttpRequest, HttpResponse, HttpResponsePermanentRedirect, HttpResponseRedirect
 from django.utils.deprecation import MiddlewareMixin
 
+from config.seo.routes import CANONICAL_REPLACEMENTS
 from redirects.lookup import lookup_redirect
 from redirects.models import Redirect
 from redirects.pathutils import normalize_path
@@ -44,6 +45,9 @@ class RedirectMiddleware(MiddlewareMixin):
         path = normalize_path(request.path)
         if path in _SKIP_EXACT or path.startswith(_SKIP_PREFIXES):
             return None
+        target = CANONICAL_REPLACEMENTS.get(path)
+        if target:
+            return HttpResponsePermanentRedirect(target)
 
         try:
             hit = lookup_redirect(path)

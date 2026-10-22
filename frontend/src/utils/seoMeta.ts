@@ -72,8 +72,16 @@ export function categorySeoDescription(
   return truncateAtWord(source, DESC_MAX);
 }
 
-const CATALOG_ROOT_TITLE =
-  "Каталог электроприводов вентиляции и кондиционирования";
+const CATALOG_ROOT_TITLE = "Каталог электроприводов для вентиляции";
+const SHORT_TITLE_MIN = 24;
+const SHORT_TITLE_TAIL = " для электроприводов";
+
+function lengthenShortTitle(name: string): string {
+  if (name.length >= SHORT_TITLE_MIN) {
+    return name;
+  }
+  return `${name}${SHORT_TITLE_TAIL}`;
+}
 
 /** Listing page <title>: unique per category; never reuse the root /catalog title. */
 export function catalogListingSeoTitle(
@@ -82,7 +90,7 @@ export function catalogListingSeoTitle(
 ): string {
   const name = (categoryName ?? "").trim();
   if (name) {
-    return name;
+    return lengthenShortTitle(name);
   }
   const slug = (categorySlug ?? "").trim();
   if (slug) {

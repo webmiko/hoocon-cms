@@ -12,7 +12,7 @@ from django.views import View
 
 from catalog.models import SKU, Category
 from catalog.urls_paths import catalog_category_path, catalog_path_for_sku
-from config.seo.routes import PUBLIC_STATIC_ROUTES
+from config.seo.routes import CANONICAL_REPLACEMENTS, PUBLIC_STATIC_ROUTES
 from content.models import Article, News, Page
 from content.views import publicly_visible
 
@@ -173,8 +173,9 @@ class SitemapXmlView(View):
 
         for page in publicly_visible(Page).order_by("slug"):
             path = f"/{page.slug}"
-            if path not in PUBLIC_STATIC_ROUTES:
-                urls.append(f"{base}{path}")
+            if path in PUBLIC_STATIC_ROUTES or path in CANONICAL_REPLACEMENTS:
+                continue
+            urls.append(f"{base}{path}")
 
         for art in publicly_visible(Article).order_by("slug"):
             urls.append(f"{base}/statyi/{art.slug}")

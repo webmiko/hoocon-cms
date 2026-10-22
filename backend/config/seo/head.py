@@ -45,6 +45,11 @@ class SeoHeadContext:
     breadcrumb: tuple[tuple[str, str], ...] = ()
     # Absolute og:image when the page has a primary photo; else site default.
     og_image_url: str | None = None
+    # 410 when the address has no live page and no redirect. 200 for real routes.
+    http_status: int = 200
+    # Facts rendered in the first HTML of a product page, before the script runs.
+    crawl_heading: str = ""
+    crawl_lines: tuple[str, ...] = ()
 
 
 def _absolute_media_url(file_field: object | None) -> str | None:
@@ -246,6 +251,17 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
 
     gallery = _sku_gallery_images(sku)
     primary_image = gallery[0] if gallery else None
+    crawl_lines: list[str] = []
+    if sku.sku_code:
+        crawl_lines.append(f"Артикул {sku.sku_code}")
+    for row in highlights[:5]:
+        label = (row.get("name") or "").strip()
+        value = (row.get("value") or "").strip()
+        unit = (row.get("unit") or "").strip()
+        if not value:
+            continue
+        shown = f"{value} {unit}".strip() if unit and unit not in value else value
+        crawl_lines.append(f"{label}: {shown}" if label else shown)
     return SeoHeadContext(
         canonical_path=canonical,
         page_title=_format_page_title(title_partial),
@@ -264,11 +280,13 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         og_image_url=_absolute_media_url(
             primary_image.image if primary_image is not None else None,
         ),
+        crawl_heading=display_name or sku.sku_code or sku.slug,
+        crawl_lines=tuple(crawl_lines),
     )
 
 
 def _resolve_missing_catalog_sku(path: str) -> SeoHeadContext | None:
-    """Unique noindex title for ``/catalog/{category}/{sku}`` when SKU is absent."""
+    """Gone (410) for ``/catalog/{category}/{sku}`` when that SKU is not published."""
     if not path.startswith("/catalog/"):
         return None
     parts = [p for p in path.removeprefix("/catalog/").split("/") if p]
@@ -292,6 +310,7 @@ def _resolve_missing_catalog_sku(path: str) -> SeoHeadContext | None:
             f"Позиция {sku_slug} не найдена в каталоге Hoocon.",
         ),
         noindex=True,
+        http_status=410,
         breadcrumb=(
             ("/", "Главная"),
             ("/catalog", "Каталог"),
@@ -316,11 +335,12 @@ def _resolve_catalog_category(path: str) -> SeoHeadContext | None:
         return None
     canonical = catalog_category_path(cat.slug)
     desc = plain_text_for_meta(cat.description or cat.name, max_len=160)
+    name = plain_text_for_meta(cat.name, max_len=TITLE_PARTIAL_MAX)
+    if len(name) < 24:
+        name = f"{name} для электроприводов"
     return SeoHeadContext(
         canonical_path=canonical,
-        page_title=_format_page_title(
-            plain_text_for_meta(cat.name, max_len=TITLE_PARTIAL_MAX),
-        ),
+        page_title=_format_page_title(name),
         description=format_meta_description(desc or DEFAULT_DESCRIPTION),
         noindex=False,
         breadcrumb=(
@@ -377,10 +397,17 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
             "/rfq": "Запрос коммерческого предложения",
             "/replacement": "Подбор аналога Belimo",
             "/compare": "Сравнение моделей",
+            "/login": "Вход в кабинет",
+            "/register": "Регистрация",
+            "/account": "Личный кабинет",
+            "/kp": "Ответ на коммерческое предложение",
         }
+        title_key = path
+        if path.startswith("/account/") or path == "/account":
+            title_key = "/account"
         return SeoHeadContext(
             canonical_path=path,
-            page_title=_format_page_title(titles.get(path)),
+            page_title=_format_page_title(titles.get(title_key)),
             description=DEFAULT_DESCRIPTION,
             noindex=True,
         )
@@ -398,6 +425,7 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
         page_title=_format_page_title("Страница не найдена — 404"),
         description=DEFAULT_DESCRIPTION,
         noindex=True,
+        http_status=410,
     )
 
 

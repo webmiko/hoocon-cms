@@ -61,6 +61,51 @@ def test_spa_catalog_skips_home_lcp_boot(client) -> None:
 
 
 @pytest.mark.django_db
+def test_spa_unknown_address_is_gone(client) -> None:
+    """A path with no page and no redirect is 410, not a 200 page hidden by noindex."""
+    response = client.get("/etot-adres-uzhe-ne-sushchestvuet")
+    assert response.status_code == 410
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" in body
+
+
+@pytest.mark.django_db
+def test_spa_missing_catalog_sku_is_gone(client) -> None:
+    """An unpublished catalog address is 410. A published card stays 200."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Воздушные", slug="vozdushnie-gone")
+    prod = Product.objects.create(name="HVA", slug="hva-gone", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Черновик",
+        slug="chernovik-gone",
+        sku_code="GONE-1",
+        price="1.00",
+        is_published=False,
+    )
+    missing = client.get("/catalog/vozdushnie-gone/chernovik-gone")
+    assert missing.status_code == 410
+    assert 'name="robots" content="noindex, nofollow"' in missing.content.decode()
+
+    SKU.objects.filter(slug="chernovik-gone").update(is_published=True)
+    live = client.get("/catalog/vozdushnie-gone/chernovik-gone")
+    assert live.status_code == 200
+    assert 'name="robots" content="index, follow"' in live.content.decode()
+
+
+@pytest.mark.django_db
+def test_spa_account_stays_open_and_noindex(client) -> None:
+    """Cabinet screens are real pages. A missing address must not close them."""
+    response = client.get("/account/orders")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" not in body
+
+
+@pytest.mark.django_db
 def test_spa_search_is_noindex(client) -> None:
     """GET /search has robots noindex."""
     response = client.get("/search")
@@ -235,3 +280,94 @@ def test_spa_title_with_group_reference_does_not_500(client) -> None:
     response = client.get("/statyi/backref-seo")
     assert response.status_code == 200
     assert r"Схема \1 и \g&lt;0&gt; подключения" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_home_title_is_a_full_phrase(client) -> None:
+    """The home title stays a whole phrase under 60 characters."""
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.content.decode()
+    title = body.split("<title>", 1)[1].split("</title>", 1)[0]
+    assert "…" not in title
+    assert len(title) <= 60
+    assert title == "Электроприводы для вентиляции и подбор — Hoocon"
+
+
+@pytest.mark.django_db
+def test_spa_sku_html_contains_heading_and_article(client) -> None:
+    """The first HTML of a product page has the heading and article code."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Воздушные факты", slug="vozdushnie-facts")
+    prod = Product.objects.create(name="HVA факты", slug="hva-facts", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Привод HVA факты",
+        slug="privod-hva-facts",
+        sku_code="HVA-FACTS-1",
+        is_published=True,
+    )
+    response = client.get("/catalog/vozdushnie-facts/privod-hva-facts")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert '<article id="sku-crawl" hidden>' in body
+    assert "<h1>" in body
+    assert "HVA-FACTS-1" in body
+
+
+@pytest.mark.django_db
+def test_catalog_filter_query_is_noindex_and_sku_query_stays_open(client) -> None:
+    """A catalog filter is noindex. A product link with a tag stays indexable."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Фильтр SEO", slug="filtr-seo")
+    prod = Product.objects.create(name="Фильтр", slug="filtr-prod", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Фильтр SKU",
+        slug="filtr-sku",
+        sku_code="FILTR-1",
+        is_published=True,
+    )
+    listing = client.get("/catalog?moment=5")
+    assert listing.status_code == 200
+    listing_body = listing.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in listing_body
+    assert 'rel="canonical" href="https://hoocon.ru/catalog"' in listing_body
+
+    product = client.get("/catalog/filtr-seo/filtr-sku?utm_source=newsletter")
+    assert product.status_code == 200
+    product_body = product.content.decode()
+    assert 'name="robots" content="index, follow"' in product_body
+
+
+@pytest.mark.django_db
+def test_old_company_and_privacy_addresses_redirect(client) -> None:
+    """Old company and privacy addresses go to the live pages."""
+    company = client.get("/o-kompanii")
+    assert company.status_code == 301
+    assert company["Location"].endswith("/company")
+    privacy = client.get("/privacy")
+    assert privacy.status_code == 301
+    assert privacy["Location"].endswith("/privacy-policy")
+
+
+@pytest.mark.django_db
+def test_sitemap_skips_replaced_pages(client) -> None:
+    """A page that already has a live address is not a second sitemap URL."""
+    from content.models import Page
+
+    Page.objects.update_or_create(
+        slug="o-kompanii",
+        defaults={"title": "О компании", "body": "<p>Старый текст</p>", "is_published": True},
+    )
+    Page.objects.update_or_create(
+        slug="privacy",
+        defaults={"title": "Privacy", "body": "<p>Старый текст</p>", "is_published": True},
+    )
+    body = client.get("/sitemap.xml").content.decode()
+    assert "<loc>https://hoocon.ru/o-kompanii</loc>" not in body
+    assert "<loc>https://hoocon.ru/privacy</loc>" not in body
+    assert "<loc>https://hoocon.ru/company</loc>" in body
+    assert "<loc>https://hoocon.ru/privacy-policy</loc>" in body

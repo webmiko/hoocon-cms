@@ -538,6 +538,7 @@ export function CatalogPage() {
               : categorySeoDescription(catalogTitle)
           }
           path={category ? catalogCategoryPath(category) : "/catalog"}
+          noindex={searchParams.toString().length > 0}
           jsonLd={[
             buildBreadcrumbJsonLd([
               { name: "Главная", path: "/" },

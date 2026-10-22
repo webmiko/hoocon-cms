@@ -89,7 +89,7 @@ export function WhereToBuyPage() {
   return (
     <div className={styles.page}>
       <Seo
-        title="Где купить продукцию Hoocon"
+        title="Где купить электроприводы"
         description={
           "Прямые поставки и партнёры Hoocon: Москва, Санкт-Петербург, " +
           "Минск. Представительство завода в Беларуси — ООО «Чемпион-Тэк». " +
