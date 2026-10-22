@@ -5,6 +5,7 @@ import { api, type DocsHubFile } from "../api/client";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { Seo } from "../components/Seo";
 import { useAsync } from "../hooks/useAsync";
+import { visibleEacDeclarations } from "../content/eacDeclarations";
 import { catalogSkuPath } from "../utils/catalogPaths";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
 import styles from "./DocsPage.module.css";
@@ -77,6 +78,10 @@ export function DocsPage() {
   const groups = useMemo(
     () => groupFilesByFamily(data?.files ?? []),
     [data?.files],
+  );
+  const declarations = useMemo(
+    () => visibleEacDeclarations({ q, series, kind }),
+    [q, series, kind],
   );
 
   const zipByFamily = useMemo(() => {
@@ -202,10 +207,42 @@ export function DocsPage() {
         </p>
       )}
 
-      {!loading && !error && groups.length === 0 && (
+      {!loading && !error && groups.length === 0 && declarations.length === 0 && (
         <p className={styles.empty}>
           Ничего не найдено. Снимите фильтры или измените запрос.
         </p>
+      )}
+
+      {declarations.length > 0 && (
+        <section className={styles.declarations} aria-label="Декларации о соответствии">
+          <h2 className={styles.groupTitle}>Сертификаты</h2>
+          <p className={styles.groupMeta}>
+            Декларации о соответствии. Скан открыт для просмотра на странице.
+          </p>
+          <div className={styles.declarationList}>
+            {declarations.map((item) => (
+              <figure key={item.id} className={styles.declaration}>
+                <figcaption className={styles.declarationTitle}>{item.title}</figcaption>
+                <div
+                  className={styles.scanFrame}
+                  onContextMenu={(event) => event.preventDefault()}
+                >
+                  <img
+                    className={styles.scan}
+                    src={item.src}
+                    alt={item.alt}
+                    width={item.width}
+                    height={item.height}
+                    draggable={false}
+                    decoding="async"
+                    loading="lazy"
+                  />
+                  <div className={styles.scanShield} />
+                </div>
+              </figure>
+            ))}
+          </div>
+        </section>
       )}
 
       {!loading && !error && groups.length > 0 && (
