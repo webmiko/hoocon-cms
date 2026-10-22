@@ -38,8 +38,14 @@ describe("categorySeoDescription", () => {
 describe("catalogListingSeoTitle", () => {
   it("uses category name when available", () => {
     expect(catalogListingSeoTitle("sharovye-krany", "Шаровые краны")).toBe(
-      "Шаровые краны",
+      "Шаровые краны для электроприводов",
     );
+    expect(
+      catalogListingSeoTitle(
+        "protivopozharnye",
+        "Электроприводы противопожарных клапанов",
+      ),
+    ).toBe("Электроприводы противопожарных клапанов");
   });
 
   it("falls back to slug-specific title instead of root catalog", () => {

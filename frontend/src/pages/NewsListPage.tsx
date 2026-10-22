@@ -59,7 +59,7 @@ export function NewsListPage() {
   return (
     <div className={styles.page}>
       <Seo
-        title="Новости Hoocon"
+        title="Новости продукции и поставок"
         description={
           "Новости производства и каталога электроприводов Hoocon: выставки, " +
           "цены, партнёрские анонсы."

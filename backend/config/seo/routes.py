@@ -26,25 +26,25 @@ SLUG_RE = r"^[a-z0-9][a-z0-9-]{0,298}[a-z0-9]$|^[a-z0-9]$"
 
 PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
     "/": {
-        "title": ("Электроприводы для вентиляции и кондиционирования Hoocon — каталог, подбор, аналоги Belimo"),
+        "title": "Электроприводы для вентиляции и подбор",
         "description": DEFAULT_DESCRIPTION,
     },
     "/catalog": {
-        "title": "Каталог электроприводов вентиляции и кондиционирования",
+        "title": "Каталог электроприводов для вентиляции",
         "description": (
             "Каталог электроприводов Hoocon для вентиляции и кондиционирования. "
             "Фильтры по моменту, напряжению, типу; паспорта PDF; подбор аналогов Belimo."
         ),
     },
     "/statyi": {
-        "title": "Статьи по электроприводам вентиляции и кондиционирования",
+        "title": "Статьи по подбору и монтажу приводов",
         "description": (
             "Подбор привода, монтаж, противопожарные и дымоудаляющие клапаны, "
             "шаровые краны и замена аналогов Belimo — для инженеров и снабжения."
         ),
     },
     "/novosti": {
-        "title": "Новости",
+        "title": "Новости продукции и поставок",
         "description": "Новости компании Hoocon: продукция, сертификаты, поставки.",
     },
     "/company": {
@@ -61,7 +61,7 @@ PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
         ),
     },
     "/gde-kupit": {
-        "title": "Где купить",
+        "title": "Где купить электроприводы",
         "description": (
             "Прямые поставки и партнёры Hoocon по РФ; представительство завода в Беларуси — ООО «Чемпион-Тэк»."
         ),
@@ -80,7 +80,7 @@ PUBLIC_STATIC_ROUTES: dict[str, StaticRouteSeo] = {
         ),
     },
     "/kontakty": {
-        "title": "Контакты",
+        "title": "Контакты завода и офиса",
         "description": "Контакты ООО «Хогон»: телефон, email, адрес, реквизиты.",
     },
     "/oferta": {
@@ -106,4 +106,15 @@ NOINDEX_PREFIXES: tuple[str, ...] = (
     "/rfq",
     "/replacement",
     "/compare",
+    # Real screens that must stay open. They are not leftovers of a deleted page.
+    "/login",
+    "/register",
+    "/account",
+    "/kp",
 )
+
+# Old addresses that still resolve as their own pages. Server 301, not a second canonical.
+CANONICAL_REPLACEMENTS: dict[str, str] = {
+    "/o-kompanii": "/company",
+    "/privacy": "/privacy-policy",
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import secrets
 import threading
+from dataclasses import replace
 from html import escape
 from pathlib import Path
 
@@ -140,7 +141,34 @@ def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     return html
 
 
-def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpResponse:
+def inject_sku_crawl_block(html: str, heading: str, lines: tuple[str, ...]) -> str:
+    """Put the product heading and specs in the first HTML, before the script runs.
+
+    The block is hidden so the React page does not show a second heading.
+    The same facts are on the card after the script loads.
+
+    Args:
+        html: SPA shell.
+        heading: Product name for the h1.
+        lines: Short spec lines, including the article code.
+
+    Returns:
+        HTML with the crawl block, or unchanged when there is nothing to say.
+    """
+    if not heading or 'id="sku-crawl"' in html:
+        return html
+    items = "".join(f"<li>{escape(line)}</li>" for line in lines)
+    spec = f"<ul>{items}</ul>" if items else ""
+    block = f'<article id="sku-crawl" hidden><h1>{escape(heading)}</h1>{spec}</article>'
+    return html.replace('<div id="root"></div>', f'<div id="root"></div>{block}', 1)
+
+
+def render_spa_index_html(
+    raw_path: str,
+    *,
+    nonce: str | None = None,
+    query_string: str = "",
+) -> HttpResponse:
     """Build SPA HTML for a route with SEO head and JSON-LD.
 
     Args:
@@ -151,6 +179,8 @@ def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpRes
         HttpResponse with text/html body.
     """
     context = resolve_seo_context(raw_path)
+    if _catalog_query_is_a_filter(raw_path, query_string):
+        context = replace(context, noindex=True)
     site_url = settings.SITE_URL.rstrip("/")
     canonical_url = f"{site_url}{context.canonical_path}"
 
@@ -158,10 +188,15 @@ def render_spa_index_html(raw_path: str, *, nonce: str | None = None) -> HttpRes
     html = apply_seo_head(html, context, canonical_url=canonical_url)
     html = inject_json_ld(html, build_json_ld(context), nonce=nonce)
     html = inject_home_lcp_hints(html, raw_path)
+    html = inject_sku_crawl_block(html, context.crawl_heading, context.crawl_lines)
     if nonce:
         html = inject_csp_nonce(html, nonce)
 
-    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response = HttpResponse(
+        html,
+        content_type="text/html; charset=utf-8",
+        status=context.http_status,
+    )
     response["Cache-Control"] = "no-cache, must-revalidate"
     return response
 
@@ -177,4 +212,21 @@ def spa_index_view(request: HttpRequest) -> HttpResponse:
     """
     nonce = getattr(request, "csp_nonce", None) or secrets.token_urlsafe(16)
     request.csp_nonce = nonce  # type: ignore[attr-defined]
-    return render_spa_index_html(request.path, nonce=nonce)
+    return render_spa_index_html(
+        request.path,
+        nonce=nonce,
+        query_string=request.META.get("QUERY_STRING", ""),
+    )
+
+
+def _catalog_query_is_a_filter(raw_path: str, query_string: str) -> bool:
+    """A catalog listing with parameters is a filter, not its own page."""
+    if not (query_string or "").strip():
+        return False
+    path = (raw_path or "/").split("?", 1)[0].rstrip("/") or "/"
+    if path == "/catalog":
+        return True
+    if not path.startswith("/catalog/"):
+        return False
+    parts = [part for part in path.removeprefix("/catalog/").split("/") if part]
+    return len(parts) == 1
