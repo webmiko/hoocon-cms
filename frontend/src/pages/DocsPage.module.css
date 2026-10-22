@@ -144,6 +144,52 @@
   margin-bottom: var(--space-md);
 }
 
+.declarations {
+  margin: 0 0 var(--space-xl);
+  min-width: 0;
+}
+
+.declarationList {
+  display: grid;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.declaration {
+  margin: 0;
+  min-width: 0;
+}
+
+.declarationTitle {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-base);
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.scanFrame {
+  position: relative;
+  max-width: 42rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.scan {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.scanShield {
+  position: absolute;
+  inset: 0;
+}
+
 .groupTitle {
   font-family: var(--font-display);
   font-size: var(--font-size-h2);
@@ -260,7 +306,8 @@
 :global(html[data-theme="dark"]) .chip,
 :global(html[data-theme="dark"]) .chipActive,
 :global(html[data-theme="dark"]) .fileItem,
-:global(html[data-theme="dark"]) .group {
+:global(html[data-theme="dark"]) .group,
+:global(html[data-theme="dark"]) .scanFrame {
   border-color: var(--color-control-border);
 }
 
