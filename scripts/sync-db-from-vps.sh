@@ -8,9 +8,10 @@
 #   ./scripts/sync-db-from-vps.sh --from-backup   # latest /opt/hoocon/backups/*/hoocon.dump
 #   ./scripts/sync-db-from-vps.sh --with-media    # also rsync VPS media → backend/media
 #   ./scripts/sync-db-from-vps.sh --keep-secrets  # leave bot/PBX tokens in the local DB
+#   ./scripts/sync-db-from-vps.sh --allow-local-port  # this machine's Postgres is not on 5432
 #
 # Local target (auto):
-#   - Homebrew Postgres when DB_HOST is 127.0.0.1/localhost (default .env)
+#   - Homebrew Postgres when DB_HOST is 127.0.0.1/localhost (default .env), port 5432
 #   - else docker compose service ``db``
 #
 # After a DB-only sync, media paths may 404 until --with-media (or a manual rsync).
@@ -23,6 +24,22 @@ hoocon_db_host_is_local() {
     127.0.0.1|localhost|::1) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Loopback on 5432 is this machine. Another local port is often an SSH tunnel
+# to production: DROP SCHEMA would then run there. The third argument is 1
+# only when the operator passed --allow-local-port for a local Postgres.
+hoocon_db_endpoint_is_safe() {
+  local host="${1:-}"
+  local port="${2:-}"
+  local allow_port="${3:-0}"
+  if ! hoocon_db_host_is_local "${host}"; then
+    return 1
+  fi
+  if [[ "${port}" == "5432" || "${allow_port}" == "1" ]]; then
+    return 0
+  fi
+  return 1
 }
 
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
@@ -38,14 +55,16 @@ HOST="hoocon-prod"
 FROM_BACKUP=0
 WITH_MEDIA=0
 KEEP_SECRETS=0
+ALLOW_LOCAL_PORT=0
 
 for arg in "$@"; do
   case "$arg" in
     --from-backup) FROM_BACKUP=1 ;;
     --with-media) WITH_MEDIA=1 ;;
     --keep-secrets) KEEP_SECRETS=1 ;;
+    --allow-local-port) ALLOW_LOCAL_PORT=1 ;;
     -h|--help)
-      sed -n '2,22p' "$0"
+      sed -n '2,18p' "$0"
       exit 0
       ;;
     *) HOST="$arg" ;;
@@ -97,9 +116,25 @@ case "${DB_HOST}" in
     ;;
 esac
 
-if [[ "${use_compose}" -eq 0 ]] && ! hoocon_db_host_is_local "${DB_HOST}"; then
-  echo "ERROR: refusing to restore onto non-local DB_HOST=${DB_HOST}" >&2
+if [[ "${use_compose}" -eq 0 ]] && ! hoocon_db_endpoint_is_safe "${DB_HOST}" "${DB_PORT}" "${ALLOW_LOCAL_PORT}"; then
+  echo "ERROR: refusing to restore onto ${DB_HOST}:${DB_PORT}." >&2
+  echo "    Only loopback Postgres on port 5432 is accepted." >&2
+  echo "    Another local port is often an SSH tunnel; DROP SCHEMA would hit that server." >&2
+  echo "    Pass --allow-local-port only when this port is a database on this computer." >&2
   exit 1
+fi
+if [[ "${KEEP_SECRETS}" -eq 0 ]]; then
+  early_mask_host="${DB_HOST}"
+  early_mask_port="${DB_PORT}"
+  if [[ "${use_compose}" -eq 1 ]]; then
+    early_mask_host="127.0.0.1"
+  fi
+  if ! hoocon_db_endpoint_is_safe "${early_mask_host}" "${early_mask_port}" "${ALLOW_LOCAL_PORT}"; then
+    echo "ERROR: refusing to mask secrets on ${early_mask_host}:${early_mask_port}." >&2
+    echo "    Only loopback Postgres on port 5432 is accepted." >&2
+    echo "    Pass --allow-local-port only when this port is a database on this computer." >&2
+    exit 1
+  fi
 fi
 
 echo "==> remote dump (${HOST})"
@@ -182,8 +217,8 @@ if [[ "${KEEP_SECRETS}" -eq 0 ]]; then
     MASK_HOST="127.0.0.1"
     MASK_PORT="${DB_PORT:-5432}"
   fi
-  if ! hoocon_db_host_is_local "${MASK_HOST}"; then
-    echo "ERROR: refusing to mask secrets on DB_HOST=${MASK_HOST}" >&2
+  if ! hoocon_db_endpoint_is_safe "${MASK_HOST}" "${MASK_PORT}" "${ALLOW_LOCAL_PORT}"; then
+    echo "ERROR: refusing to mask secrets on ${MASK_HOST}:${MASK_PORT}." >&2
     exit 1
   fi
   echo "==> mask integration tokens and sessions in the local copy"
