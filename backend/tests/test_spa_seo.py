@@ -65,6 +65,21 @@ def test_spa_catalog_skips_home_lcp_boot(client) -> None:
 
 
 @pytest.mark.django_db
+def test_legacy_tilda_news_redirects_instead_of_410(client) -> None:
+    """Old /news/<a>/<b> is a 301 to /novosti/<a>-<b>. A crawler must not see 410."""
+    index = client.get("/news")
+    assert index.status_code == 301
+    assert index.headers["Location"].endswith("/novosti")
+
+    nested = client.get("/news/mir/klimata")
+    assert nested.status_code == 301
+    assert nested.headers["Location"].endswith("/novosti/mir-klimata")
+
+    untouched = client.get("/newsletter")
+    assert untouched.status_code == 410
+
+
+@pytest.mark.django_db
 def test_spa_unknown_address_is_gone(client) -> None:
     """A path with no page and no redirect is 410, not a 200 page hidden by noindex."""
     response = client.get("/etot-adres-uzhe-ne-sushchestvuet")
