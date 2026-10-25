@@ -413,6 +413,18 @@ def test_beat_periodic_task_registered() -> None:
 
 
 @pytest.mark.django_db
+def test_stale_outbound_mail_has_its_own_periodic_task() -> None:
+    """Сторож зависших исходящих не зависит от задачи входящей почты."""
+    watchdog = PeriodicTask.objects.get(name="crm.requeue_stale_crm_emails")
+    inbound = PeriodicTask.objects.get(name="crm.fetch_inbound_email")
+    assert watchdog.enabled is True
+    assert watchdog.task == "crm.requeue_stale_crm_emails"
+    assert watchdog.task != inbound.task
+    assert watchdog.interval is not None
+    assert watchdog.interval.every == 15
+
+
+@pytest.mark.django_db
 def test_outbound_send_stamps_message_id() -> None:
     """Исходящее получает Message-ID — ключ будущего In-Reply-To клиента."""
     from crm.tasks import send_crm_email
