@@ -126,6 +126,7 @@ export default defineConfig({
         "/api",
         "/admin",
         "/media",
+        "/dokumentaciya/pdf",
         "/robots.txt",
         "/sitemap.xml",
         "/llms.txt",

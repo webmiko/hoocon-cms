@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from rest_framework import serializers
 
+from catalog.docs_hub import public_pdf_url
 from catalog.etl.attr_groups import attach_groups, group_attribute_rows
 from catalog.etl.html_text import dedupe_description_lines
 from catalog.etl.sku_variant import (
@@ -313,12 +314,25 @@ class AttributeValueSerializer(serializers.ModelSerializer):
 
 
 class ProductFileSerializer(serializers.ModelSerializer):
-    """Public PDF metadata (URL via FileField)."""
+    """Public PDF metadata. ``file`` is the stable document URL, not storage."""
+
+    file = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductFile
         fields = ("id", "title", "file", "file_type", "sort_order")
         read_only_fields = fields
+
+    def get_file(self, obj: ProductFile) -> str:
+        """One URL per document. Pass ``sku`` in context to avoid a query."""
+        parent = cast(SKU | None, self.context.get("sku"))
+        code = parent.sku_code if parent is not None else cast(SKU, obj.sku).sku_code
+        return public_pdf_url(
+            sku_code=code,
+            title=obj.title,
+            file_type=obj.file_type,
+            request=self.context.get("request"),
+        )
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -616,7 +630,8 @@ class SKUDetailSerializer(SKUListSerializer):
             (f for f in obj.files.all() if f.is_published),
             key=lambda f: (f.sort_order, f.title),
         )
-        return ProductFileSerializer(files, many=True, context=self.context).data
+        context = {**self.context, "sku": obj}
+        return ProductFileSerializer(files, many=True, context=context).data
 
     def get_images(self, obj: SKU) -> list[dict[str, Any]]:
         """Return published gallery images for this edition only."""

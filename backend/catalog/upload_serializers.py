@@ -5,11 +5,14 @@ Spec: ПЛАН §6 Iter 2 — upload view + validation; docs/security-baseline.m
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from catalog.models import ProductFile
+from catalog.docs_hub import public_pdf_url
+from catalog.models import SKU, ProductFile
 from catalog.validators import sanitize_upload_filename, validate_pdf_upload
 
 
@@ -43,3 +46,15 @@ class ProductFileUploadSerializer(serializers.ModelSerializer):
                 exc.messages if hasattr(exc, "messages") else str(exc),
             ) from exc
         return value
+
+    def to_representation(self, instance: ProductFile) -> dict[str, object]:
+        """Public read returns the stable document URL, not the storage path."""
+        data = super().to_representation(instance)
+        sku = cast(SKU, instance.sku)
+        data["file"] = public_pdf_url(
+            sku_code=sku.sku_code,
+            title=instance.title,
+            file_type=instance.file_type,
+            request=self.context.get("request"),
+        )
+        return data

@@ -14,6 +14,7 @@ from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 import config.admin_branding  # noqa: F401 — site_header / site_title
+from catalog.docs_views import CanonicalPdfView
 from config.admin_pwa import AdminPwaManifestView, AdminPwaServiceWorkerView
 from config.csrf_views import CsrfTokenView
 from config.health_views import HealthView
@@ -87,6 +88,12 @@ urlpatterns = [
     path("llms.txt", LlmsTxtView.as_view(), name="llms-txt"),
     path("llm.txt", LlmTxtAliasView.as_view(), name="llm-txt"),
     path("llms-full.txt", LlmsFullTxtView.as_view(), name="llms-full-txt"),
+    # Before the SPA catch-all: a PDF must not be answered with HTML.
+    re_path(
+        r"^dokumentaciya/pdf/(?P<family>[-a-z0-9]+)/(?P<stem>[-a-z0-9]+)\.pdf$",
+        CanonicalPdfView.as_view(),
+        name="catalog-canonical-pdf",
+    ),
 ]
 
 if settings.DEBUG:

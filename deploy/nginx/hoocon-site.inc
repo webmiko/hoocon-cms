@@ -152,6 +152,7 @@ location /media/ {
     expires 7d;
     add_header Cache-Control "public, max-age=604800" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Robots-Tag $hoocon_media_robots always;
     # PDF inline viewing allowed; no inline scripts.
     add_header Content-Disposition "inline";
 }
