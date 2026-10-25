@@ -66,6 +66,8 @@ from crm.services import (
 from leads.channel import (
     CALL_ANSWERED_LABEL,
     CALL_MISSED_LABEL,
+    CALL_OUTBOUND_LABEL,
+    CALL_OUTBOUND_MISSED_LABEL,
     SITE_LABEL,
     STUB_CARD_DETAIL,
     STUB_CARD_HINT,
@@ -382,20 +384,22 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
                 )
             )
         if channel.call == "answered":
+            answered_label = CALL_OUTBOUND_LABEL if channel.outbound else CALL_ANSWERED_LABEL
             parts.append(
                 str(
                     format_html(
                         '<span class="hoocon-lead-origin hoocon-lead-origin--answered">{}</span>',
-                        CALL_ANSWERED_LABEL,
+                        answered_label,
                     )
                 )
             )
         elif channel.call == "missed":
+            missed_label = CALL_OUTBOUND_MISSED_LABEL if channel.outbound else CALL_MISSED_LABEL
             parts.append(
                 str(
                     format_html(
                         '<span class="hoocon-lead-origin hoocon-lead-origin--missed">{}</span>',
-                        CALL_MISSED_LABEL,
+                        missed_label,
                     )
                 )
             )

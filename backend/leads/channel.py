@@ -15,7 +15,7 @@ from typing import Literal
 from django.utils import timezone
 
 from crm.call_cards import STUB_EMAIL_SUFFIX, _phone_label
-from crm.models import Call, Client
+from crm.models import Call, CallDirection, Client
 from crm.telephony import normalize_phone_digits
 from leads.models import Lead
 
@@ -24,6 +24,8 @@ CallOutcome = Literal["answered", "missed"]
 SITE_LABEL = "Форма сайта"
 CALL_ANSWERED_LABEL = "Звонок принят"
 CALL_MISSED_LABEL = "Звонок пропущен"
+CALL_OUTBOUND_LABEL = "Исходящий звонок"
+CALL_OUTBOUND_MISSED_LABEL = "Не дозвонились"
 STUB_CARD_HINT = "Заведите карточку клиента и заметку о звонке"
 STUB_CARD_DETAIL = (
     "Это звонок, а не форма с сайта. Карточка клиента ещё не заведена: "
@@ -38,6 +40,7 @@ class LeadChannel:
     site: bool
     call: CallOutcome | None
     stub: bool
+    outbound: bool = False
 
 
 def is_call_stub_email(email: str) -> bool:
@@ -86,15 +89,31 @@ def name_is_call_placeholder(name: str, phone_label: str) -> bool:
     phone_digits = "".join(ch for ch in phone_label if ch.isdigit())
     if compact and phone_digits and compact == phone_digits:
         return True
-    return stripped.startswith(f"{CALL_ANSWERED_LABEL} ·") or stripped.startswith(f"{CALL_MISSED_LABEL} ·")
+    prefixes = (
+        CALL_ANSWERED_LABEL,
+        CALL_MISSED_LABEL,
+        CALL_OUTBOUND_LABEL,
+        CALL_OUTBOUND_MISSED_LABEL,
+    )
+    return any(stripped.startswith(f"{prefix} ·") for prefix in prefixes)
 
 
-def format_temporary_call_name(*, phone_label: str, answered: bool, when: datetime | None) -> str:
+def format_temporary_call_name(
+    *,
+    phone_label: str,
+    answered: bool,
+    when: datetime | None,
+    outbound: bool = False,
+) -> str:
     """Unique stand-in until the client card has a real name.
 
     Phone and time keep two calls from looking like the same consultation.
+    An outgoing call is not labeled as an accepted incoming one.
     """
-    outcome = CALL_ANSWERED_LABEL if answered else CALL_MISSED_LABEL
+    if outbound:
+        outcome = CALL_OUTBOUND_LABEL if answered else CALL_OUTBOUND_MISSED_LABEL
+    else:
+        outcome = CALL_ANSWERED_LABEL if answered else CALL_MISSED_LABEL
     if when is None:
         return f"{outcome} · {phone_label}"
     local = timezone.localtime(when)
@@ -108,10 +127,17 @@ def temporary_call_name(lead: object) -> str:
     if call is not None:
         when = call.started_at or call.created_at
         answered = call_was_answered(call)
+        outbound = call.direction == CallDirection.OUTBOUND
     else:
         when = getattr(lead, "created_at", None)
         answered = False
-    return format_temporary_call_name(phone_label=phone_label, answered=answered, when=when)
+        outbound = False
+    return format_temporary_call_name(
+        phone_label=phone_label,
+        answered=answered,
+        when=when,
+        outbound=outbound,
+    )
 
 
 def remember_temporary_call_name(call: Call) -> None:
@@ -124,6 +150,7 @@ def remember_temporary_call_name(call: Call) -> None:
         phone_label=phone_label,
         answered=call_was_answered(call),
         when=call.started_at or call.finished_at or call.created_at,
+        outbound=call.direction == CallDirection.OUTBOUND,
     )
     if name_is_call_placeholder(client.name, phone_label) and client.name != fresh:
         client.name = fresh
@@ -144,10 +171,12 @@ def lead_channel(lead: object) -> LeadChannel:
     stub = is_call_stub_email(email)
     call = latest_lead_call(lead)
     outcome: CallOutcome | None
+    outbound = False
     if call is not None:
         outcome = "answered" if call_was_answered(call) else "missed"
+        outbound = call.direction == CallDirection.OUTBOUND
     elif stub:
         outcome = "missed"
     else:
         outcome = None
-    return LeadChannel(site=not stub, call=outcome, stub=stub)
+    return LeadChannel(site=not stub, call=outcome, stub=stub, outbound=outbound)

@@ -719,6 +719,125 @@ def test_settings_save_keeps_round_robin_cursor(django_user_model: Any) -> None:
 
 
 @pytest.mark.django_db
+def test_softphone_outgoing_leg_is_not_an_incoming_call_to_the_manager(django_user_model: Any) -> None:
+    """Исходящий с софтфона: плечо сотрудника не записывается как принятый входящий ему же."""
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Activity, ActivityType, Client
+    from crm.novosystem import handle_novosystem_event
+    from leads.channel import lead_channel
+
+    _enable_uis(phone="74999951277")
+    manager = django_user_model.objects.create_user(
+        username="soft-out",
+        email="soft-out@hoocon.test",
+        is_staff=True,
+    )
+    StaffVpbxProfile.objects.create(user=manager, uis_employee_id="55", extension="201")
+    Client.objects.create(email="manager-card@hoocon.test", name="Сам менеджер", phone="79160001122")
+
+    assert (
+        handle_novosystem_event(
+            {
+                "id": "soft-1",
+                "direction": "in",
+                "contact_phone_number": "79160001122",
+                "calling_phone_number": "79160001122",
+                "called_phone_number": "79004445566",
+                "employee_phone_number": "79160001122",
+                "employee_id": "55",
+                "virtual_phone_number": "74999951277",
+                "finish_time": "2024-03-01T10:05:00+03:00",
+                "talk_duration": "30",
+            },
+        )
+        == "created"
+    )
+    call = Call.objects.get(entry_id="uis:soft-1")
+    assert call.direction == "outbound"
+    assert call.manager_id == manager.pk
+    assert call.to_number == "79004445566"
+    assert call.from_number == "74999951277"
+    client = Client.objects.get(email="79004445566@call.invalid")
+    assert call.client_id == client.pk
+    assert "Звонок принят" not in client.name
+    assert client.name.startswith("Исходящий звонок")
+    assert lead_channel(client.leads.get()).outbound is True
+    activity = Activity.objects.get(client=client, activity_type=ActivityType.CALL)
+    assert activity.subject == "Исходящий звонок"
+    assert Call.objects.filter(direction="inbound", from_number="79160001122").count() == 0
+
+
+@pytest.mark.django_db
+def test_finish_event_without_direction_keeps_the_outgoing_call(django_user_model: Any) -> None:
+    """Завершение без direction не превращает уже исходящий звонок во входящий."""
+    from accounts.models import StaffVpbxProfile
+    from crm.novosystem import handle_novosystem_event
+
+    _enable_uis()
+    manager = django_user_model.objects.create_user(username="soft-keep", email="soft-keep@hoocon.test", is_staff=True)
+    StaffVpbxProfile.objects.create(user=manager, uis_employee_id="55")
+    assert (
+        handle_novosystem_event(
+            {
+                "id": "soft-2",
+                "direction": "out",
+                "contact_phone_number": "79005556677",
+                "employee_id": "55",
+            },
+        )
+        == "created"
+    )
+    assert (
+        handle_novosystem_event(
+            {
+                "id": "soft-2",
+                "employee_id": "55",
+                "finish_time": "2024-03-01T10:06:00+03:00",
+                "talk_duration": "12",
+            },
+        )
+        == "updated"
+    )
+    call = Call.objects.get(entry_id="uis:soft-2")
+    assert call.direction == "outbound"
+    assert call.state == "disconnected"
+    assert call.talk_duration == 12
+    assert call.to_number == "79005556677"
+
+
+@pytest.mark.django_db
+def test_real_incoming_call_stays_incoming(django_user_model: Any) -> None:
+    """Клиент звонит на номер компании — это входящий, даже если в событии есть телефон сотрудника."""
+    from accounts.models import StaffVpbxProfile
+    from crm.models import Client
+    from crm.novosystem import handle_novosystem_event
+
+    _enable_uis(phone="74999951277")
+    manager = django_user_model.objects.create_user(username="soft-in", email="soft-in@hoocon.test", is_staff=True)
+    StaffVpbxProfile.objects.create(user=manager, uis_employee_id="55", extension="201")
+    caller = Client.objects.create(email="buyer-in@hoocon.test", name="Покупатель", phone="79007778899")
+    handle_novosystem_event(
+        {
+            "id": "soft-in",
+            "direction": "in",
+            "contact_phone_number": "79007778899",
+            "calling_phone_number": "79007778899",
+            "called_phone_number": "74999951277",
+            "employee_phone_number": "79160001122",
+            "employee_id": "55",
+            "virtual_phone_number": "74999951277",
+            "finish_time": "2024-03-01T10:07:00+03:00",
+            "talk_duration": "20",
+        },
+    )
+    call = Call.objects.get(entry_id="uis:soft-in")
+    assert call.direction == "inbound"
+    assert call.client_id == caller.pk
+    assert call.manager_id == manager.pk
+    assert call.from_number == "79007778899"
+
+
+@pytest.mark.django_db
 def test_unknown_finished_call_opens_one_card_and_reuses_it(django_user_model: Any) -> None:
     """Незнакомый номер после разговора — одна карточка менеджера, повтор не плодит вторую и не шлёт письмо."""
     from unittest.mock import patch
