@@ -7,7 +7,7 @@
  */
 
 import { isAnalyticsAllowed, readCookieConsent } from "./cookieConsent";
-import { urlWithoutCredentials } from "./yandexMetrikaInit";
+import { ga4TransportParams, urlWithoutCredentials } from "./yandexMetrikaInit";
 
 export type LeadTrackType = "rfq" | "consultation" | "replacement";
 
@@ -91,6 +91,7 @@ export function trackSpaHit(path: string, title?: string): void {
   }
   if (ga4Id !== null && typeof window !== "undefined" && window.gtag) {
     window.gtag("event", "page_view", {
+      ...ga4TransportParams(normalized),
       page_path: normalized,
       page_title: pageTitle,
       send_to: ga4Id,
@@ -113,6 +114,7 @@ export function trackLeadSubmit(leadType: LeadTrackType): void {
   }
   if (typeof window !== "undefined" && window.gtag) {
     window.gtag("event", "generate_lead", {
+      ...ga4TransportParams(),
       lead_type: leadType,
       ...(ga4Id ? { send_to: ga4Id } : {}),
     });
@@ -129,6 +131,7 @@ function trackQuizGoal(
   }
   if (typeof window !== "undefined" && window.gtag) {
     window.gtag("event", goal, {
+      ...ga4TransportParams(),
       ...(params ?? {}),
       ...(ga4Id ? { send_to: ga4Id } : {}),
     });

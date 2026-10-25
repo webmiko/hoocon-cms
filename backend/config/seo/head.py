@@ -24,6 +24,7 @@ from config.seo.routes import (
     NOINDEX_PREFIXES,
     OG_IMAGE_PATH,
     PUBLIC_STATIC_ROUTES,
+    SLUG_RE,
     YANDEX_VERIFICATION_CONTENT,
 )
 from config.seo.sanitize import normalize_spa_path, plain_text_for_meta, validate_slug
@@ -438,6 +439,25 @@ def _resolve_catalog_category(path: str) -> SeoHeadContext | None:
     )
 
 
+def _legacy_news_target(path: str) -> str | None:
+    """Tilda ``/news/<a>/<b>`` → ``/novosti/<a>-<b>``.
+
+    The SPA joins the same segments. A crawler that does not run JavaScript
+    must get this 301 from the first response, not a 410.
+    """
+    if path == "/news":
+        return "/novosti"
+    if not path.startswith("/news/"):
+        return None
+    parts = [part.lower() for part in path.removeprefix("/news/").split("/") if part]
+    if not parts:
+        return "/novosti"
+    slug = "-".join(parts)
+    if not slug or len(slug) > 300 or not re.fullmatch(SLUG_RE, slug):
+        return None
+    return f"/novosti/{slug}"
+
+
 def resolve_seo_context(raw_path: str) -> SeoHeadContext:
     """Resolve SEO context for a request pathname.
 
@@ -448,6 +468,16 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
         SeoHeadContext for head injection and JSON-LD.
     """
     path = normalize_spa_path(raw_path)
+    legacy_news = _legacy_news_target(path)
+    if legacy_news is not None:
+        return SeoHeadContext(
+            canonical_path=legacy_news,
+            page_title=_format_page_title("Новости"),
+            description=DEFAULT_DESCRIPTION,
+            noindex=True,
+            http_status=301,
+            redirect_to=legacy_news,
+        )
 
     # CMS pages before SKU so reserved slugs (company, faq, …) stay content.
     for resolver in (_resolve_article, _resolve_news, _resolve_page):

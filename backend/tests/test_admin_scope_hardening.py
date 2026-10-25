@@ -904,3 +904,132 @@ def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
     assert moved.status_code == 302
     owned.refresh_from_db()
     assert owned.assignee_id == manager.pk
+
+
+@pytest.mark.django_db
+def test_manager_cannot_add_contact_or_call_on_another_managers_company() -> None:
+    """Чужая карточка не принимает новый контакт и новый плановый звонок. Своя — принимает."""
+    from django.utils import timezone
+
+    from crm.models import Company, PlannedTouch
+
+    manager = _staff_with_perms(
+        username="scope-add-mgr",
+        codenames=(
+            "view_company",
+            "change_company",
+            "add_client",
+            "view_client",
+            "change_client",
+            "add_plannedtouch",
+            "view_plannedtouch",
+            "change_plannedtouch",
+        ),
+    )
+    other = User.objects.create_user(
+        username="scope-add-other",
+        email="scope-add-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    foreign = Company.objects.create(name="Чужая для строки", assignee=other)
+    own = Company.objects.create(name="Своя для строки", assignee=manager)
+    page = Client()
+    page.force_login(manager)
+
+    def add_rows(company: Company) -> Any:
+        url = reverse("admin:crm_company_change", args=[company.pk])
+        posted = _admin_change_post(page, url)
+        call_index = int(posted["planned_touches-TOTAL_FORMS"])
+        posted["planned_touches-TOTAL_FORMS"] = str(call_index + 1)
+        posted[f"planned_touches-{call_index}-id"] = ""
+        posted[f"planned_touches-{call_index}-company"] = str(company.pk)
+        posted[f"planned_touches-{call_index}-starts_at_0"] = timezone.localdate().isoformat()
+        posted[f"planned_touches-{call_index}-starts_at_1"] = "10:00:00"
+        posted[f"planned_touches-{call_index}-status"] = "planned"
+        posted[f"planned_touches-{call_index}-assignee"] = ""
+        posted[f"planned_touches-{call_index}-title"] = "Новый звонок"
+        client_index = int(posted["clients-TOTAL_FORMS"])
+        posted["clients-TOTAL_FORMS"] = str(client_index + 1)
+        posted[f"clients-{client_index}-id"] = ""
+        posted[f"clients-{client_index}-company_ref"] = str(company.pk)
+        posted[f"clients-{client_index}-name"] = "Новый контакт"
+        posted[f"clients-{client_index}-email"] = f"new-{company.pk}@example.com"
+        posted[f"clients-{client_index}-phone"] = ""
+        posted[f"clients-{client_index}-assignee"] = ""
+        return page.post(url, posted)
+
+    blocked = add_rows(foreign)
+    # The company card itself still saves. The new contact and call are dropped.
+    assert blocked.status_code == 302
+    foreign.refresh_from_db()
+    assert foreign.assignee_id == other.pk
+    assert PlannedTouch.objects.filter(company=foreign).count() == 0
+    assert CrmClient.objects.filter(company_ref=foreign).count() == 0
+
+    saved = add_rows(own)
+    assert saved.status_code == 302, saved.status_code
+    assert PlannedTouch.objects.filter(company=own, title="Новый звонок").count() == 1
+    assert CrmClient.objects.filter(company_ref=own, email=f"new-{own.pk}@example.com").count() == 1
+
+
+@pytest.mark.django_db
+def test_manager_cannot_confirm_a_member_on_another_managers_company() -> None:
+    """Чужая компания: нельзя завести подтверждённого сотрудника кабинета и открыть её реквизиты в ЛК."""
+    from crm.models import Company, CompanyMember
+
+    manager = _staff_with_perms(
+        username="scope-member-mgr",
+        codenames=(
+            "view_company",
+            "change_company",
+            "view_client",
+            "add_companymember",
+            "change_companymember",
+            "view_companymember",
+        ),
+    )
+    other = User.objects.create_user(
+        username="scope-member-other",
+        email="scope-member-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    mine = CrmClient.objects.create(name="Мой", email="scope-member-mine@example.com", assignee=manager)
+    foreign = Company.objects.create(name="Чужая с реквизитами", assignee=other, inn="7707083893")
+    own = Company.objects.create(name="Своя с реквизитами", assignee=manager, inn="7736050003")
+    existing = CompanyMember.objects.create(company=foreign, client=mine, is_confirmed=False)
+    page = Client()
+    page.force_login(manager)
+
+    def post_member(company: Company, *, confirm_existing: bool) -> Any:
+        url = reverse("admin:crm_company_change", args=[company.pk])
+        posted = _admin_change_post(page, url)
+        if confirm_existing:
+            posted["members-0-is_confirmed"] = "on"
+            return page.post(url, posted)
+        index = int(posted["members-TOTAL_FORMS"])
+        posted["members-TOTAL_FORMS"] = str(index + 1)
+        posted[f"members-{index}-id"] = ""
+        posted[f"members-{index}-company"] = str(company.pk)
+        posted[f"members-{index}-client"] = str(mine.pk)
+        posted[f"members-{index}-account"] = ""
+        posted[f"members-{index}-role"] = "buyer"
+        posted[f"members-{index}-is_confirmed"] = "on"
+        return page.post(url, posted)
+
+    blocked = post_member(foreign, confirm_existing=False)
+    assert blocked.status_code == 302
+    assert CompanyMember.objects.filter(company=foreign, is_confirmed=True).count() == 0
+    existing.refresh_from_db()
+    assert existing.is_confirmed is False
+
+    flipped = post_member(foreign, confirm_existing=True)
+    assert flipped.status_code == 302
+    existing.refresh_from_db()
+    assert existing.is_confirmed is False
+
+    added = post_member(own, confirm_existing=False)
+    assert added.status_code == 302, added.status_code
+    own_member = CompanyMember.objects.get(company=own, client=mine)
+    assert own_member.is_confirmed is True

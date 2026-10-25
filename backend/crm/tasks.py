@@ -76,6 +76,17 @@ def requeue_stale_crm_emails() -> int:
     return sent
 
 
+@shared_task(name="crm.requeue_stale_crm_emails")
+def requeue_stale_crm_emails_task() -> str:
+    """Beat: hand QUEUED mail stuck past the in-flight window back to the broker.
+
+    This does not ride on IMAP fetch. Turning off inbound mail must not stop
+    the watchdog for outbound mail that never left QUEUED.
+    """
+    found = requeue_stale_crm_emails()
+    return f"requeued:{found}"
+
+
 def claim_crm_email_send(email_id: int) -> bool:
     """Move the row to SENDING before SMTP. Only one worker's update matches.
 
@@ -276,9 +287,6 @@ def fetch_inbound_email(self: object) -> str:
 
     from crm.imap_fetch import fetch_inbound_email as _fetch
     from crm.models import InboundMailboxState
-
-    # Stuck QUEUED mail is independent of whether IMAP has anything to fetch.
-    requeue_stale_crm_emails()
 
     # Beat fires every few minutes; a slow run must not overlap the next one
     # (same UIDs fetched twice, both workers busy).

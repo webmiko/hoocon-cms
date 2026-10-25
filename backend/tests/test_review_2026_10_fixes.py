@@ -318,6 +318,71 @@ def test_sync_from_vps_treats_only_loopback_as_local() -> None:
     assert completed.returncode == 0, completed.stderr
 
 
+def test_sync_from_vps_accepts_only_loopback_on_port_5432() -> None:
+    """Порт туннеля не считается локальной базой, пока оператор явно не разрешил его."""
+    script = ROOT / "scripts" / "sync-db-from-vps.sh"
+    completed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "{script}"; '
+            "hoocon_db_endpoint_is_safe 127.0.0.1 5432 0 && "
+            "hoocon_db_endpoint_is_safe localhost 5432 0 && "
+            "hoocon_db_endpoint_is_safe ::1 5432 0 && "
+            "! hoocon_db_endpoint_is_safe 127.0.0.1 5555 0 && "
+            "hoocon_db_endpoint_is_safe 127.0.0.1 5555 1 && "
+            "! hoocon_db_endpoint_is_safe db 5432 0 && "
+            "! hoocon_db_endpoint_is_safe 203.0.113.10 5432 1",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_sync_from_vps_stops_before_ssh_on_a_tunnel_port(tmp_path: Path) -> None:
+    """Скрипт с портом 5555 выходит до ssh и не начинает выгрузку."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    target = scripts / "sync-db-from-vps.sh"
+    target.write_text((ROOT / "scripts" / "sync-db-from-vps.sh").read_text(encoding="utf-8"), encoding="utf-8")
+    target.chmod(0o755)
+    (tmp_path / ".env").write_text(
+        "DB_HOST=127.0.0.1\nDB_PORT=5555\nDB_NAME=hoocon\nDB_USER=hoocon\nDB_PASSWORD=secret\n",
+        encoding="utf-8",
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    ssh = bin_dir / "ssh"
+    ssh.write_text("#!/bin/sh\necho SSH_CALLED\nexit 99\n", encoding="utf-8")
+    ssh.chmod(0o755)
+    env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", "HOME": str(tmp_path)}
+
+    refused = subprocess.run(
+        [str(target)],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert refused.returncode == 1
+    assert "5555" in refused.stderr
+    assert "SSH_CALLED" not in refused.stdout
+
+    allowed = subprocess.run(
+        [str(target), "--allow-local-port"],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert allowed.returncode == 99
+    assert "SSH_CALLED" in allowed.stdout
+
+
 def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:
     """Уборка не стирает последние полные копии и не трогает незавершённый свежий каталог."""
     root = tmp_path / "backups"

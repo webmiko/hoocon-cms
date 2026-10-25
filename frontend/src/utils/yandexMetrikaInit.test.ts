@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { yandexMetrikaInitOptions } from "./yandexMetrikaInit";
+import { ga4ConfigParams, yandexMetrikaInitOptions } from "./yandexMetrikaInit";
 
 describe("yandexMetrikaInitOptions", () => {
   it("matches Metrika cabinet flags for webvisor and ecommerce", () => {
@@ -23,5 +23,17 @@ describe("yandexMetrikaInitOptions", () => {
     expect(options.referrer).not.toContain("secret");
     expect(options.url).not.toContain("secret");
     expect(options.url).not.toContain("#");
+  });
+
+  it("strips the quote token from the GA4 page URL and the referrer", () => {
+    const params = ga4ConfigParams(
+      "https://hoocon.ru/kp/offer?t=secret#t=also-secret",
+      "https://hoocon.ru/kp?token=other",
+    );
+    expect(params.send_page_view).toBe(true);
+    expect(params.page_location).toBe("https://hoocon.ru/kp/offer");
+    expect(params.page_referrer).toBe("https://hoocon.ru/kp");
+    expect(params.page_location).not.toContain("secret");
+    expect(params.page_referrer).not.toContain("other");
   });
 });

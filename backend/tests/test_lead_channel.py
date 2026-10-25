@@ -80,6 +80,7 @@ def test_latest_call_decides_whether_the_lead_was_answered() -> None:
 
     _call(entry_id="uis:newest-talk", lead=lead, client=client, talk=15, started_at=now)
     assert lead_channel(lead).call == "answered"
+    assert lead_channel(lead).outbound is False
 
     quiet = Client.objects.create(email="79002223344@call.invalid", name="+7 900 222-33-44", phone="79002223344")
     quiet_lead = Lead.objects.create(

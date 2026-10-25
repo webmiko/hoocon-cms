@@ -113,12 +113,14 @@ def _staff(username: str, *codenames: str):
 
 @pytest.mark.django_db
 def test_today_board_groups_unassigned_then_overdue_then_later() -> None:
-    """A free call offers «Взять». A company that already has a manager shows that name."""
+    """A free call offers «Взять». Another manager's call is not on this board."""
     from datetime import datetime, timedelta
 
+    from django.contrib.auth.models import Group
     from django.test import RequestFactory
     from django.utils import timezone
 
+    from accounts.roles import GROUP_ADMIN
     from config.dashboard import build_admin_dashboard
     from crm.models import Company
 
@@ -153,11 +155,21 @@ def test_today_board_groups_unassigned_then_overdue_then_later() -> None:
     assert free_row["tel"] == "+78435540045"
     assert free_row["assign_url"]
     assert free_row["owner"] == ""
-    owned = {item["name"]: item for item in groups["overdue"]["items"]}
-    assert owned["Чужая"]["owner"] == "Ольга Смирнова"
-    assert owned["Чужая"]["assign_url"] == ""
+    assert [item["name"] for item in groups["overdue"]["items"]] == ["Моя вчера"]
+    assert "Чужая" not in str(groups)
+    assert "Ольга Смирнова" not in str(groups)
     assert [item["name"] for item in groups["later"]["items"]] == ["Моя позже"]
     assert "Завтра" not in str(groups)
+
+    head = _staff("today-head", "view_plannedtouch")
+    head.groups.add(Group.objects.get(name=GROUP_ADMIN))
+    request.user = head
+    head_groups = {
+        group["key"]: group for group in build_admin_dashboard(request)["hoocon_dashboard"]["today"]["groups"]
+    }
+    head_overdue = {item["name"]: item for item in head_groups["overdue"]["items"]}
+    assert head_overdue["Чужая"]["owner"] == "Ольга Смирнова"
+    assert head_overdue["Чужая"]["assign_url"] == ""
 
 
 @pytest.mark.django_db

@@ -183,6 +183,86 @@ def _talk_seconds(value: Any) -> int:
         return 0
 
 
+_OUT_DIRECTION = frozenset({"out", "outbound", "исходящий", "исходящее"})
+_IN_DIRECTION = frozenset({"in", "inbound", "входящий", "входящее"})
+
+
+def _party_digits(value: Any) -> str:
+    return normalize_phone_digits(str(value or ""))
+
+
+def _uis_parties(payload: dict[str, Any]) -> dict[str, str]:
+    extension = "".join(ch for ch in str(payload.get("extension") or "") if ch.isdigit())
+    return {
+        "contact": _party_digits(payload.get("contact_phone_number")),
+        "calling": _party_digits(payload.get("calling_phone_number")),
+        "called": _party_digits(payload.get("called_phone_number")),
+        "virtual": _party_digits(payload.get("virtual_phone_number")),
+        "employee": _party_digits(payload.get("employee_phone_number")),
+        "extension": extension,
+    }
+
+
+def _configured_virtual() -> str:
+    _enabled, _token, virtual, _secret = novosystem_settings()
+    return normalize_phone_digits(virtual)
+
+
+def _is_our_number(number: str, parties: dict[str, str], company: str) -> bool:
+    """True for the company number, the employee's phone, or a short extension."""
+    if not number:
+        return False
+    if company and number == company:
+        return True
+    if parties["virtual"] and number == parties["virtual"]:
+        return True
+    if parties["employee"] and len(parties["employee"]) >= 10 and number == parties["employee"]:
+        return True
+    if parties["extension"] and number == parties["extension"]:
+        return True
+    return False
+
+
+def _external_number(number: str, parties: dict[str, str], company: str) -> str:
+    if len(number) >= 10 and not _is_our_number(number, parties, company):
+        return number
+    return ""
+
+
+def _classify_uis_call(payload: dict[str, Any], *, kept_direction: str | None) -> tuple[str, str, str, str]:
+    """Direction, client number, from, to.
+
+    UIS splits a call into legs. The employee's side of a softphone call is
+    an incoming leg, so ``direction=in`` on that leg is not an incoming call
+    from a client. A later notification that omits direction must not turn
+    an outgoing call into an incoming one.
+    """
+    raw = str(payload.get("direction") or "").strip().lower()
+    parties = _uis_parties(payload)
+    company = parties["virtual"] or _configured_virtual()
+
+    def ours(number: str) -> bool:
+        return _is_our_number(number, parties, company)
+
+    called_ext = _external_number(parties["called"], parties, company)
+    calling_ext = _external_number(parties["calling"], parties, company)
+    contact_ext = _external_number(parties["contact"], parties, company)
+    employee_leg = bool(called_ext and ours(parties["calling"]) and not calling_ext)
+    outbound = raw in _OUT_DIRECTION or employee_leg
+    if raw in _IN_DIRECTION and calling_ext and not called_ext:
+        outbound = False
+    if not raw and not employee_leg and kept_direction:
+        outbound = kept_direction == CallDirection.OUTBOUND
+    if outbound:
+        client = contact_ext or called_ext or calling_ext
+        origin = company or parties["employee"] or parties["calling"]
+        return CallDirection.OUTBOUND, client, origin, client
+    client = contact_ext or calling_ext or called_ext
+    if client and ours(client):
+        client = ""
+    return CallDirection.INBOUND, client, client, company or parties["called"]
+
+
 def _resolve_uis_manager(employee_id: Any, extension: str) -> Any:
     """Staff user by UIS employee id, then by the Mango/UIS extension."""
     from django.db.models import Q
@@ -217,16 +297,8 @@ def handle_novosystem_event(payload: dict[str, Any]) -> str:
     if not session:
         return "ignored"
     entry_id = f"uis:{session}"[:128]
-    direction_raw = str(payload.get("direction") or "in").lower()
-    direction = CallDirection.OUTBOUND if direction_raw in {"out", "outbound"} else CallDirection.INBOUND
-    raw_contact = payload.get("contact_phone_number") or payload.get("calling_phone_number") or ""
-    contact = normalize_phone_digits(str(raw_contact))
-    virtual = normalize_phone_digits(str(payload.get("virtual_phone_number") or ""))
+    direction, contact, from_number, to_number = _classify_uis_call(payload, kept_direction=None)
     extension = str(payload.get("extension") or "").strip()[:20]
-    if direction == CallDirection.INBOUND:
-        from_number, to_number = contact, virtual
-    else:
-        from_number, to_number = virtual, contact
     is_lost = str(payload.get("is_lost") or "").lower() in {"1", "true", "yes"}
     talk_duration = _talk_seconds(payload.get("talk_duration") or payload.get("talk_time_duration"))
     started = _parse_uis_time(payload.get("start_time"))
@@ -262,6 +334,11 @@ def handle_novosystem_event(payload: dict[str, Any]) -> str:
     )
     previously_finished = not created and call.state == CallState.DISCONNECTED
     if not created:
+        direction, contact, from_number, to_number = _classify_uis_call(
+            payload,
+            kept_direction=call.direction,
+        )
+        client = _resolve_client(contact)
         if not previously_finished:
             call.direction = direction
             call.state = state

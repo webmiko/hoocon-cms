@@ -75,11 +75,17 @@ describe("analyticsTrack", () => {
     expect(ym).toHaveBeenCalledWith(123456, "hit", "/catalog", {
       title: expect.any(String),
     });
-    expect(gtag).toHaveBeenCalledWith("event", "page_view", {
+    expect(gtag).toHaveBeenCalledWith("event", "page_view", expect.objectContaining({
       page_path: "/catalog",
       page_title: expect.any(String),
       send_to: "G-TEST",
-    });
+      page_referrer: expect.any(String),
+    }));
+    const pageView = gtag.mock.calls.find((call) => call[1] === "page_view")?.[2] as {
+      page_location: string;
+    };
+    expect(pageView.page_location.endsWith("/catalog")).toBe(true);
+    expect(pageView.page_location).not.toContain("#");
 
     trackSpaHit("/catalog");
     expect(ym).toHaveBeenCalledTimes(1);
@@ -96,10 +102,30 @@ describe("analyticsTrack", () => {
     expect(ym).toHaveBeenCalledWith(99, "reachGoal", LEAD_SUBMIT_GOAL, {
       lead_type: "rfq",
     });
-    expect(gtag).toHaveBeenCalledWith("event", "generate_lead", {
+    expect(gtag).toHaveBeenCalledWith("event", "generate_lead", expect.objectContaining({
       lead_type: "rfq",
       send_to: "G-LEAD",
-    });
+      page_location: expect.any(String),
+      page_referrer: expect.any(String),
+    }));
+  });
+
+  it("does not send a quote token in the GA4 page_view location", () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    setAnalyticsCounters("123456", "G-TEST");
+
+    trackSpaHit("/");
+    trackSpaHit("/kp/offer?t=secret&ok=1#t=also-secret");
+
+    const pageView = gtag.mock.calls.find((call) => call[1] === "page_view")?.[2] as {
+      page_location: string;
+      page_path: string;
+    };
+    expect(pageView.page_path).toBe("/kp/offer?ok=1");
+    expect(pageView.page_location.endsWith("/kp/offer?ok=1")).toBe(true);
+    expect(pageView.page_location).not.toContain("secret");
+    expect(pageView.page_location).not.toContain("#");
   });
 
   it("no-ops when counters are unset", () => {

@@ -87,6 +87,8 @@ class NovosystemEventsView(APIView):
                 "direction",
                 "contact_phone_number",
                 "calling_phone_number",
+                "called_phone_number",
+                "employee_phone_number",
                 "virtual_phone_number",
                 "extension",
                 "employee_id",

@@ -21,6 +21,19 @@ from crm.models import Client, Company, CompanyMember, PlannedTouch
 from crm.phone_widget import MultiPhoneWidget
 
 
+def _manager_may_add_to_company(user: Any, company: Company | None) -> bool:
+    """Contacts and planned calls are added on a free company or on one's own.
+
+    Reading another manager's rows is already hidden by the queryset. This
+    stops a new row on a company that already has an owner.
+    """
+    if company is None or company.pk is None:
+        return True
+    if staff_sees_all_leads(user):
+        return True
+    return company.assignee_id in (None, getattr(user, "pk", None))
+
+
 class CompanyClientInline(TabularInline):
     """People of this company. The contact card opens from the row link."""
 
@@ -40,6 +53,12 @@ class CompanyClientInline(TabularInline):
 
         return scope_clients_for_manager(super().get_queryset(request), request.user)
 
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """No new contact on a company that already belongs to someone else."""
+        if not super().has_add_permission(request, obj):
+            return False
+        return _manager_may_add_to_company(request.user, obj)
+
 
 class CompanyCallInline(TabularInline):
     """Planned calls live on the company, not in a separate daily section."""
@@ -58,6 +77,12 @@ class CompanyCallInline(TabularInline):
         from crm.services import scope_planned_touches_for_manager
 
         return scope_planned_touches_for_manager(super().get_queryset(request), request.user)
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """No new planned call on a company that already belongs to someone else."""
+        if not super().has_add_permission(request, obj):
+            return False
+        return _manager_may_add_to_company(request.user, obj)
 
 
 class CompanyMemberInline(LabeledToggleMixin, TabularInline):
@@ -84,6 +109,18 @@ class CompanyMemberInline(LabeledToggleMixin, TabularInline):
 
             kwargs["queryset"] = scope_clients_for_manager(Client.objects.all(), request.user)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """No new cabinet member on a company that already belongs to someone else."""
+        if not super().has_add_permission(request, obj):
+            return False
+        return _manager_may_add_to_company(request.user, obj)
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Confirmation of a member on someone else's company is not this manager's write."""
+        if not super().has_change_permission(request, obj):
+            return False
+        return _manager_may_add_to_company(request.user, obj)
 
 
 class CompanyAdminForm(forms.ModelForm):

@@ -170,6 +170,8 @@ def test_seed_wiki_novosystem_guide() -> None:
     assert "Александра и Ларисы" in doc.body
     assert "в сценарий не входят" not in doc.body
     assert "Личные мобильные в этот дозвон не входят" in doc.body
+    assert "called_phone_number" in doc.body
+    assert "employee_phone_number" in doc.body
     assert "Схема выше — прежний способ" not in doc.body
     assert "Окно «Телефон» и кнопка «Позвонить клиенту» звонят через UIS" in doc.body
     assert "Mango" not in doc.body
@@ -607,3 +609,24 @@ def test_seed_wiki_retires_mango_guide() -> None:
     assert "mango-telephony-guide" not in {str(seed["slug"]) for seed in WIKI_SEEDS}
     manager = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     assert "Mango" not in manager.body
+
+
+@pytest.mark.django_db
+def test_seed_wiki_today_board_is_the_managers_own_queue() -> None:
+    """Руководство: «Сегодня» без чужих звонков, чужая карточка без новой строки, импорт с листа «Клиенты»."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert "Чужой плановый звонок на панель не попадает" in body
+    assert "сотрудника кабинета на эту карточку добавить нельзя" in body
+    assert "Лист «Пример» не попадает в базу" in body
+    assert "Исходящий звонок" in body
+    assert changelog.index("changelog-outbound-softphone") < changelog.index("changelog-today-own-queue")
+    assert changelog.index("changelog-today-own-queue") < changelog.index("changelog-company-list-view")
+    row = changelog.split('id="changelog-today-own-queue"', 1)[1].split("</tr>", 1)[0]
+    assert "25.10.2026" in row
+    assert "лист «Клиенты»" in row
