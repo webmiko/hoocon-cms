@@ -15,7 +15,7 @@ import {
   trackSpaHit,
 } from "../utils/analyticsTrack";
 import { trackSitePageView } from "../utils/siteAnalytics";
-import { yandexMetrikaInitOptions } from "../utils/yandexMetrikaInit";
+import { ga4ConfigParams, yandexMetrikaInitOptions } from "../utils/yandexMetrikaInit";
 import {
   COOKIE_CONSENT_CHANGE_EVENT,
   COOKIE_CONSENT_STORAGE_KEY,
@@ -126,7 +126,7 @@ function loadGa4(measurementId: string): void {
     window.dataLayer?.push(args);
   };
   window.gtag("js", new Date());
-  window.gtag("config", measurementId);
+  window.gtag("config", measurementId, ga4ConfigParams(location.href, document.referrer));
 }
 
 function metrikaLoaded(): boolean {
