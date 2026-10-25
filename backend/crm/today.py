@@ -3,6 +3,9 @@
 The list is short on purpose. A touch is in one group only: unassigned
 first, then overdue ones that already have an owner, then the rest of
 today. Tomorrow stays on the planned-call calendar.
+
+The same owner rule as the planned-call list: a free call is shared,
+another manager's call stays on their board. Head of sales still sees all.
 """
 
 from __future__ import annotations
@@ -21,19 +24,25 @@ _OVERDUE_DAYS = 14
 
 
 def build_today_board(user: Any) -> dict[str, Any] | None:
-    """Groups for the «Сегодня» block, or None when the user cannot see calls."""
+    """Groups for the «Сегодня» block, or None when the user cannot see calls.
+
+    A manager sees free calls and their own. Another manager's call is not
+    on this board. «Админ» and «Аналитик» still see every call.
+    """
     if not getattr(user, "is_authenticated", False) or not user.has_perm("crm.view_plannedtouch"):
         return None
     from crm.models import PlannedTouch
+    from crm.services import scope_planned_touches_for_manager
 
     now = timezone.now()
     start, end = _today_bounds(now)
     horizon = now - timedelta(days=_OVERDUE_DAYS)
-    queryset = (
+    queryset = scope_planned_touches_for_manager(
         PlannedTouch.objects.filter(starts_at__gte=horizon, starts_at__lt=end)
         .select_related("company", "company__assignee", "client", "assignee")
         .prefetch_related("company__phones")
-        .order_by("starts_at", "pk")
+        .order_by("starts_at", "pk"),
+        user,
     )
     unassigned: list[Any] = []
     overdue: list[Any] = []
