@@ -251,6 +251,9 @@
     <tr><td><code>call_session_id</code></td><td>Обязателен. Один звонок — одна строка в журнале, повторы обновляют её</td></tr>
     <tr><td><code>direction</code></td><td>Входящий или исходящий (<code>in</code> / <code>out</code>)</td></tr>
     <tr><td><code>contact_phone_number</code></td><td>Номер клиента — по нему находится карточка</td></tr>
+    <tr><td><code>calling_phone_number</code></td><td>Кто звонит. У исходящего с софтфона это номер сотрудника или номер компании</td></tr>
+    <tr><td><code>called_phone_number</code></td><td>Куда звонят. У исходящего это номер клиента</td></tr>
+    <tr><td><code>employee_phone_number</code></td><td>Телефон сотрудника. Нужен, чтобы его собственное плечо не записать как входящий к нему же</td></tr>
     <tr><td><code>virtual_phone_number</code></td><td>Номер компании</td></tr>
     <tr><td><code>employee_id</code></td><td>ID сотрудника UIS — по нему журнал находит менеджера</td></tr>
     <tr><td><code>extension</code></td><td>Добавочный, если ID в уведомлении нет</td></tr>
