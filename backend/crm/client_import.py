@@ -23,6 +23,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
+from config.logging_utils import setup_logger
 from crm.models import Client, Company, CompanyMember
 from crm.outreach import CompanyProfile, apply_company_profile, ensure_work_labels, remember_client_plan
 from crm.work_labels import (
@@ -37,6 +38,10 @@ from crm.work_labels import (
     relevance_value,
 )
 from leads.services import normalize_company_label
+
+logger = setup_logger("hoocon.crm")
+
+_CLIENT_SHEET_NAME = "Клиенты"
 
 CLIENT_SHEET_HEADERS: tuple[str, ...] = (
     "Компания",
@@ -362,8 +367,44 @@ def _usable_contact(name: str) -> str:
     return name.strip()
 
 
+def _data_sheet(workbook: Workbook) -> Worksheet | None:
+    """The «Клиенты» sheet, or the first sheet when the file has no such name.
+
+    ``workbook.active`` is whichever tab was selected at save time. The example
+    tab must not become the import just because it was left open.
+    """
+    names = list(workbook.sheetnames)
+    if _CLIENT_SHEET_NAME in names:
+        return workbook[_CLIENT_SHEET_NAME]
+    if not names:
+        return None
+    return workbook[names[0]]
+
+
+def _is_client_email_conflict(exc: IntegrityError) -> bool:
+    """True when Postgres or SQLite rejected a second card with the same email."""
+    text = f"{exc.__cause__ or ''} {exc}".casefold()
+    return "crm_client" in text and "email" in text
+
+
+def _note_integrity(row: _ClientRow, report: ClientImportReport, exc: IntegrityError) -> None:
+    """A duplicate email is «already there». Any other constraint is a row error.
+
+    The database message can contain the email, so it stays out of the report
+    and out of the log.
+    """
+    if _is_client_email_conflict(exc):
+        report.skipped_existing += 1
+        return
+    logger.warning("client_import_integrity row=%s", row.row_number)
+    report.bad_rows += 1
+    report.errors.append(
+        f"Строка {row.row_number}: строку не удалось записать, повторите импорт этой строки.",
+    )
+
+
 def _read_rows(file_obj: BinaryIO | BytesIO) -> tuple[list[_ClientRow], ClientImportReport]:
-    """Parse the first sheet. Structural problems raise; bad data rows stay in the report."""
+    """Parse «Клиенты», else the first sheet. Bad data rows stay in the report."""
     from django.utils import timezone
 
     try:
@@ -374,7 +415,7 @@ def _read_rows(file_obj: BinaryIO | BytesIO) -> tuple[list[_ClientRow], ClientIm
     report = ClientImportReport()
     today = timezone.localdate()
     try:
-        sheet = workbook.active
+        sheet = _data_sheet(workbook)
         if sheet is None:
             raise ClientImportError("В книге нет листа с данными.")
         rows_iter = sheet.iter_rows(values_only=True)
@@ -576,8 +617,8 @@ def _apply_row(
                 )
                 remember_client_plan(client, row.next_contact_on)
                 made += 1
-    except IntegrityError:
-        report.skipped_existing += 1
+    except IntegrityError as exc:
+        _note_integrity(row, report, exc)
         return
     except DataError as exc:
         report.bad_rows += 1
@@ -601,7 +642,8 @@ def _refresh_existing_company(row: _ClientRow, report: ClientImportReport, index
             _fill_company(org, row, report)
             report.touches_created += apply_company_profile(org, _profile_from_row(row))
             index.add(org)
-    except IntegrityError:
+    except IntegrityError as exc:
+        _note_integrity(row, report, exc)
         return
     if created_company:
         report.companies_created += 1
@@ -682,7 +724,7 @@ def import_clients_xlsx(
     *,
     assignee: Any | None = None,
 ) -> ClientImportReport:
-    """Create client and company cards from the first worksheet.
+    """Create client and company cards from the «Клиенты» sheet.
 
     The client template (email optional) and the niche workbook are both
     accepted. Companies that differ only by «ООО» and quotes land on one card.
@@ -763,8 +805,9 @@ def export_clients_xlsx(clients: Iterable[Client]) -> bytes:
 def build_client_template_xlsx() -> bytes:
     """Workbook: empty «Клиенты» sheet plus an example that is not imported.
 
-    The importer reads only the first sheet, so downloading and uploading the
-    template does not create the sample company.
+    The importer reads the sheet named «Клиенты» even when «Пример» was the
+    active tab at save time, so uploading the template does not create the
+    sample company.
     """
     book = Workbook()
     data = book.active

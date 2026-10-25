@@ -496,3 +496,92 @@ def test_company_and_client_lists_keep_cards_or_rows(client) -> None:
 
     junk = client.get(f"{companies}?view=kanban")
     assert 'data-hoocon-list-view="rows"' in junk.content.decode()
+
+
+@pytest.mark.django_db
+def test_import_reads_clients_sheet_when_example_is_active() -> None:
+    """An open «Пример» tab must not replace the «Клиенты» rows."""
+    book = Workbook()
+    sample = book.active
+    assert sample is not None
+    sample.title = "Пример"
+    sample.append(HEADERS)
+    sample.append(
+        ["ООО «Пример»", "", "", "Иван Петров", "ivan.petrov@example.com", "", "образец"],
+    )
+    data = book.create_sheet("Клиенты", 0)
+    data.append(HEADERS)
+    data.append(
+        ["ООО «Ромашка»", "", "", "Анна", "anna-sheet@example.com", "", "живая строка"],
+    )
+    book.active = sample
+    buf = BytesIO()
+    book.save(buf)
+    buf.seek(0)
+    loaded = load_workbook(buf, read_only=True, data_only=True)
+    try:
+        assert loaded.active is not None
+        assert loaded.active.title == "Пример"
+    finally:
+        loaded.close()
+    buf.seek(0)
+
+    report = import_clients_xlsx(buf)
+
+    assert report.created == 1
+    assert report.bad_rows == 0
+    assert Client.objects.filter(email="anna-sheet@example.com").exists()
+    assert not Client.objects.filter(email="ivan.petrov@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_duplicate_email_during_import_counts_as_already_present() -> None:
+    """A unique email conflict is «already there», not a silent database error."""
+    from django.db.models.signals import pre_save
+
+    def steal(sender: object, instance: Client, **kwargs: object) -> None:
+        if instance.pk or instance.email != "race@example.com":
+            return
+        pre_save.disconnect(steal, sender=Client)
+        Client.objects.create(name="уже", email="race@example.com", company="Другая")
+
+    pre_save.connect(steal, sender=Client)
+    try:
+        report = import_clients_xlsx(
+            _xlsx([HEADERS, ["ООО «Гонка»", "", "", "Гонка", "race@example.com", "", ""]]),
+        )
+    finally:
+        pre_save.disconnect(steal, sender=Client)
+
+    assert report.skipped_existing == 1
+    assert report.bad_rows == 0
+    assert report.created == 0
+    assert "race@example.com" not in " ".join(report.errors)
+
+
+@pytest.mark.django_db
+def test_non_email_integrity_error_is_a_row_error() -> None:
+    """A dedupe-key conflict is reported. It is not counted as an existing client."""
+    from django.db import IntegrityError
+    from django.db.models.signals import pre_save
+
+    def boom(sender: object, instance: Company, **kwargs: object) -> None:
+        pre_save.disconnect(boom, sender=Company)
+        raise IntegrityError(
+            'duplicate key value violates unique constraint "crm_plannedtouch_dedupe_key_key"',
+        )
+
+    pre_save.connect(boom, sender=Company)
+    try:
+        report = import_clients_xlsx(
+            _xlsx([HEADERS, ["ООО «Сигнал»", "", "", "Пётр", "petr-signal@example.com", "", ""]]),
+        )
+    finally:
+        pre_save.disconnect(boom, sender=Company)
+
+    assert report.created == 0
+    assert report.skipped_existing == 0
+    assert report.bad_rows == 1
+    assert "не удалось записать" in report.errors[0]
+    assert "petr-signal@example.com" not in report.errors[0]
+    assert "dedupe_key" not in report.errors[0]
