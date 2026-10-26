@@ -643,6 +643,7 @@ def test_seed_wiki_says_support_bot_does_not_answer_clients() -> None:
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     body, changelog = guide.body.split('id="changelog"', 1)
     assert "бот клиенту не отвечает" in body
+    assert changelog.index("changelog-imap-folder") < changelog.index("changelog-quote-sku-code")
     assert changelog.index("changelog-quote-sku-code") < changelog.index("changelog-client-manual-quote")
     assert changelog.index("changelog-client-manual-quote") < changelog.index("changelog-client-manual-rows")
     sku_code_row = changelog.split('id="changelog-quote-sku-code"', 1)[1].split("</tr>", 1)[0]
