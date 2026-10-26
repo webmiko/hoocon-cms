@@ -643,7 +643,17 @@ def test_seed_wiki_says_support_bot_does_not_answer_clients() -> None:
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     body, changelog = guide.body.split('id="changelog"', 1)
     assert "бот клиенту не отвечает" in body
+    assert changelog.index("changelog-quote-sku-code") < changelog.index("changelog-client-manual-quote")
+    assert changelog.index("changelog-client-manual-quote") < changelog.index("changelog-client-manual-rows")
+    sku_code_row = changelog.split('id="changelog-quote-sku-code"', 1)[1].split("</tr>", 1)[0]
+    assert "код артикула" in sku_code_row
+    assert changelog.index("changelog-client-manual-rows") < changelog.index("changelog-quote-letter")
+    quote_add_row = changelog.split('id="changelog-client-manual-quote"', 1)[1].split("</tr>", 1)[0]
+    assert "внутри КП" in quote_add_row
     assert changelog.index("changelog-quote-letter") < changelog.index("changelog-lead-pool")
+    manual_row = changelog.split('id="changelog-client-manual-rows"', 1)[1].split("</tr>", 1)[0]
+    assert "Добавить ещё один" in manual_row
+    assert "З-ГГММДД" in manual_row
     assert changelog.index("changelog-lead-pool") < changelog.index("changelog-support-bot-off")
     quote_row = changelog.split('id="changelog-quote-letter"', 1)[1].split("</tr>", 1)[0]
     assert "26.10.2026" in quote_row
