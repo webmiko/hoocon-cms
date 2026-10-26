@@ -82,6 +82,7 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         js = (
             _versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),
             _versioned_static("admin/js/hoocon-admin-quotes-board.js"),
+            _versioned_static("admin/js/hoocon-admin-quote-sku-code.js"),
         )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Quote]:
@@ -177,6 +178,11 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         urls = super().get_urls()
         custom = [
             path(
+                "sku-code/",
+                self.admin_site.admin_view(self.sku_code_view),
+                name="crm_quote_sku_code",
+            ),
+            path(
                 "<int:object_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="crm_quote_set_status",
@@ -193,6 +199,20 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             ),
         ]
         return custom + urls
+
+    def sku_code_view(self, request: HttpRequest) -> JsonResponse:
+        """Article code for the readonly cell when a SKU is picked."""
+        if request.method != "GET":
+            return JsonResponse({"sku_code": ""}, status=405)
+        if not (request.user.has_perm("crm.change_quote") or request.user.has_perm("crm.add_quote")):
+            raise PermissionDenied
+        raw = (request.GET.get("id") or "").strip()
+        if not raw.isdigit():
+            return JsonResponse({"sku_code": ""})
+        from catalog.models import SKU
+
+        code = SKU.objects.filter(pk=int(raw)).values_list("sku_code", flat=True).first()
+        return JsonResponse({"sku_code": code or ""})
 
     def set_status_view(self, request: HttpRequest, object_id: int) -> JsonResponse:
         """JSON status update for КП kanban drag-and-drop."""
