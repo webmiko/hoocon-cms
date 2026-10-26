@@ -1027,7 +1027,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         options.append(
             {
                 "label": "По статусу",
-                "url": _url({"o": None, "lead_sort": None}),
+                "url": _url({"o": None, "lead_sort": "status"}),
                 "selected": default_status_blocks,
             }
         )

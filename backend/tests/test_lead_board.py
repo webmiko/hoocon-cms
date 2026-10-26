@@ -358,6 +358,43 @@ def test_lead_changelist_date_sort_is_flat_newest_first() -> None:
 
 
 @pytest.mark.django_db
+def test_lead_sort_status_after_date_clears_flat_timeline() -> None:
+    """«По статусу» must pass lead_sort=status so session date mode is replaced."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    older_new = Lead.objects.create(
+        name="Старая новая",
+        email="older-status@example.com",
+        message="old",
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.filter(pk=older_new.pk).update(
+        created_at=timezone.now() - timedelta(days=2),
+    )
+    Lead.objects.create(
+        name="Свежая завершённая",
+        email="newer-status@example.com",
+        message="done",
+        status=Lead.LeadStatus.DONE,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-status-after-date",
+        email="lead-status-after-date@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    client.get("/admin/leads/lead/?lead_sort=date&view=wall")
+    resp = client.get("/admin/leads/lead/?lead_sort=status&view=wall")
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "lead_sort=status" in html
+    assert html.index("older-status@example.com") < html.index("newer-status@example.com")
+
+
+@pytest.mark.django_db
 def test_lead_changelist_sort_controls_and_name_order() -> None:
     """Changelist exposes А→Я / Я→А sort; ``?o=`` orders rows on the server."""
     Lead.objects.create(
