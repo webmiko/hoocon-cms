@@ -1,7 +1,7 @@
 """What happens after any new Lead row: routing, emails, staff alerts.
 
 Every entry point (public form, cabinet repeat, spec → lead) calls
-:func:`on_lead_created` so no channel silently skips the manager.
+:func:`on_lead_created` so no channel silently skips the sales letter.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from django.db import transaction
 
 from config.logging_utils import setup_logger
 from leads.models import Lead
-from leads.services import assign_lead_on_create
 from leads.tasks import send_lead_client_confirmation, send_lead_notification
 
 logger = setup_logger("hoocon.leads")
@@ -31,8 +30,11 @@ def _enqueue_staff_push(lead_id: int) -> None:
 
 
 def on_lead_created(lead: Lead) -> None:
-    """Assign a manager now; email sales + client and push staff after commit."""
-    assign_lead_on_create(lead)
+    """Email sales and the client, and alert staff. The lead stays unassigned.
+
+    A manager takes it from the sales letter («Взять») or the Admin action.
+    Auto-assignment (company rules, round-robin) is not applied to new leads.
+    """
     lead_id = lead.pk
     transaction.on_commit(lambda: send_lead_notification.delay(lead_id))
     transaction.on_commit(lambda: send_lead_client_confirmation.delay(lead_id))

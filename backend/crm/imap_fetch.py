@@ -320,20 +320,27 @@ def _create_lead_from_email(*, client: Client, subject: str, body: str) -> Lead:
 
 
 def _route_new_lead(box: _Mailbox, lead: Lead) -> None:
-    """Assign owner to an email-created lead via the canonical pipeline.
+    """Route an email-created lead.
 
-    Личный ящик → его владелец (письмо пришло лично ему). Общий ящик →
-    ``assign_lead_on_create``: pinned-правила компаний (Admin) →
-    закреплённый владелец по ``company_key`` → round-robin по группе
-    «Менеджер» с курсором ``SiteSettings`` и гейтом ``lead_routing_mode``.
-    Оба пути закрепляют ``Client.assignee``, если он пуст.
+    A personal mailbox keeps the lead: the letter arrived for that manager.
+    The shared mailbox leaves it unassigned, same as a form on the site.
+    The sales letter then offers «Взять».
     """
-    from leads.services import assign_lead_on_create, assign_lead_to_user
+    from leads.services import assign_lead_to_user
 
     if box.staff_mailbox is not None:
         assign_lead_to_user(lead, box.staff_mailbox.user)
-    else:
-        assign_lead_on_create(lead)
+        return
+    from django.db import transaction
+
+    from leads.tasks import send_lead_notification
+
+    lead_id = lead.pk
+
+    def _notify_sales() -> None:
+        send_lead_notification.delay(lead_id)
+
+    transaction.on_commit(_notify_sales)
 
 
 def _save_attachments(parsed: Message, msg_row: EmailMessage) -> int:

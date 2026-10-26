@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>Заявка #{{ lead.pk }}</h1>
+  <p>{{ lead.name }}{% if lead.company %} · {{ lead.company }}{% endif %}</p>
+  {% if lead.phone %}<p>Телефон: {{ lead.phone }}</p>{% endif %}
+  {% if mine %}
+    <p>Заявка уже у вас.</p>
+  {% elif owner %}
+    <p>Заявку ведёт {{ owner }}.</p>
+  {% else %}
+    <p>Ответственного нет. Возьмите заявку, если будете её вести.</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="button">Взять</button>
+    </form>
+  {% endif %}
+  <p>
+    {% if call_href %}<a href="{{ call_href }}">Позвонить</a> · {% endif %}
+    <a href="{{ open_url }}">Открыть заявку</a>
+  </p>
+{% endblock %}

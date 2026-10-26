@@ -35,7 +35,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
@@ -83,7 +83,9 @@ from leads.services import (
     apply_lead_manager_on_save,
     build_lead_processing_stats,
     count_new_leads,
+    lead_visible_to_manager,
     log_manager_activity,
+    manager_display_name,
     mark_lead_seen,
     scope_leads_for_manager,
     set_lead_status,
@@ -1120,6 +1122,10 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             )
 
         transaction.on_commit(_crm_tg)
+        if prev_assignee_id is None and obj.assignee_id is not None:
+            from leads.services import _enqueue_lead_taken_notice
+
+            transaction.on_commit(lambda: _enqueue_lead_taken_notice(lead_id))
 
     @admin.action(description="Взять в работу (назначить на меня)", permissions=("change",))
     def action_take_in_work(
@@ -1278,6 +1284,11 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
                 name="leads_lead_stats",
             ),
             path(
+                "<int:object_id>/assign-me/",
+                self.admin_site.admin_view(self.assign_me_view),
+                name="leads_lead_assign_me",
+            ),
+            path(
                 "<int:object_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="leads_lead_set_status",
@@ -1294,6 +1305,41 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             ),
         ]
         return custom + super().get_urls()
+
+    def assign_me_view(self, request: HttpRequest, object_id: int) -> HttpResponse:
+        """Page from the sales letter: call, or take a lead that has no owner.
+
+        GET does not assign. Mail scanners follow links, so the claim is a POST
+        by a logged-in manager, same as «Взять» on the dashboard.
+        """
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        lead = get_object_or_404(Lead.objects.select_related("assignee"), pk=object_id)
+        if not lead_visible_to_manager(lead, request.user):
+            raise PermissionDenied
+        if request.method == "POST":
+            lead, taken = take_lead_in_work(lead, request.user)
+            if not taken:
+                raise PermissionDenied
+            messages.success(request, "Вы взяли заявку.")
+            return HttpResponseRedirect(reverse("admin:leads_lead_change", args=[lead.pk]))
+        elif request.method != "GET":
+            return HttpResponseNotAllowed(["GET", "POST"])
+        owner = ""
+        if lead.assignee_id and lead.assignee_id != request.user.pk:
+            owner = manager_display_name(lead.assignee)
+        phone = (lead.phone or "").strip()
+        digits = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Заявка #{lead.pk}",
+            "lead": lead,
+            "owner": owner,
+            "mine": lead.assignee_id == request.user.pk,
+            "call_href": f"tel:{digits}" if digits else "",
+            "open_url": reverse("admin:leads_lead_change", args=[lead.pk]),
+        }
+        return render(request, "admin/leads/lead/assign_me.html", context)
 
     def set_status_view(self, request: HttpRequest, object_id: int) -> JsonResponse:
         """JSON status update for kanban drag-and-drop.
