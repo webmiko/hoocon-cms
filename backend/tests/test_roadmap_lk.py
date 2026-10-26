@@ -417,39 +417,31 @@ def test_quote_vat_rounds_half_up_and_label_drops_zeros() -> None:
 
 
 @pytest.mark.django_db
-def test_quote_pdf_prints_local_dates_and_clean_vat(monkeypatch: pytest.MonkeyPatch, settings) -> None:
+def test_quote_pdf_prints_local_dates_and_clean_vat(settings) -> None:
     """Дата КП в PDF была по UTC: КП от 00:30 МСК печаталось вчерашним числом."""
     from datetime import UTC, datetime
     from decimal import Decimal
 
-    from reportlab.pdfgen.canvas import Canvas
-
     from crm.quote_pdf import render_quote_pdf
+    from tests.quote_pdf_text import pdf_text
 
     settings.TIME_ZONE = "Europe/Moscow"
     quote = _quote(_client("quote-tz@acme.test"))
     item = quote.items.first()
-    item.unit_price = Decimal("0.625")
+    item.unit_price = Decimal("122.00")
     item.quantity = 1
     item.save()
     Quote.objects.filter(pk=quote.pk).update(
-        created_at=datetime(2026, 10, 8, 21, 30, tzinfo=UTC), vat_rate=Decimal("20.00")
+        created_at=datetime(2026, 10, 8, 21, 30, tzinfo=UTC), vat_rate=Decimal("22.00")
     )
     quote.refresh_from_db()
 
-    drawn: list[str] = []
-    for method in ("drawString", "drawRightString"):
-        original = getattr(Canvas, method)
-
-        def _capture(self, x, y, text, *a, _orig=original, **kw):  # noqa: ANN001, ANN202
-            drawn.append(str(text))
-            return _orig(self, x, y, text, *a, **kw)
-
-        monkeypatch.setattr(Canvas, method, _capture)
-
-    render_quote_pdf(quote)
-    assert "Дата: 09.10.2026" in drawn
-    assert "НДС 20%: 0.13 ₽" in drawn
+    text = pdf_text(render_quote_pdf(quote))
+    assert "09.10.2026" in text
+    assert "08.10.2026" not in text
+    # 122 ₽ уже с НДС 22%: налог внутри 122 × 22 / 122 = 22, а не 122 × 0,22 сверху.
+    assert "В том числе НДС 22%: 22.00" in text
+    assert "148.84" not in text
 
 
 @pytest.mark.django_db
