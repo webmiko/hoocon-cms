@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django import forms
 from django.contrib import admin
 from django.db.models import F, QuerySet
 from django.http import HttpRequest
@@ -19,13 +20,32 @@ from leads.services import scope_leads_for_manager
 from supportchat.models import Conversation
 
 
+class OrderCardInlineForm(forms.ModelForm):
+    """One order row on the client card. An empty number is filled on save."""
+
+    number = forms.CharField(
+        label="номер",
+        required=False,
+        max_length=60,
+        widget=forms.TextInput(attrs={"placeholder": "Пусто — номер поставим сами"}),
+    )
+
+    class Meta:
+        model = Order
+        fields = ("number", "status", "comment")
+        widgets = {
+            "comment": forms.TextInput(attrs={"placeholder": "Звонок: что заказать"}),
+        }
+
+
 class OrderInline(TabularInline):
     """Orders on the client card (cabinet.Order)."""
 
     tab = True
     model = Order
+    form = OrderCardInlineForm
     extra = 0
-    fields = ("number", "status", "progress", "planned_ship_date", "created_at")
+    fields = ("number", "status", "comment", "created_at")
     readonly_fields = ("created_at",)
     show_change_link = True
     can_delete = False
@@ -34,8 +54,10 @@ class OrderInline(TabularInline):
     verbose_name_plural = "заказы клиента"
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        """Заказ создаётся из КП, не вручную на карточке."""
-        return False
+        """Manual order from a phone call, same button as a document row."""
+        if obj is None or not getattr(obj, "pk", None):
+            return False
+        return request.user.has_perm("cabinet.add_order")
 
 
 class RmaCaseInline(TabularInline):
@@ -57,22 +79,26 @@ class RmaCaseInline(TabularInline):
         return False
 
 
+class LeadCardInlineForm(forms.ModelForm):
+    """One lead row. Name and email are copied from the card on save."""
+
+    class Meta:
+        model = Lead
+        fields = ("lead_type", "message", "status", "assignee")
+        widgets = {
+            "message": forms.TextInput(attrs={"placeholder": "Что сказал клиент"}),
+        }
+
+
 class LeadInline(TabularInline):
     """RFQ / consult requests on this client card (scoped for managers)."""
 
     tab = True
     model = Lead
+    form = LeadCardInlineForm
     extra = 0
-    fields = (
-        "status",
-        "lead_type",
-        "name",
-        "company",
-        "message",
-        "assignee",
-        "created_at",
-    )
-    readonly_fields = fields
+    fields = ("lead_type", "message", "status", "assignee", "created_at")
+    readonly_fields = ("created_at",)
     show_change_link = True
     can_delete = False
     ordering = ("-created_at",)
@@ -80,8 +106,10 @@ class LeadInline(TabularInline):
     verbose_name_plural = "лиды клиента"
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        """Leads arrive via public API / signal — not manual add on the card."""
-        return False
+        """Manual lead from the card, for a call that is not a site form."""
+        if obj is None or not getattr(obj, "pk", None):
+            return False
+        return request.user.has_perm("leads.add_lead")
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Lead]:
         """Hide foreign leads that the manager cannot open in Lead Admin."""
@@ -184,23 +212,63 @@ class ConversationInline(TabularInline):
         return super().get_queryset(request).select_related("assignee")
 
 
+class QuoteItemInlineForm(forms.ModelForm):
+    """The article code is a snapshot of the chosen SKU, not a second input."""
+
+    class Meta:
+        model = QuoteItem
+        fields = ("sku", "sku_code", "quantity", "unit_price", "sort_order")
+        widgets = {
+            "sku_code": forms.TextInput(
+                attrs={
+                    "readonly": "readonly",
+                    "tabindex": "-1",
+                    "placeholder": "Подставится из артикула",
+                },
+            ),
+        }
+
+    def clean(self) -> dict[str, Any]:
+        """Keep the stored code equal to the selected SKU, ignoring typed text."""
+        cleaned = super().clean() or {}
+        sku = cleaned.get("sku")
+        if sku is not None:
+            cleaned["sku_code"] = sku.sku_code
+        return cleaned
+
+
 class QuoteItemInline(TabularInline):
     """SKU lines of a quote (manager-editable)."""
 
     model = QuoteItem
+    form = QuoteItemInlineForm
     extra = 0
     fields = ("sku", "sku_code", "quantity", "unit_price", "sort_order")
     autocomplete_fields = ("sku",)
 
 
+class QuoteCardInlineForm(forms.ModelForm):
+    """Draft quote row. Product lines are chosen on the quote card itself."""
+
+    class Meta:
+        model = Quote
+        fields = ("comment", "vat_rate")
+        widgets = {
+            "comment": forms.TextInput(
+                attrs={"placeholder": "Что посчитать. Артикулы выбираются внутри этого КП"},
+            ),
+        }
+
+
 class QuoteInline(TabularInline):
-    """Quotes issued from this client card (read-mostly)."""
+    """Quotes on the client card. Lines with a chosen SKU live on the quote."""
 
     tab = True
     model = Quote
+    form = QuoteCardInlineForm
     extra = 0
-    fields = ("number", "status", "lead", "sent_at", "created_at")
-    readonly_fields = fields
+    fields = ("comment", "vat_rate", "number", "status", "created_at")
+    readonly_fields = ("number", "status", "created_at")
     show_change_link = True
     can_delete = False
     ordering = ("-created_at",)
@@ -208,8 +276,10 @@ class QuoteInline(TabularInline):
     verbose_name_plural = "коммерческие предложения"
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        """КП создаётся кнопкой «Создать КП» на заявке, не вручную здесь."""
-        return False
+        """Draft КП from the card; the manager picks SKUs after opening it."""
+        if obj is None or not getattr(obj, "pk", None):
+            return False
+        return request.user.has_perm("crm.add_quote")
 
 
 class CallInline(TabularInline):

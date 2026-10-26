@@ -4305,3 +4305,10 @@ label.hoocon-bool-toggle,
   border-color: var(--primary-400, #60a5fa);
   background: rgb(96 165 250 / 0.1);
 }
+
+/* Quote line: article code is shown, not typed. Unfold loads this file. */
+#items-data .field-sku_code input[readonly] {
+  pointer-events: none;
+  background: var(--hoocon-surface-muted);
+  color: var(--hoocon-quiet);
+}

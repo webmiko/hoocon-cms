@@ -17,8 +17,10 @@ from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
+from cabinet.models import Order
 from config.admin_mixins import OpenChangeLinkMixin
 from config.unfold_callbacks import _versioned_static
+from crm.admin.card_rows import fill_manual_lead, next_manual_order_number
 from crm.admin.client_workbook import ClientWorkbookMixin
 from crm.admin.inlines import (
     ActivityInline,
@@ -36,7 +38,7 @@ from crm.admin.scope import OverdueNextContactFilter
 from crm.forms import ComposeEmailForm, SpecImportForm
 from crm.mail_links import staff_reply_to_email
 from crm.manager_signatures import manager_reply_signature
-from crm.models import Activity, Client, EmailStatus, EmailTemplate
+from crm.models import Activity, Client, EmailStatus, EmailTemplate, Quote
 from crm.services import (
     create_outbound_email,
     email_template_context_for_client,
@@ -296,6 +298,7 @@ class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
     ) -> None:
         """Set author on new Activity rows; reject out-of-scope lead FKs."""
         instances = formset.save(commit=False)
+        client = form.instance
         for obj in instances:
             if isinstance(obj, Activity):
                 if obj.author_id is None:
@@ -305,6 +308,13 @@ class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
                     raise PermissionDenied(
                         _("Нельзя привязать активность к чужой заявке."),
                     )
+            elif isinstance(obj, Lead) and obj.pk is None:
+                fill_manual_lead(obj, client, request.user)
+            elif isinstance(obj, Order) and not (obj.number or "").strip():
+                obj.number = next_manual_order_number(client)
+            elif isinstance(obj, Quote) and obj.pk is None:
+                if obj.created_by_id is None and getattr(request.user, "is_authenticated", False):
+                    obj.created_by = request.user
             obj.save()
         formset.save_m2m()
         for obj in formset.deleted_objects:

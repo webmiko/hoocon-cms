@@ -197,6 +197,73 @@ def test_quote_issue_pdf_uses_items_saved_in_same_form() -> None:
 
 
 @pytest.mark.django_db
+def test_quote_line_code_follows_the_selected_sku_and_is_readonly() -> None:
+    """Код артикула в КП нельзя вписать: сохраняется код выбранного товара."""
+    from pathlib import Path
+
+    from catalog.models import SKU, Category, Product
+    from crm.models import QuoteItem
+
+    admin = _superuser()
+    lead = _make_lead()
+    quote = Quote.objects.create(client=lead.client, lead=lead, created_by=admin, status=QuoteStatus.DRAFT)
+    category = Category.objects.create(name="Приводы", slug="quote-code-cat")
+    product = Product.objects.create(name="DA", slug="quote-code-da", category=category)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA16MQU | Привод",
+        slug="quote-code-da16",
+        sku_code="DA16MQU230-A",
+    )
+    item = QuoteItem.objects.create(quote=quote, sku=sku, sku_code="OLD", quantity=1, sort_order=0)
+    page = DjClient()
+    page.force_login(admin)
+    change = reverse("admin:crm_quote_change", args=[quote.pk])
+    html = page.get(change).content.decode()
+    assert 'id="id_items-0-sku_code"' in html
+    assert "readonly" in html
+    extras = Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css"
+    css = extras.read_text(encoding="utf-8")
+    assert "#items-data .field-sku_code input[readonly]" in css
+    assert "pointer-events: none" in css.split("#items-data .field-sku_code input[readonly]", 1)[1].split("}", 1)[0]
+    response = page.post(
+        change,
+        {
+            "status": QuoteStatus.DRAFT,
+            "client": str(quote.client_id),
+            "lead": str(lead.pk),
+            "created_by": "",
+            "comment": "",
+            "vat_rate": "22.00",
+            "valid_until": "",
+            "items-TOTAL_FORMS": "1",
+            "items-INITIAL_FORMS": "1",
+            "items-MIN_NUM_FORMS": "0",
+            "items-MAX_NUM_FORMS": "1000",
+            "items-0-id": str(item.pk),
+            "items-0-quote": str(quote.pk),
+            "items-0-sku": str(sku.pk),
+            "items-0-sku_code": "НЕ-ТОТ-КОД",
+            "items-0-quantity": "2",
+            "items-0-unit_price": "1000.00",
+            "items-0-sort_order": "0",
+        },
+    )
+    assert response.status_code == 302, response.status_code
+    item.refresh_from_db()
+    assert item.sku_code == "DA16MQU230-A"
+    assert item.quantity == 2
+    stranger = _staff_with_perms(username="no-quote-code", codenames=("view_lead",))
+    page.force_login(stranger)
+    denied = page.get(reverse("admin:crm_quote_sku_code"), {"id": str(sku.pk)})
+    assert denied.status_code == 403
+    page.force_login(admin)
+    found = page.get(reverse("admin:crm_quote_sku_code"), {"id": str(sku.pk)})
+    assert found.status_code == 200
+    assert found.json()["sku_code"] == "DA16MQU230-A"
+
+
+@pytest.mark.django_db
 def test_create_quote_requires_add_quote_perm() -> None:
     """Без crm.add_quote кнопка недоступна (403)."""
     staff = _staff_with_perms(
