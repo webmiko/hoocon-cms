@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import base64
 import email
 import hashlib
 import imaplib
@@ -101,6 +102,39 @@ _FREE_MAIL_DOMAINS = frozenset(
 
 # Служебные поддомены почтового хостинга — обрезаем при угадывании.
 _MAIL_SERVICE_SUBDOMAINS = frozenset({"mail", "webmail", "smtp", "pop", "pop3", "imap", "mx", "mx1", "mx2"})
+
+
+def encode_imap_utf7(name: str) -> str:
+    """Encode a mailbox name for IMAP SELECT (RFC 3501 modified UTF-7).
+
+    imaplib sends commands as ASCII. A Cyrillic folder such as «Заявки»
+    raises UnicodeEncodeError unless it is encoded first. ASCII names,
+    including INBOX, are left unchanged.
+    """
+    if name.isascii():
+        return name
+    out: list[str] = []
+    chunk: list[str] = []
+
+    def flush() -> None:
+        if not chunk:
+            return
+        raw = "".join(chunk).encode("utf-16-be")
+        token = base64.b64encode(raw).decode("ascii").rstrip("=").replace("/", ",")
+        out.append(f"&{token}-")
+        chunk.clear()
+
+    for char in name:
+        if char == "&":
+            flush()
+            out.append("&-")
+        elif " " <= char <= "~":
+            flush()
+            out.append(char)
+        else:
+            chunk.append(char)
+    flush()
+    return "".join(out)
 
 
 @dataclass
@@ -512,7 +546,7 @@ def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
     state = box.state
     conn = _connect(box)
     try:
-        conn.select(box.folder, readonly=True)
+        conn.select(encode_imap_utf7(box.folder), readonly=True)
         uids = _new_uids(conn, state.last_uid, limit)
         report["seen"] += len(uids)
         max_uid = state.last_uid

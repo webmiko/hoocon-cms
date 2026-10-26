@@ -256,10 +256,23 @@ class StaffMailbox(models.Model):
         return f"IMAP({self.user_id}, {addr})"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Encrypt the app password at rest before persisting."""
+        """Encrypt the app password at rest before persisting.
+
+        UID numbers belong to one folder. Switching the folder starts
+        the cursor over, otherwise mail already in the new folder is skipped.
+        """
         from accounts.mailbox_secrets import encrypt_mailbox_secret
 
+        previous_folder = ""
+        if self.pk:
+            previous_folder = type(self).objects.filter(pk=self.pk).values_list("folder", flat=True).first() or ""
         self.imap_password = encrypt_mailbox_secret(self.imap_password or "")
+        if previous_folder and previous_folder != (self.folder or ""):
+            self.last_uid = 0
+            self.last_error = ""
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = list({*update_fields, "last_uid", "last_error"})
         super().save(*args, **kwargs)
 
     @property
