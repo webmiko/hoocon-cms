@@ -65,6 +65,7 @@ class _FakeIMAP:
     """Minimal imaplib.IMAP4_SSL stub over an in-memory UID store."""
 
     fail_logins: ClassVar[set[str]] = set()
+    selected: ClassVar[list[str]] = []
 
     def __init__(self, host: str, port: int, *, messages: dict[int, bytes]) -> None:
         self._messages = messages
@@ -75,6 +76,7 @@ class _FakeIMAP:
         return "OK"
 
     def select(self, folder: str, readonly: bool = True) -> tuple[str, list[bytes]]:
+        type(self).selected.append(folder)
         return "OK", [b"1"]
 
     def uid(self, command: str, *args: Any) -> tuple[str, list[Any]]:
@@ -118,6 +120,7 @@ def _imap(
         return _FakeIMAP(host, port, messages=store)
 
     _IMAP_CONNECT_TIMEOUTS.clear()
+    _FakeIMAP.selected.clear()
     monkeypatch.setattr("crm.imap_fetch.imaplib.IMAP4_SSL", _connect)
     monkeypatch.setattr("crm.imap_fetch._notify_staff", lambda msg_row, box: None)
     return store
@@ -518,6 +521,48 @@ def test_staff_mailbox_fetched_when_env_disabled(
     assert row.client.assignee_id == owner.pk
     mailbox.refresh_from_db()
     assert mailbox.last_uid == 4
+
+
+@pytest.mark.django_db
+def test_cyrillic_folder_is_selected_and_a_folder_change_resets_the_cursor(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """«Заявки» is sent as IMAP UTF-7. Switching folders does not keep the old UID."""
+    from accounts.models import StaffMailbox
+    from crm.imap_fetch import encode_imap_utf7
+
+    settings.IMAP_ENABLED = False
+    encoded = encode_imap_utf7("Заявки")
+    assert encoded.isascii()
+    assert encoded.startswith("&")
+    assert encode_imap_utf7("INBOX") == "INBOX"
+
+    owner = _staff_user("zayavki")
+    mailbox = StaffMailbox.objects.create(
+        user=owner,
+        imap_user="alexander@hoocon.ru",
+        imap_password="app-not-secret",
+        folder="INBOX",
+        last_uid=265,
+        last_error="UnicodeEncodeError",
+    )
+    mailbox.folder = "Заявки"
+    mailbox.save()
+    mailbox.refresh_from_db()
+    assert mailbox.last_uid == 0
+    assert mailbox.last_error == ""
+
+    _imap[3] = _raw_email(
+        message_id="<zayavki@t>",
+        from_addr="Клиент <cl@corp.test>",
+        subject="Заявка из папки",
+    )
+    report = fetch_inbound_email()
+
+    assert _FakeIMAP.selected == [encoded]
+    assert report["created"] == 1
+    assert EmailMessage.objects.filter(message_id="<zayavki@t>").exists()
 
 
 @pytest.mark.django_db
