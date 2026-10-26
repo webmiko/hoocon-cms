@@ -17,7 +17,7 @@ import re
 from typing import Literal
 
 # Beta: three-part + channel; after GA: MAJOR.MINOR.PATCH (see _docs/releases.md).
-RELEASE_VERSION = "3.8.18"
+RELEASE_VERSION = "3.8.19"
 
 # Pre-release channel: "beta" | "rc" | "" (stable / GA).
 RELEASE_CHANNEL = ""
