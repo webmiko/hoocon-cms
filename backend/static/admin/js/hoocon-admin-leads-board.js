@@ -284,14 +284,39 @@
   }
 
   /**
+   * Wall headings only when rows follow new → in progress → done (no repeats).
+   *
+   * @param {HTMLTableRowElement[]} rows
+   * @returns {boolean}
+   */
+  function rowsUseStatusBlockOrder(rows) {
+    let lastRank = -1;
+    for (let i = 0; i < rows.length; i += 1) {
+      const rank = STATUS_ORDER.indexOf(rowStatus(rows[i]));
+      if (rank < 0) {
+        continue;
+      }
+      if (rank < lastRank) {
+        return false;
+      }
+      lastRank = rank;
+    }
+    return true;
+  }
+
+  /**
    * Insert full-width status section titles between card groups (wall mode).
    *
    * @param {HTMLTableElement} table
    */
   function applyWallHeadings(table) {
     clearWallHeadings(table);
+    const rows = dataRows(table);
+    if (!rowsUseStatusBlockOrder(rows)) {
+      return;
+    }
     let last = null;
-    dataRows(table).forEach(function (row) {
+    rows.forEach(function (row) {
       const status = rowStatus(row);
       if (status === last) {
         return;

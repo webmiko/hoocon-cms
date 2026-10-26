@@ -185,6 +185,7 @@ def test_lead_board_js_classifies_status_badges_and_wall_headings() -> None:
     assert "hoocon-lead-status--in_progress" in src
     assert "hoocon-lead-status--done" in src
     assert "hoocon-lead-wall-heading" in src
+    assert "rowsUseStatusBlockOrder" in src
     assert 'STATUS_ORDER = ["new", "in_progress", "done"]' in src
     assert 'new: "Новая"' in src
     assert 'in_progress: "В работе"' in src
@@ -287,25 +288,25 @@ def test_lead_changelist_renders_header_hamburger_markup() -> None:
 
 
 @pytest.mark.django_db
-def test_lead_changelist_default_orders_newest_first() -> None:
-    """Default board sort is created_at descending (newest lead on top)."""
+def test_lead_changelist_default_groups_by_status_then_newest() -> None:
+    """Default board sort is status blocks, newest first within each block."""
     from datetime import timedelta
 
     from django.utils import timezone
 
-    older = Lead.objects.create(
-        name="Старая",
+    older_new = Lead.objects.create(
+        name="Старая новая",
         email="older-sort@example.com",
         message="old",
         status=Lead.LeadStatus.NEW,
     )
-    Lead.objects.filter(pk=older.pk).update(
+    Lead.objects.filter(pk=older_new.pk).update(
         created_at=timezone.now() - timedelta(days=2),
     )
     Lead.objects.create(
-        name="Новая",
-        email="newer-sort@example.com",
-        message="new",
+        name="Свежая завершённая",
+        email="newer-done@example.com",
+        message="done",
         status=Lead.LeadStatus.DONE,
     )
     admin_user = User.objects.create_superuser(
@@ -316,7 +317,81 @@ def test_lead_changelist_default_orders_newest_first() -> None:
     client = Client()
     client.force_login(admin_user)
     html = client.get("/admin/leads/lead/?view=wall").content.decode()
-    assert html.index("newer-sort@example.com") < html.index("older-sort@example.com")
+    # «Новая» block before «Завершена» even if done row is newer by date.
+    assert html.index("older-sort@example.com") < html.index("newer-done@example.com")
+
+
+@pytest.mark.django_db
+def test_lead_changelist_date_sort_is_flat_newest_first() -> None:
+    """``lead_sort=date`` keeps a single timeline (newest on top)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    older_new = Lead.objects.create(
+        name="Старая новая",
+        email="older-flat@example.com",
+        message="old",
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.filter(pk=older_new.pk).update(
+        created_at=timezone.now() - timedelta(days=2),
+    )
+    Lead.objects.create(
+        name="Свежая завершённая",
+        email="newer-flat@example.com",
+        message="done",
+        status=Lead.LeadStatus.DONE,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-flat-date-sort",
+        email="lead-flat-date-sort@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    resp = client.get("/admin/leads/lead/?lead_sort=date&view=wall")
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "?e=1" not in html
+    assert html.index("newer-flat@example.com") < html.index("older-flat@example.com")
+
+
+@pytest.mark.django_db
+def test_lead_sort_status_after_date_clears_flat_timeline() -> None:
+    """«По статусу» must pass lead_sort=status so session date mode is replaced."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    older_new = Lead.objects.create(
+        name="Старая новая",
+        email="older-status@example.com",
+        message="old",
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.filter(pk=older_new.pk).update(
+        created_at=timezone.now() - timedelta(days=2),
+    )
+    Lead.objects.create(
+        name="Свежая завершённая",
+        email="newer-status@example.com",
+        message="done",
+        status=Lead.LeadStatus.DONE,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-status-after-date",
+        email="lead-status-after-date@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    client.get("/admin/leads/lead/?lead_sort=date&view=wall")
+    resp = client.get("/admin/leads/lead/?lead_sort=status&view=wall")
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "lead_sort=status" in html
+    assert html.index("older-status@example.com") < html.index("newer-status@example.com")
 
 
 @pytest.mark.django_db

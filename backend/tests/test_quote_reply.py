@@ -41,21 +41,88 @@ def test_quote_email_names_manager_deadline_and_reply_links(settings) -> None:
         "anna@hoocon.test": {"name": "Анна Смирнова", "phone": "+7 495 000-00-00", "company": "Hoocon"},
     }
     _client, quote, _manager = _issued_quote()
-    from crm.quote_docs import notify_quote_issued
+    from crm.email_body import is_html_email_body
+    from crm.quote_docs import notify_quote_issued, render_quote_issued_email
 
-    message = notify_quote_issued(quote, send_now=False)
-    assert "Анна Смирнова" in message.body
-    assert "+7 495 000-00-00" in message.body
-    assert "anna@hoocon.test" in message.body
-    assert f"Действует до {quote.valid_until:%d.%m.%Y}." in message.body
-    assert "Согласовать: https://hoocon.test/kp#" in message.body
-    assert "https://hoocon.test/kp?" not in message.body
-    assert "action=accept" in message.body
-    assert "Нужны правки: https://hoocon.test/kp#" in message.body
-    assert "action=revise" in message.body
-    assert "без входа в кабинет" in message.body
-    assert "одноразовый код" not in message.body
+    _subject, text_body, html_body = render_quote_issued_email(quote, author=_manager)
+    assert "Анна Смирнова" in text_body
+    assert "+7 495 000-00-00" in text_body
+    assert "anna@hoocon.test" in text_body
+    assert f"Действует до {quote.valid_until:%d.%m.%Y}." in text_body
+    assert "Согласовать: https://hoocon.test/kp#" in text_body
+    assert "https://hoocon.test/kp?" not in text_body
+    assert "action=accept" in text_body
+    assert "Нужны правки: https://hoocon.test/kp#" in text_body
+    assert "action=revise" in text_body
+    assert "без входа в кабинет" in text_body
+    assert "одноразовый код" not in text_body
+
+    message = notify_quote_issued(quote, send_now=False, author=_manager)
+    assert is_html_email_body(message.body)
+    assert message.body == html_body
+    assert "HOOCON" in message.body
+    assert 'href="' in message.body and "action=accept" in message.body
     assert message.reply_to_email == "anna@hoocon.test"
+    assert message.quote_id == quote.pk
+    assert message.created_by_id == _manager.pk
+
+
+@pytest.mark.django_db
+def test_quote_issued_email_bccs_manager_via_shared_smtp(settings) -> None:
+    """КП через общий SMTP → BCC менеджеру, тред в его ящике."""
+    from django.core import mail as dj_mail
+
+    from crm.quote_docs import QUOTE_ISSUED_SUBJECT_MARKER, notify_quote_issued
+    from crm.tasks import send_crm_email
+
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.DEFAULT_FROM_EMAIL = "noreply@hoocon.ru"
+    settings.SITE_URL = "https://hoocon.test"
+    settings.MANAGER_SIGNATURE_CONTACTS = {
+        "anna@hoocon.test": {"name": "Анна", "phone": "+7 495 000-00-00", "company": "Hoocon"},
+    }
+    _client, quote, manager = _issued_quote()
+    msg = notify_quote_issued(quote, send_now=False, author=manager)
+    assert QUOTE_ISSUED_SUBJECT_MARKER in msg.subject
+
+    send_crm_email.run(msg.pk)
+
+    assert len(dj_mail.outbox) == 1
+    sent = dj_mail.outbox[0]
+    assert sent.to == [_client.email]
+    assert sent.reply_to == ["anna@hoocon.test"]
+    assert sent.bcc == ["anna@hoocon.test"]
+
+
+@pytest.mark.django_db
+def test_quote_issued_from_personal_mailbox_still_bccs_manager(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """КП с личного SMTP менеджера → BCC себе, чтобы копия была не только в «Отправленных»."""
+    from accounts.models import StaffMailbox
+    from crm.quote_docs import notify_quote_issued
+    from crm.tasks import send_crm_email
+    from tests.test_crm_imap_fetch import _FakeConnection
+
+    _client, quote, manager = _issued_quote()
+    StaffMailbox.objects.create(
+        user=manager,
+        imap_user="anna@hoocon.test",
+        imap_password="x-not-secret",
+        smtp_host="smtp.test",
+        smtp_port=587,
+        smtp_use_ssl=False,
+    )
+    msg = notify_quote_issued(quote, send_now=False, author=manager)
+    conn = _FakeConnection()
+    monkeypatch.setattr("crm.tasks.get_connection", lambda **kw: conn)
+
+    send_crm_email.run(msg.pk)
+
+    assert len(conn.sent) == 1
+    sent = conn.sent[0]
+    assert sent.from_email == "anna@hoocon.test"
+    assert sent.bcc == ["anna@hoocon.test"]
 
 
 @pytest.mark.django_db

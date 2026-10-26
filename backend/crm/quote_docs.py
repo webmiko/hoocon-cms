@@ -10,10 +10,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, cast
+import re
+from typing import TYPE_CHECKING, Any, cast
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.files.base import ContentFile
+from django.template.loader import render_to_string
 
 from crm.models import Client, ClientDocument, DocumentKind, Quote
 from leads.models import Lead
@@ -22,6 +25,8 @@ if TYPE_CHECKING:
     from crm.models import EmailMessage
 
 logger = logging.getLogger(__name__)
+
+QUOTE_ISSUED_SUBJECT_MARKER = "коммерческое предложение Hoocon"
 
 
 def ensure_quote_pdf_document(quote: Quote) -> ClientDocument:
@@ -48,6 +53,69 @@ def ensure_quote_pdf_document(quote: Quote) -> ClientDocument:
     return doc
 
 
+def _quote_email_signature(manager: Any) -> dict[str, str]:
+    """Signature block for the quote letter (same sources as lead confirmation)."""
+    from crm.manager_signatures import manager_public_contact, manager_signature_contacts
+
+    contact = manager_public_contact(manager)
+    email = contact["email"]
+    sig = manager_signature_contacts(email) if email else None
+    company = (sig.get("company") if sig else None) or 'ООО "ХОГОН"'
+    phone = contact["phone"]
+    name = contact["name"] or "Команда продаж Hoocon"
+    return {
+        "name": name,
+        "company": company,
+        "phone": phone,
+        "tel_href": "+" + re.sub(r"\D", "", phone) if phone else "",
+        "email": email,
+    }
+
+
+def _quote_email_manager_block(manager: Any) -> dict[str, str]:
+    """Manager contacts shown in the «Ваш менеджер» callout."""
+    from crm.manager_signatures import manager_public_contact
+
+    contact = manager_public_contact(manager)
+    phone = contact["phone"]
+    return {
+        "name": contact["name"],
+        "phone": phone,
+        "email": contact["email"],
+        "tel_href": "+" + re.sub(r"\D", "", phone) if phone else "",
+    }
+
+
+def render_quote_issued_email(
+    quote: Quote,
+    *,
+    author: AbstractBaseUser | None = None,
+) -> tuple[str, str, str]:
+    """Subject, plain text, and HTML bodies for the issued-quote client email."""
+    from crm.quote_reply import quote_reply_urls
+
+    client = cast(Client, quote.client)
+    manager = author or quote.created_by or client.assignee
+    accept_url, revise_url = quote_reply_urls(quote.pk)
+    site_url = getattr(settings, "SITE_URL", "").rstrip("/") or "https://hoocon.ru"
+    valid_until_label = quote.valid_until.strftime("%d.%m.%Y") if quote.valid_until else ""
+    context = {
+        "site_url": site_url,
+        "brand_name": "Hoocon",
+        "quote_number": quote.number,
+        "client_name": (client.name or "").strip(),
+        "valid_until_label": valid_until_label,
+        "manager": _quote_email_manager_block(manager),
+        "accept_url": accept_url,
+        "revise_url": revise_url,
+        "signature": _quote_email_signature(manager),
+    }
+    subject = f"{quote.number} — {QUOTE_ISSUED_SUBJECT_MARKER}"
+    text_body = render_to_string("crm/email/quote_issued.txt", context).strip()
+    html_body = render_to_string("crm/email/quote_issued.html", context).strip()
+    return subject, text_body, html_body
+
+
 def notify_quote_issued(
     quote: Quote,
     *,
@@ -56,6 +124,7 @@ def notify_quote_issued(
     document: ClientDocument | None = None,
 ) -> EmailMessage:
     """Queue the «КП выдано» email to the client with the PDF attached."""
+    from crm.manager_signatures import manager_public_contact
     from crm.services import create_outbound_email
 
     client = cast(Client, quote.client)
@@ -65,41 +134,15 @@ def notify_quote_issued(
         with document.file.open("rb") as fh:
             pdf_bytes = fh.read()
         attachments = [(document.title or f"{quote.number}.pdf", "application/pdf", pdf_bytes)]
-    from crm.manager_signatures import manager_public_contact
-    from crm.quote_reply import quote_reply_urls
-
     manager = author or quote.created_by or client.assignee
     contact = manager_public_contact(manager)
-    accept_url, revise_url = quote_reply_urls(quote.pk)
-    lines = [
-        "Здравствуйте!",
-        "",
-        f"Коммерческое предложение {quote.number} — PDF во вложении.",
-    ]
-    if quote.valid_until:
-        lines.append(f"Действует до {quote.valid_until:%d.%m.%Y}.")
-    if contact["name"] or contact["phone"] or contact["email"]:
-        lines.extend(["", "Ваш менеджер:"])
-        if contact["name"]:
-            lines.append(contact["name"])
-        if contact["phone"]:
-            lines.append(f"Телефон: {contact['phone']}")
-        if contact["email"]:
-            lines.append(f"Почта: {contact['email']}")
-    lines.extend(
-        [
-            "",
-            f"Согласовать: {accept_url}",
-            f"Нужны правки: {revise_url}",
-            "",
-            "Ссылки открываются без входа в кабинет.",
-        ],
-    )
+    subject, _text_body, html_body = render_quote_issued_email(quote, author=author)
     return create_outbound_email(
         client=client,
-        subject=f"{quote.number} — коммерческое предложение Hoocon",
-        body="\n".join(lines),
+        subject=subject,
+        body=html_body,
         lead=lead,
+        quote=quote,
         author=author,
         send_now=send_now,
         attachments=attachments,

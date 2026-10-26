@@ -566,6 +566,34 @@ def test_cyrillic_folder_is_selected_and_a_folder_change_resets_the_cursor(
 
 
 @pytest.mark.django_db
+def test_each_enabled_staff_mailbox_selects_its_own_folder(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """Каждый личный ящик открывает свою папку IMAP, не общий INBOX."""
+    from accounts.models import StaffMailbox
+    from crm.imap_fetch import encode_imap_utf7
+
+    settings.IMAP_ENABLED = False
+    StaffMailbox.objects.create(
+        user=_staff_user("mgr-inbox"),
+        imap_user="inbox@hoocon.ru",
+        imap_password="app-not-secret",
+        folder="INBOX",
+    )
+    StaffMailbox.objects.create(
+        user=_staff_user("mgr-zayavki"),
+        imap_user="zayavki@hoocon.ru",
+        imap_password="app-not-secret",
+        folder="Заявки",
+    )
+
+    fetch_inbound_email()
+
+    assert _FakeIMAP.selected == ["INBOX", encode_imap_utf7("Заявки")]
+
+
+@pytest.mark.django_db
 def test_same_message_in_two_boxes_deduped(
     _imap: dict[int, bytes],
 ) -> None:

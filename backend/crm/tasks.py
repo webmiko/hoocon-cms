@@ -159,6 +159,19 @@ def send_quote_reply_mail(self: object, subject: str, body: str, recipient: str)
         raise self.retry(exc=exc)  # type: ignore[attr-defined]
 
 
+def _bcc_manager_for_client_thread(msg: EmailMessage, reply_to: str, sender: str) -> bool:
+    """Whether to BCC the manager mailbox for a client-bound outbound row."""
+    from crm.quote_docs import QUOTE_ISSUED_SUBJECT_MARKER
+
+    to_addr = (msg.to_email or "").strip().casefold()
+    manager = reply_to.casefold()
+    if not manager or manager == to_addr:
+        return False
+    if QUOTE_ISSUED_SUBJECT_MARKER in (msg.subject or ""):
+        return True
+    return bool(msg.lead_id) and manager != sender.casefold()
+
+
 @shared_task(
     bind=True,
     max_retries=3,
@@ -238,14 +251,10 @@ def send_crm_email(self: object, email_id: int) -> None:
                 )
         if reply_to:
             django_msg.reply_to = [reply_to]
-            # Lead «Ответить клиенту»: BCC manager so the thread starts in their
-            # mailbox. Не нужно, когда отправка идёт с его же ящика — копия
-            # и так в «Отправленных».
-            if (
-                msg.lead_id
-                and reply_to.casefold() != (msg.to_email or "").strip().casefold()
-                and reply_to.casefold() != sender.casefold()
-            ):
+            # Lead reply / issued quote: BCC manager so the thread lands in their
+            # mailbox (общий SMTP). КП с личного ящика тоже BCC — иначе копия
+            # только в «Отправленных», а папку «Заявки» менеджер не опрашивает.
+            if _bcc_manager_for_client_thread(msg, reply_to, sender):
                 django_msg.bcc = [reply_to]
         if not claim_crm_email_send(email_id):
             logger.info("crm_email_send_skipped id=%s", email_id)

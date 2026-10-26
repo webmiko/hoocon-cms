@@ -962,7 +962,7 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         return filter_autocomplete_by_client(request, qs)
 
     def get_ordering(self, request: HttpRequest) -> tuple[str, ...]:
-        """Lead changelist: newest first; optional status grouping via ``lead_sort``.
+        """Lead changelist: status blocks by default; ``lead_sort=date`` for flat timeline.
 
         Other admins (e.g. EmailMessage FK widgets) call this without the
         annotation — return model fields only in that case.
@@ -976,9 +976,12 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         match = getattr(request, "resolver_match", None)
         url_name = getattr(match, "url_name", "") or ""
         if url_name.startswith("leads_lead_changelist"):
-            if request.GET.get("lead_sort") == "status":
-                return ("_status_rank", "-created_at", "-pk")
-            return ("-created_at", "-pk")
+            lead_sort = str(getattr(request, "hoocon_lead_sort", "") or "").strip()
+            # Wall section titles assume status blocks (new → in progress → done).
+            # Pure date / column sort mixes statuses — use ``lead_sort=date`` for that.
+            if lead_sort == "date" or request.GET.get("o"):
+                return ("-created_at", "-pk")
+            return ("_status_rank", "-created_at", "-pk")
         return ("-created_at", "-pk")
 
     def _lead_changelist_sort_options(
@@ -1019,20 +1022,20 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
 
         lead_sort = (params.get("lead_sort") if hasattr(params, "get") else "") or ""
         lead_sort = str(lead_sort).strip()
-        default_date_desc = not current_o and lead_sort != "status"
+        default_status_blocks = not current_o and lead_sort != "date"
 
-        options.append(
-            {
-                "label": "Дата · Я→А",
-                "url": _url({"o": None, "lead_sort": None}),
-                "selected": default_date_desc,
-            }
-        )
         options.append(
             {
                 "label": "По статусу",
                 "url": _url({"o": None, "lead_sort": "status"}),
-                "selected": not current_o and lead_sort == "status",
+                "selected": default_status_blocks,
+            }
+        )
+        options.append(
+            {
+                "label": "Дата · Я→А",
+                "url": _url({"o": None, "lead_sort": "date"}),
+                "selected": not current_o and lead_sort == "date",
             }
         )
 
@@ -1225,8 +1228,9 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
     ) -> HttpResponse:
         """Add stats link and wall/kanban view toggle to the leads list.
 
-        ``view`` is not a model lookup — strip it before ChangeList runs, and
-        remember the choice in the session so pagination/filters keep the mode.
+        ``view`` and ``lead_sort`` are not model lookups — strip them before
+        ChangeList runs, and remember the choice in the session so pagination
+        and filters keep wall/kanban mode and sort mode.
 
         Args:
             request: admin request.
@@ -1248,18 +1252,35 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             if view not in {"wall", "kanban"}:
                 view = "wall"
 
+        raw_sort = (original.get("lead_sort") or "").strip().lower()
+        if raw_sort in {"date", "status"}:
+            request.session["hoocon_lead_sort"] = raw_sort
+        elif "lead_sort" in original:
+            request.session.pop("hoocon_lead_sort", None)
+            raw_sort = ""
+        else:
+            raw_sort = (request.session.get("hoocon_lead_sort") or "").strip().lower()
+        if raw_sort not in {"date", "status", ""}:
+            request.session.pop("hoocon_lead_sort", None)
+            raw_sort = ""
+        request.hoocon_lead_sort = raw_sort  # type: ignore[attr-defined]
+
         filter_params = original.copy()
         filter_params.pop("view", None)
-        wall_params = filter_params.copy()
+        filter_params.pop("lead_sort", None)
+        sort_params = filter_params.copy()
+        if raw_sort:
+            sort_params["lead_sort"] = raw_sort
+        wall_params = sort_params.copy()
         wall_params["view"] = "wall"
-        kanban_params = filter_params.copy()
+        kanban_params = sort_params.copy()
         kanban_params["view"] = "kanban"
         extra["hoocon_lead_view"] = view
         extra["hoocon_lead_view_wall_url"] = f"?{wall_params.urlencode()}"
         extra["hoocon_lead_view_kanban_url"] = f"?{kanban_params.urlencode()}"
         extra["hoocon_lead_sort_options"] = self._lead_changelist_sort_options(
             request,
-            filter_params,
+            sort_params,
         )
 
         # ChangeList rejects unknown GET keys (redirects with ?e=1).
