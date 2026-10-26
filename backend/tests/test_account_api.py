@@ -685,7 +685,6 @@ def test_cabinet_leads_notify_and_route_like_site_form(django_capture_on_commit_
         patch("leads.lifecycle.send_lead_notification") as sales,
         patch("leads.lifecycle.send_lead_client_confirmation") as confirm,
         patch("leads.lifecycle._enqueue_staff_push") as push,
-        patch("leads.lifecycle.assign_lead_on_create") as assign,
         django_capture_on_commit_callbacks(execute=True),
     ):
         repeat = api.post(f"/api/account/leads/{source.pk}/repeat/")
@@ -693,10 +692,13 @@ def test_cabinet_leads_notify_and_route_like_site_form(django_capture_on_commit_
     assert repeat.status_code == 201
     assert from_spec.status_code == 201, from_spec.content
     created = {repeat.json()["id"], from_spec.json()["id"]}
-    assert {c.args[0].pk for c in assign.call_args_list} == created
     assert {c.args[0] for c in sales.delay.call_args_list} == created
     assert {c.args[0] for c in confirm.delay.call_args_list} == created
     assert {c.args[0] for c in push.call_args_list} == created
+    from leads.models import Lead
+
+    for lead_id in created:
+        assert Lead.objects.get(pk=lead_id).assignee_id is None
 
 
 @pytest.mark.django_db

@@ -443,6 +443,7 @@ def take_lead_in_work(lead: Lead, manager: Any) -> tuple[Lead, bool]:
         if locked.assignee_id and locked.assignee_id != manager.pk:
             lead.refresh_from_db()
             return lead, False
+        was_free = locked.assignee_id is None
         locked.assignee = manager
         locked.status = Lead.LeadStatus.IN_PROGRESS
         if locked.seen_at is None:
@@ -450,6 +451,9 @@ def take_lead_in_work(lead: Lead, manager: Any) -> tuple[Lead, bool]:
         locked.save(
             update_fields=["assignee", "status", "seen_at", "updated_at"],
         )
+        if was_free:
+            lead_id = locked.pk
+            transaction.on_commit(lambda: _enqueue_lead_taken_notice(lead_id))
         lead.refresh_from_db()
     _log_manager_activity(
         lead,
@@ -458,6 +462,12 @@ def take_lead_in_work(lead: Lead, manager: Any) -> tuple[Lead, bool]:
         body="Статус → В работе",
     )
     return lead, True
+
+
+def _enqueue_lead_taken_notice(lead_id: int) -> None:
+    from leads.tasks import send_lead_taken_notice
+
+    send_lead_taken_notice.delay(lead_id)
 
 
 def apply_lead_manager_on_save(lead: Lead, *, actor: Any) -> None:
@@ -687,6 +697,22 @@ def new_leads_changelist_url() -> str:
     return f"{base}?status__exact=new&seen_at__isempty=1"
 
 
+def lead_sales_notice_id(lead_id: int) -> str:
+    """Message-ID of the first sales letter, so a later reply stays in that thread."""
+    return f"<lead-{lead_id}-new@{_notify_mail_domain()}>"
+
+
+def lead_taken_notice_id(lead_id: int) -> str:
+    """Message-ID of the reply that names the manager who took the lead."""
+    return f"<lead-{lead_id}-taken@{_notify_mail_domain()}>"
+
+
+def _notify_mail_domain() -> str:
+    site = getattr(settings, "SITE_URL", "") or "https://hoocon.ru"
+    host = site.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+    return host or "hoocon.ru"
+
+
 def build_lead_admin_url(lead_id: int) -> str:
     """Absolute Admin change URL for a lead (for email body).
 
@@ -725,6 +751,14 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         subject=f"Re: {format_lead_reply_subject(lead)}",
         from_email=(getattr(assignee, "email", "") or "").strip(),
     )
+    take_url = ""
+    call_url = ""
+    if assignee is None:
+        take_url = f"{site_url}{reverse('admin:leads_lead_assign_me', args=[lead.pk])}"
+        phone = (lead.phone or "").strip()
+        digits = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+        if digits:
+            call_url = f"tel:{digits}"
     context = {
         "lead": lead,
         "site_url": site_url,
@@ -736,6 +770,8 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         "is_continuation": is_continuation,
         "bundle_root": root,
         "reply_url": reply_url,
+        "take_url": take_url,
+        "call_url": call_url,
     }
     if is_continuation and root is not None:
         subject = f"Продолжение КП #{root.pk} → заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
@@ -743,6 +779,25 @@ def render_lead_notification(lead: Lead) -> tuple[str, str, str]:
         subject = f"Новая заявка #{lead.pk}: {lead.get_lead_type_display()} от {lead.name}"
     text_body = render_to_string("leads/email/new_lead.txt", context).strip()
     html_body = render_to_string("leads/email/new_lead.html", context).strip()
+    return subject, text_body, html_body
+
+
+def render_lead_taken_notice(lead: Lead) -> tuple[str, str, str]:
+    """Subject and bodies for the sales-thread reply after a manager takes a lead.
+
+    The subject keeps the original one with ``Re:``, so the mailbox groups it
+    with the first letter even when threading headers are dropped.
+    """
+    original, _text, _html = render_lead_notification(lead)
+    subject = original if original.lower().startswith("re:") else f"Re: {original}"
+    name = manager_display_name(lead.assignee) if lead.assignee_id else ""
+    context = {
+        "lead": lead,
+        "manager_name": name,
+        "admin_url": build_lead_admin_url(lead.pk),
+    }
+    text_body = render_to_string("leads/email/lead_taken.txt", context).strip()
+    html_body = render_to_string("leads/email/lead_taken.html", context).strip()
     return subject, text_body, html_body
 
 

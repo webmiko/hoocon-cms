@@ -630,3 +630,21 @@ def test_seed_wiki_today_board_is_the_managers_own_queue() -> None:
     row = changelog.split('id="changelog-today-own-queue"', 1)[1].split("</tr>", 1)[0]
     assert "25.10.2026" in row
     assert "лист «Клиенты»" in row
+
+
+@pytest.mark.django_db
+def test_seed_wiki_says_support_bot_does_not_answer_clients() -> None:
+    """Руководство: бот чата не отвечает клиенту, вне часов остаётся автоответ."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert "бот клиенту не отвечает" in body
+    assert changelog.index("changelog-lead-pool") < changelog.index("changelog-support-bot-off")
+    assert changelog.index("changelog-support-bot-off") < changelog.index("changelog-outbound-softphone")
+    row = changelog.split('id="changelog-support-bot-off"', 1)[1].split("</tr>", 1)[0]
+    assert "26.10.2026" in row
+    assert "больше не отвечает клиенту" in row

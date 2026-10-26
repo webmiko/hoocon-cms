@@ -319,16 +319,11 @@ def test_company_owner_notify_goes_to_manager_email() -> None:
 
 
 @pytest.mark.django_db
-def test_new_lead_inherits_pinned_client_assignee() -> None:
-    """Заявка на закреплённую карточку → assignee её владельца (любой канал).
-
-    Регресс правила §14.8.4: связь «клиент → его менеджер» работает и без
-    company (почтовая карточка до заполнения юрлица), и вне режима
-    round-robin — это владение, не распределение.
-    """
+def test_new_lead_stays_unassigned_even_on_a_pinned_client() -> None:
+    """A new lead is not given to the manager who already owns the client card."""
     mgr = _make_manager(username="inh-a", email="inh-a@hoocon.ru")
     _make_manager(username="inh-b", email="inh-b@hoocon.ru")
-    _set_mode(SiteSettings.LeadRoutingMode.OFF)  # ротация выключена
+    _set_mode(SiteSettings.LeadRoutingMode.OFF)
     CrmClient.objects.create(
         name="Иван",
         email="ivan@corp-inh.ru",
@@ -340,7 +335,8 @@ def test_new_lead_inherits_pinned_client_assignee() -> None:
 
     lead.refresh_from_db()
     assert lead.client is not None
-    assert lead.assignee_id == mgr.pk
+    assert lead.client.assignee_id == mgr.pk
+    assert lead.assignee_id is None
 
 
 @pytest.mark.django_db

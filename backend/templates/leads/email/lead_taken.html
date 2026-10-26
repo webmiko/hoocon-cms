@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Заявка #{{ lead.pk }} взята в работу</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f7;color:#2a2a2a;
+             font-family:Helvetica,Arial,sans-serif;line-height:1.5;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+         style="background:#f3f4f7;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+               style="max-width:560px;background:#ffffff;border-radius:16px;
+                      border:1px solid rgba(30,30,40,0.08);">
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 12px;font-size:16px;color:#2a2a2a;">
+                Заявка #{{ lead.pk }} уже с ответственным менеджером.
+              </p>
+              <p style="margin:0 0 20px;font-size:16px;color:#2a2a2a;">
+                Взята в работу: <strong>{{ manager_name }}</strong>.
+              </p>
+              <a href="{{ admin_url }}"
+                 style="display:inline-block;padding:12px 22px;background:#da0e2b;color:#ffffff;
+                        font-size:14px;font-weight:700;text-decoration:none;border-radius:10px;">
+                Открыть заявку
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

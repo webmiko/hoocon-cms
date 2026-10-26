@@ -140,8 +140,8 @@ def test_aterna_skips_round_robin_among_managers() -> None:
 
 @pytest.mark.django_db(transaction=True)
 @override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru")
-def test_api_aterna_assigns_assistant(client) -> None:
-    """POST /api/leads/ from ООО Атерна sets assignee assistant@hoocon.ru."""
+def test_api_aterna_stays_unassigned(client) -> None:
+    """POST /api/leads/ from ООО Атерна stays in the shared pool."""
     from unittest.mock import patch
 
     _make_manager(username="api-aterna-mgr", email="api-mgr@hoocon.ru")
@@ -168,7 +168,8 @@ def test_api_aterna_assigns_assistant(client) -> None:
         )
         assert response.status_code == 201
     lead = Lead.objects.get(pk=response.json()["id"])
-    assert lead.assignee_id == lyudmila.pk
+    assert lead.assignee_id is None
+    assert lead.assignee_id != lyudmila.pk
     mock_task.delay.assert_called_once_with(lead.pk)
 
 
@@ -394,8 +395,8 @@ def test_scope_hides_assigned_new_from_other_managers() -> None:
 
 @pytest.mark.django_db(transaction=True)
 @override_settings(LEAD_NOTIFY_EMAIL="sales@hoocon.ru")
-def test_api_assign_sales_sets_assignee(client) -> None:
-    """POST /api/leads/ in assign_sales mode sets Lead.assignee."""
+def test_api_lead_stays_unassigned(client) -> None:
+    """POST /api/leads/ does not pick a manager, even in assign_sales mode."""
     from unittest.mock import patch
 
     mgr = _make_manager(username="api-rr", email="api-rr@hoocon.ru")
@@ -415,7 +416,8 @@ def test_api_assign_sales_sets_assignee(client) -> None:
         )
         assert response.status_code == 201
     lead = Lead.objects.get(pk=response.json()["id"])
-    assert lead.assignee_id == mgr.pk
+    assert lead.assignee_id is None
+    assert lead.assignee_id != mgr.pk
     mock_task.delay.assert_called_once_with(lead.pk)
 
 

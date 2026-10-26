@@ -1,8 +1,11 @@
-"""Public documentation hub API (list + family zip)."""
+"""Public documentation hub API (list + family zip) and the stable PDF URL."""
 
 from __future__ import annotations
 
-from django.http import FileResponse, HttpResponse
+from typing import Any
+
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.views import View
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -16,8 +19,11 @@ from catalog.docs_hub import (
     collect_hub_payload,
     family_zip_etag,
     family_zip_total_bytes,
+    files_for_pdf_path,
+    published_file_for_pdf_path,
     unique_product_files_for_family,
 )
+from catalog.models import ProductFile
 
 
 class DocsHubListView(APIView):
@@ -71,4 +77,44 @@ class DocsFamilyZipView(APIView):
         response = FileResponse(buf, as_attachment=True, filename=f"{family_key}-docs.zip")
         response["ETag"] = f'"{etag}"'
         response["Cache-Control"] = "public, max-age=300"
+        return response
+
+
+def _open_stored_pdf(pf: ProductFile) -> Any:
+    """Open the stored PDF, or None when the blob is missing."""
+    if not pf.file:
+        return None
+    try:
+        return pf.file.open("rb")
+    except (OSError, ValueError, FileNotFoundError):
+        return None
+
+
+class CanonicalPdfView(View):
+    """GET /dokumentaciya/pdf/<family>/<stem>.pdf — one indexable file per document.
+
+    Copies under ``/media/product_files/`` are not this URL. Those stay on disk
+    for the admin and are marked noindex at nginx.
+    """
+
+    http_method_names = ["get", "head", "options"]
+
+    def get(self, request: HttpRequest, family: str, stem: str) -> FileResponse:
+        """Stream the winning published copy. A missing blob falls through to the next."""
+        path = f"/dokumentaciya/pdf/{family}/{stem}.pdf"
+        winner = published_file_for_pdf_path(path)
+        handle = _open_stored_pdf(winner) if winner is not None else None
+        if handle is None and winner is not None:
+            for other in files_for_pdf_path(path):
+                if other.pk == winner.pk:
+                    continue
+                handle = _open_stored_pdf(other)
+                if handle is not None:
+                    break
+        if handle is None:
+            raise Http404
+        response = FileResponse(handle, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{stem}.pdf"'
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "public, max-age=86400"
         return response

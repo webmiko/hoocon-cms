@@ -1,7 +1,7 @@
 """Documentation hub: family keys, kind inference, deduped ProductFile lists.
 
-Public download center at ``/dokumentaciya`` — not the SKU-nested files API.
-Family manuals are attached to many SKUs; list/zip must unique-by-title.
+Public download center at ``/dokumentaciya``. Family manuals are attached to
+many SKUs; list, zip and the public PDF URL are unique per document.
 """
 
 from __future__ import annotations
@@ -66,6 +66,21 @@ KIND_CERTIFICATE = "certificate"
 KIND_CATALOG = "catalog"
 KIND_DATASHEET = "datasheet"
 KIND_OTHER = "other"
+
+# One public URL per document. Certificates and print catalogs are the same
+# file on many families; manuals and passports stay per family.
+SHARED_PDF_FAMILY = "obshchee"
+_PDF_KIND_SLUG: dict[str, str] = {
+    KIND_PASSPORT: "pasport",
+    KIND_MANUAL: "instrukciya",
+    KIND_CERTIFICATE: "sertifikat",
+    KIND_CATALOG: "katalog",
+    KIND_DATASHEET: "dokument",
+    KIND_OTHER: "prochee",
+}
+_PDF_SLUG_MAX = 60
+_PDF_HASH_LEN = 10
+_PDF_INDEX_TTL = 120
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +267,51 @@ def normalize_doc_title(title: str) -> str:
     return re.sub(r"\s+", " ", (title or "").strip()).casefold()
 
 
+def _pdf_family_segment(sku_code: str, kind: str) -> str:
+    """URL family: one bucket for a shared certificate/catalog, else the series."""
+    if kind in (KIND_CERTIFICATE, KIND_CATALOG):
+        return SHARED_PDF_FAMILY
+    token = slugify(doc_family_key(sku_code), allow_unicode=False)
+    return token or "other"
+
+
+def _pdf_stem(title: str, kind: str) -> str:
+    """Ascii filename stem. The hash is of kind + normalized title, not the bytes."""
+    digest = hashlib.sha256(
+        f"{kind}\n{normalize_doc_title(title)}".encode(),
+    ).hexdigest()[:_PDF_HASH_LEN]
+    latin = slugify(title, allow_unicode=False).strip("-")[:_PDF_SLUG_MAX].strip("-")
+    kind_slug = _PDF_KIND_SLUG.get(kind, "dokument")
+    if latin:
+        return f"{kind_slug}-{latin}-{digest}"
+    return f"{kind_slug}-{digest}"
+
+
+def canonical_pdf_path(*, sku_code: str, title: str, file_type: str) -> str:
+    """Stable public path for a ProductFile. Copies of one document share it.
+
+    Manuals and passports are keyed by family + title. A certificate or a
+    print catalog is keyed by title only, so every card points at one URL.
+    """
+    kind = doc_kind(title, file_type)
+    family = _pdf_family_segment(sku_code, kind)
+    return f"/dokumentaciya/pdf/{family}/{_pdf_stem(title, kind)}.pdf"
+
+
+def public_pdf_url(
+    *,
+    sku_code: str,
+    title: str,
+    file_type: str,
+    request: Any | None = None,
+) -> str:
+    """Absolute URL when a request is present, otherwise the path."""
+    path = canonical_pdf_path(sku_code=sku_code, title=title, file_type=file_type)
+    if request is None:
+        return path
+    return request.build_absolute_uri(path)
+
+
 def published_files_qs() -> QuerySet[ProductFile]:
     """Published ProductFiles on published SKUs, with catalog FKs loaded."""
     return (
@@ -302,13 +362,97 @@ def cached_file_sizes(files: Iterable[ProductFile]) -> dict[int, int]:
 
 
 def _file_url(pf: ProductFile, request: Any | None) -> str:
-    """Absolute or relative media URL for the PDF."""
-    if not pf.file:
-        return ""
-    url = pf.file.url
-    if request is not None:
-        return request.build_absolute_uri(url)
-    return url
+    """Public canonical URL. Storage paths under /media/ stay unlisted."""
+    sku = cast(SKU, pf.sku)
+    return public_pdf_url(
+        sku_code=sku.sku_code,
+        title=pf.title,
+        file_type=pf.file_type,
+        request=request,
+    )
+
+
+def _published_pdf_stamp() -> str:
+    """Changes when a published file row changes, not when a SKU is hidden."""
+    from django.db.models import Count, Max
+
+    agg = ProductFile.objects.filter(
+        is_published=True,
+        sku__is_published=True,
+    ).aggregate(n=Count("id"), stamp=Max("updated_at"))
+    stamp = agg["stamp"]
+    stamp_s = stamp.isoformat() if stamp is not None else ""
+    return f"{agg['n']}:{stamp_s}"
+
+
+def _pdf_index() -> tuple[dict[str, int], str]:
+    """Map canonical path → lowest published ProductFile id."""
+    cache_key = f"docs-pdf-index:v1:{_published_pdf_stamp()}"
+    cached = cache.get(cache_key)
+    if isinstance(cached, dict):
+        return cached, cache_key
+    index: dict[str, int] = {}
+    for pf in published_files_qs().order_by("id"):
+        sku = cast(SKU, pf.sku)
+        path = canonical_pdf_path(
+            sku_code=sku.sku_code,
+            title=pf.title,
+            file_type=pf.file_type,
+        )
+        index.setdefault(path, pf.id)
+    cache.set(cache_key, index, timeout=_PDF_INDEX_TTL)
+    return index, cache_key
+
+
+def _published_pdf(pk: int) -> ProductFile | None:
+    """The row only if it is still a published file on a published SKU."""
+    return published_files_qs().filter(pk=pk).first()
+
+
+def published_file_for_pdf_path(path: str) -> ProductFile | None:
+    """Resolve a public PDF path. Hiding the winning SKU promotes the next copy."""
+    index, cache_key = _pdf_index()
+    pk = index.get(path)
+    if pk is None:
+        return None
+    found = _published_pdf(pk)
+    if found is not None:
+        return found
+    cache.delete(cache_key)
+    index, _cache_key = _pdf_index()
+    pk = index.get(path)
+    if pk is None:
+        return None
+    return _published_pdf(pk)
+
+
+def files_for_pdf_path(path: str) -> list[ProductFile]:
+    """Every published copy of the document at ``path``, lowest id first."""
+    rows: list[ProductFile] = []
+    for pf in published_files_qs().order_by("id"):
+        sku = cast(SKU, pf.sku)
+        candidate = canonical_pdf_path(
+            sku_code=sku.sku_code,
+            title=pf.title,
+            file_type=pf.file_type,
+        )
+        if candidate == path:
+            rows.append(pf)
+    return rows
+
+
+def canonical_pdf_locations() -> list[tuple[str, datetime]]:
+    """One sitemap row per public PDF path, with the winning file's lastmod."""
+    winners: dict[str, ProductFile] = {}
+    for pf in published_files_qs().order_by("id"):
+        sku = cast(SKU, pf.sku)
+        path = canonical_pdf_path(
+            sku_code=sku.sku_code,
+            title=pf.title,
+            file_type=pf.file_type,
+        )
+        winners.setdefault(path, pf)
+    return [(path, pf.updated_at) for path, pf in sorted(winners.items())]
 
 
 def dedupe_files_by_family_title(

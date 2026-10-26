@@ -660,9 +660,15 @@ def test_new_client_company_guessed_from_corporate_domain(
 @pytest.mark.django_db
 def test_env_box_routes_via_canonical_pipeline(
     _imap: dict[int, bytes],
+    django_capture_on_commit_callbacks: object,
 ) -> None:
-    """Общий ящик + новый отправитель → канонический assign_lead_on_create:
-    round-robin по группе «Менеджер», клиент закрепляется за ним."""
+    """Общий ящик + новый отправитель остаётся без ответственного.
+
+    Письмо на sales предлагает «Взять». Круговая очередь на входящие не ставит
+    менеджера и не закрепляет карточку клиента.
+    """
+    from unittest.mock import patch
+
     from django.contrib.auth.models import Group
 
     from accounts.roles import GROUP_MANAGER
@@ -680,14 +686,19 @@ def test_env_box_routes_via_canonical_pipeline(
     _imap[1] = _raw_email(message_id="<d1@t>", from_addr="Новый <n1@alpha.test>")
     _imap[2] = _raw_email(message_id="<d2@t>", from_addr="Другой <n2@beta.test>")
 
-    fetch_inbound_email()
+    with (
+        patch("leads.tasks.send_lead_notification.delay") as notify,
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        fetch_inbound_email()
 
     row1 = EmailMessage.objects.get(message_id="<d1@t>")
     row2 = EmailMessage.objects.get(message_id="<d2@t>")
     assert row1.lead is not None and row2.lead is not None
-    assert row1.lead.assignee_id == m1.pk
-    assert row1.client.assignee_id == m1.pk  # компания закреплена
-    assert row2.lead.assignee_id == m2.pk  # следующий по кругу
+    assert row1.lead.assignee_id is None
+    assert row1.client.assignee_id is None
+    assert row2.lead.assignee_id is None
+    assert {call.args[0] for call in notify.call_args_list} == {row1.lead.pk, row2.lead.pk}
 
 
 @pytest.mark.django_db

@@ -40,7 +40,7 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     - ScopedRateThrottle on `lead_create` (10/hour per IP).
     - Honeypot silent drop: if `website` field is filled, returns 201
       but does NOT create a Lead or send email.
-    - Assignee: ООО Атерна → assistant@hoocon.ru; else round-robin when enabled.
+    - Assignee: a new lead stays unassigned. A manager takes it from the sales letter.
     - Celery task `send_lead_notification` fires via transaction.on_commit
       after successful creation.
     """

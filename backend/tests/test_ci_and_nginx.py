@@ -499,6 +499,17 @@ def test_telephony_webhook_token_not_in_access_log() -> None:
     assert "proxy_set_header X-Forwarded-For $remote_addr;" in block
 
 
+def test_product_file_copies_are_noindex_and_the_stable_pdf_is_not() -> None:
+    """Storage copies get X-Robots-Tag noindex. The SPA proxy must not."""
+    conf = NGINX_CONF.read_text(encoding="utf-8")
+    inc = NGINX_SITE_INC.read_text(encoding="utf-8")
+    assert "map $uri $hoocon_media_robots" in conf
+    assert '~*^/media/product_files/ "noindex"' in conf
+    assert "add_header X-Robots-Tag $hoocon_media_robots always;" in inc
+    spa = inc.split("location @spa", 1)[1]
+    assert "noindex" not in spa
+
+
 def test_all_shell_scripts_parse_with_bash_n() -> None:
     """Поведенческая проверка вместо «файл существует»: каждый scripts/*.sh парсится bash."""
     import subprocess

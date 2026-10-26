@@ -327,6 +327,20 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
     analog_code = (sku.analog_belimo_code or "").strip()
     if analog_code:
         crawl_lines.append(f"Аналог Belimo: {analog_code}")
+    from catalog.docs_hub import canonical_pdf_path
+
+    pdf_links: list[tuple[str, str]] = []
+    seen_pdf: set[str] = set()
+    for pf in sku.files.filter(is_published=True).order_by("sort_order", "title", "id"):
+        href = canonical_pdf_path(
+            sku_code=sku.sku_code or "",
+            title=pf.title,
+            file_type=pf.file_type,
+        )
+        if href in seen_pdf:
+            continue
+        seen_pdf.add(href)
+        pdf_links.append((href, pf.title))
     redirect_to = ""
     http_status = 200
     if path.startswith("/catalog/") and path != canonical:
@@ -355,7 +369,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         ),
         crawl_heading=display_name or sku.sku_code or sku.slug,
         crawl_lines=tuple(crawl_lines),
-        crawl_links=tuple(crumbs[:-1]),
+        crawl_links=tuple([*crumbs[:-1], *pdf_links]),
         redirect_to=redirect_to,
         http_status=http_status,
     )

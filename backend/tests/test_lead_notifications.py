@@ -286,3 +286,166 @@ def test_admin_css_defines_lead_sticker() -> None:
     assert "hoocon-admin-lead-sticker__count" in css
     assert ".hoocon-lead-status--new" in css
     assert "a.hoocon-admin-lead-open" in css
+
+
+@pytest.mark.django_db
+@override_settings(SITE_URL="https://hoocon.ru")
+def test_unassigned_lead_email_offers_call_and_take() -> None:
+    """A lead with no owner emails sales a call link and a take link."""
+    lead = Lead.objects.create(
+        name="Иван",
+        email="ivan@example.com",
+        phone="+7 (495) 111-22-33",
+        message="Нужен привод на заслонку.",
+        lead_type=Lead.LeadType.RFQ,
+    )
+    _subject, text_body, html_body = render_lead_notification(lead)
+    take = f"https://hoocon.ru/admin/leads/lead/{lead.pk}/assign-me/"
+    assert take in text_body
+    assert take in html_body
+    assert "Взять" in html_body
+    assert "tel:+74951112233" in html_body
+    assert "Позвонить" in html_body
+    assert "Ответственный менеджер" not in html_body
+
+
+@pytest.mark.django_db
+def test_take_link_does_not_assign_until_post() -> None:
+    """Opening the sales-letter link does not claim the lead. POST does.
+
+    A second manager cannot take a lead that already has an owner.
+    """
+    from django.urls import reverse
+
+    owner = User.objects.create_superuser("take-a", "take-a@example.com", "password12")
+    other = User.objects.create_superuser("take-b", "take-b@example.com", "password12")
+    lead = Lead.objects.create(
+        name="Мария",
+        email="maria@example.com",
+        phone="84951112233",
+        message="Срок поставки.",
+    )
+    url = reverse("admin:leads_lead_assign_me", args=[lead.pk])
+    first = Client()
+    first.force_login(owner)
+    opened = first.get(url)
+    assert opened.status_code == 200
+    assert "Взять" in opened.content.decode()
+    lead.refresh_from_db()
+    assert lead.assignee_id is None
+
+    taken = first.post(url)
+    assert taken.status_code == 302
+    lead.refresh_from_db()
+    assert lead.assignee_id == owner.pk
+    assert lead.status == Lead.LeadStatus.IN_PROGRESS
+
+    second = Client()
+    second.force_login(other)
+    blocked = second.post(url)
+    assert blocked.status_code == 403
+    lead.refresh_from_db()
+    assert lead.assignee_id == owner.pk
+
+
+@pytest.mark.django_db
+@override_settings(
+    LEAD_NOTIFY_EMAIL="sales@hoocon.ru",
+    SITE_URL="https://hoocon.ru",
+    DEFAULT_FROM_EMAIL="crm@hoocon.ru",
+    CELERY_TASK_ALWAYS_EAGER=True,
+    CELERY_TASK_EAGER_PROPAGATES=True,
+)
+def test_taking_a_free_lead_replies_in_the_sales_thread(
+    django_capture_on_commit_callbacks: object,
+) -> None:
+    """The sales box gets a reply in the same thread naming who took the lead.
+
+    A second click and a failed grab do not send another letter.
+    """
+    from leads.services import lead_sales_notice_id, take_lead_in_work
+
+    manager = User.objects.create_user(
+        username="larisa",
+        email="larisa@hoocon.ru",
+        password="password12",
+        first_name="Лариса",
+        is_staff=True,
+        is_active=True,
+    )
+    other = User.objects.create_user(
+        username="other-take",
+        email="other-take@hoocon.ru",
+        password="password12",
+        first_name="Пётр",
+        is_staff=True,
+        is_active=True,
+    )
+    lead = Lead.objects.create(
+        name="Иван",
+        email="ivan@example.com",
+        message="Нужен привод для вентиляции.",
+        lead_type=Lead.LeadType.RFQ,
+    )
+    mail.outbox.clear()
+    send_lead_notification.apply(args=[lead.pk]).get()
+    first = mail.outbox[0]
+    assert first.to == ["sales@hoocon.ru"]
+    assert first.message()["Message-ID"] == lead_sales_notice_id(lead.pk)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        _lead, taken = take_lead_in_work(lead, manager)
+    assert taken is True
+    assert len(mail.outbox) == 2
+    reply = mail.outbox[1]
+    assert reply.to == ["sales@hoocon.ru"]
+    assert reply.subject == f"Re: {first.subject}"
+    assert "Взята в работу: Лариса." in reply.body
+    assert "уже с ответственным менеджером" in reply.body
+    assert reply.message()["In-Reply-To"] == lead_sales_notice_id(lead.pk)
+    assert lead_sales_notice_id(lead.pk) in reply.message()["References"]
+
+    with django_capture_on_commit_callbacks(execute=True):
+        take_lead_in_work(lead, manager)
+    assert len(mail.outbox) == 2
+
+    fresh = Lead.objects.create(
+        name="Ольга",
+        email="olga@example.com",
+        message="Другая заявка на привод.",
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        _taken_first, ok_first = take_lead_in_work(fresh, manager)
+        _taken_second, ok_second = take_lead_in_work(fresh, other)
+    assert ok_first is True and ok_second is False
+    replies = [item for item in mail.outbox if item.subject.startswith("Re:")]
+    assert len(replies) == 2
+    assert all(item.to == ["sales@hoocon.ru"] for item in replies)
+
+
+@pytest.mark.django_db
+def test_view_only_staff_cannot_take_a_lead_from_the_sales_link() -> None:
+    """A staff user who can only view leads cannot claim one from the letter."""
+    from django.contrib.auth.models import Permission
+    from django.urls import reverse
+
+    viewer = User.objects.create_user(
+        username="lead-view-only",
+        email="lead-view-only@example.com",
+        password="password12",
+        is_staff=True,
+        is_superuser=False,
+    )
+    viewer.user_permissions.add(Permission.objects.get(codename="view_lead"))
+    lead = Lead.objects.create(
+        name="Только просмотр",
+        email="view-only-lead@example.com",
+        message="Заявка без права изменить.",
+        status=Lead.LeadStatus.NEW,
+    )
+    client = Client()
+    client.force_login(viewer)
+    response = client.post(reverse("admin:leads_lead_assign_me", args=[lead.pk]))
+    assert response.status_code == 403
+    lead.refresh_from_db()
+    assert lead.assignee_id is None

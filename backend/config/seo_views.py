@@ -13,6 +13,7 @@ from django.http import HttpRequest, HttpResponse
 from django.utils import timezone
 from django.views import View
 
+from catalog.docs_hub import canonical_pdf_locations
 from catalog.models import SKU, Category
 from catalog.urls_paths import catalog_category_path, catalog_path_for_sku
 from config.seo.routes import CANONICAL_REPLACEMENTS, PUBLIC_STATIC_ROUTES
@@ -242,6 +243,9 @@ class SitemapXmlView(View):
             if mirrored and mirrored in article_slugs:
                 continue
             urls.append((f"{base}/novosti/{news.slug}", _lastmod(news.updated_at)))
+
+        for pdf_path, updated in canonical_pdf_locations():
+            urls.append((f"{base}{pdf_path}", _lastmod(updated)))
 
         seen: set[str] = set()
         unique: list[tuple[str, str | None]] = []

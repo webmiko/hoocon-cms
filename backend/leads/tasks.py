@@ -20,8 +20,12 @@ from django.core.mail import EmailMultiAlternatives
 from config.logging_utils import setup_logger
 from leads.models import Lead
 from leads.services import (
+    lead_sales_notice_id,
+    lead_taken_notice_id,
+    parse_notify_emails,
     render_lead_client_confirmation,
     render_lead_notification,
+    render_lead_taken_notice,
     resolve_lead_notify_recipients,
     resolve_lead_reply_to,
 )
@@ -58,6 +62,7 @@ def send_lead_notification(self: object, lead_id: int) -> None:
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=recipients,
+        headers={"Message-ID": lead_sales_notice_id(lead.pk)},
     )
     message.attach_alternative(html_body, "text/html")
 
@@ -122,3 +127,50 @@ def send_lead_client_confirmation(self: object, lead_id: int) -> None:
         raise self.retry(exc=exc)  # type: ignore[attr-defined]
 
     logger.info("Lead client confirmation sent: lead_id=%s", lead_id)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_lead_taken_notice(self: object, lead_id: int) -> None:
+    """Reply in the sales thread: the lead now has a manager.
+
+    Always goes to LEAD_NOTIFY_EMAIL, the same box as the first letter,
+    not to the manager who just took it.
+    """
+    try:
+        lead = Lead.objects.select_related("assignee").get(pk=lead_id)
+    except Lead.DoesNotExist:
+        logger.warning("Lead not found: lead_id=%s (skipping taken notice)", lead_id)
+        return
+    if lead.assignee_id is None:
+        logger.info("Lead has no assignee; skipping taken notice lead_id=%s", lead_id)
+        return
+
+    recipients = parse_notify_emails(getattr(settings, "LEAD_NOTIFY_EMAIL", "") or "")
+    if not recipients:
+        logger.warning("No lead notify recipients; skipping taken notice lead_id=%s", lead_id)
+        return
+
+    subject, text_body, html_body = render_lead_taken_notice(lead)
+    root_id = lead_sales_notice_id(lead.pk)
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+        headers={
+            "Message-ID": lead_taken_notice_id(lead.pk),
+            "In-Reply-To": root_id,
+            "References": root_id,
+        },
+    )
+    message.attach_alternative(html_body, "text/html")
+    try:
+        message.send(fail_silently=False)
+    except Exception as exc:
+        logger.exception("Failed to send lead taken notice: lead_id=%s", lead_id)
+        raise self.retry(exc=exc)  # type: ignore[attr-defined]
+    logger.info(
+        "Lead taken notice sent: lead_id=%s recipients=%s",
+        lead_id,
+        len(recipients),
+    )
