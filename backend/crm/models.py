@@ -560,7 +560,7 @@ class Quote(models.Model):
         max_digits=5,
         decimal_places=2,
         default=Decimal("22.00"),
-        help_text="Ставка НДС в PDF. 0 — не показывать строку НДС.",
+        help_text="Ставка НДС, уже включённая в цену. 0 — строку НДС в PDF не печатать.",
     )
     created_by: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,
@@ -641,7 +641,9 @@ class QuoteItem(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Необязательно. Цены видны только менеджеру и в счёте.",
+        help_text=(
+            "Цена за единицу с НДС. В PDF печатается как есть, налог из суммы выделяется, а не начисляется сверху."
+        ),
     )
     sort_order: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
         "порядок",
