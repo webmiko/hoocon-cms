@@ -236,6 +236,14 @@ class EmailMessage(models.Model):
         related_name="crm_emails",
         verbose_name="заявка",
     )
+    quote: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        "crm.Quote",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emails",
+        verbose_name="коммерческое предложение",
+    )
     direction: models.CharField = models.CharField(
         "направление",
         max_length=20,

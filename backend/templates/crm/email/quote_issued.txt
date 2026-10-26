@@ -1,0 +1,18 @@
+Здравствуйте{% if client_name %}, {{ client_name }}{% endif %}!
+
+Коммерческое предложение {{ quote_number }} — PDF во вложении.
+{% if valid_until_label %}Действует до {{ valid_until_label }}.
+{% endif %}
+{% if manager.name or manager.phone or manager.email %}Ваш менеджер:
+{% if manager.name %}{{ manager.name }}
+{% endif %}{% if manager.phone %}Телефон: {{ manager.phone }}
+{% endif %}{% if manager.email %}Почта: {{ manager.email }}
+{% endif %}{% endif %}
+Согласовать: {{ accept_url }}
+Нужны правки: {{ revise_url }}
+
+Ссылки открываются без входа в кабинет.
+
+С уважением, {{ signature.name }}
+{{ signature.company }}
+{% if signature.phone %}{{ signature.phone }}{% if signature.email %} | {% endif %}{% endif %}{% if signature.email %}{{ signature.email }}{% endif %}

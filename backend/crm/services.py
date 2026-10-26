@@ -273,6 +273,7 @@ def create_outbound_email(
     body: str,
     to_email: str | None = None,
     lead: Lead | None = None,
+    quote: Quote | None = None,
     author: AbstractBaseUser | None = None,
     reply_to_email: str | None = None,
     send_now: bool = True,
@@ -286,6 +287,7 @@ def create_outbound_email(
         body: plain-text body.
         to_email: override recipient (default client.email).
         lead: optional related Lead.
+        quote: optional related Quote (issued KP letter).
         author: staff User who composed the message.
         reply_to_email: optional Reply-To header (manager mailbox).
         send_now: enqueue Celery send after commit.
@@ -308,6 +310,7 @@ def create_outbound_email(
     msg = EmailMessage.objects.create(
         client=client,
         lead=lead,
+        quote=quote,
         direction=EmailDirection.OUTBOUND,
         status=EmailStatus.QUEUED if send_now else EmailStatus.DRAFT,
         to_email=(to_email or client.email).strip(),
@@ -326,12 +329,17 @@ def create_outbound_email(
             size=len(content),
             file=ContentFile(content, name=filename),
         )
+    from crm.email_body import html_email_to_plain, is_html_email_body
+
+    activity_body = msg.body
+    if is_html_email_body(activity_body):
+        activity_body = html_email_to_plain(activity_body)
     Activity.objects.create(
         client=client,
         lead=lead,
         activity_type=ActivityType.EMAIL,
         subject=msg.subject,
-        body=msg.body[:2000],
+        body=activity_body[:2000],
         author=created_by,  # type: ignore[misc]
     )
     if send_now:

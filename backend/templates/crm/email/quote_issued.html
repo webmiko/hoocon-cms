@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>{{ quote_number }} — коммерческое предложение {{ brand_name }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f7;color:#2a2a2a;
+             font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+         style="background:#f3f4f7;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+               style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;
+                      border:1px solid rgba(30,30,40,0.08);
+                      box-shadow:0 12px 40px rgba(20,20,30,0.06);">
+
+          <tr>
+            <td style="background:#141414;padding:22px 28px 20px;">
+              <a href="{{ site_url }}" style="text-decoration:none;">
+                <span style="font-family:Montserrat,Helvetica,Arial,sans-serif;
+                             font-size:22px;font-weight:700;letter-spacing:0.04em;
+                             color:#da0e2b;">HOOCON</span>
+              </a>
+              <div style="margin-top:6px;font-size:12px;line-height:1.4;color:#a3a3a3;">
+                Приводы и арматура для инженерных систем
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px 28px 8px;">
+              <div style="display:inline-block;padding:4px 10px;border-radius:6px;
+                          background:rgba(218,14,43,0.09);color:#b80c24;
+                          font-size:12px;font-weight:600;letter-spacing:0.02em;">
+                Коммерческое предложение
+              </div>
+              <h1 style="margin:14px 0 8px;font-family:Montserrat,Helvetica,Arial,sans-serif;
+                         font-size:22px;font-weight:700;line-height:1.25;color:#2a2a2a;">
+                {{ quote_number }}
+              </h1>
+              <p style="margin:0;font-size:15px;color:#5a5a5a;">
+                {% if client_name %}Здравствуйте, {{ client_name }}!<br>{% else %}Здравствуйте!<br>{% endif %}
+                PDF с предложением — во вложении к этому письму.
+                {% if valid_until_label %}
+                <br>Срок действия: <strong style="color:#2a2a2a;">до {{ valid_until_label }}</strong>.
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+
+          {% if manager.name or manager.phone or manager.email %}
+          <tr>
+            <td style="padding:16px 28px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                     style="background:rgba(218,14,43,0.07);border-radius:12px;
+                            border:1px solid rgba(218,14,43,0.16);">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;color:#2a2a2a;">
+                    Ваш менеджер:
+                    {% if manager.name %}
+                    <strong style="color:#b80c24;">{{ manager.name }}</strong>
+                    {% endif %}
+                    {% if manager.phone %}
+                    <br><a href="tel:{{ manager.tel_href }}"
+                           style="color:#b80c24;text-decoration:none;">{{ manager.phone }}</a>
+                    {% endif %}
+                    {% if manager.email %}
+                    <br><a href="mailto:{{ manager.email }}"
+                           style="color:#b80c24;text-decoration:none;">{{ manager.email }}</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {% endif %}
+
+          <tr>
+            <td style="padding:16px 28px 8px;">
+              <p style="margin:0 0 14px;font-size:15px;color:#2a2a2a;">
+                Можно согласовать предложение или попросить правки — вход в личный кабинет не нужен.
+              </p>
+              <a href="{{ accept_url }}"
+                 style="display:inline-block;padding:12px 22px;background:#da0e2b;color:#ffffff;
+                        font-size:15px;font-weight:600;text-decoration:none;border-radius:10px;">
+                Согласовать
+              </a>
+              <a href="{{ revise_url }}"
+                 style="display:inline-block;margin-left:8px;padding:11px 22px;background:#ffffff;
+                        color:#b80c24;font-size:15px;font-weight:600;text-decoration:none;
+                        border-radius:10px;border:1px solid rgba(218,14,43,0.35);">
+                Нужны правки
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:8px 28px 28px;font-size:14px;color:#5a5a5a;">
+              С уважением,<br>
+              <strong style="color:#2a2a2a;">{{ signature.name }}</strong><br>
+              {{ signature.company|safe }}<br>
+              {% if signature.phone %}
+              <a href="tel:{{ signature.tel_href }}"
+                 style="color:#b80c24;text-decoration:none;">{{ signature.phone }}</a>
+              {% if signature.email %}<span style="color:#a3a3a3;"> | </span>{% endif %}
+              {% endif %}
+              {% if signature.email %}
+              <a href="mailto:{{ signature.email }}"
+                 style="color:#b80c24;text-decoration:none;">{{ signature.email }}</a>
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#0f0f0f;padding:18px 28px;">
+              <a href="{{ site_url }}"
+                 style="font-family:Montserrat,Helvetica,Arial,sans-serif;
+                        font-size:13px;font-weight:700;letter-spacing:0.04em;
+                        color:#da0e2b;text-decoration:none;">HOOCON</a>
+              <span style="font-size:12px;color:#737373;"> · B2B HVAC</span>
+              <div style="margin-top:6px;font-size:12px;color:#737373;">
+                Ответ на это письмо придёт менеджеру, который ведёт ваше предложение.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
