@@ -212,6 +212,18 @@ def test_nginx_conf_has_security_headers() -> None:
     assert "X-Frame-Options" in content
 
 
+def test_nginx_security_headers_not_duplicated_on_proxied_responses() -> None:
+    """File locations set headers; server preamble and @spa do not (Django owns proxy)."""
+    site = NGINX_SITE_INC.read_text(encoding="utf-8")
+    preamble = site.split("location ", 1)[0]
+    assert "add_header X-Frame-Options" not in preamble
+    assert "add_header X-Content-Type-Options" not in preamble
+
+    spa_block = site.split("location @spa", 1)[1].split("\nlocation ", 1)[0]
+    assert "add_header X-Frame-Options" not in spa_block
+    assert "add_header X-Content-Type-Options" not in spa_block
+
+
 def test_nginx_conf_has_lead_rate_limit() -> None:
     """nginx config rate-limits /api/leads/ (anti-spam backstop)."""
     content = _nginx_site_text()

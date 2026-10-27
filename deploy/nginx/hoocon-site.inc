@@ -7,10 +7,9 @@ client_max_body_size 20M;  # matches MAX_PRODUCT_FILE_SIZE_BYTES (PDF upload)
 root /var/www/hoocon/frontend/dist;
 index index.html;
 
-# Security headers (CSP tightened in Iter 5; baseline now).
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-Frame-Options "DENY" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+# Baseline security headers — on file-serving locations only (each try_files
+# block below). Proxied /api/, /admin/, robots/sitemap, @spa → Django
+# SecurityMiddleware (no duplicate add_header here).
 # CSP / HSTS — enable HSTS after TLS cutover stabilizes (docs/infra-reg-ru.md §5.3).
 # add_header Content-Security-Policy "default-src 'self'; object-src 'none'; frame-ancestors 'none';" always;
 # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
@@ -152,6 +151,8 @@ location /media/ {
     expires 7d;
     add_header Cache-Control "public, max-age=604800" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header X-Robots-Tag $hoocon_media_robots always;
     # PDF inline viewing allowed; no inline scripts.
     add_header Content-Disposition "inline";
@@ -177,6 +178,8 @@ location /static/ {
     expires 30d;
     add_header Cache-Control "public, max-age=2592000, immutable" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 }
 
 # Vite hashed bundles (JS/CSS/fonts under /assets/*-[hash].*) — immutable.
@@ -228,10 +231,12 @@ location ~* ^/(?:home|brand|hero)/ {
 }
 
 # Root public wordmarks (stable names; 30d revalidate).
-location ~* ^/(?:logo(?:-on-dark)?|favicon|og-image)\.(?:svg|png|ico)$ {
+location ~* ^/(?:logo(?:-on-dark)?|favicon(?:-(?:\d+|mark))?|og-image)\.(?:svg|png|ico)$ {
     expires 30d;
     add_header Cache-Control "public, max-age=2592000" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     try_files $uri =404;
 }
 
@@ -240,12 +245,17 @@ location ~* ^/(?:pwa-\d+|apple-touch-icon)\.(?:png|ico)$ {
     expires 1d;
     add_header Cache-Control "public, max-age=86400, must-revalidate" always;
     add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     try_files $uri =404;
 }
 
 location = /manifest.webmanifest {
     expires 1d;
     add_header Cache-Control "public, max-age=86400" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     try_files $uri =404;
 }
 
@@ -273,6 +283,9 @@ location = /index.html {
 
 location / {
     rewrite ^/(.*)/$ /$1 permanent;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     try_files $uri @spa;
 }
 
