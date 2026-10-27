@@ -162,3 +162,32 @@ def test_admin_decoy_otp_correct_code_still_rejected() -> None:
         start_admin_otp_decoy(request, login="unknown-admin", next_url="/admin/")
     with pytest.raises(AdminOtpVerifyError, match="Неверный код"):
         verify_admin_otp(request, "111111")
+
+
+@pytest.mark.django_db
+def test_admin_decoy_otp_rejects_short_code() -> None:
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.test import RequestFactory
+
+    from config.admin_otp import AdminOtpVerifyError, start_admin_otp_decoy, verify_admin_otp
+
+    request = RequestFactory().post("/")
+    request.session = SessionStore()
+    start_admin_otp_decoy(request, login="unknown-admin", next_url="/admin/")
+    with pytest.raises(AdminOtpVerifyError, match="значный"):
+        verify_admin_otp(request, "12")
+
+
+@pytest.mark.django_db
+@override_settings(ADMIN_EMAIL_OTP_RESEND_COOLDOWN_SECONDS=0)
+def test_admin_decoy_otp_resend_refreshes_without_leaking_login() -> None:
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.test import RequestFactory
+
+    from config.admin_otp import resend_admin_otp, start_admin_otp_decoy
+
+    request = RequestFactory().post("/")
+    request.session = SessionStore()
+    start_admin_otp_decoy(request, login="ghost@nowhere.test", next_url="/admin/")
+    resend_admin_otp(request)
+    assert request.session.get("admin_otp_decoy") is True
