@@ -147,16 +147,22 @@ export function WhereToBuyPage() {
           <h3 className={styles.cardTitle}>ООО «Чемпион-Тэк»</h3>
           <ul className={styles.cardMeta}>
             <li>
-              Юридический адрес: 220030 Минск, пр-т Независимости 32А, пом.&nbsp;11
+              220030, Минск, пр-т Независимости, 32А, стр.&nbsp;4, пом.&nbsp;11
             </li>
             <li>
-              Многоканальный телефон:{" "}
-              <a href="tel:+375293726888">+375 29 372 6888</a>
+              <a href="tel:+375293726888">+375 (29) 372-68-88</a>
             </li>
             <li>
-              По вопросам сотрудничества:{" "}
-              <a href="mailto:ichampiontech@yandex.ru">
-                ichampiontech@yandex.ru
+              <a href="mailto:info@championtech.by">info@championtech.by</a>
+            </li>
+            <li>Пн–Пт 9:00–17:00</li>
+            <li>
+              <a
+                href="https://championtech.by/"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                championtech.by
               </a>
             </li>
           </ul>
