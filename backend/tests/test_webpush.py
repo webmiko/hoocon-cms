@@ -130,6 +130,34 @@ def test_subscribe_marketing_requires_consent_header() -> None:
     WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
     WEBPUSH_VAPID_PRIVATE_KEY="test-private",
 )
+def test_unsubscribe_wrong_keys_leaves_row() -> None:
+    upsert_subscription(
+        endpoint="https://fcm.googleapis.com/fcm/send/owned",
+        p256dh="p",
+        auth="a",
+        topic_marketing=True,
+    )
+    client = _csrf_client()
+    token = client.cookies["csrftoken"].value
+    resp = client.post(
+        "/api/webpush/unsubscribe/",
+        data={
+            "endpoint": "https://fcm.googleapis.com/fcm/send/owned",
+            "keys": {"p256dh": "wrong", "auth": "wrong"},
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 0
+    assert PushSubscription.objects.filter(endpoint="https://fcm.googleapis.com/fcm/send/owned").exists()
+
+
+@pytest.mark.django_db
+@override_settings(
+    WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
+    WEBPUSH_VAPID_PRIVATE_KEY="test-private",
+)
 def test_unsubscribe() -> None:
     upsert_subscription(
         endpoint="https://fcm.googleapis.com/fcm/send/gone",
@@ -141,7 +169,10 @@ def test_unsubscribe() -> None:
     token = client.cookies["csrftoken"].value
     resp = client.post(
         "/api/webpush/unsubscribe/",
-        data={"endpoint": "https://fcm.googleapis.com/fcm/send/gone"},
+        data={
+            "endpoint": "https://fcm.googleapis.com/fcm/send/gone",
+            "keys": {"p256dh": "p", "auth": "a"},
+        },
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
     )
@@ -415,6 +446,7 @@ def test_clear_marketing_topic_keeps_support() -> None:
         "/api/webpush/topics/",
         data={
             "endpoint": endpoint,
+            "keys": {"p256dh": "p", "auth": "a"},
             "clear_marketing": True,
             "marketing_consent": False,
         },

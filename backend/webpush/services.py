@@ -113,6 +113,9 @@ def upsert_subscription(
             topic_marketing=topic_marketing,
         )
 
+    if existing.p256dh != p256dh or existing.auth != auth:
+        raise ValueError("subscription keys mismatch")
+
     existing.p256dh = p256dh
     existing.auth = auth
     if user_pk:
@@ -127,9 +130,31 @@ def upsert_subscription(
     return existing
 
 
+def subscription_matches_keys(
+    endpoint: str,
+    *,
+    p256dh: str,
+    auth: str,
+) -> PushSubscription | None:
+    """Return the row only when endpoint and encryption keys match."""
+    endpoint = (endpoint or "").strip()
+    p256dh = (p256dh or "").strip()
+    auth = (auth or "").strip()
+    if not endpoint or not p256dh or not auth:
+        return None
+    existing = PushSubscription.objects.filter(endpoint=endpoint).first()
+    if existing is None:
+        return None
+    if existing.p256dh != p256dh or existing.auth != auth:
+        return None
+    return existing
+
+
 def clear_subscription_topics(
     endpoint: str,
     *,
+    p256dh: str,
+    auth: str,
     clear_support: bool = False,
     clear_marketing: bool = False,
 ) -> PushSubscription | None:
@@ -137,12 +162,9 @@ def clear_subscription_topics(
 
     Returns the updated subscription, or None when deleted / missing.
     """
-    endpoint = (endpoint or "").strip()
-    if not endpoint:
-        raise ValueError("endpoint required")
     if not clear_support and not clear_marketing:
         raise ValueError("at least one topic to clear")
-    existing = PushSubscription.objects.filter(endpoint=endpoint).first()
+    existing = subscription_matches_keys(endpoint, p256dh=p256dh, auth=auth)
     if existing is None:
         return None
     if clear_support:
@@ -156,9 +178,13 @@ def clear_subscription_topics(
     return existing
 
 
-def remove_subscription(endpoint: str) -> int:
-    """Delete by endpoint; return number deleted."""
-    return PushSubscription.objects.filter(endpoint=(endpoint or "").strip()).delete()[0]
+def remove_subscription(endpoint: str, *, p256dh: str, auth: str) -> int:
+    """Delete when endpoint and keys match; return number deleted."""
+    existing = subscription_matches_keys(endpoint, p256dh=p256dh, auth=auth)
+    if existing is None:
+        return 0
+    existing.delete()
+    return 1
 
 
 def sanitize_push_url(url: str) -> str:

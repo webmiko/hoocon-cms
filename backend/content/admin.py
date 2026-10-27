@@ -233,6 +233,18 @@ class WikiDocumentAdmin(OpenChangeLinkMixin, ModelAdmin):
         }
         return render(request, "admin/content/wikidocument/browse.html", context)
 
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: WikiDocument,
+        form: Any,
+        change: bool,
+    ) -> None:
+        from content.wiki_sanitize import sanitize_wiki_html
+
+        obj.body = sanitize_wiki_html(obj.body)
+        super().save_model(request, obj, form, change)
+
     def read_view(self, request: HttpRequest, slug: str) -> HttpResponse:
         """Render stored HTML for staff (full document or admin-wrapped fragment)."""
         if not request.user.has_perm("content.view_wikidocument"):

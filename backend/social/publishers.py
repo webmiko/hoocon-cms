@@ -418,10 +418,11 @@ def max_download_attachment(url: str) -> tuple[bytes, str] | None:
 
     Attachment URLs point at public CDN hosts — no bot token is sent.
     """
+    from social.max_http import max_attachment_url_allowed, public_urlopen
+
     src = (url or "").strip()
-    if not src.startswith("https://"):
+    if not max_attachment_url_allowed(src):
         return None
-    from social.max_http import public_urlopen
 
     request = Request(src)
     try:

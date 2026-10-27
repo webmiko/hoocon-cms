@@ -437,7 +437,7 @@ def test_uis_http_error_surfaces_api_message() -> None:
 
 @pytest.mark.django_db
 def test_uis_webhook_url_quotes_secret(client: Any, django_user_model: Any) -> None:
-    """Секрет с & и + не разваливает query вебхука на странице интеграций."""
+    """Секрет вебхука не попадает в URL на странице интеграций (только X-Webhook-Token)."""
     _enable_uis(secret="a&b+c")
     user = django_user_model.objects.create_superuser(
         username="pbx-secret",
@@ -446,13 +446,14 @@ def test_uis_webhook_url_quotes_secret(client: Any, django_user_model: Any) -> N
     )
     client.force_login(user)
     html = client.get(reverse("admin:sitesettings_sitesettings_changelist")).content.decode()
-    assert "token=a%26b%2Bc" in html
+    assert "token=a%26b%2Bc" not in html
     assert "token=a&b" not in html
+    assert "X-Webhook-Token" in html
 
 
 @pytest.mark.django_db
 def test_uis_webhook_secret_hidden_until_revealed(client: Any, django_user_model: Any) -> None:
-    """URL вебхука с секретом был открытым текстом на странице интеграций."""
+    """URL вебхука на интеграциях не содержит секрет (ни в summary, ни в code)."""
     _enable_uis(secret="very-secret-token")
     user = django_user_model.objects.create_superuser(
         username="pbx-mask",
@@ -461,10 +462,9 @@ def test_uis_webhook_secret_hidden_until_revealed(client: Any, django_user_model
     )
     client.force_login(user)
     html = client.get(reverse("admin:sitesettings_sitesettings_changelist")).content.decode()
-    summary = html.split('<details class="hoocon-pbx__url">', 1)[1].split("</summary>", 1)[0]
-    assert "token=••••" in summary
-    assert "very-secret-token" not in summary
-    assert "<code>" in html.split('<details class="hoocon-pbx__url">', 1)[1]
+    assert "very-secret-token" not in html
+    assert "token=••••" not in html
+    assert "/api/telephony/novosystem/events/" in html
 
 
 @pytest.mark.django_db

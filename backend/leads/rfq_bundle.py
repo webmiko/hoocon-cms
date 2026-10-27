@@ -102,15 +102,20 @@ def attach_rfq_bundle(lead: Lead) -> None:
         lead.save(update_fields=["rfq_bundle_key", "rfq_bundle_root", "updated_at"])
 
 
-def rfq_bundle_queryset(lead: Lead) -> QuerySet[Lead]:
-    """Root + siblings for Admin thread display."""
+def rfq_bundle_queryset(lead: Lead, *, user: object | None = None) -> QuerySet[Lead]:
+    """Root + siblings for Admin thread display (optionally scoped to ``user``)."""
     if lead.rfq_bundle_root_id:
         root_id = lead.rfq_bundle_root_id
     else:
         root_id = lead.pk
-    return Lead.objects.filter(
+    qs = Lead.objects.filter(
         Q(pk=root_id) | Q(rfq_bundle_root_id=root_id),
     ).order_by("created_at", "pk")
+    if user is not None:
+        from leads.services import scope_leads_for_manager
+
+        qs = scope_leads_for_manager(qs, user)
+    return qs
 
 
 def mark_rfq_bundle_done(lead: Lead, *, actor: object) -> int:
@@ -123,7 +128,8 @@ def mark_rfq_bundle_done(lead: Lead, *, actor: object) -> int:
 
     now = timezone.now()
     count = 0
-    for sibling in rfq_bundle_queryset(lead):
+    scoped = rfq_bundle_queryset(lead, user=actor)
+    for sibling in scoped:
         if sibling.status == Lead.LeadStatus.DONE:
             continue
         sibling.status = Lead.LeadStatus.DONE
