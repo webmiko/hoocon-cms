@@ -928,6 +928,8 @@ def test_unfold_extras_css_covers_lead_ui() -> None:
     assert "isUnfoldTabularInline" in js
     assert "processTabularInlineLabels" in js
     assert "observeTabularInlineRows" in js
+    assert "scrollAddedTabularInlineIntoView" in js
+    assert '"formset:added"' in js
     # Inline delete cell label (Unfold's delete <th> is empty → unlabeled icon).
     assert "DELETE_LABEL" in js
     assert '"Удалить"' in js

@@ -13,6 +13,7 @@ from django.utils.html import format_html
 from unfold.admin import TabularInline
 
 from cabinet.models import Order, RmaCase
+from crm.admin.inline_extra import OneBlankInlineRowMixin
 from crm.admin.scope import _scoped_lead_queryset
 from crm.models import Activity, Call, ClientDocument, EmailMessage, Quote, QuoteItem
 from leads.models import Lead
@@ -38,13 +39,12 @@ class OrderCardInlineForm(forms.ModelForm):
         }
 
 
-class OrderInline(TabularInline):
+class OrderInline(OneBlankInlineRowMixin, TabularInline):
     """Orders on the client card (cabinet.Order)."""
 
     tab = True
     model = Order
     form = OrderCardInlineForm
-    extra = 0
     fields = ("number", "status", "comment", "created_at")
     readonly_fields = ("created_at",)
     show_change_link = True
@@ -90,13 +90,12 @@ class LeadCardInlineForm(forms.ModelForm):
         }
 
 
-class LeadInline(TabularInline):
+class LeadInline(OneBlankInlineRowMixin, TabularInline):
     """RFQ / consult requests on this client card (scoped for managers)."""
 
     tab = True
     model = Lead
     form = LeadCardInlineForm
-    extra = 0
     fields = ("lead_type", "message", "status", "assignee", "created_at")
     readonly_fields = ("created_at",)
     show_change_link = True
@@ -116,12 +115,11 @@ class LeadInline(TabularInline):
         return scope_leads_for_manager(super().get_queryset(request), request.user)
 
 
-class ActivityInline(TabularInline):
+class ActivityInline(OneBlankInlineRowMixin, TabularInline):
     """Timeline notes on a Client card."""
 
     tab = True
     model = Activity
-    extra = 0
     fields = ("activity_type", "subject", "body", "lead", "author", "created_at")
     readonly_fields = ("author", "created_at")
     autocomplete_fields = ("lead",)
@@ -237,12 +235,11 @@ class QuoteItemInlineForm(forms.ModelForm):
         return cleaned
 
 
-class QuoteItemInline(TabularInline):
+class QuoteItemInline(OneBlankInlineRowMixin, TabularInline):
     """SKU lines of a quote (manager-editable)."""
 
     model = QuoteItem
     form = QuoteItemInlineForm
-    extra = 0
     fields = ("sku", "sku_code", "quantity", "unit_price", "sort_order")
     autocomplete_fields = ("sku",)
 
@@ -260,13 +257,12 @@ class QuoteCardInlineForm(forms.ModelForm):
         }
 
 
-class QuoteInline(TabularInline):
+class QuoteInline(OneBlankInlineRowMixin, TabularInline):
     """Quotes on the client card. Lines with a chosen SKU live on the quote."""
 
     tab = True
     model = Quote
     form = QuoteCardInlineForm
-    extra = 0
     fields = ("comment", "vat_rate", "number", "status", "created_at")
     readonly_fields = ("number", "status", "created_at")
     show_change_link = True
@@ -309,12 +305,11 @@ class CallInline(TabularInline):
         return False
 
 
-class ClientDocumentInline(TabularInline):
+class ClientDocumentInline(OneBlankInlineRowMixin, TabularInline):
     """Документы карточки (ЛК-3/14): КП-счёта-УПД, private download."""
 
     tab = True
     model = ClientDocument
-    extra = 0
     fields = ("title", "kind", "file", "edo_status", "download_link", "created_at")
     readonly_fields = ("download_link", "created_at")
     ordering = ("-created_at",)

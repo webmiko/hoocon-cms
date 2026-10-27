@@ -16,7 +16,9 @@ from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
+from crm.admin.inline_extra import OneBlankInlineRowMixin
 from crm.admin.list_view import remember_list_view
+from crm.admin.work_label_form import WorkLabelAssignableFormMixin
 from crm.models import Client, Company, CompanyMember, PlannedTouch
 from crm.phone_widget import MultiPhoneWidget
 
@@ -34,12 +36,11 @@ def _manager_may_add_to_company(user: Any, company: Company | None) -> bool:
     return company.assignee_id in (None, getattr(user, "pk", None))
 
 
-class CompanyClientInline(TabularInline):
+class CompanyClientInline(OneBlankInlineRowMixin, TabularInline):
     """People of this company. The contact card opens from the row link."""
 
     model = Client
     fk_name = "company_ref"
-    extra = 0
     fields = ("name", "email", "phone", "assignee")
     autocomplete_fields = ("assignee",)
     show_change_link = True
@@ -60,12 +61,11 @@ class CompanyClientInline(TabularInline):
         return _manager_may_add_to_company(request.user, obj)
 
 
-class CompanyCallInline(TabularInline):
+class CompanyCallInline(OneBlankInlineRowMixin, TabularInline):
     """Planned calls live on the company, not in a separate daily section."""
 
     model = PlannedTouch
     fk_name = "company"
-    extra = 0
     fields = ("starts_at", "status", "assignee", "title")
     autocomplete_fields = ("assignee",)
     show_change_link = True
@@ -85,11 +85,10 @@ class CompanyCallInline(TabularInline):
         return _manager_may_add_to_company(request.user, obj)
 
 
-class CompanyMemberInline(LabeledToggleMixin, TabularInline):
+class CompanyMemberInline(LabeledToggleMixin, OneBlankInlineRowMixin, TabularInline):
     """Members of a company card (CRM-x)."""
 
     model = CompanyMember
-    extra = 1
     toggle_labels = {"is_confirmed": ("Не подтверждён", "Подтверждён")}
     fields = ("client", "account", "role", "is_confirmed")
     autocomplete_fields = ("client",)
@@ -133,7 +132,7 @@ class CompanyAdminForm(forms.ModelForm):
 
 
 @admin.register(Company)
-class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
+class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin):
     """Карточка юрлица: реквизиты + члены (целевая схема CRM-x)."""
 
     form = CompanyAdminForm
@@ -144,7 +143,7 @@ class CompanyAdmin(OpenChangeLinkMixin, ModelAdmin):
     list_filter = ("relevance", "region", "niche", WorkQueueFilter, "assignee", "work_labels")
     search_fields = ("name", "inn", "city", "phone", "email", "website", "contact_name")
     autocomplete_fields = ("assignee",)
-    filter_horizontal = ("work_labels",)
+    filter_horizontal = ()
     readonly_fields = ("company_key", "created_at", "updated_at")
     inlines = (CompanyClientInline, CompanyCallInline, CompanyMemberInline)
     actions = ("merge_companies_action", "assign_to_me")

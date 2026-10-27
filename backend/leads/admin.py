@@ -48,6 +48,8 @@ from catalog.models import SKU
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin, filter_autocomplete_by_client
 from config.admin_toggle import LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
+from crm.admin.inline_extra import OneBlankInlineRowMixin
+from crm.admin.work_label_form import WorkLabelAssignableFormMixin
 from crm.forms import ComposeEmailForm
 from crm.mail_links import (
     format_lead_reply_body,
@@ -135,11 +137,11 @@ class OverdueLeadFilter(admin.SimpleListFilter):
         return queryset.filter(pk__in=overdue_new_lead_pks(queryset))
 
 
-class LeadItemInline(TabularInline):
+class LeadItemInline(OneBlankInlineRowMixin, TabularInline):
     """SKU lines on a lead (multi-RFQ)."""
 
     model = LeadItem
-    extra = 0
+    fk_name = "lead"
     autocomplete_fields = ("sku",)
     fields = ("sku", "sku_code", "quantity", "sort_order")
     ordering = ("sort_order", "id")
@@ -157,7 +159,13 @@ def _scoped_leads(request: HttpRequest) -> QuerySet[Lead]:
 
 
 @admin.register(Lead)
-class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
+class LeadAdmin(
+    WorkLabelAssignableFormMixin,
+    LabeledToggleMixin,
+    ScopedForeignKeyMixin,
+    OpenChangeLinkMixin,
+    ModelAdmin,
+):
     """Admin for customer inquiries (RFQ / consultation / replacement).
 
     PII (email/phone) is visible to staff in Admin — that's the only

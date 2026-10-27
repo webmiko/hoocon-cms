@@ -122,8 +122,8 @@ def test_client_change_form_lists_leads_inline(client, django_user_model) -> Non
 
 
 @pytest.mark.django_db
-def test_client_change_form_no_empty_activity_row(client, django_user_model) -> None:
-    """Activity inline: no always-visible empty row — «Добавить» clones __prefix__ form."""
+def test_client_change_form_shows_blank_activity_and_document_rows(client, django_user_model) -> None:
+    """Empty client card: one blank tabular row per inline until the first save."""
     user = django_user_model.objects.create_user(
         username="crm-activity-extra",
         password="test-pass-not-secret",
@@ -134,11 +134,8 @@ def test_client_change_form_no_empty_activity_row(client, django_user_model) -> 
     client.force_login(user)
     url = reverse("admin:crm_client_change", args=[crm_client.pk])
     html = client.get(url).content.decode()
-    # extra=0 → нет реальной строки №0 без существующих активностей/документов.
-    assert 'name="activities-0-subject"' not in html
-    assert 'id="id_activities-0-subject"' not in html
-    assert 'name="documents-0-title"' not in html
-    # Кнопка «Добавить» остаётся рабочей — JS клонирует пустой шаблон.
+    assert 'name="activities-0-subject"' in html
+    assert 'name="documents-0-title"' in html
     assert "activities-__prefix__" in html
     assert "documents-__prefix__" in html
 

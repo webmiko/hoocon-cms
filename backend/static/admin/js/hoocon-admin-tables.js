@@ -443,6 +443,23 @@
     });
   }
 
+  /** After Unfold clones a tabular row, scroll it into view (add button sits in tfoot). */
+  function scrollAddedTabularInlineIntoView(event) {
+    const row = event.target;
+    if (!(row instanceof Element)) {
+      return;
+    }
+    const tbody = row.closest("tbody.form-group");
+    if (!tbody || tbody.classList.contains("empty-form")) {
+      return;
+    }
+    const table = tbody.closest("[data-inline-type='tabular'] table.formset");
+    if (!table) {
+      return;
+    }
+    tbody.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
   function observeInlineRows() {
     document.querySelectorAll(`.inline-group .tabular table.${CARD_CLASS}`).forEach((table) => {
       const labels = headerLabels(table);
@@ -564,6 +581,7 @@
   function init() {
     processAllTables(document);
     observeTabularInlineRows();
+    document.addEventListener("formset:added", scrollAddedTabularInlineIntoView);
     observeInlineRows();
     collapseIdleFilters();
     enhanceSidebarActionTitles();
