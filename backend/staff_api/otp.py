@@ -17,10 +17,14 @@ from config.admin_otp import (
     OtpChallengeStore,
     OtpCodeMismatchError,
     OtpExpiredError,
+    assert_otp_account_verify_open,
+    consume_otp_account_send_quota,
     consume_otp_request_quota,
     find_staff_user_for_otp,
     generate_otp_code,
     mask_email,
+    note_otp_account_verify_failure,
+    otp_account_subject_staff,
     otp_resend_cooldown_seconds,
 )
 
@@ -64,7 +68,9 @@ def start_staff_otp(request: HttpRequest, login: str) -> dict[str, str]:
 
     Unknown or role-less logins get a decoy challenge with the same reply
     (no email is sent; verify then fails as «Неверный код»), so the endpoint
-    does not reveal which logins exist.
+    does not reveal which logins exist. A real account that has spent its
+    send cap gets «Слишком много запросов» and no further email — a new
+    client IP does not reset that cap.
     """
     from django.conf import settings
 
@@ -75,6 +81,8 @@ def start_staff_otp(request: HttpRequest, login: str) -> dict[str, str]:
         window=int(getattr(settings, "STAFF_OTP_REQUEST_WINDOW_SECONDS", 3600)),
     )
     user = _staff_app_user(login)
+    if user is not None:
+        consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
     code = generate_otp_code()
     challenge_id = secrets.token_urlsafe(24)
     payload = {"user_id": user.pk if user is not None else None, "sent_at": time.time()}
@@ -106,6 +114,8 @@ def resend_staff_otp(request: HttpRequest, challenge_id: str) -> None:
         if user is None:
             _STORE.drop(challenge_id)
             raise AdminOtpDeliveryError("Сессия входа истекла. Запросите код снова.")
+    if user is not None:
+        consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
     code = generate_otp_code()
     _STORE.put(challenge_id, {**raw, "sent_at": time.time()}, code=code)
     if user is not None:
@@ -114,13 +124,22 @@ def resend_staff_otp(request: HttpRequest, challenge_id: str) -> None:
 
 def verify_staff_otp(challenge_id: str, raw_code: str) -> User:
     """Validate code; return staff user. Deletes challenge on success."""
+    pending = _STORE.get(challenge_id)
+    user_id = pending.get("user_id") if pending is not None else None
+    subject = otp_account_subject_staff(int(user_id)) if user_id is not None else None
+    if subject is not None:
+        assert_otp_account_verify_open(subject)
     try:
         raw = _STORE.verify(challenge_id, raw_code)
     except OtpExpiredError:
         raise AdminOtpVerifyError("Код истёк. Запросите новый.") from None
     except OtpAttemptsExhaustedError:
+        if subject is not None:
+            note_otp_account_verify_failure(subject)
         raise AdminOtpVerifyError("Слишком много попыток. Запросите новый код.") from None
     except OtpCodeMismatchError:
+        if subject is not None:
+            note_otp_account_verify_failure(subject)
         raise AdminOtpVerifyError("Неверный код.") from None
     from django.contrib.auth import get_user_model
 

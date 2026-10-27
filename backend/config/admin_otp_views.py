@@ -29,6 +29,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.recovery_codes import RecoveryAttempt, attempt_recovery_code, recovery_subject
 from config.admin_otp import (
     AdminOtpDeliveryError,
+    AdminOtpRateLimitError,
     AdminOtpVerifyError,
     admin_email_otp_enabled,
     begin_admin_otp_session,
@@ -282,6 +283,10 @@ class AdminPasswordlessOtpLoginView(LoginView):
         next_url = self.get_success_url()
         try:
             start_admin_otp_challenge(self.request, user, next_url=next_url)
+        except AdminOtpRateLimitError as exc:
+            _record_axes_failure(self.request, login)
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
         except AdminOtpDeliveryError as exc:
             # Superuser break-glass: open verify session without emailed code.
             if getattr(user, "is_superuser", False):

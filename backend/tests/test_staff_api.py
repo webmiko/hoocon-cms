@@ -457,6 +457,90 @@ def test_otp_resend_resets_real_attempt_counter() -> None:
 
 
 @pytest.mark.django_db
+@override_settings(
+    **{
+        **STAFF_SETTINGS,
+        "ADMIN_EMAIL_OTP_ENABLED": True,
+        "ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT": 1,
+        "EMAIL_BACKEND": "django.core.mail.backends.locmem.EmailBackend",
+    },
+)
+def test_otp_send_quota_is_shared_by_staff_app_and_admin_login() -> None:
+    """Один лимит на сотрудника: новый IP и вход в админку не присылают второй код."""
+    user = _manager(email="shared-quota@example.com")
+    with patch("config.admin_otp.send_admin_otp_email") as send:
+        started = Client(REMOTE_ADDR="203.0.113.20").post(
+            "/api/staff/auth/otp/start/",
+            {"login": user.email},
+            content_type="application/json",
+        )
+        assert started.status_code == 200
+        again = Client(REMOTE_ADDR="203.0.113.21").post(
+            "/api/staff/auth/otp/start/",
+            {"login": user.email},
+            content_type="application/json",
+        )
+        assert again.status_code == 400
+        assert again.json()["detail"] == "Слишком много запросов. Попробуйте позже."
+        admin = Client(REMOTE_ADDR="203.0.113.22")
+        admin.get("/admin/login/")
+        blocked = admin.post(
+            "/admin/login/",
+            {
+                "username": user.username,
+                "next": "/admin/",
+                "csrfmiddlewaretoken": admin.cookies["csrftoken"].value,
+            },
+        )
+    assert blocked.status_code == 200
+    assert "Слишком много запросов" in blocked.content.decode()
+    assert send.call_count == 1
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **STAFF_SETTINGS,
+        "ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT": 2,
+        "ADMIN_EMAIL_OTP_MAX_ATTEMPTS": 5,
+    },
+)
+def test_otp_verify_failures_survive_a_new_challenge() -> None:
+    """Два неверных кода с одного IP блокируют верный код нового челленджа с другого IP."""
+    user = _manager(email="verify-quota@example.com")
+    with patch("staff_api.otp.generate_otp_code", return_value="111111"):
+        with patch("config.admin_otp.send_admin_otp_email"):
+            first = Client(REMOTE_ADDR="203.0.113.30").post(
+                "/api/staff/auth/otp/start/",
+                {"login": user.email},
+                content_type="application/json",
+            )
+    challenge_id = first.json()["challenge_id"]
+    for code in ("000000", "000001"):
+        bad = Client(REMOTE_ADDR="203.0.113.30").post(
+            "/api/staff/auth/otp/verify/",
+            {"challenge_id": challenge_id, "code": code},
+            content_type="application/json",
+        )
+        assert bad.status_code == 400
+    with patch("staff_api.otp.generate_otp_code", return_value="222222"):
+        with patch("config.admin_otp.send_admin_otp_email"):
+            second = Client(REMOTE_ADDR="203.0.113.31").post(
+                "/api/staff/auth/otp/start/",
+                {"login": user.email},
+                content_type="application/json",
+            )
+    blocked = Client(REMOTE_ADDR="203.0.113.31").post(
+        "/api/staff/auth/otp/verify/",
+        {"challenge_id": second.json()["challenge_id"], "code": "222222"},
+        content_type="application/json",
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"] == "Слишком много попыток. Попробуйте позже."
+    assert not StaffAuthToken.objects.filter(user=user).exists()
+
+
+@pytest.mark.django_db
 @override_settings(**STAFF_SETTINGS)
 def test_staff_close_requests_rating_once() -> None:
     """Закрытие из мобильного приложения не просило клиента оценить диалог (в Admin просило)."""

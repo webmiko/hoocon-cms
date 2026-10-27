@@ -19,12 +19,19 @@ from django.template.loader import render_to_string
 from accounts.models import ClientAccount, ClientAuthMode
 from config.admin_otp import (
     AdminOtpError,
+    AdminOtpRateLimitError,
+    AdminOtpVerifyError,
     OtpAttemptsExhaustedError,
     OtpChallengeStore,
+    OtpCodeMismatchError,
     OtpExpiredError,
+    assert_otp_account_verify_open,
+    consume_otp_account_send_quota,
     consume_otp_request_quota,
     generate_otp_code,
     mask_email,
+    note_otp_account_verify_failure,
+    otp_account_subject_client,
     otp_resend_cooldown_seconds,
     otp_ttl_human,
 )
@@ -35,6 +42,8 @@ logger = logging.getLogger(__name__)
 
 _OTP = OtpChallengeStore(key_prefix="client_otp:v1:", settings_prefix="CLIENT_OTP")
 _OTP_REQ_PREFIX = "client_otp:req_v1:"
+_OTP_ACCOUNT_SEND_PREFIX = "client_otp:acct_req_v1:"
+_OTP_ACCOUNT_VERIFY_PREFIX = "client_otp:acct_verify_v1:"
 
 
 class ClientAuthError(Exception):
@@ -147,12 +156,26 @@ def start_client_otp(request: HttpRequest, email: str, *, pdn_consent: bool = Fa
 
 def verify_client_otp(*, challenge_id: str, code: str) -> ClientAccount:
     """Step 2 for both modes: validate code → verified, linked account."""
+    pending = _OTP.get(challenge_id)
+    email = str(pending.get("email") or "") if pending is not None else ""
+    subject = otp_account_subject_client(email) if email else None
+    if subject is not None:
+        try:
+            assert_otp_account_verify_open(subject, cache_prefix=_OTP_ACCOUNT_VERIFY_PREFIX)
+        except AdminOtpVerifyError as exc:
+            raise ClientAuthError(str(exc)) from None
     try:
         payload = _OTP.verify(challenge_id, (code or "").strip())
     except OtpExpiredError:
         raise ClientAuthError("Код истёк — запросите новый.") from None
     except OtpAttemptsExhaustedError:
+        if subject is not None:
+            note_otp_account_verify_failure(subject, cache_prefix=_OTP_ACCOUNT_VERIFY_PREFIX)
         raise ClientAuthError("Превышено число попыток — запросите новый код.") from None
+    except OtpCodeMismatchError:
+        if subject is not None:
+            note_otp_account_verify_failure(subject, cache_prefix=_OTP_ACCOUNT_VERIFY_PREFIX)
+        raise ClientAuthError("Неверный код.") from None
     except AdminOtpError:
         raise ClientAuthError("Неверный код.") from None
     return _account_for_verified_email(payload)
@@ -167,6 +190,7 @@ def resend_client_otp(request: HttpRequest, challenge_id: str) -> dict[str, str]
     if now < payload["resend_after"]:
         raise ClientAuthError("Подождите перед повторной отправкой.")
     _consume_quota(request)
+    _consume_account_send_quota(str(payload["email"]))
     code = generate_otp_code()
     payload = {**payload, "sent_at": now, "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP")}
     _OTP.put(challenge_id, payload, code=code)
@@ -186,6 +210,17 @@ def _consume_quota(request: HttpRequest) -> None:
         raise ClientRateLimitError(str(exc)) from exc
 
 
+def _consume_account_send_quota(email: str) -> None:
+    """Per-address send cap. Rotating the client IP does not open a new bucket."""
+    try:
+        consume_otp_account_send_quota(
+            otp_account_subject_client(email),
+            cache_prefix=_OTP_ACCOUNT_SEND_PREFIX,
+        )
+    except AdminOtpRateLimitError as exc:
+        raise ClientRateLimitError(str(exc)) from exc
+
+
 def _issue_challenge(
     request: HttpRequest,
     *,
@@ -195,6 +230,7 @@ def _issue_challenge(
 ) -> dict[str, str]:
     """Store a fresh code challenge for ``email`` and send the letter."""
     _consume_quota(request)
+    _consume_account_send_quota(email)
     code = generate_otp_code()
     challenge_id = secrets.token_urlsafe(24)
     now = time.time()

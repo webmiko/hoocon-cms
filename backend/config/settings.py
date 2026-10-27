@@ -744,6 +744,20 @@ ADMIN_EMAIL_OTP_REQUEST_LIMIT = int(os.getenv("ADMIN_EMAIL_OTP_REQUEST_LIMIT", "
 ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS = int(
     os.getenv("ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS", "600"),
 )
+# Per account, not per IP. Shared by admin login, the staff app and the cabinet:
+# a new address must not mint another 6-digit code or another set of guesses.
+ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT = int(
+    os.getenv("ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT", "20"),
+)
+ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_WINDOW_SECONDS = int(
+    os.getenv("ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_WINDOW_SECONDS", "86400"),
+)
+ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT = int(
+    os.getenv("ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT", "50"),
+)
+ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_WINDOW_SECONDS = int(
+    os.getenv("ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_WINDOW_SECONDS", "3600"),
+)
 
 # Admin WebAuthn passkeys (Touch ID / Google Password Manager). Spec: plan passkey.
 # Prod: ADMIN_PASSKEY_ENABLED=true + RP_ID=hoocon.ru + ORIGIN=https://hoocon.ru
