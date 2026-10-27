@@ -93,11 +93,12 @@ OEM и завод: <a href="/zavod">/zavod</a> · {_EMAIL_INFO}.</p>
 <h2>Представительство завода в Беларуси</h2>
 <h3>ООО «Чемпион-Тэк» — Минск</h3>
 <ul>
-<li>Юридический адрес: 220030 Минск, пр-т Независимости 32А, пом.&nbsp;11</li>
-<li>Многоканальный телефон:
-<a href="tel:+375293726888">+375 29 372 6888</a></li>
-<li>По вопросам сотрудничества:
-<a href="mailto:ichampiontech@yandex.ru">ichampiontech@yandex.ru</a></li>
+<li>220030, Минск, пр-т Независимости, 32А, стр.&nbsp;4, пом.&nbsp;11</li>
+<li><a href="tel:+375293726888">+375 (29) 372-68-88</a></li>
+<li><a href="mailto:info@championtech.by">info@championtech.by</a></li>
+<li>Пн–Пт 9:00–17:00</li>
+<li><a href="https://championtech.by/" rel="noopener noreferrer"
+target="_blank">championtech.by</a></li>
 </ul>
 <h2>Партнёры</h2>
 <h3>«ТД Панорамавент» — Москва</h3>
