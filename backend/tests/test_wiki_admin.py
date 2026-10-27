@@ -487,7 +487,7 @@ def test_wiki_admin_save_strips_active_content_from_body() -> None:
         slug="xss-strip-test",
         title="XSS strip",
         category="Тест",
-        body='<p>safe</p><script>alert(1)</script>',
+        body="<p>safe</p><script>alert(1)</script>",
         is_active=True,
     )
     admin = WikiDocumentAdmin(WikiDocument, AdminSite())
@@ -497,7 +497,7 @@ def test_wiki_admin_save_strips_active_content_from_body() -> None:
         email="wiki-super@example.com",
         password="password12",
     )
-    doc.body = '<p>safe</p><script>alert(1)</script>'
+    doc.body = "<p>safe</p><script>alert(1)</script>"
     admin.save_model(request, doc, form=None, change=True)
     doc.refresh_from_db()
     assert "<script" not in doc.body.casefold()
