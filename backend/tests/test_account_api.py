@@ -234,6 +234,65 @@ def test_otp_quota_exceeded_returns_429(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_otp_account_quota_is_not_reset_by_a_new_ip(settings) -> None:
+    """Квота писем кабинета сидит на адресе почты: новый IP не открывает ещё один код."""
+    settings.ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT = 1
+    settings.CLIENT_OTP_REQUEST_LIMIT = 50
+    body = {
+        "pdn_consent": True,
+        "email": "quota-ip@acme.test",
+        "form_start_ts": time.time() - 10,
+    }
+    with patch("cabinet.tasks.send_client_otp_email_task.delay") as send:
+        first = APIClient(REMOTE_ADDR="203.0.113.50").post("/api/auth/otp/start/", body, format="json")
+        second = APIClient(REMOTE_ADDR="203.0.113.51").post("/api/auth/otp/start/", body, format="json")
+        other = APIClient(REMOTE_ADDR="203.0.113.52").post(
+            "/api/auth/otp/start/",
+            {**body, "email": "other-quota@acme.test"},
+            format="json",
+        )
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert "Слишком много запросов" in second.json()["detail"]
+    assert other.status_code == 200
+    assert send.call_count == 2
+
+
+@pytest.mark.django_db
+def test_otp_verify_failures_follow_the_email_across_challenges(settings) -> None:
+    """Неверные коды копятся на адресе: свежий челлендж с другого IP не принимает верный код."""
+    settings.ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT = 2
+    settings.CLIENT_OTP_MAX_ATTEMPTS = 5
+    body = {
+        "pdn_consent": True,
+        "email": "guess-ip@acme.test",
+        "form_start_ts": time.time() - 10,
+    }
+    with patch("cabinet.services.generate_otp_code", return_value="111111"):
+        with patch("cabinet.tasks.send_client_otp_email_task.delay"):
+            first = APIClient(REMOTE_ADDR="203.0.113.60").post("/api/auth/otp/start/", body, format="json")
+    challenge_id = first.json()["challenge_id"]
+    for code in ("000000", "000001"):
+        bad = APIClient().post(
+            "/api/auth/otp/verify/",
+            {"challenge_id": challenge_id, "code": code},
+            format="json",
+        )
+        assert bad.status_code == 400
+    with patch("cabinet.services.generate_otp_code", return_value="222222"):
+        with patch("cabinet.tasks.send_client_otp_email_task.delay"):
+            second = APIClient(REMOTE_ADDR="203.0.113.61").post("/api/auth/otp/start/", body, format="json")
+    blocked = APIClient(REMOTE_ADDR="203.0.113.61").post(
+        "/api/auth/otp/verify/",
+        {"challenge_id": second.json()["challenge_id"], "code": "222222"},
+        format="json",
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"] == "Слишком много попыток. Попробуйте позже."
+    assert not ClientAccount.objects.filter(email="guess-ip@acme.test").exists()
+
+
+@pytest.mark.django_db
 def test_honeypot_rejects_missing_form_timestamp() -> None:
     """Без form_start_ts honeypot пропускал запрос (elapsed = эпоха Unix)."""
     api = APIClient()

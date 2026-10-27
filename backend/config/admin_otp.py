@@ -5,7 +5,9 @@ cache challenge, TTL / attempts / resend cooldown. Hoocon uses passwordless
 request-code (username/email → code) instead of password+OTP 2FA.
 
 Hardening: short TTL, email allowlist, progressive verify delay, IP request
-rate limit (axes remains for long IP lockout).
+rate limit, plus a per-account send cap and a per-account verify-failure
+cap so a fresh IP cannot mint another guess at the 6-digit code.
+Axes remains for long IP lockout.
 """
 
 from __future__ import annotations
@@ -52,6 +54,10 @@ class AdminOtpDeliveryError(AdminOtpError):
     """Code could not be emailed."""
 
 
+class AdminOtpRateLimitError(AdminOtpDeliveryError):
+    """Per-account send quota is spent. Not an SMTP failure."""
+
+
 class AdminOtpVerifyError(AdminOtpError):
     """Code rejected (wrong, expired, or attempts exhausted)."""
 
@@ -84,6 +90,36 @@ def otp_request_limit() -> int:
 def otp_request_window_seconds() -> int:
     """Sliding window for IP OTP request rate limit."""
     return int(getattr(settings, "ADMIN_EMAIL_OTP_REQUEST_WINDOW_SECONDS", 600))
+
+
+def otp_account_request_limit() -> int:
+    """Max OTP emails for one account per window, across all client IPs."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT", 20))
+
+
+def otp_account_request_window_seconds() -> int:
+    """Window for the per-account OTP send cap."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_WINDOW_SECONDS", 86400))
+
+
+def otp_account_verify_limit() -> int:
+    """Max wrong codes for one account per window, across challenges and IPs."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT", 50))
+
+
+def otp_account_verify_window_seconds() -> int:
+    """Window for the per-account wrong-code cap."""
+    return int(getattr(settings, "ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_WINDOW_SECONDS", 3600))
+
+
+def otp_account_subject_staff(user_id: int) -> str:
+    """Stable quota subject for a staff user (admin login and staff app share it)."""
+    return f"staff:{int(user_id)}"
+
+
+def otp_account_subject_client(email: str) -> str:
+    """Stable quota subject for a cabinet address."""
+    return f"client:{(email or '').strip().lower()}"
 
 
 def otp_allowed_emails() -> frozenset[str]:
@@ -258,6 +294,28 @@ class OtpChallengeStore:
         return payload
 
 
+def _bump_window_counter(key: str, window: int) -> int:
+    """Increment a cache counter, starting its TTL on the first hit."""
+    try:
+        return int(cache.incr(key))
+    except ValueError:
+        # Key missing — seed window.
+        cache.add(key, 1, timeout=window)
+        # Race: another worker may have created it.
+        if cache.get(key) != 1:
+            try:
+                return int(cache.incr(key))
+            except ValueError:
+                return 1
+        return 1
+
+
+def _account_quota_key(cache_prefix: str, subject: str) -> str:
+    """Cache key for an account quota. The subject is hashed so it is not stored raw."""
+    digest = hashlib.sha256(subject.encode("utf-8")).hexdigest()
+    return f"{cache_prefix}{digest}"
+
+
 def consume_otp_request_quota(
     request: HttpRequest,
     *,
@@ -269,20 +327,51 @@ def consume_otp_request_quota(
     resolved_limit = otp_request_limit() if limit is None else limit
     resolved_window = otp_request_window_seconds() if window is None else window
     key = f"{cache_prefix}{client_rate_key(request)}"
-    try:
-        count = int(cache.incr(key))
-    except ValueError:
-        # Key missing — seed window.
-        cache.add(key, 1, timeout=resolved_window)
-        count = 1
-        # Race: another worker may have created it.
-        if cache.get(key) != 1:
-            try:
-                count = int(cache.incr(key))
-            except ValueError:
-                count = 1
+    count = _bump_window_counter(key, resolved_window)
     if count > resolved_limit:
         raise AdminOtpDeliveryError("Слишком много запросов. Попробуйте позже.")
+
+
+def consume_otp_account_send_quota(
+    subject: str,
+    *,
+    cache_prefix: str = "admin_email_otp:acct_req_v1:",
+    limit: int | None = None,
+    window: int | None = None,
+) -> None:
+    """Count an OTP email for one account. A new client IP does not reset this."""
+    resolved_limit = otp_account_request_limit() if limit is None else limit
+    resolved_window = otp_account_request_window_seconds() if window is None else window
+    count = _bump_window_counter(_account_quota_key(cache_prefix, subject), resolved_window)
+    if count > resolved_limit:
+        raise AdminOtpRateLimitError("Слишком много запросов. Попробуйте позже.")
+
+
+def assert_otp_account_verify_open(
+    subject: str,
+    *,
+    cache_prefix: str = "admin_email_otp:acct_verify_v1:",
+    limit: int | None = None,
+) -> None:
+    """Refuse every code, including a correct one, once this account is over the cap."""
+    resolved_limit = otp_account_verify_limit() if limit is None else limit
+    try:
+        count = int(cache.get(_account_quota_key(cache_prefix, subject)) or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count >= resolved_limit:
+        raise AdminOtpVerifyError("Слишком много попыток. Попробуйте позже.")
+
+
+def note_otp_account_verify_failure(
+    subject: str,
+    *,
+    cache_prefix: str = "admin_email_otp:acct_verify_v1:",
+    window: int | None = None,
+) -> None:
+    """Count one wrong code against the account, not against a single challenge."""
+    resolved_window = otp_account_verify_window_seconds() if window is None else window
+    _bump_window_counter(_account_quota_key(cache_prefix, subject), resolved_window)
 
 
 _ADMIN_OTP = OtpChallengeStore(key_prefix="admin_email_otp:v1:", settings_prefix="ADMIN_EMAIL_OTP")
@@ -458,6 +547,7 @@ def start_admin_otp_challenge(
     if not staff_email_allowed_for_otp(email):
         raise AdminOtpDeliveryError("Не удалось отправить код на email.")
 
+    consume_otp_account_send_quota(otp_account_subject_staff(int(user.pk)))
     session_key = _ensure_session_key(request)
     code = generate_otp_code()
     try:
@@ -491,6 +581,7 @@ def resend_admin_otp(request: HttpRequest) -> None:
     if not staff_email_allowed_for_otp(email):
         raise AdminOtpDeliveryError("Не удалось отправить код на email.")
 
+    consume_otp_account_send_quota(otp_account_subject_staff(int(user.pk)))
     session_key = _ensure_session_key(request)
     code = generate_otp_code()
     try:
@@ -551,6 +642,9 @@ def verify_admin_otp(
     if user is None:
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
 
+    account_subject = otp_account_subject_staff(int(user.pk))
+    assert_otp_account_verify_open(account_subject)
+
     next_url = peek_admin_otp_next_url(request, fallback="/admin/")
     session_key = request.session.session_key
     if not session_key:
@@ -571,7 +665,11 @@ def verify_admin_otp(
 
     # Superuser may paste a saved recovery code even when email OTP is missing/wrong.
     if getattr(user, "is_superuser", False) and looks_like_recovery_code(raw_code):
-        _verify_recovery_code(user, raw_code, challenge_id if payload is not None else None)
+        try:
+            _verify_recovery_code(user, raw_code, challenge_id if payload is not None else None)
+        except AdminOtpVerifyError:
+            note_otp_account_verify_failure(account_subject)
+            raise
         clear_admin_otp_challenge(request)
         return user, next_url
 
@@ -586,6 +684,7 @@ def verify_admin_otp(
     code = normalize_otp_input(raw_code)
     if len(code) != _OTP_DIGITS:
         _register_miss(challenge_id)
+        note_otp_account_verify_failure(account_subject)
         raise AdminOtpVerifyError(
             f"Введите {_OTP_DIGITS}-значный код из письма или резервный код супер-админа (XXXX-XXXX).",
         )
@@ -596,9 +695,11 @@ def verify_admin_otp(
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Код истёк. Войдите снова.") from None
     except OtpAttemptsExhaustedError:
+        note_otp_account_verify_failure(account_subject)
         clear_admin_otp_challenge(request)
         raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None
     except OtpCodeMismatchError as exc:
+        note_otp_account_verify_failure(account_subject)
         if exc.remaining <= 0:
             clear_admin_otp_challenge(request)
             raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None

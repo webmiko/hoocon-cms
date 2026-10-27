@@ -516,6 +516,113 @@ def test_otp_ttl_human_and_allowlist_helpers() -> None:
         assert staff_email_allowed_for_otp("a@other.ru") is False
 
 
+def test_account_otp_quota_defaults() -> None:
+    """Квоты на учётку: 20 писем в сутки и 50 неверных кодов в час, не на IP."""
+    from django.conf import settings
+
+    assert settings.ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT == 20
+    assert settings.ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_WINDOW_SECONDS == 86400
+    assert settings.ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT == 50
+    assert settings.ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_WINDOW_SECONDS == 3600
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **OTP_SETTINGS,
+        "ADMIN_EMAIL_OTP_ACCOUNT_REQUEST_LIMIT": 3,
+    },
+)
+def test_otp_send_quota_follows_the_account_across_ips() -> None:
+    """Смена IP, логина на email и повторная отправка не дают новый бакет кода."""
+    victim = _staff(username="otp-acct", email="otp-acct@example.com")
+    colleague = _staff(username="otp-other", email="otp-other@example.com")
+
+    def _request_code(client: Client, login: str) -> object:
+        return _csrf_post(client, "/admin/login/", {"username": login, "next": "/admin/"})
+
+    with patch("config.admin_otp.generate_otp_code", return_value="121212"):
+        first = _request_code(Client(REMOTE_ADDR="203.0.113.10"), victim.username)
+        assert first.status_code == 302
+        second_client = Client(REMOTE_ADDR="203.0.113.11")
+        second = _request_code(second_client, victim.email)
+        assert second.status_code == 302
+        session = second_client.session
+        session["admin_otp_sent_at"] = 0.0
+        session.save()
+        csrf = second_client.cookies["csrftoken"].value
+        resent = second_client.post("/admin/otp/resend/", {"csrfmiddlewaretoken": csrf})
+        assert resent.status_code == 302
+        blocked = _request_code(Client(REMOTE_ADDR="203.0.113.12"), victim.username)
+    assert blocked.status_code == 200
+    assert "Слишком много запросов" in blocked.content.decode()
+    assert len(mail.outbox) == 3
+
+    colleague_resp = _request_code(Client(REMOTE_ADDR="203.0.113.13"), colleague.username)
+    assert colleague_resp.status_code == 302
+    assert len(mail.outbox) == 4
+
+
+@pytest.mark.django_db
+@override_settings(
+    **{
+        **OTP_SETTINGS,
+        "ADMIN_EMAIL_OTP_ACCOUNT_VERIFY_LIMIT": 2,
+    },
+)
+def test_otp_verify_failures_follow_the_account_across_challenges() -> None:
+    """Новый IP и новый код не обнуляют неудачные вводы: верный код тоже не входит."""
+    victim = _staff(username="otp-guess", email="otp-guess@example.com")
+    colleague = _staff(username="otp-guess-ok", email="otp-guess-ok@example.com")
+
+    def _post_code(client: Client, code: str) -> object:
+        csrf = client.cookies["csrftoken"].value
+        return client.post("/admin/otp/", {"otp_code": code, "csrfmiddlewaretoken": csrf})
+
+    attacker = Client(REMOTE_ADDR="203.0.113.40")
+    with patch("config.admin_otp.generate_otp_code", return_value="111111"):
+        assert (
+            _csrf_post(
+                attacker,
+                "/admin/login/",
+                {"username": victim.username, "next": "/admin/"},
+            ).status_code
+            == 302
+        )
+    with patch("config.admin_otp._delay_after_attempts", return_value=0):
+        assert _post_code(attacker, "000000").status_code == 200
+        assert _post_code(attacker, "000001").status_code == 200
+
+    rotated = Client(REMOTE_ADDR="203.0.113.41")
+    with patch("config.admin_otp.generate_otp_code", return_value="222222"):
+        assert (
+            _csrf_post(
+                rotated,
+                "/admin/login/",
+                {"username": victim.username, "next": "/admin/"},
+            ).status_code
+            == 302
+        )
+    blocked = _post_code(rotated, "222222")
+    assert blocked.status_code == 200
+    assert "Слишком много попыток" in blocked.content.decode()
+    assert rotated.session.get("_auth_user_id") is None
+
+    colleague_client = Client(REMOTE_ADDR="203.0.113.42")
+    with patch("config.admin_otp.generate_otp_code", return_value="333333"):
+        assert (
+            _csrf_post(
+                colleague_client,
+                "/admin/login/",
+                {"username": colleague.username, "next": "/admin/"},
+            ).status_code
+            == 302
+        )
+    logged_in = _post_code(colleague_client, "333333")
+    assert logged_in.status_code == 302
+    assert colleague_client.session.get("_auth_user_id") == str(colleague.pk)
+
+
 @pytest.fixture(autouse=True)
 def _clear_cache() -> None:
     cache.clear()
