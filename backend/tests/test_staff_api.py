@@ -542,6 +542,45 @@ def test_otp_verify_failures_survive_a_new_challenge() -> None:
 
 @pytest.mark.django_db
 @override_settings(**STAFF_SETTINGS)
+def test_support_conversations_require_supportchat_permissions() -> None:
+    """Без supportchat.view/change диалоги в staff API недоступны при валидном токене."""
+    from django.contrib.auth.models import Group, Permission
+
+    from accounts.roles import GROUP_MANAGER
+    from accounts.services import ensure_staff_groups
+    from supportchat.models import Channel, Conversation
+
+    ensure_staff_groups()
+    user = _manager(email="nosupport@example.com")
+    api = _auth_client(user)
+    conv = Conversation.objects.create(
+        channel=Channel.WEB,
+        external_user_id="sess-nosupport-api",
+        status="open",
+    )
+    group = Group.objects.get(name=GROUP_MANAGER)
+    support_perms = list(Permission.objects.filter(content_type__app_label="supportchat"))
+    group.permissions.remove(*support_perms)
+    try:
+        badges = api.get("/api/staff/badges/").json()
+        assert badges["support_unread"] == 0
+        assert api.get("/api/staff/conversations/").status_code == 403
+        assert api.get(f"/api/staff/conversations/{conv.pk}/").status_code == 403
+        assert api.get(f"/api/staff/conversations/{conv.pk}/messages/").status_code == 403
+        post = api.post(
+            f"/api/staff/conversations/{conv.pk}/messages/",
+            {"body": "hello"},
+            content_type="application/json",
+        )
+        assert post.status_code == 403
+        assert api.post(f"/api/staff/conversations/{conv.pk}/assign/").status_code == 403
+        assert api.post(f"/api/staff/conversations/{conv.pk}/close/").status_code == 403
+    finally:
+        group.permissions.add(*support_perms)
+
+
+@pytest.mark.django_db
+@override_settings(**STAFF_SETTINGS)
 def test_staff_close_requests_rating_once() -> None:
     """Закрытие из мобильного приложения не просило клиента оценить диалог (в Admin просило)."""
     from supportchat.models import Channel, Conversation
