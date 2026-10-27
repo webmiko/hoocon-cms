@@ -603,16 +603,20 @@ export const api = {
     });
   },
 
-  webpushUnsubscribe(endpoint: string): Promise<{ deleted: number }> {
+  webpushUnsubscribe(data: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+  }): Promise<{ deleted: number }> {
     return apiFetch("/api/webpush/unsubscribe/", {
       method: "POST",
-      body: JSON.stringify({ endpoint }),
+      body: JSON.stringify(data),
       headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },
 
   webpushTopics(data: {
     endpoint?: string;
+    keys?: { p256dh: string; auth: string };
     clear_support?: boolean;
     clear_marketing?: boolean;
     marketing_consent?: boolean;

@@ -158,6 +158,7 @@
           },
           body: JSON.stringify({
             endpoint: json.endpoint,
+            keys: json.keys,
             clear_support: true,
           }),
         });

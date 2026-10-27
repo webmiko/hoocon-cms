@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponseNotAllowed, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
@@ -103,8 +104,12 @@ class SocialAnnounceAdminMixin:
         self,
         request: HttpRequest,
         object_id: str,
-    ) -> HttpResponseRedirect:
-        """POST/GET handler: announce one object and redirect back."""
+    ) -> HttpResponseRedirect | HttpResponseNotAllowed:
+        """POST-only: announce one published object and redirect back."""
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        if not self.has_change_permission(request):
+            raise PermissionDenied
         model = self.model  # type: ignore[attr-defined]
         obj = model.objects.filter(pk=object_id).first()
         opts = self.opts  # type: ignore[attr-defined]

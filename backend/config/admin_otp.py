@@ -39,6 +39,9 @@ SESSION_NEXT = "admin_otp_next"
 SESSION_SENT_AT = "admin_otp_sent_at"
 # True when challenge was opened without an emailed code (SMTP fail / recovery-only).
 SESSION_EMAIL_FAILED = "admin_otp_email_failed"
+# Decoy OTP flow for unknown logins (no email sent; verify never succeeds).
+SESSION_DECOY = "admin_otp_decoy"
+SESSION_TYPED_LOGIN = "admin_otp_typed_login"
 
 _OTP_DIGITS = 6
 _MASK_LOCAL_KEEP = 1
@@ -382,6 +385,27 @@ def _challenge_id(user_id: int, session_key: str) -> str:
     return f"{user_id}:{session_digest}"
 
 
+def _decoy_challenge_id(session_key: str) -> str:
+    session_digest = hashlib.sha256(session_key.encode("utf-8")).hexdigest()[:32]
+    return f"decoy:{session_digest}"
+
+
+def admin_otp_is_decoy(request: HttpRequest) -> bool:
+    """True when the pending Admin OTP session is a non-enumerating decoy."""
+    return bool(request.session.get(SESSION_DECOY))
+
+
+def admin_otp_masked_hint(request: HttpRequest) -> str:
+    """Mask shown on the OTP page (real user email or typed login for decoys)."""
+    if admin_otp_is_decoy(request):
+        typed = str(request.session.get(SESSION_TYPED_LOGIN) or "").strip()
+        return mask_email(typed) if "@" in typed else "***"
+    user = get_pending_admin_otp_user(request)
+    if user is None:
+        return "***"
+    return mask_email((getattr(user, "email", "") or "").strip())
+
+
 def _ensure_session_key(request: HttpRequest) -> str:
     if not request.session.session_key:
         request.session.create()
@@ -393,13 +417,19 @@ def _ensure_session_key(request: HttpRequest) -> str:
 
 def clear_admin_otp_challenge(request: HttpRequest) -> None:
     """Drop session + cache challenge."""
+    was_decoy = bool(request.session.get(SESSION_DECOY))
     user_id = request.session.pop(SESSION_USER_ID, None)
     request.session.pop(SESSION_NEXT, None)
     request.session.pop(SESSION_SENT_AT, None)
     request.session.pop(SESSION_EMAIL_FAILED, None)
+    request.session.pop(SESSION_DECOY, None)
+    request.session.pop(SESSION_TYPED_LOGIN, None)
     session_key = request.session.session_key
-    if user_id is not None and session_key:
-        _ADMIN_OTP.drop(_challenge_id(int(user_id), session_key))
+    if session_key:
+        if was_decoy:
+            _ADMIN_OTP.drop(_decoy_challenge_id(session_key))
+        elif user_id is not None:
+            _ADMIN_OTP.drop(_challenge_id(int(user_id), session_key))
 
 
 def pending_otp_email_failed(request: HttpRequest) -> bool:
@@ -534,6 +564,25 @@ def send_admin_otp_email(*, to_email: str, code: str) -> None:
     msg.send(fail_silently=False)
 
 
+def start_admin_otp_decoy(
+    request: HttpRequest,
+    login: str,
+    *,
+    next_url: str,
+) -> None:
+    """Open the OTP screen without revealing whether the login exists."""
+    session_key = _ensure_session_key(request)
+    code = generate_otp_code()
+    _ADMIN_OTP.put(_decoy_challenge_id(session_key), {"locked_until": 0.0}, code=code)
+    request.session[SESSION_DECOY] = True
+    request.session[SESSION_TYPED_LOGIN] = (login or "").strip()
+    request.session[SESSION_NEXT] = next_url
+    request.session[SESSION_SENT_AT] = time.time()
+    request.session.pop(SESSION_USER_ID, None)
+    request.session.pop(SESSION_EMAIL_FAILED, None)
+    request.session.modified = True
+
+
 def start_admin_otp_challenge(
     request: HttpRequest,
     user: AbstractBaseUser,
@@ -563,6 +612,21 @@ def start_admin_otp_challenge(
 
 def resend_admin_otp(request: HttpRequest) -> None:
     """Send a fresh code for the pending challenge."""
+    if admin_otp_is_decoy(request):
+        sent_at = request.session.get(SESSION_SENT_AT)
+        if isinstance(sent_at, (int, float)):
+            elapsed = time.time() - float(sent_at)
+            cooldown = otp_resend_cooldown_seconds()
+            if elapsed < cooldown:
+                wait = int(cooldown - elapsed) + 1
+                raise AdminOtpVerifyError(f"Повторная отправка через {wait} сек.")
+        session_key = _ensure_session_key(request)
+        code = generate_otp_code()
+        _ADMIN_OTP.put(_decoy_challenge_id(session_key), {"locked_until": 0.0}, code=code)
+        request.session[SESSION_SENT_AT] = time.time()
+        request.session.modified = True
+        return
+
     user = get_pending_admin_otp_user(request)
     if user is None:
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
@@ -633,11 +697,54 @@ def _verify_recovery_code(
     raise AdminOtpVerifyError("Неверный резервный код. Введите сохранённый код формата XXXX-XXXX.")
 
 
+def _verify_admin_decoy_otp(request: HttpRequest, raw_code: str) -> None:
+    """Always reject decoy codes with the same errors as a real challenge."""
+    session_key = request.session.session_key
+    if not session_key:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")
+    challenge_id = _decoy_challenge_id(session_key)
+    payload = _ADMIN_OTP.get(challenge_id)
+    if payload is None:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Код истёк. Войдите снова.")
+    now = time.time()
+    if _locked_until(payload) > now:
+        wait = max(1, int(math.ceil(_locked_until(payload) - now)))
+        raise AdminOtpVerifyError(f"Подождите {wait} сек. перед следующей попыткой.")
+    if _ADMIN_OTP.attempts(challenge_id) >= _ADMIN_OTP.max_attempts():
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.")
+    code = normalize_otp_input(raw_code)
+    if len(code) != _OTP_DIGITS:
+        _register_miss(challenge_id)
+        raise AdminOtpVerifyError(f"Введите {_OTP_DIGITS}-значный код из письма.")
+    try:
+        _ADMIN_OTP.verify(challenge_id, code)
+    except OtpExpiredError:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Код истёк. Войдите снова.") from None
+    except OtpAttemptsExhaustedError:
+        clear_admin_otp_challenge(request)
+        raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None
+    except OtpCodeMismatchError as exc:
+        if exc.remaining <= 0:
+            clear_admin_otp_challenge(request)
+            raise AdminOtpVerifyError("Слишком много попыток. Войдите снова.") from None
+        _delay_next_try(challenge_id, _ADMIN_OTP.max_attempts() - exc.remaining)
+        raise AdminOtpVerifyError(f"Неверный код. Осталось попыток: {exc.remaining}.") from None
+    clear_admin_otp_challenge(request)
+    raise AdminOtpVerifyError("Неверный код.")
+
+
 def verify_admin_otp(
     request: HttpRequest,
     raw_code: str,
 ) -> tuple[AbstractBaseUser, str]:
     """Validate emailed OTP or superuser recovery code; return (user, next_url)."""
+    if admin_otp_is_decoy(request):
+        _verify_admin_decoy_otp(request, raw_code)
+
     user = get_pending_admin_otp_user(request)
     if user is None:
         raise AdminOtpVerifyError("Сессия подтверждения истекла. Войдите снова.")

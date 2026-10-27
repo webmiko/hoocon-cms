@@ -37,7 +37,8 @@ def on_lead_created(lead: Lead) -> None:
     """
     lead_id = lead.pk
     transaction.on_commit(lambda: send_lead_notification.delay(lead_id))
-    transaction.on_commit(lambda: send_lead_client_confirmation.delay(lead_id))
+    if lead.contact_verified:
+        transaction.on_commit(lambda: send_lead_client_confirmation.delay(lead_id))
     transaction.on_commit(lambda: _enqueue_staff_push(lead_id))
     # PII-safe log: only lead_id and type (NO email/phone).
     logger.info("Lead created: lead_id=%s type=%s", lead_id, lead.lead_type)

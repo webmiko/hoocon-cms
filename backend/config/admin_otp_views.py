@@ -8,6 +8,7 @@ and single-use recovery codes (``?mode=recovery`` / OTP verify field).
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlencode
 
@@ -32,15 +33,17 @@ from config.admin_otp import (
     AdminOtpRateLimitError,
     AdminOtpVerifyError,
     admin_email_otp_enabled,
+    admin_otp_is_decoy,
+    admin_otp_masked_hint,
     begin_admin_otp_session,
     clear_admin_otp_challenge,
     consume_otp_request_quota,
     find_staff_user_for_otp,
     get_pending_admin_otp_user,
-    mask_email,
     pending_otp_email_failed,
     resend_admin_otp,
     start_admin_otp_challenge,
+    start_admin_otp_decoy,
     verify_admin_otp,
 )
 
@@ -215,6 +218,16 @@ class AdminSuperuserRecoveryForm(forms.Form):
         return cleaned
 
 
+def _pad_admin_otp_step(started: float) -> None:
+    """Reduce SMTP timing oracle on login → OTP redirect."""
+    from django.conf import settings
+
+    floor = float(getattr(settings, "ADMIN_OTP_MIN_STEP_SECONDS", 0.35))
+    delay = floor - (time.monotonic() - started)
+    if delay > 0:
+        time.sleep(delay)
+
+
 def _record_axes_failure(request: HttpRequest, username: str) -> None:
     """Feed django-axes from custom OTP login failures."""
     user_login_failed.send(
@@ -266,6 +279,7 @@ class AdminPasswordlessOtpLoginView(LoginView):
         return reverse("admin:index")
 
     def form_valid(self, form: Any) -> HttpResponse:
+        started = time.monotonic()
         login = str(form.cleaned_data.get("username") or "").strip()
         try:
             consume_otp_request_quota(self.request)
@@ -275,12 +289,12 @@ class AdminPasswordlessOtpLoginView(LoginView):
             return self.form_invalid(form)
 
         user = find_staff_user_for_otp(login)
-        if user is None or not (getattr(user, "email", "") or "").strip():
-            _record_axes_failure(self.request, login)
-            form.add_error(None, _GENERIC_OTP_FAIL)
-            return self.form_invalid(form)
-
         next_url = self.get_success_url()
+        if user is None or not (getattr(user, "email", "") or "").strip():
+            start_admin_otp_decoy(self.request, login, next_url=next_url)
+            _pad_admin_otp_step(started)
+            return HttpResponseRedirect(reverse("admin:otp"))
+
         try:
             start_admin_otp_challenge(self.request, user, next_url=next_url)
         except AdminOtpRateLimitError as exc:
@@ -306,6 +320,7 @@ class AdminPasswordlessOtpLoginView(LoginView):
             form.add_error(None, str(exc))
             return self.form_invalid(form)
 
+        _pad_admin_otp_step(started)
         return HttpResponseRedirect(reverse("admin:otp"))
 
 
@@ -400,8 +415,9 @@ class AdminSuperuserRecoveryLoginView(LoginView):
 def admin_otp_verify_view(request: HttpRequest) -> HttpResponse:
     """Enter the emailed 6-digit code (or superuser recovery code)."""
     site = admin.site
-    user = get_pending_admin_otp_user(request)
-    if user is None:
+    decoy = admin_otp_is_decoy(request)
+    user = None if decoy else get_pending_admin_otp_user(request)
+    if user is None and not decoy:
         messages.error(request, "Сессия подтверждения истекла. Войдите снова.")
         return HttpResponseRedirect(reverse("admin:login"))
 
@@ -418,8 +434,9 @@ def admin_otp_verify_view(request: HttpRequest) -> HttpResponse:
             return HttpResponseRedirect(next_url)
         except AdminOtpVerifyError as exc:
             error = str(exc)
-            _record_axes_failure(request, getattr(user, "get_username", lambda: "")())
-            if get_pending_admin_otp_user(request) is None:
+            if user is not None:
+                _record_axes_failure(request, getattr(user, "get_username", lambda: "")())
+            if not decoy and get_pending_admin_otp_user(request) is None:
                 messages.error(request, error)
                 return HttpResponseRedirect(reverse("admin:login"))
 
@@ -428,7 +445,7 @@ def admin_otp_verify_view(request: HttpRequest) -> HttpResponse:
         **site.each_context(request),
         "title": "Код подтверждения",
         "subtitle": None,
-        "masked_email": mask_email(getattr(user, "email", "") or ""),
+        "masked_email": admin_otp_masked_hint(request),
         "error": error,
         "email_failed": email_failed,
         "allow_recovery_hint": bool(getattr(user, "is_superuser", False)),
@@ -488,7 +505,12 @@ def _patched_login(
 
     mode = _login_mode(request)
     # Pending OTP challenge: stay on verify unless user explicitly opens break-glass.
-    if request.method == "GET" and admin_email_otp_enabled() and mode == "otp" and get_pending_admin_otp_user(request):
+    if (
+        request.method == "GET"
+        and admin_email_otp_enabled()
+        and mode == "otp"
+        and (get_pending_admin_otp_user(request) or admin_otp_is_decoy(request))
+    ):
         return HttpResponseRedirect(reverse("admin:otp"))
 
     from accounts.passkey_views import passkey_login_context

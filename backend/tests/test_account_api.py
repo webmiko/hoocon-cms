@@ -651,7 +651,8 @@ def test_web_chat_contact_verified_only_for_owner_session() -> None:
 
     api = _register(APIClient(), "chat2@acme.test")
     hidden = start_or_resume_web_conversation(_request(False), contact_email="chat2@acme.test", pdn_consent=True)
-    assert hidden.client_id is not None
+    assert hidden.client_id is None
+    assert hidden.contact_verified is False
     assert api.get("/api/account/conversations/").json() == []
 
 

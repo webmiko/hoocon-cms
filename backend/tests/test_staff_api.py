@@ -480,8 +480,9 @@ def test_otp_send_quota_is_shared_by_staff_app_and_admin_login() -> None:
             {"login": user.email},
             content_type="application/json",
         )
-        assert again.status_code == 400
-        assert again.json()["detail"] == "Слишком много запросов. Попробуйте позже."
+        assert again.status_code == 200
+        assert again.json()["ok"] is True
+        assert "challenge_id" in again.json()
         admin = Client(REMOTE_ADDR="203.0.113.22")
         admin.get("/admin/login/")
         blocked = admin.post(

@@ -9,6 +9,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email
@@ -44,6 +45,8 @@ _OTP = OtpChallengeStore(key_prefix="client_otp:v1:", settings_prefix="CLIENT_OT
 _OTP_REQ_PREFIX = "client_otp:req_v1:"
 _OTP_ACCOUNT_SEND_PREFIX = "client_otp:acct_req_v1:"
 _OTP_ACCOUNT_VERIFY_PREFIX = "client_otp:acct_verify_v1:"
+_PWD_FAIL_PREFIX = "client_pwd_fail_v1:"
+_UNIFORM_LOGIN_FAIL = "Неверная почта или пароль."
 
 
 class ClientAuthError(Exception):
@@ -72,6 +75,41 @@ def _min_fill_seconds() -> int:
 
 def _max_form_age_seconds() -> int:
     return int(getattr(settings, "CLIENT_AUTH_MAX_FORM_AGE_SECONDS", 24 * 60 * 60))
+
+
+def _client_password_fail_key(email: str) -> str:
+    return f"{_PWD_FAIL_PREFIX}{email}"
+
+
+def _client_password_fail_limit() -> int:
+    return int(getattr(settings, "CLIENT_PASSWORD_FAIL_LIMIT", 20))
+
+
+def _client_password_fail_window() -> int:
+    return int(getattr(settings, "CLIENT_PASSWORD_FAIL_WINDOW_SECONDS", 3600))
+
+
+def _assert_client_password_open(email: str) -> None:
+    try:
+        count = int(cache.get(_client_password_fail_key(email)) or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count >= _client_password_fail_limit():
+        raise ClientAuthError(_UNIFORM_LOGIN_FAIL)
+
+
+def _note_client_password_failure(email: str) -> None:
+    key = _client_password_fail_key(email)
+    window = _client_password_fail_window()
+    try:
+        if not cache.add(key, 1, timeout=window):
+            cache.incr(key)
+    except Exception:  # noqa: BLE001 — cache backend may lack incr
+        cache.set(key, 1, timeout=window)
+
+
+def _clear_client_password_failures(email: str) -> None:
+    cache.delete(_client_password_fail_key(email))
 
 
 def check_honeypot(request: HttpRequest, form_start_ts: Any, trap_value: str) -> None:
@@ -113,7 +151,17 @@ def start_client_registration(
         raise ClientAuthError("Пароль — минимум 8 символов.")
     existing = ClientAccount.objects.filter(email=email).first()
     if existing is not None and not existing.is_active:
-        raise ClientAuthError("Аккаунт недоступен. Обратитесь к менеджеру.")
+        decoy_pending = {
+            "password_hash": make_password(password),
+            "name": (name or "").strip(),
+            "phone": (phone or "").strip(),
+        }
+        return _issue_decoy_challenge(
+            request,
+            email=email,
+            pending=decoy_pending,
+            pdn_consent=pdn_consent,
+        )
     pending: dict[str, str] | None = None
     if existing is None or existing.email_verified_at is None:
         pending = {
@@ -131,14 +179,19 @@ def authenticate_password(*, email: str, password: str) -> ClientAccount:
     set by whoever typed the address, not necessarily its owner.
     """
     email = normalize_client_email(email)
+    _assert_client_password_open(email)
     try:
         account = ClientAccount.objects.get(email=email, is_active=True)
     except ClientAccount.DoesNotExist as exc:
-        raise ClientAuthError("Неверная почта или пароль.") from exc
+        _note_client_password_failure(email)
+        raise ClientAuthError(_UNIFORM_LOGIN_FAIL) from exc
     if not account.check_password(password or ""):
-        raise ClientAuthError("Неверная почта или пароль.")
+        _note_client_password_failure(email)
+        raise ClientAuthError(_UNIFORM_LOGIN_FAIL)
     if account.email_verified_at is None:
-        raise ClientAuthError("Подтвердите почту: войдите по коду из письма.")
+        _note_client_password_failure(email)
+        raise ClientAuthError(_UNIFORM_LOGIN_FAIL)
+    _clear_client_password_failures(email)
     return account
 
 
@@ -150,13 +203,17 @@ def start_client_otp(request: HttpRequest, email: str, *, pdn_consent: bool = Fa
     """
     email = normalize_client_email(email)
     if ClientAccount.objects.filter(email=email, is_active=False).exists():
-        raise ClientAuthError("Аккаунт недоступен. Обратитесь к менеджеру.")
+        return _issue_decoy_challenge(request, email=email, pending=None, pdn_consent=pdn_consent)
     return _issue_challenge(request, email=email, pending=None, pdn_consent=pdn_consent)
 
 
 def verify_client_otp(*, challenge_id: str, code: str) -> ClientAccount:
     """Step 2 for both modes: validate code → verified, linked account."""
     pending = _OTP.get(challenge_id)
+    if pending is None:
+        raise ClientAuthError("Код истёк — запросите новый.")
+    if pending.get("decoy"):
+        _verify_client_decoy_otp(challenge_id=challenge_id, code=code)
     email = str(pending.get("email") or "") if pending is not None else ""
     subject = otp_account_subject_client(email) if email else None
     if subject is not None:
@@ -190,6 +247,11 @@ def resend_client_otp(request: HttpRequest, challenge_id: str) -> dict[str, str]
     if now < payload["resend_after"]:
         raise ClientAuthError("Подождите перед повторной отправкой.")
     _consume_quota(request)
+    if payload.get("decoy"):
+        code = generate_otp_code()
+        payload = {**payload, "sent_at": now, "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP")}
+        _OTP.put(challenge_id, payload, code=code)
+        return {"challenge_id": challenge_id, "email_masked": mask_email(str(payload["email"]))}
     _consume_account_send_quota(str(payload["email"]))
     code = generate_otp_code()
     payload = {**payload, "sent_at": now, "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP")}
@@ -219,6 +281,47 @@ def _consume_account_send_quota(email: str) -> None:
         )
     except AdminOtpRateLimitError as exc:
         raise ClientRateLimitError(str(exc)) from exc
+
+
+def _issue_decoy_challenge(
+    request: HttpRequest,
+    *,
+    email: str,
+    pending: dict[str, str] | None,
+    pdn_consent: bool = False,
+) -> dict[str, str]:
+    """Same response shape as a real OTP start; no email is sent."""
+    _consume_quota(request)
+    code = generate_otp_code()
+    challenge_id = secrets.token_urlsafe(24)
+    now = time.time()
+    _OTP.put(
+        challenge_id,
+        {
+            "email": email,
+            "pending": pending,
+            "pdn_consent": bool(pdn_consent),
+            "decoy": True,
+            "sent_at": now,
+            "resend_after": now + otp_resend_cooldown_seconds("CLIENT_OTP"),
+        },
+        code=code,
+    )
+    return {"challenge_id": challenge_id, "email_masked": mask_email(email)}
+
+
+def _verify_client_decoy_otp(*, challenge_id: str, code: str) -> None:
+    try:
+        _OTP.verify(challenge_id, (code or "").strip())
+    except OtpExpiredError:
+        raise ClientAuthError("Код истёк — запросите новый.") from None
+    except OtpAttemptsExhaustedError:
+        raise ClientAuthError("Превышено число попыток — запросите новый код.") from None
+    except OtpCodeMismatchError:
+        raise ClientAuthError("Неверный код.") from None
+    except AdminOtpError:
+        raise ClientAuthError("Неверный код.") from None
+    raise ClientAuthError("Неверный код.")
 
 
 def _issue_challenge(
@@ -359,4 +462,5 @@ def _backfill_conversations(client: Client) -> None:
     Conversation.objects.filter(
         client__isnull=True,
         contact_email__iexact=client.email,
+        contact_verified=True,
     ).update(client=client)

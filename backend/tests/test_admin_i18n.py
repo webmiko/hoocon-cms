@@ -42,6 +42,26 @@ def test_admin_app_verbose_name_is_russian(label: str, name: str) -> None:
     assert apps.get_app_config(label).verbose_name == name
 
 
+def test_localize_third_party_admin_skips_unknown_labels() -> None:
+    """Missing optional apps/models do not break Admin RU branding setup."""
+    from config import admin_branding
+
+    admin_branding._THIRD_PARTY_APP_NAMES["__missing_app_for_test__"] = "X"
+    admin_branding._THIRD_PARTY_MODEL_NAMES["__missing_app__.Model"] = ("a", "b")
+    try:
+        admin_branding.localize_third_party_admin()
+    finally:
+        admin_branding._THIRD_PARTY_APP_NAMES.pop("__missing_app_for_test__", None)
+        admin_branding._THIRD_PARTY_MODEL_NAMES.pop("__missing_app__.Model", None)
+
+
+def test_install_admin_choice_labels_is_idempotent() -> None:
+    """Second install is a no-op (autocomplete hook already patched)."""
+    from config import admin_branding
+
+    admin_branding.install_admin_choice_labels()
+
+
 @pytest.mark.django_db
 def test_admin_index_has_no_english_app_headings() -> None:
     """Admin dashboard does not show English app group titles."""

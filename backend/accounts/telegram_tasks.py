@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from celery import shared_task
 
 from config.logging_utils import setup_logger
@@ -138,7 +140,7 @@ def retire_telegram_support_alert(conversation_id: int, author_user_id: int | No
         if not stored:
             continue
         is_author = author is not None and user.pk == author.pk
-        suffix = "\n\n✅ Вы ответили" if is_author else f"\n\n✅ Ответил: {author_label}"
+        suffix = "\n\n✅ Вы ответили" if is_author else f"\n\n✅ Ответил: {html.escape(author_label)}"
         mid = stored["message_id"]
         result = telegram_api_call(
             "editMessageText",

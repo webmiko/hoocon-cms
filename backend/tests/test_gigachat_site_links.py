@@ -27,6 +27,13 @@ def test_expand_skips_already_absolute() -> None:
     assert expand_site_links_for_messenger(url, base_url="https://hoocon.ru") == url
 
 
+def test_expand_rejects_evil_site_suffix() -> None:
+    """hoocon.ru.evil.com must not become the link base."""
+    text = "Каталог — /catalog."
+    expanded = expand_site_links_for_messenger(text, base_url="https://hoocon.ru.evil.com")
+    assert expanded == "Каталог — https://hoocon.ru/catalog."
+
+
 def test_expand_home_anchor() -> None:
     """Подбор на главной → полный URL с якорем."""
     text = "Квиз подбора — /#podbor."

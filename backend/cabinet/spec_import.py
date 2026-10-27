@@ -64,6 +64,9 @@ def parse_spec_xlsx(file_obj: IO[bytes]) -> list[ParsedSpecRow]:
     column (артикул/sku/код/модель…); a quantity column is optional
     (defaults to 1). Up to ``_MAX_ROWS`` data rows are consumed.
     """
+    from catalog.validators import validate_stock_xlsx_upload
+
+    validate_stock_xlsx_upload(file_obj)
     import openpyxl
 
     try:

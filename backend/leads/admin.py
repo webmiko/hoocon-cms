@@ -549,7 +549,8 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
         from django.utils.safestring import mark_safe
 
         rows: list[str] = []
-        qs = rfq_bundle_queryset(obj).prefetch_related("items").select_related("sku")
+        scope_user = getattr(self, "_rfq_scope_user", None)
+        qs = rfq_bundle_queryset(obj, user=scope_user).prefetch_related("items").select_related("sku")
         for sibling in qs:
             url = reverse("admin:leads_lead_change", args=[sibling.pk])
             mark = " (корень)" if sibling.rfq_bundle_root_id is None else ""
@@ -624,8 +625,14 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             if lead_rows
             else "<p><strong>Заявки:</strong> других нет</p>"
         )
+        from crm.services import scope_emails_for_manager
+
         mail_rows: list[str] = []
-        for mail in client.emails.select_related("lead").order_by("-created_at")[:5]:
+        emails_qs = scope_emails_for_manager(
+            client.emails.select_related("lead"),
+            request.user,
+        ).order_by("-created_at")[:5]
+        for mail in emails_qs:
             lead_ref = ""
             if mail.lead_id:
                 lead_ref = format_html(
@@ -694,6 +701,25 @@ class LeadAdmin(LabeledToggleMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, 
             Changeform response from ModelAdmin.
         """
         extra = dict(extra_context or {})
+        self._rfq_scope_user = request.user
+        try:
+            return self._changeform_view_inner(
+                request,
+                object_id=object_id,
+                form_url=form_url,
+                extra=extra,
+            )
+        finally:
+            del self._rfq_scope_user
+
+    def _changeform_view_inner(
+        self,
+        request: HttpRequest,
+        *,
+        object_id: str | None,
+        form_url: str,
+        extra: dict,
+    ) -> HttpResponse:
         obj: Lead | None = None
         if object_id:
             obj = self.get_object(request, object_id)

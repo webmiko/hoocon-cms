@@ -155,7 +155,8 @@ def start_or_resume_web_conversation(
         if not conv.contact_verified and session_owns_email(request, conv.contact_email):
             conv.contact_verified = True
             conv.save(update_fields=["contact_verified"])
-    _auto_link_client(conv)
+    if conv.contact_verified:
+        _auto_link_client(conv)
     return conv
 
 

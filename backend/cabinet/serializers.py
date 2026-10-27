@@ -228,6 +228,13 @@ class RmaCaseCreateSerializer(serializers.ModelSerializer):
         model = RmaCase
         fields = ("order", "serial_number", "subject", "description", "photo")
 
+    def validate_photo(self, photo: Any) -> Any:
+        if photo:
+            from catalog.validators import validate_image_upload
+
+            validate_image_upload(photo)
+        return photo
+
     def validate_order(self, order: Order | None) -> Order | None:
         """Owner-scope: RMA order must belong to the requester."""
         client = self.context.get("client")

@@ -23,6 +23,17 @@ from webpush.services import (
 logger = setup_logger("hoocon.webpush")
 
 _THROTTLE = "webpush_subscribe"
+
+
+def _subscription_keys(data: dict[str, Any]) -> tuple[str, str, str]:
+    endpoint = str(data.get("endpoint") or "").strip()
+    raw_keys = data.get("keys")
+    keys: dict[str, Any] = raw_keys if isinstance(raw_keys, dict) else {}
+    p256dh = str(keys.get("p256dh") or data.get("p256dh") or "").strip()
+    auth = str(keys.get("auth") or data.get("auth") or "").strip()
+    return endpoint, p256dh, auth
+
+
 _SESSION_MARKETING_CONSENT = "hoocon_marketing_push_consent"
 _MARKETING_CONSENT_HEADER = "HTTP_X_HOOCON_MARKETING_CONSENT"
 
@@ -134,10 +145,13 @@ class UnsubscribeView(APIView):
 
     def post(self, request: Request) -> Response:
         data = request.data if isinstance(request.data, dict) else {}
-        endpoint = str(data.get("endpoint") or "").strip()
-        if not endpoint:
-            return Response({"detail": "endpoint required"}, status=status.HTTP_400_BAD_REQUEST)
-        deleted = remove_subscription(endpoint)
+        endpoint, p256dh, auth = _subscription_keys(data)
+        if not endpoint or not p256dh or not auth:
+            return Response(
+                {"detail": "endpoint, p256dh and auth are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        deleted = remove_subscription(endpoint, p256dh=p256dh, auth=auth)
         return Response({"deleted": deleted})
 
 
@@ -164,7 +178,7 @@ class TopicsView(APIView):
                 # Revoking cookie marketing also clears session gate for subscribe.
                 pass
 
-        endpoint = str(data.get("endpoint") or "").strip()
+        endpoint, p256dh, auth = _subscription_keys(data)
         clear_support = bool(data.get("clear_support"))
         clear_marketing = bool(data.get("clear_marketing"))
         if not endpoint:
@@ -176,6 +190,11 @@ class TopicsView(APIView):
                 )
             return Response(
                 {"detail": "endpoint required to clear topics"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not p256dh or not auth:
+            return Response(
+                {"detail": "p256dh and auth are required to clear topics"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -195,6 +214,8 @@ class TopicsView(APIView):
         try:
             sub = clear_subscription_topics(
                 endpoint,
+                p256dh=p256dh,
+                auth=auth,
                 clear_support=clear_support,
                 clear_marketing=clear_marketing,
             )

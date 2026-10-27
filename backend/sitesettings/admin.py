@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from urllib.parse import quote
 
 from django import forms
 from django.conf import settings
@@ -34,8 +33,8 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
     """
     uis_on, uis_token, uis_phone, uis_secret = novosystem_settings(site)
     webhook_base = request.build_absolute_uri(reverse("novosystem-events"))
-    webhook = f"{webhook_base}?token={quote(uis_secret, safe='')}" if uis_secret else webhook_base
-    webhook_masked = f"{webhook_base}?token=••••" if uis_secret else webhook_base
+    webhook = webhook_base
+    webhook_masked = webhook_base
 
     def status(enabled: bool, ready: bool) -> tuple[str, str]:
         if enabled and ready:
@@ -63,6 +62,7 @@ def _telephony_widgets(request: HttpRequest, site: SiteSettings) -> list[dict[st
             "webhook_url_masked": webhook_masked,
             "hint": (
                 "В ЛК UIS: API Базовый набор, белый IP сервера, HTTP-уведомление POST на URL выше. "
+                "Секрет вебхука — заголовок X-Webhook-Token (не в query). "
                 "ID сотрудника — в карточке пользователя."
             ),
         },

@@ -12,6 +12,7 @@ from django.http import HttpRequest
 
 from config.admin_otp import (
     AdminOtpDeliveryError,
+    AdminOtpRateLimitError,
     AdminOtpVerifyError,
     OtpAttemptsExhaustedError,
     OtpChallengeStore,
@@ -81,14 +82,20 @@ def start_staff_otp(request: HttpRequest, login: str) -> dict[str, str]:
         window=int(getattr(settings, "STAFF_OTP_REQUEST_WINDOW_SECONDS", 3600)),
     )
     user = _staff_app_user(login)
+    if user is not None and not (getattr(user, "email", "") or "").strip():
+        user = None
+    mail_user = user
     if user is not None:
-        consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
+        try:
+            consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
+        except AdminOtpRateLimitError:
+            mail_user = None
     code = generate_otp_code()
     challenge_id = secrets.token_urlsafe(24)
-    payload = {"user_id": user.pk if user is not None else None, "sent_at": time.time()}
+    payload = {"user_id": mail_user.pk if mail_user is not None else None, "sent_at": time.time()}
     _STORE.put(challenge_id, payload, code=code)
-    if user is not None:
-        _send_otp_email(user, code)
+    if mail_user is not None:
+        _send_otp_email(mail_user, code)
     return {"challenge_id": challenge_id, "email_masked": _public_email_mask(login)}
 
 
@@ -114,12 +121,19 @@ def resend_staff_otp(request: HttpRequest, challenge_id: str) -> None:
         if user is None:
             _STORE.drop(challenge_id)
             raise AdminOtpDeliveryError("Сессия входа истекла. Запросите код снова.")
+    mail_user = user
     if user is not None:
-        consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
+        try:
+            consume_otp_account_send_quota(otp_account_subject_staff(user.pk))
+        except AdminOtpRateLimitError:
+            mail_user = None
     code = generate_otp_code()
-    _STORE.put(challenge_id, {**raw, "sent_at": time.time()}, code=code)
-    if user is not None:
-        _send_otp_email(user, code)
+    next_payload = {**raw, "sent_at": time.time()}
+    if mail_user is None:
+        next_payload["user_id"] = None
+    _STORE.put(challenge_id, next_payload, code=code)
+    if mail_user is not None:
+        _send_otp_email(mail_user, code)
 
 
 def verify_staff_otp(challenge_id: str, raw_code: str) -> User:
@@ -150,7 +164,7 @@ def verify_staff_otp(challenge_id: str, raw_code: str) -> User:
         else None
     )
     if user is None:
-        raise AdminOtpVerifyError("Учётная запись недоступна.")
+        raise AdminOtpVerifyError("Неверный код.")
     return user
 
 

@@ -308,7 +308,7 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
 
 @pytest.mark.django_db
 def test_web_conversation_auto_links_to_client_card() -> None:
-    """Диалог с contact_email сам попадает на карточку (создаёт её при нужде)."""
+    """CRM link только после подтверждения contact_email (не по одному вводу в виджете)."""
     client = Client.objects.create(email="chatter@corp.test", name="Чат-клиент")
 
     api = APIClient()
@@ -324,9 +324,14 @@ def test_web_conversation_auto_links_to_client_card() -> None:
     )
     assert resp.status_code == 201, resp.content
     conv = Conversation.objects.get(pk=resp.json()["id"])
-    assert conv.client_id == client.pk, "диалог не привязался к карточке по email"
+    assert conv.client_id is None
+    Conversation.objects.filter(pk=conv.pk).update(contact_verified=True)
+    from supportchat.services import _auto_link_client
 
-    # Новый email → карточка создаётся по правилу досье, диалог линкуется.
+    conv.refresh_from_db()
+    _auto_link_client(conv)
+    assert conv.client_id == client.pk
+
     api2 = APIClient()
     resp = api2.post(
         "/api/support/conversations/",
@@ -335,8 +340,8 @@ def test_web_conversation_auto_links_to_client_card() -> None:
     )
     assert resp.status_code == 201, resp.content
     conv2 = Conversation.objects.get(pk=resp.json()["id"])
-    new_client = Client.objects.get(email="newbie@fresh.test")
-    assert conv2.client_id == new_client.pk
+    assert conv2.client_id is None
+    assert not Client.objects.filter(email="newbie@fresh.test").exists()
 
 
 @pytest.mark.django_db
@@ -346,7 +351,7 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
     site.cabinet_enabled = True
     site.save()
 
-    client = Client.objects.create(email="legacy@corp.test", name="Легаси")
+    crm_client = Client.objects.create(email="legacy@corp.test", name="Легаси")
     orphan = Conversation.objects.create(
         channel=Channel.WEB,
         external_user_id="sess-legacy",
@@ -360,8 +365,8 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
     _register_cabinet(cab, "legacy@corp.test", "Легаси")
 
     orphan.refresh_from_db()
-    assert orphan.client_id == client.pk
-    # contact_email в виджете вводит посетитель — без подтверждения контакта диалог скрыт.
+    assert orphan.client_id is None
+    # contact_email в виджете вводит посетитель — без подтверждения контакта CRM не линкуем.
     assert cab.get("/api/account/conversations/").json() == []
 
     manager = User.objects.create_user("legacy-mgr", password="x", is_staff=True)
@@ -374,6 +379,11 @@ def test_account_link_backfills_orphan_conversations(settings: Any) -> None:
     assert cab.get("/api/account/conversations/").json() == []
 
     Conversation.objects.filter(pk=orphan.pk).update(contact_verified=True)
+    from cabinet.services import _backfill_conversations
+
+    _backfill_conversations(crm_client)
+    orphan.refresh_from_db()
+    assert orphan.client_id == crm_client.pk
     convs = cab.get("/api/account/conversations/").json()
     assert convs[0]["id"] == orphan.pk
 

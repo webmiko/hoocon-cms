@@ -159,9 +159,11 @@ def test_unknown_login_does_not_send_mail() -> None:
         "/admin/login/",
         {"username": "nobody@example.com", "next": "/admin/"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert response["Location"].endswith("/admin/otp/")
     assert len(mail.outbox) == 0
     assert client.session.get("_auth_user_id") is None
+    assert client.session.get("admin_otp_decoy") is True
 
 
 @pytest.mark.django_db
@@ -174,8 +176,10 @@ def test_staff_without_email_does_not_send_mail() -> None:
         "/admin/login/",
         {"username": "no-mail", "next": "/admin/"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert response["Location"].endswith("/admin/otp/")
     assert len(mail.outbox) == 0
+    assert client.session.get("admin_otp_decoy") is True
 
 
 @pytest.mark.django_db
@@ -390,7 +394,8 @@ def test_domain_allowlist_allows_hoocon_staff() -> None:
         "/admin/login/",
         {"username": blocked.username, "next": "/admin/"},
     )
-    assert blocked_resp.status_code == 200
+    assert blocked_resp.status_code == 302
+    assert blocked_resp["Location"].endswith("/admin/otp/")
     assert len(mail.outbox) == 0
 
     ok_resp = _csrf_post(
@@ -418,7 +423,8 @@ def test_allowlist_blocks_other_staff_email() -> None:
         "/admin/login/",
         {"username": "blocked", "next": "/admin/"},
     )
-    assert blocked_resp.status_code == 200
+    assert blocked_resp.status_code == 302
+    assert blocked_resp["Location"].endswith("/admin/otp/")
     assert len(mail.outbox) == 0
 
     ok_resp = _csrf_post(
@@ -621,6 +627,25 @@ def test_otp_verify_failures_follow_the_account_across_challenges() -> None:
     logged_in = _post_code(colleague_client, "333333")
     assert logged_in.status_code == 302
     assert colleague_client.session.get("_auth_user_id") == str(colleague.pk)
+
+
+@pytest.mark.django_db
+@override_settings(**OTP_SETTINGS, ADMIN_OTP_MIN_STEP_SECONDS=0)
+def test_admin_login_unknown_user_decoy_redirects_to_otp() -> None:
+    """Unknown staff login must not differ from valid login (302 → OTP, no mail)."""
+    client = Client()
+    response = _csrf_post(
+        client,
+        "/admin/login/",
+        {"username": "ghost-staff@example.com", "next": "/admin/"},
+    )
+    assert response.status_code == 302
+    assert response["Location"].endswith("/admin/otp/")
+    assert len(mail.outbox) == 0
+    assert client.session.get("admin_otp_decoy") is True
+    otp_page = client.get("/admin/otp/")
+    assert otp_page.status_code == 200
+    assert b"ghost" not in otp_page.content.lower() or b"***" in otp_page.content
 
 
 @pytest.fixture(autouse=True)

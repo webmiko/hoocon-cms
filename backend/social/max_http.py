@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import mimetypes
 import ssl
@@ -10,12 +11,33 @@ from http.client import HTTPResponse
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from django.conf import settings
 
 _MAX_API = "https://platform-api2.max.ru"
 _HTTP_TIMEOUT_SEC = 30
+_MAX_ATTACHMENT_HOST_SUFFIXES = (".max.ru",)
+
+
+def max_attachment_url_allowed(url: str) -> bool:
+    """True when a MAX inbound attachment URL is an allowed public HTTPS host."""
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not host or host == "localhost":
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None
+    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
+        return False
+    return any(host == suffix.lstrip(".") or host.endswith(suffix) for suffix in _MAX_ATTACHMENT_HOST_SUFFIXES)
+
+
 _CA_BUNDLE = Path(settings.BASE_DIR) / "certs" / "max-ca-bundle.pem"
 
 

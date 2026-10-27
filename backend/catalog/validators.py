@@ -193,6 +193,8 @@ def validate_stock_xlsx_upload(uploaded: Any) -> None:
         ValidationError: empty, wrong type, spoofed content, or oversize.
     """
     name = getattr(uploaded, "name", "") or ""
+    if not str(name).strip():
+        name = "upload.xlsx"
     safe_name = sanitize_upload_filename(name)
     ext = os.path.splitext(safe_name)[1].lower()
     if ext != ALLOWED_STOCK_XLSX_EXTENSION:

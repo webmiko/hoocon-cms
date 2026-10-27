@@ -157,8 +157,8 @@ def test_send_client_confirmation_skips_missing_lead() -> None:
 
 
 @pytest.mark.django_db(transaction=True)
-def test_post_lead_schedules_client_confirmation(client) -> None:
-    """POST /api/leads/ ставит send_lead_client_confirmation через on_commit."""
+def test_post_lead_skips_client_confirmation_until_contact_verified(client) -> None:
+    """Анонимная заявка не шлёт клиенту письмо с текстом формы (anti-phishing)."""
     from unittest.mock import patch
 
     payload = {
@@ -171,9 +171,29 @@ def test_post_lead_schedules_client_confirmation(client) -> None:
     with patch("leads.lifecycle.send_lead_client_confirmation") as mock_task:
         response = client.post("/api/leads/", data=payload, content_type="application/json")
     assert response.status_code == 201
-    lead = Lead.objects.first()
-    assert lead is not None
-    mock_task.delay.assert_called_once_with(lead.pk)
+    mock_task.delay.assert_not_called()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_on_lead_created_schedules_client_confirmation_only_when_verified() -> None:
+    """Клиентское письмо — только для contact_verified (anti-phishing)."""
+    from unittest.mock import patch
+
+    from django.db import transaction
+
+    from leads.lifecycle import on_lead_created
+
+    lead = _make_lead(email="anon@example.com", contact_verified=False)
+    with patch("leads.lifecycle.send_lead_client_confirmation") as mock_task:
+        with transaction.atomic():
+            on_lead_created(lead)
+    mock_task.delay.assert_not_called()
+
+    verified = _make_lead(email="owner@example.com", contact_verified=True)
+    with patch("leads.lifecycle.send_lead_client_confirmation") as mock_task:
+        with transaction.atomic():
+            on_lead_created(verified)
+    mock_task.delay.assert_called_once_with(verified.pk)
 
 
 # ── Manager email reply button ───────────────────────────────────────

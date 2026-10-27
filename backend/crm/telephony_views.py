@@ -65,7 +65,7 @@ class NovosystemEventsView(APIView):
     throttle_scope = "novosystem_webhook"
 
     def post(self, request: Request) -> Response:
-        """Accept JSON or form body when ``token`` matches the widget secret."""
+        """Accept JSON or form body; secret via body ``token`` or ``X-Webhook-Token``."""
         return self._accept(request)
 
     def get(self, request: Request) -> Response:
@@ -75,7 +75,7 @@ class NovosystemEventsView(APIView):
     def _accept(self, request: Request) -> Response:
         data = request.data if isinstance(request.data, dict) else {}
         query = request.query_params
-        token = str(data.get("token") or query.get("token") or request.headers.get("X-Webhook-Token") or "")
+        token = str(data.get("token") or request.headers.get("X-Webhook-Token") or "")
         if not webhook_token_ok(token):
             logger.warning("novosystem_event_rejected")
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)

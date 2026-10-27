@@ -128,6 +128,19 @@ def passkey_login_begin(request: HttpRequest) -> HttpResponse:
     blocked = _require_enabled()
     if blocked is not None:
         return blocked
+    from django.conf import settings
+
+    from config.admin_otp import AdminOtpDeliveryError, consume_otp_request_quota
+
+    try:
+        consume_otp_request_quota(
+            request,
+            cache_prefix="admin_passkey:req_v1:",
+            limit=int(getattr(settings, "ADMIN_PASSKEY_REQUEST_LIMIT", 30)),
+            window=int(getattr(settings, "ADMIN_PASSKEY_REQUEST_WINDOW_SECONDS", 3600)),
+        )
+    except AdminOtpDeliveryError as exc:
+        return _json_error(str(exc), status=429)
     try:
         body = _parse_json_body(request)
     except ValueError as exc:
