@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from django.test import override_settings
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(autouse=True)
@@ -49,6 +53,14 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert "hoocon-lcp-boot" not in body
     assert 'type="module" src="/assets/index.js"' in body
     assert 'getElementById("hoocon-lcp-boot")' not in body
+
+
+def test_spa_crawl_block_masked_in_critical_css() -> None:
+    """Crawl copy stays in HTML for bots but must not flash as visible text before JS."""
+    shell = (_REPO_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+    assert 'id="hoocon-critical"' in shell
+    assert "#seo-crawl" in shell
+    assert "clip-path: inset(50%)" in shell
 
 
 @pytest.mark.django_db
