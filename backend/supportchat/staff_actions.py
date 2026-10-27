@@ -23,8 +23,17 @@ _STAFF_ASSIGN_RE = re.compile(
 _STAFF_TEMPLATE_RE = re.compile(r"^/t\s+([\w-]+)\s*$", re.IGNORECASE)
 _STAFF_TEMPLATE_LIST = {"/t", "/tpls", "/templates"}
 
+STAFF_SUPPORT_VIEW_PERMISSION = "supportchat.view_conversation"
 STAFF_SUPPORT_PERMISSION = "supportchat.change_conversation"
 STAFF_SUPPORT_DENIED = "Недостаточно прав для ответа в поддержке."
+STAFF_SUPPORT_VIEW_DENIED = "Недостаточно прав для просмотра диалогов поддержки."
+
+
+def staff_may_view_support(staff_user: AbstractBaseUser | None) -> bool:
+    """True when the user may list or read support dialogs (Admin list permission)."""
+    from django.contrib.auth.models import PermissionsMixin
+
+    return isinstance(staff_user, PermissionsMixin) and staff_user.has_perm(STAFF_SUPPORT_VIEW_PERMISSION)
 
 
 def staff_may_handle_support(staff_user: AbstractBaseUser | None) -> bool:

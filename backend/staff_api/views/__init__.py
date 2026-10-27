@@ -58,9 +58,16 @@ from staff_api.serializers import (
     serialize_user,
 )
 from staff_api.tokens import issue_staff_token
-from supportchat.models import Conversation, ConversationStatus
+from supportchat.models import Conversation, ConversationStatus, MessageDirection
 from supportchat.rating import request_client_rating
-from supportchat.services import SupportChatError, add_staff_reply, count_staff_unread, delete_unlinked_conversation
+from supportchat.services import SupportChatError, count_staff_unread, delete_unlinked_conversation
+from supportchat.staff_actions import (
+    STAFF_SUPPORT_DENIED,
+    STAFF_SUPPORT_VIEW_DENIED,
+    staff_may_handle_support,
+    staff_may_view_support,
+    submit_staff_reply,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +97,14 @@ def _staff_user(request: Request) -> User:
     if not isinstance(user, User):
         raise NotAuthenticated
     return user
+
+
+def _support_view_denied() -> Response:
+    return Response({"detail": STAFF_SUPPORT_VIEW_DENIED}, status=status.HTTP_403_FORBIDDEN)
+
+
+def _support_change_denied() -> Response:
+    return Response({"detail": STAFF_SUPPORT_DENIED}, status=status.HTTP_403_FORBIDDEN)
 
 
 class OtpStartView(APIView):
@@ -175,10 +190,12 @@ class BadgesView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        user = _staff_user(request)
+        support_unread = count_staff_unread() if staff_may_view_support(user) else 0
         return Response(
             {
-                "leads_new": count_new_leads(user=_staff_user(request)),
-                "support_unread": count_staff_unread(),
+                "leads_new": count_new_leads(user=user),
+                "support_unread": support_unread,
             },
         )
 
@@ -333,6 +350,8 @@ class ConversationListView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_view_support(_staff_user(request)):
+            return _support_view_denied()
         qs = (
             Conversation.objects.select_related("client", "lead", "assignee").all().order_by("-last_message_at", "-id")
         )
@@ -351,6 +370,8 @@ class ConversationDetailView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_view_support(_staff_user(request)):
+            return _support_view_denied()
         conv = get_object_or_404(
             Conversation.objects.select_related("client", "lead", "assignee"),
             pk=pk,
@@ -378,6 +399,8 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_view_support(_staff_user(request)):
+            return _support_view_denied()
         conv = get_object_or_404(Conversation, pk=pk)
         qs = conv.messages.order_by("created_at", "id")
         after = request.query_params.get("after")
@@ -395,22 +418,19 @@ class ConversationMessagesView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_handle_support(_staff_user(request)):
+            return _support_change_denied()
         ser = MessageCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        with transaction.atomic():
-            _conversation_for_update(pk)
-            conv = _conversation_for_staff(pk=pk)
-            try:
-                msg = add_staff_reply(conv, ser.validated_data["body"], author=_staff_user(request))
-            except SupportChatError as exc:
-                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        from supportchat.tasks import deliver_outbound_message
-
-        try:
-            deliver_outbound_message.delay(msg.pk)
-        except Exception:  # noqa: BLE001 — broker may be unreachable
-            logger.exception("deliver_outbound_message_enqueue_failed msg_id=%s", msg.pk)
-        return Response(serialize_message(msg), status=status.HTTP_201_CREATED)
+        ok, status_text = submit_staff_reply(_staff_user(request), pk, ser.validated_data["body"])
+        if not ok:
+            code = status.HTTP_403_FORBIDDEN if status_text == STAFF_SUPPORT_DENIED else status.HTTP_400_BAD_REQUEST
+            return Response({"detail": status_text}, status=code)
+        conv = _conversation_for_staff(pk=pk)
+        last = conv.messages.filter(direction=MessageDirection.OUTBOUND).order_by("-id").first()
+        if last is None:
+            return Response({"detail": status_text}, status=status.HTTP_201_CREATED)
+        return Response(serialize_message(last), status=status.HTTP_201_CREATED)
 
 
 def _conversation_for_update(pk: int) -> None:
@@ -434,6 +454,8 @@ class ConversationAssignView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_handle_support(_staff_user(request)):
+            return _support_change_denied()
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
@@ -448,6 +470,8 @@ class ConversationCloseView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_handle_support(_staff_user(request)):
+            return _support_change_denied()
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)
@@ -463,6 +487,8 @@ class ConversationReadView(StaffAuthMixin, APIView):
         blocked = _require_enabled()
         if blocked:
             return blocked
+        if not staff_may_handle_support(_staff_user(request)):
+            return _support_change_denied()
         with transaction.atomic():
             _conversation_for_update(pk)
             conv = _conversation_for_staff(pk=pk)

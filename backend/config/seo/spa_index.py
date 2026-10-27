@@ -128,7 +128,8 @@ def inject_crawl_block(
 
     React replaces #root on startup, so visitors do not keep a second copy.
     Crawlers that do not run scripts still see the title, the text and the
-    links. The block is not ``hidden``: a hidden article is skipped.
+    links. No ``hidden`` attribute (some bots skip it); ``#seo-crawl`` is
+    clipped in ``index.html`` critical CSS until React replaces ``#root``.
 
     Args:
         html: SPA shell.
