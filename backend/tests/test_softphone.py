@@ -389,7 +389,7 @@ def test_admin_page_loads_dock_only_for_phone_users(client: Any, django_user_mod
     client.force_login(with_token)
     html = client.get("/admin/").content.decode()
     assert "hoocon-softphone-dock.js" in html
-    assert "hoocon-noop.js" not in html
+    assert "hoocon-admin-permissions.js" not in html
 
     client.force_login(plain)
     html = client.get("/admin/").content.decode()

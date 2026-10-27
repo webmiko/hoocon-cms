@@ -184,6 +184,27 @@ def admin_desktop_settings_js(request: HttpRequest) -> str:
     return _versioned_static("admin/js/hoocon-admin-desktop-settings.js")
 
 
+def admin_permissions_picker_js(request: HttpRequest) -> str:
+    """Grouped permission / work-label pickers on change forms (cache-busted).
+
+    Widget ``Media`` alone is unreliable behind ``RelatedFieldWidgetWrapper`` in Unfold.
+    """
+    path = request.path
+    if not any(
+        path.startswith(prefix)
+        for prefix in (
+            "/admin/auth/group/",
+            "/admin/auth/user/",
+            "/admin/crm/company/",
+            "/admin/leads/lead/",
+        )
+    ):
+        return _versioned_static("admin/js/hoocon-noop.js")
+    if "/change/" not in path and not path.rstrip("/").endswith("/add"):
+        return _versioned_static("admin/js/hoocon-noop.js")
+    return _versioned_static("admin/js/hoocon-admin-permissions.js")
+
+
 def admin_softphone_js(request: HttpRequest) -> str:
     """Softphone dock for staff who have a browser-phone token; no-op for everyone else.
 

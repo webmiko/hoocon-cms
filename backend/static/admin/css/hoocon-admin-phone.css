@@ -241,7 +241,8 @@
     width: 100%;
   }
 
-  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper:has(.selector) {
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper:has(.selector),
+  body.hoocon-phone-ready.change-form #content-main form .related-widget-wrapper:has(.hoocon-perm-picker) {
     display: block !important;
     width: 100%;
     max-width: 100%;

@@ -4312,3 +4312,288 @@ label.hoocon-bool-toggle,
   background: var(--hoocon-surface-muted);
   color: var(--hoocon-quiet);
 }
+
+/* Auth Group / User — permissions as grouped checkboxes (not filter_horizontal). */
+.field-permissions .grow,
+.field-user_permissions .grow,
+.field-groups .grow,
+.field-work_labels .grow {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Unfold wraps M2M in related-widget-wrapper + more_vert; full-width pickers need block layout. */
+#content-main form .field-line .grow .flex-col.items-center.w-full:has(.hoocon-perm-picker) {
+  align-items: stretch;
+  width: 100%;
+}
+
+#content-main form .related-widget-wrapper:has(.hoocon-perm-picker) {
+  display: block !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+#content-main form .related-widget-wrapper:has(.hoocon-perm-picker) .hoocon-perm-picker {
+  pointer-events: auto;
+}
+
+#content-main form .related-widget-wrapper:has(.hoocon-perm-picker) > div {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#content-main form .related-widget-wrapper:has(.hoocon-perm-picker) [x-ref^="relatedWidgetWrapper"] {
+  display: none !important;
+}
+
+#content-main form .hoocon-perm-picker {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.25rem;
+}
+
+.hoocon-perm-picker__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  background: linear-gradient(
+    to bottom,
+    var(--hoocon-surface, #fff) 70%,
+    rgb(255 255 255 / 0)
+  );
+}
+
+.dark .hoocon-perm-picker__toolbar {
+  background: linear-gradient(
+    to bottom,
+    var(--hoocon-surface-dark, #18181b) 70%,
+    rgb(24 24 27 / 0)
+  );
+}
+
+.hoocon-perm-picker__filter {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--hoocon-radius-default, 0.375rem);
+  border: 1px solid var(--border-base-200, #e4e4e7);
+  background: var(--hoocon-surface-muted, #f4f4f5);
+  font-size: 0.9375rem;
+}
+
+.hoocon-perm-picker__filter:focus-visible {
+  outline: 2px solid var(--hoocon-primary, #dc1313);
+  outline-offset: 1px;
+}
+
+#content-main form .hoocon-perm-picker > .hoocon-perm-picker__app {
+  display: block;
+  border: 1px solid var(--border-base-200, #e4e4e7);
+  border-radius: var(--hoocon-radius-default, 0.375rem);
+  overflow: hidden;
+  background: var(--hoocon-surface, #fff);
+  margin: 0;
+}
+
+#content-main form .hoocon-perm-picker > .hoocon-perm-picker__app + .hoocon-perm-picker__app {
+  margin-top: 1rem !important;
+}
+
+.dark #content-main form .hoocon-perm-picker > .hoocon-perm-picker__app,
+html.dark #content-main form .hoocon-perm-picker > .hoocon-perm-picker__app {
+  border-color: var(--border-base-800, #3f3f46);
+  background: rgb(24 24 27 / 0.55);
+}
+
+.dark #content-main form .hoocon-perm-picker > .hoocon-perm-picker__app .hoocon-perm-picker__app-title,
+html.dark #content-main form .hoocon-perm-picker > .hoocon-perm-picker__app .hoocon-perm-picker__app-title {
+  border-bottom-color: var(--border-base-800, #3f3f46);
+}
+
+.hoocon-perm-picker__app-title {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.65rem 0.85rem;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  background: var(--hoocon-surface-muted, #f4f4f5);
+  border-bottom: 1px solid var(--border-base-200, #e4e4e7);
+}
+
+.hoocon-perm-picker__app-title::-webkit-details-marker {
+  display: none;
+}
+
+.hoocon-perm-picker__app-body {
+  padding: 0.5rem 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hoocon-perm-picker__bulk {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--hoocon-surface-muted, rgb(0 0 0 / 4%));
+  pointer-events: auto;
+}
+
+.dark .hoocon-perm-picker__bulk,
+html.dark .hoocon-perm-picker__bulk {
+  background: rgb(255 255 255 / 6%);
+}
+
+.hoocon-perm-picker__bulk-label {
+  font-size: 0.75rem;
+  color: var(--hoocon-quiet, #71717a);
+  margin-right: 0.15rem;
+}
+
+.hoocon-perm-picker__bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.hoocon-perm-picker__bulk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--hoocon-border, rgb(0 0 0 / 12%));
+  background: var(--hoocon-surface, #fff);
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hoocon-perm-picker__bulk-btn:has(.hoocon-perm-picker__bulk-toggle:checked) {
+  border-color: var(--hoocon-accent, #2563eb);
+  background: rgb(37 99 235 / 8%);
+}
+
+.hoocon-perm-picker__bulk-btn:has(.hoocon-perm-picker__bulk-toggle:indeterminate) {
+  border-color: var(--hoocon-accent, #2563eb);
+}
+
+.hoocon-perm-picker__bulk-btn:hover {
+  border-color: var(--hoocon-accent, #2563eb);
+}
+
+.hoocon-perm-picker__bulk-btn:focus-within {
+  outline: 2px solid var(--hoocon-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.hoocon-perm-picker__bulk-toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hoocon-perm-picker__bulk-text {
+  pointer-events: none;
+}
+
+.dark .hoocon-perm-picker__bulk-btn,
+html.dark .hoocon-perm-picker__bulk-btn {
+  background: rgb(255 255 255 / 4%);
+  border-color: rgb(255 255 255 / 12%);
+}
+
+.hoocon-perm-picker__bulk-btn--all .hoocon-perm-picker__bulk-text {
+  font-weight: 600;
+}
+
+.hoocon-perm-picker__model-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--hoocon-quiet, #71717a);
+}
+
+.hoocon-perm-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.hoocon-perm-picker__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.15rem 0;
+}
+
+.hoocon-perm-picker__label input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+}
+
+.hoocon-perm-picker__empty {
+  margin: 0;
+  color: var(--hoocon-quiet, #71717a);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 767px) {
+  .hoocon-perm-picker__list {
+    grid-template-columns: 1fr;
+  }
+
+  .field-permissions.field-line,
+  .field-user_permissions.field-line,
+  .field-groups.field-line,
+  .field-work_labels.field-line {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .field-permissions .field-label,
+  .field-user_permissions .field-label,
+  .field-groups .field-label,
+  .field-work_labels .field-label {
+    width: 100%;
+    padding-bottom: 0.25rem;
+  }
+}
