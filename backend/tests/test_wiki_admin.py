@@ -475,6 +475,36 @@ def test_seed_wiki_refreshes_unedited_page_from_repo() -> None:
 
 
 @pytest.mark.django_db
+def test_wiki_admin_save_strips_active_content_from_body() -> None:
+    """Wiki save in admin sanitizes HTML before persist (Security Swarm XSS)."""
+    from django.contrib.admin.sites import AdminSite
+    from django.test import RequestFactory
+
+    from content.admin import WikiDocumentAdmin
+    from content.models import WikiDocument
+
+    doc = WikiDocument.objects.create(
+        slug="xss-strip-test",
+        title="XSS strip",
+        category="Тест",
+        body='<p>safe</p><script>alert(1)</script>',
+        is_active=True,
+    )
+    admin = WikiDocumentAdmin(WikiDocument, AdminSite())
+    request = RequestFactory().get("/")
+    request.user = User.objects.create_superuser(
+        username="wiki-super",
+        email="wiki-super@example.com",
+        password="password12",
+    )
+    doc.body = '<p>safe</p><script>alert(1)</script>'
+    admin.save_model(request, doc, form=None, change=True)
+    doc.refresh_from_db()
+    assert "<script" not in doc.body.casefold()
+    assert "<p>safe</p>" in doc.body
+
+
+@pytest.mark.django_db
 def test_wiki_browse_requires_permission(client) -> None:
     """User without content.view_wikidocument cannot open Wiki browse."""
     user = User.objects.create_user(
