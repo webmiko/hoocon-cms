@@ -14,6 +14,7 @@ import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { MessengerLinks } from "./MessengerLinks";
 import { ThemeToggle } from "./ThemeToggle";
+import { useCabinetEnabled } from "../account/cabinetEnabled";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useSupportChannels } from "../hooks/useSupportChannels";
 import { openCookieConsentSettings } from "../utils/cookieConsent";
@@ -72,6 +73,7 @@ export function Layout() {
   const [inlineCtaVisible, setInlineCtaVisible] = useState(true);
   const [inlineTrack, setInlineTrack] = useState(isHome || isZavod);
   const messengerLinks = useSupportChannels();
+  const cabinetEnabled = useCabinetEnabled();
 
   // Reset visibility when entering home or /zavod.
   if ((isHome || isZavod) !== inlineTrack) {
@@ -433,6 +435,11 @@ export function Layout() {
               <li>
                 <Link to="/consultation">Консультация инженера</Link>
               </li>
+              {cabinetEnabled ? (
+                <li>
+                  <Link to="/login">Личный кабинет</Link>
+                </li>
+              ) : null}
               <li>
                 <Link to="/kontakty">Все контакты</Link>
               </li>
