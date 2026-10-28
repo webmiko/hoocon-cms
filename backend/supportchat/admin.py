@@ -234,8 +234,10 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
         ),
     )
 
-    def get_ordering(self, request: HttpRequest) -> tuple[Any, ...]:
+    def get_ordering(self, request: HttpRequest | None) -> tuple[Any, ...]:
         """Inbox default: unread first; column header sort uses ``?o=``."""
+        if request is None:
+            return self.ordering
         if request.GET.get("o"):
             return ()
         match = getattr(request, "resolver_match", None)
