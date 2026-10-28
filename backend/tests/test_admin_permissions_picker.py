@@ -11,10 +11,15 @@ from django.urls import reverse
 
 from config.admin_permissions import (
     AuthGroupCheckboxWidget,
+    GroupedPermissionWidget,
+    _app_verbose_name,
+    _codename_sort_key,
     _humanize_model_slug,
     _model_label_from_can_permission,
     _resolve_model_label,
     build_permission_groups,
+    install_admin_permission_pickers,
+    ordered_permission_queryset,
     permission_action_key,
     permission_action_label,
 )
@@ -116,6 +121,78 @@ def test_group_permissions_save_via_checkboxes(client) -> None:
 
 def test_humanize_model_slug_splits_leadelegationstate() -> None:
     assert _humanize_model_slug("leadelegationstate") == "Lead delegation state"
+
+
+def test_codename_sort_key_puts_custom_permissions_last() -> None:
+    assert _codename_sort_key("custom_perm")[0] == 99
+
+
+def test_app_verbose_name_falls_back_to_label_on_unknown_app() -> None:
+    assert _app_verbose_name("definitely_not_an_installed_app_label") == "definitely_not_an_installed_app_label"
+
+
+def test_model_label_from_can_permission_rejects_non_can_prefix() -> None:
+    assert _model_label_from_can_permission("View lead") is None
+
+
+def test_model_label_from_can_permission_strips_change_verb() -> None:
+    assert _model_label_from_can_permission("Can change lead") == "lead"
+
+
+def test_resolve_model_label_uses_content_type_name_before_humanize(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Meta:
+        verbose_name = "lead"
+
+    class _Model:
+        _meta = _Meta()
+
+    monkeypatch.setattr("config.admin_permissions.apps.get_model", lambda _a, _m: _Model())
+    label = _resolve_model_label(
+        "leads",
+        "lead",
+        "Клиентский лид",
+        ["Can view lead"],
+    )
+    assert label == "Клиентский лид"
+
+
+def test_grouped_permission_widget_context_marks_selected_ids() -> None:
+    widget = GroupedPermissionWidget(queryset=Permission.objects.none())
+    context = widget.get_context("permissions", ["7", 8], {})
+    assert context["selected_ids"] == {"7", "8"}
+    assert context["standard_bulk_actions"]
+
+
+def test_grouped_permission_widget_value_from_datadict_handles_all_shapes() -> None:
+    from django.utils.datastructures import MultiValueDict
+
+    widget = GroupedPermissionWidget()
+    data = MultiValueDict({"permissions": ["1", "2"]})
+    assert widget.value_from_datadict(data, {}, "permissions") == ["1", "2"]
+    assert widget.value_from_datadict({"permissions": "3"}, {}, "permissions") == ["3"]
+    assert widget.value_from_datadict({"permissions": ["4"]}, {}, "permissions") == ["4"]
+    assert widget.value_from_datadict({}, {}, "permissions") == []
+
+
+def test_auth_group_widget_value_from_datadict_handles_all_shapes() -> None:
+    from django.utils.datastructures import MultiValueDict
+
+    widget = AuthGroupCheckboxWidget(queryset=Group.objects.none())
+    data = MultiValueDict({"groups": ["1"]})
+    assert widget.value_from_datadict(data, {}, "groups") == ["1"]
+    assert widget.value_from_datadict({"groups": "2"}, {}, "groups") == ["2"]
+    assert widget.value_from_datadict({}, {}, "groups") == []
+
+
+def test_install_admin_permission_pickers_is_idempotent() -> None:
+    install_admin_permission_pickers()
+
+
+@pytest.mark.django_db
+def test_ordered_permission_queryset_is_select_related() -> None:
+    perm = ordered_permission_queryset().first()
+    assert perm is not None
+    assert perm.content_type.app_label
 
 
 def test_model_label_from_can_permission_strips_view_verb() -> None:
