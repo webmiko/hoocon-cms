@@ -318,6 +318,8 @@ def install_admin_permission_pickers() -> None:
             if remote is WorkLabel:
                 field.queryset = assignable_work_label_queryset(field.queryset)
                 field.widget = WorkLabelGroupedWidget(queryset=field.queryset)
+                # ModelMultipleChoiceField keeps SelectMultiple help_text; checkboxes need none.
+                field.help_text = "Можно отметить несколько галочками."
         return field
 
     formfield_for_manytomany._hoocon_permission_pickers = True  # type: ignore[attr-defined]
