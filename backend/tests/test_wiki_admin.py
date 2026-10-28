@@ -342,6 +342,20 @@ def test_seed_wiki_guide_explains_company_member_confirmation() -> None:
 
 
 @pytest.mark.django_db
+def test_seed_wiki_guide_explains_company_card_contact_blocks() -> None:
+    """Руководство 3.0: журнал — подсказки блоков на карточке компании."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    changelog = guide.body.split('id="changelog"', 1)[1]
+    assert 'id="changelog-company-card-hints"' in changelog
+    assert "Карточки клиентов" in changelog
+
+
+@pytest.mark.django_db
 def test_seed_wiki_guide_explains_quote_transitions_and_mail_matching() -> None:
     """Руководство 3.0: порядок статусов КП и привязка писем только от клиента заявки."""
     from io import StringIO

@@ -59,11 +59,17 @@ def test_company_change_work_labels_use_grouped_picker(client) -> None:
     client.force_login(admin)
     response = client.get(reverse("admin:crm_company_change", args=[company.pk]))
     assert response.status_code == 200
-    _work_label_picker_widget(response.context["adminform"].form.fields["work_labels"])
+    field = response.context["adminform"].form.fields["work_labels"]
+    _work_label_picker_widget(field)
+    assert field.help_text == "Можно отметить несколько галочками."
     html = response.content.decode()
+    work_labels_html = html.split("work_labels", 1)[1][:4000]
     assert "data-hoocon-perm-picker" in html
-    assert 'class="selector"' not in html.split("work_labels", 1)[1][:4000]
+    assert 'class="selector"' not in work_labels_html
     assert "Очередь" in html or "Флаг" in html
+    assert "Удерживайте" not in html
+    assert "несколько значений" not in html
+    assert "Можно отметить несколько галочками." in html
 
 
 @pytest.mark.django_db
@@ -81,10 +87,14 @@ def test_lead_change_work_labels_use_grouped_picker(client, django_user_model) -
     url = reverse("admin:leads_lead_change", args=[lead.pk]) + "?edit=1"
     response = client.get(url)
     assert response.status_code == 200
-    _work_label_picker_widget(response.context["adminform"].form.fields["work_labels"])
+    field = response.context["adminform"].form.fields["work_labels"]
+    _work_label_picker_widget(field)
+    assert field.help_text == "Можно отметить несколько галочками."
     html = response.content.decode()
+    work_labels_html = html.split("work_labels", 1)[1][:4000]
     assert "data-hoocon-perm-picker" in html
-    assert 'class="selector"' not in html.split("work_labels", 1)[1][:4000]
+    assert 'class="selector"' not in work_labels_html
+    assert "Удерживайте" not in html
 
 
 @pytest.mark.django_db

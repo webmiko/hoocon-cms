@@ -52,7 +52,11 @@ def test_company_change_shows_one_input_per_number(client: Any) -> None:
     assert "hoocon-company-phones.js" in html
     assert 'href="tel:+78435555396"' in html
     assert "Плановые звонки" in html
-    assert "Контакты" in html
+    assert "Карточки клиентов" in html
+    assert "Общий контакт фирмы" in html
+    assert "Сотрудники компании (кабинет)" in html
+    assert "не CRM-досье" in html
+    assert "Подтверждён менеджером" in html
     css = Path("static/admin/css/hoocon-unfold-extras.css").read_text(encoding="utf-8")
     assert ".hoocon-phones" in css
     assert "flex-direction: column" in css

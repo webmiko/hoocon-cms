@@ -186,9 +186,12 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
     autocomplete_fields = ("assignee", "client", "lead")
     # Messages render in the messenger template (not a tabular inline).
     inlines = ()
-    # NULL last_message_at (сессии без сообщений) — внизу списка,
-    # иначе Postgres DESC ставит их выше живых диалогов.
-    ordering = (F("last_message_at").desc(nulls_last=True), "-id")
+    # Сначала непрочитанные (staff_unread_count), затем свежесть; пустые сессии — вниз.
+    ordering = (
+        "-staff_unread_count",
+        F("last_message_at").desc(nulls_last=True),
+        "-id",
+    )
     change_form_template = "admin/supportchat/conversation/change_form.html"
     change_list_template = "admin/supportchat/conversation/change_list.html"
     actions = ("action_mark_read", "action_close", "action_delete_unlinked")
@@ -230,6 +233,18 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
             },
         ),
     )
+
+    def get_ordering(self, request: HttpRequest | None) -> tuple[Any, ...]:
+        """Inbox default: unread first; column header sort uses ``?o=``."""
+        if request is None:
+            return self.ordering
+        if request.GET.get("o"):
+            return ()
+        match = getattr(request, "resolver_match", None)
+        url_name = getattr(match, "url_name", "") or ""
+        if url_name == "supportchat_conversation_changelist":
+            return self.ordering
+        return ("-last_message_at", "-id")
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Conversation]:
         from django.db.models import OuterRef, Subquery

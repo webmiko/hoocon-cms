@@ -694,6 +694,30 @@ _NEWS_GUIDES_SLUG = "articles-podbor-i-sertifikaty"
 _NEWS_GUIDES_TITLE = "Новые статьи: подбор привода и сертификаты CE/UL/EAC"
 _NEWS_GUIDES_COVER = _FIXTURES_DIR / "article_podbor_privoda_cover.webp"
 
+_NEWS_AIRVENT_2027_SLUG = "hoocon-airvent-2027"
+_NEWS_AIRVENT_2027_TITLE = "AIRVent 2027: участие Hoocon"
+# Official exhibition og:image (AV27_1200x630.png, airventmoscow.ru).
+_NEWS_AIRVENT_2027_COVER = _FIXTURES_DIR / "news_airvent_2027_cover.webp"
+
+NEWS_AIRVENT_2027_BODY = f"""
+<p>Компания <strong>Hoocon</strong> (ООО «Хогон») планирует участие в
+международной выставке <strong>AIRVent&nbsp;2027</strong> — отраслевом форуме
+по вентиляции, кондиционированию и холодоснабжению жилых, коммерческих и
+промышленных объектов.</p>
+<p><strong>Когда и где.</strong> 1–4&nbsp;февраля 2027&nbsp;года, Москва,
+МВЦ «Крокус Экспо», павильон&nbsp;3, зал&nbsp;15. Регистрация и программа —
+на сайте
+<a href="https://airventmoscow.ru/ru/" rel="noopener noreferrer" target="_blank">AIRVent</a>.</p>
+<p><strong>Стенд.</strong> Номер нашего стенда и расположение на плане
+выставки опубликуем позже — эту новость обновим, когда организаторы выдадут
+площадку.</p>
+<p>Ближе к датам дополним программу встречи на стенде. Вопросы по продукции и
+встрече на выставке — через <a href="/consultation">заявку на КП</a>,
+по телефону {_PHONE} или
+<a href="mailto:{_EMAIL_SALES}">{_EMAIL_SALES}</a>.</p>
+<p><a href="/kontakty">Контакты Hoocon</a></p>
+""".strip()
+
 NEWS_GUIDES_BODY = """
 <p>В разделе <a href="/statyi">«Статьи»</a> — два практических материала для
 подбора и приёмки электроприводов ОВК.</p>
@@ -922,6 +946,30 @@ class Command(BaseCommand):
             self.stdout.write(f"news {_NEWS_GUIDES_SLUG}: cover from fixture")
         elif guides.cover:
             self.stdout.write(f"news {_NEWS_GUIDES_SLUG}: cover already set")
+
+        airvent, airvent_created = News.objects.update_or_create(
+            slug=_NEWS_AIRVENT_2027_SLUG,
+            defaults={
+                "title": _NEWS_AIRVENT_2027_TITLE,
+                "body": NEWS_AIRVENT_2027_BODY,
+                "is_published": True,
+            },
+        )
+        if airvent.published_at is None:
+            airvent.published_at = now
+            airvent.save(update_fields=["published_at", "updated_at"])
+        self.stdout.write(
+            f"news {airvent.slug}: {'created' if airvent_created else 'updated'}",
+        )
+        if _NEWS_AIRVENT_2027_COVER.is_file():
+            from django.core.files.base import ContentFile
+
+            airvent.cover.save(
+                _NEWS_AIRVENT_2027_COVER.name,
+                ContentFile(_NEWS_AIRVENT_2027_COVER.read_bytes()),
+                save=True,
+            )
+            self.stdout.write(f"news {_NEWS_AIRVENT_2027_SLUG}: cover from fixture")
 
         from content.news_categories import assign_news_categories, ensure_categories
 

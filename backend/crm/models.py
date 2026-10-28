@@ -800,18 +800,33 @@ class Company(models.Model):
     )
     comment: models.TextField = models.TextField("комментарий", blank=True, default="")
     contact_name: models.CharField = models.CharField(
-        "контакт",
+        "контактное лицо (текст)",
         max_length=200,
         blank=True,
         default="",
+        help_text=(
+            "Имя из базы или импорта. Не создаёт карточку клиента — "
+            "для человека с историей используйте таблицу «Карточки клиентов» ниже."
+        ),
     )
-    phone: models.CharField = models.CharField("телефон", max_length=300, blank=True, default="")
+    phone: models.CharField = models.CharField(
+        "телефон",
+        max_length=300,
+        blank=True,
+        default="",
+        help_text=(
+            "Общие номера фирмы (несколько — «Добавить телефон»). Входящий на любой из них открывает эту компанию."
+        ),
+    )
     email: models.CharField = models.CharField(
         "эл. почта",
         max_length=300,
         blank=True,
         default="",
-        help_text="Один или несколько адресов через точку с запятой. Карточка клиента создаётся по каждому адресу.",
+        help_text=(
+            "Общие адреса фирмы; несколько — через точку с запятой. "
+            "Письма и заявки по конкретному человеку ведите через карточку клиента (таблица ниже)."
+        ),
     )
     website: models.CharField = models.CharField("сайт", max_length=200, blank=True, default="")
     city: models.CharField = models.CharField("город", max_length=80, blank=True, default="")
