@@ -4,7 +4,7 @@
  * Beta and GA both show ``MAJOR.MINOR.PATCH`` (``v3.6.0``).
  * MINOR is a new feature; PATCH is a fix; MAJOR is manual.
  */
-export const RELEASE_VERSION = "3.8.28";
+export const RELEASE_VERSION = "3.8.29";
 export const RELEASE_CHANNEL = "";
 
 const VERSION_CORE = /^(\d+)\.(\d+)(?:\.(\d+))?$/;
