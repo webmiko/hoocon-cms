@@ -102,6 +102,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Staff users — login email, display name, Unfold Add button."""
 
     action_form = ActionForm
+    filter_horizontal = ()
     # Unfold add_link.html gates on this; Django UserAdmin alone omits the button.
     show_add_link = True
     form = StaffUserChangeForm
@@ -405,6 +406,7 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
     action_form = ActionForm
     show_add_link = True
+    filter_horizontal = ()
 
 
 admin.site.unregister(User)

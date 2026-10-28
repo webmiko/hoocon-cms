@@ -1,0 +1,70 @@
+<div class="hoocon-perm-picker" data-hoocon-perm-picker>
+  <div class="hoocon-perm-picker__toolbar">
+    <input
+      type="search"
+      class="hoocon-perm-picker__filter"
+      data-hoocon-perm-filter
+      placeholder="Фильтр по разделу или действию…"
+      autocomplete="off"
+      aria-label="Фильтр прав"
+    >
+  </div>
+  {% for app in permission_groups %}
+    <details class="hoocon-perm-picker__app" open data-hoocon-perm-app>
+      <summary class="hoocon-perm-picker__app-title">{{ app.label }}</summary>
+      <div class="hoocon-perm-picker__app-body">
+        <div class="hoocon-perm-picker__bulk" data-hoocon-perm-bulk>
+          <span class="hoocon-perm-picker__bulk-label">Для всего раздела:</span>
+          <div class="hoocon-perm-picker__bulk-actions">
+            {% for action_key, action_label in standard_bulk_actions %}
+              <label class="hoocon-perm-picker__bulk-btn">
+                <input
+                  type="checkbox"
+                  class="hoocon-perm-picker__bulk-toggle"
+                  data-hoocon-perm-bulk-action="{{ action_key }}"
+                  aria-label="Включить или снять «{{ action_label }}» для всего раздела"
+                >
+                <span class="hoocon-perm-picker__bulk-text">{{ action_label }}</span>
+              </label>
+            {% endfor %}
+            <label class="hoocon-perm-picker__bulk-btn hoocon-perm-picker__bulk-btn--all">
+              <input
+                type="checkbox"
+                class="hoocon-perm-picker__bulk-toggle"
+                data-hoocon-perm-bulk-action="all"
+                aria-label="Включить или снять все права раздела"
+              >
+              <span class="hoocon-perm-picker__bulk-text">Все</span>
+            </label>
+          </div>
+        </div>
+        {% for model in app.models %}
+          <section class="hoocon-perm-picker__model" data-hoocon-perm-model>
+            <h4 class="hoocon-perm-picker__model-title">{{ model.label }}</h4>
+            <ul class="hoocon-perm-picker__list">
+              {% for perm in model.permissions %}
+                <li
+                  class="hoocon-perm-picker__item"
+                  data-hoocon-perm-item
+                  data-hoocon-perm-action="{{ perm.action_key }}"
+                >
+                  <label class="hoocon-perm-picker__label">
+                    <input
+                      type="checkbox"
+                      name="{{ widget.name }}"
+                      value="{{ perm.pk }}"
+                      {% if perm.pk|stringformat:"s" in selected_ids %}checked{% endif %}
+                    >
+                    <span class="hoocon-perm-picker__action">{{ perm.action_label }}</span>
+                  </label>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endfor %}
+      </div>
+    </details>
+  {% empty %}
+    <p class="hoocon-perm-picker__empty">Нет доступных прав.</p>
+  {% endfor %}
+</div>

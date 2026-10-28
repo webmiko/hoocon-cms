@@ -35,10 +35,12 @@ class AccountsConfig(AppConfig):
         """Install Admin Email OTP + passkey routes/login patch."""
         from accounts.passkey_views import install_admin_passkeys
         from config.admin_otp_views import install_admin_email_otp
+        from config.admin_permissions import install_admin_permission_pickers
         from config.admin_toggle import install_admin_boolean_toggles
         from config.client_ip import install_rate_limit_identity
 
         install_admin_boolean_toggles()
+        install_admin_permission_pickers()
         install_admin_email_otp()
         install_admin_passkeys()
         install_rate_limit_identity()

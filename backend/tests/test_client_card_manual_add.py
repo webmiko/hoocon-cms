@@ -83,7 +83,9 @@ def test_manager_adds_a_call_lead_and_order_on_the_client_card() -> None:
     assert opened.status_code == 200
     html = opened.content.decode()
     assert "leads-__prefix__-message" in html
+    assert 'name="leads-0-message"' in html
     assert "orders-__prefix__-number" in html
+    assert 'name="orders-0-number"' in html
 
     posted = _admin_change_post(page, url)
     lead_index = int(posted["leads-TOTAL_FORMS"])
@@ -126,7 +128,10 @@ def test_manager_adds_a_quote_on_the_client_card_and_picks_sku_inside_it() -> No
     page = DjangoClient()
     page.force_login(admin)
     url = reverse("admin:crm_client_change", args=[person.pk])
-    assert "quotes-__prefix__-comment" in page.get(url).content.decode()
+    html = page.get(url).content.decode()
+    assert "quotes-__prefix__-comment" in html
+    # One blank row on the card (not only the hidden clone template).
+    assert 'name="quotes-0-comment"' in html
 
     posted = _admin_change_post(page, url)
     index = int(posted["quotes-TOTAL_FORMS"])

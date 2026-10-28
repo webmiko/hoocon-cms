@@ -1,0 +1,19 @@
+<div class="hoocon-perm-picker hoocon-auth-groups-picker">
+  <ul class="hoocon-perm-picker__list">
+    {% for group in groups %}
+      <li class="hoocon-perm-picker__item">
+        <label class="hoocon-perm-picker__label">
+          <input
+            type="checkbox"
+            name="{{ widget.name }}"
+            value="{{ group.pk }}"
+            {% if group.pk|stringformat:"s" in selected_ids %}checked{% endif %}
+          >
+          <span class="hoocon-perm-picker__action">{{ group.name }}</span>
+        </label>
+      </li>
+    {% empty %}
+      <li class="hoocon-perm-picker__empty">Нет групп.</li>
+    {% endfor %}
+  </ul>
+</div>

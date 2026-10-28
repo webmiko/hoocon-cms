@@ -1,0 +1,38 @@
+<div class="hoocon-perm-picker" data-hoocon-perm-picker>
+  <div class="hoocon-perm-picker__toolbar">
+    <input
+      type="search"
+      class="hoocon-perm-picker__filter"
+      data-hoocon-perm-filter
+      placeholder="Фильтр по отметке…"
+      autocomplete="off"
+      aria-label="Фильтр отметок"
+    >
+  </div>
+  {% for section in label_groups %}
+    <details class="hoocon-perm-picker__app" open data-hoocon-perm-app>
+      <summary class="hoocon-perm-picker__app-title">{{ section.label }}</summary>
+      <div class="hoocon-perm-picker__app-body">
+        <section class="hoocon-perm-picker__model" data-hoocon-perm-model>
+          <ul class="hoocon-perm-picker__list">
+            {% for label in section.labels %}
+              <li class="hoocon-perm-picker__item" data-hoocon-perm-item>
+                <label class="hoocon-perm-picker__label">
+                  <input
+                    type="checkbox"
+                    name="{{ widget.name }}"
+                    value="{{ label.pk }}"
+                    {% if label.pk|stringformat:"s" in selected_ids %}checked{% endif %}
+                  >
+                  <span class="hoocon-perm-picker__action">{{ label.name }}</span>
+                </label>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      </div>
+    </details>
+  {% empty %}
+    <p class="hoocon-perm-picker__empty">Нет активных отметок.</p>
+  {% endfor %}
+</div>
