@@ -16,6 +16,7 @@ from content.article_go_live import (
 from content.models import Article, News, NewsCategory
 from content.news_categories import (
     CATEGORY_KOMPANIYA,
+    CATEGORY_MEROPRIYATIYA,
     CATEGORY_PRODUKTY,
     CATEGORY_STATI,
     assign_news_categories,
@@ -48,6 +49,7 @@ def test_ensure_and_assign_known_slugs() -> None:
 
     assert category_slug_for_news("launch-hva-5nm") == CATEGORY_PRODUKTY
     assert category_slug_for_news("article-x") == CATEGORY_STATI
+    assert category_slug_for_news("hoocon-airvent-2027") == CATEGORY_MEROPRIYATIYA
     assert category_slug_for_news("unknown") == CATEGORY_KOMPANIYA
 
     updated = assign_news_categories()

@@ -33,6 +33,7 @@ NEWS_SLUG_TO_CATEGORY: dict[str, str] = {
     "mirklimata-2025": CATEGORY_MEROPRIYATIYA,
     "mir-klimata-2026-hoocon": CATEGORY_MEROPRIYATIYA,
     "hoocon-airvent-2026": CATEGORY_MEROPRIYATIYA,
+    "hoocon-airvent-2027": CATEGORY_MEROPRIYATIYA,
     "partner-snizhenie-cen-022026": CATEGORY_KOMPANIYA,
 }
 
