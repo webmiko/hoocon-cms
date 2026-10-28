@@ -348,19 +348,52 @@ def test_has_messages_filter() -> None:
 
 
 @pytest.mark.django_db
-def test_empty_conversations_sort_last() -> None:
+def test_empty_conversations_sort_last(client, django_user_model) -> None:
     """Пустые сессии не должны всплывать выше диалогов (NULLS LAST)."""
-    from django.contrib import admin as django_admin
+    from django.urls import reverse
 
+    admin = django_user_model.objects.create_superuser(
+        username="conv-sort-empty",
+        email="conv-sort-empty@example.com",
+        password="password12",
+    )
     empty_new = _conversation()
     with_messages = _conversation()
-    _inbound(with_messages, "Привет")
+    with_messages.last_message_at = timezone.now()
+    with_messages.save(update_fields=["last_message_at", "updated_at"])
 
-    model_admin = ConversationAdmin(Conversation, django_admin.site)
-    ordered = list(model_admin.get_queryset(None))
+    client.force_login(admin)
+    response = client.get(reverse("admin:supportchat_conversation_changelist"))
+    assert response.status_code == 200
+    ordered = list(response.context["cl"].result_list)
 
     assert ordered[0].pk == with_messages.pk
     assert ordered[-1].pk == empty_new.pk
+
+
+@pytest.mark.django_db
+def test_conversation_changelist_sorts_unread_first(client, django_user_model) -> None:
+    """Диалог с непрочитанными выше прочитанного, даже если тот свежее по дате."""
+    from django.urls import reverse
+
+    admin = django_user_model.objects.create_superuser(
+        username="conv-sort-unread",
+        email="conv-sort-unread@example.com",
+        password="password12",
+    )
+    fresh_read = _conversation(staff_unread_count=0)
+    fresh_read.last_message_at = timezone.now()
+    fresh_read.save(update_fields=["last_message_at", "updated_at"])
+    stale_unread = _conversation(staff_unread_count=5)
+    stale_unread.last_message_at = timezone.now() - timedelta(days=2)
+    stale_unread.save(update_fields=["last_message_at", "updated_at"])
+
+    client.force_login(admin)
+    response = client.get(reverse("admin:supportchat_conversation_changelist"))
+    assert response.status_code == 200
+    ordered = [row.pk for row in response.context["cl"].result_list]
+
+    assert ordered.index(stale_unread.pk) < ordered.index(fresh_read.pk)
 
 
 @pytest.mark.django_db
