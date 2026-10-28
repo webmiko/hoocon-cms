@@ -45,8 +45,9 @@ class CompanyClientInline(OneBlankInlineRowMixin, TabularInline):
     autocomplete_fields = ("assignee",)
     show_change_link = True
     can_delete = False
-    verbose_name = "контакт"
-    verbose_name_plural = "контакты"
+    verbose_name = "карточка клиента"
+    verbose_name_plural = "Карточки клиентов"
+    template_before = "admin/crm/company/inline_help_clients.html"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Client]:
         """A manager edits only the contacts already on their own list."""
@@ -71,6 +72,7 @@ class CompanyCallInline(OneBlankInlineRowMixin, TabularInline):
     show_change_link = True
     verbose_name = "плановый звонок"
     verbose_name_plural = "плановые звонки"
+    template_before = "admin/crm/company/inline_help_calls.html"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[PlannedTouch]:
         """Another manager's calls are not on this card and are not saved from it."""
@@ -92,6 +94,9 @@ class CompanyMemberInline(LabeledToggleMixin, OneBlankInlineRowMixin, TabularInl
     toggle_labels = {"is_confirmed": ("Не подтверждён", "Подтверждён")}
     fields = ("client", "account", "role", "is_confirmed")
     autocomplete_fields = ("client",)
+    verbose_name = "сотрудник компании"
+    verbose_name_plural = "Сотрудники компании (кабинет)"
+    template_before = "admin/crm/company/inline_help_members.html"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[CompanyMember]:
         """Hide members whose contact card the manager cannot open."""
@@ -148,14 +153,36 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
     inlines = (CompanyClientInline, CompanyCallInline, CompanyMemberInline)
     actions = ("merge_companies_action", "assign_to_me")
     fieldsets = (
-        (None, {"fields": ("name", "inn", "legal_address", "city", "region")}),
         (
-            "Контакт",
-            {"fields": ("contact_name", "phone", "email", "website")},
+            "Реквизиты",
+            {
+                "fields": ("name", "inn", "legal_address", "city", "region"),
+                "description": (
+                    "Юрлицо одно на всех людей с тем же названием. "
+                    "Дубликаты объединяются действием «Объединить компании» в списке «Компании»."
+                ),
+            },
+        ),
+        (
+            "Общий контакт фирмы",
+            {
+                "fields": ("contact_name", "phone", "email", "website"),
+                "description": (
+                    "Общие телефоны, почта и сайт для обзвона и импорта — не CRM-досье. "
+                    "Заявки, письма, звонки и КП по человеку — только в карточке клиента "
+                    "(таблица «Карточки клиентов» ниже)."
+                ),
+            },
         ),
         (
             "Работа",
-            {"fields": ("niche", "relevance", "assignee", "next_contact_at", "work_labels", "comment")},
+            {
+                "fields": ("niche", "relevance", "assignee", "next_contact_at", "work_labels", "comment"),
+                "description": (
+                    "«Следующий контакт» — напоминание по фирме. "
+                    "Плановый звонок на дату ставьте в таблице «Плановые звонки» ниже — он попадёт в блок «Сегодня»."
+                ),
+            },
         ),
         ("Служебное", {"fields": ("company_key", "created_at", "updated_at")}),
     )
