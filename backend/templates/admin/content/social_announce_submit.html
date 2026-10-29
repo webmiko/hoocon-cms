@@ -1,0 +1,28 @@
+{% load i18n %}
+{% if variant == "banner" %}
+  <div class="hoocon-social-announce-banner">
+    <form method="post" action="{{ social_announce_url }}" class="hoocon-social-announce-form">
+      {% csrf_token %}
+      <button type="submit" class="hoocon-social-announce-form__btn">
+        <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
+        {% trans "Опубликовать в соцсети" %}
+      </button>
+      <p class="hoocon-social-announce-form__hint">
+        {% trans "Telegram, VK и MAX — если каналы включены в «Интеграциях»." %}
+      </p>
+    </form>
+  </div>
+{% elif variant == "tool" %}
+  <li class="dark:border-base-700 max-lg:first:rounded-t-default border-base-200 min-lg:first:rounded-l-default select-none min-lg:-ml-px hover:bg-base-500/8 max-lg:last:rounded-b-default border dark:hover:text-primary-500 min-lg:last:rounded-r-default max-lg:-mt-px hover:text-primary-600">
+    <form method="post" action="{{ social_announce_url }}" class="flex grow min-w-0 m-0">
+      {% csrf_token %}
+      <button
+        type="submit"
+        class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap w-full bg-transparent border-0 font-inherit text-inherit"
+      >
+        <span class="material-symbols-outlined" aria-hidden="true">campaign</span>
+        {% trans "Опубликовать в соцсети" %}
+      </button>
+    </form>
+  </li>
+{% endif %}
