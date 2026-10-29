@@ -1450,6 +1450,54 @@ table.hoocon-lead-stats__table.hoocon-admin-table-stacked tbody a:hover {
   overflow: hidden;
 }
 
+/* Article/News: mobile-friendly social announce (no changelist checkboxes). */
+.hoocon-social-announce-banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hoocon-glass-border, rgba(30, 30, 40, 0.14));
+  border-radius: var(--hoocon-radius, 0.75rem);
+  background: var(--hoocon-surface, #fff);
+}
+
+.hoocon-social-announce-form {
+  margin: 0;
+}
+
+.hoocon-social-announce-form__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: var(--hoocon-radius-btn-sm, var(--hoocon-radius-sm));
+  background: var(--color-primary-600, #2563eb);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hoocon-social-announce-form__btn .material-symbols-outlined {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.hoocon-social-announce-form__hint {
+  margin: 0.55rem 0 0;
+  color: var(--hoocon-quiet, #5a626c);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 768px) {
+  .hoocon-social-announce-banner {
+    display: none;
+  }
+}
+
 /* Sticky header: nav_global_side is bare <li>s (no ul.object-tools). */
 .hoocon-header-object-tools {
   display: flex;
