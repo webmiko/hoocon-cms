@@ -135,6 +135,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         "is_superuser",
         "telegram_chat_short",
         "max_user_short",
+        "vk_user_short",
         "mailbox_short",
     )
     list_filter = ("is_staff", "is_superuser", "is_active", "groups")
@@ -290,6 +291,19 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             return f"{uid} (выкл)"
         return uid
 
+    @admin.display(description="VK")
+    def vk_user_short(self, obj: User) -> str:
+        """Show linked VK user id on the user list."""
+        profile = getattr(obj, "vk_profile", None)
+        if profile is None:
+            return "—"
+        uid = (profile.vk_user_id or "").strip()
+        if not uid:
+            return "—"
+        if not profile.vk_alerts_enabled:
+            return f"{uid} (выкл)"
+        return uid
+
     @admin.display(description="Почта (IMAP)")
     def mailbox_short(self, obj: User) -> str:
         """Show configured mailbox on the user list."""
@@ -310,6 +324,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             .select_related(
                 "telegram_profile",
                 "max_profile",
+                "vk_profile",
                 "mailbox",
             )
         )
