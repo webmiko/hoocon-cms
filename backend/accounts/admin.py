@@ -27,6 +27,7 @@ from accounts.models import (
     StaffMailbox,
     StaffMaxProfile,
     StaffTelegramProfile,
+    StaffVkProfile,
     StaffVpbxProfile,
 )
 from accounts.passkeys import admin_passkey_enabled
@@ -57,6 +58,18 @@ class StaffMaxProfileInline(StackedInline):
     fields = ("max_user_id", "max_alerts_enabled")
     verbose_name = "MAX"
     verbose_name_plural = "MAX сотрудника"
+
+
+class StaffVkProfileInline(StackedInline):
+    """Personal VK user_id for staff alerts."""
+
+    model = StaffVkProfile
+    can_delete = False
+    extra = 1
+    max_num = 1
+    fields = ("vk_user_id", "vk_alerts_enabled")
+    verbose_name = "VK"
+    verbose_name_plural = "VK сотрудника"
 
 
 class StaffMailboxInline(LabeledToggleMixin, StackedInline):
@@ -108,8 +121,9 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     form = StaffUserChangeForm
     add_form = StaffUserCreationForm
     inlines = (
-        StaffTelegramProfileInline,
+        StaffVkProfileInline,
         StaffMaxProfileInline,
+        StaffTelegramProfileInline,
         StaffMailboxInline,
         StaffVpbxProfileInline,
     )

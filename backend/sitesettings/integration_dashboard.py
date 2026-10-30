@@ -82,7 +82,7 @@ def build_integration_dashboard(site: SiteSettings | None = None) -> dict[str, A
                 f"токен: "
                 f"{token_source_label(row.vk_access_token, getattr(settings, 'VK_ACCESS_TOKEN', ''))}"
             ),
-            "hint": "Публикации на стену сообщества",
+            "hint": "Стена + сообщения (Callback → support-чат)",
         },
         {
             "name": "MAX",

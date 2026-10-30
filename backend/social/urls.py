@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from social.views import MaxWebhookView, TelegramWebhookView
+from social.views import MaxWebhookView, TelegramWebhookView, VkCallbackView
 
 urlpatterns = [
     path(
@@ -16,5 +16,10 @@ urlpatterns = [
         "max/webhook/",
         MaxWebhookView.as_view(),
         name="max-webhook",
+    ),
+    path(
+        "vk/callback/",
+        VkCallbackView.as_view(),
+        name="vk-callback",
     ),
 ]

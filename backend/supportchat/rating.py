@@ -73,6 +73,24 @@ def support_rating_reply_markup_tg(conversation_id: int) -> dict[str, Any]:
     return {"inline_keyboard": [buttons]}
 
 
+def support_rating_keyboard_vk(conversation_id: int) -> str:
+    """VK inline keyboard: ⭐1…⭐5 under the rating request."""
+    from social.vk_keyboard import vk_inline_keyboard
+
+    return vk_inline_keyboard(
+        [
+            [
+                {
+                    "type": "callback",
+                    "text": f"{n} ⭐",
+                    "payload": support_rating_callback_payload(conversation_id, n),
+                }
+                for n in range(1, 6)
+            ],
+        ],
+    )
+
+
 def support_rating_attachments_max(conversation_id: int) -> list[dict[str, Any]]:
     """MAX inline keyboard: ⭐1…⭐5 under the rating request."""
     buttons = [

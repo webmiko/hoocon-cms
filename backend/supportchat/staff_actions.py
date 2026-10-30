@@ -195,36 +195,56 @@ def notify_conversation_assigned(
     actor: AbstractBaseUser | None,
 ) -> None:
     """Ping the new assignee in bound messengers; the notice carries reply buttons."""
-    from social.publishers import publish_max, publish_telegram
+    from social.publishers import publish_max, publish_vk_dm
 
     actor_label = staff_public_name(actor)
     label = conversation.display_name or conversation.external_user_id
     channel_label = conversation.get_channel_display()
     text = f"🔀 {actor_label} передал вам диалог #{conversation.pk} · {channel_label} · {label}"
 
-    from accounts.telegram_alerts import telegram_chat_id_for
+    from accounts.vk_alerts import vk_user_id_for
+    from social.vk_staff_reply import staff_support_alert_keyboard, store_support_alert_mid
 
-    chat_id = telegram_chat_id_for(target)
-    if chat_id:
-        from social.telegram_staff_reply import (
-            staff_support_alert_reply_markup,
-            store_support_alert_message_id,
+    vk_uid = vk_user_id_for(target)
+    if vk_uid:
+        result = publish_vk_dm(
+            user_id=vk_uid,
+            text=text,
+            keyboard=staff_support_alert_keyboard(conversation.pk),
         )
+        if result.ok and result.external_id:
+            store_support_alert_mid(conversation.pk, vk_uid, result.external_id, text)
 
+    from accounts.telegram_alerts import telegram_chat_id_for
+    from social.publishers import publish_telegram
+    from social.telegram_staff_reply import (
+        staff_support_alert_reply_markup,
+        store_support_alert_message_id,
+    )
+
+    tg_chat = telegram_chat_id_for(target)
+    if tg_chat:
         result = publish_telegram(
-            chat_id=chat_id,
+            chat_id=tg_chat,
             text=text,
             reply_markup=staff_support_alert_reply_markup(conversation.pk),
         )
         if result.ok and result.external_id:
-            store_support_alert_message_id(conversation.pk, chat_id, result.external_id, text)
+            store_support_alert_message_id(
+                conversation.pk,
+                tg_chat,
+                result.external_id,
+                text,
+            )
 
     profile = getattr(target, "max_profile", None)
     max_user_id = (getattr(profile, "max_user_id", "") or "").strip() if profile else ""
     if max_user_id and getattr(profile, "max_alerts_enabled", False):
         from social.max_staff_reply import (
             staff_support_alert_attachments,
-            store_support_alert_mid,
+        )
+        from social.max_staff_reply import (
+            store_support_alert_mid as store_max_support_alert_mid,
         )
 
         result = publish_max(
@@ -233,7 +253,12 @@ def notify_conversation_assigned(
             attachments=staff_support_alert_attachments(conversation.pk),
         )
         if result.ok and result.external_id:
-            store_support_alert_mid(conversation.pk, max_user_id, result.external_id, text)
+            store_max_support_alert_mid(
+                conversation.pk,
+                max_user_id,
+                result.external_id,
+                text,
+            )
 
 
 @transaction.atomic

@@ -17,13 +17,13 @@ logger = setup_logger("hoocon.leads")
 
 def _enqueue_staff_push(lead_id: int) -> None:
     try:
-        from accounts.tasks import notify_staff_max_new_lead, notify_staff_telegram_new_lead
+        from accounts.tasks import notify_staff_max_new_lead, notify_staff_vk_new_lead
         from staff_api.tasks import notify_staff_fcm_new_lead
         from webpush.tasks import notify_staff_new_lead
 
         notify_staff_fcm_new_lead.delay(lead_id)
         notify_staff_new_lead.delay(lead_id)
-        notify_staff_telegram_new_lead.delay(lead_id)
+        notify_staff_vk_new_lead.delay(lead_id)
         notify_staff_max_new_lead.delay(lead_id)
     except Exception:  # noqa: BLE001 — optional broker/app may be absent
         logger.exception("lead_staff_push_enqueue_failed lead_id=%s", lead_id)

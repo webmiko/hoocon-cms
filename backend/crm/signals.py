@@ -75,8 +75,8 @@ def notify_superuser_on_staff_activity(
     url = f"/admin/crm/client/{client_id}/change/" if client_id else "/admin/crm/client/"
 
     def _enqueue() -> None:
-        from accounts.tasks import notify_superuser_telegram_crm
+        from accounts.tasks import notify_superuser_vk_crm
 
-        notify_superuser_telegram_crm.delay("CRM: активность", body, url)
+        notify_superuser_vk_crm.delay("CRM: активность", body, url)
 
     transaction.on_commit(_enqueue)

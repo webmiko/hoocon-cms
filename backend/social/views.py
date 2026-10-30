@@ -1,4 +1,4 @@
-"""Public API views for social integrations (Telegram / MAX webhooks)."""
+"""Public API views for social integrations (Telegram / MAX / VK webhooks)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -22,6 +23,7 @@ _TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 _MAX_SECRET_HEADER = "X-Max-Bot-Api-Secret"
 _TELEGRAM_THROTTLE_SCOPE = "telegram_webhook"
 _MAX_THROTTLE_SCOPE = "max_webhook"
+_VK_THROTTLE_SCOPE = "vk_webhook"
 
 
 class TelegramWebhookView(APIView):
@@ -84,3 +86,70 @@ class MaxWebhookView(APIView):
             handle_sync=handle_max_update,
             logger=logger,
         )
+
+
+class VkCallbackView(APIView):
+    """POST /api/integrations/vk/callback/ — VK Callback API (community messages).
+
+    Validates ``secret`` in the JSON body against ``VK_CALLBACK_SECRET``.
+    ``confirmation`` events return plain-text ``VK_CALLBACK_CONFIRMATION``;
+    other events enqueue Celery work and respond with ``ok``.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[Any] = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = _VK_THROTTLE_SCOPE
+
+    def post(self, request: Request) -> HttpResponse | Response:
+        payload = request.data
+        if not isinstance(payload, dict):
+            return HttpResponse("ok", content_type="text/plain; charset=utf-8")
+
+        expected = getattr(settings, "VK_CALLBACK_SECRET", "").strip()
+        provided = str(payload.get("secret") or "").strip()
+        if not expected or not secrets_equal(expected, provided):
+            return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
+
+        from sitesettings.models import SiteSettings
+
+        site = SiteSettings.load()
+        configured_gid = (site.vk_group_id or "").strip().lstrip("-")
+        payload_gid = str(payload.get("group_id") or "").strip().lstrip("-")
+        if configured_gid and payload_gid and configured_gid != payload_gid:
+            return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
+
+        event_type = (payload.get("type") or "").strip()
+        if event_type == "confirmation":
+            confirmation = getattr(settings, "VK_CALLBACK_CONFIRMATION", "").strip()
+            if not confirmation:
+                return Response(
+                    {"ok": False, "error": "confirmation_not_configured"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            return HttpResponse(confirmation, content_type="text/plain; charset=utf-8")
+
+        from social.tasks import process_vk_callback_task
+        from social.vk_bot import handle_vk_callback
+
+        try:
+            process_vk_callback_task.delay(payload)
+        except Exception as exc:
+            logger.warning(
+                "vk_callback_enqueue_failed error=%s falling_back_sync",
+                type(exc).__name__,
+            )
+            try:
+                from social.webhook_dedup import webhook_once
+
+                with webhook_once("vk", payload) as first:
+                    if first:
+                        handle_vk_callback(payload)
+            except Exception as sync_exc:
+                logger.error(
+                    "vk_callback_handler_failed error=%s",
+                    type(sync_exc).__name__,
+                    exc_info=sync_exc,
+                )
+
+        return HttpResponse("ok", content_type="text/plain; charset=utf-8")

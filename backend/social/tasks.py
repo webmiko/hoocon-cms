@@ -112,3 +112,29 @@ def process_max_update_task(self: Any, update: dict[str, Any]) -> None:
                 type(exc).__name__,
             )
             raise
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(OSError, TimeoutError),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 2},
+    name="social.process_vk_callback",
+)
+def process_vk_callback_task(self: Any, event: dict[str, Any]) -> None:
+    """Handle VK Callback API event off the HTTP request thread."""
+    from social.vk_bot import handle_vk_callback
+    from social.webhook_dedup import webhook_once
+
+    with webhook_once("vk", event) as first:
+        if not first:
+            logger.info("vk_callback_duplicate skipped")
+            return
+        try:
+            handle_vk_callback(event)
+        except Exception as exc:
+            logger.warning(
+                "vk_callback_task_failed error=%s",
+                type(exc).__name__,
+            )
+            raise

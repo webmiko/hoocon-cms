@@ -172,6 +172,26 @@ class SiteSettings(models.Model):
         help_text=("Входящее сообщение в чат поддержки → личный MAX менеджерам с привязанным ID пользователя."),
     )
 
+    # ── Staff VK DMs (personal user_id on StaffVkProfile) ──
+    staff_vk_leads_enabled: models.BooleanField = models.BooleanField(
+        "VK при новой заявке (если нет уведомлений на устройстве)",
+        default=True,
+        help_text=(
+            "Личные сообщения от сообщества Hoocon, если у сотрудника нет активных "
+            "браузерных уведомлений. Нужен ид. VK в карточке (/chatid в чате)."
+        ),
+    )
+    staff_vk_support_enabled: models.BooleanField = models.BooleanField(
+        "VK при сообщении в поддержке",
+        default=True,
+        help_text=("Входящий чат → VK менеджерам с привязанным ид. VK и кнопкой «Ответить»."),
+    )
+    staff_vk_superuser_crm_enabled: models.BooleanField = models.BooleanField(
+        "VK супер-админу по CRM (если нет уведомлений на устройстве)",
+        default=True,
+        help_text=("CRM-события супер-админам без активных браузерных уведомлений."),
+    )
+
     # ── Analytics (public counter IDs; loaded after cookie consent) ──
     yandex_metrika_id: models.CharField = models.CharField(
         "ID Яндекс.Метрики",

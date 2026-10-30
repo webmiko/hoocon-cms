@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.conf import settings
 from django.core.files import File
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -74,30 +73,27 @@ class SupportChannelsView(APIView):
         del request
         site = SiteSettings.load()
         channels: list[dict[str, str]] = []
-        if site.telegram_enabled:
-            bot = getattr(settings, "TELEGRAM_BOT_USERNAME", "").strip().lstrip("@")
-            if bot:
-                # Deep-link opens a 1:1 chat with the bot (not the public channel).
-                channels.append(
-                    {
-                        "channel": "telegram_bot",
-                        "provider": "telegram",
-                        "kind": "bot",
-                        "label": "Написать в Telegram",
-                        "deep_link": f"https://t.me/{bot}?start=support",
-                    },
-                )
-            channel = getattr(settings, "TELEGRAM_CHANNEL_USERNAME", "").strip().lstrip("@")
-            if channel:
-                channels.append(
-                    {
-                        "channel": "telegram_channel",
-                        "provider": "telegram",
-                        "kind": "channel",
-                        "label": "Канал Telegram",
-                        "deep_link": f"https://t.me/{channel}",
-                    },
-                )
+        if site.vk_enabled and site.vk_group_id.strip():
+            from social.vk_bot import vk_community_url, vk_community_write_link
+
+            channels.append(
+                {
+                    "channel": "vk_community",
+                    "provider": "vk",
+                    "kind": "bot",
+                    "label": "Написать во VK",
+                    "deep_link": vk_community_write_link(),
+                },
+            )
+            channels.append(
+                {
+                    "channel": "vk_channel",
+                    "provider": "vk",
+                    "kind": "channel",
+                    "label": "Сообщество VK",
+                    "deep_link": vk_community_url(),
+                },
+            )
         if site.max_enabled:
             from social.max_bot import max_bot_deep_link, max_channel_deep_link
 

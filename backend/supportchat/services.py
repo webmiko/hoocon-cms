@@ -364,7 +364,7 @@ def _schedule_staff_support_push(
     from django.db import transaction
 
     def _enqueue() -> None:
-        from accounts.tasks import notify_staff_max_support, notify_staff_telegram_support
+        from accounts.tasks import notify_staff_max_support, notify_staff_vk_support
         from webpush.tasks import notify_staff_support_inbound
 
         # Дебаунс: задачи с message_id ждут и пропускают себя, если пришло
@@ -374,7 +374,7 @@ def _schedule_staff_support_push(
             args=[conversation_id, message_id],
             countdown=countdown,
         )
-        notify_staff_telegram_support.apply_async(
+        notify_staff_vk_support.apply_async(
             args=[conversation_id, message_id],
             countdown=countdown,
         )
@@ -433,8 +433,22 @@ def add_staff_reply(
     _schedule_visitor_support_push(conversation.pk)
     _schedule_superuser_staff_reply_telegram(conversation.pk, author_user)
     _schedule_retire_max_support_alert(conversation.pk, author_user)
-    _schedule_retire_telegram_support_alert(conversation.pk, author_user)
+    _schedule_retire_vk_support_alert(conversation.pk, author_user)
     return msg
+
+
+def _schedule_retire_vk_support_alert(
+    conversation_id: int,
+    author: AbstractBaseUser | None,
+) -> None:
+    author_id = getattr(author, "pk", None)
+
+    def _enqueue() -> None:
+        from accounts.vk_tasks import retire_vk_support_alert
+
+        retire_vk_support_alert.delay(conversation_id, author_id)
+
+    transaction.on_commit(_enqueue)
 
 
 def _schedule_retire_telegram_support_alert(
@@ -506,9 +520,9 @@ def _schedule_superuser_staff_reply_telegram(
     author_label = staff_public_name(author)
 
     def _enqueue() -> None:
-        from accounts.tasks import notify_superuser_telegram_crm
+        from accounts.tasks import notify_superuser_vk_crm
 
-        notify_superuser_telegram_crm.delay(
+        notify_superuser_vk_crm.delay(
             "Ответ в поддержке",
             f"{author_label}: ответ клиенту",
             f"/admin/supportchat/conversation/{conversation_id}/change/",

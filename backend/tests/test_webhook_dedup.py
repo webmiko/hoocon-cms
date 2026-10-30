@@ -19,6 +19,23 @@ def test_webhook_dedup_key_telegram_update_id() -> None:
     assert webhook_dedup_key("telegram", {"update_id": 42}) == "telegram:42"
 
 
+def test_webhook_dedup_key_vk_message_new() -> None:
+    update = {
+        "type": "message_new",
+        "group_id": 1,
+        "object": {"message": {"id": 77}},
+    }
+    assert webhook_dedup_key("vk", update) == "vk:1:77"
+
+
+def test_webhook_dedup_key_vk_message_event() -> None:
+    update = {
+        "type": "message_event",
+        "object": {"event_id": "evt-9"},
+    }
+    assert webhook_dedup_key("vk", update) == "vk:event:evt-9"
+
+
 def test_webhook_dedup_key_max_message_mid() -> None:
     update = {
         "update_type": "message_created",

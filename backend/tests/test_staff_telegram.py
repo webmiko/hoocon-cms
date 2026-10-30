@@ -447,12 +447,12 @@ def test_telegram_alert_button_retires_after_staff_reply() -> None:
 def test_activity_with_author_schedules_superuser_crm(
     django_capture_on_commit_callbacks,
 ) -> None:
-    """Staff-authored Activity enqueues superuser Telegram CRM task."""
+    """Staff-authored Activity enqueues superuser VK CRM task."""
     su = _make_super(email="su3-tg@hoocon.ru", chat_id="999")
     from crm.models import Activity, ActivityType, Client
 
     client_row = Client.objects.create(name="C", email="act@example.com")
-    with patch("accounts.tasks.notify_superuser_telegram_crm") as task:
+    with patch("accounts.tasks.notify_superuser_vk_crm") as task:
         with django_capture_on_commit_callbacks(execute=True):
             Activity.objects.create(
                 client=client_row,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
@@ -61,10 +62,34 @@ def _dispatch(
             photo_path=content_cover_path(obj),
             photo_url=content_cover_url(obj),
         )
+    cover = content_cover_path(obj)
     if channel == SocialChannel.VK:
-        return publish_vk(group_id=site.vk_group_id, text=text)
+        return publish_vk(
+            group_id=site.vk_group_id,
+            text=text,
+            photo_path=cover,
+        )
     if channel == SocialChannel.MAX:
-        return publish_max(chat_id=site.max_chat_id, text=text)
+        attachments: list[dict[str, Any]] | None = None
+        if cover is not None:
+            from sitesettings.credentials import max_bot_token
+            from social.max_http import max_upload_image
+
+            token = max_bot_token(site)
+            if token:
+                try:
+                    image_token = max_upload_image(token, cover)
+                    attachments = [{"type": "image", "payload": {"token": image_token}}]
+                except (OSError, ValueError, RuntimeError) as exc:
+                    logger.warning(
+                        "max_announce_cover_failed error=%s",
+                        type(exc).__name__,
+                    )
+        return publish_max(
+            chat_id=site.max_chat_id,
+            text=text,
+            attachments=attachments,
+        )
     return PublishResult(ok=False, error=f"Unknown channel: {channel}")
 
 
