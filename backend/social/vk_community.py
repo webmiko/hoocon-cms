@@ -15,9 +15,22 @@ from django.conf import settings
 
 from social.copy import PHONE, clip_text, hours_and_phone_line, site_url
 from social.publishers import vk_api_call
-from social.vk_bot import vk_community_url, vk_community_write_link
 
 logger = logging.getLogger("hoocon.social")
+
+
+def vk_community_screen_name() -> str:
+    raw = getattr(settings, "VK_COMMUNITY_SCREEN_NAME", "hoocon_russia").strip().lstrip("@")
+    return raw or "hoocon_russia"
+
+
+def vk_community_url() -> str:
+    return f"https://vk.ru/{vk_community_screen_name()}"
+
+
+def vk_community_write_link() -> str:
+    return f"https://vk.me/{vk_community_screen_name()}"
+
 
 _COVER_STATIC = Path("static/social/vk-community-cover.jpg")
 _COVER_PNG = Path("static/social/vk-community-cover.png")
@@ -57,6 +70,20 @@ def community_description() -> str:
         ),
         _DESCRIPTION_MAX,
     )
+
+
+def welcome_dm_photo_path() -> Path | None:
+    """Cover for the first VK DM welcome (reuse Telegram/MAX asset)."""
+    configured = getattr(settings, "VK_WELCOME_PHOTO_PATH", "").strip()
+    base = Path(settings.BASE_DIR)
+    candidates: list[Path] = []
+    if configured:
+        candidates.append(Path(configured))
+    candidates.append(base / _WELCOME_FALLBACK)
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
 
 
 def community_cover_path() -> Path | None:
@@ -159,6 +186,56 @@ def upload_wall_photo(group_id: str, photo: Path) -> tuple[str | None, str]:
     photo_id = first.get("id")
     if owner_id is None or photo_id is None:
         return None, "VK: saveWallPhoto missing photo id"
+    return f"photo{owner_id}_{photo_id}", ""
+
+
+def upload_message_photo(group_id: str, peer_id: str, photo: Path) -> tuple[str | None, str]:
+    """Upload a photo for ``messages.send``; returns ``photo{owner_id}_{id}``."""
+    gid = group_id.strip().lstrip("-")
+    pid = (peer_id or "").strip()
+    if not gid.isdigit() or not pid.isdigit():
+        return None, "invalid group_id or peer_id"
+    if not photo.is_file():
+        return None, "photo file missing"
+    init, err = vk_api_call(
+        "photos.getMessagesUploadServer",
+        {"group_id": gid, "peer_id": pid},
+    )
+    if init is None:
+        return None, err
+    upload_url = ""
+    if isinstance(init.get("response"), dict):
+        upload_url = str(init["response"].get("upload_url") or "").strip()
+    if not upload_url:
+        return None, "VK: missing messages upload_url"
+
+    try:
+        uploaded = _post_multipart(upload_url, "photo", photo)
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        logger.warning("vk_message_photo_upload_failed error=%s", type(exc).__name__)
+        return None, f"VK upload: {type(exc).__name__}"
+
+    photo_json = str(uploaded.get("photo") or "").strip()
+    hash_val = str(uploaded.get("hash") or "").strip()
+    if not photo_json or not hash_val:
+        return None, f"VK message upload incomplete: {uploaded!r}"[:200]
+
+    save_params: dict[str, Any] = {"photo": photo_json, "hash": hash_val}
+    server = uploaded.get("server")
+    if server is not None:
+        save_params["server"] = server
+
+    saved, err = vk_api_call("photos.saveMessagesPhoto", save_params)
+    if saved is None:
+        return None, err
+    items = saved.get("response")
+    if not isinstance(items, list) or not items:
+        return None, "VK: saveMessagesPhoto empty response"
+    first = items[0] if isinstance(items[0], dict) else {}
+    owner_id = first.get("owner_id")
+    photo_id = first.get("id")
+    if owner_id is None or photo_id is None:
+        return None, "VK: saveMessagesPhoto missing photo id"
     return f"photo{owner_id}_{photo_id}", ""
 
 

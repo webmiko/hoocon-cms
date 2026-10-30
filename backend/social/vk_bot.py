@@ -5,19 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from django.conf import settings
-
+from social.copy import clip_text, hours_and_phone_line
 from social.max_bot import (
     compose_catalog_reply,
     compose_chatid_reply,
     compose_consultation_reply,
     compose_contacts_text,
     compose_fallback_reply,
-    compose_welcome_text,
     compose_where_reply,
     resolve_menu_action,
 )
-from social.publishers import PublishResult
+from social.publishers import PublishResult, publish_vk_dm
 from social.vk_bot_handlers import (
     reply_keyboard_for_action,
     send_to_vk_user,
@@ -25,24 +23,38 @@ from social.vk_bot_handlers import (
     vk_message_attachment,
 )
 from social.vk_client_menu import main_menu_keyboard_vk
+from social.vk_community import (
+    upload_message_photo,
+    vk_community_url,
+    vk_community_write_link,
+    welcome_dm_photo_path,
+)
 
 logger = logging.getLogger("hoocon.social")
 
+_MESSAGE_MAX = 4000
 
-def vk_community_screen_name() -> str:
-    """Public community slug for vk.me deep links."""
-    raw = getattr(settings, "VK_COMMUNITY_SCREEN_NAME", "hoocon_russia").strip().lstrip("@")
-    return raw or "hoocon_russia"
+# Re-export for supportchat and tests importing from vk_bot.
+__all__ = [
+    "compose_vk_welcome_text",
+    "handle_vk_callback",
+    "send_vk_welcome",
+    "vk_community_url",
+    "vk_community_write_link",
+]
 
 
-def vk_community_url() -> str:
-    """HTTPS URL of the official VK community."""
-    return f"https://vk.ru/{vk_community_screen_name()}"
-
-
-def vk_community_write_link() -> str:
-    """Open 1:1 chat with the community (messages)."""
-    return f"https://vk.me/{vk_community_screen_name()}"
+def compose_vk_welcome_text() -> str:
+    """Plain welcome for /start, /help and message_allow (VK community, not MAX)."""
+    text = (
+        "Добро пожаловать в Hoocon!\n\n"
+        "HOOCON — электроприводы и арматура для вентиляции и ОВК.\n\n"
+        "Кнопки ниже — каталог, заявка, документы, контакты и сообщество VK.\n"
+        "Или напишите вопрос — ответим в рабочие дни.\n\n"
+        f"Новости и статьи: {vk_community_url()}\n"
+        f"Режим ответа: {hours_and_phone_line()}"
+    )
+    return clip_text(text, _MESSAGE_MAX)
 
 
 def compose_vk_channel_reply() -> str:
@@ -50,9 +62,29 @@ def compose_vk_channel_reply() -> str:
     return f"Официальное сообщество Hoocon: {vk_community_url()}\n\nНовости, анонсы каталога и статьи по подбору."
 
 
+def send_vk_welcome(user_key: str) -> PublishResult:
+    """Welcome DM with optional cover photo and inline menu."""
+    from sitesettings.models import SiteSettings
+
+    attachment: str | None = None
+    gid = (SiteSettings.load().vk_group_id or "").strip().lstrip("-")
+    photo = welcome_dm_photo_path()
+    if gid.isdigit() and photo is not None:
+        uploaded, up_err = upload_message_photo(gid, user_key, photo)
+        if uploaded:
+            attachment = uploaded
+        elif up_err:
+            logger.warning("vk_welcome_photo_skipped reason=%s", up_err[:120])
+
+    return publish_vk_dm(
+        user_id=user_key,
+        text=compose_vk_welcome_text(),
+        keyboard=main_menu_keyboard_vk(),
+        attachment=attachment,
+    )
+
+
 def _compose_reply_for_action(action: str, user_key: str) -> str:
-    if action in {"start", "help"}:
-        return compose_welcome_text()
     if action in {"contacts", "contact"}:
         return compose_contacts_text()
     if action == "catalog":
@@ -131,6 +163,22 @@ def _ingest_support_text(
     return None
 
 
+def _handle_message_allow(event: dict[str, Any]) -> PublishResult | None:
+    obj = event.get("object")
+    if not isinstance(obj, dict):
+        return None
+    user_id = obj.get("user_id")
+    if user_id is None:
+        return None
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    if uid <= 0:
+        return None
+    return send_vk_welcome(str(uid))
+
+
 def _handle_message_new(event: dict[str, Any]) -> PublishResult | None:
     obj = event.get("object")
     if not isinstance(obj, dict):
@@ -163,6 +211,8 @@ def _handle_message_new(event: dict[str, Any]) -> PublishResult | None:
     display_name = _display_name_from_message(message)
     action = resolve_menu_action(text)
     if action is not None:
+        if action in {"start", "help"}:
+            return send_vk_welcome(user_key)
         reply = _compose_reply_for_action(action, user_key)
         return send_to_vk_user(user_key, reply, keyboard=reply_keyboard_for_action(action))
 
@@ -179,6 +229,8 @@ def handle_vk_callback(event: dict[str, Any]) -> PublishResult | None:
     event_type = (event.get("type") or "").strip()
     if event_type == "message_new":
         return _handle_message_new(event)
+    if event_type == "message_allow":
+        return _handle_message_allow(event)
     if event_type == "message_event":
         from social.vk_bot_handlers import handle_message_event
 
