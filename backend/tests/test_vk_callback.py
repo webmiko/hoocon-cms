@@ -79,6 +79,26 @@ def test_vk_callback_confirmation_returns_plain_text(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_vk_callback_confirmation_without_secret_like_vk_ui(settings) -> None:
+    """VK URL check POSTs confirmation with group_id only (no secret field)."""
+    settings.VK_CALLBACK_SECRET = "expected-secret"
+    settings.VK_CALLBACK_CONFIRMATION = "confirm-token-xyz"
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.vk_group_id = "242719752"
+    site.save()
+    client = Client()
+    response = client.post(
+        "/api/integrations/vk/callback/",
+        data={"type": "confirmation", "group_id": 242719752},
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert response.content.decode() == "confirm-token-xyz"
+
+
+@pytest.mark.django_db
 def test_vk_callback_enqueues_message_new(settings) -> None:
     settings.VK_CALLBACK_SECRET = "expected-secret"
     settings.VK_CALLBACK_CONFIRMATION = "x"
@@ -121,11 +141,23 @@ def test_menu_action_replies_with_keyboard() -> None:
 
 
 @pytest.mark.django_db
-def test_start_command_sends_welcome_not_support() -> None:
+def test_chatid_reply_without_keyboard() -> None:
+    """VK messages.send with keyboard needs community chat-bot mode; /chatid is plain."""
     with patch(
         "social.vk_bot.send_to_vk_user",
         return_value=PublishResult(ok=True),
     ) as pub:
+        handle_vk_callback(_message_new_event(user_id=9011, text="/chatid"))
+    assert pub.called
+    assert pub.call_args.kwargs.get("keyboard") is None
+
+
+@pytest.mark.django_db
+def test_start_command_sends_welcome_not_support() -> None:
+    with patch(
+        "social.vk_bot.send_vk_welcome",
+        return_value=PublishResult(ok=True),
+    ) as welcome:
         handle_vk_callback(_message_new_event(user_id=9003, text="/start"))
     from supportchat.models import Channel, Conversation
 
@@ -133,9 +165,7 @@ def test_start_command_sends_welcome_not_support() -> None:
         channel=Channel.VK,
         external_user_id="9003",
     ).exists()
-    assert pub.called
-    sent_text = pub.call_args.args[1] if len(pub.call_args.args) > 1 else pub.call_args.kwargs.get("text", "")
-    assert "Hoocon" in sent_text
+    welcome.assert_called_once_with("9003")
 
 
 def test_vk_write_link_uses_screen_name(settings) -> None:

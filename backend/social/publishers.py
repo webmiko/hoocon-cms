@@ -525,6 +525,7 @@ def publish_vk_dm(
     user_id: str,
     text: str,
     keyboard: str | None = None,
+    attachment: str | None = None,
 ) -> PublishResult:
     """Reply to a user in VK community messages (messages.send)."""
     uid = (user_id or "").strip()
@@ -540,6 +541,11 @@ def publish_vk_dm(
     }
     if keyboard:
         params["keyboard"] = keyboard
+    att = (attachment or "").strip()
+    if att:
+        if not att.startswith("photo") or "_" not in att:
+            return PublishResult(ok=False, error="VK: invalid attachment")
+        params["attachment"] = att
     data, err = vk_api_call("messages.send", params)
     if data is None:
         skipped = err == "VK не настроен"

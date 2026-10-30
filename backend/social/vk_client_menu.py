@@ -12,7 +12,6 @@ from social.max_bot import (
     BTN_CONTACTS,
     BTN_DOCS,
     BTN_FAQ,
-    BTN_OFFER,
     BTN_PRIVACY,
     BTN_TERMS,
     BTN_WHERE,
@@ -46,9 +45,9 @@ def main_menu_keyboard_vk() -> str:
                 {"type": "link", "text": BTN_COMPANY, "url": site_page("/company")},
             ],
             [
+                # VK: max 5 rows; open_link row — не более 2 кнопок (3 → invalid).
                 {"type": "link", "text": BTN_PRIVACY, "url": site_page("/privacy-policy")},
                 {"type": "link", "text": BTN_TERMS, "url": site_page("/terms")},
-                {"type": "link", "text": BTN_OFFER, "url": site_page("/oferta")},
             ],
         ],
     )

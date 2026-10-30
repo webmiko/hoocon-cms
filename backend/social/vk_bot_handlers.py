@@ -281,6 +281,9 @@ def _handle_rating_callback(
 
 
 def reply_keyboard_for_action(action: str) -> str | None:
-    if action in {"start", "help", "contacts", "contact", "catalog", "consultation", "where", "channel", "chatid"}:
+    # /chatid — plain reply; VK rejects keyboard without «Chat bot» community mode.
+    if action == "chatid":
+        return None
+    if action in {"start", "help", "contacts", "contact", "catalog", "consultation", "where", "channel"}:
         return main_menu_keyboard_vk()
     return main_menu_keyboard_vk()
