@@ -106,20 +106,26 @@ class VkCallbackView(APIView):
         if not isinstance(payload, dict):
             return HttpResponse("ok", content_type="text/plain; charset=utf-8")
 
+        from sitesettings.models import SiteSettings
+
+        event_type = (payload.get("type") or "").strip()
         expected = getattr(settings, "VK_CALLBACK_SECRET", "").strip()
         provided = str(payload.get("secret") or "").strip()
-        if not expected or not secrets_equal(expected, provided):
-            return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
-
-        from sitesettings.models import SiteSettings
 
         site = SiteSettings.load()
         configured_gid = (site.vk_group_id or "").strip().lstrip("-")
         payload_gid = str(payload.get("group_id") or "").strip().lstrip("-")
-        if configured_gid and payload_gid and configured_gid != payload_gid:
+        if configured_gid:
+            if not payload_gid or configured_gid != payload_gid:
+                return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
+
+        # VK sends ``confirmation`` without ``secret`` when verifying the URL.
+        if event_type == "confirmation":
+            if expected and provided and not secrets_equal(expected, provided):
+                return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
+        elif not expected or not secrets_equal(expected, provided):
             return Response({"ok": False}, status=status.HTTP_403_FORBIDDEN)
 
-        event_type = (payload.get("type") or "").strip()
         if event_type == "confirmation":
             confirmation = getattr(settings, "VK_CALLBACK_CONFIRMATION", "").strip()
             if not confirmation:
