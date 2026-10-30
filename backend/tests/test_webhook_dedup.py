@@ -36,6 +36,33 @@ def test_webhook_dedup_key_vk_message_event() -> None:
     assert webhook_dedup_key("vk", update) == "vk:event:evt-9"
 
 
+def test_webhook_dedup_key_vk_message_allow() -> None:
+    """message_allow без dedup-ключа — ретрай VK шлёт welcome дублем."""
+    update = {
+        "type": "message_allow",
+        "group_id": 1,
+        "object": {"user_id": 55, "key": "k"},
+    }
+    assert webhook_dedup_key("vk", update) == "vk:1:allow:55"
+
+
+@pytest.mark.django_db
+def test_vk_message_allow_retry_sends_welcome_once() -> None:
+    """VK redelivers message_allow on timeout — welcome DM must go out once."""
+    from social.publishers import PublishResult
+    from social.tasks import process_vk_callback_task
+
+    event = {
+        "type": "message_allow",
+        "group_id": 242719752,
+        "object": {"user_id": 9042, "key": "k"},
+    }
+    with patch("social.vk_bot.publish_vk_dm", return_value=PublishResult(ok=True)) as dm:
+        process_vk_callback_task(event)
+        process_vk_callback_task(event)
+    dm.assert_called_once()
+
+
 def test_webhook_dedup_key_max_message_mid() -> None:
     update = {
         "update_type": "message_created",
