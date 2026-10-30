@@ -71,28 +71,53 @@ def test_staff_user_for_vk_user_id_prefers_support_permission() -> None:
     assert found.pk == user.pk
 
 
-@pytest.mark.django_db
-def test_try_staff_vk_reply_parses_hash_command() -> None:
-    from supportchat.models import Channel, Conversation
+def test_vk_message_attachment_skips_internal_url() -> None:
+    """Handler must not fetch a photo URL outside the VK CDN allowlist."""
+    message = {
+        "attachments": [
+            {
+                "type": "photo",
+                "photo": {
+                    "sizes": [
+                        {"url": "https://127.0.0.1/secret", "width": 100, "height": 80},
+                    ],
+                },
+            },
+        ],
+    }
+    assert vk_message_attachment(message) is None
 
+
+@pytest.mark.django_db
+def test_try_staff_vk_reply_ignores_client_without_staff_profile() -> None:
+    """A regular VK user must not take the staff-reply path."""
+    result = try_staff_vk_reply("900900", "Нужен привод")
+    assert result is None
+
+
+@pytest.mark.django_db
+def test_try_staff_vk_reply_ignores_staff_without_manager_group() -> None:
+    """is_staff editor with a VK id is not a support agent — text is not a staff reply."""
     user = get_user_model().objects.create_user(
-        username="vk-reply",
-        email="vk-reply@hoocon.ru",
+        username="vk-editor",
+        email="vk-editor@hoocon.ru",
         password="pw-12345",
         is_staff=True,
     )
-    group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
-    user.groups.add(group)
     StaffVkProfile.objects.create(user=user, vk_user_id="555002", vk_alerts_enabled=True)
-    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-vk-reply")
-    with patch(
-        "social.vk_bot_handlers.submit_staff_reply_from_vk",
-        return_value=(True, "ok"),
-    ) as submit:
-        with patch("social.vk_bot_handlers.send_to_vk_user") as send:
-            try_staff_vk_reply("555002", f"#{conv.pk} Ответ клиенту")
-    submit.assert_called_once()
-    send.assert_called_once()
+    assert staff_user_for_vk_user_id("555002") is None
+    assert try_staff_vk_reply("555002", "#1 Ответ клиенту") is None
+
+
+def _grant_support_change(user) -> None:
+    from django.contrib.auth.models import Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    from supportchat.models import Conversation
+
+    ct = ContentType.objects.get_for_model(Conversation)
+    perm = Permission.objects.get(codename="change_conversation", content_type=ct)
+    user.user_permissions.add(perm)
 
 
 @pytest.mark.django_db
@@ -110,6 +135,7 @@ def test_handle_message_event_reply_sets_pending_mode() -> None:
     )
     group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
     user.groups.add(group)
+    _grant_support_change(user)
     StaffVkProfile.objects.create(user=user, vk_user_id="555003", vk_alerts_enabled=True)
     conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-ev")
     event = {
@@ -123,3 +149,23 @@ def test_handle_message_event_reply_sets_pending_mode() -> None:
     with patch("social.vk_bot_handlers.answer_vk_message_event"):
         handle_message_event(event)
     assert get_pending_staff_reply("555003") == (conv.pk, "reply")
+
+
+@pytest.mark.django_db
+def test_handle_message_event_unknown_vk_user_is_rejected() -> None:
+    from social.max_staff_reply import staff_reply_callback_payload
+    from social.vk_bot_handlers import handle_message_event
+    from supportchat.models import Channel, Conversation
+
+    conv = Conversation.objects.create(channel=Channel.WEB, external_user_id="web-ev2")
+    event = {
+        "object": {
+            "user_id": 1,
+            "peer_id": 1,
+            "event_id": 9,
+            "payload": staff_reply_callback_payload(conv.pk),
+        },
+    }
+    with patch("social.vk_bot_handlers.answer_vk_message_event") as answer:
+        handle_message_event(event)
+    assert answer.call_args.kwargs["text"] == "Недоступно"

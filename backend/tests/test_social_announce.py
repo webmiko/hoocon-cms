@@ -469,3 +469,98 @@ def test_announce_max_with_cover_attaches_image(settings) -> None:
 
     assert len(created) == 1
     assert created[0].status == SocialPostStatus.SENT
+
+
+@pytest.mark.django_db
+def test_maybe_auto_announce_only_on_first_publish() -> None:
+    """Re-saving an already published news must not queue another announce."""
+    from content.models import News
+    from sitesettings.models import SiteSettings
+    from social.admin import maybe_auto_announce
+
+    site = SiteSettings.load()
+    site.social_announce_on_publish = True
+    site.save()
+    news = News.objects.create(title="AIRVent", slug="article-airvent", is_published=True)
+    with patch("social.admin.schedule_announce_on_commit") as sched:
+        maybe_auto_announce(news, was_published=False)
+        maybe_auto_announce(news, was_published=True)
+        draft = News.objects.create(title="Draft", slug="article-draft", is_published=False)
+        maybe_auto_announce(draft, was_published=False)
+    assert sched.call_count == 1
+    assert sched.call_args.args[0].pk == news.pk
+    assert sched.call_args.kwargs["force"] is False
+
+
+@pytest.mark.django_db
+def test_announce_default_channels_are_vk_and_max_when_telegram_off(settings) -> None:
+    """Enabled VK+MAX, Telegram off → no Telegram SocialPost."""
+    settings.VK_ACCESS_TOKEN = "vk-token"
+    settings.MAX_BOT_TOKEN = "max-token"
+    from content.models import News
+    from sitesettings.models import SiteSettings
+    from social.models import SocialChannel, SocialPost
+    from social.services import announce_content
+
+    site = SiteSettings.load()
+    site.telegram_enabled = False
+    site.vk_enabled = True
+    site.vk_group_id = "1"
+    site.vk_access_token = "vk-token"
+    site.max_enabled = True
+    site.max_chat_id = "-100"
+    site.max_bot_token = "max-token"
+    site.save()
+    news = News.objects.create(title="Both", slug="article-both", is_published=True)
+    with (
+        patch(
+            "social.services.publish_vk",
+            return_value=MagicMock(ok=True, skipped=False, error="", external_id="v"),
+        ),
+        patch(
+            "social.services.publish_max",
+            return_value=MagicMock(ok=True, skipped=False, error="", external_id="m"),
+        ),
+        patch("social.services.publish_telegram") as tg,
+    ):
+        announce_content(news)
+    channels = set(SocialPost.objects.values_list("channel", flat=True))
+    assert channels == {SocialChannel.VK, SocialChannel.MAX}
+    assert not tg.called
+
+
+@pytest.mark.django_db
+def test_backfill_skips_when_vk_and_max_already_sent() -> None:
+    """Backfill does not re-post a news that already has SENT VK and MAX rows."""
+    from io import BytesIO, StringIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.core.management import call_command
+    from PIL import Image
+
+    from content.models import News
+    from social.models import SocialChannel, SocialPost, SocialPostStatus
+
+    buf = BytesIO()
+    Image.new("RGB", (2, 2)).save(buf, format="JPEG")
+    cover = SimpleUploadedFile("c.jpg", buf.getvalue(), content_type="image/jpeg")
+    news = News.objects.create(
+        title="Done",
+        slug="article-done",
+        cover=cover,
+        is_published=True,
+    )
+    ct = SocialPost.content_type_for(news)
+    for channel in (SocialChannel.VK, SocialChannel.MAX):
+        SocialPost.objects.create(
+            content_type=ct,
+            object_id=news.pk,
+            channel=channel,
+            status=SocialPostStatus.SENT,
+            message_preview="x",
+        )
+    out = StringIO()
+    with patch("social.services.announce_content") as announce:
+        call_command("backfill_article_news_social", stdout=out)
+    assert not announce.called
+    assert "already sent" in out.getvalue()
