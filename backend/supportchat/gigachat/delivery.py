@@ -49,3 +49,17 @@ def deliver_ai_message(conversation: Conversation, message: Message) -> None:
                 conversation.pk,
                 (result.error or "")[:120],
             )
+        return
+    if conversation.channel == Channel.VK:
+        from social.publishers import publish_vk_dm
+
+        result = publish_vk_dm(
+            user_id=conversation.external_user_id,
+            text=outbound,
+        )
+        if not result.ok:
+            logger.warning(
+                "gigachat_vk_delivery_failed conversation_id=%s err=%s",
+                conversation.pk,
+                (result.error or "")[:120],
+            )

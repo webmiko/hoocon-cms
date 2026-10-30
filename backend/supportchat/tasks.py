@@ -170,6 +170,29 @@ def deliver_outbound_message(self: Any, message_id: int) -> str:
             msg.external_message_id = result.external_id
             msg.save(update_fields=["external_message_id"])
         return "max_ok"
+    if conversation.channel == Channel.VK:
+        if (msg.external_message_id or "").strip():
+            return "already_delivered"
+        from social.publishers import publish_vk_dm
+
+        result = publish_vk_dm(
+            user_id=conversation.external_user_id,
+            text=msg.body,
+        )
+        if result.skipped:
+            logger.warning("support_vk_outbound_skipped message_id=%s", message_id)
+            return "skipped"
+        if not result.ok:
+            logger.warning(
+                "support_vk_outbound_failed message_id=%s err=%s",
+                message_id,
+                (result.error or "")[:120],
+            )
+            raise self.retry(exc=RuntimeError(result.error or "vk_failed"))
+        if result.external_id and not msg.external_message_id:
+            msg.external_message_id = result.external_id
+            msg.save(update_fields=["external_message_id"])
+        return "vk_ok"
     logger.info(
         "support_outbound_channel_pending channel=%s message_id=%s",
         conversation.channel,
@@ -220,6 +243,19 @@ def send_rating_request(conversation_id: int) -> str:
             return "max_ok"
         logger.warning("support_rating_request_failed channel=max conv=%s", conversation_id)
         return "max_failed"
+    if conv.channel == Channel.VK:
+        from social.publishers import publish_vk_dm
+        from supportchat.rating import support_rating_keyboard_vk
+
+        result = publish_vk_dm(
+            user_id=conv.external_user_id,
+            text=text,
+            keyboard=support_rating_keyboard_vk(conv.pk),
+        )
+        if result.ok:
+            return "vk_ok"
+        logger.warning("support_rating_request_failed channel=vk conv=%s", conversation_id)
+        return "vk_failed"
     return "web_widget"
 
 

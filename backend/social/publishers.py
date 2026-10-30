@@ -6,6 +6,7 @@ import json
 import logging
 import mimetypes
 import os
+import random
 import time
 import uuid
 from collections.abc import Callable
@@ -437,49 +438,139 @@ def max_download_attachment(url: str) -> tuple[bytes, str] | None:
     return payload, name
 
 
-def publish_vk(*, group_id: str, text: str) -> PublishResult:
-    """Post to VK community wall (wall.post).
-
-    Args:
-        group_id: Numeric group id without minus (owner_id = -group_id).
-        text: Wall message.
+def vk_api_call(method: str, params: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """Call ``https://api.vk.com/method/{method}`` with community token.
 
     Returns:
-        PublishResult with VK post_id when successful.
+        Parsed JSON dict and empty error string on success; ``None`` and message on failure.
     """
     token = vk_access_token()
-    gid = group_id.strip().lstrip("-")
-    if not token or not gid.isdigit():
-        return PublishResult(ok=False, skipped=True, error="VK не настроен")
-    owner_id = f"-{gid}"
+    if not token:
+        return None, "VK не настроен"
     query = urlencode(
         {
+            **params,
             "access_token": token,
             "v": "5.199",
-            "owner_id": owner_id,
-            "from_group": "1",
-            "message": text,
-        }
+        },
     )
-    url = f"https://api.vk.com/method/wall.post?{query}"
+    url = f"https://api.vk.com/method/{method}?{query}"
     request = Request(url, method="POST", data=b"")
     try:
         with urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:  # noqa: S310
             raw = response.read().decode("utf-8", errors="replace")
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        logger.warning("vk_publish_failed error=%s", type(exc).__name__)
-        return PublishResult(ok=False, error=f"VK: {type(exc).__name__}")
+        logger.warning("vk_api_failed method=%s error=%s", method, type(exc).__name__)
+        return None, f"VK: {type(exc).__name__}"
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return PublishResult(ok=False, error="VK: invalid JSON")
+        return None, "VK: invalid JSON"
+    if not isinstance(data, dict):
+        return None, "VK: invalid response"
     if "error" in data:
         err = data["error"]
         msg = err.get("error_msg", str(err)) if isinstance(err, dict) else str(err)
-        return PublishResult(ok=False, error=f"VK: {msg}"[:300])
-    resp = data.get("response") if isinstance(data.get("response"), dict) else {}
-    post_id = resp.get("post_id", "")
+        return None, f"VK: {msg}"[:300]
+    return data, ""
+
+
+def publish_vk(
+    *,
+    group_id: str,
+    text: str,
+    photo_path: Path | None = None,
+) -> PublishResult:
+    """Post to VK community wall (wall.post).
+
+    Args:
+        group_id: Numeric group id without minus (owner_id = -group_id).
+        text: Wall message.
+        photo_path: Optional local cover file → wall photo attachment.
+
+    Returns:
+        PublishResult with VK post_id when successful.
+    """
+    gid = group_id.strip().lstrip("-")
+    if not gid.isdigit():
+        return PublishResult(ok=False, skipped=True, error="VK не настроен")
+    params: dict[str, Any] = {
+        "owner_id": f"-{gid}",
+        "from_group": "1",
+        "message": text,
+    }
+    if photo_path is not None and photo_path.is_file():
+        from social.vk_community import upload_wall_photo
+
+        attachment, up_err = upload_wall_photo(gid, photo_path)
+        if attachment:
+            params["attachments"] = attachment
+        elif up_err:
+            logger.warning("vk_wall_post_without_photo reason=%s", up_err[:120])
+    data, err = vk_api_call("wall.post", params)
+    if data is None:
+        skipped = err == "VK не настроен"
+        return PublishResult(ok=False, skipped=skipped, error=err)
+    raw_resp = data.get("response")
+    post_id: int | str = ""
+    if isinstance(raw_resp, dict):
+        post_id = raw_resp.get("post_id", "")
+    elif isinstance(raw_resp, int):
+        post_id = raw_resp
     return PublishResult(ok=True, external_id=str(post_id))
+
+
+def publish_vk_dm(
+    *,
+    user_id: str,
+    text: str,
+    keyboard: str | None = None,
+) -> PublishResult:
+    """Reply to a user in VK community messages (messages.send)."""
+    uid = (user_id or "").strip()
+    if not uid.isdigit():
+        return PublishResult(ok=False, skipped=True, error="VK: invalid user_id")
+    body = (text or "").strip()
+    if not body:
+        return PublishResult(ok=False, error="VK: empty message")
+    params: dict[str, Any] = {
+        "random_id": random.randint(1, 2_000_000_000),
+        "peer_id": uid,
+        "message": body,
+    }
+    if keyboard:
+        params["keyboard"] = keyboard
+    data, err = vk_api_call("messages.send", params)
+    if data is None:
+        skipped = err == "VK не настроен"
+        return PublishResult(ok=False, skipped=skipped, error=err)
+    resp = data.get("response")
+    return PublishResult(ok=True, external_id=str(resp if resp is not None else ""))
+
+
+def edit_vk_message(
+    *,
+    peer_id: str,
+    conversation_message_id: str,
+    message: str,
+    keyboard: str | None = None,
+) -> PublishResult:
+    """Edit a community message (retire staff alert keyboards)."""
+    pid = (peer_id or "").strip()
+    cmid = (conversation_message_id or "").strip()
+    if not pid.isdigit() or not cmid.isdigit():
+        return PublishResult(ok=False, error="VK: invalid edit target")
+    params: dict[str, Any] = {
+        "peer_id": pid,
+        "conversation_message_id": cmid,
+        "message": message,
+    }
+    if keyboard is not None:
+        params["keyboard"] = keyboard
+    data, err = vk_api_call("messages.edit", params)
+    if data is None:
+        return PublishResult(ok=False, error=err)
+    return PublishResult(ok=True)
 
 
 def publish_max(

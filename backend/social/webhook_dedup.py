@@ -35,6 +35,22 @@ def webhook_dedup_key(channel: str, update: dict[str, Any]) -> str | None:
         update_id = update.get("update_id")
         return f"telegram:{update_id}" if update_id is not None else None
 
+    if channel == "vk":
+        event_type = (update.get("type") or "").strip()
+        if event_type == "message_event":
+            obj = update.get("object")
+            if isinstance(obj, dict) and obj.get("event_id") is not None:
+                return f"vk:event:{obj.get('event_id')}"
+            return None
+        if event_type != "message_new":
+            return None
+        obj = update.get("object")
+        message = obj.get("message") if isinstance(obj, dict) else None
+        if isinstance(message, dict) and message.get("id") is not None:
+            group_id = update.get("group_id", "")
+            return f"vk:{group_id}:{message['id']}"
+        return None
+
     if channel != "max":
         return None
     update_type = (update.get("update_type") or "").strip()

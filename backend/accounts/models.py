@@ -173,6 +173,38 @@ class StaffMaxProfile(models.Model):
         return f"MAX({self.user_id}, {uid})"
 
 
+class StaffVkProfile(models.Model):
+    """Personal VK user id for staff alerts (community messages)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vk_profile",
+        verbose_name=_("Пользователь"),
+    )
+    vk_user_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name=_("ID пользователя VK"),
+        help_text=_("Числовой id из лички с сообществом. Клиент пишет /chatid — бот вернёт id для Admin."),
+    )
+    vk_alerts_enabled = models.BooleanField(
+        default=True,
+        verbose_name=_("уведомления VK включены"),
+        help_text=_("Выкл — не слать личные уведомления этому сотруднику во VK."),
+    )
+
+    class Meta:
+        verbose_name = _("VK сотрудника")
+        verbose_name_plural = _("VK сотрудников")
+
+    def __str__(self) -> str:
+        uid = (self.vk_user_id or "").strip() or "—"
+        return f"VK({self.user_id}, {uid})"
+
+
 class StaffMailbox(models.Model):
     """Personal mailbox of a staff user — IMAP fetch + SMTP send.
 

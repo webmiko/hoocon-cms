@@ -523,6 +523,12 @@ GA4_MEASUREMENT_ID = os.getenv("GA4_MEASUREMENT_ID", "G-DLRV7BZ5JP").strip()
 # Social bots (secrets — never expose via API; chat IDs live in SiteSettings Admin).
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 VK_ACCESS_TOKEN = os.getenv("VK_ACCESS_TOKEN", "").strip()
+# VK Callback API (сообщения сообщества → support-чат). Секрет и строка
+# подтверждения — из Управление → Работа с API → Callback.
+VK_CALLBACK_SECRET = os.getenv("VK_CALLBACK_SECRET", "").strip()
+VK_CALLBACK_CONFIRMATION = os.getenv("VK_CALLBACK_CONFIRMATION", "").strip()
+# Короткое имя сообщества для vk.me/… в виджете поддержки (без vk.com/).
+VK_COMMUNITY_SCREEN_NAME = os.getenv("VK_COMMUNITY_SCREEN_NAME", "hoocon_russia").strip().lstrip("@")
 # GigaChat API (support assistant; secrets — never expose via public API).
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "").strip()
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()
@@ -615,6 +621,7 @@ REST_FRAMEWORK = {
         # Telegram retries bursts; keep generous but bounded per IP.
         "telegram_webhook": "120/min",
         "max_webhook": "120/min",
+        "vk_webhook": "120/min",
         # Mango шлёт серию событий на вызов (appeared→connected→disconnected).
         "mango_webhook": "120/min",
         "novosystem_webhook": "120/min",

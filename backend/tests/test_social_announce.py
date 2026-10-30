@@ -334,3 +334,138 @@ def test_publish_telegram_photo_url_fallback(settings) -> None:
     body = req.data.decode("utf-8")
     assert "https://hoocon.ru/media/x.webp" in body
     assert "parse_mode" in body
+
+
+@pytest.mark.django_db
+def test_announce_vk_with_cover_attaches_wall_photo(settings) -> None:
+    """VK wall.post includes photo attachment when cover file exists."""
+    settings.VK_ACCESS_TOKEN = "vk-token"
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from content.models import News
+    from sitesettings.models import SiteSettings
+    from social.models import SocialChannel, SocialPostStatus
+    from social.services import announce_content
+
+    site = SiteSettings.load()
+    site.vk_enabled = True
+    site.vk_group_id = "242719752"
+    site.vk_access_token = "vk-token"
+    site.save()
+
+    buf = BytesIO()
+    Image.new("RGB", (4, 4), color=(1, 2, 3)).save(buf, format="JPEG")
+    cover = SimpleUploadedFile("cover.jpg", buf.getvalue(), content_type="image/jpeg")
+    news = News.objects.create(
+        title="VK cover",
+        slug="article-vk-cover",
+        cover=cover,
+        is_published=True,
+    )
+
+    def fake_vk_api(method: str, params: dict) -> tuple[dict | None, str]:
+        if method == "photos.getWallUploadServer":
+            return {"response": {"upload_url": "https://upload.vk.example/wall"}}, ""
+        if method == "photos.saveWallPhoto":
+            return {"response": [{"owner_id": -242719752, "id": 9001}]}, ""
+        if method == "wall.post":
+            assert params.get("attachments") == "photo-242719752_9001"
+            return {"response": 42}, ""
+        return None, f"unexpected {method}"
+
+    with (
+        patch("social.vk_community.vk_api_call", side_effect=fake_vk_api),
+        patch("social.publishers.vk_api_call", side_effect=fake_vk_api),
+        patch("social.vk_community.urlopen") as mocked_upload,
+    ):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b'{"photo":"[]","hash":"abc"}'
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
+        mocked_upload.return_value = mock_resp
+        created = announce_content(news, channels=[SocialChannel.VK], force=True)
+
+    assert len(created) == 1
+    assert created[0].status == SocialPostStatus.SENT
+    assert created[0].external_id == "42"
+
+
+@pytest.mark.django_db
+def test_backfill_dry_run_only_lists_article_news_with_cover(settings) -> None:
+    """Backfill dry-run skips news without cover and non-article slugs."""
+    from io import BytesIO, StringIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.core.management import call_command
+    from PIL import Image
+
+    from content.models import News
+
+    buf = BytesIO()
+    Image.new("RGB", (2, 2)).save(buf, format="JPEG")
+    cover = SimpleUploadedFile("c.jpg", buf.getvalue(), content_type="image/jpeg")
+    News.objects.create(
+        title="With cover",
+        slug="article-has-cover",
+        cover=cover,
+        is_published=True,
+    )
+    News.objects.create(
+        title="No cover",
+        slug="article-no-cover",
+        is_published=True,
+    )
+    buf = StringIO()
+    call_command("backfill_article_news_social", "--dry-run", stdout=buf)
+    out = buf.getvalue()
+    assert "article-has-cover" in out
+    assert "article-no-cover" not in out
+
+
+@pytest.mark.django_db
+def test_announce_max_with_cover_attaches_image(settings) -> None:
+    """MAX channel announce uploads cover when file exists."""
+    settings.MAX_BOT_TOKEN = "max-token"
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    from content.models import News
+    from sitesettings.models import SiteSettings
+    from social.models import SocialChannel, SocialPostStatus
+    from social.services import announce_content
+
+    site = SiteSettings.load()
+    site.max_enabled = True
+    site.max_chat_id = "-100888"
+    site.max_bot_token = "max-token"
+    site.save()
+
+    buf = BytesIO()
+    Image.new("RGB", (3, 3)).save(buf, format="JPEG")
+    cover = SimpleUploadedFile("m.jpg", buf.getvalue(), content_type="image/jpeg")
+    news = News.objects.create(
+        title="MAX cover",
+        slug="max-cover-news",
+        cover=cover,
+        is_published=True,
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b'{"message":{"body":{"mid":"mid-1"}}}'
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with (
+        patch("social.max_http.max_upload_image", return_value="img-token-xyz"),
+        patch("social.publishers.max_urlopen", return_value=mock_resp),
+    ):
+        created = announce_content(news, channels=[SocialChannel.MAX], force=True)
+
+    assert len(created) == 1
+    assert created[0].status == SocialPostStatus.SENT

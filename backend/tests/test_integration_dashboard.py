@@ -31,6 +31,25 @@ def test_build_integration_dashboard_telegram_connected(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_build_integration_dashboard_vk_connected(settings) -> None:
+    """Enabled VK with token + group id is status «on»."""
+    settings.VK_ACCESS_TOKEN = ""
+    from sitesettings.integration_dashboard import build_integration_dashboard
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.vk_enabled = True
+    site.vk_access_token = "vk-test"
+    site.vk_group_id = "242719752"
+    site.save()
+
+    dash = build_integration_dashboard(site)
+    by_name = {card["name"]: card for card in dash["cards"]}
+    assert by_name["VK"]["status"] == "on"
+    assert "242719752" in by_name["VK"]["detail"]
+
+
+@pytest.mark.django_db
 def test_sitesettings_changelist_shows_integration_dashboard(
     client,
     django_user_model,
@@ -42,6 +61,9 @@ def test_sitesettings_changelist_shows_integration_dashboard(
     site.telegram_enabled = True
     site.telegram_bot_token = "token-test"
     site.telegram_chat_id = "@hoocon_moscow"
+    site.vk_enabled = True
+    site.vk_access_token = "vk-token"
+    site.vk_group_id = "242719752"
     site.save()
 
     user = django_user_model.objects.create_superuser(
@@ -57,6 +79,7 @@ def test_sitesettings_changelist_shows_integration_dashboard(
     assert "hoocon-integrations__tile hoocon-integrations__card" in html
     assert "hoocon-lead-stats__cards hoocon-integrations__cards" not in html
     assert "Telegram" in html
+    assert "VK" in html
     assert "Подключён" in html
     assert "Уведомления персоналу" in html
     assert "Настроить" in html
@@ -64,6 +87,32 @@ def test_sitesettings_changelist_shows_integration_dashboard(
 
 
 @pytest.mark.django_db
+@pytest.mark.django_db
+def test_sitesettings_admin_lists_staff_vk_subscribers(django_user_model) -> None:
+    """Admin integration page lists managers with VK id."""
+    from django.contrib.auth.models import Group
+
+    from accounts.models import StaffVkProfile
+    from accounts.roles import GROUP_MANAGER
+    from sitesettings.admin import SiteSettingsAdmin
+    from sitesettings.models import SiteSettings
+
+    user = django_user_model.objects.create_user(
+        username="vk-sub",
+        email="vk-sub@hoocon.ru",
+        password="pw-12345",
+        is_staff=True,
+    )
+    group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
+    user.groups.add(group)
+    StaffVkProfile.objects.create(user=user, vk_user_id="555099", vk_alerts_enabled=True)
+    site = SiteSettings.load()
+    admin = SiteSettingsAdmin(SiteSettings, None)
+    html = str(admin.staff_vk_subscribers(site))
+    assert "555099" in html
+    assert "vk-sub" in html
+
+
 def test_sitesettings_model_verbose_name_is_integrations() -> None:
     """Admin model labels are «интеграции» under app «Настройки сайта»."""
     from sitesettings.models import SiteSettings

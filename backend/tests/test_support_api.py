@@ -77,13 +77,13 @@ def test_chat_faq_public_only_show_in_chat() -> None:
 
 @pytest.mark.django_db
 def test_channels_hides_tokens(settings) -> None:
-    settings.TELEGRAM_BOT_USERNAME = "hoocon_bot"
-    settings.TELEGRAM_CHANNEL_USERNAME = "hoocon_moscow"
+    settings.VK_COMMUNITY_SCREEN_NAME = "hoocon_russia"
     from sitesettings.models import SiteSettings
 
     site = SiteSettings.load()
-    site.telegram_enabled = True
-    site.telegram_bot_token = "secret-token-value"
+    site.vk_enabled = True
+    site.vk_group_id = "242719752"
+    site.vk_access_token = "secret-token-value"
     site.save()
     client = Client()
     resp = client.get("/api/support/channels/")
@@ -93,18 +93,18 @@ def test_channels_hides_tokens(settings) -> None:
     channels = resp.json()["channels"]
     assert channels == [
         {
-            "channel": "telegram_bot",
-            "provider": "telegram",
+            "channel": "vk_community",
+            "provider": "vk",
             "kind": "bot",
-            "label": "Написать в Telegram",
-            "deep_link": "https://t.me/hoocon_bot?start=support",
+            "label": "Написать во VK",
+            "deep_link": "https://vk.me/hoocon_russia",
         },
         {
-            "channel": "telegram_channel",
-            "provider": "telegram",
+            "channel": "vk_channel",
+            "provider": "vk",
             "kind": "channel",
-            "label": "Канал Telegram",
-            "deep_link": "https://t.me/hoocon_moscow",
+            "label": "Сообщество VK",
+            "deep_link": "https://vk.ru/hoocon_russia",
         },
     ]
 

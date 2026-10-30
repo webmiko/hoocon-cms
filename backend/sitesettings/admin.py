@@ -152,6 +152,7 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
         "staff_push_subscribers",
         "staff_telegram_subscribers",
         "staff_max_subscribers",
+        "staff_vk_subscribers",
         "telegram_token_status",
         "vk_token_status",
         "max_token_status",
@@ -233,9 +234,24 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
                     "staff_max_subscribers",
                 ),
                 "description": (
-                    "Личные уведомления в MAX (параллельно Telegram и браузерным "
+                    "Личные уведомления в MAX (параллельно VK и браузерным "
                     "уведомлениям). ID — в карточке пользователя: /chatid в боте "
                     "@id5024199634_bot."
+                ),
+            },
+        ),
+        (
+            "VK персоналу",
+            {
+                "fields": (
+                    "staff_vk_leads_enabled",
+                    "staff_vk_support_enabled",
+                    "staff_vk_superuser_crm_enabled",
+                    "staff_vk_subscribers",
+                ),
+                "description": (
+                    "Личные сообщения от сообщества Hoocon (кнопка «Ответить»). "
+                    "ид. VK — в карточке пользователя (/chatid в чате с сообществом)."
                 ),
             },
         ),
@@ -428,6 +444,32 @@ class SiteSettingsAdmin(OpenChangeLinkMixin, ModelAdmin):
             role = "супер" if user.is_superuser else "сотрудник"
             items.append(
                 (change_url, name, f"{profile.max_user_id} · {role} · {flag}"),
+            )
+        return format_html(
+            '<ul style="margin:0;padding-left:1.25rem;">{}</ul>',
+            format_html_join("", '<li><a href="{}">{}</a> — {}</li>', items),
+        )
+
+    @admin.display(description="Сотрудники с VK")
+    def staff_vk_subscribers(self, obj: SiteSettings) -> str:
+        """List staff with a personal VK user id."""
+        del obj
+        from accounts.models import StaffVkProfile
+
+        rows = StaffVkProfile.objects.exclude(vk_user_id="").select_related("user").order_by("user__email")[:40]
+        if not rows:
+            return (
+                "Пока никто не привязал ид. VK. В чате с сообществом отправьте /chatid → Пользователи → VK сотрудника."
+            )
+        items: list[tuple[str, str, str]] = []
+        for profile in rows:
+            user = profile.user
+            name = (user.get_username() or user.email or f"#{user.pk}").strip()
+            change_url = reverse("admin:auth_user_change", args=[user.pk])
+            flag = "вкл" if profile.vk_alerts_enabled else "выкл"
+            role = "супер" if user.is_superuser else "сотрудник"
+            items.append(
+                (change_url, name, f"{profile.vk_user_id} · {role} · {flag}"),
             )
         return format_html(
             '<ul style="margin:0;padding-left:1.25rem;">{}</ul>',

@@ -1144,7 +1144,7 @@ class LeadAdmin(
         )
 
         def _crm_tg() -> None:
-            from accounts.tasks import notify_superuser_telegram_crm
+            from accounts.tasks import notify_superuser_vk_crm
 
             bits: list[str] = [f"Заявка #{lead_id}"]
             if status_changed:
@@ -1152,7 +1152,7 @@ class LeadAdmin(
             if assignee_changed:
                 bits.append("сменён ответственный")
             bits.append(f"({actor_name})")
-            notify_superuser_telegram_crm.delay(
+            notify_superuser_vk_crm.delay(
                 "Изменение заявки",
                 "; ".join(bits),
                 f"/admin/leads/lead/{lead_id}/change/",
@@ -1447,7 +1447,7 @@ class LeadAdmin(
             )
 
             def _crm_tg() -> None:
-                from accounts.tasks import notify_superuser_telegram_crm
+                from accounts.tasks import notify_superuser_vk_crm
 
                 bits: list[str] = [f"Заявка #{lead_id}"]
                 if status_changed:
@@ -1455,7 +1455,7 @@ class LeadAdmin(
                 if assignee_changed:
                     bits.append("сменён ответственный")
                 bits.append(f"({actor_name})")
-                notify_superuser_telegram_crm.delay(
+                notify_superuser_vk_crm.delay(
                     "Изменение заявки",
                     "; ".join(bits),
                     f"/admin/leads/lead/{lead_id}/change/",
