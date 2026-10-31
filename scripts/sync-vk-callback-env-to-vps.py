@@ -76,10 +76,14 @@ set -euo pipefail
 cd "{REPO}"
 source scripts/ssh-trust.sh
 hoocon_ssh_trust
-rsync -az -e "ssh ${{SSH_OPTS[*]}}" "{fragment}" hoocon-prod:/tmp/hoocon-vk-callback.env
-rsync -az -e "ssh ${{SSH_OPTS[*]}}" "{merge_path}" hoocon-prod:/tmp/merge_vk_callback_env.py
-ssh "${{SSH_OPTS[@]}}" hoocon-prod python3 /tmp/merge_vk_callback_env.py /tmp/hoocon-vk-callback.env
-ssh "${{SSH_OPTS[@]}}" hoocon-prod rm -f /tmp/hoocon-vk-callback.env /tmp/merge_vk_callback_env.py
+FRAG=/tmp/hoocon-vk-callback.env
+MERGE=/tmp/merge_vk_callback_env.py
+cleanup() {{ ssh "${{SSH_OPTS[@]}}" hoocon-prod "rm -f $FRAG $MERGE" || true; }}
+trap cleanup EXIT
+rsync -az -e "ssh ${{SSH_OPTS[*]}}" "{fragment}" "hoocon-prod:$FRAG"
+rsync -az -e "ssh ${{SSH_OPTS[*]}}" "{merge_path}" "hoocon-prod:$MERGE"
+ssh "${{SSH_OPTS[@]}}" hoocon-prod 'python3 /tmp/merge_vk_callback_env.py /tmp/hoocon-vk-callback.env;
+rc=$?; rm -f /tmp/hoocon-vk-callback.env /tmp/merge_vk_callback_env.py; exit $rc'
 """
     result = subprocess.run(["bash", "-c", bash], capture_output=True, text=True)
     Path(fragment).unlink(missing_ok=True)

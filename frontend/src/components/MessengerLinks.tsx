@@ -1,5 +1,6 @@
 import { MaxLogo } from "./icons/MaxLogo";
 import { TelegramLogo } from "./icons/TelegramLogo";
+import { VkLogo } from "./icons/VkLogo";
 import styles from "./MessengerLinks.module.css";
 
 export type MessengerChannel = {
@@ -10,22 +11,30 @@ export type MessengerChannel = {
   kind?: string;
 };
 
-function providerFor(channel: MessengerChannel): "max" | "telegram" | null {
+type MessengerProvider = "max" | "telegram" | "vk";
+
+function providerFor(channel: MessengerChannel): MessengerProvider | null {
   if (channel.provider === "max" || channel.channel.startsWith("max_")) {
     return "max";
   }
   if (channel.provider === "telegram" || channel.channel.startsWith("telegram_")) {
     return "telegram";
   }
+  if (channel.provider === "vk" || channel.channel.startsWith("vk_")) {
+    return "vk";
+  }
   return null;
 }
 
 function iconClass(
-  provider: "max" | "telegram",
+  provider: MessengerProvider,
   variant: "compact" | "footer",
 ): string {
   if (provider === "max") {
     return variant === "footer" ? styles.footerIconMax : styles.compactIconMax;
+  }
+  if (provider === "vk") {
+    return variant === "footer" ? styles.footerIconVk : styles.compactIconVk;
   }
   return variant === "footer" ? styles.footerIconTelegram : styles.compactIconTelegram;
 }
@@ -35,13 +44,16 @@ function MessengerIcon({
   className,
   withWordmark = false,
 }: {
-  provider: "max" | "telegram";
+  provider: MessengerProvider;
   className?: string;
   withWordmark?: boolean;
 }) {
-  const title = provider === "max" ? "MAX" : "Telegram";
+  const title = provider === "max" ? "MAX" : provider === "vk" ? "VK" : "Telegram";
   if (provider === "max") {
     return <MaxLogo className={className} withWordmark={withWordmark} title={title} />;
+  }
+  if (provider === "vk") {
+    return <VkLogo className={className} withWordmark={withWordmark} title={title} />;
   }
   return <TelegramLogo className={className} withWordmark={withWordmark} title={title} />;
 }
@@ -73,7 +85,7 @@ export function MessengerLinks({
     <ul className={rootClass} role="list" aria-label="Мессенджеры">
       {items.map((ch) => {
         const provider = providerFor(ch);
-        const withWordmark = provider === "max" || provider === "telegram";
+        const withWordmark = provider !== null;
         return (
           <li key={ch.channel}>
             <a
@@ -91,7 +103,9 @@ export function MessengerLinks({
                   className={iconClass(provider, variant)}
                   withWordmark={withWordmark}
                 />
-              ) : null}
+              ) : (
+                ch.label
+              )}
             </a>
           </li>
         );

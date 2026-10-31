@@ -22,6 +22,14 @@ const maxChannel = {
   kind: "bot",
 } as const;
 
+const vkChannel = {
+  channel: "vk_community",
+  label: "Написать во VK",
+  deep_link: "https://vk.me/hoocon_russia",
+  provider: "vk",
+  kind: "bot",
+} as const;
+
 describe("MessengerLinks", () => {
   it("renders semantic list items without role=listitem on links", () => {
     const html = renderToStaticMarkup(
@@ -54,12 +62,47 @@ describe("MessengerLinks", () => {
     expect(html).not.toContain('aria-hidden="true"');
   });
 
-  it("uses the same logo height for MAX and Telegram footer buttons", () => {
+  it("renders VK logo instead of an empty link for vk_community channel", () => {
+    const html = renderToStaticMarkup(
+      <MessengerLinks channels={[vkChannel]} variant="compact" />,
+    );
+
+    expect(html).toContain('aria-label="VK"');
+    expect(html).toContain("<svg");
+    expect(html).not.toContain('aria-hidden="true"');
+  });
+
+  it("keeps accessible label on VK footer link", () => {
+    const html = renderToStaticMarkup(
+      <MessengerLinks channels={[vkChannel]} variant="footer" />,
+    );
+
+    expect(html).toContain('aria-label="VK"');
+    expect(html).toContain('href="https://vk.me/hoocon_russia"');
+  });
+
+  it("falls back to channel label for an unknown provider", () => {
+    const unknown = {
+      channel: "whatsapp_bot",
+      label: "WhatsApp",
+      deep_link: "https://wa.me/70000000000",
+      provider: "whatsapp",
+      kind: "bot",
+    } as const;
+    const html = renderToStaticMarkup(
+      <MessengerLinks channels={[unknown]} variant="compact" />,
+    );
+
+    expect(html).toContain("WhatsApp");
+    expect(html).not.toContain("<svg");
+  });
+
+  it("uses the same logo height for MAX, Telegram and VK footer buttons", () => {
     const css = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), "MessengerLinks.module.css"),
       "utf8",
     );
-    const footerRule = css.split(".footerIconMax,\n.footerIconTelegram {")[1].split("}")[0];
+    const footerRule = css.split(".footerIconVk {")[1].split("}")[0];
 
     expect(footerRule).toContain("height: 1.5rem");
     expect(footerRule).toContain("width: auto");

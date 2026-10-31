@@ -8,6 +8,7 @@ import pytest
 
 from social.publishers import PublishResult
 from social.vk_bot import compose_vk_welcome_text, handle_vk_callback, send_vk_welcome, vk_community_url
+from social.vk_community import community_cover_path, welcome_dm_photo_path
 
 
 def test_compose_vk_welcome_mentions_vk_community_not_max() -> None:
@@ -48,6 +49,18 @@ def test_start_uses_vk_welcome() -> None:
     with patch("social.vk_bot.send_vk_welcome", return_value=PublishResult(ok=True)) as welcome:
         handle_vk_callback(event)
     welcome.assert_called_once_with("9003")
+
+
+def test_vk_photo_path_env_overrides_wired(settings, tmp_path) -> None:
+    """VK_WELCOME_PHOTO_PATH / VK_COMMUNITY_COVER_PATH were .env-only dead knobs."""
+    assert hasattr(settings, "VK_WELCOME_PHOTO_PATH")
+    assert hasattr(settings, "VK_COMMUNITY_COVER_PATH")
+    photo = tmp_path / "cover.png"
+    photo.write_bytes(b"fake")
+    settings.VK_WELCOME_PHOTO_PATH = str(photo)
+    settings.VK_COMMUNITY_COVER_PATH = str(photo)
+    assert welcome_dm_photo_path() == photo
+    assert community_cover_path() == photo
 
 
 @pytest.mark.django_db

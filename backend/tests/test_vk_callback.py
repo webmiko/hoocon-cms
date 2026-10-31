@@ -99,6 +99,47 @@ def test_vk_callback_confirmation_without_secret_like_vk_ui(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_vk_callback_confirmation_rejects_wrong_secret(settings) -> None:
+    """Confirmation carrying a wrong secret is rejected; secretless is for VK UI only."""
+    settings.VK_CALLBACK_SECRET = "expected-secret"
+    settings.VK_CALLBACK_CONFIRMATION = "confirm-token-xyz"
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.vk_group_id = "242719752"
+    site.save()
+    client = Client()
+    response = client.post(
+        "/api/integrations/vk/callback/",
+        data={"type": "confirmation", "group_id": 242719752, "secret": "wrong"},
+        content_type="application/json",
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_vk_callback_rejects_event_without_group_id(settings) -> None:
+    """Configured vk_group_id requires the event to carry it (spoof guard)."""
+    settings.VK_CALLBACK_SECRET = "expected-secret"
+    from sitesettings.models import SiteSettings
+
+    site = SiteSettings.load()
+    site.vk_group_id = "242719752"
+    site.save()
+    client = Client()
+    response = client.post(
+        "/api/integrations/vk/callback/",
+        data={
+            "type": "message_new",
+            "secret": "expected-secret",
+            "object": {"message": {"id": 1, "from_id": 1, "text": "x"}},
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 def test_vk_callback_enqueues_message_new(settings) -> None:
     settings.VK_CALLBACK_SECRET = "expected-secret"
     settings.VK_CALLBACK_CONFIRMATION = "x"

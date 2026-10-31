@@ -42,6 +42,13 @@ def webhook_dedup_key(channel: str, update: dict[str, Any]) -> str | None:
             if isinstance(obj, dict) and obj.get("event_id") is not None:
                 return f"vk:event:{obj.get('event_id')}"
             return None
+        if event_type == "message_allow":
+            obj = update.get("object")
+            user_id = obj.get("user_id") if isinstance(obj, dict) else None
+            if user_id is not None:
+                group_id = update.get("group_id", "")
+                return f"vk:{group_id}:allow:{user_id}"
+            return None
         if event_type != "message_new":
             return None
         obj = update.get("object")

@@ -529,6 +529,9 @@ VK_CALLBACK_SECRET = os.getenv("VK_CALLBACK_SECRET", "").strip()
 VK_CALLBACK_CONFIRMATION = os.getenv("VK_CALLBACK_CONFIRMATION", "").strip()
 # Короткое имя сообщества для vk.me/… в виджете поддержки (без vk.com/).
 VK_COMMUNITY_SCREEN_NAME = os.getenv("VK_COMMUNITY_SCREEN_NAME", "hoocon_russia").strip().lstrip("@")
+# Опциональные пути к обложкам VK: приветствие в ЛС и обложка сообщества.
+VK_WELCOME_PHOTO_PATH = os.getenv("VK_WELCOME_PHOTO_PATH", "").strip()
+VK_COMMUNITY_COVER_PATH = os.getenv("VK_COMMUNITY_COVER_PATH", "").strip()
 # GigaChat API (support assistant; secrets — never expose via public API).
 GIGACHAT_CREDENTIALS = os.getenv("GIGACHAT_CREDENTIALS", "").strip()
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()

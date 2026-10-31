@@ -54,7 +54,8 @@
 }
 
 .compactIconMax,
-.compactIconTelegram {
+.compactIconTelegram,
+.compactIconVk {
   height: 1.075rem;
   width: auto;
   flex-shrink: 0;
@@ -95,7 +96,8 @@
 }
 
 .footerIconMax,
-.footerIconTelegram {
+.footerIconTelegram,
+.footerIconVk {
   height: 1.5rem;
   width: auto;
   flex-shrink: 0;
