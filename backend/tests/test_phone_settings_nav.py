@@ -384,7 +384,12 @@ def test_command_search_endpoint_finds_lead_record() -> None:
         email="settings-nav-search@example.com",
         password="password12",
     )
-    lead = Lead.objects.create(name="Палитра Поисков", company="Hoocon")
+    lead = Lead.objects.create(
+        name="Палитра Поисков",
+        company="Hoocon",
+        email="poisk@example.test",
+        contact_verified=True,
+    )
     client = Client()
     client.force_login(admin_user)
     response = client.get("/admin/search/", {"s": "Палитра Поисков"})

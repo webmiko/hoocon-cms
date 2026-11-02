@@ -402,6 +402,82 @@ def test_password_login_and_logout() -> None:
 
 
 @pytest.mark.django_db
+def test_password_login_unknown_email_runs_dummy_hash() -> None:
+    """L2: несуществующий email — тот же ответ и тот же hasher-проход.
+
+    Без dummy check_password ответ уходит раньше PBKDF2 — timing раскрывал
+    существование аккаунта. Проверяем uniform detail + вызов hasher'а.
+    """
+    api = APIClient()
+    _register(api)
+    api.post("/api/auth/logout/")
+
+    wrong = api.post(
+        "/api/auth/login/",
+        {"email": "buyer@acme.test", "password": "wrong-pass"},
+        format="json",
+    )
+    with patch("cabinet.services.check_password", return_value=False) as hasher:
+        unknown = api.post(
+            "/api/auth/login/",
+            {"email": "ghost@acme.test", "password": "wrong-pass"},
+            format="json",
+        )
+    assert unknown.status_code == 400 == wrong.status_code
+    assert unknown.json() == wrong.json()
+    hasher.assert_called_once()
+    assert hasher.call_args.args[1] != ""  # реальный hash, не ранний выход
+
+
+@pytest.mark.django_db
+def test_password_login_otp_only_account_runs_dummy_hash() -> None:
+    """L2: аккаунт без пароля (OTP-only) не «быстрее» — тот же KDF-проход."""
+    from django.utils import timezone
+
+    ClientAccount.objects.create(
+        email="otponly@acme.test",
+        password_hash="",
+        email_verified_at=timezone.now(),
+    )
+    api = APIClient()
+    with patch("cabinet.services.check_password", return_value=False) as hasher:
+        resp = api.post(
+            "/api/auth/login/",
+            {"email": "otponly@acme.test", "password": "any-pass"},
+            format="json",
+        )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Неверная почта или пароль."
+    hasher.assert_called_once()
+    assert hasher.call_args.args[1] != ""  # dummy hash вместо мгновенного False
+
+
+@pytest.mark.django_db
+def test_password_login_otp_only_rejects_dummy_equalizer_password() -> None:
+    """OTP-only аккаунт не впускает по паролю из dummy-хеша.
+
+    Корень: check_password(equalizer, _DUMMY_PASSWORD_HASH) == True — без
+    отдельного гейта на пустой password_hash литерал открывал чужой кабинет.
+    """
+    from django.utils import timezone
+
+    ClientAccount.objects.create(
+        email="otponly@acme.test",
+        password_hash="",
+        email_verified_at=timezone.now(),
+    )
+    api = APIClient()
+    resp = api.post(
+        "/api/auth/login/",
+        {"email": "otponly@acme.test", "password": "hoocon-login-timing-equalizer"},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Неверная почта или пароль."
+    assert api.get("/api/auth/me/").status_code == 401
+
+
+@pytest.mark.django_db
 def test_otp_flow_logs_in_and_verifies_email() -> None:
     """Mode B: start → verify → session; email marked verified."""
     api = APIClient()
@@ -554,9 +630,18 @@ def _cabinet_lead_ids(api: APIClient) -> list[int]:
 def test_foreign_anonymous_lead_hidden_until_contact_confirmed() -> None:
     """M8: аноним с чужим email не подкидывает заявку в кабинет жертвы — даже после взятия в работу."""
     victim = _register(APIClient(), "victim@acme.test")
+    victim_card = Client.objects.get(email="victim@acme.test")
     forged = _post_public_lead(APIClient(), "victim@acme.test", "Срочно оплатите по ссылке evil.test")
-    assert forged.client_id == Client.objects.get(email="victim@acme.test").pk
+    assert forged.client_id == victim_card.pk
     assert forged.contact_verified is False
+
+    # M1: неподтверждённая заявка не пишет на карточку жертвы —
+    # ни Activity с текстом атакующего, ни merge полей карточки.
+    from crm.models import Activity
+
+    assert Activity.objects.filter(client=victim_card, lead=forged).count() == 0
+    victim_card.refresh_from_db()
+    assert victim_card.company == ""
 
     assert forged.pk not in _cabinet_lead_ids(victim)
     assert victim.get(f"/api/account/leads/{forged.pk}/").status_code == 404
@@ -569,8 +654,66 @@ def test_foreign_anonymous_lead_hidden_until_contact_confirmed() -> None:
     assert forged.pk not in _cabinet_lead_ids(victim)
     assert victim.get(f"/api/account/leads/{forged.pk}/").status_code == 404
 
-    Lead.objects.filter(pk=forged.pk).update(contact_verified=True)
+    # Реальный путь подтверждения: менеджер выставил КП — контакт доказан,
+    # карточка получает входящую Activity и данные из заявки.
+    from crm.quote_ops import finalize_quote_status
+
+    quote = Quote.objects.create(client=forged.client, lead=forged, status=QuoteStatus.SENT)
+    with patch("crm.quote_docs.ensure_quote_pdf_document", return_value=None):
+        finalize_quote_status(quote, actor=manager)
+    forged.refresh_from_db()
+    assert forged.contact_verified is True
     assert forged.pk in _cabinet_lead_ids(victim)
+    inbound = Activity.objects.filter(client=victim_card, lead=forged, subject__startswith="Входящая заявка")
+    assert inbound.count() == 1
+    victim_card.refresh_from_db()
+    assert victim_card.company == "ООО Ромашка"
+
+
+@pytest.mark.django_db
+def test_forged_lead_writes_nothing_on_victim_card() -> None:
+    """M1 (корень): неподтверждённый контакт — дедуп-ссылка есть, записи нет.
+
+    post_save-сигнал линковал заявку по голому email, создавал Activity
+    с текстом атакующего на карточке жертвы и merge-ил её поля.
+    record_lead_inbound идемпотентен: повторный вызов не дублирует NOTE.
+    """
+    _register(APIClient(), "clean@acme.test")
+    card = Client.objects.get(email="clean@acme.test")
+    forged = _post_public_lead(APIClient(), "clean@acme.test", "Оплатите по ссылке.")
+
+    from crm.models import Activity
+    from crm.services import record_lead_inbound
+
+    assert forged.contact_verified is False
+    assert Activity.objects.filter(lead=forged).count() == 0
+    card.refresh_from_db()
+    assert card.company == ""
+    record_lead_inbound(forged)  # неподтверждённая — no-op
+    assert Activity.objects.filter(lead=forged).count() == 0
+
+    Lead.objects.filter(pk=forged.pk).update(contact_verified=True)
+    forged.refresh_from_db()
+    record_lead_inbound(forged)
+    record_lead_inbound(forged)
+    assert Activity.objects.filter(lead=forged).count() == 1
+    card.refresh_from_db()
+    assert card.company == "ООО Ромашка"
+
+
+@pytest.mark.django_db
+def test_forged_lead_new_email_creates_neutral_card() -> None:
+    """M1: лид на НОВУЮ почту не предзаполняет карту полями атакующего.
+
+    Карточка нужна для дедупа, но имя/телефон/компания будущего владельца
+    почты не должны устанавливаться чужой формой.
+    """
+    forged = _post_public_lead(APIClient(), "future-owner@acme.test", "Фишинг.")
+    card = Client.objects.get(email="future-owner@acme.test")
+    assert forged.client_id == card.pk
+    assert card.name == "future-owner@acme.test"
+    assert card.phone == ""
+    assert card.company == ""
 
 
 @pytest.mark.django_db

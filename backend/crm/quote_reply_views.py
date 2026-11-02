@@ -22,9 +22,10 @@ class QuoteReplyView(APIView):
     throttle_scope = "quote_reply"
 
     def get(self, request: Request) -> Response:
+        # L3: token only via header — query strings leak into access logs
+        # and Referer; old «?t=» links are resolved client-side by the SPA.
         header = str(request.headers.get("X-Quote-Token") or "")
-        query = str(request.query_params.get("token") or "")
-        quote = load_reply_quote(header or query)
+        quote = load_reply_quote(header)
         if quote is None:
             return Response({"detail": "Ссылка недействительна."}, status=404)
         return Response(reply_preview(quote))

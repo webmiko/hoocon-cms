@@ -137,10 +137,20 @@ def test_full_client_journey_lead_to_cabinet(settings: Any) -> None:
     client = Client.objects.get(email=_CLIENT_EMAIL)
     lead.refresh_from_db()
     assert lead.client_id == client.pk, "заявка не привязана к карточке"
-    assert client.phone, "карточка не подхватила телефон заявки"
+    # Контакт не подтверждён: карточка рождается нейтральной — данные формы
+    # дописываются после verify-flip (M1: чужие поля не предзаполняют карту).
+    assert client.name == _CLIENT_EMAIL
+    assert client.phone == ""
+    Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
+    lead.refresh_from_db()
+    from crm.services import record_lead_inbound
+
+    record_lead_inbound(lead)
     inbound = Activity.objects.get(client=client, lead=lead)
     assert inbound.activity_type == ActivityType.NOTE
     assert f"#{lead.pk}" in inbound.subject
+    client.refresh_from_db()
+    assert client.phone, "карточка не подхватила телефон заявки"
 
     # ── Шаг 2: менеджер отвечает на заявку — письмо + Activity на карточке ──
     manager = User.objects.create_user(

@@ -120,6 +120,10 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
     Multiple requests with the same email attach to one client card.
     Name/company are used for profile match and to fill empty fields.
 
+    Field merge into an EXISTING card runs only for ``contact_verified``
+    leads: a forged public form must not rewrite the mailbox owner's card
+    (audit M1). Unverified leads keep the dedup link but write nothing.
+
     The whole read/create/merge sequence runs in one transaction and the
     returned row is re-locked with ``select_for_update()`` so concurrent
     leads with the same email cannot overwrite each other's merge.
@@ -131,11 +135,16 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         Client linked (or to be linked) to this lead.
     """
     email = normalize_client_email(lead.email)
-    defaults = {
-        "name": normalize_client_name(lead.name) or email,
-        "phone": lead.phone or "",
-        "company": normalize_client_company(lead.company),
-    }
+    if lead.contact_verified:
+        defaults = {
+            "name": normalize_client_name(lead.name) or email,
+            "phone": lead.phone or "",
+            "company": normalize_client_company(lead.company),
+        }
+    else:
+        # Unverified contact fields must not pre-write a fresh card either:
+        # the future mailbox owner would inherit attacker's name/phone/company.
+        defaults = {"name": email, "phone": "", "company": ""}
     with transaction.atomic():
         client, created = Client.objects.get_or_create(
             email=email,
@@ -144,7 +153,7 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         # Re-fetch locked so a concurrent lead with the same email waits for
         # this transaction before it reads/merges the same card.
         client = Client.objects.select_for_update().get(pk=client.pk)
-        if not created:
+        if not created and lead.contact_verified:
             return _merge_lead_contact_into_client(client, lead)
         return client
 
@@ -227,6 +236,43 @@ def link_lead_to_client(lead: Lead) -> Client:
     Lead.objects.filter(pk=lead.pk).update(client_id=client.pk)
     lead.client_id = client.pk
     lead.client = client
+    return client
+
+
+def record_lead_inbound(lead: Lead) -> Client | None:
+    """Enrich the card and log the inbound note for a proven lead.
+
+    Runs on create (post_save signal) and at every ``contact_verified``
+    flip (sent quote, admin confirm). An unverified lead keeps the dedup
+    ``lead.client`` link but writes nothing on the card — a forged email
+    must not put attacker text or contact fields onto the owner's card
+    (audit M1). Idempotent: the auto-note is created once per lead.
+
+    Args:
+        lead: saved Lead instance.
+
+    Returns:
+        The linked Client, or None while the contact is unverified.
+    """
+    if not lead.contact_verified:
+        return None
+    client = link_lead_to_client(lead)
+    _merge_lead_contact_into_client(client, lead)
+    subject = f"Входящая заявка #{lead.pk}"
+    already = Activity.objects.filter(
+        lead=lead,
+        activity_type=ActivityType.NOTE,
+        subject__startswith=subject,
+    ).exists()
+    if already:
+        return client
+    Activity.objects.create(
+        client=client,
+        lead=lead,
+        activity_type=ActivityType.NOTE,
+        subject=f"{subject}: {lead.get_lead_type_display()}",
+        body=(lead.message or "")[:2000],
+    )
     return client
 
 

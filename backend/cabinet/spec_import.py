@@ -136,6 +136,9 @@ def create_lead_from_spec_rows(
         phone=client.phone,
         company=client.company,
         client=client,
+        # Manager-driven import on the client card — same trust level as a
+        # manually created lead (contact already proven to us).
+        contact_verified=True,
         message=f"Спецификация из файла «{source_name}»",
     )
     for idx, row in enumerate(rows):

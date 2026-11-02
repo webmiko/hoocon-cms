@@ -143,6 +143,8 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert "07.10.2026" in doc.body
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
+    assert 'id="changelog-unverified-lead-card"' in doc.body
+    assert "неподтверждённым контактом больше не пишет на карточку" in doc.body
     assert "Диалоги поддержки" in doc.body
     assert "отчёт роп" in doc.summary.casefold()
     assert "диалоги" in doc.summary.casefold()

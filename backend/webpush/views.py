@@ -35,12 +35,6 @@ def _subscription_keys(data: dict[str, Any]) -> tuple[str, str, str]:
 
 
 _SESSION_MARKETING_CONSENT = "hoocon_marketing_push_consent"
-_MARKETING_CONSENT_HEADER = "HTTP_X_HOOCON_MARKETING_CONSENT"
-
-
-def _header_marketing_consent(request: Request) -> bool:
-    raw = str(request.META.get(_MARKETING_CONSENT_HEADER) or "").strip().lower()
-    return raw in {"1", "true", "yes"}
 
 
 def _session_marketing_consent(request: Request) -> bool:
@@ -55,13 +49,12 @@ def _set_session_marketing_consent(request: Request, allowed: bool) -> None:
 
 
 def _marketing_consent_ok(request: Request) -> bool:
-    """True when session opt-in is set, or header echoes cookie and we persist it."""
-    if _session_marketing_consent(request):
-        return True
-    if _header_marketing_consent(request):
-        _set_session_marketing_consent(request, True)
-        return True
-    return False
+    """True only when this session already carries a marketing opt-in.
+
+    The only write path is ``POST /api/webpush/topics/`` — a request header
+    must not be an independent authorization (audit L1).
+    """
+    return _session_marketing_consent(request)
 
 
 class VapidPublicKeyView(APIView):
@@ -80,10 +73,9 @@ class VapidPublicKeyView(APIView):
 class SubscribeView(APIView):
     """POST /api/webpush/subscribe/ — session-bound.
 
-    ``topic_marketing`` requires marketing consent in Django session
-    (set via ``X-Hoocon-Marketing-Consent: 1`` echo of cookie opt-in, or
-    prior ``/topics/`` consent sync). ``topic_support`` links visitors via
-    support session id.
+    ``topic_marketing`` requires marketing consent already stored in the
+    Django session (prior ``/topics/`` consent sync). ``topic_support``
+    links visitors via support session id.
     """
 
     permission_classes = (AllowAny,)

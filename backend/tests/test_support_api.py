@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 from django.test import Client, override_settings
 
 from supportchat.models import Channel, Conversation, FaqItem, Message, MessageDirection
@@ -1401,6 +1402,65 @@ def test_web_attachment_only_message_accepted(settings, tmp_path) -> None:
         assert msg["body"].startswith("📎")
         assert "spec.pdf" in msg["body"]
         assert msg["attachment_is_image"] is False
+
+
+def _post_widget_file(client: Client, token: str, name: str) -> HttpResponse:
+    """POST one small attachment to the widget messages endpoint."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    doc = SimpleUploadedFile(name, b"%PDF-1.4 fake", content_type="application/pdf")
+    return client.post(
+        "/api/support/conversations/current/messages/",
+        data={"attachment": doc},
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+
+@pytest.mark.django_db
+def test_web_attachment_quota_per_conversation(settings, tmp_path) -> None:
+    """M2: сверх лимита файлов на диалог — 400 и файл не сохраняется."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    settings.SUPPORT_ATTACHMENT_MAX_FILES = 2
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        assert _post_widget_file(client, token, "a.pdf").status_code == 201
+        assert _post_widget_file(client, token, "b.pdf").status_code == 201
+        resp = _post_widget_file(client, token, "c.pdf")
+        assert resp.status_code == 400
+        assert "Лимит вложений" in resp.json()["detail"]
+    conv = Conversation.objects.get()
+    files = Message.objects.filter(conversation=conv).exclude(attachment="")
+    assert files.count() == 2
+    # Текст без файла по-прежнему принимается в том же диалоге.
+    with patch("supportchat.services.is_open_now", return_value=True):
+        text = client.post(
+            "/api/support/conversations/current/messages/",
+            data={"body": "а текст можно?"},
+            HTTP_X_CSRFTOKEN=token,
+        )
+        assert text.status_code == 201
+
+
+@pytest.mark.django_db
+def test_web_attachment_upload_has_own_ip_throttle(settings, tmp_path) -> None:
+    """M2: вложения считаются в scope support_attachment — исчерпание → 429."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    rates = dict(settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"])
+    rates["support_attachment"] = "2/day"
+    rf = {**settings.REST_FRAMEWORK, "DEFAULT_THROTTLE_RATES": rates}
+    with override_settings(REST_FRAMEWORK=rf):
+        with patch("supportchat.services.is_open_now", return_value=True):
+            client = _csrf_client()
+            token = client.cookies["csrftoken"].value
+            statuses = [
+                _post_widget_file(client, token, f"f{i}.pdf").status_code for i in range(3)
+            ]
+    assert statuses == [201, 201, 429]
 
 
 @pytest.mark.django_db

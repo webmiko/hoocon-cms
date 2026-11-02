@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, SimpleRateThrottle
 from rest_framework.views import APIView
 
 from config.logging_utils import setup_logger
@@ -37,6 +37,35 @@ logger = setup_logger("hoocon.supportchat")
 
 _MSG_THROTTLE = "support_message"
 _POLL_THROTTLE = "support_poll"
+
+
+class SupportAttachmentUploadThrottle(SimpleRateThrottle):
+    """Per-IP cap on widget file uploads (disk-flood bound, audit M2).
+
+    Text posts are not counted: a request consumes the attachment scope
+    only when it actually carries a file.
+    """
+
+    scope = "support_attachment"
+
+    def __init__(self) -> None:
+        # Resolve rates per instance: the class-level THROTTLE_RATES dict is
+        # bound at import and never sees override_settings/env changes.
+        from rest_framework.settings import api_settings
+
+        self.THROTTLE_RATES = api_settings.DEFAULT_THROTTLE_RATES
+        super().__init__()
+
+    def get_cache_key(self, request: Request, view: APIView) -> str:
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
+
+    def allow_request(self, request: Request, view: APIView) -> bool:
+        if not getattr(request, "FILES", None):
+            return True
+        return super().allow_request(request, view)
 
 
 def _conversation_public_payload(conversation: Conversation) -> dict[str, object]:
@@ -154,7 +183,7 @@ class CurrentMessagesView(APIView):
     """GET/POST /api/support/conversations/current/messages/."""
 
     permission_classes = (AllowAny,)
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedRateThrottle, SupportAttachmentUploadThrottle]
     # Default for POST; GET overrides via get_throttles().
     throttle_scope = _MSG_THROTTLE
 

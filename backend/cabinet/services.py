@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
@@ -47,6 +47,9 @@ _OTP_ACCOUNT_SEND_PREFIX = "client_otp:acct_req_v1:"
 _OTP_ACCOUNT_VERIFY_PREFIX = "client_otp:acct_verify_v1:"
 _PWD_FAIL_PREFIX = "client_pwd_fail_v1:"
 _UNIFORM_LOGIN_FAIL = "Неверная почта или пароль."
+# L2: unknown-email logins run the same hasher pass as wrong-password ones —
+# response time must not reveal whether the account exists.
+_DUMMY_PASSWORD_HASH = make_password("hoocon-login-timing-equalizer")
 
 
 class ClientAuthError(Exception):
@@ -183,9 +186,15 @@ def authenticate_password(*, email: str, password: str) -> ClientAccount:
     try:
         account = ClientAccount.objects.get(email=email, is_active=True)
     except ClientAccount.DoesNotExist as exc:
+        check_password(password or "", _DUMMY_PASSWORD_HASH)
         _note_client_password_failure(email)
         raise ClientAuthError(_UNIFORM_LOGIN_FAIL) from exc
-    if not account.check_password(password or ""):
+    # OTP-only accounts have no hash — still run the dummy hasher pass so
+    # their timing matches wrong-password/unknown-email (no «registered
+    # but OTP-only» leak). The comparison must never authenticate them:
+    # the dummy hash matches the literal equalizer password by design.
+    password_ok = check_password(password or "", account.password_hash or _DUMMY_PASSWORD_HASH)
+    if not account.password_hash or not password_ok:
         _note_client_password_failure(email)
         raise ClientAuthError(_UNIFORM_LOGIN_FAIL)
     if account.email_verified_at is None:

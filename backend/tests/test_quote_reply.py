@@ -154,6 +154,22 @@ def test_accept_link_is_once_and_a_bad_token_changes_nothing(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_query_string_token_is_rejected_header_accepted(settings) -> None:
+    """L3: GET принимает токен только в X-Quote-Token — не в query.
+
+    ?token= попадал в access.log/Referer; SPA сам переносит ?t= из старых
+    писем в заголовок, поэтому серверный query-путь не нужен.
+    """
+    _client, quote, _manager = _issued_quote()
+    from crm.quote_reply import sign_quote_token
+
+    token = sign_quote_token(quote.pk)
+    api = APIClient()
+    assert api.get("/api/quotes/reply/", {"token": token}).status_code == 404
+    assert api.get("/api/quotes/reply/", HTTP_X_QUOTE_TOKEN=token).status_code == 200
+
+
+@pytest.mark.django_db
 def test_expired_and_draft_links_do_not_accept() -> None:
     """Просроченное КП и черновик ссылкой не согласуются."""
     _client, quote, _manager = _issued_quote()
@@ -172,7 +188,7 @@ def test_expired_and_draft_links_do_not_accept() -> None:
     assert quote.status == QuoteStatus.SENT
 
     draft = Quote.objects.create(client=quote.client, status=QuoteStatus.DRAFT, created_by=quote.created_by)
-    assert api.get("/api/quotes/reply/", {"token": sign_quote_token(draft.pk)}).status_code == 404
+    assert api.get("/api/quotes/reply/", HTTP_X_QUOTE_TOKEN=sign_quote_token(draft.pk)).status_code == 404
     draft.refresh_from_db()
     assert draft.status == QuoteStatus.DRAFT
 

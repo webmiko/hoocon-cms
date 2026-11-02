@@ -223,6 +223,8 @@ export function MarketingPushPrompt() {
         setStatusKind("error");
         return;
       }
+      // Session opt-in must land before subscribe — server trusts only it.
+      await syncMarketingPushConsent(true);
       const result = await subscribeWebPush({ topic_marketing: true });
       if (result.ok) {
         setStatus("Готово — будем присылать новости");

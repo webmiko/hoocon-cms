@@ -76,13 +76,19 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
     session_a = sub.session_key
     assert sub.topic_support is True
 
-    # Simulate reload: same browser endpoint, marketing added, support kept via OR.
+    # Simulate reload: consent synced via /topics/, marketing topic added.
+    consent = client.post(
+        "/api/webpush/topics/",
+        data={"marketing_consent": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert consent.status_code == 200
     second = client.post(
         "/api/webpush/subscribe/",
         data={**payload, "topic_marketing": True},
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
-        HTTP_X_HOOCON_MARKETING_CONSENT="1",
     )
     assert second.status_code == 201
     assert PushSubscription.objects.filter(endpoint=payload["endpoint"]).count() == 1
@@ -97,7 +103,9 @@ def test_resubscribe_same_endpoint_keeps_row_and_topics() -> None:
     WEBPUSH_VAPID_PUBLIC_KEY="BPtestpublickey",
     WEBPUSH_VAPID_PRIVATE_KEY="test-private",
 )
-def test_subscribe_marketing_requires_consent_header() -> None:
+def test_subscribe_marketing_requires_session_consent() -> None:
+    """L1: заголовок X-Hoocon-Marketing-Consent больше не создаёт opt-in —
+    единственный путь consent'а в сессию — POST /api/webpush/topics/."""
     client = _csrf_client()
     token = client.cookies["csrftoken"].value
     payload = {
@@ -114,12 +122,30 @@ def test_subscribe_marketing_requires_consent_header() -> None:
     assert denied.status_code == 400
     assert PushSubscription.objects.count() == 0
 
-    ok = client.post(
+    header_only = client.post(
         "/api/webpush/subscribe/",
         data=payload,
         content_type="application/json",
         HTTP_X_CSRFTOKEN=token,
         HTTP_X_HOOCON_MARKETING_CONSENT="1",
+    )
+    assert header_only.status_code == 400
+    assert PushSubscription.objects.count() == 0
+
+    consent = client.post(
+        "/api/webpush/topics/",
+        data={"marketing_consent": True},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert consent.status_code == 200
+    assert consent.json()["marketing_consent"] is True
+
+    ok = client.post(
+        "/api/webpush/subscribe/",
+        data=payload,
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
     )
     assert ok.status_code == 201
     assert PushSubscription.objects.get().topic_marketing is True
