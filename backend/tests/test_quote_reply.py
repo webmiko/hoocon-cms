@@ -44,27 +44,29 @@ def test_quote_email_names_manager_deadline_and_reply_links(settings) -> None:
     from crm.email_body import is_html_email_body
     from crm.quote_docs import notify_quote_issued, render_quote_issued_email
 
-    _subject, text_body, html_body = render_quote_issued_email(quote, author=_manager)
-    assert "Анна Смирнова" in text_body
-    assert "+7 495 000-00-00" in text_body
-    assert "anna@hoocon.test" in text_body
-    assert f"Действует до {quote.valid_until:%d.%m.%Y}." in text_body
-    assert "Согласовать: https://hoocon.test/kp#" in text_body
-    assert "https://hoocon.test/kp?" not in text_body
-    assert "action=accept" in text_body
-    assert "Нужны правки: https://hoocon.test/kp#" in text_body
-    assert "action=revise" in text_body
-    assert "без входа в кабинет" in text_body
-    assert "одноразовый код" not in text_body
+    # TimestampSigner changes between renders — pin token so html matches notify.
+    with patch("crm.quote_reply.sign_quote_token", return_value="test-fixed-quote-token"):
+        _subject, text_body, html_body = render_quote_issued_email(quote, author=_manager)
+        assert "Анна Смирнова" in text_body
+        assert "+7 495 000-00-00" in text_body
+        assert "anna@hoocon.test" in text_body
+        assert f"Действует до {quote.valid_until:%d.%m.%Y}." in text_body
+        assert "Согласовать: https://hoocon.test/kp#" in text_body
+        assert "https://hoocon.test/kp?" not in text_body
+        assert "action=accept" in text_body
+        assert "Нужны правки: https://hoocon.test/kp#" in text_body
+        assert "action=revise" in text_body
+        assert "без входа в кабинет" in text_body
+        assert "одноразовый код" not in text_body
 
-    message = notify_quote_issued(quote, send_now=False, author=_manager)
-    assert is_html_email_body(message.body)
-    assert message.body == html_body
-    assert "HOOCON" in message.body
-    assert 'href="' in message.body and "action=accept" in message.body
-    assert message.reply_to_email == "anna@hoocon.test"
-    assert message.quote_id == quote.pk
-    assert message.created_by_id == _manager.pk
+        message = notify_quote_issued(quote, send_now=False, author=_manager)
+        assert is_html_email_body(message.body)
+        assert message.body == html_body
+        assert "HOOCON" in message.body
+        assert 'href="' in message.body and "action=accept" in message.body
+        assert message.reply_to_email == "anna@hoocon.test"
+        assert message.quote_id == quote.pk
+        assert message.created_by_id == _manager.pk
 
 
 @pytest.mark.django_db
@@ -154,6 +156,22 @@ def test_accept_link_is_once_and_a_bad_token_changes_nothing(settings) -> None:
 
 
 @pytest.mark.django_db
+def test_query_string_token_is_rejected_header_accepted(settings) -> None:
+    """L3: GET принимает токен только в X-Quote-Token — не в query.
+
+    ?token= попадал в access.log/Referer; SPA сам переносит ?t= из старых
+    писем в заголовок, поэтому серверный query-путь не нужен.
+    """
+    _client, quote, _manager = _issued_quote()
+    from crm.quote_reply import sign_quote_token
+
+    token = sign_quote_token(quote.pk)
+    api = APIClient()
+    assert api.get("/api/quotes/reply/", {"token": token}).status_code == 404
+    assert api.get("/api/quotes/reply/", HTTP_X_QUOTE_TOKEN=token).status_code == 200
+
+
+@pytest.mark.django_db
 def test_expired_and_draft_links_do_not_accept() -> None:
     """Просроченное КП и черновик ссылкой не согласуются."""
     _client, quote, _manager = _issued_quote()
@@ -172,7 +190,7 @@ def test_expired_and_draft_links_do_not_accept() -> None:
     assert quote.status == QuoteStatus.SENT
 
     draft = Quote.objects.create(client=quote.client, status=QuoteStatus.DRAFT, created_by=quote.created_by)
-    assert api.get("/api/quotes/reply/", {"token": sign_quote_token(draft.pk)}).status_code == 404
+    assert api.get("/api/quotes/reply/", HTTP_X_QUOTE_TOKEN=sign_quote_token(draft.pk)).status_code == 404
     draft.refresh_from_db()
     assert draft.status == QuoteStatus.DRAFT
 

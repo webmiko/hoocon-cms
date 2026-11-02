@@ -69,6 +69,11 @@ def finalize_quote_status(quote: Quote, *, actor: Any = None) -> dict[str, Any]:
         if lead is not None and not lead.contact_verified:
             Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
             lead.contact_verified = True
+        if lead is not None and lead.contact_verified:
+            # Contact proven by the issued quote: card gets its inbound trail.
+            from crm.services import record_lead_inbound
+
+            record_lead_inbound(lead)
         if lead is not None and lead.status != Lead.LeadStatus.DONE:
             from leads.services import set_lead_status
 

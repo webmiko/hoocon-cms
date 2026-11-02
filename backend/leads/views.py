@@ -75,10 +75,8 @@ class LeadViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        lead = serializer.save()
-        if session_owns_email(request, lead.email):
-            Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
-            lead.contact_verified = True
+        owns = session_owns_email(request, serializer.validated_data.get("email") or "")
+        lead = serializer.save(contact_verified=owns)
 
         on_lead_created(lead)
 

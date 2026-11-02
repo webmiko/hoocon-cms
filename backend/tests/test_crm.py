@@ -39,6 +39,16 @@ def test_new_lead_auto_creates_and_links_client() -> None:
     client = lead.client
     assert client is not None
     assert client.email.lower() == "ivan.crm@example.com"
+    # Неподтверждённый контакт: карточка нейтральная до verify-flip.
+    assert client.name == "ivan.crm@example.com"
+    assert client.company == ""
+    assert client.phone == ""
+    from crm.services import record_lead_inbound
+
+    Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
+    lead.refresh_from_db()
+    record_lead_inbound(lead)
+    client.refresh_from_db()
     assert client.name == "Иван Петров"
     assert client.company == "ООО Тест"
     assert client.phone == "+79001234567"
@@ -46,7 +56,7 @@ def test_new_lead_auto_creates_and_links_client() -> None:
 
 @pytest.mark.django_db
 def test_second_lead_same_email_reuses_client() -> None:
-    """Two leads with same email share one Client card."""
+    """Two leads with same email share one Client card; verified merges fields."""
     Lead.objects.create(
         name="Anna",
         email="shared@example.com",
@@ -57,6 +67,7 @@ def test_second_lead_same_email_reuses_client() -> None:
         email="shared@example.com",
         message="Second",
         company="NewCo",
+        contact_verified=True,
     )
     lead2.refresh_from_db()
     assert Client.objects.filter(email__iexact="shared@example.com").count() == 1
@@ -171,6 +182,7 @@ def test_get_or_create_client_from_lead_locks_before_merge() -> None:
         email="merge.lock@example.com",
         message="msg",
         company="NewCo",
+        contact_verified=True,  # M1: поля карточки дополняет только доказанный контакт
     )
     with patch("crm.services.Client.objects.select_for_update") as mock_sf:
         mock_sf.return_value.get.return_value = existing

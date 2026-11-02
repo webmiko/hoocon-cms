@@ -589,17 +589,10 @@ export const api = {
     topic_support?: boolean;
     topic_marketing?: boolean;
   }): Promise<{ id: number; topic_support: boolean; topic_marketing: boolean }> {
-    const headers: Record<string, string> = {
-      "X-CSRFToken": getCsrfToken() ?? "",
-    };
-    if (data.topic_marketing) {
-      // Echo cookie marketing opt-in; server rejects marketing without this.
-      headers["X-Hoocon-Marketing-Consent"] = "1";
-    }
     return apiFetch("/api/webpush/subscribe/", {
       method: "POST",
       body: JSON.stringify(data),
-      headers,
+      headers: { "X-CSRFToken": getCsrfToken() ?? "" },
     });
   },
 

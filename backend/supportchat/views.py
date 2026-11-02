@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import ScopedRateThrottle, SimpleRateThrottle
 from rest_framework.views import APIView
 
 from config.logging_utils import setup_logger
@@ -37,6 +37,34 @@ logger = setup_logger("hoocon.supportchat")
 
 _MSG_THROTTLE = "support_message"
 _POLL_THROTTLE = "support_poll"
+
+
+class SupportAttachmentUploadThrottle(SimpleRateThrottle):
+    """Per-IP cap on widget file uploads (disk-flood bound, audit M2).
+
+    Text posts are not counted: a request consumes the attachment scope
+    only when it actually carries a file.
+    """
+
+    scope = "support_attachment"
+
+    def get_rate(self) -> str | None:
+        # Read rates at request time so tests can override_settings().
+        from rest_framework.settings import api_settings
+
+        raw = api_settings.DEFAULT_THROTTLE_RATES.get(self.scope)
+        return None if raw is None else str(raw)
+
+    def get_cache_key(self, request: Request, view: APIView) -> str:
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }
+
+    def allow_request(self, request: Request, view: APIView) -> bool:
+        if not getattr(request, "FILES", None):
+            return True
+        return super().allow_request(request, view)
 
 
 def _conversation_public_payload(conversation: Conversation) -> dict[str, object]:
@@ -154,7 +182,7 @@ class CurrentMessagesView(APIView):
     """GET/POST /api/support/conversations/current/messages/."""
 
     permission_classes = (AllowAny,)
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedRateThrottle, SupportAttachmentUploadThrottle]
     # Default for POST; GET overrides via get_throttles().
     throttle_scope = _MSG_THROTTLE
 

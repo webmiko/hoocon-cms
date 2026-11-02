@@ -201,6 +201,23 @@ def add_inbound_message(
             return existing, None
 
     if attachment is not None:
+        # M2: per-conversation file quota bounds disk growth per thread
+        # (checked under the row lock, so bursts cannot slip past it).
+        from django.conf import settings as dj_settings
+
+        max_files = int(getattr(dj_settings, "SUPPORT_ATTACHMENT_MAX_FILES", 20))
+        used_files = (
+            Message.objects.filter(
+                conversation=conversation,
+                direction=MessageDirection.INBOUND,
+            )
+            .exclude(attachment="")
+            .count()
+        )
+        if used_files >= max_files:
+            raise SupportChatError(
+                "Лимит вложений в этом диалоге исчерпан. Отправьте файлы менеджеру почтой или в мессенджере.",
+            )
         from supportchat.attachments import safe_attachment_mime
 
         attachment_mime = safe_attachment_mime(attachment, attachment_mime)

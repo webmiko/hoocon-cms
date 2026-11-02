@@ -430,13 +430,14 @@ class ProductFileViewSet(
     def get_queryset(self) -> QuerySet[ProductFile]:
         """Published files for the SKU identified by sku_slug.
 
-        Anonymous visitors only see files of published SKUs (a hidden card
-        must not leak through its manuals).
+        A hidden card must not leak through its manuals — for anyone.
+        ``SKUViewSet`` 404s a draft SKU even for staff, so this list
+        applies the same ``sku__is_published`` scope; bare ``is_staff``
+        is not a preview permission (POST is gated separately by
+        ``catalog.add_productfile``).
         """
         sku_slug = self.kwargs.get("sku_slug")
-        qs = ProductFile.objects.filter(is_published=True).select_related("sku")
-        if not self.request.user.is_staff:
-            qs = qs.filter(sku__is_published=True)
+        qs = ProductFile.objects.filter(is_published=True, sku__is_published=True).select_related("sku")
         if sku_slug:
             qs = qs.filter(sku__slug=sku_slug)
         return qs.order_by("sort_order", "title")

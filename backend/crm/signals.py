@@ -19,7 +19,11 @@ def link_new_lead_to_client(
     created: bool,
     **kwargs: object,
 ) -> None:
-    """On new Lead, create/find Client, link, and log inbound Activity.
+    """On new Lead, link to the email-dedup card; verified → note on it.
+
+    The dedup ``lead.client`` link always happens; card writes (inbound
+    Activity, contact-field merge) are gated by ``contact_verified`` —
+    see :func:`crm.services.record_lead_inbound` (audit M1).
 
     Args:
         sender: Lead model class.
@@ -28,8 +32,7 @@ def link_new_lead_to_client(
     """
     if not created:
         return
-    from crm.models import Activity, ActivityType
-    from crm.services import link_lead_to_client
+    from crm.services import link_lead_to_client, record_lead_inbound
 
     # Savepoint: a DB error here must not poison the caller's transaction
     # (the lead itself and its items are saved in the same atomic block).
@@ -38,16 +41,7 @@ def link_new_lead_to_client(
         with transaction.atomic():
             if not instance.client_id:
                 link_lead_to_client(instance)
-            client_id = instance.client_id
-            if not client_id:
-                return
-            Activity.objects.create(
-                client_id=client_id,
-                lead=instance,
-                activity_type=ActivityType.NOTE,
-                subject=f"Входящая заявка #{instance.pk}: {instance.get_lead_type_display()}",
-                body=(instance.message or "")[:2000],
-            )
+            record_lead_inbound(instance)
     except (DatabaseError, IntegrityError):
         instance.client_id, instance.assignee_id = linked_before
         logger.exception("crm_link_lead_failed lead_id=%s", instance.pk)

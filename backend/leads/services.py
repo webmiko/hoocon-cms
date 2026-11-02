@@ -137,6 +137,27 @@ def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | 
     if client is not None:
         owners = owners.exclude(pk=client.pk)
     first = owners.first()
+    if first is not None:
+        return first.assignee
+
+    # Unverified leads keep their cards neutral (company is not copied),
+    # so the same-company claim lives on the lead rows of claimed cards.
+    lead_claims = (
+        Lead.objects.filter(
+            client__assignee__isnull=False,
+            client__assignee__is_active=True,
+            client__assignee__is_staff=True,
+        )
+        .exclude(company="")
+        .values_list("client_id", "company")
+        .distinct()
+    )
+    if client is not None:
+        lead_claims = lead_claims.exclude(client_id=client.pk)
+    claimed = {cid for cid, lead_company in lead_claims if normalize_company_label(lead_company) == key}
+    if not claimed:
+        return None
+    first = CrmClient.objects.filter(pk__in=claimed).select_related("assignee").order_by("created_at", "pk").first()
     return first.assignee if first is not None else None
 
 

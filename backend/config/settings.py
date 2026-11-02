@@ -543,6 +543,8 @@ GIGACHAT_MODE = os.getenv("GIGACHAT_MODE", "triage").strip().casefold()
 SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = int(
     os.getenv("SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS", "300"),
 )
+# Hard cap of stored files per support conversation (audit M2 disk bound).
+SUPPORT_ATTACHMENT_MAX_FILES = int(os.getenv("SUPPORT_ATTACHMENT_MAX_FILES", "20"))
 # Менеджер уже вёл диалог и не ответил клиенту за N секунд — бот подхватывает.
 SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS = int(
     os.getenv("SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS", "45"),
@@ -615,6 +617,8 @@ REST_FRAMEWORK = {
         "lead_create": "10/hour",
         # POST start/send only — keep tight against spam.
         "support_message": "60/hour",
+        # File uploads bound stored bytes per IP (audit M2: ≤ ~200MB/day).
+        "support_attachment": "20/day",
         # GET poll every ~4s needs headroom (15/min); separate from POST scope.
         "support_poll": "120/minute",
         "support_faq": "60/minute",

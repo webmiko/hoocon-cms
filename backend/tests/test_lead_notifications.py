@@ -263,13 +263,14 @@ def test_new_leads_count_endpoint_requires_staff() -> None:
 
 @pytest.mark.django_db
 def test_new_lead_creates_crm_inbound_activity() -> None:
-    """New Lead creates CRM Activity of type note (inbound sticker trail)."""
+    """Verified Lead creates CRM Activity of type note (inbound trail)."""
     from crm.models import Activity, ActivityType
 
     lead = Lead.objects.create(
         name="CRM Act",
         email="crm-act@example.com",
         message="Заявка для активности CRM.",
+        contact_verified=True,
     )
     lead.refresh_from_db()
     assert lead.client_id is not None

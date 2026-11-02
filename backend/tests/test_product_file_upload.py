@@ -329,7 +329,11 @@ def test_list_files_for_sku(client) -> None:
 
 @pytest.mark.django_db
 def test_files_of_unpublished_sku_hidden_from_public(client, django_user_model) -> None:
-    """M31: скрытая карточка не «светится» через свои PDF в публичном API."""
+    """M31/M3: скрытая карточка не «светится» через свои PDF в публичном API.
+
+    Голый ``is_staff`` — не право просмотра черновика: SKU detail даёт 404
+    всем, и файловый список обязан вести себя так же.
+    """
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     from catalog.models import ProductFile
@@ -347,4 +351,4 @@ def test_files_of_unpublished_sku_hidden_from_public(client, django_user_model) 
 
     assert client.get(url).data["results"] == []
     client.force_login(_staff_user(django_user_model))
-    assert len(client.get(url).data["results"]) == 1
+    assert client.get(url).data["results"] == []

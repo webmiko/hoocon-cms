@@ -1120,15 +1120,22 @@ class LeadAdmin(
         """
         prev_status = ""
         prev_assignee_id: int | None = None
+        prev_verified = False
         if change and obj.pk:
-            prev = Lead.objects.filter(pk=obj.pk).values("status", "assignee_id").first()
+            prev = Lead.objects.filter(pk=obj.pk).values("status", "assignee_id", "contact_verified").first()
             if prev is not None:
                 prev_status = str(prev.get("status") or "")
                 prev_assignee_id = prev.get("assignee_id")
+                prev_verified = bool(prev.get("contact_verified"))
         if not change or ("client" in (getattr(form, "changed_data", None) or []) and obj.client_id):
             obj.contact_verified = True
         apply_lead_manager_on_save(obj, actor=request.user)
         super().save_model(request, obj, form, change)
+        if change and obj.contact_verified and not prev_verified:
+            # Manager marked the contact proven: card gets its inbound trail.
+            from crm.services import record_lead_inbound
+
+            record_lead_inbound(obj)
         if not change:
             return
         status_changed = prev_status != obj.status
