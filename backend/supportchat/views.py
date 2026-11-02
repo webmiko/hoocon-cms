@@ -48,13 +48,12 @@ class SupportAttachmentUploadThrottle(SimpleRateThrottle):
 
     scope = "support_attachment"
 
-    def __init__(self) -> None:
-        # Resolve rates per instance: the class-level THROTTLE_RATES dict is
-        # bound at import and never sees override_settings/env changes.
+    def get_rate(self) -> str | None:
+        # Read rates at request time so tests can override_settings().
         from rest_framework.settings import api_settings
 
-        self.THROTTLE_RATES = api_settings.DEFAULT_THROTTLE_RATES
-        super().__init__()
+        raw = api_settings.DEFAULT_THROTTLE_RATES.get(self.scope)
+        return None if raw is None else str(raw)
 
     def get_cache_key(self, request: Request, view: APIView) -> str:
         return self.cache_format % {
