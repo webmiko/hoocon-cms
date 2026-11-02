@@ -216,8 +216,7 @@ def add_inbound_message(
         )
         if used_files >= max_files:
             raise SupportChatError(
-                "Лимит вложений в этом диалоге исчерпан. "
-                "Отправьте файлы менеджеру почтой или в мессенджере.",
+                "Лимит вложений в этом диалоге исчерпан. Отправьте файлы менеджеру почтой или в мессенджере.",
             )
         from supportchat.attachments import safe_attachment_mime
 

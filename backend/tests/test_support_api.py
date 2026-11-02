@@ -1457,9 +1457,7 @@ def test_web_attachment_upload_has_own_ip_throttle(settings, tmp_path) -> None:
         with patch("supportchat.services.is_open_now", return_value=True):
             client = _csrf_client()
             token = client.cookies["csrftoken"].value
-            statuses = [
-                _post_widget_file(client, token, f"f{i}.pdf").status_code for i in range(3)
-            ]
+            statuses = [_post_widget_file(client, token, f"f{i}.pdf").status_code for i in range(3)]
     assert statuses == [201, 201, 429]
 
 

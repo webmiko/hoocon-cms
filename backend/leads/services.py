@@ -154,17 +154,10 @@ def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | 
     )
     if client is not None:
         lead_claims = lead_claims.exclude(client_id=client.pk)
-    claimed = {
-        cid for cid, lead_company in lead_claims if normalize_company_label(lead_company) == key
-    }
+    claimed = {cid for cid, lead_company in lead_claims if normalize_company_label(lead_company) == key}
     if not claimed:
         return None
-    first = (
-        CrmClient.objects.filter(pk__in=claimed)
-        .select_related("assignee")
-        .order_by("created_at", "pk")
-        .first()
-    )
+    first = CrmClient.objects.filter(pk__in=claimed).select_related("assignee").order_by("created_at", "pk").first()
     return first.assignee if first is not None else None
 
 
