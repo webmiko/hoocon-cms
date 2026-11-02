@@ -44,27 +44,29 @@ def test_quote_email_names_manager_deadline_and_reply_links(settings) -> None:
     from crm.email_body import is_html_email_body
     from crm.quote_docs import notify_quote_issued, render_quote_issued_email
 
-    _subject, text_body, html_body = render_quote_issued_email(quote, author=_manager)
-    assert "Анна Смирнова" in text_body
-    assert "+7 495 000-00-00" in text_body
-    assert "anna@hoocon.test" in text_body
-    assert f"Действует до {quote.valid_until:%d.%m.%Y}." in text_body
-    assert "Согласовать: https://hoocon.test/kp#" in text_body
-    assert "https://hoocon.test/kp?" not in text_body
-    assert "action=accept" in text_body
-    assert "Нужны правки: https://hoocon.test/kp#" in text_body
-    assert "action=revise" in text_body
-    assert "без входа в кабинет" in text_body
-    assert "одноразовый код" not in text_body
+    # TimestampSigner changes between renders — pin token so html matches notify.
+    with patch("crm.quote_reply.sign_quote_token", return_value="test-fixed-quote-token"):
+        _subject, text_body, html_body = render_quote_issued_email(quote, author=_manager)
+        assert "Анна Смирнова" in text_body
+        assert "+7 495 000-00-00" in text_body
+        assert "anna@hoocon.test" in text_body
+        assert f"Действует до {quote.valid_until:%d.%m.%Y}." in text_body
+        assert "Согласовать: https://hoocon.test/kp#" in text_body
+        assert "https://hoocon.test/kp?" not in text_body
+        assert "action=accept" in text_body
+        assert "Нужны правки: https://hoocon.test/kp#" in text_body
+        assert "action=revise" in text_body
+        assert "без входа в кабинет" in text_body
+        assert "одноразовый код" not in text_body
 
-    message = notify_quote_issued(quote, send_now=False, author=_manager)
-    assert is_html_email_body(message.body)
-    assert message.body == html_body
-    assert "HOOCON" in message.body
-    assert 'href="' in message.body and "action=accept" in message.body
-    assert message.reply_to_email == "anna@hoocon.test"
-    assert message.quote_id == quote.pk
-    assert message.created_by_id == _manager.pk
+        message = notify_quote_issued(quote, send_now=False, author=_manager)
+        assert is_html_email_body(message.body)
+        assert message.body == html_body
+        assert "HOOCON" in message.body
+        assert 'href="' in message.body and "action=accept" in message.body
+        assert message.reply_to_email == "anna@hoocon.test"
+        assert message.quote_id == quote.pk
+        assert message.created_by_id == _manager.pk
 
 
 @pytest.mark.django_db
