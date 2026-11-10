@@ -24,14 +24,15 @@ Python 3.12–3.13.
 ```text
 backend/     Django apps (catalog, leads, search, …), API, ETL
 frontend/    Публичный SPA
-_docs/       Проектная документация (локально, не в git; индекс: _docs/README.md)
+_docs/       Проектная документация (в основном локально; индекс: _docs/README.md).
+             В git: единый план сайта и соцсетей — _docs/plan-razvitiya-sayta-i-socsetey.md
 scripts/     Checkup, деплой-хелперы
 ```
 
 ## Документация
 
-Полный индекс (локально): `_docs/README.md` (каталог `_docs/` в git не
-попадает — см. `.gitignore`).
+Полный индекс (локально): `_docs/README.md` (большая часть `_docs/` в git не
+попадает — см. `.gitignore`; исключение — план развития сайта и соцсетей).
 
 Ключевые темы:
 
@@ -44,6 +45,7 @@ scripts/     Checkup, деплой-хелперы
 | Инфраструктура | `_docs/infra-reg-ru.md` |
 | ETL / качество данных | `_docs/data-quality-etl.md` |
 | Карточки серий | `_docs/series-card-templates.md` |
+| Сайт и соцсети (маркетинг + продукт) | `_docs/plan-razvitiya-sayta-i-socsetey.md` (в git) |
 
 ## Локальный запуск (кратко)
 
