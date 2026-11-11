@@ -143,7 +143,13 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert "07.10.2026" in doc.body
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
-    assert 'id="changelog-unverified-lead-card"' in doc.body
+    assert 'id="changelog-pin-from-company"' in doc.body
+    assert doc.body.index("changelog-pin-from-company") < doc.body.index("changelog-pinned-by-manager")
+    assert 'id="changelog-pinned-by-manager"' in doc.body
+    assert doc.body.index("changelog-pinned-by-manager") < doc.body.index("changelog-email-template-visibility")
+    assert 'id="changelog-email-template-visibility"' in doc.body
+    assert doc.body.index("changelog-email-template-visibility") < doc.body.index("changelog-unverified-lead-card")
+    assert "Кому видно" in doc.body
     assert "неподтверждённым контактом больше не пишет на карточку" in doc.body
     assert "Диалоги поддержки" in doc.body
     assert "отчёт роп" in doc.summary.casefold()
