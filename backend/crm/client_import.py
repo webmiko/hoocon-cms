@@ -152,6 +152,7 @@ class ClientImportReport:
     companies_created: int = 0
     companies_reused: int = 0
     touches_created: int = 0
+    lead_rules_pinned: int = 0
     skipped_existing: int = 0
     skipped_blank: int = 0
     bad_rows: int = 0
@@ -165,6 +166,7 @@ class ClientImportReport:
             f"новых компаний: {self.companies_created}; "
             f"компаний обновлено: {self.companies_reused}; "
             f"плановых звонков: {self.touches_created}; "
+            f"закреплений заявок: {self.lead_rules_pinned}; "
             f"уже были: {self.skipped_existing}; "
             f"пустых строк: {self.skipped_blank}; "
             f"с ошибкой: {self.bad_rows}."
@@ -576,6 +578,7 @@ def _apply_row(
     seen_emails: set[str],
     index: _CompanyIndex,
     assignee: Any | None = None,
+    pin_lead_rules: bool = False,
 ) -> None:
     """Insert contacts and fill the company card. An existing email is left as-is."""
     emails = row.emails
@@ -590,7 +593,7 @@ def _apply_row(
     if emails and not fresh:
         report.skipped_existing += len(emails)
         if row.niche or row.website or row.city or row.region:
-            _refresh_existing_company(row, report, index)
+            _refresh_existing_company(row, report, index, assignee=assignee, pin_lead_rules=pin_lead_rules)
         return
     made = 0
     touches = 0
@@ -601,6 +604,8 @@ def _apply_row(
             _fill_company(org, row, report)
             _claim_company(org, assignee)
             touches = apply_company_profile(org, _profile_from_row(row))
+            if pin_lead_rules and assignee is not None:
+                _pin_lead_rule(org, assignee, report)
             index.add(org)
             for email in fresh:
                 client = Client(
@@ -634,13 +639,23 @@ def _apply_row(
         report.companies_reused += 1
 
 
-def _refresh_existing_company(row: _ClientRow, report: ClientImportReport, index: _CompanyIndex) -> None:
+def _refresh_existing_company(
+    row: _ClientRow,
+    report: ClientImportReport,
+    index: _CompanyIndex,
+    *,
+    assignee: Any | None = None,
+    pin_lead_rules: bool = False,
+) -> None:
     """A second workbook may only add niche, site and city. Contacts stay as they are."""
     try:
         with transaction.atomic():
             org, created_company = _company_for_row(row, index)
             _fill_company(org, row, report)
+            _claim_company(org, assignee)
             report.touches_created += apply_company_profile(org, _profile_from_row(row))
+            if pin_lead_rules and assignee is not None:
+                _pin_lead_rule(org, assignee, report)
             index.add(org)
     except IntegrityError as exc:
         _note_integrity(row, report, exc)
@@ -649,6 +664,22 @@ def _refresh_existing_company(row: _ClientRow, report: ClientImportReport, index
         report.companies_created += 1
     else:
         report.companies_reused += 1
+
+
+def _pin_lead_rule(org: Company, assignee: Any, report: ClientImportReport) -> None:
+    """Create or refresh a CompanyManagerRule so inbound leads route to ``assignee``."""
+    from leads.models import CompanyManagerRule
+
+    _rule, created = CompanyManagerRule.objects.update_or_create(
+        company_key=org.company_key,
+        defaults={
+            "company_label": org.name,
+            "assignee": assignee,
+            "is_active": True,
+        },
+    )
+    if created:
+        report.lead_rules_pinned += 1
 
 
 def _claim_company(org: Company, assignee: Any | None) -> None:
@@ -723,6 +754,7 @@ def import_clients_xlsx(
     file_obj: BinaryIO | BytesIO,
     *,
     assignee: Any | None = None,
+    pin_lead_rules: bool = False,
 ) -> ClientImportReport:
     """Create client and company cards from the «Клиенты» sheet.
 
@@ -735,6 +767,7 @@ def import_clients_xlsx(
     Args:
         file_obj: Binary ``.xlsx`` stream.
         assignee: Staff user who should own the new cards. None leaves them free.
+        pin_lead_rules: When set with ``assignee``, create admin lead-routing rules per company.
 
     Returns:
         Counters and per-row messages.
@@ -747,7 +780,7 @@ def import_clients_xlsx(
     seen: set[str] = set()
     index = _CompanyIndex()
     for row in rows:
-        _apply_row(row, report, seen, index, assignee)
+        _apply_row(row, report, seen, index, assignee, pin_lead_rules)
     return report
 
 

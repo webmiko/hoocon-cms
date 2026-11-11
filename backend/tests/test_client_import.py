@@ -585,3 +585,37 @@ def test_non_email_integrity_error_is_a_row_error() -> None:
     assert "не удалось записать" in report.errors[0]
     assert "petr-signal@example.com" not in report.errors[0]
     assert "dedupe_key" not in report.errors[0]
+
+
+@pytest.mark.django_db
+def test_import_pins_lead_routing_rules_for_companies() -> None:
+    """Ops import can attach Company.assignee and CompanyManagerRule in one pass."""
+    from leads.models import CompanyManagerRule
+
+    manager = User.objects.create_user(
+        "lyuda",
+        email="assistant@hoocon.ru",
+        password="x",
+        is_staff=True,
+        is_active=True,
+    )
+    report = import_clients_xlsx(
+        _xlsx(
+            [
+                HEADERS,
+                ["ООО «Ромашка»", "", "", "Анна", "anna-pin@example.com", "", ""],
+                ["ООО «Василёк»", "", "", "Борис", "boris-pin@example.com", "", ""],
+            ],
+        ),
+        assignee=manager,
+        pin_lead_rules=True,
+    )
+    assert report.created == 2
+    assert report.lead_rules_pinned == 2
+    client = Client.objects.get(email="anna-pin@example.com")
+    romashka = client.company_ref
+    assert romashka is not None
+    assert romashka.assignee_id == manager.pk
+    rule = CompanyManagerRule.objects.get(company_key=romashka.company_key)
+    assert rule.assignee_id == manager.pk
+    assert rule.is_active is True
