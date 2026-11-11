@@ -4645,3 +4645,60 @@ html.dark .hoocon-perm-picker__bulk-btn {
     padding-bottom: 0.25rem;
   }
 }
+
+/* Pinned companies: one block per manager. Sizes and colors are the shared tokens. */
+.hoocon-pinned-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hoocon-group-inset);
+}
+
+.hoocon-pinned-manager {
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+  padding: var(--hoocon-card-pad);
+  background: var(--hoocon-surface);
+}
+
+.hoocon-pinned-manager__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--hoocon-section-gap);
+  align-items: center;
+  margin-bottom: var(--hoocon-section-gap);
+}
+
+.hoocon-pinned-manager__head h2 {
+  margin: 0;
+  font-size: var(--hoocon-row-label);
+  color: var(--hoocon-ink);
+}
+
+.hoocon-pinned-manager__head p {
+  margin: 0;
+  color: var(--hoocon-quiet);
+  font-size: var(--hoocon-row-sub);
+}
+
+.hoocon-pinned-manager__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hoocon-section-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.hoocon-pinned-companies .hoocon-pinned-manager__cards a,
+body.hoocon-pinned-companies .hoocon-pinned-manager__cards a:visited,
+body.hoocon-pinned-companies .hoocon-pinned-manager__cards a:hover {
+  display: inline-block;
+  padding: var(--hoocon-chip-pad);
+  border-radius: var(--hoocon-radius-btn-sm);
+  background: var(--hoocon-surface-muted);
+  color: var(--hoocon-ink);
+  font-size: var(--hoocon-chip-font);
+  font-weight: 600;
+  text-decoration: none;
+}

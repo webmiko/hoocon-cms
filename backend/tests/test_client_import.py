@@ -367,6 +367,26 @@ def test_import_does_not_claim_a_company_whose_contacts_belong_to_someone_else(c
 
 
 @pytest.mark.django_db
+def test_import_claim_moves_the_pin_to_the_uploader() -> None:
+    """A workbook that takes a free company also moves its lead pin."""
+    from leads.models import CompanyManagerRule
+
+    former = User.objects.create_user("pin-former", password="x", is_staff=True)
+    uploader = User.objects.create_user("pin-uploader", password="x", is_staff=True)
+    org = Company.objects.create(name="ООО Ромашка")
+    CompanyManagerRule.objects.create(company_label=org.name, assignee=former)
+
+    import_clients_xlsx(
+        _xlsx([HEADERS, ["ООО Ромашка", "", "", "Новый", "pin-new@example.com", "", ""]]),
+        assignee=uploader,
+    )
+
+    org.refresh_from_db()
+    assert org.assignee_id == uploader.pk
+    assert CompanyManagerRule.objects.get(company_key=org.company_key).assignee_id == uploader.pk
+
+
+@pytest.mark.django_db
 def test_export_matches_import_columns_and_does_not_duplicate() -> None:
     """The export is the import sheet: loading it again leaves existing cards as they are."""
     import_clients_xlsx(

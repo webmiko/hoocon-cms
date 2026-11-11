@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from crm.models import Company, WorkLabel
 from crm.work_label_widget import WorkLabelGroupedWidget, assignable_work_label_queryset, build_work_label_groups
-from tests.test_admin_scope_hardening import _admin_change_post
+from tests.admin_form import _admin_change_post
 
 User = get_user_model()
 

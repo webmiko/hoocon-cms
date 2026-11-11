@@ -262,8 +262,8 @@ class CompanyManagerRule(models.Model):
     casefold, collapsed spaces, quotes stripped) — the same normalization as the
     code-level ООО Атерна rule, so «ООО "Ромашка"» and «ооо ромашка» hit one rule.
 
-    ``exclusive=True`` removes the manager from the shared round-robin pool:
-    they only receive leads for their pinned companies.
+    Whether the manager stays in the shared queue is not stored here.
+    That switch is one row per person: :class:`ManagerQueueMode`.
     """
 
     company_label: models.CharField = models.CharField(
@@ -285,11 +285,6 @@ class CompanyManagerRule(models.Model):
         related_name="lead_company_rules",
         verbose_name="менеджер",
         limit_choices_to={"is_staff": True},
-    )
-    exclusive: models.BooleanField = models.BooleanField(
-        "только закреплённые компании",
-        default=False,
-        help_text="Убрать менеджера из общей очереди: он получает заявки только по своим компаниям.",
     )
     is_active: models.BooleanField = models.BooleanField("активно", default=True)
     comment: models.CharField = models.CharField(
@@ -315,3 +310,38 @@ class CompanyManagerRule(models.Model):
 
         self.company_key = normalize_company_label(self.company_label)
         super().save(*args, **kwargs)
+
+
+class ManagerQueueMode(models.Model):
+    """Whether a manager takes only pinned companies. One row per person.
+
+    The company list groups several :class:`CompanyManagerRule` rows under
+    one manager. The queue switch used to sit on every row, so it looked
+    like each company had its own mode. Routing already treated any
+    ``exclusive`` row as "this manager leaves the shared pool".
+    """
+
+    assignee: models.OneToOneField = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lead_queue_mode",
+        verbose_name="менеджер",
+        limit_choices_to={"is_staff": True},
+    )
+    pinned_only: models.BooleanField = models.BooleanField(
+        "только закреплённые компании",
+        default=False,
+        help_text=(
+            "Один переключатель на менеджера. "
+            "Включён — новые заявки только по компаниям из его списка. "
+            "Выключен — менеджер остаётся в общей очереди."
+        ),
+    )
+    updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "очередь менеджера"
+        verbose_name_plural = "очереди менеджеров"
+
+    def __str__(self) -> str:
+        return f"{self.assignee_id}: {'только закреплённые' if self.pinned_only else 'общая очередь'}"

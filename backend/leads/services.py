@@ -18,8 +18,10 @@ from django.db.models import (
     Avg,
     Count,
     DurationField,
+    Exists,
     ExpressionWrapper,
     F,
+    OuterRef,
     Q,
     QuerySet,
 )
@@ -96,7 +98,126 @@ def pinned_rule_for_company(company: str) -> Any | None:
     key = normalize_company_label(company)
     if not key:
         return None
+    retarget_pin_to_card_owner(key)
     return CompanyManagerRule.objects.filter(company_key=key, is_active=True).select_related("assignee").first()
+
+
+def sync_company_pin(company: Any, *, pinned: bool, previous_key: str = "") -> None:
+    """Create or drop the lead-routing row for a company card.
+
+    The pinned-company list does not grow a second card. The switch on the
+    company card writes one ``CompanyManagerRule`` for the responsible manager,
+    or removes it. ``previous_key`` is the key before a rename, so the old row
+    follows the new name instead of being left behind.
+
+    Args:
+        company: saved ``crm.Company`` with ``name``, ``company_key`` and ``assignee``.
+        pinned: whether this company should route new leads to its assignee.
+        previous_key: company key before this save. Empty when the card is new.
+    """
+    from leads.models import CompanyManagerRule
+
+    keys = {key for key in (previous_key, company.company_key) if key}
+    rules = list(CompanyManagerRule.objects.filter(company_key__in=keys).order_by("pk"))
+    primary = rules[0] if rules else None
+    extra_ids = [rule.pk for rule in rules if primary is None or rule.pk != primary.pk]
+    if extra_ids:
+        CompanyManagerRule.objects.filter(pk__in=extra_ids).delete()
+    released = {rule.assignee_id for rule in rules if rule.assignee_id}
+    if not pinned or company.assignee_id is None:
+        if primary is not None:
+            released.add(primary.assignee_id)
+            primary.delete()
+        for assignee_id in released:
+            release_queue_mode_without_pins(assignee_id)
+        return
+    previous_assignee_id = primary.assignee_id if primary is not None else None
+    if primary is None:
+        primary = CompanyManagerRule(company_label=company.name, assignee=company.assignee)
+    else:
+        primary.company_label = company.name
+        primary.assignee = company.assignee
+        primary.is_active = True
+    primary.save()
+    for assignee_id in released:
+        if assignee_id != company.assignee_id:
+            release_queue_mode_without_pins(assignee_id)
+    if previous_assignee_id and previous_assignee_id != company.assignee_id:
+        release_queue_mode_without_pins(previous_assignee_id)
+
+
+def retarget_pin_to_card_owner(company_key: str) -> bool:
+    """Move the pin to whoever the company card names. The card itself stays.
+
+    Returns:
+        True when a pin row changed manager.
+    """
+    if not company_key:
+        return False
+    from crm.models import Company
+    from leads.models import CompanyManagerRule
+
+    owner_id = Company.objects.filter(company_key=company_key).values_list("assignee_id", flat=True).first()
+    if not owner_id:
+        return False
+    updated = (
+        CompanyManagerRule.objects.filter(company_key=company_key)
+        .exclude(assignee_id=owner_id)
+        .update(
+            assignee_id=owner_id,
+        )
+    )
+    return updated > 0
+
+
+def release_queue_mode_without_pins(assignee_id: int | None) -> None:
+    """A manager with no companies left returns to the shared queue.
+
+    ``pinned_only`` without a single active company would drop every new lead
+    until someone opens the switch by hand.
+    """
+    if not assignee_id:
+        return
+    from leads.models import CompanyManagerRule, ManagerQueueMode
+
+    if CompanyManagerRule.objects.filter(assignee_id=assignee_id, is_active=True).exists():
+        return
+    ManagerQueueMode.objects.filter(assignee_id=assignee_id, pinned_only=True).update(pinned_only=False)
+
+
+def align_pinned_rules_to_company_assignee() -> int:
+    """Point each pin at the company card's responsible person.
+
+    The pin list must not gather every company under one manager. The card
+    keeps its assignee; only a drifted pin row is moved to that same person.
+    A card with no assignee is left alone.
+
+    Returns:
+        How many pin rows were moved.
+    """
+    from crm.models import Company
+    from leads.models import CompanyManagerRule
+
+    rules = list(CompanyManagerRule.objects.all().only("pk", "company_key", "assignee_id"))
+    if not rules:
+        return 0
+    owners = {
+        row["company_key"]: row["assignee_id"]
+        for row in Company.objects.filter(company_key__in=[rule.company_key for rule in rules]).values(
+            "company_key",
+            "assignee_id",
+        )
+    }
+    moved = 0
+    for rule in rules:
+        if rule.company_key not in owners:
+            continue
+        owner_id = owners[rule.company_key]
+        if owner_id is None or owner_id == rule.assignee_id:
+            continue
+        CompanyManagerRule.objects.filter(pk=rule.pk).update(assignee_id=owner_id)
+        moved += 1
+    return moved
 
 
 def company_owner_assignee(company: str, *, client: Any | None = None) -> Any | None:
@@ -238,19 +359,18 @@ def manager_rotation_queryset() -> QuerySet[Any]:
     - ``assistant@hoocon.ru`` — she handles ООО Атерна only (invariant,
       enforced in code so she stays out of rotation even without an
       Admin rule);
-    - holders of active ``exclusive`` pinned rules — they only receive
-      leads for their pinned companies.
+    - managers with ``ManagerQueueMode.pinned_only`` and at least one active
+      company. The switch alone, after the last company is removed, does not
+      take them out of the queue.
 
     Returns:
         User queryset ordered by primary key (stable round-robin order).
     """
     from accounts.roles import GROUP_MANAGER
-    from leads.models import CompanyManagerRule
+    from leads.models import CompanyManagerRule, ManagerQueueMode
 
-    exclusive = CompanyManagerRule.objects.filter(
-        is_active=True,
-        exclusive=True,
-    ).values("assignee_id")
+    has_company = CompanyManagerRule.objects.filter(assignee_id=OuterRef("assignee_id"), is_active=True)
+    exclusive = ManagerQueueMode.objects.filter(pinned_only=True).filter(Exists(has_company)).values("assignee_id")
     return (
         User.objects.filter(
             is_active=True,

@@ -21,6 +21,7 @@ from leads.services import (
     assign_lead_round_robin,
     manager_rotation_queryset,
     resolve_lead_notify_recipients,
+    sync_company_pin,
 )
 from sitesettings.models import SiteSettings
 
@@ -169,26 +170,114 @@ def test_rule_with_inactive_assignee_falls_back_to_rotation() -> None:
 
 
 @pytest.mark.django_db
-def test_exclusive_rule_removes_manager_from_pool() -> None:
-    """exclusive=True: manager gets only pinned companies, not rotation."""
+def test_pinned_only_is_one_switch_per_manager() -> None:
+    """One queue switch removes the manager. A second company does not need its own flag."""
+    from leads.models import ManagerQueueMode
+
     a = _make_manager(username="excl-a", email="excl-a@hoocon.ru")
     exclusive_mgr = _make_manager(username="excl-b", email="excl-b@hoocon.ru")
     shared = _make_manager(username="excl-c", email="excl-c@hoocon.ru")
-    CompanyManagerRule.objects.create(
-        company_label="ООО Ромашка",
-        assignee=exclusive_mgr,
-        exclusive=True,
-    )
-    CompanyManagerRule.objects.create(
-        company_label="ООО Василёк",
-        assignee=shared,
-        exclusive=False,
-    )
+    CompanyManagerRule.objects.create(company_label="ООО Ромашка", assignee=exclusive_mgr)
+    CompanyManagerRule.objects.create(company_label="ООО Лютик", assignee=exclusive_mgr)
+    CompanyManagerRule.objects.create(company_label="ООО Василёк", assignee=shared)
+    ManagerQueueMode.objects.create(assignee=exclusive_mgr, pinned_only=True)
 
     pks = set(manager_rotation_queryset().values_list("pk", flat=True))
     assert a.pk in pks
     assert shared.pk in pks
     assert exclusive_mgr.pk not in pks
+    assert ManagerQueueMode.objects.filter(assignee=exclusive_mgr).count() == 1
+
+
+@pytest.mark.django_db
+def test_last_pin_returns_manager_to_the_shared_queue() -> None:
+    """Removing the last company clears the switch. A leftover switch must not swallow leads."""
+    from crm.models import Company
+    from leads.models import ManagerQueueMode
+
+    waiting = _make_manager(username="last-a", email="last-a@hoocon.ru")
+    pinned = _make_manager(username="last-b", email="last-b@hoocon.ru")
+    org = Company.objects.create(name="ООО Ромашка", assignee=pinned)
+    CompanyManagerRule.objects.create(company_label=org.name, assignee=pinned)
+    ManagerQueueMode.objects.create(assignee=pinned, pinned_only=True)
+
+    sync_company_pin(org, pinned=False)
+
+    mode = ManagerQueueMode.objects.get(assignee=pinned)
+    assert mode.pinned_only is False
+    pks = set(manager_rotation_queryset().values_list("pk", flat=True))
+    assert pinned.pk in pks
+    assert waiting.pk in pks
+
+    ManagerQueueMode.objects.filter(assignee=pinned).update(pinned_only=True)
+    assert pinned.pk in set(manager_rotation_queryset().values_list("pk", flat=True))
+
+
+@pytest.mark.django_db
+def test_lead_follows_the_company_card_when_the_pin_is_stale() -> None:
+    """A lead uses the card's manager before anyone opens the pinned list."""
+    from crm.models import Company
+
+    former = _make_manager(username="stale-a", email="stale-a@hoocon.ru")
+    current = _make_manager(username="stale-b", email="stale-b@hoocon.ru")
+    Company.objects.create(name="ООО Ромашка", assignee=current)
+    CompanyManagerRule.objects.create(company_label="ООО Ромашка", assignee=former)
+
+    lead = _make_lead(company="ООО Ромашка")
+    picked = assign_lead_on_create(lead)
+
+    assert picked is not None
+    assert picked.pk == current.pk
+    card = Company.objects.get(name="ООО Ромашка")
+    assert card.assignee_id == current.pk
+    assert CompanyManagerRule.objects.get(company_key=card.company_key).assignee_id == current.pk
+
+
+@pytest.mark.django_db
+def test_assign_to_me_moves_the_pin_with_the_card(client) -> None:
+    """«Назначить меня» writes the card past save_model and still moves the pin."""
+    from django.urls import reverse
+
+    from crm.models import Company
+
+    former = _make_manager(username="claim-a", email="claim-a@hoocon.ru")
+    org = Company.objects.create(name="ООО Свободная")
+    CompanyManagerRule.objects.create(company_label=org.name, assignee=former)
+    admin = User.objects.create_superuser("claim-admin", "claim-admin@hoocon.ru", "password12")
+    client.force_login(admin)
+
+    response = client.post(
+        reverse("admin:crm_company_changelist"),
+        {"action": "assign_to_me", "_selected_action": [str(org.pk)]},
+    )
+
+    assert response.status_code == 302
+    org.refresh_from_db()
+    assert org.assignee_id == admin.pk
+    assert CompanyManagerRule.objects.get(company_key=org.company_key).assignee_id == admin.pk
+
+
+@pytest.mark.django_db
+def test_taking_a_free_call_moves_the_pin_with_the_company(client) -> None:
+    """Claiming a call writes the company past the card form and still moves the pin."""
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from crm.models import Company, PlannedTouch
+
+    former = _make_manager(username="call-a", email="call-a@hoocon.ru")
+    org = Company.objects.create(name="ООО Звонок")
+    CompanyManagerRule.objects.create(company_label=org.name, assignee=former)
+    touch = PlannedTouch.objects.create(company=org, title="Позвонить", starts_at=timezone.now())
+    admin = User.objects.create_superuser("call-admin", "call-admin@hoocon.ru", "password12")
+    client.force_login(admin)
+
+    response = client.post(reverse("admin:crm_plannedtouch_assign_me", args=[touch.pk]))
+
+    assert response.status_code == 302
+    org.refresh_from_db()
+    assert org.assignee_id == admin.pk
+    assert CompanyManagerRule.objects.get(company_key=org.company_key).assignee_id == admin.pk
 
 
 @pytest.mark.django_db
@@ -378,3 +467,202 @@ def test_pipeline_honors_client_owner_without_company() -> None:
 
     assert picked is not None
     assert picked.pk == owner.pk
+
+
+@pytest.mark.django_db
+def test_pinned_list_groups_companies_and_one_queue_switch(client) -> None:
+    """The list gathers companies under a manager and does not repeat the queue switch."""
+    from pathlib import Path
+
+    from django.urls import reverse
+
+    from leads.models import ManagerQueueMode
+
+    lyuda = _make_manager(username="grp-l", email="grp-l@hoocon.ru")
+    lyuda.first_name = "Людмила"
+    lyuda.save(update_fields=["first_name"])
+    other = _make_manager(username="grp-v", email="grp-v@hoocon.ru")
+    other.first_name = "Валерия"
+    other.save(update_fields=["first_name"])
+    CompanyManagerRule.objects.create(company_label="Демо Альфа", assignee=lyuda)
+    CompanyManagerRule.objects.create(company_label="Демо Бета", assignee=lyuda)
+    CompanyManagerRule.objects.create(company_label="Демо Эпсилон", assignee=other)
+    admin = User.objects.create_superuser("grp-admin", "grp-admin@hoocon.ru", "password12")
+    client.force_login(admin)
+
+    page = client.get(reverse("admin:leads_companymanagerrule_changelist"))
+    html = page.content.decode()
+    assert page.status_code == 200
+    assert 'name="exclusive"' not in html
+    assert "hoocon-admin-pinned-companies.js" in html
+    assert html.index("Демо Эпсилон") < html.index("Демо Альфа") < html.index("Демо Бета")
+    assert html.count(f'data-assignee-id="{lyuda.pk}"') == 3
+    assert html.count(f'data-assignee-id="{other.pk}"') == 2
+    assert html.count('data-off="В общей очереди"') == 2
+    assert html.count('data-on="Только закреплённые"') == 2
+    assert html.count("Сохранено") == 2
+    assert "hoocon-pinned-assignee" not in html
+    # source-lint: the script the changelist loads rolls the switch back and says it saved
+    script = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-pinned-companies.js").read_text(
+        encoding="utf-8"
+    )
+    assert "hoocon-pinned-manager" in script
+    assert "data-assignee-id" in script
+    assert ".catch(" in script
+    assert "hoocon-pinned-manager__saved" in script
+    css = (Path(__file__).resolve().parents[1] / "static/admin/css/hoocon-unfold-extras.css").read_text(
+        encoding="utf-8",
+    )
+    assert css.count(".hoocon-pinned-manager__cards a") == 3
+    assert "hoocon-pinned-group" not in css
+    card = css.split(".hoocon-pinned-manager {", 1)[1].split("}", 1)[0]
+    assert "border-radius: var(--hoocon-radius)" in card
+    assert "padding: var(--hoocon-card-pad)" in card
+    assert "background: var(--hoocon-surface)" in card
+    chip = css.split("body.hoocon-pinned-companies .hoocon-pinned-manager__cards a,", 1)[1].split("}", 1)[0]
+    assert "color: var(--hoocon-ink)" in chip
+    assert "background: var(--hoocon-surface-muted)" in chip
+    assert "padding: var(--hoocon-chip-pad)" in chip
+    assert "#" not in chip
+
+    saved = client.post(
+        reverse("admin:leads_companymanagerrule_queue_mode"),
+        {"assignee": str(lyuda.pk), "pinned_only": "1"},
+    )
+    assert saved.status_code == 302
+    assert ManagerQueueMode.objects.get(assignee=lyuda).pinned_only is True
+    assert ManagerQueueMode.objects.filter(assignee=other).count() == 0
+    assert lyuda.pk not in set(manager_rotation_queryset().values_list("pk", flat=True))
+    assert other.pk in set(manager_rotation_queryset().values_list("pk", flat=True))
+
+    from crm.models import Company
+    from tests.admin_form import _admin_change_post  # shared form replay, not another test module
+
+    firm = Company.objects.create(name="ООО «Демо Закрепление»")
+    before = Company.objects.count()
+    card_url = reverse("admin:crm_company_change", args=[firm.pk])
+    card = client.get(card_url)
+    assert card.status_code == 200
+    assert "В списке закреплённых" in card.content.decode()
+    posted = _admin_change_post(client, card_url)
+    posted["assignee"] = str(lyuda.pk)
+    posted["pin_for_leads"] = "on"
+    saved = client.post(card_url, posted)
+    assert saved.status_code == 302
+    rule = CompanyManagerRule.objects.get(company_key=firm.company_key)
+    assert rule.assignee_id == lyuda.pk
+    assert Company.objects.count() == before
+    opened = client.get(reverse("admin:leads_companymanagerrule_change", args=[rule.pk]))
+    assert opened.status_code == 302
+    assert opened.url == card_url
+    added = client.get(reverse("admin:leads_companymanagerrule_add"))
+    assert added.status_code == 403
+
+    cleared = _admin_change_post(client, card_url)
+    cleared.pop("pin_for_leads", None)
+    cleared["assignee"] = str(lyuda.pk)
+    again = client.post(card_url, cleared)
+    assert again.status_code == 302
+    assert not CompanyManagerRule.objects.filter(company_key=firm.company_key).exists()
+
+    bare = _admin_change_post(client, card_url)
+    bare.pop("assignee", None)
+    bare["pin_for_leads"] = "on"
+    refused = client.post(card_url, bare)
+    assert refused.status_code == 200
+    assert "ответственного" in refused.content.decode()
+    assert not CompanyManagerRule.objects.filter(company_key=firm.company_key).exists()
+
+    stranger = User.objects.create_user("grp-no", password="x", is_staff=True)
+    client.force_login(stranger)
+    denied = client.post(
+        reverse("admin:leads_companymanagerrule_queue_mode"),
+        {"assignee": str(other.pk), "pinned_only": "1"},
+    )
+    assert denied.status_code == 403
+    assert not ManagerQueueMode.objects.filter(assignee=other, pinned_only=True).exists()
+
+
+@pytest.mark.django_db
+def test_pinned_list_keeps_each_companys_assignee(client) -> None:
+    """A drifted pin follows the company card. The card is not given to one manager."""
+    from django.urls import reverse
+
+    from crm.models import Company
+
+    lyuda = _make_manager(username="keep-l", email="keep-l@hoocon.ru")
+    lyuda.first_name = "Людмила"
+    lyuda.save(update_fields=["first_name"])
+    other = _make_manager(username="keep-v", email="keep-v@hoocon.ru")
+    other.first_name = "Валерия"
+    other.save(update_fields=["first_name"])
+    hers = Company.objects.create(name="Карточка Валерии", assignee=other)
+    his = Company.objects.create(name="Карточка Людмилы", assignee=lyuda)
+    CompanyManagerRule.objects.create(company_label=hers.name, assignee=lyuda)
+    CompanyManagerRule.objects.create(company_label=his.name, assignee=lyuda)
+    admin = User.objects.create_superuser("keep-admin", "keep-admin@hoocon.ru", "password12")
+    client.force_login(admin)
+
+    page = client.get(reverse("admin:leads_companymanagerrule_changelist"))
+    html = page.content.decode()
+    assert page.status_code == 200
+    hers.refresh_from_db()
+    his.refresh_from_db()
+    assert hers.assignee_id == other.pk
+    assert his.assignee_id == lyuda.pk
+    assert CompanyManagerRule.objects.get(company_key=hers.company_key).assignee_id == other.pk
+    assert CompanyManagerRule.objects.get(company_key=his.company_key).assignee_id == lyuda.pk
+    assert html.index("Валерия") < html.index("Карточка Валерии")
+    assert html.index("Карточка Валерии") < html.index("Людмила")
+    assert html.index("Людмила") < html.index("Карточка Людмилы")
+
+
+@pytest.mark.django_db
+def test_pinned_list_does_not_rewrite_rows_without_permission(client) -> None:
+    """A staff user who cannot open the list does not move pins or reach a company card."""
+    from django.urls import reverse
+
+    from crm.models import Company
+
+    former = _make_manager(username="deny-a", email="deny-a@hoocon.ru")
+    current = _make_manager(username="deny-b", email="deny-b@hoocon.ru")
+    org = Company.objects.create(name="ООО Закрыто", assignee=current)
+    rule = CompanyManagerRule.objects.create(company_label=org.name, assignee=former)
+    stranger = User.objects.create_user("deny-staff", password="x", is_staff=True)
+    client.force_login(stranger)
+
+    listing = client.get(reverse("admin:leads_companymanagerrule_changelist"))
+    opened = client.get(reverse("admin:leads_companymanagerrule_change", args=[rule.pk]))
+
+    assert listing.status_code == 403
+    assert opened.status_code == 403
+    rule.refresh_from_db()
+    assert rule.assignee_id == former.pk
+    org.refresh_from_db()
+    assert org.assignee_id == current.pk
+
+
+@pytest.mark.django_db
+def test_queue_switch_skips_staff_outside_the_manager_group(client) -> None:
+    """An analyst keeps a pin row, but the queue switch does not create a mode for them."""
+    from django.urls import reverse
+
+    from leads.models import ManagerQueueMode
+
+    analyst = User.objects.create_user("pin-analyst", password="x", is_staff=True, is_active=True)
+    CompanyManagerRule.objects.create(company_label="ООО Аналитик", assignee=analyst)
+    admin = User.objects.create_superuser("pin-queue-admin", "pin-queue-admin@hoocon.ru", "password12")
+    client.force_login(admin)
+
+    page = client.get(reverse("admin:leads_companymanagerrule_changelist"))
+    html = page.content.decode()
+    assert page.status_code == 200
+    assert f'data-assignee-id="{analyst.pk}"' in html
+    assert 'data-off="В общей очереди"' not in html
+
+    denied = client.post(
+        reverse("admin:leads_companymanagerrule_queue_mode"),
+        {"assignee": str(analyst.pk), "pinned_only": "1"},
+    )
+    assert denied.status_code == 403
+    assert not ManagerQueueMode.objects.filter(assignee=analyst).exists()

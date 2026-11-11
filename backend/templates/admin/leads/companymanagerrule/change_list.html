@@ -1,0 +1,49 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block bodyclass %}{{ block.super }} hoocon-pinned-companies{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="{% static 'admin/js/hoocon-admin-pinned-companies.js' %}?v={{ STATIC_VERSION }}" defer></script>
+{% endblock %}
+
+{% block result_list %}
+  <div class="hoocon-pinned-board" data-url="{% url 'admin:leads_companymanagerrule_queue_mode' %}">
+    {% regroup cl.result_list by assignee_id as pinned_by_manager %}
+    {% for group in pinned_by_manager %}
+      {% with rule=group.list.0 %}
+        <section class="hoocon-pinned-manager" data-assignee-id="{{ rule.assignee_id }}">
+          <header class="hoocon-pinned-manager__head">
+            <div>
+              <h2>{% firstof rule.assignee.first_name rule.assignee.email %}</h2>
+              <p>{{ rule.assignee.email }} · {{ group.list|length }} комп.</p>
+              <p class="hoocon-pinned-manager__saved" hidden>Сохранено</p>
+            </div>
+            {% if rule.assignee_in_rotation %}
+            <label class="hoocon-bool-toggle">
+              <input
+                type="checkbox"
+                class="hoocon-toggle"
+                {% if rule.assignee.lead_queue_mode.pinned_only %}checked{% endif %}
+                aria-label="Только закреплённые компании"
+              >
+              <span class="hoocon-bool-toggle__state hoocon-bool-toggle__state--off" data-off="В общей очереди">В общей очереди</span>
+              <span class="hoocon-bool-toggle__state hoocon-bool-toggle__state--on" data-on="Только закреплённые">Только закреплённые</span>
+            </label>
+            {% endif %}
+          </header>
+          <ul class="hoocon-pinned-manager__cards">
+            {% for item in group.list %}
+              <li data-assignee-id="{{ rule.assignee_id }}">
+                <a href="{% url 'admin:leads_companymanagerrule_change' item.pk %}">{{ item.company_label }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endwith %}
+    {% empty %}
+      <p class="hoocon-pinned-board__empty">Пока нет закреплённых компаний. Откройте карточку фирмы и включите «В списке закреплённых».</p>
+    {% endfor %}
+  </div>
+{% endblock %}

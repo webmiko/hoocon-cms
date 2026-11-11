@@ -15,7 +15,7 @@ from django.urls import reverse
 from catalog.models import SKU, AnalogMap, Attribute, AttributeValue, Category, Product
 from config.admin_toggle import HooconToggleInput, toggle_function_label
 from crm.models import Company, CompanyMember
-from leads.models import CompanyManagerRule, Lead
+from leads.models import Lead
 from supportchat.models import (
     Channel,
     Conversation,
@@ -98,7 +98,7 @@ def test_state_flags_render_meaningful_captions(client, django_user_model) -> No
 
     Locks each surface: contact_verified ×2, is_closed (own page + inline),
     is_confirmed inline, copy_locked ×2, is_manual inline, spring_return,
-    exclusive. Captions are bound to the field's own toggle: two fields with
+    Captions are bound to the field's own toggle: two fields with
     equal captions on one page are still told apart.
     """
     user = django_user_model.objects.create_superuser(
@@ -128,7 +128,6 @@ def test_state_flags_render_meaningful_captions(client, django_user_model) -> No
     # Имя, отличное от компании заявки: сигнал лида уже создал карточку «ООО Тест».
     company = Company.objects.create(name="ООО Участники")
     CompanyMember.objects.create(company=company)
-    rule = CompanyManagerRule.objects.create(company_label="ООО Акме", assignee=user)
 
     checks = [
         # url_name, pk, query, field name (inline names carry a prefix), off, on
@@ -141,7 +140,7 @@ def test_state_flags_render_meaningful_captions(client, django_user_model) -> No
         ("catalog_sku_change", sku.pk, "", "is_manual", "Из мануала", "Правлено вручную"),
         ("catalog_analogmap_change", amap.pk, "", "spring_return", "Нет", "Есть"),
         ("crm_company_change", company.pk, "", "is_confirmed", "Не подтверждён", "Подтверждён"),
-        ("leads_companymanagerrule_change", rule.pk, "", "exclusive", "В общей очереди", "Только закреплённые"),
+        ("crm_company_change", company.pk, "", "pin_for_leads", "Не в списке", "Закреплена"),
     ]
     for url_name, pk, query, field, off, on in checks:
         html = client.get(reverse(f"admin:{url_name}", args=[pk]) + query).content.decode()
