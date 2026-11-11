@@ -37,7 +37,7 @@ from crm.work_labels import (
     relevance_label_code,
     relevance_value,
 )
-from leads.services import normalize_company_label
+from leads.services import normalize_company_label, retarget_pin_to_card_owner
 
 logger = setup_logger("hoocon.crm")
 
@@ -601,6 +601,8 @@ def _apply_row(
             _fill_company(org, row, report)
             _claim_company(org, assignee)
             touches = apply_company_profile(org, _profile_from_row(row))
+            if org.company_key:
+                retarget_pin_to_card_owner(org.company_key)
             index.add(org)
             for email in fresh:
                 client = Client(

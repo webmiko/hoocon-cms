@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
@@ -14,11 +15,12 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
+from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
 from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
 from crm.models import Client, EmailAttachment, EmailMessage, EmailStatus, EmailTemplate, InboundMailboxState
-from crm.services import scope_emails_for_manager
+from crm.services import email_templates_for_user, scope_emails_for_manager
 from leads.models import Lead
 from leads.services import lead_visible_to_manager
 
@@ -198,36 +200,109 @@ class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLin
             enqueue_crm_email(obj.pk)
 
 
+class EmailTemplateAdminForm(forms.ModelForm):
+    """Keep a shared template shared unless the author or an unscoped admin restricts it."""
+
+    class Meta:
+        model = EmailTemplate
+        fields = "__all__"
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean()
+        if cleaned is None:
+            return {}
+        visibility = cleaned.get("visibility")
+        if visibility != EmailTemplate.Visibility.AUTHOR:
+            return cleaned
+        request = getattr(self, "request", None)
+        user = getattr(request, "user", None)
+        author_id = self.instance.created_by_id
+        if user is None or not getattr(user, "is_authenticated", False):
+            self.add_error("visibility", "Сохраните шаблон ещё раз из админки.")
+            return cleaned
+        if author_id == user.pk or not self.instance.pk:
+            return cleaned
+        if staff_sees_all_leads(user):
+            return cleaned
+        self.add_error(
+            "visibility",
+            "Чужой или общий шаблон может сузить до себя только его автор или администратор.",
+        )
+        return cleaned
+
+
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(ModelAdmin):
     """Reusable email presets: picked via «Шаблон» on compose forms."""
 
-    list_display = ("name", "subject", "is_active", "sort_order", "updated_at")
+    form = EmailTemplateAdminForm
+    list_display = ("name", "subject", "visibility", "is_active", "sort_order", "created_by", "updated_at")
     list_editable = ("is_active", "sort_order")
-    list_filter = ("is_active",)
+    list_filter = ("is_active", "visibility")
     search_fields = ("name", "subject", "body")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_by", "created_at", "updated_at")
     ordering = ("sort_order", "name")
     fieldsets = (
         (
             None,
             {
-                "fields": ("name", "is_active", "sort_order", "subject", "body"),
+                "fields": ("name", "visibility", "is_active", "sort_order", "subject", "body"),
                 "description": (
                     "Плейсхолдеры {имя}, {компания}, {почта}, {телефон}, {заказ} "
                     "подставляются из карточки клиента или заявки. "
-                    "{заказ} — сообщение и позиции заявки; в письме с карточки клиента берётся последняя заявка."
+                    "{заказ} — сообщение и позиции заявки; в письме с карточки клиента берётся последняя заявка. "
+                    "«Кому видно»: всем менеджерам или только автору."
                 ),
             },
         ),
         (
             "Метаданные",
             {
-                "fields": ("created_at", "updated_at"),
+                "fields": ("created_by", "created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),
     )
+
+    def get_form(
+        self,
+        request: HttpRequest,
+        obj: EmailTemplate | None = None,
+        **kwargs: Any,
+    ) -> type[EmailTemplateAdminForm]:
+        """Bind the current user so visibility checks know the author."""
+        form_class = super().get_form(request, obj, **kwargs)
+
+        class EmailTemplateRequestForm(form_class):  # type: ignore[valid-type,misc]
+            def __init__(self, *args: Any, **form_kwargs: Any) -> None:
+                self.request = request
+                super().__init__(*args, **form_kwargs)
+
+        return EmailTemplateRequestForm
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EmailTemplate]:
+        """Managers see shared templates and their own. Unscoped staff see all."""
+        qs = super().get_queryset(request).select_related("created_by")
+        return email_templates_for_user(request.user, qs)
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: EmailTemplate,
+        form: Any,
+        change: bool,
+    ) -> None:
+        """The first save records the author. A manager cannot claim a colleague's template."""
+        if not change and obj.created_by_id is None:
+            obj.created_by = request.user
+        if obj.visibility == EmailTemplate.Visibility.AUTHOR:
+            if obj.created_by_id is None and staff_sees_all_leads(request.user):
+                obj.created_by = request.user
+            elif obj.created_by_id != request.user.pk and not staff_sees_all_leads(request.user):
+                obj.visibility = EmailTemplate.Visibility.ALL
+            elif obj.created_by_id is None:
+                obj.visibility = EmailTemplate.Visibility.ALL
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(EmailAttachment)

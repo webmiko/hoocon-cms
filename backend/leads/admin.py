@@ -21,10 +21,12 @@ from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db.models import (
     Case,
     Count,
+    Exists,
     IntegerField,
     OuterRef,
     Prefetch,
@@ -58,10 +60,11 @@ from crm.mail_links import (
 )
 from crm.manager_signatures import manager_reply_signature
 from crm.models import Client as CrmClient
-from crm.models import EmailStatus, EmailTemplate
+from crm.models import EmailStatus
 from crm.services import (
     create_lead_reply_email,
     email_template_context_for_lead,
+    email_templates_for_user,
     get_active_email_template,
     render_email_template,
 )
@@ -79,7 +82,7 @@ from leads.channel import (
     phone_label_for_lead,
     temporary_call_name,
 )
-from leads.models import CompanyManagerRule, Lead, LeadItem
+from leads.models import CompanyManagerRule, Lead, LeadItem, ManagerQueueMode
 from leads.rfq_bundle import mark_rfq_bundle_done, rfq_bundle_queryset
 from leads.services import (
     apply_lead_manager_on_save,
@@ -860,7 +863,7 @@ class LeadAdmin(
         change_url = reverse("admin:leads_lead_change", args=[lead.pk])
         author = request.user if request.user.is_authenticated else None
         manager_email = staff_reply_to_email(author)
-        template = get_active_email_template(request.GET.get("template"))
+        template = get_active_email_template(request.GET.get("template"), request.user)
 
         if request.method == "POST":
             form = ComposeEmailForm(request.POST)
@@ -915,7 +918,7 @@ class LeadAdmin(
             "manager_reply_to_email": manager_email,
             "manager_signature_preview": manager_reply_signature(manager_email),
             "lead_change_url": change_url,
-            "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
+            "email_templates": email_templates_for_user(request.user, active_only=True).only("pk", "name"),
             "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/leads/compose_reply.html", context)
@@ -1519,27 +1522,140 @@ class LeadAdmin(
 
 
 @admin.register(CompanyManagerRule)
-class CompanyManagerRuleAdmin(LabeledToggleMixin, ModelAdmin):
-    """Pinned company → manager rules for lead routing.
+class CompanyManagerRuleAdmin(ModelAdmin):
+    """Pinned company → manager rules, listed under each manager.
 
-    Заявка от закреплённой компании назначается выбранному менеджеру
-    в обход общей очереди (и даже при выключенной ротации). Флаг
-    «только закреплённые компании» убирает менеджера из общей очереди.
+    The queue switch is one per manager (``ManagerQueueMode``), drawn once
+    above that manager's companies. A company row only names the company.
     """
 
-    toggle_labels = {"exclusive": ("В общей очереди", "Только закреплённые")}
-
-    list_display = ("company_label", "assignee", "exclusive", "is_active", "updated_at")
-    list_filter = ("is_active", "exclusive")
-    search_fields = ("company_label", "company_key", "assignee__username", "assignee__email")
+    change_list_template = "admin/leads/companymanagerrule/change_list.html"
+    list_display = ("company_label",)
+    list_display_links = ("company_label",)
+    list_filter = ("is_active", "assignee")
+    search_fields = ("company_label", "company_key", "assignee__username", "assignee__email", "assignee__first_name")
     readonly_fields = ("company_key", "created_at", "updated_at")
     fields = (
         "company_label",
         "company_key",
         "assignee",
-        "exclusive",
         "is_active",
         "comment",
         "created_at",
         "updated_at",
     )
+
+    list_per_page = 500
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Companies are pinned from the company card, not by a second card here."""
+        return False
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Group pins by the company card's assignee before the page is built.
+
+        Someone who cannot open the list does not get to rewrite the rows.
+        """
+        if self.has_view_permission(request):
+            from leads.services import align_pinned_rules_to_company_assignee
+
+            align_pinned_rules_to_company_assignee()
+        return super().changelist_view(request, extra_context)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Open the company card when this row belongs to exactly one.
+
+        ``Company.company_key`` is unique. A second match is not guessed at,
+        and the redirect waits until the person may see this row.
+        """
+        if not self.has_view_or_change_permission(request):
+            return super().change_view(request, object_id, form_url, extra_context)
+        from crm.models import Company
+
+        rule = self.get_object(request, object_id)
+        if rule is not None:
+            matches = list(Company.objects.filter(company_key=rule.company_key).only("pk")[:2])
+            if len(matches) == 1:
+                return HttpResponseRedirect(reverse("admin:crm_company_change", args=[matches[0].pk]))
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CompanyManagerRule]:
+        """Load the manager, their queue switch, and whether rotation includes them."""
+        from accounts.roles import GROUP_MANAGER
+
+        in_rotation = (
+            get_user_model()
+            .objects.filter(
+                pk=OuterRef("assignee_id"),
+                is_active=True,
+                is_staff=True,
+                groups__name=GROUP_MANAGER,
+            )
+            .values("pk")
+        )
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("assignee", "assignee__lead_queue_mode")
+            .annotate(assignee_in_rotation=Exists(in_rotation))
+        )
+
+    def get_changelist(self, request: HttpRequest, **kwargs: Any) -> type:
+        """Keep each manager's companies together. Column sort would split the groups."""
+        base = super().get_changelist(request, **kwargs)
+
+        class GroupedByManager(base):  # type: ignore[valid-type,misc]
+            def get_ordering(self, request: HttpRequest, queryset: QuerySet[Any]) -> list[str]:
+                return ["assignee__first_name", "assignee__email", "company_label", "pk"]
+
+        return GroupedByManager
+
+    def get_urls(self) -> list[Any]:
+        """POST target for the one queue switch in a manager's group header."""
+        custom = [
+            path(
+                "queue-mode/",
+                self.admin_site.admin_view(self.queue_mode_view),
+                name="leads_companymanagerrule_queue_mode",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def queue_mode_view(self, request: HttpRequest) -> HttpResponse:
+        """Save «только закреплённые» for one manager, not for one company."""
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        raw_id = str(request.POST.get("assignee") or "").strip()
+        if not raw_id.isdigit():
+            raise PermissionDenied
+        from accounts.roles import GROUP_MANAGER
+
+        assignee = (
+            get_user_model()
+            .objects.filter(
+                pk=int(raw_id),
+                is_active=True,
+                is_staff=True,
+                groups__name=GROUP_MANAGER,
+            )
+            .first()
+        )
+        if assignee is None:
+            raise PermissionDenied
+        ManagerQueueMode.objects.update_or_create(
+            assignee=assignee,
+            defaults={"pinned_only": request.POST.get("pinned_only") == "1"},
+        )
+        return HttpResponseRedirect(reverse("admin:leads_companymanagerrule_changelist"))

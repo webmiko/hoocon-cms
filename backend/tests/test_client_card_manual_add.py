@@ -10,7 +10,7 @@ from django.test import Client as DjangoClient
 from django.urls import reverse
 
 from crm.models import Client
-from tests.test_admin_scope_hardening import _admin_change_post
+from tests.admin_form import _admin_change_post
 
 
 def _staff(username: str, *codenames: str) -> User:

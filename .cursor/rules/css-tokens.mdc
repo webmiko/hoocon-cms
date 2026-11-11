@@ -1,0 +1,38 @@
+---
+description: Стили — без дублей селекторов, только существующие CSS-константы
+globs: "**/*.{css,scss}"
+alwaysApply: false
+---
+
+# Стили: константы, без второго правила
+
+Перед правкой CSS проверь файл. Новое свойство берётся из уже объявленной переменной. Второй блок на тот же узел не добавляется.
+
+## Перед правкой
+
+1. Найди селектор в файле. Правишь его, а не копируешь ниже.
+2. Цвет, радиус, отступ, кегль — из токенов этого файла (`:root` / `.dark`) или из `frontend` `tokens.css`.
+3. Старый блок, который вёрстка больше не использует, удали в той же правке.
+
+Админка: `backend/static/admin/css/hoocon-unfold-extras.css` — `--hoocon-ink`, `--hoocon-surface`, `--hoocon-surface-muted`, `--hoocon-hairline`, `--hoocon-radius`, `--hoocon-radius-btn-sm`, `--hoocon-card-pad`, `--hoocon-chip-pad`, `--hoocon-chip-font`, `--hoocon-row-label`, `--hoocon-row-sub`, `--hoocon-quiet`, `--hoocon-group-inset`, `--hoocon-section-gap`.
+
+## Нельзя
+
+```css
+/* ❌ свой радиус и запасной hex рядом с токеном */
+border-radius: 0.75rem;
+color: var(--hoocon-ink, #2a2a2a);
+background: #f4f4f5;
+
+/* ❌ старое правило осталось, новое написано ниже */
+.block { padding: 1rem; }
+.block { padding: var(--hoocon-card-pad); }
+```
+
+```css
+/* ✅ */
+border-radius: var(--hoocon-radius);
+color: var(--hoocon-ink);
+background: var(--hoocon-surface-muted);
+padding: var(--hoocon-card-pad);
+```

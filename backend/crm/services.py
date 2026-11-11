@@ -585,19 +585,62 @@ def scope_spec_lists_for_manager(queryset: QuerySet[Any], user: Any) -> QuerySet
     return queryset.filter(account_id__in=account_ids)
 
 
-def get_active_email_template(template_id: str | int | None) -> EmailTemplate | None:
+def email_templates_for_user(
+    user: Any,
+    queryset: QuerySet[EmailTemplate] | None = None,
+    *,
+    active_only: bool = False,
+) -> QuerySet[EmailTemplate]:
+    """Templates this staff user may see in Admin and in the compose picker.
+
+    A manager sees shared templates and their own author-only ones.
+    Superuser, «Админ» and «Аналитик» see every template. An anonymous
+    user sees nothing. An unknown user (``None``) sees only shared templates,
+    so a forgotten caller cannot pull a private draft.
+
+    Args:
+        user: staff user, anonymous user, or None.
+        queryset: optional base queryset (admin may already have select_related).
+        active_only: when True, drop inactive templates (compose picker).
+
+    Returns:
+        Filtered EmailTemplate queryset.
+    """
+    from accounts.roles import staff_sees_all_leads
+
+    qs = EmailTemplate.objects.all() if queryset is None else queryset
+    if active_only:
+        qs = qs.filter(is_active=True)
+    if user is not None and staff_sees_all_leads(user):
+        return qs
+    if user is None:
+        return qs.filter(visibility=EmailTemplate.Visibility.ALL)
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return qs.none()
+    return qs.filter(
+        Q(visibility=EmailTemplate.Visibility.ALL)
+        | Q(visibility=EmailTemplate.Visibility.AUTHOR, created_by_id=user.pk),
+    )
+
+
+def get_active_email_template(
+    template_id: str | int | None,
+    user: Any | None = None,
+) -> EmailTemplate | None:
     """Active EmailTemplate picked in a compose form (``?template=<pk>``).
 
     Args:
         template_id: raw GET/POST value (str/int/None).
+        user: staff user. None keeps shared templates only, so a private
+            template cannot be loaded by guessing its id without a user.
 
     Returns:
-        EmailTemplate instance or None when missing/inactive/malformed.
+        EmailTemplate instance or None when missing, inactive, hidden, or malformed.
     """
     raw = str(template_id or "").strip()
     if not raw.isdigit():
         return None
-    return EmailTemplate.objects.filter(pk=int(raw), is_active=True).first()
+    return email_templates_for_user(user, active_only=True).filter(pk=int(raw)).first()
 
 
 def email_template_context_for_client(client: Client, user: Any | None = None) -> dict[str, str]:

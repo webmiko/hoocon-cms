@@ -359,7 +359,14 @@ class EmailTemplate(models.Model):
     Placeholders ``{имя}``, ``{компания}``, ``{почта}``, ``{телефон}`` are
     substituted from the client card / lead contact when the template is
     applied (see ``crm.services.render_email_template``).
+
+    ``visibility`` is either every manager or the author only. Staff who see
+    all CRM cards (superuser, «Админ», «Аналитик») still see every template.
     """
+
+    class Visibility(models.TextChoices):
+        ALL = "all", "Всем менеджерам"
+        AUTHOR = "author", "Только автору"
 
     name: models.CharField = models.CharField(
         "название",
@@ -382,6 +389,25 @@ class EmailTemplate(models.Model):
         "активен",
         default=True,
         db_index=True,
+    )
+    visibility: models.CharField = models.CharField(
+        "кому видно",
+        max_length=16,
+        choices=Visibility.choices,
+        default=Visibility.ALL,
+        db_index=True,
+        help_text=(
+            "«Только автору» скрывает шаблон от других менеджеров. "
+            "Администратор и аналитик по-прежнему видят все шаблоны."
+        ),
+    )
+    created_by: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="crm_email_templates",
+        verbose_name="автор",
     )
     sort_order: models.PositiveSmallIntegerField = models.PositiveSmallIntegerField(
         "порядок",

@@ -14,7 +14,7 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin
-from config.admin_toggle import LabeledToggleMixin
+from config.admin_toggle import HooconToggleInput, LabeledToggleMixin
 from crm.admin.filters import WorkQueueFilter
 from crm.admin.inline_extra import OneBlankInlineRowMixin
 from crm.admin.list_view import remember_list_view
@@ -130,10 +130,39 @@ class CompanyMemberInline(LabeledToggleMixin, OneBlankInlineRowMixin, TabularInl
 class CompanyAdminForm(forms.ModelForm):
     """Phone is one input per number. The column still stores them together."""
 
+    pin_for_leads = forms.BooleanField(
+        required=False,
+        label="В списке закреплённых",
+        help_text=(
+            "Заявки с этим названием пойдут ответственному. "
+            "Отдельная карточка в разделе «Закреплённые компании» не создаётся."
+        ),
+        widget=HooconToggleInput(labels=("Не в списке", "Закреплена")),
+    )
+
     class Meta:
         model = Company
         fields = "__all__"
         widgets = {"phone": MultiPhoneWidget()}
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        company = self.instance
+        if not company.pk:
+            return
+        from leads.models import CompanyManagerRule
+
+        key = company.company_key
+        already = bool(key) and CompanyManagerRule.objects.filter(company_key=key).exists()
+        self.fields["pin_for_leads"].initial = already
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean()
+        if cleaned is None:
+            return {}
+        if cleaned.get("pin_for_leads") and not cleaned.get("assignee"):
+            self.add_error("pin_for_leads", "Сначала выберите ответственного — без него компанию не за кем закрепить.")
+        return cleaned
 
 
 @admin.register(Company)
@@ -177,9 +206,18 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
         (
             "Работа",
             {
-                "fields": ("niche", "relevance", "assignee", "next_contact_at", "work_labels", "comment"),
+                "fields": (
+                    "niche",
+                    "relevance",
+                    "assignee",
+                    "pin_for_leads",
+                    "next_contact_at",
+                    "work_labels",
+                    "comment",
+                ),
                 "description": (
                     "«Следующий контакт» — напоминание по фирме. "
+                    "«В списке закреплённых» ставит эту же карточку в очередь заявок ответственного. "
                     "Плановый звонок на дату ставьте в таблице «Плановые звонки» ниже — он попадёт в блок «Сегодня»."
                 ),
             },
@@ -261,12 +299,30 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
         return readonly
 
     def save_model(self, request: HttpRequest, obj: Company, form: Any, change: bool) -> None:
-        """Keep the stored owner when a manager saves a company that is not theirs."""
-        if change and obj.pk and not staff_sees_all_leads(request.user):
-            stored_id = Company.objects.filter(pk=obj.pk).values_list("assignee_id", flat=True).first()
-            if stored_id not in (None, request.user.pk):
-                obj.assignee_id = stored_id
+        """Keep the stored owner when a manager saves a company that is not theirs.
+
+        Pinning for lead routing follows the company card. A manager does not
+        retarget a company that already belongs to someone else.
+        """
+        from leads.services import sync_company_pin
+
+        previous_key = ""
+        owns_pin = True
+        if change and obj.pk:
+            stored = Company.objects.filter(pk=obj.pk).values_list("company_key", "assignee_id").first()
+            if stored is not None:
+                previous_key = stored[0] or ""
+                if not staff_sees_all_leads(request.user) and stored[1] not in (None, request.user.pk):
+                    obj.assignee_id = stored[1]
+                    owns_pin = False
         super().save_model(request, obj, form, change)
+        if not owns_pin:
+            return
+        sync_company_pin(
+            obj,
+            pinned=bool(form.cleaned_data.get("pin_for_leads")),
+            previous_key=previous_key,
+        )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Company]:
         from django.db.models import Count
@@ -289,9 +345,14 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
     @admin.action(description="Назначить меня ответственным", permissions=["change"])
     def assign_to_me(self, request: HttpRequest, queryset: QuerySet[Company]) -> None:
         """Claim a company with no manager. One that already has an owner stays theirs."""
+        from leads.services import retarget_pin_to_card_owner
+
         mine = getattr(request.user, "pk", None)
         claimable = queryset.none()
         if mine is not None:
             claimable = queryset.filter(Q(assignee_id=None) | Q(assignee_id=mine))
+        keys = list(claimable.values_list("company_key", flat=True))
         updated = claimable.update(assignee=request.user)
+        for key in keys:
+            retarget_pin_to_card_owner(key)
         self.message_user(request, f"Назначено компаний: {updated}.", messages.SUCCESS)

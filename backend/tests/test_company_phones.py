@@ -223,7 +223,7 @@ def test_company_card_gives_each_new_planned_call_its_own_key(client: Any) -> No
 
     from crm.models import PlannedTouch
     from crm.outreach import touch_dedupe_key
-    from tests.test_admin_scope_hardening import _admin_change_post
+    from tests.admin_form import _admin_change_post
 
     user = get_user_model().objects.create_superuser("call-key", "call-key@example.com", "password12")
     org = Company.objects.create(name="Карточка звонков")

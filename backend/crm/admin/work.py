@@ -136,8 +136,11 @@ class PlannedTouchAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, ModelAdmin):
         touch.assignee = request.user
         touch.save(update_fields=["assignee"])
         if touch.company_id and touch.company.assignee_id is None:
+            from leads.services import retarget_pin_to_card_owner
+
             touch.company.assignee = request.user
             touch.company.save(update_fields=["assignee"])
+            retarget_pin_to_card_owner(touch.company.company_key)
         messages.success(request, "Вы взяли звонок.")
         return redirect("admin:index")
 

@@ -13,7 +13,12 @@ from django.urls import reverse
 from accounts.roles import GROUP_MANAGER
 from accounts.services import ensure_staff_groups
 from crm.models import Client, EmailTemplate
-from crm.services import email_template_context_for_client, email_template_context_for_lead, render_email_template
+from crm.services import (
+    email_template_context_for_client,
+    email_template_context_for_lead,
+    get_active_email_template,
+    render_email_template,
+)
 from leads.models import Lead, LeadItem
 
 
@@ -272,6 +277,143 @@ def test_manager_group_gets_email_template_perms(django_user_model) -> None:
     assert mgr.has_perm("crm.add_emailtemplate")
     assert mgr.has_perm("crm.change_emailtemplate")
     assert not mgr.has_perm("crm.delete_emailtemplate")
+
+
+def _manager(django_user_model, username: str):
+    """Staff user in group «Менеджер»."""
+    ensure_staff_groups()
+    user = django_user_model.objects.create_user(username=username, password="x", is_staff=True, is_active=True)
+    user.groups.add(Group.objects.get(name=GROUP_MANAGER))
+    return user
+
+
+@pytest.mark.django_db
+def test_author_only_template_is_hidden_from_other_managers(django_user_model) -> None:
+    """Личный шаблон не виден коллеге в списке, в письме и по прямой ссылке на id."""
+    author = _manager(django_user_model, "tpl-author")
+    colleague = _manager(django_user_model, "tpl-other")
+    private = EmailTemplate.objects.create(
+        name="Личный черновик Людмилы",
+        subject="Секретно {компания}",
+        body="Текст только для автора.",
+        visibility=EmailTemplate.Visibility.AUTHOR,
+        created_by=author,
+    )
+    shared = EmailTemplate.objects.create(
+        name="Общий шаблон",
+        subject="Общая тема",
+        body="Общий текст.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    lead = Lead.objects.create(
+        name="Мария",
+        email="maria-vis@example.com",
+        company="ООО Луч",
+        message="Нужно КП",
+        status=Lead.LeadStatus.NEW,
+    )
+    http = HttpClient()
+    compose = reverse("admin:leads_lead_compose_reply", args=[lead.pk])
+    listing = reverse("admin:crm_emailtemplate_changelist")
+
+    http.force_login(colleague)
+    colleague_list = http.get(listing)
+    assert colleague_list.status_code == 200
+    colleague_html = colleague_list.content.decode()
+    assert "Личный черновик Людмилы" not in colleague_html
+    assert "Общий шаблон" in colleague_html
+    hidden = http.get(compose, {"template": private.pk})
+    assert hidden.status_code == 200
+    hidden_html = hidden.content.decode()
+    assert "Текст только для автора." not in hidden_html
+    assert "Секретно" not in hidden_html
+    assert "Личный черновик Людмилы" not in hidden_html
+    assert "Общий шаблон" in hidden_html
+    change_url = reverse("admin:crm_emailtemplate_change", args=[private.pk])
+    change = http.get(change_url, follow=True)
+    change_html = change.content.decode()
+    assert "Текст только для автора." not in change_html
+    assert "Личный черновик Людмилы" not in change_html
+    stolen = http.post(
+        change_url,
+        {
+            "name": "Перехвачено",
+            "subject": "Чужая тема",
+            "body": "Чужой текст.",
+            "is_active": "on",
+            "sort_order": "0",
+            "visibility": EmailTemplate.Visibility.ALL,
+        },
+        follow=True,
+    )
+    assert "Чужой текст." not in stolen.content.decode()
+    private.refresh_from_db()
+    assert private.name == "Личный черновик Людмилы"
+    assert private.body == "Текст только для автора."
+    assert private.visibility == EmailTemplate.Visibility.AUTHOR
+    assert get_active_email_template(private.pk, colleague) is None
+    assert get_active_email_template(private.pk) is None
+    assert get_active_email_template(shared.pk, colleague) is not None
+
+    http.force_login(author)
+    own_list = http.get(listing).content.decode()
+    assert "Личный черновик Людмилы" in own_list
+    own_compose = http.get(compose, {"template": private.pk}).content.decode()
+    assert "Текст только для автора." in own_compose
+    assert "Личный черновик Людмилы" in own_compose
+    assert get_active_email_template(private.pk, author) is not None
+
+
+@pytest.mark.django_db
+def test_manager_cannot_make_a_colleague_template_private(django_user_model) -> None:
+    """Чужой общий шаблон нельзя переключить на «только автору»."""
+    author = _manager(django_user_model, "tpl-owner")
+    colleague = _manager(django_user_model, "tpl-claimer")
+    shared = EmailTemplate.objects.create(
+        name="Общее письмо",
+        subject="Тема",
+        body="Текст общего письма.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(colleague)
+    url = reverse("admin:crm_emailtemplate_change", args=[shared.pk])
+    response = http.post(
+        url,
+        {
+            "name": shared.name,
+            "subject": shared.subject,
+            "body": shared.body,
+            "is_active": "on",
+            "sort_order": "0",
+            "visibility": EmailTemplate.Visibility.AUTHOR,
+        },
+    )
+    assert response.status_code == 200
+    assert "только его автор" in response.content.decode()
+    shared.refresh_from_db()
+    assert shared.visibility == EmailTemplate.Visibility.ALL
+    assert shared.created_by_id == author.pk
+
+
+@pytest.mark.django_db
+def test_unscoped_staff_sees_author_only_template(django_user_model) -> None:
+    """Администратор видит личный шаблон менеджера, чтобы его можно было найти."""
+    author = _manager(django_user_model, "tpl-private-author")
+    admin = _superuser(django_user_model, "tpl-private-admin")
+    EmailTemplate.objects.create(
+        name="Скрытый от менеджеров",
+        subject="Тема",
+        body="Личный текст.",
+        visibility=EmailTemplate.Visibility.AUTHOR,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(admin)
+    html = http.get(reverse("admin:crm_emailtemplate_changelist")).content.decode()
+    assert "Скрытый от менеджеров" in html
 
 
 def test_compose_template_picker_controls_are_shaped() -> None:
