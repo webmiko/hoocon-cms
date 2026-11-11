@@ -58,10 +58,11 @@ from crm.mail_links import (
 )
 from crm.manager_signatures import manager_reply_signature
 from crm.models import Client as CrmClient
-from crm.models import EmailStatus, EmailTemplate
+from crm.models import EmailStatus
 from crm.services import (
     create_lead_reply_email,
     email_template_context_for_lead,
+    email_templates_for_user,
     get_active_email_template,
     render_email_template,
 )
@@ -860,7 +861,7 @@ class LeadAdmin(
         change_url = reverse("admin:leads_lead_change", args=[lead.pk])
         author = request.user if request.user.is_authenticated else None
         manager_email = staff_reply_to_email(author)
-        template = get_active_email_template(request.GET.get("template"))
+        template = get_active_email_template(request.GET.get("template"), request.user)
 
         if request.method == "POST":
             form = ComposeEmailForm(request.POST)
@@ -915,7 +916,7 @@ class LeadAdmin(
             "manager_reply_to_email": manager_email,
             "manager_signature_preview": manager_reply_signature(manager_email),
             "lead_change_url": change_url,
-            "email_templates": EmailTemplate.objects.filter(is_active=True).only("pk", "name"),
+            "email_templates": email_templates_for_user(request.user, active_only=True).only("pk", "name"),
             "selected_template_id": template.pk if template else None,
         }
         return render(request, "admin/leads/compose_reply.html", context)
