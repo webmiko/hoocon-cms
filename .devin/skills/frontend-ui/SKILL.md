@@ -18,3 +18,7 @@ description: Публичный UI hoocon-cms — вёрстка, CSS, шабл�
   brand-control подпись только белая в обеих темах: токены
   `--color-on-brand-control` / `--color-on-brand-fill`,
   `data-brand-fill` на submit/ссылках.
+- `.cursor/rules/css-tokens.mdc` — в Devin каталог `.cursor/rules` сам
+  не подключается. Перед правкой CSS прочитай это правило: не копировать
+  селектор, брать уже объявленные токены, удалять блок, который вёрстка
+  больше не использует.
