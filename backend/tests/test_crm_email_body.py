@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from crm.email_body import html_email_to_plain, is_html_email_body
+import re
+
+import pytest
+from django.urls import reverse
+
+from crm.email_body import email_body_for_reading, html_email_to_plain, is_html_email_body
 from crm.manager_signatures import (
     assemble_lead_reply_body,
     manager_reply_signature,
     manager_reply_signature_html,
 )
+from crm.models import Client, EmailMessage, EmailStatus
 
 
 def test_is_html_email_body_detects_rich_text() -> None:
@@ -19,9 +25,121 @@ def test_is_html_email_body_detects_rich_text() -> None:
 def test_html_email_to_plain_strips_markup() -> None:
     """Multipart alternative includes a readable plain body."""
     plain = html_email_to_plain("<p><strong>КП</strong><br>готово</p>")
-    assert "КП" in plain
-    assert "готово" in plain
+    assert plain == "КП\nготово"
     assert "<" not in plain
+
+
+def test_html_email_to_plain_keeps_paragraphs_and_decodes_entities() -> None:
+    """Letter-card text is paragraphs, not tags or &nbsp;."""
+    plain = html_email_to_plain("<p><p>Здравствуйте, Владимир!</p><p>Каталог:&nbsp;https://hoocon.ru/catalog</p>")
+    assert plain == "Здравствуйте, Владимир!\n\nКаталог: https://hoocon.ru/catalog"
+
+
+def test_html_email_to_plain_keeps_link_address() -> None:
+    """A link stays readable when the tags are removed."""
+    plain = html_email_to_plain('<p>Можно <a href="https://hoocon.ru/catalog">открыть каталог</a>.</p>')
+    assert plain == "Можно открыть каталог (https://hoocon.ru/catalog)."
+
+
+def test_email_body_for_reading_leaves_plain_text() -> None:
+    """Ordinary letters are not rewritten."""
+    text = "Добрый день!\n\nСчёт во вложении."
+    assert email_body_for_reading(text) == text
+
+
+def test_email_body_for_reading_strips_img_and_iframe() -> None:
+    """Inbound plain that is not a <p> still must not keep active tags."""
+    text = email_body_for_reading(
+        'Смотрите <img src="x" onerror="alert(1)"> и <iframe src="https://evil.test"></iframe> конец'
+    )
+    assert text == "Смотрите  и  конец"
+    assert "<" not in text
+    assert "onerror" not in text
+
+
+def test_html_email_to_plain_strips_tags_restored_by_unescape() -> None:
+    """&lt;script&gt; must not become a live tag after entity decoding."""
+    plain = html_email_to_plain("<p>Текст &lt;script&gt;alert(1)&lt;/script&gt;</p>")
+    assert plain == "Текст alert(1)"
+    assert "<" not in plain
+
+
+_CARD_HTML = "<p><p>Здравствуйте, Владимир!</p><p>Каталог:&nbsp;https://hoocon.ru/catalog</p>"
+_CARD_PLAIN = "Здравствуйте, Владимир!\n\nКаталог: https://hoocon.ru/catalog"
+
+
+@pytest.mark.django_db
+def test_email_change_form_shows_body_without_tags(client, django_user_model) -> None:
+    """Карточка письма показывает текст, а не HTML-теги в textarea."""
+    user = django_user_model.objects.create_user(
+        username="crm-body-plain",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Владимир", email="buyer@example.com")
+    msg = EmailMessage.objects.create(
+        client=crm_client,
+        to_email="buyer@example.com",
+        from_email="assistant@hoocon.ru",
+        subject="После выставки",
+        body=_CARD_HTML,
+        status=EmailStatus.SENT,
+    )
+    client.force_login(user)
+    html = client.get(reverse("admin:crm_emailmessage_change", args=[msg.pk])).content.decode()
+    match = re.search(r'<textarea[^>]*\bname="body"[^>]*>(.*?)</textarea>', html, re.DOTALL)
+    assert match is not None
+    shown = match.group(1)
+    assert shown == _CARD_PLAIN
+    assert "<p>" not in shown
+    assert "&lt;p&gt;" not in shown
+    assert "&nbsp;" not in shown
+
+
+@pytest.mark.django_db
+def test_email_change_form_saves_body_without_tags(client, django_user_model) -> None:
+    """Сохранение карточки не оставляет в теле вставленный HTML."""
+    user = django_user_model.objects.create_user(
+        username="crm-body-save",
+        password="test-pass-not-secret",
+        is_staff=True,
+        is_superuser=True,
+    )
+    crm_client = Client.objects.create(name="Владимир", email="buyer-save@example.com")
+    msg = EmailMessage.objects.create(
+        client=crm_client,
+        to_email="buyer-save@example.com",
+        from_email="assistant@hoocon.ru",
+        subject="После выставки",
+        body="Черновик",
+        status=EmailStatus.DRAFT,
+    )
+    client.force_login(user)
+    url = reverse("admin:crm_emailmessage_change", args=[msg.pk])
+    page = client.get(url).content.decode()
+    management = {
+        name: value
+        for name, value in re.findall(r'<input type="hidden" name="([^"]+)" value="([^"]*)"', page)
+        if "-TOTAL_FORMS" in name or "-INITIAL_FORMS" in name or "-MIN_NUM_FORMS" in name or "-MAX_NUM_FORMS" in name
+    }
+    response = client.post(
+        url,
+        {
+            "client": crm_client.pk,
+            "status": EmailStatus.DRAFT,
+            "to_email": "buyer-save@example.com",
+            "reply_to_email": "",
+            "lead": "",
+            "subject": "После выставки",
+            "body": _CARD_HTML,
+            **management,
+        },
+    )
+    assert response.status_code == 302, response.content.decode()[:1500]
+    msg.refresh_from_db()
+    assert msg.body == _CARD_PLAIN
+    assert "<" not in msg.body
 
 
 def test_manager_reply_signature_html_linkifies_phone_and_email() -> None:

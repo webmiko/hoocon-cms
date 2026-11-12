@@ -146,6 +146,30 @@ def test_fetch_creates_inbound_linked_to_existing_client(_imap: dict[int, bytes]
 
 
 @pytest.mark.django_db
+def test_fetch_stores_html_plain_part_without_tags(_imap: dict[int, bytes]) -> None:
+    """text/plain that is HTML source is stored as readable text, not tags."""
+    Client.objects.create(email="buyer@example.test", name="Buyer")
+    raw = StdEmailMessage()
+    raw["Message-ID"] = "<html-plain@t>"
+    raw["From"] = "Buyer <buyer@example.test>"
+    raw["To"] = "sales@hoocon.ru"
+    raw["Subject"] = "HTML в plain"
+    raw["Date"] = "Mon, 06 Oct 2026 10:00:00 +0300"
+    raw.set_content(
+        "<p>Здравствуйте!</p><p>Каталог:&nbsp;https://hoocon.ru/catalog</p>",
+        subtype="plain",
+    )
+    _imap[21] = raw.as_bytes()
+
+    fetch_inbound_email()
+
+    row = EmailMessage.objects.get(message_id="<html-plain@t>")
+    assert row.body == "Здравствуйте!\n\nКаталог: https://hoocon.ru/catalog"
+    assert "<" not in row.body
+    assert "&nbsp;" not in row.body
+
+
+@pytest.mark.django_db
 def test_fetch_dedup_by_message_id(_imap: dict[int, bytes]) -> None:
     """Same Message-ID fetched twice → single row, second run counts dup."""
     Client.objects.create(email="buyer@example.test", name="B")
