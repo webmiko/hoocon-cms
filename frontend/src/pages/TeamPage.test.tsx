@@ -49,6 +49,7 @@ describe("TeamPage", () => {
     expect(container.textContent).toContain("+7 (499) 995-12-77 доб. 203");
     expect(container.textContent).toContain("alexander@hoocon.ru");
     expect(container.textContent).toContain("larisa@hoocon.ru");
+    expect(container.textContent).toContain("8 800 350-58-98");
     expect(container.textContent).not.toContain("495");
 
     const cardLinks = Array.from(container.querySelectorAll('a[href^="/komanda/"]')).map((link) =>

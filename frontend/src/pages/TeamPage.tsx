@@ -8,6 +8,8 @@ import { Seo } from "../components/Seo";
 import {
   formatStaffPhone,
   mailHref,
+  RUSSIA_TOLL_FREE_LABEL,
+  russiaTollFreeHref,
   staffPhoneHref,
   STAFF_CARDS,
   type StaffCard,
@@ -69,6 +71,9 @@ function PersonCard({ card }: { card: StaffCard }) {
       <ul className={styles.contacts}>
         <li>
           <a href={staffPhoneHref(card)}>{formatStaffPhone(card)}</a>
+        </li>
+        <li>
+          <a href={russiaTollFreeHref()}>{RUSSIA_TOLL_FREE_LABEL}</a>
         </li>
         <li>
           <a href={mailHref(card.email)}>{card.email}</a>

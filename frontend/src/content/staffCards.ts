@@ -10,6 +10,10 @@ const CRLF = "\r\n";
 /** UIS city number, E.164. Same line for every extension. */
 const UIS_CITY_PHONE = "+74999951277";
 
+/** Shared Russia toll-free line, as printed on the site. */
+export const RUSSIA_TOLL_FREE_E164 = "+78003505898";
+export const RUSSIA_TOLL_FREE_LABEL = "8 800 350-58-98";
+
 export type StaffCard = {
   slug: string;
   givenName: string;
@@ -85,6 +89,10 @@ export function formatRuPhone(e164: string): string {
 
 export function phoneHref(e164: string): string {
   return `tel:${e164}`;
+}
+
+export function russiaTollFreeHref(): string {
+  return phoneHref(RUSSIA_TOLL_FREE_E164);
 }
 
 /** Number as printed, including «доб. …» when the card has an extension. */
@@ -191,6 +199,7 @@ export function staffVCard(card: StaffCard): string {
     "ORG:HOOCON",
     `TITLE:${escapeVCard(card.role)}`,
     telLine(card),
+    `TEL;TYPE=TOLL-FREE,VOICE:${RUSSIA_TOLL_FREE_E164}`,
     `EMAIL;TYPE=INTERNET:${card.email}`,
     `URL:${card.websiteUrl}`,
     ...(note ? [`NOTE:${escapeVCard(note)}`] : []),

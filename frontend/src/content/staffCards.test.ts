@@ -34,6 +34,7 @@ describe("staff card for Людмила Попова", () => {
     expect(body.startsWith("BEGIN:VCARD\r\n")).toBe(true);
     expect(body).toContain("FN:Людмила Попова");
     expect(body).toContain("TEL;TYPE=CELL,VOICE:+79957807018");
+    expect(body).toContain("TEL;TYPE=TOLL-FREE,VOICE:+78003505898");
     expect(body).toContain("EMAIL;TYPE=INTERNET:assistant@hoocon.ru");
     expect(body).toContain("WeChat: ludmilapopova");
     expect(body.endsWith("END:VCARD\r\n")).toBe(true);

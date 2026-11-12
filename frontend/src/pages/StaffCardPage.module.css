@@ -158,7 +158,7 @@
 
 .qr {
   order: 6;
-  width: min(15.5rem, 68%, 30dvh);
+  width: min(15.5rem, 68%, 26dvh);
   height: auto;
   margin-top: clamp(0.4rem, 1.2dvh, 1.35rem);
   color: var(--staff-ink);

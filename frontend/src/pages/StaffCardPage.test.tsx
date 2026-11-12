@@ -45,6 +45,7 @@ describe("StaffCardPage", () => {
     );
     expect(hrefs).toEqual([
       "tel:+79957807018",
+      "tel:+78003505898",
       "mailto:assistant@hoocon.ru",
       "https://t.me/+79957807018",
       "https://wa.me/79957807018",
@@ -101,12 +102,14 @@ describe("StaffCardPage", () => {
     );
     expect(hrefs).toEqual([
       "tel:+74999951277,202",
+      "tel:+78003505898",
       "mailto:alexander@hoocon.ru",
       "https://www.hoocon.ru",
     ]);
     expect(container.querySelector("h1 span")?.textContent).toBe("Александр");
     expect(container.textContent).toContain("Шевченко");
     expect(container.textContent).toContain("+7 (499) 995-12-77 доб. 202");
+    expect(container.textContent).toContain("8 800 350-58-98");
     expect(container.textContent).not.toContain("495");
     expect(container.textContent).not.toContain("Telegram");
     expect(container.textContent).not.toContain("WhatsApp");

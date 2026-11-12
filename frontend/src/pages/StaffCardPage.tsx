@@ -10,6 +10,8 @@ import {
   formatRuPhone,
   formatStaffPhone,
   mailHref,
+  RUSSIA_TOLL_FREE_LABEL,
+  russiaTollFreeHref,
   staffCardBySlug,
   staffFullName,
   staffPhoneHref,
@@ -120,6 +122,12 @@ function Card({ card }: { card: StaffCard }) {
               <a className={styles.row} href={staffPhoneHref(card)}>
                 <PhoneIcon />
                 <span className={styles.label}>{phone}</span>
+              </a>
+            </li>
+            <li>
+              <a className={styles.row} href={russiaTollFreeHref()}>
+                <PhoneIcon />
+                <span className={styles.label}>{RUSSIA_TOLL_FREE_LABEL}</span>
               </a>
             </li>
             <li>
