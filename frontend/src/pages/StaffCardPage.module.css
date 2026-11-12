@@ -1,0 +1,279 @@
+/*
+ * Locked light card, even when the site theme is dark.
+ * Colours live on .page so the rest of the file does not repeat hex.
+ * Must fit without vertical scroll from iPhone 13 portrait (390×844).
+ * From 960px the card lies sideways, like the 90×50 print.
+ */
+
+.page {
+  --staff-bg: #ffffff;
+  --staff-ink: #111111;
+  --staff-ink-soft: #222222;
+  --staff-muted: #4a4a4a;
+  --staff-line: #e4e4e4;
+  --staff-hairline: #d5d5d5;
+  --staff-brand: #da0e2b;
+  --staff-brand-hover: #b80c24;
+  --staff-hover: rgba(218, 14, 43, 0.06);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  background: var(--staff-bg);
+  color: var(--staff-ink);
+  color-scheme: light;
+}
+
+.page a:hover,
+.page a:active,
+.page button:hover,
+.page button:active {
+  transform: none;
+}
+
+.card {
+  width: min(26rem, 100%);
+  margin: 0 auto;
+  padding: clamp(0.75rem, 2.2dvh, 2.75rem) 1.15rem clamp(0.5rem, 1.6dvh, 2rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Phone: wrappers disappear so the pieces stay in the vertical card order. */
+.identity,
+.side {
+  display: contents;
+}
+
+.logo {
+  order: 1;
+  width: min(12.25rem, 58%);
+  height: auto;
+  margin-bottom: clamp(0.55rem, 1.6dvh, 1.75rem);
+}
+
+.name {
+  order: 2;
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 6.2vw, 2.05rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--staff-ink);
+  /* Global h1 uses text-wrap: balance, which splits a two-word name in half. */
+  text-wrap: wrap;
+}
+
+.given {
+  font-weight: 700;
+}
+
+.role {
+  order: 3;
+  margin: 0.3rem 0 0;
+  max-width: 22rem;
+  font-size: 1rem;
+  line-height: 1.25;
+  color: var(--staff-ink-soft);
+}
+
+.rule {
+  order: 4;
+  width: 3.25rem;
+  height: 1px;
+  margin: clamp(0.45rem, 1.2dvh, 1.15rem) 0 clamp(0.35rem, 1dvh, 1rem);
+  border: 0;
+  background: var(--staff-hairline);
+}
+
+.list {
+  order: 5;
+  width: min(100%, 22rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  text-align: left;
+}
+
+.row,
+.save {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0.15rem 0.35rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--staff-ink);
+  font: inherit;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  text-align: left;
+  text-decoration: none;
+}
+
+.row:link,
+.row:visited,
+.row:hover,
+.row:active,
+.save,
+.save:hover,
+.save:active {
+  color: var(--staff-ink);
+  text-decoration: none;
+  transform: none;
+}
+
+.row:hover,
+.save:hover {
+  background: var(--staff-hover);
+}
+
+.icon {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--staff-brand);
+}
+
+.label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.qr {
+  order: 6;
+  width: min(15.5rem, 68%, 30dvh);
+  height: auto;
+  margin-top: clamp(0.4rem, 1.2dvh, 1.35rem);
+  color: var(--staff-ink);
+}
+
+.caption {
+  order: 7;
+  margin: 0.4rem 0 0;
+  max-width: 16rem;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  color: var(--staff-muted);
+}
+
+.save {
+  order: 8;
+  width: auto;
+  margin-top: 0.2rem;
+  padding: 0.35rem 0.9rem;
+  color: var(--staff-brand);
+  font-weight: 600;
+  justify-content: center;
+}
+
+.save:hover,
+.save:active,
+.save:focus-visible {
+  color: var(--staff-brand-hover);
+}
+
+.missing {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.missing a:link,
+.missing a:visited {
+  color: var(--staff-brand);
+}
+
+@media (min-width: 960px) {
+  .person {
+    width: min(58rem, calc(100% - 3rem));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(14rem, 17rem);
+    column-gap: 0;
+    align-items: center;
+    text-align: left;
+    padding: 2.75rem 3rem;
+  }
+
+  .person::before {
+    content: "";
+    grid-column: 2;
+    grid-row: 1;
+    width: 1px;
+    height: 78%;
+    justify-self: center;
+    align-self: center;
+    background: var(--staff-line);
+  }
+
+  .person .identity,
+  .person .side {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .person .identity {
+    grid-column: 1;
+    align-items: flex-start;
+    padding-right: 2.75rem;
+  }
+
+  .person .side {
+    grid-column: 3;
+    align-items: center;
+    padding-left: 2.5rem;
+  }
+
+  .person .name {
+    font-size: clamp(1.85rem, 2vw, 2.35rem);
+  }
+
+  .person .role {
+    max-width: none;
+    margin-top: 0.45rem;
+    font-size: 1.125rem;
+  }
+
+  .person .rule {
+    margin: 1.1rem 0 0.95rem;
+  }
+
+  .person .list {
+    width: 100%;
+  }
+
+  .person .logo {
+    width: min(12.5rem, 100%);
+    margin-bottom: 1.35rem;
+  }
+
+  .person .qr {
+    width: min(13.5rem, 100%);
+    margin-top: 0;
+  }
+
+  .person .caption {
+    margin-top: 0.9rem;
+    text-align: center;
+  }
+
+  .person .save {
+    margin-top: 0.35rem;
+  }
+}

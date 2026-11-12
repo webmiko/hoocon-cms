@@ -89,7 +89,7 @@ def test_robots_txt_disallows_lead_and_utility_paths(client) -> None:
     """Utility SPA routes stay out of the crawl (Helmet already noindex)."""
     response = client.get("/robots.txt")
     body = response.content.decode()
-    for path in ("/search", "/consultation", "/rfq", "/replacement", "/compare"):
+    for path in ("/search", "/consultation", "/rfq", "/replacement", "/compare", "/komanda"):
         assert f"Disallow: {path}" in body
 
 

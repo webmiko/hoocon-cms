@@ -106,6 +106,8 @@ NOINDEX_PREFIXES: tuple[str, ...] = (
     "/rfq",
     "/replacement",
     "/compare",
+    # Personal staff cards: share by link, do not list in search.
+    "/komanda",
     # Real screens that must stay open. They are not leftovers of a deleted page.
     "/login",
     "/register",
