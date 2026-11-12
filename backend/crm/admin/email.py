@@ -19,6 +19,7 @@ from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
 from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
+from crm.email_body import email_body_for_reading
 from crm.models import Client, EmailAttachment, EmailMessage, EmailStatus, EmailTemplate, InboundMailboxState
 from crm.services import email_templates_for_user, scope_emails_for_manager
 from leads.models import Lead
@@ -51,6 +52,24 @@ class EmailAttachmentInline(TabularInline):
         return format_html('<a href="{}">{}</a>', url, obj.filename)
 
 
+class EmailMessageAdminForm(forms.ModelForm):
+    """Letter card shows and stores readable text, not HTML source."""
+
+    class Meta:
+        model = EmailMessage
+        fields = "__all__"
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.is_bound or "body" not in self.fields:
+            return
+        self.initial["body"] = email_body_for_reading(self.initial.get("body") or "")
+
+    def clean_body(self) -> str:
+        """Drop tags if the manager pasted HTML into the card."""
+        return email_body_for_reading(self.cleaned_data.get("body") or "")
+
+
 @admin.register(EmailMessage)
 class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """Outbound/inbound email log; staff can resend failed/draft.
@@ -58,6 +77,7 @@ class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLin
     ID = email клиента (или to_email); одинаковые ID группируются.
     """
 
+    form = EmailMessageAdminForm
     inlines = (EmailAttachmentInline,)
 
     list_display = (

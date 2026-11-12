@@ -37,7 +37,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from config.logging_utils import setup_logger
-from crm.email_body import html_email_to_plain
+from crm.email_body import email_body_for_reading, html_email_to_plain
 from crm.models import (
     Activity,
     ActivityType,
@@ -222,8 +222,9 @@ def _extract_body(parsed: Message) -> str:
             plain = _payload_text(part)
         elif content_type == "text/html" and not html:
             html = _payload_text(part)
+    # text/plain иногда сам является HTML (вставка из редактора) — в карточке тегов быть не должно.
     if plain:
-        return plain[:_BODY_MAX_CHARS]
+        return email_body_for_reading(plain)[:_BODY_MAX_CHARS]
     if html:
         return html_email_to_plain(html)[:_BODY_MAX_CHARS]
     return ""
