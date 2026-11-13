@@ -15,7 +15,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from accounts.roles import staff_sees_all_leads
 from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import HooconToggleInput, LabeledToggleMixin
-from crm.admin.filters import WorkQueueFilter
+from crm.admin.filters import ManagerFilter, WorkQueueFilter
 from crm.admin.inline_extra import OneBlankInlineRowMixin
 from crm.admin.list_view import remember_list_view
 from crm.admin.work_label_form import WorkLabelAssignableFormMixin
@@ -45,8 +45,8 @@ class CompanyClientInline(OneBlankInlineRowMixin, TabularInline):
     autocomplete_fields = ("assignee",)
     show_change_link = True
     can_delete = False
-    verbose_name = "карточка клиента"
-    verbose_name_plural = "Карточки клиентов"
+    verbose_name = "человек"
+    verbose_name_plural = "Люди"
     template_before = "admin/crm/company/inline_help_clients.html"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Client]:
@@ -172,10 +172,30 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
     form = CompanyAdminForm
     list_before_template = "admin/includes/hoocon_page_memo.html"
 
-    list_display = ("name", "inn", "city", "relevance", "work_label_list", "next_contact_at", "assignee")
+    list_display = (
+        "name",
+        "clients_count",
+        "city",
+        "relevance",
+        "work_label_list",
+        "next_contact_at",
+        "assignee",
+    )
     list_display_links = ("name",)
-    list_filter = ("relevance", "region", "niche", WorkQueueFilter, "assignee", "work_labels")
-    search_fields = ("name", "inn", "city", "phone", "email", "website", "contact_name")
+    list_filter = (ManagerFilter, "relevance", "region", "niche", WorkQueueFilter, "work_labels")
+    search_fields = (
+        "name",
+        "inn",
+        "city",
+        "phone",
+        "email",
+        "website",
+        "contact_name",
+        "clients__name",
+        "clients__email",
+        "clients__phone",
+        "clients__phone_digits",
+    )
     autocomplete_fields = ("assignee",)
     filter_horizontal = ()
     readonly_fields = ("company_key", "created_at", "updated_at")
@@ -183,46 +203,43 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
     actions = ("merge_companies_action", "assign_to_me")
     fieldsets = (
         (
-            "Реквизиты",
-            {
-                "fields": ("name", "inn", "legal_address", "city", "region"),
-                "description": (
-                    "Юрлицо одно на всех людей с тем же названием. "
-                    "Дубликаты объединяются действием «Объединить компании» в списке «Компании»."
-                ),
-            },
-        ),
-        (
-            "Общий контакт фирмы",
-            {
-                "fields": ("contact_name", "phone", "email", "website"),
-                "description": (
-                    "Общие телефоны, почта и сайт для обзвона и импорта — не CRM-досье. "
-                    "Заявки, письма, звонки и КП по человеку — только в карточке клиента "
-                    "(таблица «Карточки клиентов» ниже)."
-                ),
-            },
-        ),
-        (
-            "Работа",
+            "С кем работаем",
             {
                 "fields": (
+                    "name",
+                    "assignee",
+                    "next_contact_at",
                     "niche",
                     "relevance",
-                    "assignee",
-                    "pin_for_leads",
-                    "next_contact_at",
                     "work_labels",
+                    "pin_for_leads",
                     "comment",
                 ),
                 "description": (
-                    "«Следующий контакт» — напоминание по фирме. "
-                    "«В списке закреплённых» ставит эту же карточку в очередь заявок ответственного. "
-                    "Плановый звонок на дату ставьте в таблице «Плановые звонки» ниже — он попадёт в блок «Сегодня»."
+                    "Одна карточка — одна фирма. Сначала кто ведёт и когда связаться. "
+                    "Человека с письмами и КП открывайте в таблице «Люди» ниже."
                 ),
             },
         ),
-        ("Служебное", {"fields": ("company_key", "created_at", "updated_at")}),
+        (
+            "Как связаться",
+            {
+                "fields": ("contact_name", "phone", "email", "website", "city", "region"),
+                "description": ("Общий телефон и почта фирмы. Письмо конкретному человеку — из его строки в «Людях»."),
+            },
+        ),
+        (
+            "Реквизиты",
+            {
+                "fields": ("inn", "legal_address"),
+                "classes": ("collapse",),
+                "description": "ИНН и юридический адрес. Для счёта и кабинета, не для ежедневного звонка.",
+            },
+        ),
+        (
+            "Служебное",
+            {"fields": ("company_key", "created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
 
     def changelist_view(
@@ -237,6 +254,7 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
             extra["client_import_url"] = reverse("admin:crm_client_import_clients")
         if client_admin.has_view_permission(request):
             extra["client_export_url"] = reverse("admin:crm_client_export_clients")
+            extra["client_people_url"] = reverse("admin:crm_client_changelist")
         extra.update(remember_list_view(request))
         return super().changelist_view(request, extra_context=extra)
 
@@ -282,7 +300,7 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
             return int(count)
         return obj.members.count()
 
-    @admin.display(description="карточек", ordering="_clients_count")
+    @admin.display(description="люди", ordering="_clients_count")
     def clients_count(self, obj: Company) -> int:
         count = getattr(obj, "_clients_count", None)
         if count is not None:

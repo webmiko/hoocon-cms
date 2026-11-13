@@ -271,7 +271,7 @@ def test_every_admin_changelist_explains_empty_section() -> None:
 
 @pytest.mark.django_db
 def test_company_empty_changelist_explains_the_section() -> None:
-    """Empty «Компании» list explains the section instead of the generic stub."""
+    """Empty «Клиенты» list explains the one working section instead of the generic stub."""
     from crm.models import Company
 
     Company.objects.all().delete()
@@ -283,7 +283,7 @@ def test_company_empty_changelist_explains_the_section() -> None:
     client = Client()
     client.force_login(admin_user)
     html = client.get("/admin/crm/company/").content.decode()
-    assert "Юрлицо заказчика" in html
+    assert "Один список клиентов" in html
     assert "поля «Компания»" in html
     assert "На этой странице нет результатов" not in html
 

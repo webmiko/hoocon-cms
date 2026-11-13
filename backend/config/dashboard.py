@@ -301,13 +301,10 @@ def _build_stat_cards(
         )
 
     if can_crm:
-        from crm.models import Client, EmailMessage, EmailStatus
-        from crm.services import scope_clients_for_manager, scope_emails_for_manager
+        from crm.models import Company, EmailMessage, EmailStatus
+        from crm.services import scope_emails_for_manager
 
-        clients_n = scope_clients_for_manager(
-            Client.objects.filter(is_active=True),
-            user,
-        ).count()
+        clients_n = Company.objects.count()
         sent_period = scope_emails_for_manager(
             EmailMessage.objects.filter(
                 status=EmailStatus.SENT,
@@ -321,7 +318,7 @@ def _build_stat_cards(
                     "label": "Клиенты CRM",
                     "value": clients_n,
                     "accent": False,
-                    "url": reverse("admin:crm_client_changelist"),
+                    "url": reverse("admin:crm_company_changelist"),
                 },
                 {
                     "label": f"Писем за {_STATS_DAYS} дн.",

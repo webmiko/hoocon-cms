@@ -52,10 +52,10 @@ def test_company_change_shows_one_input_per_number(client: Any) -> None:
     assert "hoocon-company-phones.js" in html
     assert 'href="tel:+78435555396"' in html
     assert "Плановые звонки" in html
-    assert "Карточки клиентов" in html
-    assert "Общий контакт фирмы" in html
+    assert "Люди" in html
+    assert "Как связаться" in html
     assert "Сотрудники компании (кабинет)" in html
-    assert "не CRM-досье" in html
+    assert "С кем работаем" in html
     assert "Подтверждён менеджером" in html
     css = Path("static/admin/css/hoocon-unfold-extras.css").read_text(encoding="utf-8")
     assert ".hoocon-phones" in css
@@ -262,3 +262,79 @@ def test_company_card_gives_each_new_planned_call_its_own_key(client: Any) -> No
     assert saved[1].dedupe_key != canonical
     assert saved[1].dedupe_key.startswith(f"{canonical}:")
     assert timezone.localtime(saved[0].starts_at).date() == day
+
+
+@pytest.mark.django_db
+def test_client_list_finds_the_firm_by_a_persons_email(client: Any) -> None:
+    """Один список «Клиенты»: почта человека находит фирму, карточка идёт от фирмы к людям."""
+    user = get_user_model().objects.create_superuser("one-list", "one-list@example.com", "password12")
+    client.force_login(user)
+    org = Company.objects.create(name="АЗ АТОМ")
+    Company.objects.create(name="Чужая фирма")
+    Client.objects.create(
+        email="ivan@azatom.test",
+        name="Иван",
+        company="АЗ АТОМ",
+        company_ref=org,
+    )
+    found = client.get(reverse("admin:crm_company_changelist"), {"q": "ivan@azatom.test"})
+    html = found.content.decode()
+    assert found.status_code == 200
+    assert "АЗ АТОМ" in html
+    assert "Чужая фирма" not in html
+    page = client.get(reverse("admin:crm_company_change", args=[org.pk])).content.decode()
+    assert page.index("С кем работаем") < page.index("Как связаться") < page.index("Реквизиты")
+    assert "Люди" in page
+    listing = client.get(reverse("admin:crm_company_changelist")).content.decode()
+    assert reverse("admin:crm_client_changelist") in listing
+
+
+@pytest.mark.django_db
+def test_client_list_filters_by_manager(client: Any) -> None:
+    """Фильтр «менеджер» оставляет фирмы одного человека и не предлагает посторонних."""
+    from django.contrib.auth.models import Group
+
+    from accounts.roles import GROUP_MANAGER
+    from accounts.services import ensure_staff_groups
+
+    ensure_staff_groups()
+    user_model = get_user_model()
+    admin = user_model.objects.create_superuser("mgr-filter", "mgr-filter@example.com", "password12")
+    group = Group.objects.get(name=GROUP_MANAGER)
+
+    def manager(username: str, first_name: str) -> Any:
+        person = user_model.objects.create_user(
+            username=username,
+            password="x",
+            first_name=first_name,
+            is_staff=True,
+            is_active=True,
+        )
+        person.groups.add(group)
+        return person
+
+    alena = manager("mgr-alena", "Алёна")
+    boris = manager("mgr-boris", "Борис")
+    outsider = user_model.objects.create_user(
+        username="mgr-outsider",
+        password="x",
+        first_name="Стас",
+        is_staff=True,
+        is_active=True,
+    )
+    Company.objects.create(name="Фирма Алёны", assignee=alena)
+    Company.objects.create(name="Фирма Бориса", assignee=boris)
+    client.force_login(admin)
+    listing = reverse("admin:crm_company_changelist")
+    html = client.get(listing).content.decode()
+    assert f'<option value="{alena.pk}">Алёна</option>' in html
+    assert f'<option value="{boris.pk}">Борис</option>' in html
+    panel = html.split('id="changelist-filter"', 1)[1]
+    assert panel.index(">Алёна</option>") < panel.index("Можно звонить")
+    assert f'<option value="{outsider.pk}">' not in html
+    filtered = client.get(listing, {"manager": str(alena.pk)}).content.decode()
+    assert "Фирма Алёны" in filtered
+    assert "Фирма Бориса" not in filtered
+    untouched = client.get(listing, {"manager": "нет"}).content.decode()
+    assert "Фирма Алёны" in untouched
+    assert "Фирма Бориса" in untouched

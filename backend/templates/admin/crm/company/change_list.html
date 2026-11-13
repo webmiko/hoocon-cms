@@ -22,5 +22,10 @@
     <a href="{{ client_export_url }}">Выгрузить клиентов</a>
   </li>
   {% endif %}
+  {% if client_people_url %}
+  <li>
+    <a href="{{ client_people_url }}">Контакты</a>
+  </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}

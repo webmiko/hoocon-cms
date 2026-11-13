@@ -34,7 +34,7 @@ from crm.admin.inlines import (
     RmaCaseInline,
 )
 from crm.admin.list_view import remember_list_view
-from crm.admin.scope import OverdueNextContactFilter
+from crm.admin.scope import ManagerUsesTheCard, OverdueNextContactFilter
 from crm.forms import ComposeEmailForm, SpecImportForm
 from crm.mail_links import staff_reply_to_email
 from crm.manager_signatures import manager_reply_signature
@@ -64,7 +64,7 @@ def _ru_company_phone() -> str:
 
 
 @admin.register(Client)
-class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
+class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
     """CRM client card: contacts, assignee, leads, timeline, send email.
 
     ID клиента = email. Несколько заявок с одним email попадают в одну
@@ -133,8 +133,9 @@ class ClientAdmin(ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
                     "is_active",
                 ),
                 "description": (
-                    "Одинаковая эл. почта (ID) = один клиент. Заявки с тем же ID "
-                    "добавляются в эту карточку, новая карточка не создаётся."
+                    "Это человек внутри клиента. Фирма, общий телефон и плановый звонок — "
+                    "в разделе «Клиенты». Одинаковая почта — один контакт: заявки с ней "
+                    "попадают в эту карточку."
                 ),
             },
         ),

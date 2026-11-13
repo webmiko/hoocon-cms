@@ -21,6 +21,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
+from crm.admin.filters import EmailAuthorFilter
 from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
 from crm.email_body import email_body_for_reading
 from crm.models import Client, EmailAttachment, EmailMessage, EmailStatus, EmailTemplate, InboundMailboxState
@@ -94,7 +95,7 @@ class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLin
         "sent_at",
     )
     list_display_links = ("subject",)
-    list_filter = ("direction", "status", "created_at")
+    list_filter = (EmailAuthorFilter, "direction", "status", "created_at")
     search_fields = ("subject", "to_email", "from_email", "client__name", "client__email", "body")
     autocomplete_fields = ("client", "lead", "created_by")
     scoped_fk = _CLIENT_AND_LEAD
