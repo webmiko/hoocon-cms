@@ -10,6 +10,7 @@ describe("Layout footer cabinet link", () => {
   it("shows Личный кабинет in footer only when cabinet_enabled is on", () => {
     expect(layout).toContain("useCabinetEnabled");
     expect(layout.match(/<Link to="\/login">Личный кабинет<\/Link>/g)?.length).toBe(1);
+    expect(layout).toContain('<Link to="/komanda">Команда</Link>');
     const mobileNav = layout.split('aria-label="Мобильное меню"')[1]?.split("</nav>")[0] ?? "";
     expect(mobileNav).not.toContain("Личный кабинет");
   });

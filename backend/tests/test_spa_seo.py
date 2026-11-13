@@ -157,6 +157,32 @@ def test_spa_rfq_is_noindex_not_404_title(client) -> None:
 
 
 @pytest.mark.django_db
+def test_spa_team_index_is_noindex_not_gone(client) -> None:
+    """The team list is a real page and is not offered to search."""
+    response = client.get("/komanda")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" not in body
+    assert "Команда" in body
+
+
+@pytest.mark.django_db
+def test_spa_staff_card_is_noindex_not_gone(client) -> None:
+    """A personal card stays open for a shared link and stays out of search."""
+    response = client.get("/komanda/popova")
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert 'name="robots" content="noindex, nofollow"' in body
+    assert "Страница не найдена" not in body
+    assert "Визитка" in body
+    from django.conf import settings
+
+    sitemap = client.get("/sitemap.xml").content.decode()
+    assert f"{settings.SITE_URL.rstrip('/')}/komanda/popova" not in sitemap
+
+
+@pytest.mark.django_db
 def test_spa_compare_is_noindex_not_404_title(client) -> None:
     """GET /compare is a real SPA page (noindex), not a server 404 title."""
     response = client.get("/compare")
