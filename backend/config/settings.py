@@ -464,7 +464,7 @@ UNFOLD = {
                     {
                         "title": _("Клиенты"),
                         "icon": "groups",
-                        "link": reverse_lazy("admin:crm_client_changelist"),
+                        "link": reverse_lazy("admin:crm_company_changelist"),
                         "permission": "config.unfold_callbacks.perm_view_client",
                     },
                     {

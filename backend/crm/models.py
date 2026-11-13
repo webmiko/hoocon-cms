@@ -110,8 +110,8 @@ class Client(models.Model):
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "клиент"
-        verbose_name_plural = "клиенты"
+        verbose_name = "контакт"
+        verbose_name_plural = "контакты"
         ordering = ("-updated_at",)
         indexes = [
             models.Index(fields=("email", "company")),
@@ -904,8 +904,8 @@ class Company(models.Model):
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "компания"
-        verbose_name_plural = "компании"
+        verbose_name = "клиент"
+        verbose_name_plural = "клиенты"
         ordering = ("name",)
 
     def __str__(self) -> str:

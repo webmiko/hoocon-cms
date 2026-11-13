@@ -82,9 +82,9 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
         "leads-stats",
         "crm-sales-report",
         "supportchat-messages",
-        "crm-client",
-        "crm-quote",
         "crm-company",
+        "crm-quote",
+        "crm-client",
     ]
     assert "crm-activity" not in work_ids
     assert "crm-emailmessage" not in work_ids
@@ -93,9 +93,11 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     assert groups["leads-stats"]["url"].endswith("/admin/leads/lead/stats/")
     assert groups["crm-sales-report"]["action"] == "link"
     assert groups["crm-sales-report"]["url"].endswith("/admin/crm/client/sales-report/")
+    assert groups["crm-company"]["title"] == "Клиенты"
+    assert groups["crm-company"]["url"].endswith("/admin/crm/company/")
+    assert groups["crm-client"]["title"] == "Контакты"
     assert groups["crm-client"]["url"].endswith("/admin/crm/client/")
     assert groups["crm-quote"]["url"].endswith("/admin/crm/quote/")
-    assert groups["crm-company"]["url"].endswith("/admin/crm/company/")
 
     # Остальные модели crm (шаблоны писем, вложения, состояние ящика) —
     # в drill-строке «crm», не плоско.
@@ -441,13 +443,15 @@ def test_manager_nav_shows_only_permitted_sections() -> None:
     assert {
         "leads-lead",
         "supportchat-messages",
-        "crm-client",
         "crm-quote",
         "crm-company",
         "cabinet-order",
         "cabinet-rmacase",
         "cabinet-speclist",
     } <= ids
+    assert "crm-client" not in ids
+    titles = {row["id"]: row["title"] for row in nav["groups"]}
+    assert titles["crm-company"] == "Клиенты"
     hidden = {
         "crm-emailmessage",
         "crm-activity",

@@ -569,6 +569,67 @@ def test_client_change_form_lists_support_conversations(client, django_user_mode
     assert "Пётр с сайта" in html
 
 
+@pytest.mark.django_db
+def test_email_list_filters_by_the_manager_who_wrote_it(client, django_user_model) -> None:
+    """Журнал «Письма»: фильтр «менеджер» оставляет письма автора и не показывает чужие."""
+    from django.contrib.auth.models import Group
+
+    from accounts.roles import GROUP_MANAGER
+    from accounts.services import ensure_staff_groups
+
+    ensure_staff_groups()
+    admin = django_user_model.objects.create_superuser("mail-filter", "mail-filter@example.com", "x")
+    group = Group.objects.get(name=GROUP_MANAGER)
+
+    def manager(username: str, first_name: str):
+        person = django_user_model.objects.create_user(
+            username=username,
+            password="x",
+            first_name=first_name,
+            is_staff=True,
+            is_active=True,
+        )
+        person.groups.add(group)
+        return person
+
+    alena = manager("mail-alena", "Алёна")
+    boris = manager("mail-boris", "Борис")
+    buyer = Client.objects.create(name="Покупатель", email="buyer-filter@example.com")
+    EmailMessage.objects.create(
+        client=buyer,
+        to_email=buyer.email,
+        subject="Письмо Алёны",
+        body="Текст Алёны",
+        created_by=alena,
+    )
+    EmailMessage.objects.create(
+        client=buyer,
+        to_email=buyer.email,
+        subject="Письмо Бориса",
+        body="Текст Бориса",
+        created_by=boris,
+    )
+    EmailMessage.objects.create(
+        client=buyer,
+        to_email=buyer.email,
+        subject="Входящее без автора",
+        body="Входящий текст",
+        direction="inbound",
+    )
+    client.force_login(admin)
+    listing = reverse("admin:crm_emailmessage_changelist")
+    html = client.get(listing).content.decode()
+    assert "Исходящее" in html
+    assert f'<option value="{alena.pk}">Алёна</option>' in html
+    assert f'<option value="{boris.pk}">Борис</option>' in html
+    panel = html.split('id="changelist-filter"', 1)[1]
+    assert panel.index(">Алёна</option>") < panel.index("Исходящее")
+    filtered = client.get(listing, {"manager": str(alena.pk)}).content.decode()
+    assert "Письмо Алёны" in filtered
+    assert "Письмо Бориса" not in filtered
+    assert "Входящее без автора" not in filtered
+
+
 @pytest.mark.django_db(transaction=True)
 def test_email_admin_queue_send_skips_already_queued(
     client,

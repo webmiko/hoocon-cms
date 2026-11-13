@@ -481,7 +481,7 @@ def test_lead_client_and_company_lists_show_a_memo(client) -> None:
     firms = client.get(reverse("admin:crm_company_changelist")).content.decode()
     assert "Новые обращения с сайта" in leads
     assert "Карточка человека" in people
-    assert "Карточка фирмы" in firms
+    assert "Один список клиентов" in firms
     css = Path("static/admin/css/hoocon-unfold-extras.css").read_text(encoding="utf-8")
     dark = css.split(".dark .hoocon-page-memo {", 1)[1].split("}", 1)[0]
     assert "background:" in dark
