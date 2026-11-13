@@ -593,7 +593,7 @@ def email_templates_for_user(
 ) -> QuerySet[EmailTemplate]:
     """Templates this staff user may see in Admin and in the compose picker.
 
-    A manager sees shared templates and their own author-only ones.
+    A manager sees shared templates and those where they are checked.
     Superuser, «Админ» and «Аналитик» see every template. An anonymous
     user sees nothing. An unknown user (``None``) sees only shared templates,
     so a forgotten caller cannot pull a private draft.
@@ -617,9 +617,9 @@ def email_templates_for_user(
         return qs.filter(visibility=EmailTemplate.Visibility.ALL)
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return qs.none()
+    chosen = EmailTemplate.objects.filter(visible_to=user.pk).values("pk")
     return qs.filter(
-        Q(visibility=EmailTemplate.Visibility.ALL)
-        | Q(visibility=EmailTemplate.Visibility.AUTHOR, created_by_id=user.pk),
+        Q(visibility=EmailTemplate.Visibility.ALL) | Q(visibility=EmailTemplate.Visibility.SELECTED, pk__in=chosen),
     )
 
 

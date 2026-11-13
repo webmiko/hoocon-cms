@@ -10,7 +10,7 @@ from django.contrib.auth.models import Group
 from django.test import Client as HttpClient
 from django.urls import reverse
 
-from accounts.roles import GROUP_MANAGER
+from accounts.roles import GROUP_ADMIN, GROUP_ANALYST, GROUP_MANAGER
 from accounts.services import ensure_staff_groups
 from crm.models import Client, EmailTemplate
 from crm.services import (
@@ -279,6 +279,19 @@ def test_manager_group_gets_email_template_perms(django_user_model) -> None:
     assert not mgr.has_perm("crm.delete_emailtemplate")
 
 
+def _group_user(django_user_model, username: str, group_name: str):
+    """Staff member of one named group, not a superuser."""
+    ensure_staff_groups()
+    user = django_user_model.objects.create_user(username=username, password="x", is_staff=True, is_active=True)
+    user.groups.add(Group.objects.get(name=group_name))
+    return user
+
+
+def _group_admin(django_user_model, username: str):
+    """Staff in group «Админ», not a superuser."""
+    return _group_user(django_user_model, username, GROUP_ADMIN)
+
+
 def _manager(django_user_model, username: str):
     """Staff user in group «Менеджер»."""
     ensure_staff_groups()
@@ -296,9 +309,10 @@ def test_author_only_template_is_hidden_from_other_managers(django_user_model) -
         name="Личный черновик Людмилы",
         subject="Секретно {компания}",
         body="Текст только для автора.",
-        visibility=EmailTemplate.Visibility.AUTHOR,
+        visibility=EmailTemplate.Visibility.SELECTED,
         created_by=author,
     )
+    private.visible_to.add(author)
     shared = EmailTemplate.objects.create(
         name="Общий шаблон",
         subject="Общая тема",
@@ -351,7 +365,7 @@ def test_author_only_template_is_hidden_from_other_managers(django_user_model) -
     private.refresh_from_db()
     assert private.name == "Личный черновик Людмилы"
     assert private.body == "Текст только для автора."
-    assert private.visibility == EmailTemplate.Visibility.AUTHOR
+    assert private.visibility == EmailTemplate.Visibility.SELECTED
     assert get_active_email_template(private.pk, colleague) is None
     assert get_active_email_template(private.pk) is None
     assert get_active_email_template(shared.pk, colleague) is not None
@@ -367,7 +381,7 @@ def test_author_only_template_is_hidden_from_other_managers(django_user_model) -
 
 @pytest.mark.django_db
 def test_manager_cannot_make_a_colleague_template_private(django_user_model) -> None:
-    """Чужой общий шаблон нельзя переключить на «только автору»."""
+    """Чужой общий шаблон нельзя сузить до себя."""
     author = _manager(django_user_model, "tpl-owner")
     colleague = _manager(django_user_model, "tpl-claimer")
     shared = EmailTemplate.objects.create(
@@ -380,6 +394,9 @@ def test_manager_cannot_make_a_colleague_template_private(django_user_model) -> 
     http = HttpClient()
     http.force_login(colleague)
     url = reverse("admin:crm_emailtemplate_change", args=[shared.pk])
+    form_html = http.get(url).content.decode()
+    assert 'name="audience_all" id="id_audience_all" value="1" checked disabled' in form_html
+    assert '<input type="hidden" name="audience_all" value="1">' in form_html
     response = http.post(
         url,
         {
@@ -388,14 +405,20 @@ def test_manager_cannot_make_a_colleague_template_private(django_user_model) -> 
             "body": shared.body,
             "is_active": "on",
             "sort_order": "0",
-            "visibility": EmailTemplate.Visibility.AUTHOR,
+            "audience": str(colleague.pk),
         },
     )
     assert response.status_code == 200
-    assert "только его автор" in response.content.decode()
+    assert "Круг людей меняет автор шаблона или администратор." in response.content.decode()
     shared.refresh_from_db()
     assert shared.visibility == EmailTemplate.Visibility.ALL
     assert shared.created_by_id == author.pk
+    assert shared.body == "Текст общего письма."
+    edited = http.post(url, _template_post(name=shared.name, subject=shared.subject, body="Уточнённый текст."))
+    assert edited.status_code == 302
+    shared.refresh_from_db()
+    assert shared.body == "Уточнённый текст."
+    assert shared.visibility == EmailTemplate.Visibility.ALL
 
 
 @pytest.mark.django_db
@@ -407,13 +430,405 @@ def test_unscoped_staff_sees_author_only_template(django_user_model) -> None:
         name="Скрытый от менеджеров",
         subject="Тема",
         body="Личный текст.",
-        visibility=EmailTemplate.Visibility.AUTHOR,
+        visibility=EmailTemplate.Visibility.SELECTED,
         created_by=author,
     )
+    EmailTemplate.objects.get(name="Скрытый от менеджеров").visible_to.add(author)
     http = HttpClient()
     http.force_login(admin)
     html = http.get(reverse("admin:crm_emailtemplate_changelist")).content.decode()
     assert "Скрытый от менеджеров" in html
+
+
+def _named(django_user_model, username: str, first_name: str):
+    """Manager with a visible first name."""
+    user = _manager(django_user_model, username)
+    user.first_name = first_name
+    user.save(update_fields=["first_name"])
+    return user
+
+
+def _template_post(**overrides: object) -> dict[str, object]:
+    """Changelist fields the template form always posts."""
+    payload: dict[str, object] = {
+        "name": "Письмо",
+        "subject": "Тема",
+        "body": "Текст письма.",
+        "is_active": "on",
+        "sort_order": "0",
+        "audience_all": "1",
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.django_db
+def test_audience_field_lists_managers_and_everyone(django_user_model) -> None:
+    """«Кому видно» — галочка «Всем» и действующие менеджеры, без «только автору»."""
+    alena = _named(django_user_model, "tpl-alena", "Алёна")
+    _named(django_user_model, "tpl-boris", "Борис")
+    inactive = _named(django_user_model, "tpl-stas", "Стас")
+    inactive.is_active = False
+    inactive.save(update_fields=["is_active"])
+    django_user_model.objects.create_user(
+        username="tpl-super",
+        password="x",
+        first_name="Супер",
+        is_staff=True,
+        is_superuser=True,
+    )
+    http = HttpClient()
+    http.force_login(alena)
+    html = http.get(reverse("admin:crm_emailtemplate_add")).content.decode()
+    assert "Только автору" not in html
+    assert 'name="audience_all" id="id_audience_all" value="1" checked' in html
+    assert "Алёна" in html
+    assert "Борис" in html
+    assert "Стас" not in html
+    assert "Супер" not in html
+
+
+@pytest.mark.django_db
+def test_checked_managers_see_template_and_a_new_hire_does_not(django_user_model) -> None:
+    """Снятое «Всем» оставляет шаблон отмеченным людям. Новый менеджер его не видит."""
+    author = _named(django_user_model, "tpl-share-author", "Алёна")
+    colleague = _named(django_user_model, "tpl-share-colleague", "Борис")
+    outsider = _manager(django_user_model, "tpl-share-outsider")
+    lead = Lead.objects.create(
+        name="Мария",
+        email="maria-share@example.com",
+        company="ООО Луч",
+        message="Нужно КП",
+        status=Lead.LeadStatus.NEW,
+    )
+    http = HttpClient()
+    http.force_login(author)
+    saved = http.post(
+        reverse("admin:crm_emailtemplate_add"),
+        _template_post(
+            name="Для двоих",
+            body="Текст для двоих.",
+            audience=[str(author.pk), str(colleague.pk)],
+            audience_all="",
+        ),
+        follow=True,
+    )
+    assert saved.status_code == 200
+    template = EmailTemplate.objects.get(name="Для двоих")
+    assert template.visibility == EmailTemplate.Visibility.SELECTED
+    assert template.created_by_id == author.pk
+    assert set(template.visible_to.values_list("pk", flat=True)) == {author.pk, colleague.pk}
+    change = http.get(reverse("admin:crm_emailtemplate_change", args=[template.pk]))
+    change_html = change.content.decode()
+    assert f'name="audience" id="id_audience_{author.pk}" value="{author.pk}" checked' in change_html
+    assert 'name="audience_all" id="id_audience_all" value="1" checked' not in change_html
+    compose = reverse("admin:leads_lead_compose_reply", args=[lead.pk])
+    listing = reverse("admin:crm_emailtemplate_changelist")
+    assert "Алёна, Борис" in http.get(listing).content.decode()
+
+    http.force_login(colleague)
+    assert "Для двоих" in http.get(listing).content.decode()
+    assert "Текст для двоих." in http.get(compose, {"template": template.pk}).content.decode()
+
+    hired = _manager(django_user_model, "tpl-share-hired")
+    http.force_login(outsider)
+    assert "Для двоих" not in http.get(listing).content.decode()
+    assert "Текст для двоих." not in http.get(compose, {"template": template.pk}).content.decode()
+    http.force_login(hired)
+    assert "Для двоих" not in http.get(listing).content.decode()
+    assert get_active_email_template(template.pk, hired) is None
+    assert get_active_email_template(template.pk, colleague) is not None
+
+
+@pytest.mark.django_db
+def test_everyone_checkbox_includes_a_manager_hired_later(django_user_model) -> None:
+    """«Всем» не замораживает текущий список: менеджер, принятый после сохранения, тоже видит шаблон."""
+    author = _manager(django_user_model, "tpl-all-author")
+    colleague = _manager(django_user_model, "tpl-all-colleague")
+    template = EmailTemplate.objects.create(
+        name="Общее на будущее",
+        subject="Тема",
+        body="Текст для всех.",
+        visibility=EmailTemplate.Visibility.SELECTED,
+        created_by=author,
+    )
+    template.visible_to.add(author)
+    http = HttpClient()
+    http.force_login(author)
+    response = http.post(
+        reverse("admin:crm_emailtemplate_change", args=[template.pk]),
+        _template_post(name=template.name, body=template.body, audience=str(colleague.pk)),
+    )
+    assert response.status_code == 302
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+    assert template.visible_to.count() == 0
+    hired = _manager(django_user_model, "tpl-all-hired")
+    assert get_active_email_template(template.pk, hired) is not None
+    assert get_active_email_template(template.pk, colleague) is not None
+
+
+@pytest.mark.django_db
+def test_empty_audience_is_rejected(django_user_model) -> None:
+    """Без «Всем» и без людей шаблон не становится невидимым."""
+    author = _manager(django_user_model, "tpl-empty-author")
+    template = EmailTemplate.objects.create(
+        name="Не спрятать в никуда",
+        subject="Тема",
+        body="Текст остаётся общим.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(author)
+    payload = _template_post(name=template.name, body=template.body)
+    payload.pop("audience_all")
+    response = http.post(reverse("admin:crm_emailtemplate_change", args=[template.pk]), payload)
+    assert response.status_code == 200
+    assert "хотя бы одного человека" in response.content.decode()
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+    assert template.visible_to.count() == 0
+
+
+@pytest.mark.django_db
+def test_audience_rejects_a_user_who_is_not_a_manager(django_user_model) -> None:
+    """В список нельзя подставить сотрудника не из группы «Менеджер»."""
+    author = _manager(django_user_model, "tpl-staff-author")
+    outsider = django_user_model.objects.create_user(
+        username="tpl-not-manager",
+        password="x",
+        is_staff=True,
+        is_active=True,
+    )
+    template = EmailTemplate.objects.create(
+        name="Только менеджеры",
+        subject="Тема",
+        body="Текст.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(author)
+    payload = _template_post(name=template.name, body=template.body, audience=str(outsider.pk))
+    payload.pop("audience_all")
+    response = http.post(reverse("admin:crm_emailtemplate_change", args=[template.pk]), payload)
+    assert response.status_code == 200
+    assert "действующие менеджеры" in response.content.decode()
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+    assert outsider.pk not in set(template.visible_to.values_list("pk", flat=True))
+
+
+@pytest.mark.django_db
+def test_listed_manager_can_edit_text_but_not_the_audience(django_user_model) -> None:
+    """Отмеченный коллега правит текст и не вычёркивает автора из списка."""
+    author = _manager(django_user_model, "tpl-list-author")
+    colleague = _manager(django_user_model, "tpl-list-colleague")
+    template = EmailTemplate.objects.create(
+        name="Общий черновик",
+        subject="Тема",
+        body="Исходный текст.",
+        visibility=EmailTemplate.Visibility.SELECTED,
+        created_by=author,
+    )
+    template.visible_to.set([author, colleague])
+    http = HttpClient()
+    http.force_login(colleague)
+    url = reverse("admin:crm_emailtemplate_change", args=[template.pk])
+    narrowed_payload = _template_post(name=template.name, body="Чужой захват.", audience=str(colleague.pk))
+    narrowed_payload.pop("audience_all")
+    narrowed = http.post(url, narrowed_payload)
+    narrowed_html = narrowed.content.decode()
+    assert narrowed.status_code == 200
+    assert "Круг людей меняет автор шаблона или администратор." in narrowed_html
+    template.refresh_from_db()
+    assert template.body == "Исходный текст."
+    assert set(template.visible_to.values_list("pk", flat=True)) == {author.pk, colleague.pk}
+
+    edited_payload = _template_post(
+        name=template.name,
+        body="Поправленный текст.",
+        audience=[str(author.pk), str(colleague.pk)],
+    )
+    edited_payload.pop("audience_all")
+    edited = http.post(url, edited_payload)
+    assert edited.status_code == 302
+    template.refresh_from_db()
+    assert template.body == "Поправленный текст."
+    assert set(template.visible_to.values_list("pk", flat=True)) == {author.pk, colleague.pk}
+
+
+@pytest.mark.django_db
+def test_admin_can_limit_a_shared_template_that_has_no_author(django_user_model) -> None:
+    """Общий шаблон без автора администратор отдаёт одному менеджеру, коллега — нет."""
+    manager = _named(django_user_model, "tpl-assign-manager", "Алёна")
+    admin = _superuser(django_user_model, "tpl-assign-admin")
+    template = EmailTemplate.objects.create(
+        name="Холодное письмо проектировщикам",
+        subject="Приводы Hoocon для проекта {компания}",
+        body="Текст холодного письма.",
+        visibility=EmailTemplate.Visibility.ALL,
+    )
+    url = reverse("admin:crm_emailtemplate_change", args=[template.pk])
+    http = HttpClient()
+    http.force_login(manager)
+    payload = _template_post(name=template.name, subject=template.subject, body=template.body)
+    payload.pop("audience_all")
+    payload["audience"] = str(manager.pk)
+    refused = http.post(url, payload)
+    assert refused.status_code == 200
+    assert "Круг людей меняет автор шаблона или администратор." in refused.content.decode()
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+
+    http.force_login(admin)
+    saved = http.post(url, payload)
+    assert saved.status_code == 302
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.SELECTED
+    assert template.created_by_id is None
+    assert list(template.visible_to.values_list("pk", flat=True)) == [manager.pk]
+
+
+@pytest.mark.django_db
+def test_admin_assigns_template_author_to_the_requesting_manager(django_user_model) -> None:
+    """Админ создаёт шаблон по просьбе менеджера и указывает, кому он принадлежит."""
+    owner = _named(django_user_model, "tpl-owner", "Алёна")
+    colleague = _named(django_user_model, "tpl-not-owner", "Борис")
+    admin = _group_admin(django_user_model, "tpl-author-admin")
+    http = HttpClient()
+    http.force_login(admin)
+    add_url = reverse("admin:crm_emailtemplate_add")
+    form_html = http.get(add_url).content.decode()
+    assert 'name="created_by"' in form_html
+    assert f'value="{owner.pk}"' in form_html
+    created = http.post(
+        add_url,
+        _template_post(
+            name="Письмо для Алёны",
+            created_by=str(owner.pk),
+            audience=str(owner.pk),
+            audience_all="",
+        ),
+    )
+    assert created.status_code == 302
+    template = EmailTemplate.objects.get(name="Письмо для Алёны")
+    assert template.created_by_id == owner.pk
+    assert template.visibility == EmailTemplate.Visibility.SELECTED
+    assert list(template.visible_to.values_list("pk", flat=True)) == [owner.pk]
+
+    change_url = reverse("admin:crm_emailtemplate_change", args=[template.pk])
+    http.force_login(owner)
+    widened = _template_post(
+        name=template.name,
+        body=template.body,
+        audience=[str(owner.pk), str(colleague.pk)],
+    )
+    widened.pop("audience_all")
+    saved = http.post(change_url, widened)
+    assert saved.status_code == 302
+    template.refresh_from_db()
+    assert template.created_by_id == owner.pk
+    assert set(template.visible_to.values_list("pk", flat=True)) == {owner.pk, colleague.pk}
+
+    http.force_login(colleague)
+    stolen = _template_post(name=template.name, body=template.body, created_by=str(colleague.pk))
+    refused = http.post(change_url, stolen)
+    template.refresh_from_db()
+    assert template.created_by_id == owner.pk
+    assert 'name="created_by"' not in http.get(change_url).content.decode()
+    assert refused.status_code in {200, 302}
+
+
+@pytest.mark.django_db
+def test_analyst_cannot_rewrite_template_audience(django_user_model) -> None:
+    """Аналитик видит все шаблоны, но не меняет, кому они видны."""
+    author = _named(django_user_model, "tpl-analyst-author", "Алёна")
+    analyst = _group_user(django_user_model, "tpl-analyst", GROUP_ANALYST)
+    template = EmailTemplate.objects.create(
+        name="Общий для аналитика",
+        subject="Тема",
+        body="Текст.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(analyst)
+    url = reverse("admin:crm_emailtemplate_change", args=[template.pk])
+    payload = _template_post(name=template.name, subject=template.subject, body=template.body)
+    payload.pop("audience_all")
+    payload["audience"] = str(author.pk)
+    response = http.post(url, payload)
+    assert response.status_code == 403
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+    assert template.visible_to.count() == 0
+
+
+@pytest.mark.django_db
+def test_analyst_with_change_perm_still_cannot_narrow_audience(django_user_model) -> None:
+    """Даже с правом править шаблон аналитик не сужает чужой список."""
+    from django.contrib.auth.models import Permission
+
+    author = _named(django_user_model, "tpl-analyst-change-author", "Алёна")
+    analyst = _group_user(django_user_model, "tpl-analyst-change", GROUP_ANALYST)
+    perm = Permission.objects.get(codename="change_emailtemplate", content_type__app_label="crm")
+    analyst.user_permissions.add(perm)
+    template = EmailTemplate.objects.create(
+        name="Общий при лишнем праве",
+        subject="Тема",
+        body="Текст.",
+        visibility=EmailTemplate.Visibility.ALL,
+        created_by=author,
+    )
+    http = HttpClient()
+    http.force_login(analyst)
+    url = reverse("admin:crm_emailtemplate_change", args=[template.pk])
+    payload = _template_post(name=template.name, subject=template.subject, body=template.body)
+    payload.pop("audience_all")
+    payload["audience"] = str(author.pk)
+    response = http.post(url, payload)
+    assert response.status_code == 200
+    assert "Круг людей меняет автор шаблона или администратор." in response.content.decode()
+    template.refresh_from_db()
+    assert template.visibility == EmailTemplate.Visibility.ALL
+    assert template.visible_to.count() == 0
+
+
+@pytest.mark.django_db
+def test_legacy_author_flag_becomes_that_manager(django_user_model) -> None:
+    """Старое «только автору» с заполненным автором видно ему; без автора шаблон остаётся общим."""
+    import importlib
+
+    from django.apps import apps
+
+    migration = importlib.import_module("crm.migrations.0026_emailtemplate_audience")
+    author = _manager(django_user_model, "tpl-legacy-author")
+    colleague = _manager(django_user_model, "tpl-legacy-colleague")
+    named = EmailTemplate.objects.create(
+        name="Старый личный",
+        subject="Тема",
+        body="Личный текст.",
+        visibility="author",
+        created_by=author,
+    )
+    orphan = EmailTemplate.objects.create(
+        name="Старый без автора",
+        subject="Тема",
+        body="Общий текст.",
+        visibility="author",
+    )
+    migration.convert_author_only_templates(apps, None)
+    named.refresh_from_db()
+    orphan.refresh_from_db()
+    assert named.visibility == EmailTemplate.Visibility.SELECTED
+    assert list(named.visible_to.values_list("pk", flat=True)) == [author.pk]
+    assert orphan.visibility == EmailTemplate.Visibility.ALL
+    assert orphan.visible_to.count() == 0
+    assert get_active_email_template(named.pk, author) is not None
+    assert get_active_email_template(named.pk, colleague) is None
+    assert get_active_email_template(orphan.pk, colleague) is not None
 
 
 def test_compose_template_picker_controls_are_shaped() -> None:
