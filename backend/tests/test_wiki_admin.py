@@ -144,8 +144,15 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
     assert 'id="changelog-email-template-author"' in doc.body
-    assert doc.body.index("changelog-email-template-author") < doc.body.index("changelog-email-template-audience")
+    assert doc.body.index("changelog-email-template-author") < doc.body.index("changelog-mail-manager-filter")
+    assert 'id="changelog-mail-manager-filter"' in doc.body
+    assert doc.body.index("changelog-mail-manager-filter") < doc.body.index("changelog-client-manager-filter")
+    assert 'id="changelog-client-manager-filter"' in doc.body
+    assert doc.body.index("changelog-client-manager-filter") < doc.body.index("changelog-one-client-list")
+    assert 'id="changelog-one-client-list"' in doc.body
+    assert doc.body.index("changelog-one-client-list") < doc.body.index("changelog-email-template-audience")
     assert 'id="changelog-email-template-audience"' in doc.body
+    assert "Один раздел «Клиенты»" in doc.body
     assert "конкретных людей" in doc.body
     assert doc.body.index("changelog-email-template-audience") < doc.body.index("changelog-email-body-plain")
     assert 'id="changelog-email-body-plain"' in doc.body
