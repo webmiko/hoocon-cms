@@ -360,13 +360,14 @@ class EmailTemplate(models.Model):
     substituted from the client card / lead contact when the template is
     applied (see ``crm.services.render_email_template``).
 
-    ``visibility`` is either every manager or the author only. Staff who see
-    all CRM cards (superuser, «Админ», «Аналитик») still see every template.
+    ``visibility`` is either every manager or the people in ``visible_to``.
+    Staff who see all CRM cards (superuser, «Админ», «Аналитик») still see
+    every template.
     """
 
     class Visibility(models.TextChoices):
         ALL = "all", "Всем менеджерам"
-        AUTHOR = "author", "Только автору"
+        SELECTED = "selected", "Выбранным менеджерам"
 
     name: models.CharField = models.CharField(
         "название",
@@ -397,9 +398,16 @@ class EmailTemplate(models.Model):
         default=Visibility.ALL,
         db_index=True,
         help_text=(
-            "«Только автору» скрывает шаблон от других менеджеров. "
-            "Администратор и аналитик по-прежнему видят все шаблоны."
+            "«Всем менеджерам» — шаблон виден каждому менеджеру, включая новых. "
+            "«Выбранным менеджерам» — только людям из списка. "
+            "Администратор и аналитик видят все шаблоны."
         ),
+    )
+    visible_to: models.ManyToManyField = models.ManyToManyField(  # type: ignore[misc]
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="crm_visible_email_templates",
+        verbose_name="менеджеры",
     )
     created_by: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         settings.AUTH_USER_MODEL,

@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q, QuerySet
 from django.http import FileResponse, HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
-from accounts.roles import staff_sees_all_leads
+from accounts.roles import GROUP_ADMIN, GROUP_MANAGER
 from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
 from crm.admin.scope import _CLIENT_AND_LEAD, ManagerUsesTheCard
@@ -23,7 +26,7 @@ from crm.email_body import email_body_for_reading
 from crm.models import Client, EmailAttachment, EmailMessage, EmailStatus, EmailTemplate, InboundMailboxState
 from crm.services import email_templates_for_user, scope_emails_for_manager
 from leads.models import Lead
-from leads.services import lead_visible_to_manager
+from leads.services import lead_visible_to_manager, manager_display_name
 
 
 class EmailAttachmentInline(TabularInline):
@@ -220,35 +223,262 @@ class EmailMessageAdmin(ManagerUsesTheCard, ScopedForeignKeyMixin, OpenChangeLin
             enqueue_crm_email(obj.pk)
 
 
+@dataclass(frozen=True)
+class TemplateAudience:
+    """Who may see a template: every manager, or the checked people."""
+
+    everyone: bool
+    user_ids: frozenset[int]
+
+
+class TemplateAudienceWidget(forms.Widget):
+    """«Всем менеджерам» plus one checkbox per manager."""
+
+    managers: list[tuple[int, str]]
+
+    def __init__(self, attrs: dict[str, Any] | None = None) -> None:
+        super().__init__(attrs)
+        self.managers = []
+        self.locked = False
+
+    def value_from_datadict(self, data: Any, files: Any, name: str) -> dict[str, Any]:
+        """Read the everyone flag and the checked manager ids."""
+        everyone = str(data.get(f"{name}_all") or "") == "1"
+        getter = getattr(data, "getlist", None)
+        raw = getter(name) if callable(getter) else data.get(name, [])
+        if raw is None:
+            raw = []
+        if isinstance(raw, str):
+            raw = [raw]
+        return {"everyone": everyone, "ids": list(raw)}
+
+    def render(
+        self,
+        name: str,
+        value: Any,
+        attrs: dict[str, Any] | None = None,
+        renderer: Any = None,
+    ) -> SafeString:
+        """Stack the everyone checkbox above the manager list."""
+        everyone, selected = _audience_state(value)
+        base_id = (attrs or {}).get("id") or name
+        rows = [
+            format_html(
+                '<label class="flex items-center gap-2" for="{}"><input type="checkbox" name="{}_all" '
+                'id="{}" value="1"{}> Всем менеджерам</label>',
+                f"{base_id}_all",
+                name,
+                f"{base_id}_all",
+                _box_flags(checked=everyone, locked=self.locked),
+            )
+        ]
+        for user_id, label in self.managers:
+            rows.append(
+                format_html(
+                    '<label class="flex items-center gap-2" for="{}"><input type="checkbox" name="{}" '
+                    'id="{}" value="{}"{}> {}</label>',
+                    f"{base_id}_{user_id}",
+                    name,
+                    f"{base_id}_{user_id}",
+                    user_id,
+                    _box_flags(checked=user_id in selected, locked=self.locked),
+                    label,
+                )
+            )
+        if self.locked:
+            rows.extend(_locked_audience_inputs(name, everyone, selected))
+        body = mark_safe("".join(str(row) for row in rows))
+        return format_html('<div class="flex flex-col gap-2 py-1">{}</div>', body)
+
+
+class TemplateAudienceField(forms.Field):
+    """Validate that a restricted template names real managers."""
+
+    widget: TemplateAudienceWidget
+    manager_ids: set[int]
+
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs["widget"] = TemplateAudienceWidget()
+        super().__init__(**kwargs)
+        self.manager_ids = set()
+
+    def set_managers(self, managers: list[tuple[int, str]]) -> None:
+        """Replace the checkbox list. Ids outside it are rejected."""
+        self.manager_ids = {user_id for user_id, _label in managers}
+        self.widget.managers = managers
+
+    def lock(self, locked: bool) -> None:
+        """Disabled boxes still display the audience. Hidden inputs keep a text save intact."""
+        self.widget.locked = locked
+
+    def to_python(self, value: Any) -> TemplateAudience:
+        """Turn the posted checkboxes into an audience."""
+        if isinstance(value, TemplateAudience):
+            return value
+        if not isinstance(value, dict):
+            return TemplateAudience(everyone=True, user_ids=frozenset())
+        ids: list[int] = []
+        for item in value.get("ids") or []:
+            text = str(item).strip()
+            if not text.isdigit():
+                raise ValidationError("В списке только действующие менеджеры.")
+            ids.append(int(text))
+        return TemplateAudience(everyone=bool(value.get("everyone")), user_ids=frozenset(ids))
+
+    def validate(self, value: TemplateAudience) -> None:
+        """«Всем» needs no names. A short list must be managers, and not empty."""
+        super().validate(value)
+        if value.everyone:
+            return
+        if value.user_ids - self.manager_ids:
+            raise ValidationError("В списке только действующие менеджеры.")
+        if not value.user_ids:
+            raise ValidationError("Отметьте «Всем менеджерам» или хотя бы одного человека.")
+
+
+def _box_flags(*, checked: bool, locked: bool) -> SafeString:
+    """Attribute text for one checkbox. Constants only, so the string is safe."""
+    flags = ""
+    if checked:
+        flags += " checked"
+    if locked:
+        flags += " disabled"
+    return mark_safe(flags)
+
+
+def _locked_audience_inputs(name: str, everyone: bool, selected: set[int]) -> list[SafeString]:
+    """Post the current audience when the visible boxes are disabled."""
+    if everyone:
+        return [format_html('<input type="hidden" name="{}_all" value="1">', name)]
+    return [format_html('<input type="hidden" name="{}" value="{}">', name, user_id) for user_id in sorted(selected)]
+
+
+def _audience_state(value: Any) -> tuple[bool, set[int]]:
+    """Checked boxes for the first paint and for a form that failed validation."""
+    if isinstance(value, TemplateAudience):
+        return value.everyone, set(value.user_ids)
+    if isinstance(value, dict):
+        selected: set[int] = set()
+        for item in value.get("ids") or []:
+            text = str(item).strip()
+            if text.isdigit():
+                selected.add(int(text))
+        return bool(value.get("everyone")), selected
+    return True, set()
+
+
+def _may_assign_template_author(user: Any) -> bool:
+    """Superuser and group «Админ» may name who owns a template.
+
+    A manager's new template is theirs. An analyst sees every template
+    but does not reassign it.
+    """
+    if getattr(user, "is_superuser", False):
+        return True
+    if not getattr(user, "is_authenticated", False):
+        return False
+    groups = getattr(user, "groups", None)
+    if groups is None:
+        return False
+    return groups.filter(name=GROUP_ADMIN).exists()
+
+
+def _author_queryset(request: HttpRequest) -> QuerySet[Any]:
+    """Managers, plus the current user and the saved author so the choice stays valid."""
+    user_model = get_user_model()
+    managers = user_model.objects.filter(is_active=True, is_staff=True, groups__name=GROUP_MANAGER)
+    extra = [request.user.pk]
+    match = getattr(request, "resolver_match", None)
+    object_id = ""
+    if match is not None:
+        object_id = str(match.kwargs.get("object_id") or "")
+    if object_id.isdigit():
+        current = EmailTemplate.objects.filter(pk=int(object_id)).values_list("created_by_id", flat=True).first()
+        if current:
+            extra.append(current)
+    return (
+        user_model.objects.filter(Q(pk__in=managers.values("pk")) | Q(pk__in=extra))
+        .distinct()
+        .order_by("first_name", "last_name", "username")
+    )
+
+
+def _audience_managers(extra_ids: list[int]) -> list[tuple[int, str]]:
+    """Active managers, plus anyone already checked so they can be unchecked."""
+    user_model = get_user_model()
+    managers = user_model.objects.filter(is_active=True, is_staff=True, groups__name=GROUP_MANAGER)
+    people = user_model.objects.filter(Q(pk__in=managers.values("pk")) | Q(pk__in=extra_ids)).distinct()
+    rows = list(people.order_by("first_name", "last_name", "username"))
+    return [(user.pk, manager_display_name(user)) for user in rows]
+
+
 class EmailTemplateAdminForm(forms.ModelForm):
-    """Keep a shared template shared unless the author or an unscoped admin restricts it."""
+    """Pick every manager or a named list. A colleague cannot rewrite that list."""
+
+    audience = TemplateAudienceField(
+        label="Кому видно",
+        required=False,
+        help_text=(
+            "«Всем менеджерам» — шаблон виден каждому, включая новых. "
+            "Иначе — только отмеченным: отметьте и себя, если он нужен вам. "
+            "Администратор и аналитик видят все шаблоны. "
+            "Состав меняет автор шаблона или администратор."
+        ),
+    )
 
     class Meta:
         model = EmailTemplate
-        fields = "__all__"
+        exclude = ("visibility", "visible_to")
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        extra_ids: list[int] = []
+        if self.instance.pk:
+            extra_ids = list(self.instance.visible_to.values_list("pk", flat=True))
+        audience = cast(TemplateAudienceField, self.fields["audience"])
+        audience.set_managers(_audience_managers(extra_ids))
+        audience.lock(not self._may_edit_audience())
+        if not self.is_bound:
+            restricted = self.instance.pk and self.instance.visibility == EmailTemplate.Visibility.SELECTED
+            self.initial["audience"] = TemplateAudience(
+                everyone=not restricted,
+                user_ids=frozenset(extra_ids) if restricted else frozenset(),
+            )
 
     def clean(self) -> dict[str, Any]:
+        """Keep a shared or foreign list as it is, unless the author or an admin edits it."""
         cleaned = super().clean()
         if cleaned is None:
             return {}
-        visibility = cleaned.get("visibility")
-        if visibility != EmailTemplate.Visibility.AUTHOR:
+        audience = cleaned.get("audience")
+        if not isinstance(audience, TemplateAudience):
             return cleaned
+        if audience.everyone:
+            audience = TemplateAudience(everyone=True, user_ids=frozenset())
+            cleaned["audience"] = audience
+        if self._may_edit_audience() or audience == self._stored_audience():
+            return cleaned
+        self.add_error("audience", "Круг людей меняет автор шаблона или администратор.")
+        return cleaned
+
+    def _may_edit_audience(self) -> bool:
+        """New templates, the creator, and an admin may change who sees it."""
+        if not self.instance.pk:
+            return True
         request = getattr(self, "request", None)
         user = getattr(request, "user", None)
-        author_id = self.instance.created_by_id
         if user is None or not getattr(user, "is_authenticated", False):
-            self.add_error("visibility", "Сохраните шаблон ещё раз из админки.")
-            return cleaned
-        if author_id == user.pk or not self.instance.pk:
-            return cleaned
-        if staff_sees_all_leads(user):
-            return cleaned
-        self.add_error(
-            "visibility",
-            "Чужой или общий шаблон может сузить до себя только его автор или администратор.",
-        )
-        return cleaned
+            return False
+        if _may_assign_template_author(user):
+            return True
+        return self.instance.created_by_id == user.pk
+
+    def _stored_audience(self) -> TemplateAudience:
+        """Audience already saved on this row."""
+        if not self.instance.pk or self.instance.visibility != EmailTemplate.Visibility.SELECTED:
+            return TemplateAudience(everyone=True, user_ids=frozenset())
+        ids = frozenset(self.instance.visible_to.values_list("pk", flat=True))
+        return TemplateAudience(everyone=False, user_ids=ids)
 
 
 @admin.register(EmailTemplate)
@@ -256,7 +486,7 @@ class EmailTemplateAdmin(ModelAdmin):
     """Reusable email presets: picked via «Шаблон» on compose forms."""
 
     form = EmailTemplateAdminForm
-    list_display = ("name", "subject", "visibility", "is_active", "sort_order", "created_by", "updated_at")
+    list_display = ("name", "subject", "audience_label", "is_active", "sort_order", "created_by", "updated_at")
     list_editable = ("is_active", "sort_order")
     list_filter = ("is_active", "visibility")
     search_fields = ("name", "subject", "body")
@@ -266,23 +496,47 @@ class EmailTemplateAdmin(ModelAdmin):
         (
             None,
             {
-                "fields": ("name", "visibility", "is_active", "sort_order", "subject", "body"),
+                "fields": ("name", "created_by", "audience", "is_active", "sort_order", "subject", "body"),
                 "description": (
                     "Плейсхолдеры {имя}, {компания}, {почта}, {телефон}, {заказ} "
                     "подставляются из карточки клиента или заявки. "
                     "{заказ} — сообщение и позиции заявки; в письме с карточки клиента берётся последняя заявка. "
-                    "«Кому видно»: всем менеджерам или только автору."
+                    "«Автор» — кому принадлежит шаблон: этот человек меняет, кому он виден. "
+                    "Поле выбирает администратор. «Кому видно»: всем менеджерам или отмеченным людям."
                 ),
             },
         ),
         (
             "Метаданные",
             {
-                "fields": ("created_by", "created_at", "updated_at"),
+                "fields": ("created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),
     )
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: EmailTemplate | None = None,
+    ) -> list[str] | tuple[str, ...]:
+        """Managers see the author. An admin can set it when creating a template for someone."""
+        readonly = list(super().get_readonly_fields(request, obj))
+        if _may_assign_template_author(request.user):
+            return [name for name in readonly if name != "created_by"]
+        if "created_by" not in readonly:
+            readonly.append("created_by")
+        return readonly
+
+    def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        """Author choices are active managers, not every user in the database."""
+        if db_field.name == "created_by":
+            kwargs["queryset"] = _author_queryset(request)
+            kwargs["help_text"] = (
+                "Кому принадлежит шаблон. Этот человек меняет, кому он виден. "
+                "Пустое поле при сохранении оставляет шаблон за вами."
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_form(
         self,
@@ -301,9 +555,17 @@ class EmailTemplateAdmin(ModelAdmin):
         return EmailTemplateRequestForm
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[EmailTemplate]:
-        """Managers see shared templates and their own. Unscoped staff see all."""
-        qs = super().get_queryset(request).select_related("created_by")
+        """Managers see shared templates and ones they are checked on. Unscoped staff see all."""
+        qs = super().get_queryset(request).select_related("created_by").prefetch_related("visible_to")
         return email_templates_for_user(request.user, qs)
+
+    @admin.display(description="кому видно")
+    def audience_label(self, obj: EmailTemplate) -> str:
+        """«Всем менеджерам» or the checked names."""
+        if obj.visibility != EmailTemplate.Visibility.SELECTED:
+            return "Всем менеджерам"
+        names = sorted(manager_display_name(user) for user in obj.visible_to.all())
+        return ", ".join(names) if names else "—"
 
     def save_model(
         self,
@@ -312,17 +574,24 @@ class EmailTemplateAdmin(ModelAdmin):
         form: Any,
         change: bool,
     ) -> None:
-        """The first save records the author. A manager cannot claim a colleague's template."""
+        """A blank author on the first save is the person saving. The checkbox list sets who sees it."""
         if not change and obj.created_by_id is None:
             obj.created_by = request.user
-        if obj.visibility == EmailTemplate.Visibility.AUTHOR:
-            if obj.created_by_id is None and staff_sees_all_leads(request.user):
-                obj.created_by = request.user
-            elif obj.created_by_id != request.user.pk and not staff_sees_all_leads(request.user):
-                obj.visibility = EmailTemplate.Visibility.ALL
-            elif obj.created_by_id is None:
-                obj.visibility = EmailTemplate.Visibility.ALL
+        audience = form.cleaned_data.get("audience")
+        if isinstance(audience, TemplateAudience):
+            obj.visibility = EmailTemplate.Visibility.ALL if audience.everyone else EmailTemplate.Visibility.SELECTED
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        """Store the checked managers. «Всем» clears the list so new managers stay included."""
+        super().save_related(request, form, formsets, change)
+        audience = form.cleaned_data.get("audience")
+        if not isinstance(audience, TemplateAudience):
+            return
+        if audience.everyone:
+            form.instance.visible_to.clear()
+        else:
+            form.instance.visible_to.set(audience.user_ids)
 
 
 @admin.register(EmailAttachment)

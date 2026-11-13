@@ -143,6 +143,11 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert "07.10.2026" in doc.body
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
+    assert 'id="changelog-email-template-author"' in doc.body
+    assert doc.body.index("changelog-email-template-author") < doc.body.index("changelog-email-template-audience")
+    assert 'id="changelog-email-template-audience"' in doc.body
+    assert "конкретных людей" in doc.body
+    assert doc.body.index("changelog-email-template-audience") < doc.body.index("changelog-email-body-plain")
     assert 'id="changelog-email-body-plain"' in doc.body
     assert doc.body.index("changelog-email-body-plain") < doc.body.index("changelog-pin-from-company")
     assert 'id="changelog-pin-from-company"' in doc.body
