@@ -50,6 +50,7 @@ class RobotsTxtView(View):
             "Disallow: /rfq",
             "Disallow: /replacement",
             "Disallow: /compare",
+            "Disallow: /komanda",
             "",
             f"Sitemap: {_site_base_url(request)}/sitemap.xml",
         ]

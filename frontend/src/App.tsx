@@ -56,6 +56,12 @@ const QuoteReplyPage = lazyWithChunkReload(() => import("./pages/QuoteReplyPage"
 const NotFoundPage = lazyWithChunkReload(() =>
   import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
 );
+const StaffCardPage = lazyWithChunkReload(() =>
+  import("./pages/StaffCardPage").then((m) => ({ default: m.StaffCardPage })),
+);
+const TeamPage = lazyWithChunkReload(() =>
+  import("./pages/TeamPage").then((m) => ({ default: m.TeamPage })),
+);
 const LoginPage = lazyWithChunkReload(() => import("./account/LoginPage"));
 const RegisterPage = lazyWithChunkReload(() => import("./account/RegisterPage"));
 const AccountShell = lazyWithChunkReload(() => import("./account/AccountShell"));
@@ -136,6 +142,8 @@ export default function App() {
     <ChunkLoadErrorBoundary>
       <Suspense fallback={<PageFallback />}>
         <Routes>
+          {/* Outside Layout: a personal card is the whole screen, without the catalog header. */}
+          <Route path="komanda/:slug" element={<StaffCardPage />} />
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="catalog" element={<CatalogPage />} />
@@ -192,6 +200,7 @@ export default function App() {
             <Route path="dokumentaciya" element={<DocsPage />} />
             <Route path="faq" element={<PageView slug="faq" />} />
             <Route path="kontakty" element={<PageView slug="kontakty" />} />
+            <Route path="komanda" element={<TeamPage />} />
             <Route path="oferta" element={<PageView slug="oferta" />} />
             <Route path="privacy-policy" element={<PageView slug="privacy-policy" />} />
             <Route path="terms" element={<PageView slug="terms" />} />
