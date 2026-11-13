@@ -443,6 +443,9 @@ export function Layout() {
               <li>
                 <Link to="/kontakty">Все контакты</Link>
               </li>
+              <li>
+                <Link to="/komanda">Команда</Link>
+              </li>
             </ul>
           </div>
         </div>
@@ -479,11 +482,7 @@ export function Layout() {
       <DeferredShellMount mode="interaction">
         <LazyMarketingPushPrompt />
       </DeferredShellMount>
-      <DeferredShellMount
-        mode="idle"
-        eagerWhen={() => getSupportChatState().open}
-        watchSupportChat
-      >
+      <DeferredShellMount mode="idle" eagerWhen={() => getSupportChatState().open} watchSupportChat>
         <LazySupportWidget />
       </DeferredShellMount>
     </CompareProvider>

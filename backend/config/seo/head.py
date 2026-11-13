@@ -552,10 +552,16 @@ def resolve_seo_context(raw_path: str) -> SeoHeadContext:
             "/register": "Регистрация",
             "/account": "Личный кабинет",
             "/kp": "Ответ на коммерческое предложение",
+            "/komanda": "Команда",
+            "/komanda-card": "Визитка",
         }
         title_key = path
         if path.startswith("/account/") or path == "/account":
             title_key = "/account"
+        if path == "/komanda":
+            title_key = "/komanda"
+        elif path.startswith("/komanda/"):
+            title_key = "/komanda-card"
         return SeoHeadContext(
             canonical_path=path,
             page_title=_format_page_title(titles.get(title_key)),
