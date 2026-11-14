@@ -79,9 +79,15 @@ def perm_view_lead(request: HttpRequest) -> bool:
 
 
 def perm_view_client(request: HttpRequest) -> bool:
-    """Whether the user may see CRM clients in the Unfold sidebar."""
+    """Whether the user may see CRM person cards in the Unfold sidebar."""
     user = getattr(request, "user", None)
     return bool(user and user.is_authenticated and user.has_perm("crm.view_client"))
+
+
+def perm_view_company(request: HttpRequest) -> bool:
+    """Whether the user may see the firm list («Клиенты») in the Unfold sidebar."""
+    user = getattr(request, "user", None)
+    return bool(user and user.is_authenticated and user.has_perm("crm.view_company"))
 
 
 def perm_view_sku(request: HttpRequest) -> bool:

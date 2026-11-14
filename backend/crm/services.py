@@ -17,6 +17,7 @@ from crm.models import (
     Activity,
     ActivityType,
     Client,
+    Company,
     EmailDirection,
     EmailMessage,
     EmailStatus,
@@ -461,6 +462,29 @@ def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet
     return queryset.filter(
         Q(assignee_id=user.pk) | Q(leads__pk__in=scoped_lead_ids) | Q(activities__author_id=user.pk),
     ).distinct()
+
+
+def scope_companies_for_manager(queryset: QuerySet[Company], user: Any) -> QuerySet[Company]:
+    """Firms a manager counts as their own.
+
+    Admin and analyst see every firm. A manager counts firms assigned to them.
+    The company directory itself stays shared, so a colleague's firm can still
+    be opened; the dashboard card links to the list already filtered to this set.
+
+    Args:
+        queryset: base Company queryset.
+        user: authenticated staff user.
+
+    Returns:
+        Filtered Company queryset.
+    """
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+    return queryset.filter(assignee_id=user.pk)
 
 
 def scope_activities_for_manager(

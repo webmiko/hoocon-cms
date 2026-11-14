@@ -143,6 +143,38 @@ def test_lead_sticker_visible_on_changelist_not_only_index() -> None:
 
 
 @pytest.mark.django_db
+def test_clients_sidebar_link_uses_company_permission() -> None:
+    """«Клиенты» ведёт в список фирм и виден по праву view_company, не view_client."""
+    from django.contrib.auth.models import Permission
+
+    def grant(user: User, codename: str) -> None:
+        user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="crm", codename=codename),
+        )
+
+    company_only = User.objects.create_user(
+        username="nav-company-only",
+        email="nav-company-only@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    grant(company_only, "view_company")
+    client = Client()
+    client.force_login(company_only)
+    assert 'href="/admin/crm/company/"' in client.get("/admin/").content.decode()
+
+    people_only = User.objects.create_user(
+        username="nav-people-only",
+        email="nav-people-only@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    grant(people_only, "view_client")
+    client.force_login(people_only)
+    assert 'href="/admin/crm/company/"' not in client.get("/admin/").content.decode()
+
+
+@pytest.mark.django_db
 def test_sidebar_hides_leads_without_view_permission() -> None:
     """Staff without leads.view_lead must not see Лиды in Unfold sidebar."""
     staff = User.objects.create_user(
