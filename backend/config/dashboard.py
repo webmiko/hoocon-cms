@@ -300,34 +300,39 @@ def _build_stat_cards(
             ],
         )
 
-    if can_crm:
+    if can_crm or user.has_perm("crm.view_company"):
+        from accounts.roles import staff_sees_all_leads
         from crm.models import Company, EmailMessage, EmailStatus
-        from crm.services import scope_emails_for_manager
+        from crm.services import scope_companies_for_manager, scope_emails_for_manager
 
-        clients_n = Company.objects.count()
-        sent_period = scope_emails_for_manager(
-            EmailMessage.objects.filter(
-                status=EmailStatus.SENT,
-                sent_at__gte=since,
-            ),
-            user,
-        ).count()
-        cards.extend(
-            [
+        if user.has_perm("crm.view_company"):
+            company_url = reverse("admin:crm_company_changelist")
+            if not staff_sees_all_leads(user):
+                company_url = f"{company_url}?manager={user.pk}"
+            cards.append(
                 {
                     "label": "Клиенты CRM",
-                    "value": clients_n,
+                    "value": scope_companies_for_manager(Company.objects.all(), user).count(),
                     "accent": False,
-                    "url": reverse("admin:crm_company_changelist"),
+                    "url": company_url,
                 },
+            )
+        if can_crm:
+            sent_period = scope_emails_for_manager(
+                EmailMessage.objects.filter(
+                    status=EmailStatus.SENT,
+                    sent_at__gte=since,
+                ),
+                user,
+            ).count()
+            cards.append(
                 {
                     "label": f"Писем за {_STATS_DAYS} дн.",
                     "value": sent_period,
                     "accent": False,
                     "url": reverse("admin:crm_emailmessage_changelist"),
                 },
-            ],
-        )
+            )
     return cards
 
 

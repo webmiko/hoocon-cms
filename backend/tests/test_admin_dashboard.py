@@ -57,6 +57,56 @@ def test_admin_index_has_no_quick_links_strip() -> None:
 
 
 @pytest.mark.django_db
+def test_manager_dashboard_counts_only_their_companies() -> None:
+    """«Клиенты CRM» — фирмы этого менеджера, не весь справочник CRM."""
+    from django.contrib.auth.models import Group
+    from django.test import RequestFactory
+
+    from accounts.roles import GROUP_MANAGER
+    from accounts.services import ensure_staff_groups
+    from config.dashboard import build_admin_dashboard
+    from crm.models import Company
+
+    ensure_staff_groups()
+    manager = User.objects.create_user(
+        username="dash-own-mgr",
+        email="dash-own-mgr@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    other = User.objects.create_user(
+        username="dash-other-mgr",
+        email="dash-other-mgr@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    group = Group.objects.get(name=GROUP_MANAGER)
+    manager.groups.add(group)
+    other.groups.add(group)
+    Company.objects.create(name="Моя фирма", assignee=manager)
+    Company.objects.create(name="Чужая фирма", assignee=other)
+    Company.objects.create(name="Свободная фирма")
+
+    request = RequestFactory().get("/admin/")
+    request.user = manager
+    cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
+    card = next(item for item in cards if item["label"] == "Клиенты CRM")
+    assert card["value"] == 1
+    assert card["url"].endswith(f"/admin/crm/company/?manager={manager.pk}")
+
+    admin = User.objects.create_superuser(
+        username="dash-all-admin",
+        email="dash-all-admin@example.com",
+        password="password12",
+    )
+    request.user = admin
+    admin_cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
+    admin_card = next(item for item in admin_cards if item["label"] == "Клиенты CRM")
+    assert admin_card["value"] == 3
+    assert "manager=" not in admin_card["url"]
+
+
+@pytest.mark.django_db
 def test_build_admin_dashboard_payload_keys() -> None:
     """Service returns expected dashboard sections for staff."""
     from django.test import RequestFactory
