@@ -78,12 +78,6 @@ def perm_view_lead(request: HttpRequest) -> bool:
     return _can_view_leads(request)
 
 
-def perm_view_client(request: HttpRequest) -> bool:
-    """Whether the user may see CRM person cards in the Unfold sidebar."""
-    user = getattr(request, "user", None)
-    return bool(user and user.is_authenticated and user.has_perm("crm.view_client"))
-
-
 def perm_view_company(request: HttpRequest) -> bool:
     """Whether the user may see the firm list («Клиенты») in the Unfold sidebar."""
     user = getattr(request, "user", None)
