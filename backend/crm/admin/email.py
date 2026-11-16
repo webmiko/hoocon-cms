@@ -65,6 +65,10 @@ class EmailMessageAdminForm(forms.ModelForm):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        # IMAP may leave client empty while a manager's copy waits for the
+        # customer's letter. A card saved by hand still names the client.
+        if "client" in self.fields:
+            self.fields["client"].required = True
         if self.is_bound or "body" not in self.fields:
             return
         self.initial["body"] = email_body_for_reading(self.initial.get("body") or "")
@@ -652,8 +656,9 @@ class EmailAttachmentAdmin(ModelAdmin):
 class InboundMailboxStateAdmin(ModelAdmin):
     """IMAP cursor + fetch health (singleton; read-only for staff)."""
 
-    list_display = ("folder", "last_uid", "last_run_at", "last_error")
+    list_display = ("folder", "intake", "last_uid", "last_run_at", "last_error")
     readonly_fields = ("folder", "last_uid", "last_run_at", "last_error")
+    fields = ("folder", "intake", "intake_subjects", "last_uid", "last_run_at", "last_error")
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Singleton row is created by the fetch task."""

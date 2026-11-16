@@ -311,7 +311,7 @@ def _build_stat_cards(
                 company_url = f"{company_url}?manager={user.pk}"
             cards.append(
                 {
-                    "label": "Клиенты CRM",
+                    "label": "Фирмы",
                     "value": scope_companies_for_manager(Company.objects.all(), user).count(),
                     "accent": False,
                     "url": company_url,

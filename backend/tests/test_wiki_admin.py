@@ -143,6 +143,8 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert "07.10.2026" in doc.body
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
+    assert 'id="changelog-dashboard-firm-labels"' in doc.body
+    assert doc.body.index("changelog-dashboard-firm-labels") < doc.body.index("changelog-dashboard-own-firms")
     assert 'id="changelog-dashboard-own-firms"' in doc.body
     assert doc.body.index("changelog-dashboard-own-firms") < doc.body.index("changelog-email-template-author")
     assert 'id="changelog-email-template-author"' in doc.body
@@ -736,3 +738,22 @@ def test_seed_wiki_says_support_bot_does_not_answer_clients() -> None:
     row = changelog.split('id="changelog-support-bot-off"', 1)[1].split("</tr>", 1)[0]
     assert "26.10.2026" in row
     assert "больше не отвечает клиенту" in row
+
+
+@pytest.mark.django_db
+def test_seed_wiki_says_mailbox_takes_requests_not_every_letter() -> None:
+    """Руководство: из ящика по умолчанию забираются заявки и запросы КП, не вся папка."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    body, changelog = guide.body.split('id="changelog"', 1)
+    assert "Какие письма забирать" in body
+    assert "формы стоят вместе" in body
+    assert 'id="changelog-forms-before-calls"' in changelog
+    assert "Обычная переписка" in changelog
+    row = changelog.split('id="changelog-imap-intake"', 1)[1].split("</tr>", 1)[0]
+    assert "17.11.2026" in row
+    assert "Вся папка" in row

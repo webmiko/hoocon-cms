@@ -58,7 +58,7 @@ def test_admin_index_has_no_quick_links_strip() -> None:
 
 @pytest.mark.django_db
 def test_manager_dashboard_counts_only_their_companies() -> None:
-    """«Клиенты CRM» — фирмы этого менеджера, не весь справочник CRM."""
+    """«Фирмы» на панели — карточки этого менеджера, не весь справочник."""
     from django.contrib.auth.models import Group
     from django.test import RequestFactory
 
@@ -90,7 +90,7 @@ def test_manager_dashboard_counts_only_their_companies() -> None:
     request = RequestFactory().get("/admin/")
     request.user = manager
     cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
-    card = next(item for item in cards if item["label"] == "Клиенты CRM")
+    card = next(item for item in cards if item["label"] == "Фирмы")
     assert card["value"] == 1
     assert card["url"].endswith(f"/admin/crm/company/?manager={manager.pk}")
 
@@ -101,9 +101,42 @@ def test_manager_dashboard_counts_only_their_companies() -> None:
     )
     request.user = admin
     admin_cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
-    admin_card = next(item for item in admin_cards if item["label"] == "Клиенты CRM")
+    admin_card = next(item for item in admin_cards if item["label"] == "Фирмы")
     assert admin_card["value"] == 3
     assert "manager=" not in admin_card["url"]
+
+
+@pytest.mark.django_db
+def test_dashboard_firms_card_requires_view_company() -> None:
+    """Плитка «Фирмы» на панели требует crm.view_company, одного view_client мало."""
+    from django.contrib.auth.models import Permission
+    from django.test import RequestFactory
+
+    from config.dashboard import build_admin_dashboard
+
+    def grant(user: User, codename: str) -> None:
+        user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="crm", codename=codename),
+        )
+
+    people_only = User.objects.create_user(
+        username="dash-people-only",
+        email="dash-people-only@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    grant(people_only, "view_client")
+    request = RequestFactory().get("/admin/")
+    request.user = people_only
+    cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
+    assert not any(item["label"] == "Фирмы" for item in cards)
+
+    grant(people_only, "view_company")
+    # has_perm caches the first lookup; a fresh row sees the new permission.
+    people_only = User.objects.get(pk=people_only.pk)
+    request.user = people_only
+    cards = build_admin_dashboard(request)["hoocon_dashboard"]["cards"]
+    assert any(item["label"] == "Фирмы" for item in cards)
 
 
 @pytest.mark.django_db

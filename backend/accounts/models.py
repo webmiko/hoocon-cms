@@ -10,6 +10,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from config.pdn import PdnConsentFields
+from crm.mail_intake import MailIntake
 
 
 class SuperuserRecoveryCode(models.Model):
@@ -244,6 +245,28 @@ class StaffMailbox(models.Model):
             "Если заявки складываете в отдельную папку — имя как в Яндекс.Почте "
             "(например «Заявки»). После смены папки письма в новой папке "
             "подтянутся заново, дублей в CRM не будет."
+        ),
+    )
+    intake = models.CharField(
+        _("какие письма забирать"),
+        max_length=16,
+        choices=MailIntake.choices,
+        default=MailIntake.REQUESTS,
+        help_text=_(
+            "«Только заявки и запросы КП» — новое письмо берём, если в теме заявка, "
+            "консультация, запрос или КП. Ответ на письмо, которое уже есть в CRM, "
+            "берём и без этих слов. «Только продолжение» — новых заявок из почты нет. "
+            "«Вся папка» — каждое письмо папки. Уже пройденные письма повторно не читаются."
+        ),
+    )
+    intake_subjects = models.TextField(
+        _("слова в теме"),
+        blank=True,
+        default="",
+        help_text=_(
+            "По одному фрагменту темы в строке. Пусто — стандартный список: "
+            "заявка, консультац, запрос, коммерческ, кп. "
+            "Короткое «кп» ищется отдельным словом, чтобы не задеть «покупка»."
         ),
     )
     smtp_host = models.CharField(

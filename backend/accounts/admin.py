@@ -85,6 +85,8 @@ class StaffMailboxInline(LabeledToggleMixin, StackedInline):
         "imap_user",
         "imap_password",
         "folder",
+        "intake",
+        "intake_subjects",
         "smtp_host",
         "smtp_port",
         "smtp_use_ssl",

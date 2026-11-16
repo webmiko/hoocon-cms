@@ -172,9 +172,9 @@
       {% endif %}
 
       {% if hoocon_dashboard.recent_clients is not None %}
-      <section class="hoocon-dash__panel" aria-label="Клиенты CRM">
+      <section class="hoocon-dash__panel" aria-label="Люди CRM">
         <div class="hoocon-dash__panel-head">
-          <h2 class="hoocon-dash__h2">Клиенты (обновления)</h2>
+          <h2 class="hoocon-dash__h2">Люди (обновления)</h2>
           {% if hoocon_dashboard.links.clients %}
             <a href="{{ hoocon_dashboard.links.clients }}">Все →</a>
           {% endif %}
@@ -192,7 +192,7 @@
           {% endfor %}
         </ul>
         {% else %}
-        <p class="hoocon-dash__empty">Клиентов пока нет.</p>
+        <p class="hoocon-dash__empty">Контактов пока нет.</p>
         {% endif %}
       </section>
       {% endif %}

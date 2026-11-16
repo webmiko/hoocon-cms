@@ -13,6 +13,8 @@ from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.utils import timezone
 
+from crm.mail_intake import MailIntake
+
 
 class Client(models.Model):
     """B2B contact / company card for managers.
@@ -220,13 +222,23 @@ class EmailStatus(models.TextChoices):
 
 
 class EmailMessage(models.Model):
-    """Email linked to a CRM Client (outbound from Admin; inbound later)."""
+    """Email linked to a CRM Client (outbound from Admin; inbound later).
 
-    client: models.ForeignKey = models.ForeignKey(
+    ``client`` is empty only for a manager's own copy that arrived before
+    the customer's letter. The fetch fills it once that letter is stored.
+    """
+
+    client: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         Client,
         on_delete=models.CASCADE,
         related_name="emails",
         verbose_name="клиент",
+        null=True,
+        blank=True,
+        help_text=(
+            "Пусто у копии ответа менеджера, пока письмо клиента ещё не разобрано. "
+            "После разбора сюда ставится карточка клиента."
+        ),
     )
     lead: models.ForeignKey | None = models.ForeignKey(  # type: ignore[misc]
         "leads.Lead",
@@ -492,6 +504,28 @@ class InboundMailboxState(models.Model):
     """Singleton: IMAP cursor + health for ``crm.fetch_inbound_email``."""
 
     folder: models.CharField = models.CharField("папка", max_length=100, default="INBOX")
+    intake: models.CharField = models.CharField(
+        "какие письма забирать",
+        max_length=16,
+        choices=MailIntake.choices,
+        default=MailIntake.REQUESTS,
+        help_text=(
+            "«Только заявки и запросы КП» — новое письмо берём, если в теме заявка, "
+            "консультация, запрос или КП. Ответ на письмо, которое уже есть в CRM, "
+            "берём и без этих слов. «Только продолжение» — новых заявок из почты нет. "
+            "«Вся папка» — каждое письмо папки. Уже пройденные письма повторно не читаются."
+        ),
+    )
+    intake_subjects: models.TextField = models.TextField(
+        "слова в теме",
+        blank=True,
+        default="",
+        help_text=(
+            "По одному фрагменту темы в строке. Пусто — стандартный список: "
+            "заявка, консультац, запрос, коммерческ, кп. "
+            "Короткое «кп» ищется отдельным словом, чтобы не задеть «покупка»."
+        ),
+    )
     last_uid: models.PositiveBigIntegerField = models.PositiveBigIntegerField(
         "последний обработанный UID",
         default=0,

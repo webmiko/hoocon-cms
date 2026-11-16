@@ -13,6 +13,10 @@
     in_progress: "В работе",
     done: "Завершена",
   };
+  const ORIGIN_LABELS = {
+    site: "Форма сайта",
+    call: "Звонок",
+  };
   const BOARD_BUILT = "data-hoocon-lead-board-built";
   const DRAG_MIME = "application/x-hoocon-lead-pk";
 
@@ -69,6 +73,42 @@
       return "in_progress";
     }
     return "new";
+  }
+
+  /**
+   * Site form (chip «Форма сайта») or a call-only card.
+   * A form that later got a call stays with the forms.
+   *
+   * @param {HTMLTableRowElement} row
+   * @returns {"site"|"call"}
+   */
+  function rowOrigin(row) {
+    if (row.querySelector(".hoocon-lead-origin--site")) {
+      return "site";
+    }
+    if (row.querySelector(".hoocon-lead-origin--answered, .hoocon-lead-origin--missed")) {
+      return "call";
+    }
+    return "site";
+  }
+
+  /**
+   * @param {HTMLTableRowElement} row
+   * @param {string} className
+   * @param {string} text
+   */
+  function insertHeading(row, className, text) {
+    const heading = document.createElement("tr");
+    heading.className = className;
+    heading.setAttribute("aria-hidden", "true");
+    const cell = document.createElement("td");
+    cell.colSpan = 99;
+    cell.textContent = text;
+    heading.appendChild(cell);
+    const parent = row.parentElement;
+    if (parent) {
+      parent.insertBefore(heading, row);
+    }
   }
 
   /**
@@ -315,23 +355,32 @@
     if (!rowsUseStatusBlockOrder(rows)) {
       return;
     }
-    let last = null;
+    /** @type {Record<string, {site: boolean, call: boolean}>} */
+    const originsInStatus = {};
     rows.forEach(function (row) {
       const status = rowStatus(row);
-      if (status === last) {
-        return;
+      const bucket = originsInStatus[status] || { site: false, call: false };
+      bucket[rowOrigin(row)] = true;
+      originsInStatus[status] = bucket;
+    });
+    let lastStatus = null;
+    let lastOrigin = null;
+    rows.forEach(function (row) {
+      const status = rowStatus(row);
+      const origin = rowOrigin(row);
+      if (status !== lastStatus) {
+        insertHeading(row, "hoocon-lead-wall-heading", STATUS_LABELS[status] || status);
+        lastStatus = status;
+        lastOrigin = null;
       }
-      last = status;
-      const heading = document.createElement("tr");
-      heading.className = "hoocon-lead-wall-heading";
-      heading.setAttribute("aria-hidden", "true");
-      const cell = document.createElement("td");
-      cell.colSpan = 99;
-      cell.textContent = STATUS_LABELS[status] || status;
-      heading.appendChild(cell);
-      const parent = row.parentElement;
-      if (parent) {
-        parent.insertBefore(heading, row);
+      const both = originsInStatus[status].site && originsInStatus[status].call;
+      if (both && origin !== lastOrigin) {
+        insertHeading(
+          row,
+          "hoocon-lead-wall-heading hoocon-lead-wall-heading--origin",
+          ORIGIN_LABELS[origin],
+        );
+        lastOrigin = origin;
       }
     });
   }
@@ -386,9 +435,28 @@
       cols[status] = { col: col, cards: cards, count: count };
     });
 
+    /** @type {Record<string, {site: boolean, call: boolean}>} */
+    const originsInStatus = {};
     rows.forEach(function (row) {
       const status = rowStatus(row);
+      const bucket = originsInStatus[status] || { site: false, call: false };
+      bucket[rowOrigin(row)] = true;
+      originsInStatus[status] = bucket;
+    });
+    /** @type {Record<string, string|null>} */
+    const lastOrigin = {};
+    rows.forEach(function (row) {
+      const status = rowStatus(row);
+      const origin = rowOrigin(row);
       const bucket = cols[status] || cols.new;
+      const both = originsInStatus[status].site && originsInStatus[status].call;
+      if (both && lastOrigin[status] !== origin) {
+        const label = document.createElement("div");
+        label.className = "hoocon-lead-kanban__origin";
+        label.textContent = ORIGIN_LABELS[origin];
+        bucket.cards.appendChild(label);
+        lastOrigin[status] = origin;
+      }
       bucket.cards.appendChild(row);
     });
 
