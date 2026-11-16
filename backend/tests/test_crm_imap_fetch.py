@@ -17,7 +17,9 @@ from django.conf import settings as django_settings
 from django_celery_beat.models import PeriodicTask
 
 from crm.imap_fetch import fetch_inbound_email
+from crm.mail_intake import MailIntake
 from crm.models import (
+    Activity,
     Client,
     EmailAttachment,
     EmailDirection,
@@ -32,6 +34,7 @@ def _raw_email(
     *,
     message_id: str = "<mail-1@example.test>",
     from_addr: str = "Buyer <buyer@example.test>",
+    to_addr: str = "sales@hoocon.ru",
     subject: str = "Вопрос",
     body: str = "Текст письма",
     in_reply_to: str | None = None,
@@ -42,7 +45,7 @@ def _raw_email(
     msg = StdEmailMessage()
     msg["Message-ID"] = message_id
     msg["From"] = from_addr
-    msg["To"] = "sales@hoocon.ru"
+    msg["To"] = to_addr
     msg["Subject"] = subject
     msg["Date"] = "Mon, 06 Oct 2026 10:00:00 +0300"
     if in_reply_to:
@@ -101,8 +104,13 @@ def _imap(
     monkeypatch: pytest.MonkeyPatch,
     settings: Any,
     tmp_path: Any,
+    db: None,
 ) -> dict[int, bytes]:
-    """Enable IMAP with an empty fake store; silence staff notify."""
+    """Enable IMAP with an empty fake store; silence staff notify.
+
+    The shared mailbox stays on «Вся папка»: these tests check delivery,
+    not which subjects count as a request. Request-only mode has its own tests.
+    """
     store: dict[int, bytes] = {}
     settings.IMAP_ENABLED = True
     settings.IMAP_USE_SSL = True
@@ -123,6 +131,9 @@ def _imap(
     _FakeIMAP.selected.clear()
     monkeypatch.setattr("crm.imap_fetch.imaplib.IMAP4_SSL", _connect)
     monkeypatch.setattr("crm.imap_fetch._notify_staff", lambda msg_row, box: None)
+    state = InboundMailboxState.get_solo()
+    state.intake = MailIntake.ALL
+    state.save(update_fields=["intake"])
     return store
 
 
@@ -304,6 +315,369 @@ def test_fetch_unknown_sender_creates_client_and_lead(_imap: dict[int, bytes]) -
     assert lead.lead_type == Lead.LeadType.CONSULTATION
     lead.refresh_from_db()
     assert lead.client_id == row.client_id  # сигнал привязал карточку
+
+
+def _alexander_mailbox(settings: Any) -> Any:
+    """Личный ящик Александра. Общий IMAP выключен, чтобы тест читал только его."""
+    from accounts.models import StaffMailbox
+
+    settings.IMAP_ENABLED = False
+    owner = _staff_user("alexander")
+    return StaffMailbox.objects.create(
+        user=owner,
+        imap_user="alexander@hoocon.ru",
+        imap_password="app-not-secret",
+        folder="Заявки",
+    )
+
+
+@pytest.mark.django_db
+def test_manager_reply_arriving_before_the_client_joins_one_lead(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """Копия ответа в «Заявках» раньше письма клиента — одна заявка, не две.
+
+    От кого — ящик менеджера, кому — клиент, In-Reply-To — письмо клиента.
+    Заявка создаётся из письма клиента; ответ лежит в ней как исходящее.
+    """
+    _alexander_mailbox(settings)
+    _imap[6] = _raw_email(
+        message_id="<reply@yandex>",
+        from_addr="Александр Шевченко <alexander@hoocon.ru>",
+        to_addr="yurich@bk.ru",
+        subject="Re: Запрос на аналоги",
+        body="Антон Юрьевич, здравствуйте!",
+        in_reply_to="<client@bk.ru>",
+    )
+    _imap[7] = _raw_email(
+        message_id="<client@bk.ru>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        to_addr="alexander@hoocon.ru",
+        subject="Запрос на аналоги",
+        body="Просим выставить КП",
+    )
+
+    fetch_inbound_email()
+
+    assert not Client.objects.filter(email="alexander@hoocon.ru").exists()
+    assert Lead.objects.count() == 1
+    lead = Lead.objects.get()
+    assert lead.email == "yurich@bk.ru"
+    assert lead.lead_type == Lead.LeadType.CONSULTATION
+    assert "Просим выставить КП" in lead.message
+    assert "здравствуйте" not in lead.message
+    incoming = EmailMessage.objects.get(message_id="<client@bk.ru>")
+    reply = EmailMessage.objects.get(message_id="<reply@yandex>")
+    assert incoming.direction == EmailDirection.INBOUND
+    assert incoming.lead_id == lead.pk
+    assert reply.direction == EmailDirection.OUTBOUND
+    assert reply.status == EmailStatus.SENT
+    assert reply.from_email == "alexander@hoocon.ru"
+    assert reply.to_email == "yurich@bk.ru"
+    assert reply.lead_id == lead.pk
+    assert reply.client_id == incoming.client_id
+    assert Activity.objects.filter(lead=lead, subject="Re: Запрос на аналоги").exists()
+
+
+@pytest.mark.django_db
+def test_manager_reply_waits_until_the_client_letter_arrives(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """Ответ менеджера без письма клиента в базе не открывает заявку.
+
+    Адрес клиента ещё не существует. Копия ждёт без карточки менеджера.
+    Следующий опрос забирает письмо клиента и собирает оба в одну заявку.
+    """
+    _alexander_mailbox(settings)
+    _imap[6] = _raw_email(
+        message_id="<reply@yandex>",
+        from_addr="Александр Шевченко <alexander@hoocon.ru>",
+        to_addr="yurich@bk.ru",
+        subject="Re: Запрос на аналоги",
+        body="Антон Юрьевич, здравствуйте!",
+        in_reply_to="<client@bk.ru>",
+    )
+
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 0
+    assert not Client.objects.filter(email__in=["alexander@hoocon.ru", "yurich@bk.ru"]).exists()
+    reply = EmailMessage.objects.get(message_id="<reply@yandex>")
+    assert reply.client_id is None
+    assert reply.lead_id is None
+    assert reply.to_email == "yurich@bk.ru"
+
+    _imap[7] = _raw_email(
+        message_id="<client@bk.ru>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        to_addr="alexander@hoocon.ru",
+        subject="Запрос на аналоги",
+        body="Просим выставить КП",
+    )
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 1
+    lead = Lead.objects.get()
+    assert lead.email == "yurich@bk.ru"
+    reply.refresh_from_db()
+    assert reply.lead_id == lead.pk
+    assert reply.client is not None
+    assert reply.client.email == "yurich@bk.ru"
+
+
+@pytest.mark.django_db
+def test_known_manager_address_does_not_open_a_lead(_imap: dict[int, bytes]) -> None:
+    """Письмо с адреса менеджера в общий ящик — не новая заявка-консультация."""
+    manager = _staff_user("alexander")
+    manager.email = "alexander@hoocon.ru"
+    manager.save(update_fields=["email"])
+    _imap[3] = _raw_email(
+        message_id="<mgr@t>",
+        from_addr="Александр Шевченко <alexander@hoocon.ru>",
+        to_addr="yurich@bk.ru",
+        subject="Re: Запрос на аналоги",
+        body="Ответ клиенту",
+    )
+
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 0
+    assert not Client.objects.filter(email__in=["alexander@hoocon.ru", "yurich@bk.ru"]).exists()
+    row = EmailMessage.objects.get(message_id="<mgr@t>")
+    assert row.lead_id is None
+    assert row.from_email == "alexander@hoocon.ru"
+    assert row.to_email == "yurich@bk.ru"
+
+
+@pytest.mark.django_db
+def test_manager_copy_does_not_join_a_lead_by_subject_number(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """«Заявка #N» в теме своей копии не прикрепляет её к чужой заявке."""
+    _alexander_mailbox(settings)
+    buyer = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.CONSULTATION,
+        name="B",
+        email=buyer.email,
+        message="Вопрос",
+        client=buyer,
+    )
+    _imap[4] = _raw_email(
+        message_id="<own-subject@t>",
+        from_addr="Александр Шевченко <alexander@hoocon.ru>",
+        to_addr="other@corp.test",
+        subject=f"Re: Заявка #{lead.pk}",
+        body="Это не ответ buyer",
+    )
+
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 1
+    row = EmailMessage.objects.get(message_id="<own-subject@t>")
+    assert row.lead_id is None
+    assert not Client.objects.filter(email="other@corp.test").exists()
+
+
+@pytest.mark.django_db
+def test_stranger_addressed_to_the_client_does_not_join_the_thread(
+    _imap: dict[int, bytes],
+) -> None:
+    """Чужой From не становится ответом менеджера, даже если «кому» — клиент."""
+    buyer = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="B",
+        email=buyer.email,
+        message="RFQ",
+        client=buyer,
+    )
+    EmailMessage.objects.create(
+        client=buyer,
+        lead=lead,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.SENT,
+        to_email=buyer.email,
+        from_email="sales@hoocon.ru",
+        subject="КП",
+        body="…",
+        message_id="<sent@hoocon.ru>",
+    )
+    _imap[8] = _raw_email(
+        message_id="<spoof-to@t>",
+        from_addr="Злоумышленник <evil@attacker.test>",
+        to_addr=buyer.email,
+        in_reply_to="<sent@hoocon.ru>",
+        subject="Re: КП",
+    )
+
+    fetch_inbound_email()
+
+    row = EmailMessage.objects.get(message_id="<spoof-to@t>")
+    assert row.lead_id != lead.pk
+    assert row.client.email == "evil@attacker.test"
+
+
+def _requests_only() -> None:
+    """Shared mailbox: new mail only when the subject is a consultation or a quote."""
+    state = InboundMailboxState.get_solo()
+    state.intake = MailIntake.REQUESTS
+    state.intake_subjects = ""
+    state.save(update_fields=["intake", "intake_subjects"])
+
+
+@pytest.mark.django_db
+def test_requests_intake_skips_ordinary_mail_and_keeps_a_quote_request(
+    _imap: dict[int, bytes],
+) -> None:
+    """Обычное письмо из ящика не забирается. «Запрос» и отдельное «КП» — забираются."""
+    _requests_only()
+    _imap[4] = _raw_email(
+        message_id="<addr@t>",
+        from_addr="Светлана <svetlana@yandex.ru>",
+        subject="Смена юр. адреса",
+    )
+    _imap[5] = _raw_email(
+        message_id="<buy@t>",
+        from_addr="Пётр <petr@corp.test>",
+        subject="Покупка клапана",
+    )
+    _imap[6] = _raw_email(
+        message_id="<ask@t>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        subject="Запрос на аналоги сервоприводов",
+        body="Просим выставить КП",
+    )
+    _imap[7] = _raw_email(
+        message_id="<kp@t>",
+        from_addr="Ольга <olga@corp.test>",
+        subject="Нужно КП на склад",
+    )
+
+    fetch_inbound_email()
+
+    assert not EmailMessage.objects.filter(message_id__in=["<addr@t>", "<buy@t>"]).exists()
+    assert not Client.objects.filter(email__in=["svetlana@yandex.ru", "petr@corp.test"]).exists()
+    assert Lead.objects.filter(email="yurich@bk.ru").exists()
+    assert Lead.objects.filter(email="olga@corp.test").exists()
+    assert InboundMailboxState.get_solo().last_uid == 7
+
+
+@pytest.mark.django_db
+def test_reply_without_request_words_is_kept_when_the_thread_is_in_crm(
+    _imap: dict[int, bytes],
+) -> None:
+    """Ответ без слов «заявка/КП» забирается, если это продолжение письма в CRM."""
+    _requests_only()
+    buyer = Client.objects.create(email="buyer@example.test", name="B")
+    lead = Lead.objects.create(
+        lead_type=Lead.LeadType.RFQ,
+        name="B",
+        email=buyer.email,
+        message="RFQ",
+        client=buyer,
+    )
+    EmailMessage.objects.create(
+        client=buyer,
+        lead=lead,
+        direction=EmailDirection.OUTBOUND,
+        status=EmailStatus.SENT,
+        to_email=buyer.email,
+        from_email="sales@hoocon.ru",
+        subject="КП",
+        body="…",
+        message_id="<sent@hoocon.ru>",
+    )
+    _imap[3] = _raw_email(
+        message_id="<follow@t>",
+        from_addr="Buyer <buyer@example.test>",
+        subject="Уточнение по заслонке",
+        in_reply_to="<sent@hoocon.ru>",
+    )
+
+    fetch_inbound_email()
+
+    row = EmailMessage.objects.get(message_id="<follow@t>")
+    assert row.lead_id == lead.pk
+
+
+@pytest.mark.django_db
+def test_bland_manager_reply_in_the_same_batch_follows_the_request(
+    _imap: dict[int, bytes],
+    settings: Any,
+) -> None:
+    """Ответ менеджера без ключевых слов в той же пачке берётся вместе с запросом клиента."""
+    _alexander_mailbox(settings)
+    _imap[6] = _raw_email(
+        message_id="<reply@yandex>",
+        from_addr="Александр Шевченко <alexander@hoocon.ru>",
+        to_addr="yurich@bk.ru",
+        subject="Уточнение по заслонке",
+        body="Антон Юрьевич, уточните площадь.",
+        in_reply_to="<client@bk.ru>",
+    )
+    _imap[7] = _raw_email(
+        message_id="<client@bk.ru>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        to_addr="alexander@hoocon.ru",
+        subject="Запрос на аналоги",
+        body="Просим выставить КП",
+    )
+
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 1
+    reply = EmailMessage.objects.get(message_id="<reply@yandex>")
+    assert reply.lead_id == Lead.objects.get().pk
+    assert reply.direction == EmailDirection.OUTBOUND
+
+
+@pytest.mark.django_db
+def test_mailbox_subject_list_replaces_the_standard_words(_imap: dict[int, bytes]) -> None:
+    """Свой список слов заменяет стандартный: «запрос» больше не проходит, «счёт» проходит."""
+    state = InboundMailboxState.get_solo()
+    state.intake = MailIntake.REQUESTS
+    state.intake_subjects = "счёт"
+    state.save(update_fields=["intake", "intake_subjects"])
+    _imap[2] = _raw_email(
+        message_id="<ask@t>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        subject="Запрос на аналоги",
+    )
+    _imap[3] = _raw_email(
+        message_id="<bill@t>",
+        from_addr="Ольга <olga@corp.test>",
+        subject="Счет на приводы",
+    )
+
+    fetch_inbound_email()
+
+    assert not EmailMessage.objects.filter(message_id="<ask@t>").exists()
+    assert Lead.objects.filter(email="olga@corp.test").exists()
+
+
+@pytest.mark.django_db
+def test_threads_intake_does_not_open_a_lead_from_a_new_request(
+    _imap: dict[int, bytes],
+) -> None:
+    """Режим «только продолжение» не заводит заявку из нового «Запроса»."""
+    state = InboundMailboxState.get_solo()
+    state.intake = MailIntake.THREADS
+    state.save(update_fields=["intake"])
+    _imap[2] = _raw_email(
+        message_id="<ask@t>",
+        from_addr="Тарасов <yurich@bk.ru>",
+        subject="Запрос на аналоги",
+    )
+
+    fetch_inbound_email()
+
+    assert Lead.objects.count() == 0
+    assert not EmailMessage.objects.filter(message_id="<ask@t>").exists()
+    assert InboundMailboxState.get_solo().last_uid == 2
 
 
 @pytest.mark.django_db
@@ -529,7 +903,7 @@ def test_staff_mailbox_fetched_when_env_disabled(
     _imap[4] = _raw_email(
         message_id="<staff@t>",
         from_addr="Клиент <cl@corp.test>",
-        subject="Нужен привод",
+        subject="Запрос на привод",
     )
 
     report = fetch_inbound_email()
@@ -628,6 +1002,7 @@ def test_same_message_in_two_boxes_deduped(
         user=_staff_user(),
         imap_user="ivan@hoocon.ru",
         imap_password="app-not-secret",
+        intake=MailIntake.ALL,
     )
     Client.objects.create(email="buyer@example.test", name="B")
     _imap[6] = _raw_email(message_id="<both@t>")
@@ -659,6 +1034,7 @@ def test_broken_mailbox_does_not_block_others(
         user=_staff_user("good"),
         imap_user="good@hoocon.ru",
         imap_password="app-not-secret",
+        intake=MailIntake.ALL,
     )
     monkeypatch.setattr(_FakeIMAP, "fail_logins", {"bad@hoocon.ru"})
     _imap[3] = _raw_email(message_id="<ok@t>")
@@ -713,6 +1089,7 @@ def test_mailbox_scope_owner_sees_own_mail(
         user=owner,
         imap_user="owner@hoocon.ru",
         imap_password="p",
+        intake=MailIntake.ALL,
     )
     Client.objects.create(email="buyer@example.test", name="B")
     _imap[5] = _raw_email(message_id="<own@t>")
@@ -829,6 +1206,8 @@ def test_mailbox_form_keeps_password_on_empty_input() -> None:
             "imap_user": "ivan@hoocon.ru",
             "imap_password": "",
             "folder": "INBOX",
+            "intake": MailIntake.REQUESTS,
+            "intake_subjects": "",
             "smtp_host": "smtp.yandex.ru",
             "smtp_port": "465",
             "smtp_use_ssl": "on",

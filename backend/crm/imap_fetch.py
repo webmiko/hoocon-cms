@@ -2,12 +2,18 @@
 
 Яндекс 360 не отдаёт webhook — входящие забираем по IMAP (пароль
 приложения в env, см. ``.env.example``). Каждое новое письмо →
-``EmailMessage(direction=inbound, status=received)`` с привязкой:
+``EmailMessage`` с привязкой:
 
-- ``client`` — по адресу отправителя (``get_or_create`` по email);
-- ``lead`` — тред ``In-Reply-To``/``References`` → ``message_id``
-  исходящего, либо «Заявка #N» в теме; для **нового** отправителя без
-  треда — новая заявка-консультация (чтобы письмо не потерялось в inbox);
+- чужой отправитель: ``client`` по From; тред ``In-Reply-To`` /
+  ``References`` или «Заявка #N» в теме — только если заявка этого же
+  отправителя; новый отправитель без треда → заявка-консультация,
+  и только если тема — заявка, консультация или запрос КП
+  (режим ящика «Вся папка» забирает каждое письмо);
+- наш адрес (логин открытого ящика, почта сотрудника, логин любого
+  ящика менеджера): это не клиент и не новая заявка. «Кому» — клиент,
+  ``In-Reply-To`` — его письмо. Копия ответа, пришедшая раньше письма
+  клиента, ждёт без карточки и встаёт в ту же заявку, когда письмо
+  клиента разбирается;
 - вложения → ``EmailAttachment`` (private media, скачивание только staff).
 
 Дедупликация: ``message_id`` (unique) + курсор ``last_uid`` в
@@ -26,7 +32,7 @@ from dataclasses import dataclass
 from datetime import UTC
 from email.header import decode_header, make_header
 from email.message import Message
-from email.utils import parseaddr, parsedate_to_datetime
+from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 from typing import Any, cast
 
 from django.conf import settings
@@ -38,6 +44,7 @@ from django.utils import timezone
 
 from config.logging_utils import setup_logger
 from crm.email_body import email_body_for_reading, html_email_to_plain
+from crm.mail_intake import MailIntake, subject_is_request
 from crm.models import (
     Activity,
     ActivityType,
@@ -289,8 +296,8 @@ def _company_from_sender_email(email_addr: str) -> str:
     return domain[:200]
 
 
-def _resolve_client(parsed: Message) -> tuple[Client, bool]:
-    """Client by From address (create with display-name for unknown senders).
+def _sender(parsed: Message) -> tuple[str, str]:
+    """Normalized From and display name.
 
     Raises:
         ValueError: письмо без валидного From — пропускаем.
@@ -302,14 +309,195 @@ def _resolve_client(parsed: Message) -> tuple[Client, bool]:
     normalized = normalize_client_email(address)
     if not normalized:
         raise ValueError("inbound mail without From address")
-    client = Client.objects.filter(email=normalized).first()
+    return normalized, normalize_client_name(display_name)
+
+
+def _header_addresses(parsed: Message, header: str) -> list[str]:
+    """Normalized addresses from one header, order kept, duplicates dropped."""
+    from crm.services import normalize_client_email
+
+    raw = _decode_header_value(str(parsed.get(header) or ""))
+    found: list[str] = []
+    for _name, address in getaddresses([raw]):
+        normalized = normalize_client_email(address)
+        if normalized and normalized not in found:
+            found.append(normalized)
+    return found
+
+
+def _known_staff_addresses(box: _Mailbox) -> set[str]:
+    """Logins and staff emails. A letter from these addresses is ours, not a customer."""
+    from django.contrib.auth import get_user_model
+
+    from accounts.models import StaffMailbox
+    from crm.services import normalize_client_email
+
+    found: set[str] = set()
+    user_model = get_user_model()
+    staff_emails = user_model.objects.filter(is_staff=True).values_list("email", flat=True)
+    mailbox_logins = StaffMailbox.objects.exclude(imap_user="").values_list("imap_user", flat=True)
+    candidates = [*staff_emails, *mailbox_logins, box.user, getattr(settings, "IMAP_USER", "") or ""]
+    for raw in candidates:
+        normalized = normalize_client_email(raw)
+        if normalized:
+            found.add(normalized)
+    return found
+
+
+def _counterparty(addresses: list[str], staff: set[str]) -> str:
+    """First address that is not ours — the client on a manager's copy."""
+    for address in addresses:
+        if address not in staff:
+            return address
+    return ""
+
+
+def _immediate_reply_id(parsed: Message) -> str:
+    """In-Reply-To, or the last References id (RFC 5322 immediate parent)."""
+    direct = normalize_message_id(parsed.get("In-Reply-To")) or ""
+    if direct:
+        return direct
+    last = ""
+    for token in str(parsed.get("References") or "").split():
+        normalized = normalize_message_id(token.strip())
+        if normalized:
+            last = normalized
+    return last
+
+
+def _parent_message(references: set[str]) -> EmailMessage | None:
+    """Stored message this one answers. Prefer a row that already has a lead."""
+    if not references:
+        return None
+    rows = list(EmailMessage.objects.filter(message_id__in=references).select_related("lead", "client"))
+    for row in rows:
+        if row.lead_id:
+            return row
+    return rows[0] if rows else None
+
+
+def _existing_client(addresses: list[str], staff: set[str]) -> Client | None:
+    """Client card for an address already in CRM. Does not create one."""
+    external = [address for address in addresses if address not in staff]
+    if not external:
+        return None
+    found = {client.email: client for client in Client.objects.filter(email__in=external)}
+    for address in external:
+        if address in found:
+            return found[address]
+    return None
+
+
+def _our_reply_target(
+    *,
+    sender: str,
+    box: _Mailbox,
+    staff: set[str],
+    references: set[str],
+    to_addresses: list[str],
+) -> tuple[Client | None, Lead | None]:
+    """Client and lead for a letter sent from our side.
+
+    From the mailbox we just opened, In-Reply-To is enough: the copy sits
+    in that account. From another known manager address, attach only when
+    «кому» is the lead's contact — a bare message-id must not join a
+    foreign thread.
+    """
+    from crm.services import normalize_client_email
+
+    parent = _parent_message(references)
+    client = _existing_client(to_addresses, staff)
+    lead: Lead | None = None
+    if parent is not None:
+        if parent.client_id:
+            client = cast(Client, parent.client)
+        if parent.lead_id:
+            lead = cast(Lead, parent.lead)
+            if client is None and lead.client_id:
+                client = cast(Client, lead.client)
+    if lead is None:
+        return client, None
+    if sender == normalize_client_email(box.user):
+        return client, lead
+    lead_email = normalize_client_email(lead.email)
+    if lead_email and lead_email in to_addresses:
+        return client, lead
+    return client, None
+
+
+def _record_mail_activity(*, client: Client, lead: Lead | None, subject: str, body: str) -> None:
+    """One timeline row for a stored letter."""
+    Activity.objects.create(
+        client=client,
+        lead=lead,
+        activity_type=ActivityType.EMAIL,
+        subject=subject,
+        body=body[:2000],
+    )
+
+
+def _attach_pending_replies(
+    *,
+    message_id: str | None,
+    client: Client,
+    lead: Lead | None,
+    staff: set[str],
+) -> None:
+    """Hang waiting manager copies on the customer letter they answer."""
+    from crm.services import normalize_client_email
+
+    if not message_id:
+        return
+    pending = EmailMessage.objects.filter(
+        in_reply_to=message_id,
+        lead__isnull=True,
+        from_email__in=staff,
+    )
+    lead_email = normalize_client_email(lead.email) if lead is not None else ""
+    for row in pending:
+        to_addr = normalize_client_email(row.to_email)
+        addressed_elsewhere = bool(to_addr) and to_addr not in staff and to_addr != lead_email
+        if lead is not None and addressed_elsewhere:
+            continue
+        had_client = row.client_id is not None
+        had_lead = row.lead_id is not None
+        row.client = client
+        if lead is not None:
+            row.lead = lead
+        row.save(update_fields=["client", "lead"])
+        if lead is not None and not had_lead and had_client:
+            waiting = (
+                Activity.objects.filter(
+                    client_id=client.pk,
+                    lead__isnull=True,
+                    activity_type=ActivityType.EMAIL,
+                    subject=row.subject,
+                )
+                .order_by("-id")
+                .first()
+            )
+            if waiting is not None:
+                waiting.lead = lead
+                waiting.save(update_fields=["lead"])
+                continue
+        if not had_client or (lead is not None and not had_lead):
+            _record_mail_activity(client=client, lead=lead, subject=row.subject, body=row.body)
+
+
+def _resolve_client(parsed: Message) -> tuple[Client, bool]:
+    """Client by From address (create with display-name for unknown senders).
+
+    Raises:
+        ValueError: письмо без валидного From — пропускаем.
+    """
+    sender, display_name = _sender(parsed)
+    client = Client.objects.filter(email=sender).first()
     if client is not None:
         return client, False
-    name = normalize_client_name(display_name) or normalized
     client = Client.objects.create(
-        email=normalized,
-        name=name[:200],
-        company=_company_from_sender_email(normalized),
+        email=sender,
+        name=(display_name or sender)[:200],
+        company=_company_from_sender_email(sender),
     )
     return client, True
 
@@ -474,18 +662,65 @@ def _fetch_raw(conn: imaplib.IMAP4, uid: int) -> bytes:
     raise ValueError("UID FETCH returned no message body")
 
 
-def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
-    """Fetch + store one message; 'created' | 'duplicate'."""
-    raw = _fetch_raw(conn, uid)
-    parsed = email.message_from_bytes(raw)
-    message_id = normalize_message_id(parsed.get("Message-ID"))
-    if message_id and EmailMessage.objects.filter(message_id=message_id).exists():
-        return "duplicate"
+def _store_our_copy(
+    *,
+    parsed: Message,
+    uid: int,
+    box: _Mailbox,
+    staff: set[str],
+    sender: str,
+    subject: str,
+    body: str,
+    references: set[str],
+    message_id: str | None,
+) -> None:
+    """Manager's own letter: outbound to the client, never a new lead."""
+    to_addresses = _header_addresses(parsed, "To")
+    client, lead = _our_reply_target(
+        sender=sender,
+        box=box,
+        staff=staff,
+        references=references,
+        to_addresses=to_addresses,
+    )
+    external = _counterparty(to_addresses, staff)
+    to_email = external or (to_addresses[0] if to_addresses else box.user)
+    received = _received_at(parsed)
+    outgoing = bool(external)
+    with transaction.atomic():
+        row = EmailMessage.objects.create(
+            client=client,
+            lead=lead,
+            direction=EmailDirection.OUTBOUND if outgoing else EmailDirection.INBOUND,
+            status=EmailStatus.SENT if outgoing else EmailStatus.RECEIVED,
+            to_email=to_email[:254],
+            from_email=sender,
+            subject=subject,
+            body=body[:_BODY_MAX_CHARS],
+            message_id=message_id,
+            in_reply_to=_immediate_reply_id(parsed),
+            imap_uid=uid,
+            mailbox=box.staff_mailbox,
+            received_at=received,
+            sent_at=received if outgoing else None,
+        )
+        _save_attachments(parsed, row)
+        if client is not None:
+            _record_mail_activity(client=client, lead=lead, subject=subject, body=body)
 
-    subject = _decode_header_value(str(parsed.get("Subject") or ""))[:300]
-    body = _extract_body(parsed)
-    references = _references(parsed)
 
+def _store_customer_mail(
+    *,
+    parsed: Message,
+    uid: int,
+    box: _Mailbox,
+    staff: set[str],
+    subject: str,
+    body: str,
+    references: set[str],
+    message_id: str | None,
+) -> EmailMessage:
+    """Inbound letter from a customer. A new sender without a thread opens a lead."""
     with transaction.atomic():
         client, is_new_client = _resolve_client(parsed)
         lead = _find_lead(references=references, subject=subject, client=client)
@@ -502,19 +737,52 @@ def _process_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox) -> str:
             subject=subject,
             body=body[:_BODY_MAX_CHARS],
             message_id=message_id,
-            in_reply_to=normalize_message_id(parsed.get("In-Reply-To")) or "",
+            in_reply_to=_immediate_reply_id(parsed),
             imap_uid=uid,
             mailbox=box.staff_mailbox,
             received_at=_received_at(parsed),
         )
         _save_attachments(parsed, msg_row)
-        Activity.objects.create(
-            client=client,
-            lead=lead,
-            activity_type=ActivityType.EMAIL,
+        _record_mail_activity(client=client, lead=lead, subject=subject, body=body)
+        _attach_pending_replies(message_id=message_id, client=client, lead=lead, staff=staff)
+    return msg_row
+
+
+def _store_raw(raw: bytes, uid: int, box: _Mailbox, staff: set[str]) -> str:
+    """Store one already-fetched message; 'created' | 'duplicate'."""
+    parsed = email.message_from_bytes(raw)
+    message_id = normalize_message_id(parsed.get("Message-ID"))
+    if message_id and EmailMessage.objects.filter(message_id=message_id).exists():
+        return "duplicate"
+
+    sender, _display_name = _sender(parsed)
+    subject = _decode_header_value(str(parsed.get("Subject") or ""))[:300]
+    body = _extract_body(parsed)
+    references = _references(parsed)
+    if sender in staff:
+        _store_our_copy(
+            parsed=parsed,
+            uid=uid,
+            box=box,
+            staff=staff,
+            sender=sender,
             subject=subject,
-            body=body[:2000],
+            body=body,
+            references=references,
+            message_id=message_id,
         )
+        return "created"
+
+    msg_row = _store_customer_mail(
+        parsed=parsed,
+        uid=uid,
+        box=box,
+        staff=staff,
+        subject=subject,
+        body=body,
+        references=references,
+        message_id=message_id,
+    )
     _notify_staff(msg_row, box)
     return "created"
 
@@ -542,34 +810,193 @@ def _transient_budget_spent(box: _Mailbox, uid: int) -> bool:
     return failures >= _TRANSIENT_RETRIES
 
 
+def _take_uid(conn: imaplib.IMAP4, uid: int, box: _Mailbox, report: dict[str, int]) -> bytes | None:
+    """Fetch one UID. None — skipped (poison or retries spent). Raises to retry later."""
+    try:
+        return _fetch_raw(conn, uid)
+    except _TRANSIENT_ERRORS as exc:
+        logger.warning("imap_fetch_transient box=%s uid=%s: %s", box.key, uid, exc)
+        report["errors"] += 1
+        if not _transient_budget_spent(box, uid):
+            raise
+        logger.error("imap_fetch_giving_up box=%s uid=%s", box.key, uid)
+    except Exception:  # noqa: BLE001 — «ядовитое» письмо: пропускаем
+        logger.exception("imap_fetch_message_failed box=%s uid=%s", box.key, uid)
+        report["errors"] += 1
+    return None
+
+
+@dataclass
+class _Incoming:
+    """One fetched letter, before we decide whether CRM wants it."""
+
+    uid: int
+    raw: bytes
+    sender: str
+    subject: str
+    references: set[str]
+    message_id: str | None
+
+
+def _leads_named_in_subjects(items: list[_Incoming], staff: set[str]) -> set[tuple[int, str]]:
+    """(lead pk, sender) when «Заявка #N» belongs to that sender."""
+    from crm.services import normalize_client_email
+
+    wanted: dict[int, list[str]] = {}
+    for item in items:
+        if item.sender in staff:
+            continue
+        match = _LEAD_REF_RE.search(item.subject or "")
+        if match:
+            wanted.setdefault(int(match.group(1)), []).append(item.sender)
+    if not wanted:
+        return set()
+    rows = Lead.objects.filter(pk__in=wanted).values_list("pk", "email", "client__email")
+    allowed: set[tuple[int, str]] = set()
+    for pk, lead_email, client_email in rows:
+        owners = {normalize_client_email(lead_email or ""), normalize_client_email(client_email or "")}
+        owners.discard("")
+        for sender in wanted.get(pk, []):
+            if sender in owners:
+                allowed.add((pk, sender))
+    return allowed
+
+
+def _related_uids(items: list[_Incoming], box: _Mailbox, staff: set[str]) -> set[int]:
+    """UIDs to import. The rest of the folder stays in the mailbox."""
+    intake = getattr(box.state, "intake", MailIntake.REQUESTS) or MailIntake.REQUESTS
+    if intake == MailIntake.ALL:
+        return {item.uid for item in items}
+    needles = getattr(box.state, "intake_subjects", "") or ""
+    known: set[str] = set()
+    every_ref: set[str] = set()
+    for item in items:
+        every_ref.update(item.references)
+    if every_ref:
+        stored_ids = EmailMessage.objects.filter(message_id__in=every_ref).values_list("message_id", flat=True)
+        known.update(message_id for message_id in stored_ids if message_id)
+    named = _leads_named_in_subjects(items, staff)
+    related: set[int] = set()
+    related_ids: set[str] = set()
+
+    def _is_related(item: _Incoming) -> bool:
+        if item.references & known or item.references & related_ids:
+            return True
+        if item.sender not in staff:
+            match = _LEAD_REF_RE.search(item.subject or "")
+            if match and (int(match.group(1)), item.sender) in named:
+                return True
+        if intake == MailIntake.THREADS:
+            return False
+        return subject_is_request(item.subject, needles)
+
+    changed = True
+    while changed:
+        changed = False
+        for item in items:
+            if item.uid in related or not _is_related(item):
+                continue
+            related.add(item.uid)
+            if item.message_id:
+                related_ids.add(item.message_id)
+            changed = True
+    return related
+
+
+def _cursor_after(last_uid: int, seen: list[int], handled: set[int], stop_before: int | None) -> int:
+    """Highest UID this run may pass.
+
+    The cursor stops before the first UID that still needs a retry, even
+    when a higher UID was stored already — the next run dedups that one.
+    """
+    advanced = last_uid
+    for uid in sorted(seen):
+        if stop_before is not None and uid >= stop_before:
+            break
+        if uid not in handled:
+            break
+        advanced = uid
+    return advanced
+
+
 def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
-    """Fetch one mailbox; merge counters; update cursor + health on its row."""
+    """Fetch one mailbox; merge counters; update cursor + health on its row.
+
+    Customer letters are stored before our own copies from the same batch,
+    so a reply that landed in the folder first still joins the client's lead.
+    """
     state = box.state
+    staff = _known_staff_addresses(box)
     conn = _connect(box)
     try:
         conn.select(encode_imap_utf7(box.folder), readonly=True)
         uids = _new_uids(conn, state.last_uid, limit)
         report["seen"] += len(uids)
-        max_uid = state.last_uid
         last_error = ""
+        stop_before: int | None = None
+        skipped: set[int] = set()
+        incoming: list[_Incoming] = []
         for uid in uids:
             try:
-                result = _process_uid(conn, uid, box)
+                raw = _take_uid(conn, uid, box, report)
+            except _TRANSIENT_ERRORS as exc:
+                last_error = f"UID {uid}: {exc}"[:500]
+                stop_before = uid
+                break
+            if raw is None:
+                skipped.add(uid)
+                continue
+            try:
+                parsed = email.message_from_bytes(raw)
+                sender, _display_name = _sender(parsed)
+            except Exception:  # noqa: BLE001 — битый From: пропускаем
+                logger.exception("imap_fetch_message_failed box=%s uid=%s", box.key, uid)
+                report["errors"] += 1
+                skipped.add(uid)
+                continue
+            incoming.append(
+                _Incoming(
+                    uid=uid,
+                    raw=raw,
+                    sender=sender,
+                    subject=_decode_header_value(str(parsed.get("Subject") or ""))[:300],
+                    references=_references(parsed),
+                    message_id=normalize_message_id(parsed.get("Message-ID")),
+                ),
+            )
+        keep = _related_uids(incoming, box, staff)
+        customers: list[tuple[int, bytes]] = []
+        ours: list[tuple[int, bytes]] = []
+        for item in incoming:
+            if item.uid not in keep:
+                logger.info("imap_fetch_skip_unrelated box=%s uid=%s", box.key, item.uid)
+                skipped.add(item.uid)
+                continue
+            (ours if item.sender in staff else customers).append((item.uid, item.raw))
+
+        handled = set(skipped)
+        for uid, raw in [*customers, *ours]:
+            try:
+                result = _store_raw(raw, uid, box, staff)
             except _TRANSIENT_ERRORS as exc:
                 logger.warning("imap_fetch_transient box=%s uid=%s: %s", box.key, uid, exc)
                 report["errors"] += 1
                 if not _transient_budget_spent(box, uid):
-                    # Cursor stays before this uid: the next run retries it.
                     last_error = f"UID {uid}: {exc}"[:500]
+                    stop_before = uid
                     break
                 logger.error("imap_fetch_giving_up box=%s uid=%s", box.key, uid)
+                handled.add(uid)
             except Exception:  # noqa: BLE001 — «ядовитое» письмо: пропускаем
                 logger.exception("imap_fetch_message_failed box=%s uid=%s", box.key, uid)
                 report["errors"] += 1
+                handled.add(uid)
             else:
                 report["created" if result == "created" else "duplicates"] += 1
-            max_uid = max(max_uid, uid)
-        state.last_uid = max_uid
+                handled.add(uid)
+
+        seen = sorted({*skipped, *(uid for uid, _raw in customers), *(uid for uid, _raw in ours)})
+        state.last_uid = _cursor_after(state.last_uid, seen, handled, stop_before)
         state.last_run_at = timezone.now()
         state.last_error = last_error
         state.save(update_fields=["last_uid", "last_run_at", "last_error"])
@@ -578,7 +1005,7 @@ def _fetch_box(box: _Mailbox, limit: int, report: dict[str, int]) -> None:
 
 
 def fetch_inbound_email(*, limit: int | None = None) -> dict[str, int]:
-    """Poll every configured mailbox; store new mail as inbound EmailMessage.
+    """Poll every configured mailbox and store new mail.
 
     Источники: общий ящик из env (IMAP_ENABLED) + включённые личные
     ящики менеджеров (``accounts.StaffMailbox``). Ящик с ошибкой логина
