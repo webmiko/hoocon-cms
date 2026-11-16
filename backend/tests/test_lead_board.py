@@ -190,6 +190,10 @@ def test_lead_board_js_classifies_status_badges_and_wall_headings() -> None:
     assert 'new: "Новая"' in src
     assert 'in_progress: "В работе"' in src
     assert 'done: "Завершена"' in src
+    assert 'site: "Форма сайта"' in src
+    assert 'call: "Звонок"' in src
+    assert "hoocon-lead-wall-heading--origin" in src
+    assert "hoocon-lead-kanban__origin" in src
 
 
 def test_lead_board_js_kanban_dnd_posts_status_with_csrf() -> None:
@@ -319,6 +323,48 @@ def test_lead_changelist_default_groups_by_status_then_newest() -> None:
     html = client.get("/admin/leads/lead/?view=wall").content.decode()
     # «Новая» block before «Завершена» even if done row is newer by date.
     assert html.index("older-sort@example.com") < html.index("newer-done@example.com")
+
+
+@pytest.mark.django_db
+def test_lead_changelist_keeps_site_forms_ahead_of_newer_calls() -> None:
+    """Inside one status, a newer call does not jump above an older site form."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    older_form = Lead.objects.create(
+        name="Форма",
+        email="older-form@example.com",
+        message="с сайта",
+        status=Lead.LeadStatus.NEW,
+    )
+    Lead.objects.filter(pk=older_form.pk).update(created_at=timezone.now() - timedelta(days=2))
+    Lead.objects.create(
+        name="Звонок пропущен · +7 900 000-00-00",
+        email="79000000000@call.invalid",
+        message="звонок",
+        status=Lead.LeadStatus.NEW,
+    )
+    newer_form = Lead.objects.create(
+        name="Свежая форма",
+        email="newer-form@example.com",
+        message="с сайта",
+        status=Lead.LeadStatus.NEW,
+    )
+    admin_user = User.objects.create_superuser(
+        username="lead-origin-sort",
+        email="lead-origin-sort@example.com",
+        password="password12",
+    )
+    client = Client()
+    client.force_login(admin_user)
+    html = client.get("/admin/leads/lead/?view=wall").content.decode()
+    form_at = html.index("newer-form@example.com")
+    older_at = html.index("older-form@example.com")
+    # Stub address is not printed: the card shows the phone instead.
+    call_at = html.index("+7 900 000-00-00")
+    assert form_at < older_at < call_at
+    assert newer_form.email in html
 
 
 @pytest.mark.django_db

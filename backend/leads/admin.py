@@ -971,6 +971,8 @@ class LeadAdmin(
             .annotate(cnt=Count("pk"))
             .values("cnt")
         )
+        from crm.call_cards import STUB_EMAIL_SUFFIX
+
         qs = (
             self.model._default_manager.get_queryset()
             .select_related("client", "sku", "assignee", "processed_by", "rfq_bundle_root")
@@ -987,6 +989,13 @@ class LeadAdmin(
                     When(status=Lead.LeadStatus.NEW, then=0),
                     When(status=Lead.LeadStatus.IN_PROGRESS, then=1),
                     default=2,
+                    output_field=IntegerField(),
+                ),
+                # 0 — форма сайта (и письмо), 1 — звонок. Внутри одного статуса
+                # они не чередуются по дате.
+                _origin_rank=Case(
+                    When(email__iendswith=STUB_EMAIL_SUFFIX, then=Value(1)),
+                    default=Value(0),
                     output_field=IntegerField(),
                 ),
                 _bundle_root=bundle_root_id,
@@ -1015,10 +1024,11 @@ class LeadAdmin(
         if url_name.startswith("leads_lead_changelist"):
             lead_sort = str(getattr(request, "hoocon_lead_sort", "") or "").strip()
             # Wall section titles assume status blocks (new → in progress → done).
-            # Pure date / column sort mixes statuses — use ``lead_sort=date`` for that.
+            # Inside a block, site forms stay together and calls stay together.
+            # Pure date / column sort mixes both — use ``lead_sort=date`` for that.
             if lead_sort == "date" or request.GET.get("o"):
                 return ("-created_at", "-pk")
-            return ("_status_rank", "-created_at", "-pk")
+            return ("_status_rank", "_origin_rank", "-created_at", "-pk")
         return ("-created_at", "-pk")
 
     def _lead_changelist_sort_options(

@@ -3457,6 +3457,17 @@ body:not(.hoocon-support-inbox) #changelist
   body.hoocon-lead-board #changelist
     table.hoocon-admin-card-table.hoocon-admin-table-stacked
     tbody
+    tr.hoocon-lead-wall-heading--origin
+    td {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  body.hoocon-lead-board #changelist
+    table.hoocon-admin-card-table.hoocon-admin-table-stacked
+    tbody
     tr.hoocon-lead-wall-heading
     td::before {
     display: none !important;
@@ -3486,6 +3497,12 @@ body:not(.hoocon-support-inbox) #changelist
     border: 1px solid var(--hoocon-glass-border);
     border-radius: var(--hoocon-radius);
     background: color-mix(in srgb, var(--hoocon-surface-muted) 55%, transparent);
+  }
+
+  .hoocon-lead-kanban__origin {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--hoocon-quiet);
   }
 
   .hoocon-lead-kanban__head {
