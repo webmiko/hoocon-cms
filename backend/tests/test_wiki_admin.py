@@ -694,6 +694,7 @@ def test_seed_wiki_today_board_is_the_managers_own_queue() -> None:
     assert "Чужой плановый звонок на панель не попадает" in body
     assert "в списке её нет" in body
     assert 'id="changelog-firm-directory-scope"' in changelog
+    assert 'id="changelog-manager-name-links"' in changelog
     assert "Лист «Пример» не попадает в базу" in body
     assert "Исходящий звонок" in body
     assert changelog.index("changelog-outbound-softphone") < changelog.index("changelog-today-own-queue")

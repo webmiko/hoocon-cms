@@ -494,35 +494,6 @@
     });
   }
 
-  /**
-   * Unfold dropdown filters in the sidebar are selects, not links.
-   * Without list_filter_submit they sit outside a form, so picking a
-   * manager never reloads the list. Write the choice into the query string.
-   */
-  function applyChangelistDropdownFilters() {
-    const root = document.getElementById("changelist-filter");
-    if (!root || root.querySelector("#filter-form")) {
-      return;
-    }
-    root.querySelectorAll("select[name]").forEach((select) => {
-      select.addEventListener("change", () => {
-        const url = new URL(window.location.href);
-        const current = url.searchParams.get(select.name) || "";
-        const next = select.value || "";
-        if (next === current) {
-          return;
-        }
-        if (next) {
-          url.searchParams.set(select.name, next);
-        } else {
-          url.searchParams.delete(select.name);
-        }
-        url.searchParams.delete("p");
-        window.location.assign(url.toString());
-      });
-    });
-  }
-
   function filterTitle(block) {
     const titleEl = block.querySelector("h3, label");
     if (!titleEl) {
@@ -638,7 +609,6 @@
     document.addEventListener("formset:added", scrollAddedTabularInlineIntoView);
     observeInlineRows();
     collapseIdleFilters();
-    applyChangelistDropdownFilters();
     enhanceSidebarActionTitles();
     enableStackedCardNavigation();
     window.addEventListener("resize", onViewportChange);

@@ -10,14 +10,16 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
-from unfold.contrib.filters.admin import DropdownFilter
 
 from accounts.roles import GROUP_MANAGER
 from leads.services import manager_display_name
 
 
-class ManagerFilter(DropdownFilter):
+class ManagerFilter(admin.SimpleListFilter):
     """Rows of one manager, by the name other managers know.
+
+    A plain link list, same as the other sidebar filters. A dropdown inside
+    the collapsible block was a second control for the same choice.
 
     ``user_field`` is the FK column on the listed model (``assignee_id`` on a
     company, ``created_by_id`` on a letter).
