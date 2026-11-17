@@ -2537,6 +2537,51 @@ body.change-form #submit-row .container.hoocon-submit-menu-active > .flex {
   box-shadow: var(--hoocon-shadow-soft);
 }
 
+/* Each changelist filter is a disclosure: title only until it is opened. */
+#changelist #changelist-filter .hoocon-filter-fold {
+  margin: 0;
+}
+
+#changelist #changelist-filter .hoocon-filter-fold + .hoocon-filter-fold {
+  border-top: 1px solid var(--hoocon-hairline);
+}
+
+#changelist #changelist-filter .hoocon-filter-fold__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.15rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--hoocon-ink);
+}
+
+#changelist #changelist-filter .hoocon-filter-fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+#changelist #changelist-filter .hoocon-filter-fold__summary::after {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid var(--hoocon-quiet);
+  border-bottom: 1.5px solid var(--hoocon-quiet);
+  transform: rotate(45deg);
+  flex: none;
+}
+
+#changelist #changelist-filter .hoocon-filter-fold[open] > .hoocon-filter-fold__summary::after {
+  transform: rotate(-135deg);
+  margin-top: 0.2rem;
+}
+
+#changelist #changelist-filter .hoocon-filter-fold[open] > :not(summary) {
+  margin-top: 0.35rem;
+}
+
 .dark #changelist #changelist-filter > div.z-20 {
   background: var(--hoocon-page-bg) !important;
 }
