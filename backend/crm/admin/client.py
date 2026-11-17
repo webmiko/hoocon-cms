@@ -22,6 +22,7 @@ from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
 from crm.admin.card_rows import fill_manual_lead, next_manual_order_number
 from crm.admin.client_workbook import ClientWorkbookMixin
+from crm.admin.filters import MissingCompanyCardFilter
 from crm.admin.inlines import (
     ActivityInline,
     CallInline,
@@ -88,6 +89,7 @@ class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, ScopedForeignKeyMixin
         "is_active",
         "assignee",
         "company",
+        MissingCompanyCardFilter,
         OverdueNextContactFilter,
         "updated_at",
     )

@@ -397,3 +397,33 @@ def send_weekly_sales_report() -> str:
         len(report["managers"]),
     )
     return f"sent={len(recipients)}"
+
+
+@shared_task(name="crm.backfill_company_refs")
+def backfill_company_refs() -> str:
+    """Beat: link clients with a company label to their Company card.
+
+    ``ensure_company_ref`` runs only inside ``Client.save()`` — rows written
+    via ``update()``, imports, or before the card feature keep
+    ``company_ref`` empty and stay invisible in «Компании» (прод-долг
+    17.11: девять контактов, карточки заведены руками). The sweep replays
+    ``save()`` on the debt; ``company_key`` makes repeats idempotent.
+    """
+    from crm.models import Client
+
+    debt = list(Client.objects.exclude(company="").filter(company_ref__isnull=True).values_list("pk", flat=True))
+    linked = 0
+    for pk in debt:
+        client = Client.objects.filter(pk=pk).first()
+        if client is None:
+            continue
+        # Пробельная строка не образует ключ — сбрасываем, чтобы строка
+        # не висела вечным долгом в счётчике.
+        client.company = client.company.strip()
+        # Точечная запись: полный save() мог бы затирать параллельные
+        # правки менеджера в других полях.
+        client.save(update_fields=["company", "company_key", "updated_at"])
+        if client.company_ref_id:
+            linked += 1
+    logger.info("crm_company_refs_backfill debt=%d linked=%d", len(debt), linked)
+    return f"debt={len(debt)} linked={linked}"

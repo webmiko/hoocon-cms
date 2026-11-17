@@ -164,6 +164,64 @@ def test_build_admin_dashboard_payload_keys() -> None:
     assert dash["today"]["empty"] is True
 
 
+@pytest.mark.django_db
+def test_dashboard_flags_clients_missing_company_card() -> None:
+    """«Без карточки компании: N» — долг sweep-задачи виден на панели."""
+    from django.test import RequestFactory
+
+    from config.dashboard import build_admin_dashboard
+    from crm.models import Client as CrmClient
+
+    user = User.objects.create_superuser(
+        username="dash-debt",
+        email="dash-debt@example.com",
+        password="password12",
+    )
+    orphan = CrmClient.objects.create(email="orphan@mail.ru", name="O")
+    CrmClient.objects.filter(pk=orphan.pk).update(company='ООО "Долг"')
+
+    request = RequestFactory().get("/admin/")
+    request.user = user
+    items = build_admin_dashboard(request)["hoocon_dashboard"]["notifications"]
+    flagged = next(
+        (item for item in items if "без карточки" in item["title"].casefold()),
+        None,
+    )
+    assert flagged is not None
+    assert "1" in flagged["title"]
+    assert "no_company_card=yes" in flagged["url"]
+
+    orphan.company = 'ООО "Долг"'
+    orphan.save()  # ensure_company_ref закрывает долг — флаг снимается
+    items = build_admin_dashboard(request)["hoocon_dashboard"]["notifications"]
+    assert not any("без карточки" in item["title"].casefold() for item in items)
+
+
+@pytest.mark.django_db
+def test_no_company_card_filter_lists_only_debt() -> None:
+    """Фильтр «карточка компании» в списке клиентов ведёт ровно на строки-долг."""
+    from crm.models import Client as CrmClient
+
+    admin_user = User.objects.create_superuser(
+        username="flt-admin",
+        email="flt-admin@example.com",
+        password="password12",
+    )
+    debt = CrmClient.objects.create(email="debt.flt@mail.ru", name="D")
+    CrmClient.objects.filter(pk=debt.pk).update(company='ООО "Долг"')
+    CrmClient.objects.create(email="linked.flt@mail.ru", name="L", company='ООО "Есть"')
+    CrmClient.objects.create(email="other.flt@mail.ru", name="O")
+
+    client = Client()
+    client.force_login(admin_user)
+    response = client.get(reverse("admin:crm_client_changelist") + "?no_company_card=yes")
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "debt.flt@mail.ru" in html
+    assert "linked.flt@mail.ru" not in html
+    assert "other.flt@mail.ru" not in html
+
+
 def _touch(company, when, *, assignee=None, key: str, phone: str = "+7 (843) 554-00-45"):
     from crm.models import PlannedTouch
 

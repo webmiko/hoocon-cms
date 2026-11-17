@@ -193,6 +193,293 @@ def test_get_or_create_client_from_lead_locks_before_merge() -> None:
     assert client.company == "NewCo"
 
 
+@pytest.mark.django_db
+def test_unverified_lead_company_lands_in_notes_not_the_field() -> None:
+    """M1: подделанная заявка не пишет «Компанию» — только подсказку в заметки.
+
+    Symptom: verified-only merge dropped the unverified lead's company
+    entirely — a real sender's «ООО "СпецКомлект-С"» never reached the card.
+    """
+    lead = Lead.objects.create(
+        name="Тарасов",
+        email="tarasov.hint@yandex.ru",
+        company='ООО "СпецКомлект-С"',
+        message="Просим КП",
+    )
+    lead.refresh_from_db()
+    client = lead.client
+    assert client is not None
+    assert client.company == ""
+    assert f"заявке #{lead.pk}" in client.notes
+    assert "СпецКомлект-С" in client.notes
+
+
+@pytest.mark.django_db
+def test_unverified_company_hint_written_once() -> None:
+    """Повторный проход по той же заявке не дублирует строку-подсказку."""
+    lead = Lead.objects.create(
+        email="hint.once@mail.ru",
+        company='ООО "Раз"',
+        message="x",
+    )
+    get_or_create_client_from_lead(lead)
+    client = get_or_create_client_from_lead(lead)
+    assert client.notes.count("указана компания") == 1
+
+
+@pytest.mark.django_db
+def test_verified_lead_company_fills_field_without_hint() -> None:
+    """Верифицированная заявка пишет «Компанию» — строки-подсказки нет."""
+    lead = Lead.objects.create(
+        email="verified.hint@corp.test",
+        company='ООО "Верная"',
+        contact_verified=True,
+        message="x",
+    )
+    client = get_or_create_client_from_lead(lead)
+    client.refresh_from_db()
+    assert client.company == 'ООО "Верная"'
+    assert "указана компания" not in client.notes
+
+
+@pytest.mark.django_db
+def test_backfill_company_refs_links_update_bypassed_rows() -> None:
+    """Sweep: строка с company через update() получает карточку и членство.
+
+    ``ensure_company_ref`` живёт в ``Client.save()`` — bulk-пути оставляют
+    ``company`` заполненным при ``company_ref`` пустом (прод-долг 17.11).
+    """
+    from crm.models import CompanyMember
+    from crm.tasks import backfill_company_refs
+
+    client = Client.objects.create(email="debt.sweep@mail.ru", name="D")
+    Client.objects.filter(pk=client.pk).update(company='ООО "Долг"')
+    client.refresh_from_db()
+    assert client.company_ref_id is None
+    assert client.company_key == ""  # save() не запускался — ключ устарел
+
+    report = backfill_company_refs()
+
+    client.refresh_from_db()
+    org = client.company_ref
+    assert org is not None
+    assert org.name == 'ООО "Долг"'
+    assert client.company_key == "ооо долг"
+    assert CompanyMember.objects.filter(company=org, client=client).exists()
+    assert report == "debt=1 linked=1"
+
+    assert backfill_company_refs() == "debt=0 linked=0"  # идемпотентна
+
+
+@pytest.mark.django_db
+def test_backfill_company_refs_clears_whitespace_only_label() -> None:
+    """Пробельная строка не образует ключ — сбрасываем, чтобы не висела долгом."""
+    from crm.tasks import backfill_company_refs
+
+    client = Client.objects.create(email="blank.sweep@mail.ru", name="B")
+    Client.objects.filter(pk=client.pk).update(company="   ")
+
+    assert backfill_company_refs() == "debt=1 linked=0"
+
+    client.refresh_from_db()
+    assert client.company == ""
+    assert client.company_ref_id is None
+    assert backfill_company_refs() == "debt=0 linked=0"
+
+
+@pytest.mark.django_db
+def test_company_refs_sweep_periodic_task_registered() -> None:
+    """Миграция регистрирует ежедневный sweep — регресс на beat-расписание."""
+    from django_celery_beat.models import PeriodicTask
+
+    task = PeriodicTask.objects.get(name="crm.backfill_company_refs")
+    assert task.enabled is True
+    assert task.task == "crm.backfill_company_refs"
+    assert task.crontab is not None
+
+
+def test_company_guess_skips_our_own_org() -> None:
+    """Подпись «ООО "Хогон"» из пересланного письма — не компания клиента."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body="С уважением,\nАлександр\nООО «Хогон»\nsales@hoocon.ru",
+    )
+    assert guess == ""
+
+
+def test_company_guess_prefers_signature_over_quoted_history() -> None:
+    """Организация ищется до цитаты «… писал(а):» — чужая подпись внизу не считается."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body=(
+            "Добрый день!\n\nС уважением,\nИван\n"
+            'ООО "Отправитель"\n\n17.11.2026, sales@hoocon.ru писал(а):\n'
+            "> С уважением,\n> ООО «Хогон»"
+        ),
+    )
+    assert guess == "ООО «Отправитель»"
+
+
+def test_company_guess_ignores_sip_cable_brand() -> None:
+    """«СИП Иванов» — марка кабеля из нашего каталога, не «ИП Иванов»."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body="С уважением,\nСИП Иванов\nинженер",
+    )
+    assert guess == ""
+
+
+def test_company_guess_signoff_must_start_a_line() -> None:
+    """«с уважением» внутри фразы не открывает зону подписи.
+
+    Среднее-2 ревью: маркер-подстрока открывал зону до конца письма и
+    упоминание третьей стороны становилось карточкой юрлица.
+    """
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body=("Прошу отнестись с уважением к срокам.\nМы работаем с ООО «Рога» по проекту.\nИван"),
+    )
+    assert guess == ""
+
+
+def test_company_guess_single_line_letter_no_org() -> None:
+    """Однострочное письмо: упоминание юрлица в просьбе — не подпись."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body='Пришлите цены на ООО "Рога"',
+    )
+    assert guess == ""
+
+
+def test_company_guess_header_line_inside_letter_keeps_signature() -> None:
+    """«Тема:»/«Дата:» в тексте отправителя — не шапка цитаты.
+
+    Среднее ревью-2: одиночная строка-заголовок до «С уважением» обрывала
+    письмо — подпись терялась, а юрлицо над заголовком («Партнёр»)
+    ошибочно становилось компанией отправителя.
+    """
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body="ООО «Партнёр»\n\nТема: совместная поставка\n\nС уважением,\nООО «Наша»",
+    )
+    assert guess == "ООО «Наша»"
+
+    guess = company_guess_from_letter(
+        subject="",
+        body="Добрый день!\n\nТема: запрос КП\n\nС уважением,\nПетров\nООО «Рога»",
+    )
+    assert guess == "ООО «Рога»"
+
+
+def test_company_guess_quote_headers_after_signature_still_cut() -> None:
+    """Блок «От:/Кому:/Тема:» ПОСЛЕ своей подписи — по-прежнему граница."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body=(
+            "Просим КП.\n\nС уважением,\nООО «Рога»\n\n"
+            "От: Менеджер\nОтправлено: 17.11.2026\nКому: sales@hoocon.ru\n"
+            "Тема: Re: цены\n\nС уважением,\nООО «Хогон»"
+        ),
+    )
+    assert guess == "ООО «Рога»"
+
+
+def test_company_guess_standalone_org_line_without_signoff() -> None:
+    """Без «С уважением» строка целиком «ООО «Рога»» — всё же подпись."""
+    from crm.company import company_guess_from_letter
+
+    guess = company_guess_from_letter(
+        subject="",
+        body="Просим цены на 8100.\nИван Петров\nООО «Рога»",
+    )
+    assert guess == "ООО «Рога»"
+
+
+@pytest.mark.django_db
+def test_note_hint_on_debt_row_persists_company_key() -> None:
+    """Заметка-подсказка на строке-долге доносит ключ в базу.
+
+    ``update(company=...)`` обошёл save(): ключ в базе пуст. Дозапись
+    заметки через ``update_fields`` обязана нести пересчитанный ключ —
+    иначе карточка свяжется, а строка останется вечным долгом без
+    маршрутизации по ключу (среднее-3 ревью).
+    """
+    client = Client.objects.create(email="debt.note@mail.ru", name="D")
+    Client.objects.filter(pk=client.pk).update(company='ООО "Долг"')
+
+    lead = Lead.objects.create(
+        email="debt.note@mail.ru",
+        company='ООО "Совсем другая"',
+        message="x",
+    )
+    lead.refresh_from_db()
+    client = lead.client
+    assert client is not None
+    client.refresh_from_db()
+
+    assert "указана компания" in client.notes
+    assert client.company == 'ООО "Долг"'  # поле не тронули
+    assert client.company_key == "ооо долг"  # а ключ в базе есть
+    assert client.company_ref is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_ensure_company_ref_recovers_from_create_race() -> None:
+    """Гонка INSERT одного company_key: savepoint спасает fallback.
+
+    Без вложенного atomic() пойманный IntegrityError делает внешнюю
+    транзакцию письма аварийной на Postgres — следующий filter() падает
+    InternalError и письмо теряется без дедуп-метки (UID уходит вперёд).
+    """
+    from unittest.mock import patch
+
+    from django.db import transaction
+
+    from crm.company import ensure_company_ref
+    from crm.models import Company
+
+    winner = Company.objects.create(name='ООО "Гонка"')
+    client = Client.objects.create(email="race.ensure@mail.ru", name="R")
+    client.company = 'ООО "Гонка"'
+    client.company_key = "ооо гонка"
+
+    real_filter = Company.objects.filter
+    real_create = Company.objects.create
+    calls = {"filter": 0}
+
+    def _first_filter_misses(*args, **kwargs):
+        calls["filter"] += 1
+        queryset = real_filter(*args, **kwargs)
+        if calls["filter"] == 1:
+            return queryset.exclude(pk=winner.pk)
+        return queryset
+
+    with (
+        patch.object(Company.objects, "filter", side_effect=_first_filter_misses),
+        patch.object(Company.objects, "create", side_effect=lambda **kw: real_create(**kw)),
+        transaction.atomic(),
+    ):
+        org = ensure_company_ref(client)
+
+    assert org is not None and org.pk == winner.pk
+    client.refresh_from_db()
+    assert client.company_ref_id == winner.pk
+
+
 @pytest.mark.django_db(transaction=True)
 def test_create_outbound_email_queues_and_logs_activity(
     settings,

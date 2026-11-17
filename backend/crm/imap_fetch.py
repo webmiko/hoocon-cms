@@ -484,20 +484,36 @@ def _attach_pending_replies(
             _record_mail_activity(client=client, lead=lead, subject=row.subject, body=row.body)
 
 
-def _resolve_client(parsed: Message) -> tuple[Client, bool]:
+def _resolve_client(parsed: Message, *, subject: str, body: str) -> tuple[Client, bool]:
     """Client by From address (create with display-name for unknown senders).
+
+    An existing card with an empty ``company`` is enriched from a verified
+    lead or the letter's signature zone — otherwise the label stayed empty
+    forever and no Company card was born (переписка есть, карточки нет).
 
     Raises:
         ValueError: письмо без валидного From — пропускаем.
     """
+    from crm.company import (
+        MISSING_COMPANY_NOTE,
+        append_client_note,
+        company_guess_from_letter,
+        enrich_client_company,
+    )
+
     sender, display_name = _sender(parsed)
     client = Client.objects.filter(email=sender).first()
     if client is not None:
+        enrich_client_company(client, subject=subject, body=body)
+        if not client.company:
+            # Источников имени юрлица не нашлось — одна строка-флаг для
+            # менеджера, дальше дедуп по подстроке.
+            append_client_note(client, MISSING_COMPANY_NOTE)
         return client, False
     client = Client.objects.create(
         email=sender,
         name=(display_name or sender)[:200],
-        company=_company_from_sender_email(sender),
+        company=(_company_from_sender_email(sender) or company_guess_from_letter(subject=subject, body=body)),
     )
     return client, True
 
@@ -722,7 +738,7 @@ def _store_customer_mail(
 ) -> EmailMessage:
     """Inbound letter from a customer. A new sender without a thread opens a lead."""
     with transaction.atomic():
-        client, is_new_client = _resolve_client(parsed)
+        client, is_new_client = _resolve_client(parsed, subject=subject, body=body)
         lead = _find_lead(references=references, subject=subject, client=client)
         if lead is None and is_new_client:
             lead = _create_lead_from_email(client=client, subject=subject, body=body)
