@@ -620,10 +620,11 @@ def test_email_list_filters_by_the_manager_who_wrote_it(client, django_user_mode
     listing = reverse("admin:crm_emailmessage_changelist")
     html = client.get(listing).content.decode()
     assert "Исходящее" in html
-    assert f'<option value="{alena.pk}">Алёна</option>' in html
-    assert f'<option value="{boris.pk}">Борис</option>' in html
     panel = html.split('id="changelist-filter"', 1)[1]
-    assert panel.index(">Алёна</option>") < panel.index("Исходящее")
+    assert f'?manager={alena.pk}"' in panel
+    assert f'?manager={boris.pk}"' in panel
+    assert f'<option value="{alena.pk}">' not in html
+    assert panel.index("Алёна") < panel.index("Исходящее")
     filtered = client.get(listing, {"manager": str(alena.pk)}).content.decode()
     assert "Письмо Алёны" in filtered
     assert "Письмо Бориса" not in filtered

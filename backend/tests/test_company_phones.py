@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -292,11 +291,7 @@ def test_client_list_finds_the_firm_by_a_persons_email(client: Any) -> None:
 
 @pytest.mark.django_db
 def test_client_list_filters_by_manager(client: Any) -> None:
-    """Фильтр «менеджер» оставляет фирмы одного человека и не предлагает посторонних.
-
-    Выбор в выпадающем списке должен попасть в адрес: Unfold рисует select
-    без формы, поэтому смена значения сама по себе список не обновляет.
-    """
+    """Фильтр «менеджер» — список ссылок, как остальные фильтры, без второго select."""
     from django.contrib.auth.models import Group
 
     from accounts.roles import GROUP_MANAGER
@@ -332,20 +327,12 @@ def test_client_list_filters_by_manager(client: Any) -> None:
     client.force_login(admin)
     listing = reverse("admin:crm_company_changelist")
     html = client.get(listing).content.decode()
-    assert 'name="manager"' in html
-    assert "hoocon-admin-tables.js" in html
-    script = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-tables.js").read_text(
-        encoding="utf-8"
-    )
-    # source-lint: select в #changelist-filter без #filter-form пишет выбор в query.
-    assert "applyChangelistDropdownFilters" in script
-    assert 'getElementById("changelist-filter")' in script
-    assert "searchParams.set" in script
-    assert f'<option value="{alena.pk}">Алёна</option>' in html
-    assert f'<option value="{boris.pk}">Борис</option>' in html
     panel = html.split('id="changelist-filter"', 1)[1]
-    assert panel.index(">Алёна</option>") < panel.index("Можно звонить")
-    assert f'<option value="{outsider.pk}">' not in html
+    assert f'?manager={alena.pk}"' in panel
+    assert f'?manager={boris.pk}"' in panel
+    assert f'<option value="{alena.pk}">' not in html
+    assert panel.index("Алёна") < panel.index("Можно звонить")
+    assert f"manager={outsider.pk}" not in panel
     filtered = client.get(listing, {"manager": str(alena.pk)}).content.decode()
     assert "Фирма Алёны" in filtered
     assert "Фирма Бориса" not in filtered
