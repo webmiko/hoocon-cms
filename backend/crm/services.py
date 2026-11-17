@@ -465,11 +465,11 @@ def scope_clients_for_manager(queryset: QuerySet[Client], user: Any) -> QuerySet
 
 
 def scope_companies_for_manager(queryset: QuerySet[Company], user: Any) -> QuerySet[Company]:
-    """Firms a manager counts as their own.
+    """Firms a manager counts as their own on the dashboard.
 
     Admin and analyst see every firm. A manager counts firms assigned to them.
-    The company directory itself stays shared, so a colleague's firm can still
-    be opened; the dashboard card links to the list already filtered to this set.
+    The «Клиенты» list is wider: it also shows firms with no assignee.
+    See :func:`scope_company_directory_for_manager`.
 
     Args:
         queryset: base Company queryset.
@@ -485,6 +485,22 @@ def scope_companies_for_manager(queryset: QuerySet[Company], user: Any) -> Query
     if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
         return queryset.none()
     return queryset.filter(assignee_id=user.pk)
+
+
+def scope_company_directory_for_manager(queryset: QuerySet[Company], user: Any) -> QuerySet[Company]:
+    """Firms a manager may open in «Клиенты».
+
+    Admin and analyst see every firm. A manager sees firms assigned to them
+    and firms that still have no assignee. A colleague's firm is absent from
+    the list and from a direct link.
+    """
+    from accounts.roles import staff_sees_all_leads
+
+    if staff_sees_all_leads(user):
+        return queryset
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "pk", None):
+        return queryset.none()
+    return queryset.filter(Q(assignee_id=user.pk) | Q(assignee_id__isnull=True))
 
 
 def scope_activities_for_manager(

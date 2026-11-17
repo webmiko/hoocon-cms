@@ -11,8 +11,13 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from cabinet.models import Order
-from crm.models import Client, Quote
-from crm.services import scope_clients_for_manager, scope_orders_for_manager, scope_quotes_for_manager
+from crm.models import Client, Company, Quote
+from crm.services import (
+    scope_clients_for_manager,
+    scope_company_directory_for_manager,
+    scope_orders_for_manager,
+    scope_quotes_for_manager,
+)
 from leads.models import Lead
 from leads.services import scope_leads_for_manager
 
@@ -44,6 +49,11 @@ def _scoped_lead_queryset(request: HttpRequest) -> QuerySet[Lead]:
 
 def _scoped_client_queryset(request: HttpRequest) -> QuerySet[Client]:
     return scope_clients_for_manager(Client.objects.all(), request.user)
+
+
+def _scoped_company_queryset(request: HttpRequest) -> QuerySet[Company]:
+    """Firms a manager may attach a person to: their own and still unassigned."""
+    return scope_company_directory_for_manager(Company.objects.all(), request.user)
 
 
 def _scoped_quote_queryset(request: HttpRequest) -> QuerySet[Quote]:
