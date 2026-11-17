@@ -156,6 +156,18 @@ def get_or_create_client_from_lead(lead: Lead) -> Client:
         client = Client.objects.select_for_update().get(pk=client.pk)
         if not created and lead.contact_verified:
             return _merge_lead_contact_into_client(client, lead)
+        if not lead.contact_verified:
+            # Компания из неподтверждённой заявки — не факт, а подсказка:
+            # в поле её не пишем (audit M1), но и не теряем совсем.
+            from crm.company import append_client_note
+
+            company = normalize_client_company(lead.company)
+            if company:
+                append_client_note(
+                    client,
+                    f"В заявке #{lead.pk} указана компания «{company}» — "
+                    "не подтверждено; перенос в поле «Компания» — руками менеджера.",
+                )
         return client
 
 

@@ -57,6 +57,23 @@ class EmailAuthorFilter(ManagerFilter):
     user_field = "created_by_id"
 
 
+class MissingCompanyCardFilter(admin.SimpleListFilter):
+    """Contacts with a company label but no Company card — the sweep debt."""
+
+    title = "карточка компании"
+    parameter_name = "no_company_card"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        del request, model_admin
+        return [("yes", "Без карточки (поле заполнено)")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Any]) -> QuerySet[Any]:
+        del request
+        if self.value() == "yes":
+            return queryset.exclude(company="").filter(company_ref__isnull=True)
+        return queryset
+
+
 class WorkQueueFilter(admin.SimpleListFilter):
     """Shortcuts from the outreach workbook: callable, prepaid, today, overdue."""
 

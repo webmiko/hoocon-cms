@@ -1623,3 +1623,154 @@ def test_celery_has_global_time_limits() -> None:
 
     assert app.conf.task_soft_time_limit and app.conf.task_time_limit
     assert app.conf.task_soft_time_limit < app.conf.task_time_limit
+
+
+@pytest.mark.django_db
+def test_existing_client_company_filled_from_verified_lead(
+    _imap: dict[int, bytes],
+) -> None:
+    """Пустая «Компания» добирается из верифицированной заявки этого email.
+
+    Прод-симптом: у контакта merge не прошёл (verify-flip по update()),
+    письма шли, поле висело пустым — карточки компании не было.
+    """
+    from crm.models import CompanyMember
+
+    client = Client.objects.create(email="svetlana@yandex.ru", name="Svetlana")
+    lead = Lead.objects.create(
+        email="svetlana@yandex.ru",
+        name="Светлана",
+        company='ООО "ВВК"',
+        message="Реквизиты",
+    )
+    # Verify-flip через update() — merge в карточку не запускался.
+    Lead.objects.filter(pk=lead.pk).update(contact_verified=True)
+    client.refresh_from_db()
+    assert client.company == ""
+
+    _imap[1] = _raw_email(
+        message_id="<enrich-lead@t>",
+        from_addr="Svetlana <svetlana@yandex.ru>",
+        body="Добрый день!",
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == 'ООО "ВВК"'
+    assert client.company_ref is not None
+    assert client.company_ref.name == 'ООО "ВВК"'
+    assert CompanyMember.objects.filter(company=client.company_ref, client=client).exists()
+
+
+@pytest.mark.django_db
+def test_existing_client_company_guessed_from_signature(
+    _imap: dict[int, bytes],
+) -> None:
+    """Подпись «ООО "СпецКомлект-С"» — источник, когда заявки молчат (кейс Тарасова)."""
+    client = Client.objects.create(email="t196@yandex.ru", name="Тарасов")
+    _imap[1] = _raw_email(
+        message_id="<sig@t>",
+        from_addr="Тарасов <t196@yandex.ru>",
+        subject="Запрос на приводы",
+        body=('Просим цены на H8205.\n\nС уважением,\nТарасов Антон Юрьевич\nООО "СпецКомлект-С"\n+7 900 300-20-01'),
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == "ООО «СпецКомлект-С»"
+    assert client.company_ref is not None
+
+
+@pytest.mark.django_db
+def test_existing_client_company_guessed_from_subject(
+    _imap: dict[int, bytes],
+) -> None:
+    """Тема «Смена юр. адреса ООО "ВВК"» отдаёт юрлицо — прод-кейс Светланы."""
+    client = Client.objects.create(email="svet@yandex.ru", name="S")
+    _imap[1] = _raw_email(
+        message_id="<subj@t>",
+        from_addr="S <svet@yandex.ru>",
+        subject='Смена юр. адреса ООО "ВВК"',
+        body="Добрый день! Отправляю новые реквизиты.",
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == "ООО «ВВК»"
+
+
+@pytest.mark.django_db
+def test_existing_client_company_never_overwritten(
+    _imap: dict[int, bytes],
+) -> None:
+    """Заполненное вручную «ООО "Старое"» угадывание не трогает."""
+    client = Client.objects.create(email="keep@mail.ru", name="K", company='ООО "Старое"')
+    _imap[1] = _raw_email(
+        message_id="<keep@t>",
+        from_addr="K <keep@mail.ru>",
+        body='С уважением,\nООО "Другое"',
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == 'ООО "Старое"'
+
+
+@pytest.mark.django_db
+def test_existing_client_without_hints_gets_clarify_note(
+    _imap: dict[int, bytes],
+) -> None:
+    """Ни заявок, ни подписи — в заметках одна строка «уточнить компанию»."""
+    client = Client.objects.create(email="quiet@gmail.com", name="Q")
+    _imap[1] = _raw_email(
+        message_id="<quiet@t>",
+        from_addr="Q <quiet@gmail.com>",
+        body="Здравствуйте, есть вопрос по ценам.",
+    )
+    _imap[2] = _raw_email(
+        message_id="<quiet2@t>",
+        from_addr="Q <quiet@gmail.com>",
+        subject="Ещё вопрос",
+        body="И ещё один вопрос.",
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == ""
+    assert client.notes.casefold().count("уточнить") == 1
+
+
+@pytest.mark.django_db
+def test_mid_body_org_mention_does_not_become_company(
+    _imap: dict[int, bytes],
+) -> None:
+    """Упоминание третьей стороны в тексте — не повод для карточки."""
+    client = Client.objects.create(email="mid@mail.ru", name="M")
+    _imap[1] = _raw_email(
+        message_id="<mid@t>",
+        from_addr="M <mid@mail.ru>",
+        body=('Мы работаем с ООО "Рога" по этому проекту.\nПришлите цены на 8100 и H8205.\nИван'),
+    )
+    fetch_inbound_email()
+
+    client.refresh_from_db()
+    assert client.company == ""
+
+
+@pytest.mark.django_db
+def test_new_client_company_from_signature_when_domain_free(
+    _imap: dict[int, bytes],
+) -> None:
+    """Новый отправитель с бесплатного домена: компанию даёт подпись."""
+    _imap[1] = _raw_email(
+        message_id="<new-sig@t>",
+        from_addr="Ольга <olga.vvk@yandex.ru>",
+        body="Просим КП.\n\nС уважением,\nОльга\nООО «ВВК»",
+    )
+    fetch_inbound_email()
+
+    row = EmailMessage.objects.get(message_id="<new-sig@t>")
+    assert row.client.company == "ООО «ВВК»"
+    assert row.client.company_ref is not None
+    row.lead.refresh_from_db()
+    assert row.lead.company == "ООО «ВВК»"  # заявка тоже с компанией

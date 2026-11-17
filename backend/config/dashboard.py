@@ -193,6 +193,23 @@ def _build_notifications(
                 },
             )
 
+        missing_cards = scope_clients_for_manager(
+            Client.objects.exclude(company="").filter(company_ref__isnull=True),
+            user,
+        ).count()
+        if missing_cards:
+            items.append(
+                {
+                    "level": "warning",
+                    "title": f"Без карточки компании: {missing_cards}",
+                    "hint": (
+                        "У контакта заполнена «Компания», но карточка юрлица "
+                        "не создана — откройте и сохраните контакт."
+                    ),
+                    "url": reverse("admin:crm_client_changelist") + "?no_company_card=yes",
+                },
+            )
+
         failed = scope_emails_for_manager(
             EmailMessage.objects.filter(status=EmailStatus.FAILED),
             user,

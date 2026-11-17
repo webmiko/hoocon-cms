@@ -124,9 +124,17 @@ class Client(models.Model):
         from crm.telephony import normalize_phone_digits
         from leads.services import normalize_company_label
 
+        update_fields = kwargs.get("update_fields")
         self.email = (self.email or "").strip().lower()
         self.company_key = normalize_company_label(self.company)
         self.phone_digits = normalize_phone_digits(self.phone)
+        # Derived keys must travel with any partial write — a notes-only
+        # save() once linked the Company card but left company_key empty
+        # in the row (routing rules never matched, row left the sweep).
+        if update_fields:
+            missing = [f for f in ("company_key", "phone_digits") if f not in update_fields]
+            if missing:
+                kwargs["update_fields"] = [*update_fields, *missing]
         super().save(*args, **kwargs)
         from crm.company import ensure_company_ref
 
