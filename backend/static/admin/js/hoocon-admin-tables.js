@@ -494,6 +494,49 @@
     });
   }
 
+  /**
+   * Unfold dropdown filters in the sidebar are selects, not links.
+   * Without list_filter_submit they sit outside a form, so picking a
+   * manager never reloads the list. Write the choice into the query string.
+   */
+  function applyChangelistDropdownFilters() {
+    const root = document.getElementById("changelist-filter");
+    if (!root || root.querySelector("#filter-form")) {
+      return;
+    }
+    root.querySelectorAll("select[name]").forEach((select) => {
+      select.addEventListener("change", () => {
+        const url = new URL(window.location.href);
+        const current = url.searchParams.get(select.name) || "";
+        const next = select.value || "";
+        if (next === current) {
+          return;
+        }
+        if (next) {
+          url.searchParams.set(select.name, next);
+        } else {
+          url.searchParams.delete(select.name);
+        }
+        url.searchParams.delete("p");
+        window.location.assign(url.toString());
+      });
+    });
+  }
+
+  function filterTitle(block) {
+    const titleEl = block.querySelector("h3, label");
+    if (!titleEl) {
+      return "";
+    }
+    return (titleEl.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^By\s+/i, "");
+  }
+
+  /**
+   * Every sidebar filter starts closed. The manager opens the one they need.
+   */
   function collapseIdleFilters() {
     const filter = document.getElementById("changelist-filter");
     if (!filter) {
@@ -501,24 +544,35 @@
     }
 
     filter.classList.add("hoocon-phone-filter-chips");
+    const columns = filter.querySelectorAll("div.flex.flex-col.gap-4");
+    const column = columns.length ? columns[columns.length - 1] : null;
+    if (!column) {
+      return;
+    }
 
-    filter.querySelectorAll("details").forEach((details) => {
-      const selected = details.querySelector("li.selected a");
-      const selectedText = (selected?.textContent || "").replace(/\s+/g, " ").trim();
-      const isDefaultAll = !selected || selectedText === "Все" || selectedText === "All";
-      const optionCount = details.querySelectorAll("li").length;
-      // Keep short filters open; collapse long idle ones so the table stays visible.
-      // On phone prefer all collapsed except those with a non-default selection.
-      const phone =
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(max-width: 767px)").matches;
-      if (phone) {
-        details.open = !isDefaultAll;
+    Array.from(column.children).forEach((block) => {
+      if (!(block instanceof HTMLElement) || block.tagName === "DETAILS") {
         return;
       }
-      if (isDefaultAll && optionCount > 6) {
-        details.open = false;
+      const title = filterTitle(block);
+      if (!title) {
+        return;
       }
+      const heading = block.querySelector("h3, label");
+      if (heading) {
+        heading.remove();
+      }
+      const details = document.createElement("details");
+      details.className = "hoocon-filter-fold";
+      details.open = false;
+      const summary = document.createElement("summary");
+      summary.className = "hoocon-filter-fold__summary";
+      summary.textContent = title;
+      details.appendChild(summary);
+      while (block.firstChild) {
+        details.appendChild(block.firstChild);
+      }
+      block.replaceWith(details);
     });
   }
 
@@ -584,6 +638,7 @@
     document.addEventListener("formset:added", scrollAddedTabularInlineIntoView);
     observeInlineRows();
     collapseIdleFilters();
+    applyChangelistDropdownFilters();
     enhanceSidebarActionTitles();
     enableStackedCardNavigation();
     window.addEventListener("resize", onViewportChange);

@@ -787,6 +787,48 @@ def test_manager_does_not_see_or_take_another_managers_company_card() -> None:
 
 
 @pytest.mark.django_db
+def test_manager_cannot_attach_own_client_to_another_managers_company() -> None:
+    """Выпадающий список фирмы коллеги не показывает, но POST company_ref принимал её pk."""
+    from django.core.exceptions import ValidationError
+
+    from crm.admin import ClientAdmin
+    from crm.models import Company
+
+    manager = _staff_with_perms(
+        username="scope-company-fk",
+        codenames=("view_client", "change_client", "view_company"),
+    )
+    other = User.objects.create_user(
+        username="scope-company-fk-other",
+        email="scope-company-fk-other@example.com",
+        password="password12",
+        is_staff=True,
+    )
+    mine = CrmClient.objects.create(name="Мой человек", email="scope-company-fk@example.com", assignee=manager)
+    own = Company.objects.create(name="Своя для связи", assignee=manager)
+    free = Company.objects.create(name="Свободная для связи")
+    foreign = Company.objects.create(name="Чужая для связи", assignee=other)
+    field = _fk_field(ClientAdmin, CrmClient, "company_ref", manager, mine.pk)
+    assert field.clean(own.pk) == own
+    assert field.clean(free.pk) == free
+    with pytest.raises(ValidationError):
+        field.clean(foreign.pk)
+
+    already = CrmClient.objects.create(
+        name="Уже на чужой",
+        email="scope-company-fk-kept@example.com",
+        assignee=manager,
+        company_ref=foreign,
+    )
+    kept = _fk_field(ClientAdmin, CrmClient, "company_ref", manager, already.pk)
+    assert kept.clean(foreign.pk) == foreign
+
+    admin_user = User.objects.create_superuser("scope-company-fk-admin", "scope-company-fk-admin@example.com", "x")
+    admin_field = _fk_field(ClientAdmin, CrmClient, "company_ref", admin_user, mine.pk)
+    assert admin_field.clean(foreign.pk) == foreign
+
+
+@pytest.mark.django_db
 def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
     """Saving the company card does not rewrite an owner the «Назначить меня» action would keep."""
     from django.utils import timezone
@@ -805,6 +847,7 @@ def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
     )
     owned = Company.objects.create(name="Чужая фирма", assignee=other, comment="было")
     free = Company.objects.create(name="Свободная фирма")
+    Company.objects.create(name="Своя фирма", assignee=manager)
     owned_touch = PlannedTouch.objects.create(
         company=owned,
         assignee=other,
@@ -815,27 +858,22 @@ def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
 
     page = Client()
     page.force_login(manager)
+    listing = page.get(reverse("admin:crm_company_changelist")).content.decode()
+    assert "Своя фирма" in listing
+    assert "Свободная фирма" in listing
+    assert "Чужая фирма" not in listing
     owned_url = reverse("admin:crm_company_change", args=[owned.pk])
-    card = page.get(owned_url)
-    assert card.status_code == 200
-
-    stolen = _admin_change_post(page, owned_url)
-    stolen["assignee"] = str(manager.pk)
-    stolen["comment"] = "попытка забрать"
-    saved = page.post(owned_url, stolen)
-    assert saved.status_code == 302
+    hidden = page.get(owned_url)
+    assert hidden.status_code == 302
+    assert hidden.url == reverse("admin:index")
+    stolen = page.post(owned_url, {"assignee": str(manager.pk), "comment": "попытка забрать"})
+    assert stolen.status_code == 302
+    assert stolen.url == reverse("admin:index")
     owned.refresh_from_db()
     assert owned.assignee_id == other.pk
-    assert owned.comment == "попытка забрать"
-    assert 'name="assignee"' not in card.content.decode()
+    assert owned.comment == "было"
     calls = page.get(reverse("admin:crm_plannedtouch_changelist")).content.decode()
     assert owned_touch.title not in calls
-
-    cleared = _admin_change_post(page, owned_url)
-    cleared["assignee"] = ""
-    page.post(owned_url, cleared)
-    owned.refresh_from_db()
-    assert owned.assignee_id == other.pk
 
     free_url = reverse("admin:crm_company_change", args=[free.pk])
     free_card = page.get(free_url)
@@ -851,6 +889,8 @@ def test_manager_cannot_take_another_managers_company_from_the_card() -> None:
     admin_user = User.objects.create_superuser("scope-owner-admin", "scope-owner-admin@example.com", "password12")
     admin_page = Client()
     admin_page.force_login(admin_user)
+    admin_list = admin_page.get(reverse("admin:crm_company_changelist")).content.decode()
+    assert "Чужая фирма" in admin_list
     reassign = _admin_change_post(admin_page, owned_url)
     reassign["assignee"] = str(manager.pk)
     moved = admin_page.post(owned_url, reassign)
@@ -912,9 +952,9 @@ def test_manager_cannot_add_contact_or_call_on_another_managers_company() -> Non
         posted[f"clients-{client_index}-assignee"] = ""
         return page.post(url, posted)
 
-    blocked = add_rows(foreign)
-    # The company card itself still saves. The new contact and call are dropped.
-    assert blocked.status_code == 302
+    hidden = page.get(reverse("admin:crm_company_change", args=[foreign.pk]))
+    assert hidden.status_code == 302
+    assert hidden.url == reverse("admin:index")
     foreign.refresh_from_db()
     assert foreign.assignee_id == other.pk
     assert PlannedTouch.objects.filter(company=foreign).count() == 0
@@ -971,14 +1011,10 @@ def test_manager_cannot_confirm_a_member_on_another_managers_company() -> None:
         posted[f"members-{index}-is_confirmed"] = "on"
         return page.post(url, posted)
 
-    blocked = post_member(foreign, confirm_existing=False)
-    assert blocked.status_code == 302
+    hidden = page.get(reverse("admin:crm_company_change", args=[foreign.pk]))
+    assert hidden.status_code == 302
+    assert hidden.url == reverse("admin:index")
     assert CompanyMember.objects.filter(company=foreign, is_confirmed=True).count() == 0
-    existing.refresh_from_db()
-    assert existing.is_confirmed is False
-
-    flipped = post_member(foreign, confirm_existing=True)
-    assert flipped.status_code == 302
     existing.refresh_from_db()
     assert existing.is_confirmed is False
 

@@ -288,7 +288,7 @@ def test_seed_wiki_guide_explains_current_workplace() -> None:
     assert 'id="workplace"' in body
     assert 'id="mail-stuck"' in body
     assert "Для чего эта страница" in body
-    assert "только для чтения" in body
+    assert "прямая ссылка не открывает карточку" in body
     assert "сохраняются оба" in body
     assert "Отправить выбранные (очередь)" in body
     assert "статус «Отправка»" in body
@@ -692,7 +692,8 @@ def test_seed_wiki_today_board_is_the_managers_own_queue() -> None:
     guide = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
     body, changelog = guide.body.split('id="changelog"', 1)
     assert "Чужой плановый звонок на панель не попадает" in body
-    assert "сотрудника кабинета на эту карточку добавить нельзя" in body
+    assert "в списке её нет" in body
+    assert 'id="changelog-firm-directory-scope"' in changelog
     assert "Лист «Пример» не попадает в базу" in body
     assert "Исходящий звонок" in body
     assert changelog.index("changelog-outbound-softphone") < changelog.index("changelog-today-own-queue")

@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
 from cabinet.models import Order
-from config.admin_mixins import OpenChangeLinkMixin
+from config.admin_mixins import OpenChangeLinkMixin, ScopedForeignKeyMixin
 from config.unfold_callbacks import _versioned_static
 from crm.admin.card_rows import fill_manual_lead, next_manual_order_number
 from crm.admin.client_workbook import ClientWorkbookMixin
@@ -34,7 +34,7 @@ from crm.admin.inlines import (
     RmaCaseInline,
 )
 from crm.admin.list_view import remember_list_view
-from crm.admin.scope import ManagerUsesTheCard, OverdueNextContactFilter
+from crm.admin.scope import ManagerUsesTheCard, OverdueNextContactFilter, _scoped_company_queryset
 from crm.forms import ComposeEmailForm, SpecImportForm
 from crm.mail_links import staff_reply_to_email
 from crm.manager_signatures import manager_reply_signature
@@ -64,7 +64,7 @@ def _ru_company_phone() -> str:
 
 
 @admin.register(Client)
-class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, OpenChangeLinkMixin, ModelAdmin):
+class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     """CRM client card: contacts, assignee, leads, timeline, send email.
 
     ID клиента = email. Несколько заявок с одним email попадают в одну
@@ -93,6 +93,7 @@ class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, OpenChangeLinkMixin, 
     )
     search_fields = ("email", "name", "company", "phone", "phone_digits", "notes", "company_ref__inn")
     autocomplete_fields = ("assignee", "company_ref")
+    scoped_fk = {"company_ref": _scoped_company_queryset}
     readonly_fields = (
         "created_at",
         "updated_at",

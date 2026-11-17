@@ -343,11 +343,13 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
         )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Company]:
+        """Own firms and firms with no assignee. Admin and analyst see every firm."""
         from django.db.models import Count
 
+        from crm.services import scope_company_directory_for_manager
+
         return (
-            super()
-            .get_queryset(request)
+            scope_company_directory_for_manager(super().get_queryset(request), request.user)
             .prefetch_related("work_labels")
             .annotate(
                 _members_count=Count("members", distinct=True),
