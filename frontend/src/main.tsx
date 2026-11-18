@@ -13,6 +13,7 @@ import App from "./App";
 import { clearChunkReloadFlag, recoverFromStaleChunk } from "./utils/chunkLoadRecovery";
 import { reloadGuard } from "./utils/reloadGuard";
 import { reloadIfReleaseStale } from "./utils/reloadIfReleaseStale";
+import { installServerCrawlRetirement } from "./utils/serverCrawl";
 import { removeServerSeoTags } from "./utils/serverSeoTags";
 import { installSupportChatControl } from "./utils/supportChatControl";
 
@@ -84,3 +85,4 @@ createRoot(document.getElementById("root")!).render(
     </HelmetProvider>
   </StrictMode>,
 );
+installServerCrawlRetirement();

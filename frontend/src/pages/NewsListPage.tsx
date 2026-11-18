@@ -9,6 +9,7 @@ import { useAsync } from "../hooks/useAsync";
 import { usePagedList } from "../hooks/usePagedList";
 import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import { stripHtmlToText } from "../utils/stripHtml";
 import styles from "./NewsListPage.module.css";
 
@@ -131,7 +132,9 @@ export function NewsListPage() {
         </label>
       </div>
 
-      {loading && <p className={styles.status}>Загрузка…</p>}
+      {loading && !serverCrawlIsShowing() && (
+        <p className={styles.status}>Загрузка…</p>
+      )}
       {error && (
         <p className={styles.status} role="alert">
           Не удалось загрузить новости.

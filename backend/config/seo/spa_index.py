@@ -90,8 +90,8 @@ def inject_csp_nonce(html: str, nonce: str) -> str:
 def inject_home_lcp_hints(html: str, raw_path: str) -> str:
     """Preload home hero LCP image.
 
-    The picker text lives in the crawl block inside #root. React replaces
-    #root; there is no second noscript copy and no SSR overlay.
+    The picker text lives in the crawl article before #root. There is no
+    second noscript copy and no SSR overlay.
 
     Args:
         html: SPA shell HTML.
@@ -124,12 +124,15 @@ def inject_crawl_block(
     lines: tuple[str, ...],
     links: tuple[tuple[str, str], ...] = (),
 ) -> str:
-    """Put the heading, facts and links inside #root before the script runs.
+    """Put the heading, facts and links before #root.
 
-    React replaces #root on startup, so visitors do not keep a second copy.
-    Crawlers that do not run scripts still see the title, the text and the
-    links. No ``hidden`` attribute (some bots skip it); ``#seo-crawl`` is
-    clipped in ``index.html`` critical CSS until React replaces ``#root``.
+    ``createRoot`` replaces everything inside #root. A renderer that executes
+    scripts (Yandex) would otherwise snapshot «Загрузка…» or the error
+    boundary. The article stays in normal flow, outside #root, until the SPA
+    paints a real heading and removes it. #root is ``inert`` for that wait;
+    critical CSS clips it only while the article is the previous sibling.
+
+    No ``hidden`` attribute on the article (some bots skip it).
 
     Args:
         html: SPA shell.
@@ -159,7 +162,11 @@ def inject_crawl_block(
     if not parts:
         return html
     block = f'<article id="seo-crawl">{"".join(parts)}</article>'
-    return html.replace('<div id="root"></div>', f'<div id="root">{block}</div>', 1)
+    empty_root = '<div id="root"></div>'
+    if empty_root not in html:
+        return html
+    hidden_root = '<div id="root" inert aria-hidden="true"></div>'
+    return html.replace(empty_root, f"{block}\n    {hidden_root}", 1)
 
 
 def render_spa_index_html(

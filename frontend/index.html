@@ -78,11 +78,38 @@
       #root {
         min-height: 100vh;
       }
-      /* Server crawl copy in #root (spa_index); React replaces it on boot. */
+      /* Server article (spa_index) is the visible page until the SPA paints
+         a real heading and removes it. #root is clipped only while that
+         article is the previous sibling — Vite dev has no article. */
       #seo-crawl {
+        box-sizing: border-box;
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 1.5rem 1.25rem 2.5rem;
+        overflow-wrap: anywhere;
+      }
+      #seo-crawl h1 {
+        font-size: 1.75rem;
+        line-height: 1.2;
+        margin: 0 0 0.75rem;
+      }
+      #seo-crawl ul {
+        margin: 0 0 1rem;
+        padding-left: 1.25rem;
+      }
+      #seo-crawl nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+      }
+      #seo-crawl a {
+        color: #da0e2b;
+      }
+      #seo-crawl ~ #root {
         position: absolute;
         width: 1px;
         height: 1px;
+        min-height: 0;
         padding: 0;
         margin: -1px;
         overflow: hidden;

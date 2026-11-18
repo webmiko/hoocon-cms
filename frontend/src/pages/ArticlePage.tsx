@@ -19,6 +19,7 @@ import {
 import { catalogPathForSku } from "../utils/catalogPaths";
 import { protectedContentHandlers } from "../utils/contentProtection";
 import { metaDescription } from "../utils/seoMeta";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import styles from "./ArticlePage.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -37,6 +38,7 @@ export function ArticlePage() {
   const { data: listData } = useAsync(() => api.articles());
 
   if (loading) {
+    if (serverCrawlIsShowing()) return null;
     return <p className={styles.status}>Загрузка…</p>;
   }
 

@@ -14,6 +14,7 @@ import {
   buildBreadcrumbJsonLd,
 } from "../utils/jsonLd";
 import { metaDescription } from "../utils/seoMeta";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import styles from "./NewsPage.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -30,6 +31,7 @@ export function NewsPage() {
   const { data: listData } = useAsync(() => api.news());
 
   if (loading) {
+    if (serverCrawlIsShowing()) return null;
     return <p className={styles.status}>Загрузка…</p>;
   }
 

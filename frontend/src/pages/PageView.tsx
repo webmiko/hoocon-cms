@@ -8,6 +8,7 @@ import { useAsync } from "../hooks/useAsync";
 import { sanitizeHtml } from "../utils/sanitize";
 import { buildBreadcrumbJsonLd, buildFaqJsonLd } from "../utils/jsonLd";
 import { metaDescription } from "../utils/seoMeta";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import styles from "./PageView.module.css";
 import "../styles/cms-body-charts.css";
 
@@ -36,6 +37,7 @@ export function PageView({ slug: slugProp }: PageViewProps) {
   );
 
   if (slug && loading) {
+    if (serverCrawlIsShowing()) return null;
     return <p className={styles.status}>Загрузка…</p>;
   }
 
