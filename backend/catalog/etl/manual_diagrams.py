@@ -475,6 +475,85 @@ def relabel_safu_diagram_crops(
     return out
 
 
+def default_manuals_ru_root() -> Path:
+    """Repo ``_manuals-ru`` tree — ready-made PNG assets exported per manual."""
+    return Path(__file__).resolve().parents[3] / "_manuals-ru"
+
+
+def _asset_dir_with_diagrams(base: Path) -> Path | None:
+    """Dir usable as a diagram source only when both PNGs are exported."""
+    if (base / "wiring.png").is_file() and (base / "dimensions.png").is_file():
+        return base
+    return None
+
+
+def dafu_html_asset_dir(*, series_nm: int, edition: Edition, root: Path) -> Path | None:
+    """HTML manual asset dir covering this DAFU series/edition, if exported.
+
+    DA3FU and DA5FU have own folders; DA10/15/20FU share the combined pack.
+    Editions without an exported pack return ``None`` → PDF crop fallback.
+    """
+    if edition == "modulating_24":
+        name = "da10-15-20fu24-a-as" if series_nm in {10, 15, 20} else None
+    elif series_nm in {10, 15, 20}:
+        name = "da10-15-20fu24-230-d-ds"
+    else:
+        name = {3: "da3fu-d-ds", 5: "da5fu-d-ds"}.get(series_nm)
+    if name is None:
+        return None
+    return _asset_dir_with_diagrams(root / "DA" / "assets" / name)
+
+
+def safu_html_asset_dir(*, series_nm: int, root: Path) -> Path | None:
+    """HTML manual asset dir ``sa{nm}fu-ds-dst`` when it has both diagrams.
+
+    Families without an own manual reuse the fallback family pack
+    (``_SAFU_PDF_FALLBACK_NM``: SA20 → SA15), same as the PDF path.
+    """
+    for nm in dict.fromkeys((series_nm, _SAFU_PDF_FALLBACK_NM.get(series_nm, series_nm))):
+        found = _asset_dir_with_diagrams(root / "SA" / "assets" / f"sa{nm}fu-ds-dst")
+        if found is not None:
+            return found
+    return None
+
+
+def diagrams_from_html_assets(
+    asset_dir: Path,
+    *,
+    series_nm: int,
+    edition: Edition,
+    safu: bool = False,
+) -> list[DiagramCrop]:
+    """Ready-made wiring + dimensions PNGs — no PDF crop geometry to maintain.
+
+    Same ``DiagramCrop`` contract and the same ``source_url`` keys as the PDF
+    path, so the upsert replaces cropped bytes in place.
+    """
+    series = f"SA{series_nm}FU" if safu else f"DA{series_nm}FU"
+
+    def url(kind: DiagramKind) -> str:
+        if safu:
+            return source_url_for_safu(series_nm, kind)
+        return source_url_for(series_nm, edition, kind)
+
+    return [
+        DiagramCrop(
+            kind="wiring",
+            png_bytes=(asset_dir / "wiring.png").read_bytes(),
+            alt=f"{series} | Схема подключения из инструкции",
+            sort_order=SORT_WIRING,
+            source_url=url("wiring"),
+        ),
+        DiagramCrop(
+            kind="dimensions",
+            png_bytes=(asset_dir / "dimensions.png").read_bytes(),
+            alt=f"{series} | Габаритные размеры привода (мм), чертёж из инструкции",
+            sort_order=SORT_DIMENSIONS,
+            source_url=url("dimensions"),
+        ),
+    ]
+
+
 def find_safu_manual_pdf(
     *,
     series_nm: int,
@@ -732,12 +811,21 @@ def _upsert_diagram(
     return action
 
 
-def apply_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
-    """Attach wiring + dimensions diagrams for every DAFU SKU that has a manual PDF.
+def apply_manual_diagrams(
+    *,
+    dry_run: bool = False,
+    manuals_ru_root: Path | None = None,
+) -> dict[str, Any]:
+    """Attach wiring + dimensions diagrams for every DAFU SKU that has a manual.
+
+    Prefers ready-made PNGs exported into ``_manuals-ru/DA/assets`` (the same
+    drawings the site manuals show); falls back to PDF crops for editions
+    without an exported pack.
 
     Returns:
         Counters: created, updated, unpublished, skipped, series.
     """
+    ru_root = manuals_ru_root or default_manuals_ru_root()
     summary: dict[str, Any] = {
         "created": 0,
         "updated": 0,
@@ -754,7 +842,7 @@ def apply_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     skus = list(
         SKU.objects.filter(sku_code__iregex=r"(?i)^da\d+fu").order_by("sku_code"),
     )
-    crop_cache: dict[tuple[int, Edition], list[DiagramCrop] | None] = {}
+    crop_cache: dict[object, list[DiagramCrop] | None] = {}
 
     for sku in skus:
         series_nm = parse_dafu_series_nm(sku.sku_code)
@@ -763,34 +851,42 @@ def apply_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
             summary["skipped"] += 1
             continue
 
+        asset_dir = dafu_html_asset_dir(series_nm=series_nm, edition=edition, root=ru_root)
         pdf_nm = pdf_source_series_nm(series_nm)
-        cache_key = (pdf_nm, edition)
+        cache_key: object = ("assets", asset_dir) if asset_dir else ("pdf", pdf_nm, edition)
         if cache_key not in crop_cache:
-            pdf_path = find_manual_pdf(series_nm=series_nm, edition=edition)
-            if pdf_path is None:
-                logger.info(
-                    "manual_diagram_pdf_missing series=%s edition=%s pdf_nm=%s",
-                    series_nm,
-                    edition,
-                    pdf_nm,
+            if asset_dir is not None:
+                crop_cache[cache_key] = diagrams_from_html_assets(
+                    asset_dir,
+                    series_nm=series_nm,
+                    edition=edition,
                 )
-                crop_cache[cache_key] = None
             else:
-                try:
-                    crop_cache[cache_key] = diagrams_from_pdf(
-                        pdf_path,
-                        edition=edition,
-                        series_nm=pdf_nm,
-                    )
-                except Exception as exc:
-                    logger.exception(
-                        "manual_diagram_crop_failed pdf=%s series=%s edition=%s err_type=%s",
-                        pdf_path,
+                pdf_path = find_manual_pdf(series_nm=series_nm, edition=edition)
+                if pdf_path is None:
+                    logger.info(
+                        "manual_diagram_pdf_missing series=%s edition=%s pdf_nm=%s",
                         series_nm,
                         edition,
-                        type(exc).__name__,
+                        pdf_nm,
                     )
                     crop_cache[cache_key] = None
+                else:
+                    try:
+                        crop_cache[cache_key] = diagrams_from_pdf(
+                            pdf_path,
+                            edition=edition,
+                            series_nm=pdf_nm,
+                        )
+                    except Exception as exc:
+                        logger.exception(
+                            "manual_diagram_crop_failed pdf=%s series=%s edition=%s err_type=%s",
+                            pdf_path,
+                            series_nm,
+                            edition,
+                            type(exc).__name__,
+                        )
+                        crop_cache[cache_key] = None
 
         raw_crops = crop_cache[cache_key]
         if not raw_crops:
@@ -821,12 +917,20 @@ def apply_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     return summary
 
 
-def apply_safu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
-    """Attach wiring + dimensions diagrams for every SA..FU SKU with a manual PDF.
+def apply_safu_manual_diagrams(
+    *,
+    dry_run: bool = False,
+    manuals_ru_root: Path | None = None,
+) -> dict[str, Any]:
+    """Attach wiring + dimensions diagrams for every SA..FU SKU with a manual.
+
+    Prefers ready-made PNGs exported into ``_manuals-ru/SA/assets``; falls
+    back to PDF crops for families without an exported pack (SA20 → SA15).
 
     Returns:
         Counters: created, updated, skipped, series.
     """
+    ru_root = manuals_ru_root or default_manuals_ru_root()
     summary: dict[str, Any] = {
         "created": 0,
         "updated": 0,
@@ -838,7 +942,7 @@ def apply_safu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
     skus = list(
         SKU.objects.filter(sku_code__iregex=r"(?i)^sa\d+fu").order_by("sku_code"),
     )
-    crop_cache: dict[int, list[DiagramCrop] | None] = {}
+    crop_cache: dict[object, list[DiagramCrop] | None] = {}
 
     for sku in skus:
         series_nm = parse_safu_series_nm(sku.sku_code)
@@ -846,32 +950,42 @@ def apply_safu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
             summary["skipped"] += 1
             continue
 
+        asset_dir = safu_html_asset_dir(series_nm=series_nm, root=ru_root)
         pdf_nm = safu_pdf_source_series_nm(series_nm)
-        if pdf_nm not in crop_cache:
-            pdf_path = find_safu_manual_pdf(series_nm=series_nm)
-            if pdf_path is None:
-                logger.info(
-                    "safu_manual_diagram_pdf_missing series=%s pdf_nm=%s",
-                    series_nm,
-                    pdf_nm,
+        cache_key: object = ("assets", asset_dir) if asset_dir else pdf_nm
+        if cache_key not in crop_cache:
+            if asset_dir is not None:
+                crop_cache[cache_key] = diagrams_from_html_assets(
+                    asset_dir,
+                    series_nm=series_nm,
+                    edition="on_off",
+                    safu=True,
                 )
-                crop_cache[pdf_nm] = None
             else:
-                try:
-                    crop_cache[pdf_nm] = diagrams_from_safu_pdf(
-                        pdf_path,
-                        series_nm=pdf_nm,
-                    )
-                except Exception as exc:
-                    logger.exception(
-                        "safu_manual_diagram_crop_failed pdf=%s series=%s err_type=%s",
-                        pdf_path,
+                pdf_path = find_safu_manual_pdf(series_nm=series_nm)
+                if pdf_path is None:
+                    logger.info(
+                        "safu_manual_diagram_pdf_missing series=%s pdf_nm=%s",
                         series_nm,
-                        type(exc).__name__,
+                        pdf_nm,
                     )
-                    crop_cache[pdf_nm] = None
+                    crop_cache[cache_key] = None
+                else:
+                    try:
+                        crop_cache[cache_key] = diagrams_from_safu_pdf(
+                            pdf_path,
+                            series_nm=pdf_nm,
+                        )
+                    except Exception as exc:
+                        logger.exception(
+                            "safu_manual_diagram_crop_failed pdf=%s series=%s err_type=%s",
+                            pdf_path,
+                            series_nm,
+                            type(exc).__name__,
+                        )
+                        crop_cache[cache_key] = None
 
-        raw_crops = crop_cache[pdf_nm]
+        raw_crops = crop_cache[cache_key]
         if not raw_crops:
             summary["skipped"] += 1
             continue

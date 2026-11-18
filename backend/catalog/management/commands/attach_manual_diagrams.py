@@ -12,6 +12,7 @@ Usage::
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from django.core.management.base import BaseCommand
@@ -45,18 +46,26 @@ class Command(BaseCommand):
             default="all",
             help="Which series diagrams to attach (default: all).",
         )
+        parser.add_argument(
+            "--manuals-ru",
+            type=str,
+            default=None,
+            help="Override the _manuals-ru root holding exported PNG asset packs.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Run diagram attach helpers and print a short summary."""
         dry_run = bool(options.get("dry_run"))
         series = str(options.get("series") or "all")
         prefix = "[dry-run] " if dry_run else ""
+        manuals_ru_raw = options.get("manuals_ru")
+        manuals_ru_root = Path(manuals_ru_raw).resolve() if manuals_ru_raw else None
 
         jobs: list[tuple[str, dict[str, Any]]] = []
         if series in {"all", "dafu"}:
-            jobs.append(("DAFU", apply_manual_diagrams(dry_run=dry_run)))
+            jobs.append(("DAFU", apply_manual_diagrams(dry_run=dry_run, manuals_ru_root=manuals_ru_root)))
         if series in {"all", "safu"}:
-            jobs.append(("SAFU", apply_safu_manual_diagrams(dry_run=dry_run)))
+            jobs.append(("SAFU", apply_safu_manual_diagrams(dry_run=dry_run, manuals_ru_root=manuals_ru_root)))
         if series in {"all", "damu"}:
             jobs.append(("DAMU", apply_damu_manual_diagrams(dry_run=dry_run)))
         if series in {"all", "samu"}:
