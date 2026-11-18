@@ -129,8 +129,9 @@ def inject_crawl_block(
     ``createRoot`` replaces everything inside #root. A renderer that executes
     scripts (Yandex) would otherwise snapshot «Загрузка…» or the error
     boundary. The article stays in normal flow, outside #root, until the SPA
-    paints a real heading and removes it. #root is ``inert`` for that wait;
-    critical CSS clips it only while the article is the previous sibling.
+    paints a real heading and removes it. The root tag stays ``<div id="root">``
+    so the deploy smoke and the health monitor still match it. Critical CSS
+    clips #root only while the article is the previous sibling.
 
     No ``hidden`` attribute on the article (some bots skip it).
 
@@ -165,8 +166,7 @@ def inject_crawl_block(
     empty_root = '<div id="root"></div>'
     if empty_root not in html:
         return html
-    hidden_root = '<div id="root" inert aria-hidden="true"></div>'
-    return html.replace(empty_root, f"{block}\n    {hidden_root}", 1)
+    return html.replace(empty_root, f"{block}\n    {empty_root}", 1)
 
 
 def render_spa_index_html(
