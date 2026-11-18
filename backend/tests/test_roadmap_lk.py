@@ -19,6 +19,7 @@ from django.urls import reverse
 
 from cabinet.spec_import import SpecParseError, parse_spec_xlsx
 from catalog.models import SKU, AnalogMap, Category, Product
+from catalog.services import resolve_position_code
 from crm.models import (
     Client,
     ClientDocument,
@@ -189,6 +190,30 @@ def test_spec_xlsx_parser_resolves_sku_and_analog() -> None:
     assert rows[0].sku is not None and not rows[0].via_analog
     assert rows[1].sku is not None and rows[1].via_analog
     assert rows[2].sku is None
+
+
+@pytest.mark.django_db
+def test_resolve_position_code_skips_unpublished_and_brand_collision() -> None:
+    """Unpublished SKU and two brands sharing a code must not resolve."""
+    published = _sku("HVA-PUB-1")
+    hidden = _sku("HVA-HIDDEN-1")
+    hidden.is_published = False
+    hidden.save(update_fields=["is_published"])
+    assert resolve_position_code(published.sku_code) == (published, None)
+    assert resolve_position_code(hidden.sku_code) == (None, None)
+
+    AnalogMap.objects.create(brand="Belimo", foreign_code="NM24A", sku=published)
+    AnalogMap.objects.create(brand="Siemens", foreign_code="NM24A", sku=published)
+    assert resolve_position_code("NM24A") == (None, None)
+
+    AnalogMap.objects.filter(brand="Siemens").delete()
+    sku, row = resolve_position_code("nm24a")
+    assert sku == published
+    assert row is not None and row.brand == "Belimo"
+
+    published.is_published = False
+    published.save(update_fields=["is_published"])
+    assert resolve_position_code("NM24A") == (None, None)
 
 
 @pytest.mark.django_db

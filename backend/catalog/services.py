@@ -35,16 +35,28 @@ def resolve_position_code(code: str) -> tuple[SKU | None, AnalogMap | None]:
 
     Returns ``(sku, analog_map_row)`` — ``analog_map_row`` non-null marks
     that the SKU came from a foreign-article match (для подсказки
-    менеджеру/инженеру).
+    менеджеру/инженеру). Unpublished SKUs are skipped. Two active rows
+    with the same code and different brands are not a match.
     """
     key = (code or "").strip()
     if not key:
         return None, None
-    sku = SKU.objects.filter(sku_code__iexact=key).first()
+    sku = SKU.objects.filter(sku_code__iexact=key, is_published=True).order_by("pk").first()
     if sku is not None:
         return sku, None
     norm_key = normalize_analog_code(key)
-    row = AnalogMap.objects.filter(is_active=True, foreign_code_key=norm_key).select_related("sku").first()
-    if row is not None:
-        return row.sku, row
-    return None, None
+    if not norm_key:
+        return None, None
+    rows = list(
+        AnalogMap.objects.filter(
+            is_active=True,
+            foreign_code_key=norm_key,
+            sku__is_published=True,
+        )
+        .select_related("sku")
+        .order_by("brand", "pk"),
+    )
+    # Same code at two brands is not one match. Do not pick .first() at random.
+    if len(rows) != 1:
+        return None, None
+    return rows[0].sku, rows[0]
