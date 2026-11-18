@@ -480,6 +480,35 @@ def default_manuals_ru_root() -> Path:
     return Path(__file__).resolve().parents[3] / "_manuals-ru"
 
 
+# Exported ``dimensions.png`` figures pack the actuator drawing next to damper
+# mounting accessories (adapter plate / coupling pin) or a capture artefact
+# (black banner).  Card gallery needs the actuator only — ``(left, top, right,
+# bottom)`` box measured per asset dir; dirs absent here ship uncropped.
+_HTML_ASSET_DIMENSION_CROP: Final[dict[str, tuple[int, int, int, int]]] = {
+    "da3fu-d-ds": (0, 0, 700, 464),
+    "da5fu-d-ds": (0, 0, 650, 537),
+    "da10-15-20fu24-230-d-ds": (0, 0, 560, 538),
+    "da10-15-20fu24-a-as": (0, 0, 590, 570),
+    "sa3fu-ds-dst": (0, 0, 780, 574),
+    "sa10fu-ds-dst": (0, 0, 670, 619),
+    "sa15fu-ds-dst": (0, 0, 680, 618),
+    "sa7mu-ds-dst": (0, 100, 1339, 709),
+    "sa10mu-ds-dst": (0, 95, 1339, 709),
+    "sa15mu-ds-dst": (320, 0, 1339, 736),
+    "sa30mu-ds-dst": (0, 0, 620, 667),
+}
+
+
+def _cropped_dimensions_bytes(asset_dir: Path) -> bytes:
+    """``dimensions.png`` bytes, cut to the actuator when the pack is listed."""
+    box = _HTML_ASSET_DIMENSION_CROP.get(asset_dir.name)
+    raw = (asset_dir / "dimensions.png").read_bytes()
+    if box is None:
+        return raw
+    with Image.open(io.BytesIO(raw)) as img:
+        return _pil_to_png_bytes(img.crop(box))
+
+
 def _asset_dir_with_diagrams(base: Path) -> Path | None:
     """Dir usable as a diagram source only when both PNGs are exported."""
     if (base / "wiring.png").is_file() and (base / "dimensions.png").is_file():
@@ -517,21 +546,38 @@ def safu_html_asset_dir(*, series_nm: int, root: Path) -> Path | None:
     return None
 
 
+def samu_html_asset_dir(*, series_nm: int, root: Path) -> Path | None:
+    """HTML manual asset dir ``sa{nm}mu-ds-dst`` when it has both diagrams."""
+    for nm in dict.fromkeys((series_nm, _SAMU_PDF_FALLBACK_NM.get(series_nm, series_nm))):
+        found = _asset_dir_with_diagrams(root / "SA" / "assets" / f"sa{nm}mu-ds-dst")
+        if found is not None:
+            return found
+    return None
+
+
 def diagrams_from_html_assets(
     asset_dir: Path,
     *,
     series_nm: int,
     edition: Edition,
     safu: bool = False,
+    samu: bool = False,
 ) -> list[DiagramCrop]:
     """Ready-made wiring + dimensions PNGs — no PDF crop geometry to maintain.
 
     Same ``DiagramCrop`` contract and the same ``source_url`` keys as the PDF
     path, so the upsert replaces cropped bytes in place.
     """
-    series = f"SA{series_nm}FU" if safu else f"DA{series_nm}FU"
+    if samu:
+        series = f"SA{series_nm}MU"
+    elif safu:
+        series = f"SA{series_nm}FU"
+    else:
+        series = f"DA{series_nm}FU"
 
     def url(kind: DiagramKind) -> str:
+        if samu:
+            return source_url_for_samu(series_nm, kind)
         if safu:
             return source_url_for_safu(series_nm, kind)
         return source_url_for(series_nm, edition, kind)
@@ -546,7 +592,7 @@ def diagrams_from_html_assets(
         ),
         DiagramCrop(
             kind="dimensions",
-            png_bytes=(asset_dir / "dimensions.png").read_bytes(),
+            png_bytes=_cropped_dimensions_bytes(asset_dir),
             alt=f"{series} | Габаритные размеры привода (мм), чертёж из инструкции",
             sort_order=SORT_DIMENSIONS,
             source_url=url("dimensions"),
@@ -1489,8 +1535,17 @@ def find_samu_manual_pdf(*, series_nm: int, manuals_dir: Path | None = None) -> 
     return None
 
 
-def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
-    """Attach wiring + dimensions for every SA..MU SKU with a manual PDF."""
+def apply_samu_manual_diagrams(
+    *,
+    dry_run: bool = False,
+    manuals_ru_root: Path | None = None,
+) -> dict[str, Any]:
+    """Attach wiring + dimensions for every SA..MU SKU with a manual.
+
+    Prefers ready-made PNGs exported into ``_manuals-ru/SA/assets``; falls
+    back to PDF crops for families without an exported pack.
+    """
+    ru_root = manuals_ru_root or default_manuals_ru_root()
     summary: dict[str, Any] = {
         "created": 0,
         "updated": 0,
@@ -1499,37 +1554,47 @@ def apply_samu_manual_diagrams(*, dry_run: bool = False) -> dict[str, Any]:
         "dry_run": dry_run,
     }
     skus = list(SKU.objects.filter(sku_code__iregex=r"(?i)^sa\d+mu").order_by("sku_code"))
-    crop_cache: dict[int, list[DiagramCrop] | None] = {}
+    crop_cache: dict[object, list[DiagramCrop] | None] = {}
     for sku in skus:
         series_nm = parse_samu_series_nm(sku.sku_code)
         if series_nm is None:
             summary["skipped"] += 1
             continue
         pdf_nm = samu_pdf_source_series_nm(series_nm)
-        if pdf_nm not in crop_cache:
-            pdf_path = find_samu_manual_pdf(series_nm=series_nm)
-            if pdf_path is None:
-                logger.info(
-                    "samu_manual_diagram_pdf_missing series=%s pdf_nm=%s",
-                    series_nm,
-                    pdf_nm,
+        asset_dir = samu_html_asset_dir(series_nm=series_nm, root=ru_root)
+        cache_key: object = ("assets", asset_dir) if asset_dir else pdf_nm
+        if cache_key not in crop_cache:
+            if asset_dir is not None:
+                crop_cache[cache_key] = diagrams_from_html_assets(
+                    asset_dir,
+                    series_nm=pdf_nm,
+                    edition="on_off",
+                    samu=True,
                 )
-                crop_cache[pdf_nm] = None
             else:
-                try:
-                    crop_cache[pdf_nm] = diagrams_from_samu_pdf(
-                        pdf_path,
-                        series_nm=pdf_nm,
-                    )
-                except Exception as exc:
-                    logger.exception(
-                        "samu_manual_diagram_crop_failed pdf=%s series=%s err_type=%s",
-                        pdf_path,
+                pdf_path = find_samu_manual_pdf(series_nm=series_nm)
+                if pdf_path is None:
+                    logger.info(
+                        "samu_manual_diagram_pdf_missing series=%s pdf_nm=%s",
                         series_nm,
-                        type(exc).__name__,
+                        pdf_nm,
                     )
-                    crop_cache[pdf_nm] = None
-        raw_crops = crop_cache[pdf_nm]
+                    crop_cache[cache_key] = None
+                else:
+                    try:
+                        crop_cache[cache_key] = diagrams_from_samu_pdf(
+                            pdf_path,
+                            series_nm=pdf_nm,
+                        )
+                    except Exception as exc:
+                        logger.exception(
+                            "samu_manual_diagram_crop_failed pdf=%s series=%s err_type=%s",
+                            pdf_path,
+                            series_nm,
+                            type(exc).__name__,
+                        )
+                        crop_cache[cache_key] = None
+        raw_crops = crop_cache[cache_key]
         if not raw_crops:
             summary["skipped"] += 1
             continue

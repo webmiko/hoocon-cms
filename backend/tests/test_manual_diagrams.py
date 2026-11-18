@@ -622,11 +622,9 @@ def test_apply_manual_diagrams_prefers_html_assets(tmp_path: Path, monkeypatch: 
     pack = tmp_path / "DA" / "assets" / "da5fu-d-ds"
     pack.mkdir(parents=True)
     # Small real PNGs so convert_bytes_to_webp has valid input.
-    from PIL import Image as PILImage
-
     for name in ("wiring", "dimensions"):
         buf = io.BytesIO()
-        PILImage.new("RGB", (20, 10), "white").save(buf, format="PNG")
+        Image.new("RGB", (20, 10), "white").save(buf, format="PNG")
         (pack / f"{name}.png").write_bytes(buf.getvalue())
 
     cat = Category.objects.create(name="FU", slug="fu-assets")
@@ -649,3 +647,59 @@ def test_apply_manual_diagrams_prefers_html_assets(tmp_path: Path, monkeypatch: 
     dims = sku.images.get(source_url__icontains="da5fu-dds-dimensions")
     assert dims.is_published
     assert dims.image.name.endswith(".webp")
+
+
+def test_dimensions_asset_crop_table_cuts_accessories(tmp_path: Path) -> None:
+    """Regression: exported figures pack damper hardware next to the actuator.
+
+    Card gallery keeps only the actuator half — the crop box is per asset dir.
+    """
+    from catalog.etl.manual_diagrams import _cropped_dimensions_bytes
+
+    pack = tmp_path / "da10-15-20fu24-230-d-ds"
+    pack.mkdir()
+    buf = io.BytesIO()
+    Image.new("RGB", (896, 538), "white").save(buf, format="PNG")
+    (pack / "dimensions.png").write_bytes(buf.getvalue())
+
+    out = _cropped_dimensions_bytes(pack)
+    with Image.open(io.BytesIO(out)) as img:
+        assert img.size == (560, 538)
+
+
+def test_dimensions_asset_crop_absent_dir_ships_uncropped(tmp_path: Path) -> None:
+    from catalog.etl.manual_diagrams import _cropped_dimensions_bytes
+
+    pack = tmp_path / "unlisted-pack"
+    pack.mkdir()
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 20), "white").save(buf, format="PNG")
+    (pack / "dimensions.png").write_bytes(buf.getvalue())
+
+    assert _cropped_dimensions_bytes(pack) == buf.getvalue()
+
+
+def test_samu_html_asset_dir_maps_series(tmp_path: Path) -> None:
+    from catalog.etl.manual_diagrams import samu_html_asset_dir
+
+    pack = tmp_path / "SA" / "assets" / "sa15mu-ds-dst"
+    pack.mkdir(parents=True)
+    (pack / "wiring.png").write_bytes(b"w")
+    (pack / "dimensions.png").write_bytes(b"d")
+
+    assert samu_html_asset_dir(series_nm=15, root=tmp_path).name == "sa15mu-ds-dst"
+    assert samu_html_asset_dir(series_nm=99, root=tmp_path) is None
+
+
+def test_diagrams_from_html_assets_samu_urls(tmp_path: Path) -> None:
+    from catalog.etl.manual_diagrams import diagrams_from_html_assets
+
+    for name in ("wiring", "dimensions"):
+        buf = io.BytesIO()
+        Image.new("RGB", (20, 10), "white").save(buf, format="PNG")
+        (tmp_path / f"{name}.png").write_bytes(buf.getvalue())
+
+    crops = diagrams_from_html_assets(tmp_path, series_nm=15, edition="on_off", samu=True)
+    assert crops[0].source_url.endswith("sa15mu-ds-wiring.webp")
+    assert crops[1].source_url.endswith("sa15mu-ds-dimensions.webp")
+    assert crops[1].alt.startswith("SA15MU")

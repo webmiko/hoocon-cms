@@ -8,7 +8,7 @@ electrical/timing rows until a dedicated PDF is available; damper area is 2 м²
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Final
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -20,6 +20,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
+from catalog.etl.series_copy_damu import _COMPETITIVE_SECTION
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant, sku_code_is_thermal
 from catalog.etl.tech_copy import (
     MANUAL_OVERRIDE_BUTTON_SELF_RESET,
@@ -173,6 +174,18 @@ TORQUE_SPECS: dict[int, _TorqueSpec] = {
 TEMP_SENSOR_NONE = "Нет"
 TEMP_SENSOR_SAF72 = "SAF72"
 
+# Противопожарная ниша — не бытовая вентиляция, как у DA-серий.
+_APPLICATION_SECTION: Final[str] = "\n".join(
+    [
+        "Сфера применения:",
+        "– Противопожарные клапаны систем вентиляции",
+        "– Дымовые клапаны систем дымоудаления",
+        "– Противодымная защита зданий и помещений",
+        "– Огнестойкие узлы вентиляционных каналов",
+        "– Промышленные системы с требованиями пожарной безопасности",
+    ],
+)
+
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
 Электропривод противопожарного / дымового клапана с пружинным возвратом.
@@ -190,7 +203,11 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 – Температура окружающей среды: –20…+50 °C.
 – Температура хранения: –40…+70 °C.
 – Исполнение -DST: термодатчик SAF72 (окружающая среда TS1 и канал TS2, 72 °C).
-""".strip(),
+""".strip()
+    + "\n\n"
+    + _APPLICATION_SECTION
+    + "\n\n"
+    + _COMPETITIVE_SECTION,
 )
 
 SERIES_INSTRUCTIONS = normalize_tech_copy(
@@ -424,23 +441,38 @@ def _sku_description(variant: SkuVariant, torque_nm: int, spec: _TorqueSpec) -> 
     lines = [
         (
             "Электропривод противопожарного / дымового клапана с пружинным возвратом. "
-            f"Крутящий момент {spec['moment']}, площадь заслонки {spec['damper-area']}."
+            f"Крутящий момент {spec['moment']}, площадь заслонки {spec['damper-area']}. "
+            "Используется для управления противопожарными и дымовыми клапанами "
+            "в системах вентиляции и дымоудаления."
         ),
-        ("Ручное управление: редуктор выводится из зацепления при помощи кнопки с самовозвратом, ручная блокировка."),
         "",
-        "Управление: открыто/закрыто.",
-        "Вспомогательные переключатели: 2 SPDT (исполнение S / -DS / -DST).",
+        "Особенности исполнения:",
+        "– Пружинный возврат при отключении питания.",
+        (
+            "– Ручное управление: редуктор выводится из зацепления "
+            "при помощи кнопки с самовозвратом, ручная блокировка."
+        ),
+        "– Управление: открыто/закрыто.",
+        "– Вспомогательные переключатели: 2 SPDT (исполнение S / -DS / -DST).",
     ]
     if sku_code_is_thermal(variant.code):
         lines.append(
-            "Термодатчик: SAF72 (TS1 — окружающая среда, TS2 — канал, срабатывание при 72 °C).",
+            "– Термодатчик: SAF72 (TS1 — окружающая среда, TS2 — канал, срабатывание при 72 °C).",
         )
     else:
-        lines.append("Термодатчик: без датчика (исполнение -DS).")
+        lines.append("– Термодатчик: без датчика (исполнение -DS).")
     if variant.voltage == "24":
-        lines.append("Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
     elif variant.voltage == "230":
-        lines.append("Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+    lines.extend(
+        [
+            "",
+            _APPLICATION_SECTION,
+            "",
+            _COMPETITIVE_SECTION,
+        ],
+    )
     return normalize_tech_copy("\n".join(lines))
 
 
