@@ -1,39 +1,5 @@
 Список аналогов для привода заслонки Hoocon серии DA..MU 2 Нм
 
-Аналоги для DA2MU24-D/DS (24 В, 2Нм):
+Крупные марки: Belimo, Siemens, Honeywell, Schneider Electric, Johnson Controls, Danfoss, Gruner.
 
-– Belimo TMC24A
-– Belimo TMC24A-S
-– Belimo CM24-L/R
-– Dastech DA-02N24 / DA-02N24A
-– Lufberg DA02N24 / DA02N24S
-– Sputnik AR24-2-S
-– BVM TM24-2
-– Siemens GSD121.1A / GSD126.1A
-
-Аналоги для DA2MU24-A/AS (24 В, 2Нм):
-
-– Belimo TMC24A-SR
-– Dastech DA-02N24-SR / DA-02N24A-SR
-– Lufberg DA02N24P / DA02N24PS
-– Siemens GSD161.1A / GSD166.1A
-
-Аналоги для DA2MU230-D/DS (230 В, 2Нм):
-
-– Belimo TMC230A
-– Belimo TMC230A-S
-– Belimo CM230-L/R
-– Dastech DA-02N220 / DA-02N220A
-– Lufberg DA02N220 / DA02N220S
-– Sputnik AR230-2-S
-– BVM TM230-2
-– Siemens GSD321.1A / GSD326.1A
-
-Аналоги для DA2MU230-A/AS (230 В, 2Нм):
-
-– Belimo TMC230A-SR
-– Dastech DA-02N220-SR / DA-02N220A-SR
-– Lufberg DA02N220P / DA02N220PS
-– Siemens GSD361.1A
-
-Важно: При выборе аналога необходимо проверить соответствие всех технических параметров конкретной системе вентиляции, включая размер вала, направление вращения и требуемое усилие.
+При выборе аналога сверяйте крутящий момент, напряжение, тип управления, наличие вспомогательных переключателей и габариты монтажа. Точные артикулы ушедших из РФ брендов уточняйте по паспорту / шильдику заменяемого привода.

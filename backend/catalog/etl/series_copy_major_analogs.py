@@ -1,10 +1,10 @@
-"""Curated «Аналоги» for gap / empty cards — major brands only.
+"""Curated «Аналоги» copy for gap / empty cards — guidance, not pairs.
 
-Policy (product / RF replacement framing): list only large, well-known makers,
-especially those that left or suspended official business in RF:
-
-Belimo, Siemens, Honeywell, Schneider Electric, Johnson Controls, Danfoss, Gruner.
-
+Policy: a bullet «– Brand ARTICLE» reads as a confirmed replacement pair, and
+none of the generated pairs is datasheet-confirmed — matching torque/area is
+not proof. Builders below therefore emit the series title, the class
+guidance (incl. the major-brands line: Belimo, Siemens, Honeywell, Schneider
+Electric, Johnson Controls, Danfoss, Gruner) and the selection footnote only.
 Do **not** invent obscure OEM clones (Nanotek, Dastech, Lufberg, BVM, …).
 Fill only when ``Product.analogs_text`` is empty (unless ``force=True``).
 """
@@ -12,10 +12,9 @@ Fill only when ``Product.analogs_text`` is empty (unless ``force=True``).
 from __future__ import annotations
 
 import re
-from typing import Any, Final
+from typing import Any
 
 from catalog.etl.attr_write import write_copy
-from catalog.etl.belimo_analogs import belimo_family_by_area, compose_belimo_article
 from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.tech_copy import normalize_tech_copy
 from catalog.models import SKU, Product
@@ -27,116 +26,13 @@ _FOOTNOTE = normalize_tech_copy(
     "уточняйте по паспорту / шильдику заменяемого привода.",
 )
 
-
-def belimo_fast_family(nm: int) -> str | None:
-    """Belimo Q-series by area (LMQ 0.4 / NMQ 0.8 / SMQ 1.6 / GMQ 4.0 м²)."""
-    return belimo_family_by_area("fast", nm / 10)
-
-
-# Siemens OpenAir (on/off base; modulating → …61).
-_SIEMENS_AIR: Final[dict[int, str]] = {
-    5: "GDB",
-    8: "GLB",
-    10: "GLB",
-    16: "GEB",
-    20: "GEB",
-    24: "GEB",
-    32: "GIB",
-    40: "GIB",
-}
-
-
-def _belimo_air(family: str | None, voltage: str, *, modulating: bool, aux: bool) -> str | None:
-    """«Belimo …» bullet text, or None when Belimo has no direct analog."""
-    if family is None:
-        return None
-    code = compose_belimo_article(family, voltage=voltage, modulating=modulating, aux=aux)
-    return f"Belimo {code}" if code else None
-
-
-def _siemens_air(prefix: str, voltage: str, *, modulating: bool, aux: bool) -> str:
-    # OpenAir: GDB131.1E on/off 24 V; GDB161.1E modulating; 230 V → GCA / GEB / GIB.
-    mid = "61" if modulating else "31"
-    if voltage == "230":
-        brand = {"GDB": "GCA", "GLB": "GCA", "GEB": "GEB", "GIB": "GIB"}.get(prefix, prefix)
-        code = f"{brand}1{mid}.1E"
-    else:
-        code = f"{prefix}1{mid}.1E"
-    if aux:
-        code += "-S"
-    return f"Siemens {code}"
-
-
-def _honeywell_air(nm: int, voltage: str, *, modulating: bool, aux: bool) -> str:
-    # Compact Honeywell MN / ML band used on existing HVD-20 cards.
-    if nm <= 10:
-        base = "MN6105A" if voltage == "24" else "MN6105C"
-    elif nm <= 25:
-        base = "ML7984A" if voltage == "24" else "ML7983A"
-    else:
-        base = "ML7421A" if voltage == "24" else "ML7421C"
-    if modulating and nm <= 10:
-        base = f"{base}1007"
-    if aux:
-        base = f"{base}S" if not base.endswith("S") else base
-    return f"Honeywell {base}"
-
-
-def _jci_air(nm: int, voltage: str, *, aux: bool) -> str:
-    if nm <= 10:
-        code = "M9104-AGA-2" if voltage == "24" else "M9104-AGA-3"
-    elif nm <= 25:
-        code = "M9120-GGA-24" if voltage == "24" else "M9120-GGA-230"
-    else:
-        code = "M9220-GGA-24" if voltage == "24" else "M9220-GGA-230"
-    if aux:
-        code = f"{code}-S"
-    return f"Johnson Controls {code}"
-
-
-def _schneider_air(voltage: str, *, modulating: bool) -> str:
-    code = f"MD20A-{voltage}"
-    if modulating:
-        code += "-SR"
-    return f"Schneider Electric {code}"
-
-
-def _danfoss_air(voltage: str) -> str:
-    return f"Danfoss AMV{'320' if voltage == '230' else '310'}"
-
-
-def _lines_major_air(
-    *,
-    nm: int,
-    voltage: str,
-    modulating: bool,
-    aux: bool,
-    fast: bool,
-) -> list[str]:
-    """Bullet lines for one edition (major brands only)."""
-    family = belimo_family_by_area("fast" if fast else "air_no_spring", nm / 10)
-    siemens = _SIEMENS_AIR.get(nm, "GLB")
-    belimo = _belimo_air(family, voltage, modulating=modulating, aux=aux)
-    lines = [f"– {belimo}"] if belimo else []
-    lines += [
-        f"– {_siemens_air(siemens, voltage, modulating=modulating, aux=aux)}",
-        f"– {_honeywell_air(nm, voltage, modulating=modulating, aux=aux)}",
-        f"– {_jci_air(nm, voltage, aux=aux)}",
-    ]
-    if modulating:
-        lines.append(f"– {_schneider_air(voltage, modulating=True)}")
-    elif voltage == "230":
-        lines.append(f"– {_danfoss_air(voltage)}")
-    if nm >= 8:
-        if voltage == "24":
-            lines.append("– Gruner 227C-024-10-S1")
-        else:
-            lines.append("– Gruner 227C-230-10-S1")
-    return lines
+# A bullet «– Brand ARTICLE» in this copy would read as a confirmed pair.
+# None is datasheet-confirmed, so the builders below print no bullets —
+# only the class guidance and the selection footnote.
 
 
 def build_damqu_analogs(nm: int) -> str:
-    """DA..MQU — fast non-spring, A/AS + D/DS × 24/230."""
+    """DA..MQU — fast non-spring. Guidance only: no unverified pair articles."""
     blocks: list[str] = [
         (
             f"Список аналогов для привода заслонки Hoocon серии DA{nm}MQU "
@@ -149,75 +45,27 @@ def build_damqu_analogs(nm: int) -> str:
             "Schneider Electric, Johnson Controls, Gruner."
         ),
         "",
+        _FOOTNOTE,
     ]
-    for voltage in ("24", "230"):
-        for modulating, aux, suf in (
-            (False, False, "D"),
-            (False, True, "DS"),
-            (True, False, "A"),
-            (True, True, "AS"),
-        ):
-            code = f"DA{nm}MQU{voltage}-{suf}"
-            mode = "пропорциональное (модулирующее) 0…10 В" if modulating else "2-/3-позиционное"
-            aux_note = ", 2×SPDT" if aux else ""
-            blocks.append(f"{code} ({voltage} В, {mode}{aux_note}):")
-            blocks.extend(
-                _lines_major_air(
-                    nm=nm,
-                    voltage=voltage,
-                    modulating=modulating,
-                    aux=aux,
-                    fast=True,
-                ),
-            )
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
 
 
 def build_sa7mu_analogs() -> str:
-    """SA7MU smoke — on/off DS/DST; no Belimo (smallest smoke class BEN/BLE is 15 Нм)."""
+    """SA7MU smoke — no Belimo (smallest smoke class is 15 Нм); guidance only."""
     blocks: list[str] = [
         ("Список аналогов для привода заслонки дымоудаления Hoocon серии SA7MU (без возвратной пружины, 7 Нм)"),
         "",
         "Крупные марки: Siemens, Honeywell, Gruner, Johnson Controls.",
         "",
+        _FOOTNOTE,
     ]
-    for voltage in ("24", "230"):
-        for thermal, suf in ((False, "DS"), (True, "DST")):
-            code = f"SA7MU{voltage}-{suf}"
-            note = ", с термодатчиком" if thermal else ""
-            blocks.append(f"{code} ({voltage} В, открыто/закрыто{note}):")
-            hw = "MS4120F1006" if voltage == "24" else "MS4120F1206"
-            if thermal:
-                blocks.extend(
-                    [
-                        "– Siemens GIB161.1E",
-                        f"– Honeywell {hw}",
-                        f"– Gruner 340TA-{voltage}-10-S2",
-                    ],
-                )
-            else:
-                blocks.extend(
-                    [
-                        "– Siemens GIB131.1E",
-                        f"– Honeywell {hw}",
-                        f"– Johnson Controls M9220-AGA-{voltage}",
-                        f"– Gruner 340-{voltage}-10-S2",
-                    ],
-                )
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
 
 
 def build_hva_analogs(nm: int, *, fast: bool) -> str:
-    """HVA / HVA-Q — modulating air, optional aux S."""
+    """HVA / HVA-Q — modulating air. Guidance only: no unverified pair articles."""
     label = f"HVA-{nm}{'Q' if fast else ''}"
-    if fast:
-        kind = "ускоренное срабатывание"
-    else:
-        kind = "стандартное время поворота"
+    kind = "ускоренное срабатывание" if fast else "стандартное время поворота"
     blocks: list[str] = [
         (
             f"Список аналогов для привода заслонки Hoocon серии {label} "
@@ -227,36 +75,15 @@ def build_hva_analogs(nm: int, *, fast: bool) -> str:
         "",
         ("Крупные марки: Belimo, Siemens, Honeywell, Schneider Electric, Johnson Controls, Danfoss, Gruner."),
         "",
+        _FOOTNOTE,
     ]
-    for voltage in ("24", "230"):
-        for aux in (False, True):
-            s = "S" if aux else ""
-            code = f"HVA{voltage}{s}-{nm}{'Q' if fast else ''}"
-            aux_note = ", со вспомогательными переключателями" if aux else ""
-            blocks.append(f"{code} ({voltage} В{aux_note}):")
-            blocks.extend(
-                _lines_major_air(
-                    nm=nm,
-                    voltage=voltage,
-                    modulating=True,
-                    aux=aux,
-                    fast=fast,
-                ),
-            )
-            if not aux and voltage == "230":
-                blocks.append(f"– {_danfoss_air(voltage)}")
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
 
 
 def build_hvd_air_analogs(nm: int, *, fast: bool) -> str:
-    """HVD / HVD-Q — on/off air (2-/3-point), optional aux S."""
+    """HVD / HVD-Q — on/off air (2-/3-point). Guidance only, no pair articles."""
     label = f"HVD-{nm}{'Q' if fast else ''}"
-    if fast:
-        kind = "ускоренное срабатывание"
-    else:
-        kind = "стандартное время поворота"
+    kind = "ускоренное срабатывание" if fast else "стандартное время поворота"
     blocks: list[str] = [
         (
             f"Список аналогов для привода заслонки Hoocon серии {label} "
@@ -266,70 +93,37 @@ def build_hvd_air_analogs(nm: int, *, fast: bool) -> str:
         "",
         ("Крупные марки: Belimo, Siemens, Honeywell, Johnson Controls, Danfoss, Gruner."),
         "",
+        _FOOTNOTE,
     ]
-    for voltage in ("24", "230"):
-        for aux in (False, True):
-            s = "S" if aux else ""
-            code = f"HVD{voltage}{s}-{nm}{'Q' if fast else ''}"
-            aux_note = ", со вспомогательными переключателями" if aux else ""
-            blocks.append(f"{code} ({voltage} В{aux_note}):")
-            blocks.extend(
-                _lines_major_air(
-                    nm=nm,
-                    voltage=voltage,
-                    modulating=False,
-                    aux=aux,
-                    fast=fast,
-                ),
-            )
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
 
 
 def build_qx_analogs(brand: str, nm: int) -> str:
-    """HVA/HVD-QX — electronic fail-safe (capacitor). Major brands with caveats."""
+    """HVA/HVD-QX — capacitor fail-safe, not fast Q and not a spring.
+
+    LMQ…GMQ are fast and non-fail-safe. GCA returns by spring. MN6105 has
+    no emergency return. The only direct electronic-fail-safe article in
+    this torque band is Belimo SuperCap when its area is not above ours
+    (NKQ 1.2 m², 24 V; fail-safe brochure 2026) — printed once that pair is
+    datasheet-confirmed, not here.
+    """
     brand_u = brand.upper()
     control = "пропорциональное (модулирующее)" if brand_u == "HVA" else "2-/3-позиционное"
     blocks: list[str] = [
         (
-            f"Список близких по классу аналогов для {brand_u}-{nm}QX "
-            f"(электронный отказоустойчивый привод, {control}, {nm} Нм)"
+            f"Список аналогов для {brand_u}-{nm}QX "
+            f"(электронный отказоустойчивый привод, конденсаторный возврат, "
+            f"{control}, {nm} Нм)"
         ),
         "",
         (
-            "Прямых аналогов мало: ориентир — линейки Belimo SuperCap / Fail-Safe "
-            "и Siemens / Honeywell с электронным возвратом. Перед заменой "
-            "сверяйте время резерва и схему подключения."
+            "Подходят только приводы с электронным аварийным возвратом "
+            "(конденсаторный / SuperCap-класс). Пружинный возврат и приводы "
+            "без аварийного возврата не подходят."
         ),
         "",
+        _FOOTNOTE,
     ]
-    modulating = brand_u == "HVA"
-    for voltage in ("24", "230"):
-        for aux in (False, True):
-            s = "S" if aux else ""
-            code = f"{brand_u}{voltage}{s}-{nm}QX"
-            blocks.append(f"{code} ({voltage} В):")
-            # Belimo electronic fail-safe: same family class; confirm SuperCap docs.
-            bel = _belimo_air(belimo_fast_family(nm), voltage, modulating=modulating, aux=aux)
-            if bel:
-                blocks.append(f"– {bel} (класс; уточняйте Fail-Safe / SuperCap)")
-            siemens = _siemens_air(
-                _SIEMENS_AIR.get(nm, "GLB"),
-                voltage,
-                modulating=modulating,
-                aux=aux,
-            )
-            blocks.append(f"– {siemens} (электронный fail-safe — каталог Siemens)")
-            honey = _honeywell_air(
-                nm,
-                voltage,
-                modulating=modulating,
-                aux=aux,
-            )
-            blocks.append(f"– {honey} (серии с электронным возвратом)")
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())
 
 

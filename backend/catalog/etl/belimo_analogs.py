@@ -1,8 +1,8 @@
-"""Belimo analog codes from card «Аналоги» text or ТТХ heuristics.
+"""Belimo analog codes.
 
-Used by the catalog «Аналоги» facet and ``SKU.analog_belimo_code`` backfill.
-Prefer explicit Belimo lines in copy; otherwise infer a typical Belimo article
-from purpose (category), damper torque/area band, voltage, control, aux SPDT.
+The public card does not invent a replacement. ``belimo_article_for_sku``
+stays empty until a pair is confirmed for that model. The catalog table is
+the nomenclature used to reject articles Belimo does not sell.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ Purpose = Literal[
     "air_spring",
     "fire_spring",
     "fast",
+    "electronic_failsafe",
     "smoke",
     "valve",
     "unknown",
@@ -35,9 +36,12 @@ _HAS_230 = re.compile(r"(?:^|[^0-9])230(?:[^0-9]|$)")
 _HAS_24 = re.compile(r"(?:^|[^0-9])24(?:[^0-9]|$)")
 _MOMENT_NUM = re.compile(r"(\d+[.,]?\d*)")
 _AREA_NUM = re.compile(r"(\d+[.,]?\d*)")
-# Belimo thermal: ``BF24-T``, ``BF24-FST``, ``FST-230-3N``, smoke ``BEE24ST``.
+# Fire thermoelectric trip is ``-T`` / ``-FST`` (``BF24-T``). A leading ``FST``
+# is the US life-safety series (FSTF/FSNF), not a licence to invent ``FST-24-3N``.
+# ``BEE24-ST`` ends in ``-ST`` and is a connector plug for BKNE230-24
+# (datasheet BEE24-ST), not a thermal sensor.
 _THERMAL_BELIMO_TOKEN = re.compile(
-    r"(?:^|-)fst(?:-|$)|fst$|st$|-t$",
+    r"(?:^|-)fst(?:-|$)|-t$",
 )
 
 # Belimo recommended max damper area per family, м² — EU datasheets / selection tools.
@@ -48,7 +52,11 @@ BELIMO_FAMILY_AREA: dict[str, tuple[tuple[str, float], ...]] = {
     "air_no_spring": (("TMC", 0.2), ("LM", 0.5), ("NM", 1.0), ("SM", 2.0), ("GM", 4.0)),
     "air_spring": (("TF", 0.25), ("LF", 0.4), ("NF", 1.0), ("SF", 2.0)),
     "fire_spring": (("BFL", 0.4), ("BLF", 0.5), ("BFN", 0.8), ("BF", 1.5)),
+    # Fast running, non fail-safe (Belimo brochure 2026): LMQ 2.5 s / NMQ 4 s / SMQ 7 s.
     "fast": (("LMQ", 0.4), ("NMQ", 0.8), ("SMQ", 1.6), ("GMQ", 4.0)),
+    # SuperCap electronic fail-safe, not the Q series above.
+    # NKQ 6 Nm / 1.2 m², 24 V only; GK 40 Nm / 8 m² (fail-safe brochure 2026).
+    "electronic_failsafe": (("NKQ", 1.2), ("GK", 8.0)),
     "smoke": (("BEN", 1.5), ("BEE", 2.5), ("BE", 4.0)),
 }
 # Every family above (+ BLE next to BEN, compact CM next to TMC) → area, м².
@@ -239,6 +247,214 @@ def infer_belimo_codes(
     return [code] if code else []
 
 
+# Factory articles only. A missing key means Belimo does not sell that
+# combination — compose returns None instead of gluing a suffix.
+# Sources (EU datasheets / UK shop / installation sheets), not generator output:
+# - LMQ24A, LMQ24A-SR, NMQ24A-SR: AC/DC 24 V; aux is add-on S1A/S2A, not ``-S``.
+# - LF24-SR (datasheet en-gb 2026-10-29). There is no LF24-RS.
+# - NF24A-S2, NF24A-SR-S2 (UK shop / datasheet). Suffix is ``-S2``, two SPDT.
+# - NF230A / NF230A-S2 still named on the NF..A installation sheet (2025-11);
+#   the current multi-voltage replacement is NFA / NFA-S2.
+# - GM24A-S and GM230A-S are the NG open/close + 1×SPDT (Belimo CZ comparison).
+#   GM24S.2A is a different actuator (35 s, 2×SPST), not a rename of GM24A-S.
+#   GM24A-SR-S is not in that table.
+# - NM230ASR and TMC230ASR have datasheets (2025). GM230A-SR is not in the
+#   NG table, so it is not emitted.
+# - BEE230 / BEN24 / BE24 are on the UK smoke-control list. ``-ST`` is a
+#   connector plug (BEE24-ST, BEN24-ST), not a thermoelectric trip.
+#   BEN/BEE/BE have no ``-T``. BLE is discontinued and is not generated.
+# - NKQ24A-1 / NKQ24A-SR, GK24A-1 / GK24A-SR: SuperCap, AC/DC 24 V only.
+_CatalogKey = tuple[str, str, bool, bool, bool]
+
+# (family, voltage, modulating, aux, thermal, article). Aux on fire/smoke is
+# built in, so both aux flags point at the same literal. Nothing here is
+# assembled from family + suffix.
+_BELIMO_ARTICLE_ROWS: tuple[tuple[str, str, bool, bool, bool, str], ...] = (
+    ("LM", "24", False, False, False, "LM24A"),
+    ("LM", "24", False, True, False, "LM24A-S"),
+    ("LM", "24", True, False, False, "LM24A-SR"),
+    ("LM", "230", False, False, False, "LM230A"),
+    ("LM", "230", False, True, False, "LM230A-S"),
+    ("LM", "230", True, False, False, "LM230A-SR"),
+    ("NM", "24", False, False, False, "NM24A"),
+    ("NM", "24", False, True, False, "NM24A-S"),
+    ("NM", "24", True, False, False, "NM24A-SR"),
+    ("NM", "230", False, False, False, "NM230A"),
+    ("NM", "230", False, True, False, "NM230A-S"),
+    ("NM", "230", True, False, False, "NM230A-SR"),
+    ("SM", "24", False, False, False, "SM24A"),
+    ("SM", "24", False, True, False, "SM24A-S"),
+    ("SM", "24", True, False, False, "SM24A-SR"),
+    ("SM", "230", False, False, False, "SM230A"),
+    ("SM", "230", False, True, False, "SM230A-S"),
+    ("SM", "230", True, False, False, "SM230A-SR"),
+    ("GM", "24", False, False, False, "GM24A"),
+    ("GM", "24", False, True, False, "GM24A-S"),
+    ("GM", "24", True, False, False, "GM24A-SR"),
+    ("GM", "230", False, False, False, "GM230A"),
+    ("GM", "230", False, True, False, "GM230A-S"),
+    ("TMC", "24", False, False, False, "TMC24A"),
+    ("TMC", "24", False, True, False, "TMC24A-S"),
+    ("TMC", "24", True, False, False, "TMC24A-SR"),
+    ("TMC", "230", False, False, False, "TMC230A"),
+    ("TMC", "230", False, True, False, "TMC230A-S"),
+    ("TMC", "230", True, False, False, "TMC230A-SR"),
+    ("LMQ", "24", False, False, False, "LMQ24A"),
+    ("LMQ", "24", True, False, False, "LMQ24A-SR"),
+    ("NMQ", "24", False, False, False, "NMQ24A"),
+    ("NMQ", "24", True, False, False, "NMQ24A-SR"),
+    ("SMQ", "24", False, False, False, "SMQ24A"),
+    ("SMQ", "24", True, False, False, "SMQ24A-SR"),
+    ("GMQ", "24", False, False, False, "GMQ24A"),
+    ("GMQ", "24", True, False, False, "GMQ24A-SR"),
+    ("TF", "24", False, False, False, "TF24"),
+    ("TF", "24", False, True, False, "TF24-S"),
+    ("TF", "230", False, False, False, "TF230"),
+    ("TF", "230", False, True, False, "TF230-S"),
+    ("LF", "24", False, False, False, "LF24"),
+    ("LF", "24", False, True, False, "LF24-S"),
+    ("LF", "24", True, False, False, "LF24-SR"),
+    ("LF", "230", False, False, False, "LF230"),
+    ("LF", "230", False, True, False, "LF230-S"),
+    ("NF", "24", False, False, False, "NF24A"),
+    ("NF", "24", False, True, False, "NF24A-S2"),
+    ("NF", "24", True, False, False, "NF24A-SR"),
+    ("NF", "24", True, True, False, "NF24A-SR-S2"),
+    ("NF", "230", False, False, False, "NF230A"),
+    ("NF", "230", False, True, False, "NF230A-S2"),
+    ("SF", "24", False, False, False, "SF24A"),
+    ("SF", "24", False, True, False, "SF24A-S2"),
+    ("SF", "24", True, False, False, "SF24A-SR"),
+    ("SF", "24", True, True, False, "SF24A-SR-S2"),
+    ("SF", "230", False, False, False, "SF230A"),
+    ("SF", "230", False, True, False, "SF230A-S2"),
+    ("NKQ", "24", False, False, False, "NKQ24A-1"),
+    ("NKQ", "24", True, False, False, "NKQ24A-SR"),
+    ("GK", "24", False, False, False, "GK24A-1"),
+    ("GK", "24", True, False, False, "GK24A-SR"),
+    ("BFL", "24", False, False, False, "BFL24"),
+    ("BFL", "24", False, True, False, "BFL24"),
+    ("BFL", "24", False, False, True, "BFL24-T"),
+    ("BFL", "24", False, True, True, "BFL24-T"),
+    ("BFL", "230", False, False, False, "BFL230"),
+    ("BFL", "230", False, True, False, "BFL230"),
+    ("BFL", "230", False, False, True, "BFL230-T"),
+    ("BFL", "230", False, True, True, "BFL230-T"),
+    ("BLF", "24", False, False, False, "BLF24"),
+    ("BLF", "24", False, True, False, "BLF24"),
+    ("BLF", "24", False, False, True, "BLF24-T"),
+    ("BLF", "24", False, True, True, "BLF24-T"),
+    ("BLF", "230", False, False, False, "BLF230"),
+    ("BLF", "230", False, True, False, "BLF230"),
+    ("BLF", "230", False, False, True, "BLF230-T"),
+    ("BLF", "230", False, True, True, "BLF230-T"),
+    ("BFN", "24", False, False, False, "BFN24"),
+    ("BFN", "24", False, True, False, "BFN24"),
+    ("BFN", "24", False, False, True, "BFN24-T"),
+    ("BFN", "24", False, True, True, "BFN24-T"),
+    ("BFN", "230", False, False, False, "BFN230"),
+    ("BFN", "230", False, True, False, "BFN230"),
+    ("BFN", "230", False, False, True, "BFN230-T"),
+    ("BFN", "230", False, True, True, "BFN230-T"),
+    ("BF", "24", False, False, False, "BF24"),
+    ("BF", "24", False, True, False, "BF24"),
+    ("BF", "24", False, False, True, "BF24-T"),
+    ("BF", "24", False, True, True, "BF24-T"),
+    ("BF", "230", False, False, False, "BF230"),
+    ("BF", "230", False, True, False, "BF230"),
+    ("BF", "230", False, False, True, "BF230-T"),
+    ("BF", "230", False, True, True, "BF230-T"),
+    ("BEN", "24", False, False, False, "BEN24"),
+    ("BEN", "24", False, True, False, "BEN24"),
+    ("BEN", "230", False, False, False, "BEN230"),
+    ("BEN", "230", False, True, False, "BEN230"),
+    ("BEN", "24", True, False, False, "BEN24-SR"),
+    ("BEN", "24", True, True, False, "BEN24-SR"),
+    ("BEE", "24", False, False, False, "BEE24"),
+    ("BEE", "24", False, True, False, "BEE24"),
+    ("BEE", "230", False, False, False, "BEE230"),
+    ("BEE", "230", False, True, False, "BEE230"),
+    ("BEE", "24", True, False, False, "BEE24-SR"),
+    ("BEE", "24", True, True, False, "BEE24-SR"),
+    ("BE", "24", False, False, False, "BE24"),
+    ("BE", "24", False, True, False, "BE24"),
+    ("BE", "230", False, False, False, "BE230"),
+    ("BE", "230", False, True, False, "BE230"),
+)
+
+
+def _catalog() -> dict[_CatalogKey, str]:
+    rows: dict[_CatalogKey, str] = {}
+    for family, voltage, modulating, aux, thermal, code in _BELIMO_ARTICLE_ROWS:
+        key = (family, voltage, modulating, aux, thermal)
+        if key in rows:
+            raise RuntimeError(f"duplicate Belimo catalog key {key}")
+        rows[key] = code
+    return rows
+
+
+BELIMO_CATALOG: dict[_CatalogKey, str] = _catalog()
+
+# Strings this project used to print that Belimo does not sell.
+# A code outside this set is not rejected: card copy also cites real
+# articles the matrix does not generate (``CM230-L/R``, ``NM24A-SR-20``).
+BELIMO_NOT_ISSUED: frozenset[str] = frozenset(
+    {
+        "LMQ230A",
+        "NMQ230A",
+        "SMQ230A",
+        "GMQ230A",
+        "LMQ24A-S",
+        "LMQ24A-SR-S",
+        "NMQ24A-S",
+        "NMQ24A-SR-S",
+        "SMQ24A-S",
+        "SMQ24A-SR-S",
+        "SMQ230A",
+        "SMQ230A-S",
+        "GMQ24A-S",
+        "GMQ24A-SR-S",
+        "LM24A-SR-S",
+        "NM24A-SR-S",
+        "NM230A-SR-S",
+        "SM24A-SR-S",
+        "GM24A-SR-S",
+        "GM230A-SR-S",
+        "GM230A-SR",
+        "LF24-RS",
+        "LF230-RS",
+        "LF230-SR",
+        "NF24A-S",
+        "NF230A-S",
+        "NF24A-SR-S",
+        "SF24A-S",
+        "SF230A-S",
+        "SF24A-SR-S",
+        "BEN24-T",
+        "BEN230-T",
+        "BEE24-T",
+        "BEE230-T",
+        "BEE24ST",
+        "BEE230ST",
+        "BE24-T",
+        "BLE24-T",
+        "BLE230-T",
+        "FST-24-3N",
+        "FST-230-3N",
+        "FSR-24-3N",
+        "FSR-230-3N",
+    },
+)
+
+
+def belimo_code_is_issued(code: str | None) -> bool:
+    """False only for articles this catalog used to invent.
+
+    Other tokens (``CM230-L/R``, a hand-typed real variant) stay allowed.
+    """
+    return normalize_belimo_code(code or "") not in BELIMO_NOT_ISSUED
+
+
 def compose_belimo_article(
     family: str,
     *,
@@ -247,7 +463,11 @@ def compose_belimo_article(
     aux: bool,
     thermal: bool = False,
 ) -> str | None:
-    """Belimo article for one Hoocon edition, or None when Belimo has no direct analog.
+    """Belimo article for one Hoocon edition, or None when that article is not made.
+
+    The map is the nomenclature. Combinations Belimo does not sell
+    (Q-series 230 V, ``…-SR-S`` on LM/NM/SM/Q, ``LF…-RS``, smoke ``-T``,
+    ``NF…-S`` without the ``2``) are absent and return None.
 
     Shared by ТТХ inference and the curated «Аналоги» generators so both
     always print the same article for the same edition.
@@ -259,33 +479,9 @@ def compose_belimo_article(
         aux: Hoocon edition with auxiliary switches (``-DS/-AS/S``).
         thermal: Hoocon thermal edition (``DST`` / ``ST``).
     """
-    if family in _BUILTIN_AUX_FAMILIES:
-        # Fire / smoke: on/off only, 2× SPDT built in, optional thermal.
-        if modulating:
-            return None
-        if family == "BEE":
-            return f"BEE{voltage}{'ST' if thermal else ''}"
-        return f"{family}{voltage}{'-T' if thermal else ''}"
-    if family == "TF":
-        # TF24 / TF24-S; no proportional edition in the card range.
-        if modulating:
-            return None
-        return f"TF{voltage}{'-S' if aux else ''}"
-    if family == "LF":
-        # LF24 / LF24-S / LF24-RS (proportional, no auxiliary switches).
-        if modulating:
-            return None if aux else f"LF{voltage}-RS"
-        return f"LF{voltage}{'-S' if aux else ''}"
-    if family == "TMC" and modulating and aux:
-        # Belimo ships aux as add-on S1A, not a factory ``…-SR-S``.
+    if voltage not in {"24", "230"}:
         return None
-    # LM/NM/SM/GM/TMC, LMQ…GMQ, NF/SF — modern ``A`` generation.
-    code = f"{family}{voltage}A"
-    if modulating:
-        code += "-SR"
-    if aux:
-        code += "-S"
-    return code
+    return BELIMO_CATALOG.get((family, voltage, modulating, aux, thermal))
 
 
 def _belimo_family_of(code: str) -> str | None:
@@ -317,6 +513,13 @@ def belimo_code_is_direct_for_sku(code: str | None, sku_code: str | None) -> boo
     family = _belimo_family_of(code or "")
     if family is None:
         return True
+    # QX is capacitor return. A fast non-fail-safe article (LMQ…GMQ) can
+    # still pass the area check; it is not a direct analog of this SKU.
+    purpose = detect_purpose(category_slug="", sku_code=sku_code or "")
+    if purpose == "electronic_failsafe":
+        allowed = {name for name, _area in BELIMO_FAMILY_AREA["electronic_failsafe"]}
+        if family not in allowed:
+            return False
     nm = hoocon_torque_nm(sku_code)
     if nm is not None and _FAMILY_AREA[family] > round(nm / 10, 2):
         return False
@@ -336,16 +539,21 @@ def detect_purpose(*, category_slug: str, sku_code: str) -> Purpose:
     # Must win over category ``…dymoudalen…`` which also hosts SA..MU (no spring).
     if re.search(r"(?i)^hvd\d.*-\d+f(?:$|[^a-z0-9])", code):
         return "fire_spring"
-    # HVD-Q / HVD-QX — fast non-spring air (not fire).
-    if re.search(r"(?i)^hvd\d.*-\d+qx?(?:$|[^a-z0-9])", code):
+    # HVD-QX — capacitor return. Not the fast non-fail-safe Q series.
+    if re.search(r"(?i)^hvd\d.*-\d+qx(?:$|[^a-z0-9])", code):
+        return "electronic_failsafe"
+    # HVD-Q — fast non-spring air (not fire).
+    if re.search(r"(?i)^hvd\d.*-\d+q(?:$|[^a-z0-9])", code):
         return "fast"
     if re.search(r"(?i)^hvd\d", code):
         return "air_no_spring"
-    # HVA: suffix decides spring / speed regardless of category (QX lives in «отказоустойчивые»).
+    # HVA: suffix decides spring / speed / capacitor regardless of category.
     if hva := parse_hva_code(sku_code):
         if hva.suffix == "p":
             return "air_spring"
-        return "fast" if hva.suffix in {"q", "uq", "qx"} else "air_no_spring"
+        if hva.suffix == "qx":
+            return "electronic_failsafe"
+        return "fast" if hva.suffix in {"q", "uq"} else "air_no_spring"
     for fragment, purpose in _PURPOSE_BY_CATEGORY:
         if fragment in slug:
             return purpose
@@ -387,7 +595,21 @@ def _analogs_text_scoped(raw: str, sku: SKU) -> str:
         filtered = _drop_belimo_lines_for_control(filtered, variant.control)
     aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
     filtered = _drop_belimo_lines_for_aux(filtered, aux)
-    return _drop_belimo_lines_not_direct(filtered, sku.sku_code)
+    filtered = _drop_belimo_lines_not_direct(filtered, sku.sku_code)
+    return _drop_unissued_belimo_lines(filtered)
+
+
+def _drop_unissued_belimo_lines(text: str) -> str:
+    """Drop bullets whose Belimo token is one this project used to invent."""
+    if not text.strip():
+        return text
+    out: list[str] = []
+    for line in text.splitlines():
+        codes = extract_belimo_codes_from_text(line)
+        if codes and not any(belimo_code_is_issued(code) for code in codes):
+            continue
+        out.append(line)
+    return "\n".join(out).strip()
 
 
 def _drop_belimo_lines_not_direct(text: str, sku_code: str) -> str:
@@ -500,61 +722,20 @@ def _sku_uses_ds_as_control_editions(sku_code: str) -> bool:
     return suf in {"a", "as", "d", "ds", "dst"}
 
 
-def belimo_codes_for_sku(sku: SKU) -> list[str]:
-    """Resolve Belimo codes for a SKU: card text first, else ТТХ inference.
+def belimo_article_for_sku(sku: SKU) -> str | None:
+    """Belimo article shown for this SKU.
 
-    Card text wins only when codes match the SKU control mode. Combined
-    ``-DS/-AS`` analog blocks often list an on/off Belimo (e.g. ``CM230-L/R``);
-    modulating editions then fall through to inference (``…-SR``).
-
-    Args:
-        sku: Catalog SKU (product + category + EAV used when inferring).
-
-    Returns:
-        Ordered unique Belimo article codes.
+    None. Publishing a code means it is the replacement for this exact model.
+    A torque or area band does not establish that, so nothing is shown until
+    the pair is confirmed against the Belimo datasheet.
     """
-    if sku_takes_no_analogs(sku):
-        return []
-    variant = parse_sku_variant(sku.sku_code)
-    voltage = variant.voltage
-    control = variant.control
-    apply_control = _sku_uses_ds_as_control_editions(sku.sku_code)
-    from catalog.sku_access import sku_section_text
+    return None
 
-    raw = sku_section_text(sku, "analogs_text")
-    text = _analogs_text_scoped(raw, sku) if raw.strip() else ""
-    from_text = extract_belimo_codes_from_text(text, voltage=voltage)
-    if from_text:
-        aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
-        filtered = _strip_lone_aux_suffix(_filter_codes_by_aux(from_text, aux), aux)
-        if apply_control:
-            filtered = _filter_codes_by_control(filtered, control)
-        if sku_code_is_thermal(sku.sku_code):
-            thermal_only = [c for c in filtered if belimo_code_is_thermal(c)]
-            if thermal_only:
-                filtered = thermal_only
-            # else keep card codes for facet; primary_belimo_code_for_sku
-            # still refuses a non-thermal primary.
-        else:
-            filtered = [c for c in filtered if not belimo_code_is_thermal(c)]
-        if filtered:
-            return filtered
 
-    stored = (sku.analog_belimo_code or "").strip()
-    if stored:
-        code = normalize_belimo_code(stored)
-        thermal_sku = sku_code_is_thermal(sku.sku_code)
-        thermal_code = belimo_code_is_thermal(code)
-        # Stale fill: thermal Belimo on plain DS (or reverse) must not block inference.
-        if thermal_sku != thermal_code or not belimo_code_is_direct_for_sku(code, sku.sku_code):
-            pass
-        elif not apply_control or belimo_code_matches_control(code, control):
-            aux = _resolve_aux_switch(variant.aux_switch, sku.sku_code)
-            filtered = _strip_lone_aux_suffix(_filter_codes_by_aux([code], aux), aux)
-            if filtered:
-                return filtered
-
-    return _infer_for_sku(sku, voltage=voltage)
+def belimo_codes_for_sku(sku: SKU) -> list[str]:
+    """Verified Belimo articles for this SKU. Empty until a pair is confirmed."""
+    code = belimo_article_for_sku(sku)
+    return [code] if code else []
 
 
 def _resolve_aux_switch(parsed: bool | None, sku_code: str) -> bool | None:
@@ -629,34 +810,60 @@ def _filter_codes_by_control(codes: list[str], control: str | None) -> list[str]
 
 
 def belimo_code_is_thermal(code: str | None) -> bool:
-    """True when a Belimo article is a thermal edition (``FST`` / ``ST`` / ``-T``).
+    """True when a Belimo article is a thermal edition (``-T`` / ``FST`` / ``-FST``).
 
     Args:
-        code: Belimo article (e.g. ``BF24-T``, ``FST-230-3N``, ``BEE24ST``).
+        code: Belimo article (e.g. ``BF24-T``, ``BF24-FST``).
 
     Returns:
-        True for ``FST…`` / ``…ST`` / ``…-T`` / ``…-FST`` thermal markers.
+        True for a trailing ``-T``, a leading ``FST`` series, or ``-FST``.
+        ``BEE24-ST`` is a connector plug, not a thermal sensor.
         Mid-string ``-T-`` (e.g. ``X-T-Y``) is not thermal.
     """
     return bool(_THERMAL_BELIMO_TOKEN.search(normalize_belimo_code(code or "").casefold()))
 
 
 def primary_belimo_code_for_sku(sku: SKU) -> str | None:
-    """First Belimo code for ``SKU.analog_belimo_code`` persistence.
+    """Value for ``SKU.analog_belimo_code``. Empty until a pair is confirmed."""
+    return belimo_article_for_sku(sku)
 
-    Thermal editions (``DST`` / ``-T`` suffix on the Hoocon article) must map to a
-    thermal Belimo code (``FST`` / ``-T``). If none is present among resolved
-    codes, return ``None`` rather than a non-thermal fallback.
+
+_ANALOG_BULLET = re.compile(r"^\s*[–—\-•*]")
+# A bare edition header left after its bullets are gone:
+# ``CODE…:`` or ``CODE…: (примечание)``.
+_ORPHAN_EDITION_HEADER = re.compile(r"^.*:\s*(\([^()]*\))?\s*$")
+
+
+def _drop_unverified_analog_lines(text: str) -> str:
+    """Remove analog-candidate bullets and headers left without a pair.
+
+    A bullet in the analogs tab names one foreign article as a stand-in for
+    this edition. No stored bullet is a datasheet-confirmed pair, so the tab
+    keeps only the selection guidance. A block reduced to its bare edition
+    header (``SA15MU24-DST (24 В, …):``, ``HVD24ST-5F: (с термодатчиком)``)
+    is dropped with it.
     """
-    codes = belimo_codes_for_sku(sku)
-    if not codes:
-        return None
-    if not sku_code_is_thermal(sku.sku_code):
-        return codes[0]
-    for code in codes:
-        if belimo_code_is_thermal(code):
-            return code
-    return None
+    if not text.strip():
+        return text
+    kept: list[str] = []
+    for block in re.split(r"\n\s*\n", text.strip()):
+        lines = [line for line in block.splitlines() if not _ANALOG_BULLET.match(line)]
+        if not lines:
+            continue
+        if len(lines) == 1 and _ORPHAN_EDITION_HEADER.match(lines[0].rstrip()):
+            continue
+        kept.append("\n".join(lines))
+    return "\n\n".join(kept).strip()
+
+
+def analogs_text_for_card(sku: SKU) -> str:
+    """Analogs tab without unverified foreign-article lines.
+
+    Belimo, Siemens, Honeywell, Gruner and other old bullets are dropped:
+    a torque or area band does not confirm that the article replaces this
+    model. Nothing is inserted in their place until a verified pair exists.
+    """
+    return _drop_unverified_analog_lines(analogs_plain_text_for_sku(sku))
 
 
 def _infer_for_sku(sku: SKU, *, voltage: str | None) -> list[str]:

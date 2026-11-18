@@ -173,10 +173,10 @@ def _sku_specs_text(obj: SKU) -> str:
 
 
 def _sku_analogs_text(obj: SKU) -> str:
-    """Аналоги text for this edition only (control-aware Belimo lines)."""
-    from catalog.etl.belimo_analogs import analogs_plain_text_for_sku
+    """Аналоги for this edition. Belimo article is the catalog match for the model."""
+    from catalog.etl.belimo_analogs import analogs_text_for_card
 
-    return analogs_plain_text_for_sku(obj)
+    return analogs_text_for_card(obj)
 
 
 def _sku_attribute_rows(obj: SKU, context: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -449,10 +449,13 @@ class SKUListSerializer(serializers.ModelSerializer):
         )
 
     def to_representation(self, instance: SKU) -> dict[str, Any]:
-        """Drop `price` key entirely when show_prices_on_site is False."""
+        """Drop `price` when hidden. Belimo article stays empty until a pair is confirmed."""
+        from catalog.etl.belimo_analogs import belimo_article_for_sku
+
         data = super().to_representation(instance)
         if not _prices_visible(self.context):
             data.pop("price", None)
+        data["analog_belimo_code"] = belimo_article_for_sku(instance)
         return data
 
 

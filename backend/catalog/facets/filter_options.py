@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, QuerySet
 
 from catalog.facets.aux import AUX_SWITCH_NONE
 from catalog.facets.defs import (
@@ -146,8 +146,6 @@ def facet_defs_for_category(category_slug: str | None) -> tuple[FacetDef, ...]:
 _FACETS_NEEDING_SKU_CONTEXT: frozenset[str] = frozenset(
     {"aux_switch", "voltage", "control", "area", "temp_sensor"},
 )
-# Above this size, skip Belimo inference and use only persisted analog codes.
-_ANALOG_INFERENCE_SKU_CAP = 150
 _BELIMO_CODE_MAX_LEN = 64
 
 
@@ -250,21 +248,16 @@ def _collect_simple_facet_counts(
     return counts
 
 
-def _without_no_analog_skus(queryset: QuerySet[SKU]) -> QuerySet[SKU]:
-    """Drop kits / ball valves: a hand-typed field there must not reach the facet."""
-    from catalog.etl.belimo_analogs import NO_ANALOG_CATEGORY_FRAGMENTS, NO_ANALOG_SKU_PATTERN
-
-    no_analogs = Q(sku_code__iregex=NO_ANALOG_SKU_PATTERN)
-    for fragment in NO_ANALOG_CATEGORY_FRAGMENTS:
-        no_analogs |= Q(product__category__slug__contains=fragment)
-    return queryset.exclude(no_analogs)
-
-
 def _filter_skus_by_belimo_analog(
     queryset: QuerySet[SKU],
     value: str,
 ) -> QuerySet[SKU]:
-    """Match SKUs that list the Belimo article (card text, field, or inference)."""
+    """Match SKUs whose verified Belimo pair equals ``value``.
+
+    ``SKU.analog_belimo_code`` may hold a stale or hand-typed value, so the
+    field itself is not proof of a pair — only ``belimo_codes_for_sku``
+    (datasheet-confirmed pairs) counts. Empty until such a pair exists.
+    """
     from catalog.etl.belimo_analogs import belimo_codes_for_sku, normalize_belimo_code
 
     if len(value) > _BELIMO_CODE_MAX_LEN:
@@ -272,20 +265,8 @@ def _filter_skus_by_belimo_analog(
     needle = normalize_belimo_code(value)
     if not needle:
         return queryset.none()
-    # Fast path: persisted primary code.
-    direct_ids = set(
-        _without_no_analog_skus(queryset.filter(analog_belimo_code__iexact=needle)).values_list("id", flat=True),
-    )
-    # Same rule as the «Аналоги» facet: inference only on small scopes.
-    if queryset.count() > _ANALOG_INFERENCE_SKU_CAP:
-        return queryset.filter(id__in=direct_ids) if direct_ids else queryset.none()
-    skus = queryset.select_related("product", "product__category").prefetch_related(
-        "attribute_values__attribute",
-    )
-    matching: set[int] = set(direct_ids)
-    for sku in skus:
-        if sku.id in matching:
-            continue
+    matching: set[int] = set()
+    for sku in queryset.select_related("product", "product__category"):
         codes = {normalize_belimo_code(c) for c in belimo_codes_for_sku(sku)}
         if needle in codes:
             matching.add(sku.id)
@@ -297,37 +278,21 @@ def _filter_skus_by_belimo_analog(
 def _collect_analog_facet_options(
     sku_ids: list[int],
 ) -> dict[str, object] | None:
-    """Build «Аналоги» facet from card Belimo lines, field, or ТТХ inference.
+    """Build «Аналоги» facet from verified Belimo pairs only.
 
-    Large scopes (kits / valves with hundreds of SKUs) only use the persisted
-    ``analog_belimo_code`` field — full Belimo inference over every row is too
-    expensive and usually empty for those categories.
+    Card text, a stored ``analog_belimo_code`` or a torque-band guess are not
+    proof that the article replaces the model, so the facet is empty until a
+    datasheet-confirmed pair exists.
     """
-    from catalog.etl.belimo_analogs import belimo_codes_for_sku, normalize_belimo_code
+    from catalog.etl.belimo_analogs import belimo_codes_for_sku
 
     if not sku_ids:
         return None
     counts: dict[str, set[int]] = {}
-
-    if len(sku_ids) > _ANALOG_INFERENCE_SKU_CAP:
-        for sku_id, code in (
-            _without_no_analog_skus(SKU.objects.filter(id__in=sku_ids))
-            .exclude(analog_belimo_code__isnull=True)
-            .exclude(analog_belimo_code="")
-            .values_list("id", "analog_belimo_code")
-        ):
-            normalized = normalize_belimo_code(str(code))
-            if normalized:
-                counts.setdefault(normalized, set()).add(sku_id)
-    else:
-        skus = (
-            SKU.objects.filter(id__in=sku_ids)
-            .select_related("product", "product__category")
-            .prefetch_related("attribute_values__attribute")
-        )
-        for sku in skus:
-            for code in belimo_codes_for_sku(sku):
-                counts.setdefault(code, set()).add(sku.id)
+    skus = SKU.objects.filter(id__in=sku_ids).select_related("product", "product__category")
+    for sku in skus:
+        for code in belimo_codes_for_sku(sku):
+            counts.setdefault(code, set()).add(sku.id)
 
     if not counts:
         return None

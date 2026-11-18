@@ -4,27 +4,15 @@ from __future__ import annotations
 
 from django.core.management.base import BaseCommand
 
-from catalog.etl.belimo_analogs import (
-    _sku_uses_ds_as_control_editions,
-    belimo_code_is_direct_for_sku,
-    belimo_code_is_thermal,
-    belimo_code_matches_control,
-    belimo_codes_for_sku,
-    normalize_belimo_code,
-    primary_belimo_code_for_sku,
-    sku_takes_no_analogs,
-)
-from catalog.etl.sku_variant import parse_sku_variant, sku_code_is_thermal
+from catalog.etl.belimo_analogs import primary_belimo_code_for_sku
 from catalog.models import SKU
 
 
 class Command(BaseCommand):
-    """Fill ``analog_belimo_code`` from card «Аналоги» text or ТТХ inference."""
+    """Clear ``analog_belimo_code`` until a datasheet-confirmed pair exists."""
 
     help = (
-        "Set SKU.analog_belimo_code from Belimo lines in analogs_text "
-        "(edition-filtered) or infer from category / moment / voltage / "
-        "control / aux switch. Use --dry-run to preview."
+        "Clear SKU.analog_belimo_code. A code is not written from torque, area or card text. Use --dry-run to preview."
     )
 
     def add_arguments(self, parser) -> None:  # type: ignore[no-untyped-def]
@@ -41,7 +29,7 @@ class Command(BaseCommand):
 
     def handle(self, *args: object, **options: object) -> None:
         dry_run = bool(options.get("dry_run"))
-        force = bool(options.get("force"))
+        _ = bool(options.get("force"))  # accepted; a different stored code is always replaced
         qs = (
             SKU.objects.filter(is_published=True)
             .select_related("product", "product__category")
@@ -53,43 +41,19 @@ class Command(BaseCommand):
         empty = 0
         cleared = 0
         for sku in qs:
-            primary = primary_belimo_code_for_sku(sku)
+            primary = primary_belimo_code_for_sku(sku) or ""
             current = (sku.analog_belimo_code or "").strip()
             if not primary:
                 empty += 1
-                # Large-scope facets read the field directly: drop non-direct leftovers.
-                if current and (sku_takes_no_analogs(sku) or not belimo_code_is_direct_for_sku(current, sku.sku_code)):
-                    self.stdout.write(f"  {sku.sku_code}: {current} → ∅ (нет прямого аналога)")
-                    if not dry_run:
-                        sku.analog_belimo_code = ""
-                        sku.save(update_fields=["analog_belimo_code"])
-                    cleared += 1
-                continue
-            if current and not force:
-                if current.casefold() == primary.casefold():
-                    skipped += 1
-                    continue
-                # Auto-refresh clear mismatches without --force:
-                # shared DS/AS on/off Belimo on modulating SKU, or DST without FST/-T.
-                control = parse_sku_variant(sku.sku_code).control
-                control_mismatch = _sku_uses_ds_as_control_editions(
-                    sku.sku_code,
-                ) and not belimo_code_matches_control(current, control)
-                thermal_mismatch = (
-                    sku_code_is_thermal(sku.sku_code)
-                    and belimo_code_is_thermal(primary)
-                    and current.casefold() != primary.casefold()
-                ) or (
-                    # Plain DS/… kept a thermal Belimo from a shared voltage list.
-                    (not sku_code_is_thermal(sku.sku_code)) and belimo_code_is_thermal(current)
-                )
-                # Family / aux drift: the card «Аналоги» no longer lists this article.
-                stale = normalize_belimo_code(current) not in belimo_codes_for_sku(sku)
-                if not control_mismatch and not thermal_mismatch and not stale:
-                    skipped += 1
-                    continue
-            if current.casefold() == primary.casefold():
+            if current == primary:
                 skipped += 1
+                continue
+            if not primary:
+                self.stdout.write(f"  {sku.sku_code}: {current} → ∅ (нет артикула в каталоге)")
+                if not dry_run:
+                    sku.analog_belimo_code = ""
+                    sku.save(update_fields=["analog_belimo_code"])
+                cleared += 1
                 continue
             self.stdout.write(f"  {sku.sku_code}: {current or '∅'} → {primary}")
             if not dry_run:

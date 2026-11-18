@@ -15,6 +15,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from catalog.etl.belimo_analogs import _drop_unverified_analog_lines
 from catalog.etl.html_text import (
     ensure_safety_in_instructions,
     extract_safety_notice,
@@ -147,7 +148,9 @@ class Command(BaseCommand):
         instructions = ensure_safety_in_instructions(instructions, safety)
         instructions = _normalize_instructions(instructions)
         specs = _normalize_copy(tabs.get("specs", ""))
-        analogs = _normalize_copy(tabs.get("analogs", ""))
+        # Tilda «Аналоги» still carries unverified «– Brand ARTICLE» bullets;
+        # only the guidance text is stored (same rule as the card output).
+        analogs = _drop_unverified_analog_lines(_normalize_copy(tabs.get("analogs", "")))
 
         if dry_run:
             self.stdout.write(

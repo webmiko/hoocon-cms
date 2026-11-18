@@ -11,7 +11,11 @@ Belimo non-spring rotary (official EU datasheets):
 Hoocon 4/6/8/16/24/32 Нм map to the largest Belimo family whose damper area ≤ Hoocon's
 (i.e. the Hoocon actuator covers at least the Belimo's rated area).
 
-DA2MU keeps the dedicated ``data/damu_2nm_analogs.txt`` (TMC + verified clones).
+DA2MU keeps the dedicated ``data/damu_2nm_analogs.txt``.
+
+A bullet «– Brand ARTICLE» would read as a confirmed pair. No pair here is
+datasheet-confirmed, so the copy carries class guidance and the selection
+footnote only — no edition blocks.
 """
 
 from __future__ import annotations
@@ -19,13 +23,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from catalog.etl.belimo_analogs import BELIMO_FAMILY_AREA, belimo_family_by_area
-from catalog.etl.series_copy_major_analogs import _FOOTNOTE, _lines_major_air
+from catalog.etl.series_copy_major_analogs import _FOOTNOTE
 from catalog.etl.tech_copy import normalize_tech_copy
 
 _DAMU_2NM = Path(__file__).resolve().parent / "data" / "damu_2nm_analogs.txt"
 
 # Recommended area of the largest Belimo family whose area ≤ Hoocon's.
-# Siemens/Honeywell analogs in the copy key off this Belimo area band.
+# The guidance note in the copy keys off this Belimo area band.
 _AIR_AREA = dict(BELIMO_FAMILY_AREA["air_no_spring"])
 DAMU_BELIMO_NM: dict[int, int] = {
     nm: int(_AIR_AREA[family] * 10)
@@ -35,7 +39,7 @@ DAMU_BELIMO_NM: dict[int, int] = {
 
 
 def build_damu_analogs(nm: int) -> str:
-    """Build edition-scoped analogs for DA..MU ``nm`` Нм."""
+    """Guidance-only analogs copy for DA..MU ``nm`` Нм (no pair articles)."""
     if nm == 2:
         return normalize_tech_copy(_DAMU_2NM.read_text(encoding="utf-8").strip())
 
@@ -50,27 +54,6 @@ def build_damu_analogs(nm: int) -> str:
             "Johnson Controls, Danfoss, Gruner."
         ),
         "",
+        _FOOTNOTE,
     ]
-    for voltage in ("24", "230"):
-        for modulating, aux, suf in (
-            (False, False, "D"),
-            (False, True, "DS"),
-            (True, False, "A"),
-            (True, True, "AS"),
-        ):
-            code = f"DA{nm}MU{voltage}-{suf}"
-            mode = "пропорциональное (модулирующее) 0…10 В" if modulating else "2-/3-позиционное"
-            aux_note = ", со вспомогательным(и) переключателем(ями)" if aux else ""
-            blocks.append(f"Аналоги для {code} ({voltage} В, {mode}{aux_note}):")
-            blocks.extend(
-                _lines_major_air(
-                    nm=band,
-                    voltage=voltage,
-                    modulating=modulating,
-                    aux=aux,
-                    fast=False,
-                ),
-            )
-            blocks.append("")
-    blocks.append(_FOOTNOTE)
     return normalize_tech_copy("\n".join(blocks).strip())

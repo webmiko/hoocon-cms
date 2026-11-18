@@ -20,6 +20,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
+from catalog.etl.series_copy_major_analogs import _FOOTNOTE
 from catalog.etl.sku_instructions import damper_area_for_nm
 from catalog.etl.sku_variant import (
     SkuVariant,
@@ -232,61 +233,31 @@ SERIES_INSTRUCTIONS = normalize_tech_copy(
 
 # Belimo BLF ≈ 6/4 Нм (HVD-5F). HVD-3F: no Belimo — the smallest BFL is 4/3 Нм.
 # ST ↔ Belimo …-T (BAT 72 °C).
+# No bullet «– Brand ARTICLE»: no pair is datasheet-confirmed, so the copy is
+# class guidance + the selection footnote only.
 _ANALOGS_BY_NM: dict[int, str] = {
     3: normalize_tech_copy(
-        """
+        f"""
 Список аналогов электропривода Hoocon HVD-3F с такими же или близкими характеристиками
 (пружинный возврат, открыто/закрыто, ~3 Нм, 2×SPDT, IP54, вал 12×12 мм)
 
-HVD24S-3F:
-– BVM BFL24-03
-– Nanotek BFL 24 B
+Belimo fire (каталог): BFL ≈ 4/3, BLF ≈ 6/4 Нм (мотор/пружина) — даже наименьший мощнее HVD-3F.
 
-HVD24ST-3F: (с термодатчиком)
-– BVM BFL24-03-T
-– Nanotek BFL 24 B-T
+Крупные марки: Belimo, Siemens, Honeywell, Gruner.
 
-HVD230S-3F:
-– BVM BFL230-03
-– Nanotek BFL 230 B
-
-HVD230ST-3F: (с термодатчиком)
-– BVM BFL230-03-T
-– Nanotek BFL 230 B-T
+{_FOOTNOTE}
 """.strip(),
     ),
     5: normalize_tech_copy(
-        """
+        f"""
 Список аналогов электропривода Hoocon HVD-5F с такими же или близкими характеристиками
 (пружинный возврат, открыто/закрыто, ~5 Нм, 2×SPDT, IP54, вал 12×12 мм)
 
-HVD24S-5F:
-– Belimo BLF24
-– Nanotek BLF 24 B
-– Sputnik FS24-5
-– BVM BLF24-05
-– Vilmann TAFA2-05S24
+Belimo fire (каталог): BLF ≈ 6/4 Нм (мотор/пружина).
 
-HVD24ST-5F: (с термодатчиком)
-– Belimo BLF24-T
-– Nanotek BLF 24 B-T
-– Sputnik FS24-5-ST
-– BVM BLF24-05-T
-– Vilmann TAFA2-05ST24
+Крупные марки: Belimo, Siemens, Honeywell, Gruner.
 
-HVD230S-5F:
-– Belimo BLF230
-– Nanotek BLF 230 B
-– Sputnik FS230-5
-– BVM BLF230-05
-– AIRS BLF230A
-
-HVD230ST-5F: (с термодатчиком)
-– Belimo BLF230-T
-– Nanotek BLF 230 B-T
-– Sputnik FS230-5-ST
-– BVM BLF230-05-T
-– AIRS BLF230A-T
+{_FOOTNOTE}
 """.strip(),
     ),
 }
