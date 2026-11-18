@@ -112,3 +112,23 @@ def test_enriched_hvdf_3nm_damper_area_is_0_3(sku_code: str) -> None:
     assert area == damper_area_for_nm(3)
     assert area == "до 0,3 м²"
     assert "до 0,3 м²" in (sku.description or "")
+
+
+@pytest.mark.django_db
+def test_analogs_cover_every_torque_spec() -> None:
+    """Regression: _ANALOGS_BY_NM must cover all TORQUE_SPECS keys —
+    10F was added to specs without an analogs entry → empty tab."""
+    from catalog.etl.series_copy_hvdf import _ANALOGS_BY_NM
+
+    assert set(_ANALOGS_BY_NM) == set(TORQUE_SPECS)
+    for nm, text in _ANALOGS_BY_NM.items():
+        assert f"HVD-{nm}F" in text
+        assert "– " not in text  # методичка без артикулов-пар
+
+    Category.objects.create(
+        name="Дымоудаление",
+        slug="elektroprivody-dlya-klapanov-dymoudaleniya",
+    )
+    apply_hvdf_enrichment(dry_run=False)
+    sku = SKU.objects.get(sku_code="HVD24SX-10F")
+    assert "HVD-10F" in (sku.analogs_text or "")

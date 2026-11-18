@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
@@ -562,3 +563,89 @@ def test_punch_studio_shadow_drops_grey_halo_and_keeps_housing() -> None:
     assert out.getpixel((16, 14))[3] == 255
     assert out.getpixel((20, 15))[3] == 255
     assert out.getpixel((18, 14))[3] == 255
+
+
+def test_dafu_html_asset_dir_maps_series(tmp_path: Path) -> None:
+    """Each DAFU family resolves to its exported HTML manual pack."""
+    from catalog.etl.manual_diagrams import dafu_html_asset_dir
+
+    for folder in ("da3fu-d-ds", "da5fu-d-ds", "da10-15-20fu24-230-d-ds", "da10-15-20fu24-a-as"):
+        pack = tmp_path / "DA" / "assets" / folder
+        pack.mkdir(parents=True)
+        (pack / "wiring.png").write_bytes(b"w")
+        (pack / "dimensions.png").write_bytes(b"d")
+
+    assert dafu_html_asset_dir(series_nm=3, edition="on_off", root=tmp_path).name == "da3fu-d-ds"
+    assert dafu_html_asset_dir(series_nm=5, edition="on_off", root=tmp_path).name == "da5fu-d-ds"
+    assert dafu_html_asset_dir(series_nm=15, edition="on_off", root=tmp_path).name == "da10-15-20fu24-230-d-ds"
+    assert dafu_html_asset_dir(series_nm=20, edition="modulating_24", root=tmp_path).name == "da10-15-20fu24-a-as"
+    # DA5 A/AS has no exported pack → PDF crop fallback stays in charge.
+    assert dafu_html_asset_dir(series_nm=5, edition="modulating_24", root=tmp_path) is None
+
+
+def test_safu_html_asset_dir_reuses_fallback_family(tmp_path: Path) -> None:
+    """SA20 has no own manual: it borrows the SA15 exported pack, like the PDF path."""
+    from catalog.etl.manual_diagrams import safu_html_asset_dir
+
+    pack = tmp_path / "SA" / "assets" / "sa15fu-ds-dst"
+    pack.mkdir(parents=True)
+    (pack / "wiring.png").write_bytes(b"w")
+    (pack / "dimensions.png").write_bytes(b"d")
+
+    assert safu_html_asset_dir(series_nm=20, root=tmp_path).name == "sa15fu-ds-dst"
+    assert safu_html_asset_dir(series_nm=15, root=tmp_path).name == "sa15fu-ds-dst"
+    assert safu_html_asset_dir(series_nm=10, root=tmp_path) is None
+
+
+def test_diagrams_from_html_assets_keep_stable_source_url(tmp_path: Path) -> None:
+    """Asset crops reuse the manual-diagrams source_url so upsert replaces bytes."""
+    from catalog.etl.manual_diagrams import diagrams_from_html_assets
+
+    for name in ("wiring", "dimensions"):
+        (tmp_path / f"{name}.png").write_bytes(b"png-bytes")
+
+    crops = diagrams_from_html_assets(tmp_path, series_nm=5, edition="on_off")
+    assert [c.kind for c in crops] == ["wiring", "dimensions"]
+    assert crops[1].source_url.endswith("da5fu-dds-dimensions.webp")
+    assert crops[1].sort_order == 8
+
+    safu_crops = diagrams_from_html_assets(tmp_path, series_nm=10, edition="on_off", safu=True)
+    assert safu_crops[0].source_url.endswith("sa10fu-ds-wiring.webp")
+
+
+@pytest.mark.django_db
+def test_apply_manual_diagrams_prefers_html_assets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the HTML pack exists, gallery diagrams come from its PNGs, not PDF crops."""
+    from catalog.etl import manual_diagrams
+    from catalog.models import SKU, Category, Product
+
+    pack = tmp_path / "DA" / "assets" / "da5fu-d-ds"
+    pack.mkdir(parents=True)
+    # Small real PNGs so convert_bytes_to_webp has valid input.
+    from PIL import Image as PILImage
+
+    for name in ("wiring", "dimensions"):
+        buf = io.BytesIO()
+        PILImage.new("RGB", (20, 10), "white").save(buf, format="PNG")
+        (pack / f"{name}.png").write_bytes(buf.getvalue())
+
+    cat = Category.objects.create(name="FU", slug="fu-assets")
+    product = Product.objects.create(name="DA5FU", slug="da5fu-assets", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="da5fu24-d",
+        slug="da5fu24-d-assets",
+        sku_code="da5fu24-d",
+        is_published=True,
+    )
+
+    def _no_pdf(**kwargs: object) -> None:
+        raise AssertionError("PDF fallback must not run when the HTML pack exists")
+
+    monkeypatch.setattr(manual_diagrams, "find_manual_pdf", _no_pdf)
+    summary = manual_diagrams.apply_manual_diagrams(manuals_ru_root=tmp_path)
+
+    assert summary["created"] == 2
+    dims = sku.images.get(source_url__icontains="da5fu-dds-dimensions")
+    assert dims.is_published
+    assert dims.image.name.endswith(".webp")

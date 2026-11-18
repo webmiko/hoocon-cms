@@ -766,8 +766,8 @@ class AnalogMap(models.Model):
         ordering = ("brand", "foreign_code")
         constraints = [
             models.UniqueConstraint(
-                fields=("brand", "foreign_code_key"),
-                name="catalog_analogmap_brand_code_uniq",
+                fields=("brand", "foreign_code_key", "sku"),
+                name="catalog_analogmap_brand_code_sku_uniq",
             ),
         ]
 

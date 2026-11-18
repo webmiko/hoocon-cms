@@ -260,6 +260,18 @@ Belimo fire (каталог): BLF ≈ 6/4 Нм (мотор/пружина).
 {_FOOTNOTE}
 """.strip(),
     ),
+    10: normalize_tech_copy(
+        f"""
+Список аналогов электропривода Hoocon HVD-10F с такими же или близкими характеристиками
+(пружинный возврат, открыто/закрыто, ~10 Нм, 2×SPDT, IP54, вал 12×12 мм)
+
+Belimo fire (каталог): BFN ≈ 9/7, BF ≈ 18/12 Нм (мотор/пружина) — полосы меньше и больше HVD-10F.
+
+Крупные марки: Belimo, Siemens, Honeywell, Gruner.
+
+{_FOOTNOTE}
+""".strip(),
+    ),
 }
 
 # (voltage, aux suffix on article)
