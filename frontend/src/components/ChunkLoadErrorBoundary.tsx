@@ -1,9 +1,8 @@
 import { Component, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-import {
-  isChunkLoadError,
-  recoverFromStaleChunk,
-} from "../utils/chunkLoadRecovery";
+import { isChunkLoadError, recoverFromStaleChunk } from "../utils/chunkLoadRecovery";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import styles from "./ChunkLoadErrorBoundary.module.css";
 
 type Props = {
@@ -23,15 +22,28 @@ function ReloadPrompt({ message }: { message: string }) {
     <div className={styles.root} role="alert">
       <p>{message}</p>
       <p>
-        <button
-          type="button"
-          className={styles.button}
-          onClick={() => window.location.reload()}
-        >
+        <button type="button" className={styles.button} onClick={() => window.location.reload()}>
           Обновить
         </button>
       </p>
     </div>
+  );
+}
+
+/**
+ * While the server article is the visible page, do not replace it with the
+ * crash sentence — that sentence was becoming the Yandex snippet.
+ */
+function CrawlReloadButton() {
+  const article = document.getElementById("seo-crawl");
+  if (!article) return null;
+  return createPortal(
+    <p>
+      <button type="button" className={styles.button} onClick={() => window.location.reload()}>
+        Обновить страницу
+      </button>
+    </p>,
+    article,
   );
 }
 
@@ -61,16 +73,15 @@ export class ChunkLoadErrorBoundary extends Component<Props, State> {
     if (!error) {
       return this.props.children;
     }
+    if (serverCrawlIsShowing()) {
+      return <CrawlReloadButton />;
+    }
     if (isChunkLoadError(error) && this.props.fallback != null) {
       return this.props.fallback;
     }
     if (isChunkLoadError(error)) {
-      return (
-        <ReloadPrompt message="Не удалось загрузить страницу после обновления сайта." />
-      );
+      return <ReloadPrompt message="Не удалось загрузить страницу после обновления сайта." />;
     }
-    return (
-      <ReloadPrompt message="Произошла ошибка. Попробуйте обновить страницу." />
-    );
+    return <ReloadPrompt message="Произошла ошибка. Попробуйте обновить страницу." />;
   }
 }

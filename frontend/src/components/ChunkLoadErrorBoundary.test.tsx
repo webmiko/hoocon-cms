@@ -54,6 +54,31 @@ describe("ChunkLoadErrorBoundary", () => {
     expect(host.textContent).toBe("Контакты");
   });
 
+  it("does not put the crash sentence in the page while the server article is up", () => {
+    // That sentence was the Yandex snippet: the renderer executes JS, the
+    // boundary replaces the route, and the server description is gone.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const article = document.createElement("article");
+    article.id = "seo-crawl";
+    article.innerHTML =
+      "<h1>Электроприводы для вентиляции</h1><p>Подбор модели за минуту, каталог и паспорта PDF.</p>";
+    document.body.appendChild(article);
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root?.render(
+        <ChunkLoadErrorBoundary>
+          <Boom />
+        </ChunkLoadErrorBoundary>,
+      ),
+    );
+    expect(host.textContent).not.toContain("Произошла ошибка");
+    expect(article.textContent).toContain("Подбор модели за минуту");
+    expect(article.textContent).toContain("Обновить страницу");
+    article.remove();
+  });
+
   it("wraps the route outlet inside the shell, keyed by pathname", () => {
     expect(src("components/Layout.tsx")).toMatch(
       /<ChunkLoadErrorBoundary resetKey=\{location\.pathname\}>\s*<RouteSlideOutlet \/>/,

@@ -35,6 +35,7 @@ import {
   skuSeoTitlePartial,
 } from "../utils/seoMeta";
 import { mediaPurposeFromCategory } from "../utils/mediaPurpose";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import { photoScalePlanFromHighlights } from "../utils/productPhotoScale";
 import { useNormalizedPhotoScale } from "../hooks/useNormalizedPhotoScale";
 import {
@@ -301,6 +302,7 @@ export function SkuDetailPage() {
   );
 
   if (loading && !sku) {
+    if (serverCrawlIsShowing()) return null;
     return <p className={styles.status}>Загрузка…</p>;
   }
 

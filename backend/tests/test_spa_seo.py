@@ -55,12 +55,36 @@ def test_spa_home_preloads_lcp_hero(client) -> None:
     assert 'getElementById("hoocon-lcp-boot")' not in body
 
 
-def test_spa_crawl_block_masked_in_critical_css() -> None:
-    """Crawl copy stays in HTML for bots but must not flash as visible text before JS."""
+def test_spa_crawl_block_is_visible_until_the_shell_paints() -> None:
+    """Yandex indexes visible text.
+
+    The article is in normal flow. #root is clipped only while the article precedes it.
+    """
     shell = (_REPO_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     assert 'id="hoocon-critical"' in shell
-    assert "#seo-crawl" in shell
-    assert "clip-path: inset(50%)" in shell
+    crawl_css = shell.split("#seo-crawl {", 1)[1].split("}", 1)[0]
+    assert "clip-path" not in crawl_css
+    assert "position: absolute" not in crawl_css
+    assert "width: 1px" not in crawl_css
+    sibling = shell.split("#seo-crawl ~ #root {", 1)[1].split("}", 1)[0]
+    assert "clip-path: inset(50%)" in sibling
+    assert "min-height: 0" in sibling
+
+
+@pytest.mark.django_db
+def test_crawl_article_sits_outside_the_react_root(client) -> None:
+    """createRoot wipes #root.
+
+    The snippet text has to be a previous sibling, or Yandex snapshots the shell.
+    """
+    body = client.get("/").content.decode()
+    assert body.index('id="seo-crawl"') < body.index('<div id="root"')
+    root_open = body.split('<div id="root"', 1)[1].split(">", 1)[0]
+    assert "inert" in root_open
+    assert 'aria-hidden="true"' in root_open
+    article = body.split('id="seo-crawl"', 1)[1].split("</article>", 1)[0]
+    assert "<h1>" in article
+    assert "hidden" not in article
 
 
 @pytest.mark.django_db

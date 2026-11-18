@@ -9,6 +9,7 @@ import { LoadMore } from "../components/LoadMore";
 import { usePagedList } from "../hooks/usePagedList";
 import { generatedCoverCaption } from "../utils/generatedCoverCaption";
 import { buildBreadcrumbJsonLd } from "../utils/jsonLd";
+import { serverCrawlIsShowing } from "../utils/serverCrawl";
 import styles from "./ArticlesListPage.module.css";
 
 /**
@@ -65,7 +66,9 @@ export function ArticlesListPage() {
         </p>
       </header>
 
-      {loading && <p className={styles.status}>Загрузка…</p>}
+      {loading && !serverCrawlIsShowing() && (
+        <p className={styles.status}>Загрузка…</p>
+      )}
       {error && (
         <p className={styles.status} role="alert">
           Не удалось загрузить статьи.
