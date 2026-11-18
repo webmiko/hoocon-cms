@@ -1280,3 +1280,118 @@ def test_invented_q230_article_is_not_shown_or_stored() -> None:
     call_command("fill_belimo_analogs", stdout=StringIO())
     sku.refresh_from_db()
     assert sku.analog_belimo_code == ""
+
+
+@pytest.mark.django_db
+def test_analogmap_confirmed_pair_drives_card_and_codes() -> None:
+    """AnalogMap (brand=Belimo, active) is the confirmed-pair store:
+    it feeds belimo_article_for_sku, belimo_codes_for_sku and the
+    verified block inside the card analogs tab."""
+    from catalog.etl.belimo_analogs import (
+        analogs_text_for_card,
+        belimo_article_for_sku,
+        belimo_codes_for_sku,
+    )
+    from catalog.models import AnalogMap
+
+    cat = Category.objects.create(name="Air", slug="air-am")
+    product = Product.objects.create(name="DA8MU", slug="da8mu-am", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA8MU24-DS",
+        slug="da8mu24-ds-am",
+        sku_code="DA8MU24-DS",
+        is_published=True,
+        analogs_text="Список аналогов электропривода Hoocon DA8MU\n\nКрупные марки: Belimo, Siemens.\n",
+    )
+    assert belimo_article_for_sku(sku) is None
+    assert belimo_codes_for_sku(sku) == []
+    assert "Belimo NM24A" not in analogs_text_for_card(sku)
+
+    AnalogMap.objects.create(
+        brand="Belimo",
+        foreign_code="NM24A-S2",
+        sku=sku,
+        torque_nm=10,
+        voltage="AC/DC 24 В",
+        control="откр/закр",
+        note="2×SPDT",
+        is_active=True,
+    )
+    assert belimo_article_for_sku(sku) == "NM24A-S2"
+    assert belimo_codes_for_sku(sku) == ["NM24A-S2"]
+    card = analogs_text_for_card(sku)
+    assert "Подтверждённые замены" in card
+    assert "– Belimo NM24A-S2" in card
+    assert "Siemens" in card  # методичка-футер остаётся
+
+    # inactive row — скрывается
+    AnalogMap.objects.filter(sku=sku).update(is_active=False)
+    assert belimo_codes_for_sku(sku) == []
+    assert "NM24A-S2" not in analogs_text_for_card(sku)
+
+
+@pytest.mark.django_db
+def test_analogmap_non_belimo_brand_is_ignored() -> None:
+    """Siemens and other brands in AnalogMap do not leak into the Belimo slot."""
+    from catalog.etl.belimo_analogs import belimo_codes_for_sku
+    from catalog.models import AnalogMap
+
+    cat = Category.objects.create(name="Air", slug="air-am2")
+    product = Product.objects.create(name="HVA", slug="hva-am2", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="HVA24-10",
+        slug="hva24-10-am2",
+        sku_code="HVA24-10",
+        is_published=True,
+    )
+    AnalogMap.objects.create(
+        brand="Siemens",
+        foreign_code="GLB161.1E",
+        sku=sku,
+        is_active=True,
+    )
+    assert belimo_codes_for_sku(sku) == []
+
+
+@pytest.mark.django_db
+def test_verified_pairs_migration_seeds_only_confirmed_pairs() -> None:
+    """Data migration 0024 fills AnalogMap from the curated table.
+
+    A SKU present in the table gets the exact Belimo article; a SKU with no
+    confirmed counterpart (fast >16 Nm, 230 V modulating, UQ) stays unpaired.
+    """
+    import importlib
+
+    migration = importlib.import_module("catalog.migrations.0024_analogmap_belimo_verified")
+    cat = Category.objects.create(name="Air", slug="air-mig")
+    product = Product.objects.create(name="DA", slug="da-mig", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA8MU24-DS",
+        slug="da8mu24-ds-mig",
+        sku_code="DA8MU24-DS",
+        is_published=True,
+    )
+    unpaired = SKU.objects.create(
+        product=product,
+        name="DA20MQU24-D",
+        slug="da20mqu24-d-mig",
+        sku_code="DA20MQU24-D",
+        is_published=True,
+    )
+
+    migration.forwards(__import__("django.apps", fromlist=["apps"]).apps, None)
+
+    from catalog.etl.belimo_analogs import belimo_article_for_sku
+    from catalog.models import AnalogMap
+
+    row = AnalogMap.objects.get(sku=sku, brand="Belimo")
+    assert row.foreign_code == "NM24A-S2"
+    assert row.torque_nm == 10
+    assert row.is_active
+    assert "2×SPDT" in row.note
+    assert belimo_article_for_sku(sku) == "NM24A-S2"
+    assert not AnalogMap.objects.filter(sku=unpaired).exists()
+    assert belimo_article_for_sku(unpaired) is None

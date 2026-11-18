@@ -257,7 +257,7 @@ class SKUViewSet(
         qs = annotate_moment_nm(
             SKU.objects.filter(is_published=True)
             .select_related("product", "product__category")
-            .prefetch_related(published_images, published_attrs)
+            .prefetch_related(published_images, published_attrs, "analog_maps")
             .annotate(
                 category_spec_order=spec_order_case(
                     slug_field="product__category__slug",
