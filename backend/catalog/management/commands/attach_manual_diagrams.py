@@ -69,7 +69,7 @@ class Command(BaseCommand):
         if series in {"all", "damu"}:
             jobs.append(("DAMU", apply_damu_manual_diagrams(dry_run=dry_run)))
         if series in {"all", "samu"}:
-            jobs.append(("SAMU", apply_samu_manual_diagrams(dry_run=dry_run)))
+            jobs.append(("SAMU", apply_samu_manual_diagrams(dry_run=dry_run, manuals_ru_root=manuals_ru_root)))
         if series in {"all", "hvdf"}:
             jobs.append(("HVDF", apply_hvdf_manual_diagrams(dry_run=dry_run)))
         if series in {"all", "hva"}:
@@ -85,7 +85,8 @@ class Command(BaseCommand):
             extra = ""
             if "unpublished_combined" in summary:
                 extra = (
-                    f" unpub_combined={summary['unpublished_combined']} unpub_static={summary['unpublished_static']}"
+                    f" unpub_combined={summary['unpublished_combined']}"
+                    f" unpub_static={summary.get('unpublished_static', 0)}"
                 )
             if "unpublished_legacy" in summary:
                 extra += f" unpub_legacy={summary['unpublished_legacy']}"
