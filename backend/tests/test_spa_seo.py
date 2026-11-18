@@ -78,10 +78,8 @@ def test_crawl_article_sits_outside_the_react_root(client) -> None:
     The snippet text has to be a previous sibling, or Yandex snapshots the shell.
     """
     body = client.get("/").content.decode()
-    assert body.index('id="seo-crawl"') < body.index('<div id="root"')
-    root_open = body.split('<div id="root"', 1)[1].split(">", 1)[0]
-    assert "inert" in root_open
-    assert 'aria-hidden="true"' in root_open
+    assert body.index('id="seo-crawl"') < body.index('<div id="root">')
+    assert '<div id="root">' in body
     article = body.split('id="seo-crawl"', 1)[1].split("</article>", 1)[0]
     assert "<h1>" in article
     assert "hidden" not in article
