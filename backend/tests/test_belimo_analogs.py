@@ -1395,3 +1395,44 @@ def test_verified_pairs_migration_seeds_only_confirmed_pairs() -> None:
     assert belimo_article_for_sku(sku) == "NM24A-S2"
     assert not AnalogMap.objects.filter(sku=unpaired).exists()
     assert belimo_article_for_sku(unpaired) is None
+
+
+@pytest.mark.django_db
+def test_fu_pairs_migration_matches_lowercase_sku_codes() -> None:
+    """Data migration 0025 seeds FU pairs; FU sku_codes are lowercase in DB.
+
+    Regression: an exact-match lookup would silently skip every FU row.
+    """
+    import importlib
+
+    migration = importlib.import_module("catalog.migrations.0025_analogmap_belimo_fu")
+    cat = Category.objects.create(name="Spring", slug="spring-mig")
+    product = Product.objects.create(name="DAFU", slug="dafu-mig", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="da10fu24-ds",
+        slug="da10fu24-ds-mig",
+        sku_code="da10fu24-ds",
+        is_published=True,
+    )
+    thermal = SKU.objects.create(
+        product=product,
+        name="sa10fu24-dst",
+        slug="sa10fu24-dst-mig",
+        sku_code="sa10fu24-dst",
+        is_published=True,
+    )
+
+    migration.forwards(__import__("django.apps", fromlist=["apps"]).apps, None)
+
+    from catalog.etl.belimo_analogs import belimo_article_for_sku
+    from catalog.models import AnalogMap
+
+    row = AnalogMap.objects.get(sku=sku, brand="Belimo")
+    assert row.foreign_code == "NF24A-S2"
+    assert row.spring_return
+    assert belimo_article_for_sku(sku) == "NF24A-S2"
+
+    thermal_row = AnalogMap.objects.get(sku=thermal, brand="Belimo")
+    assert thermal_row.foreign_code == "BF24"
+    assert "BAT72" in thermal_row.note
