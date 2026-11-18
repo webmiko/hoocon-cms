@@ -125,3 +125,20 @@ def test_sa15_power_and_shaft_match_ru_manual() -> None:
     assert by_ds["power-consumption"] == "5 Вт (работа) / 1 Вт (удержание)"
     assert by_ds["shaft-length"] == "≥ 90"
     assert by_dst["temp-sensor"] == TEMP_SENSOR_NONE
+
+
+def test_samu_sku_description_follows_damu_structure() -> None:
+    """Regression: MU smoke cards shipped a bare spec list; DA..MU structure is canon."""
+    from catalog.etl.series_copy_samu import TORQUE_SPECS, _sku_description
+    from catalog.etl.sku_variant import parse_sku_variant
+
+    text = _sku_description(parse_sku_variant("SA15MU24-DS"), TORQUE_SPECS[15])
+    assert "Особенности исполнения:" in text
+    assert "Сфера применения:" in text
+    assert "Конкурентные преимущества перед аналогами:" in text
+    assert text.index("Особенности исполнения:") < text.index("Сфера применения:")
+    assert text.index("Сфера применения:") < text.index("Конкурентные преимущества перед аналогами:")
+    assert "– Без возвратной пружины" in text
+    # Smoke extraction damper — must not claim plain HVAC applications.
+    assert "дымоудаления" in text
+    assert "Системы общеобменной вентиляции" not in text

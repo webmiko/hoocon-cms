@@ -117,3 +117,21 @@ def test_apply_safu_enrichment_writes_attrs() -> None:
     assert by_ds["manual-override"] == MANUAL_OVERRIDE_BUTTON_SELF_RESET
     assert by_ds["moment"] == "3 Нм"
     assert by_ds["ip-rating"] == "IP54"
+
+
+def test_safu_sku_description_follows_damu_structure() -> None:
+    """Regression: FU cards shipped a bare spec list; DA..MU structure is canon."""
+    from catalog.etl.series_copy_safu import TORQUE_SPECS, _sku_description
+    from catalog.etl.sku_variant import parse_sku_variant
+
+    text = _sku_description(parse_sku_variant("SA10FU24-DST"), 10, TORQUE_SPECS[10])
+    assert "Особенности исполнения:" in text
+    assert "Сфера применения:" in text
+    assert "Конкурентные преимущества перед аналогами:" in text
+    assert text.index("Особенности исполнения:") < text.index("Сфера применения:")
+    assert text.index("Сфера применения:") < text.index("Конкурентные преимущества перед аналогами:")
+    assert "– Пружинный возврат при отключении питания." in text
+    assert "SAF72" in text
+    # Fire/smoke damper — must not claim plain HVAC applications.
+    assert "Противопожарные клапаны" in text
+    assert "Системы общеобменной вентиляции" not in text

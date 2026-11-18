@@ -20,6 +20,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
+from catalog.etl.series_copy_damu import _APPLICATION_SECTION, _COMPETITIVE_SECTION
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import (
     CONTROL_MODULATING,
@@ -267,7 +268,11 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 – Открыто/закрыто: суффиксы -D / -DS.
 – Пропорциональное (модулирующее) 0(2)…10 В=: суффиксы -A / -AS (24 В).
 – Вспомогательный переключатель: 2 SPDT (суффиксы -DS / -AS).
-""".strip(),
+""".strip()
+    + "\n\n"
+    + _APPLICATION_SECTION
+    + "\n\n"
+    + _COMPETITIVE_SECTION,
 )
 
 # Install guide on Product.instructions — numbers must match SHARED_ATTRS / TORQUE_SPECS.
@@ -530,27 +535,39 @@ def _sku_description(variant: SkuVariant, torque_nm: int, spec: _TorqueSpec) -> 
     lines = [
         (
             "Электропривод воздушной заслонки с пружинным возвратом. "
-            f"Крутящий момент {spec['moment']}, площадь заслонки {spec['damper-area']}."
+            f"Крутящий момент {spec['moment']}, площадь заслонки {spec['damper-area']}. "
+            "Используется для управления воздушными регулирующими заслонками "
+            "в системах ОВК (отопления, вентиляции и кондиционирования)."
         ),
-        "Ручное управление отсутствует / не предусмотрено.",
         "",
+        "Особенности исполнения:",
+        "– Пружинный возврат при отключении питания.",
+        "– Ручное управление: отсутствует / не предусмотрено.",
     ]
     if variant.control == "modulating":
         lines.append(
-            "Управление: пропорциональное (модулирующее), сигнал Y 0(2)…10 В= (0(4)…20 мА — спецзаказ).",
+            "– Управление: пропорциональное (модулирующее), сигнал Y 0(2)…10 В= (0(4)…20 мА — спецзаказ).",
         )
     elif variant.control == "on_off":
-        lines.append("Управление: открыто/закрыто.")
+        lines.append("– Управление: открыто/закрыто.")
     if variant.aux_switch is True:
         from catalog.facets.aux import aux_spdt_count_from_sku
 
         count = aux_spdt_count_from_sku(variant.code) or 1
         edition = "AS" if (variant.code or "").casefold().endswith("-as") else "DS"
-        lines.append(f"Вспомогательный переключатель: {count} SPDT (исполнение {edition}).")
+        lines.append(f"– Вспомогательный переключатель: {count} SPDT (исполнение {edition}).")
     if variant.voltage == "24":
-        lines.append("Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
     elif variant.voltage == "230":
-        lines.append("Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+    lines.extend(
+        [
+            "",
+            _APPLICATION_SECTION,
+            "",
+            _COMPETITIVE_SECTION,
+        ],
+    )
     return normalize_tech_copy("\n".join(lines))
 
 

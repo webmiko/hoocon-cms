@@ -306,3 +306,19 @@ def test_dafu_all_aux_editions_are_spdt_2() -> None:
         aux = AttributeValue.objects.get(sku=sku, attribute__slug="aux-switch").value
         assert aux == AUX_SWITCH_SPDT_2, code
         assert "2 SPDT" in (sku.description or ""), code
+
+
+def test_dafu_sku_description_follows_damu_structure() -> None:
+    """Regression: FU cards shipped a bare spec list; DA..MU structure is canon."""
+    from catalog.etl.series_copy_dafu import _sku_description, dafu_spec
+    from catalog.etl.sku_variant import parse_sku_variant
+
+    text = _sku_description(parse_sku_variant("DA10FU24-DS"), 10, dafu_spec(10, "D"))
+    assert "Особенности исполнения:" in text
+    assert "Сфера применения:" in text
+    assert "Конкурентные преимущества перед аналогами:" in text
+    assert text.index("Особенности исполнения:") < text.index("Сфера применения:")
+    assert text.index("Сфера применения:") < text.index("Конкурентные преимущества перед аналогами:")
+    assert "– Пружинный возврат при отключении питания." in text
+    assert "– Вспомогательный переключатель: 2 SPDT (исполнение DS)." in text
+    assert "Системы общеобменной вентиляции" in text

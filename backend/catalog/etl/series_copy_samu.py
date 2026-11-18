@@ -7,7 +7,7 @@ SA7 shares the SA..MU manuals family; catalog SKUs include 7/10/15/30 Нм.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Final
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -18,6 +18,7 @@ from catalog.etl.attr_groups import (
     ATTR_GROUP_SIZE,
 )
 from catalog.etl.attr_write import cached_attributes, clear_etl_attributes, set_sku_attribute, write_copy
+from catalog.etl.series_copy_damu import _COMPETITIVE_SECTION
 from catalog.etl.sku_variant import SkuVariant, parse_sku_variant
 from catalog.etl.tech_copy import (
     MANUAL_SAFETY_ATTENTION_LINES,
@@ -153,6 +154,18 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     },
 }
 
+# Дымоудаление — своя ниша, не бытовая вентиляция.
+_APPLICATION_SECTION: Final[str] = "\n".join(
+    [
+        "Сфера применения:",
+        "– Дымовые клапаны систем дымоудаления",
+        "– Противодымная вентиляция зданий",
+        "– Клапаны подпора воздуха при пожаре",
+        "– Противодымная защита лестничных клеток и шахт лифтов",
+        "– Промышленные системы дымоудаления",
+    ],
+)
+
 SERIES_DESCRIPTION = normalize_tech_copy(
     """
 Электропривод дымового клапана без возвратной пружины.
@@ -163,7 +176,11 @@ SERIES_DESCRIPTION = normalize_tech_copy(
 – Вспомогательные переключатели: 2 SPDT (исполнение -DS).
 – Степень защиты корпуса: IP54.
 – Температура окружающей среды: –30…+50 °C.
-""".strip(),
+""".strip()
+    + "\n\n"
+    + _APPLICATION_SECTION
+    + "\n\n"
+    + _COMPETITIVE_SECTION,
 )
 
 SERIES_INSTRUCTIONS = normalize_tech_copy(
@@ -282,17 +299,30 @@ def _sku_description(variant: SkuVariant, row: dict[str, str]) -> str:
     lines = [
         (
             "Электропривод дымового клапана без возвратной пружины. "
-            f"Крутящий момент {row['moment']}, площадь заслонки {format_damper_area(row['damper-area'])}."
+            f"Крутящий момент {row['moment']}, площадь заслонки {format_damper_area(row['damper-area'])}. "
+            "Используется для управления дымовыми клапанами "
+            "в системах дымоудаления и противодымной вентиляции."
         ),
-        f"Время поворота: {row['running-time']}.",
-        "Управление: открыто/закрыто, 2-/3-позиционное.",
-        "Вспомогательные переключатели: 2 SPDT.",
-        "Термодатчик: без датчика (исполнение -DS).",
+        "",
+        "Особенности исполнения:",
+        "– Без возвратной пружины: положение заслонки сохраняется при отключении питания.",
+        f"– Время поворота: {row['running-time']}.",
+        "– Управление: открыто/закрыто, 2-/3-позиционное.",
+        "– Вспомогательные переключатели: 2 SPDT.",
+        "– Термодатчик: без датчика (исполнение -DS).",
     ]
     if variant.voltage == "24":
-        lines.append("Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC/DC 24 В, 50/60 Гц.")
     elif variant.voltage == "230":
-        lines.append("Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+        lines.append("– Номинальное напряжение: AC 100…240 В, 50/60 Гц.")
+    lines.extend(
+        [
+            "",
+            _APPLICATION_SECTION,
+            "",
+            _COMPETITIVE_SECTION,
+        ],
+    )
     return normalize_tech_copy("\n".join(lines))
 
 
