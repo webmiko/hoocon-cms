@@ -15,6 +15,7 @@ from catalog.etl.belimo_analogs import (
     belimo_code_is_thermal,
     belimo_code_matches_control,
     belimo_codes_for_sku,
+    compose_belimo_article,
     detect_purpose,
     extract_belimo_codes_from_text,
     infer_belimo_codes,
@@ -114,7 +115,7 @@ def test_extract_filters_by_sku_voltage() -> None:
 
 @pytest.mark.django_db
 def test_belimo_codes_filters_aux_suffix_from_shared_block() -> None:
-    """Shared HVD analogs block keeps -S only for S-editions."""
+    """HVD 20 Нм is SM. The shared card text is not the source of the article."""
     cat = Category.objects.create(name="Air", slug="air-aux-analog")
     product = Product.objects.create(name="HVD20", slug="hvd20-aux", category=cat)
     text = """
@@ -139,8 +140,8 @@ def test_belimo_codes_filters_aux_suffix_from_shared_block() -> None:
         is_published=True,
         analogs_text=text,
     )
-    assert belimo_codes_for_sku(bare) == ["NM24A-SR-20"]
-    assert belimo_codes_for_sku(with_s) == ["NM24A-SR-20-S"]
+    assert belimo_codes_for_sku(bare) == []
+    assert belimo_codes_for_sku(with_s) == []
 
 
 @pytest.mark.django_db
@@ -172,10 +173,10 @@ def test_belimo_codes_strips_lone_s_for_non_aux_damu_d() -> None:
         is_published=True,
         analog_belimo_code="LM24A-S",
     )
-    assert belimo_codes_for_sku(bare) == ["LM24A"]
-    assert belimo_codes_for_sku(with_s) == ["LM24A-S"]
-    assert primary_belimo_code_for_sku(bare) == "LM24A"
-    assert primary_belimo_code_for_sku(with_s) == "LM24A-S"
+    assert belimo_codes_for_sku(bare) == []
+    assert belimo_codes_for_sku(with_s) == []
+    assert primary_belimo_code_for_sku(bare) is None
+    assert primary_belimo_code_for_sku(with_s) is None
 
 
 def test_infer_air_no_spring_by_moment_voltage_aux_control() -> None:
@@ -287,14 +288,26 @@ def test_infer_smoke_control_not_cm() -> None:
             )
             == []
         )
+    # Smoke BEN/BEE/BE have no thermoelectric -T. BEE24-ST is a connector plug.
+    assert (
+        infer_belimo_codes(
+            purpose="smoke",
+            moment_nm=15.0,
+            voltage="230",
+            control="on_off",
+            aux_spdt=2,
+            thermal=True,
+        )
+        == []
+    )
     assert infer_belimo_codes(
         purpose="smoke",
         moment_nm=15.0,
         voltage="230",
         control="on_off",
         aux_spdt=2,
-        thermal=True,
-    ) == ["BEN230-T"]
+        thermal=False,
+    ) == ["BEN230"]
     assert infer_belimo_codes(
         purpose="smoke",
         moment_nm=30.0,
@@ -316,18 +329,28 @@ def test_detect_purpose_hvd_is_fire_spring() -> None:
     assert detect_purpose(category_slug=slug, sku_code="HVD24-40") == "air_no_spring"
     assert detect_purpose(category_slug=slug, sku_code="HVD24S-20") == "air_no_spring"
     assert detect_purpose(category_slug=slug, sku_code="HVD24-10Q") == "fast"
-    assert detect_purpose(category_slug=slug, sku_code="HVD230S-40QX") == "fast"
+    assert detect_purpose(category_slug=slug, sku_code="HVD230S-40QX") == "electronic_failsafe"
 
 
 def test_infer_fast_actuator() -> None:
-    """Accelerated DAMQU / HVA-Q → L/N/S/GMQ by torque band, with control and aux suffixes."""
+    """Q-series is AC/DC 24 V, base or -SR. No 230 V and no factory aux -S (S1A/S2A)."""
     assert infer_belimo_codes(
         purpose="fast",
         moment_nm=8.0,
         voltage="24",
         control="modulating",
-        aux_spdt=2,
-    ) == ["NMQ24A-SR-S"]
+        aux_spdt=0,
+    ) == ["NMQ24A-SR"]
+    assert (
+        infer_belimo_codes(
+            purpose="fast",
+            moment_nm=8.0,
+            voltage="24",
+            control="modulating",
+            aux_spdt=2,
+        )
+        == []
+    )
     assert infer_belimo_codes(
         purpose="fast",
         moment_nm=16.0,
@@ -335,28 +358,31 @@ def test_infer_fast_actuator() -> None:
         control="modulating",
         aux_spdt=0,
     ) == ["SMQ24A-SR"]
-    assert infer_belimo_codes(
-        purpose="fast",
-        moment_nm=24.0,
-        voltage="230",
-        control="on_off",
-        aux_spdt=1,
-    ) == ["SMQ230A-S"]
-    assert infer_belimo_codes(
-        purpose="fast",
-        moment_nm=5.0,
-        voltage="24",
-        control="modulating",
-        aux_spdt=1,
-    ) == ["LMQ24A-SR-S"]
+    assert (
+        infer_belimo_codes(
+            purpose="fast",
+            moment_nm=24.0,
+            voltage="230",
+            control="on_off",
+            aux_spdt=1,
+        )
+        == []
+    )
+    assert (
+        infer_belimo_codes(
+            purpose="fast",
+            moment_nm=5.0,
+            voltage="24",
+            control="modulating",
+            aux_spdt=1,
+        )
+        == []
+    )
 
 
 @pytest.mark.django_db
 def test_belimo_codes_for_sku_prefers_card_text() -> None:
-    """SKU with analogs_text uses Belimo lines; field is secondary.
-
-    ``LF24-RS`` has no auxiliary switches, so it is not a direct analog of a DS edition.
-    """
+    """Card prose is not a confirmed pair, so it does not become the article."""
     cat = Category.objects.create(name="Air", slug="air-analog-test")
     product = Product.objects.create(name="DA5", slug="da5-analog-test", category=cat)
     sku = SKU.objects.create(
@@ -368,7 +394,7 @@ def test_belimo_codes_for_sku_prefers_card_text() -> None:
         analog_belimo_code="WRONG24",
         analogs_text="Аналог DA5FU24-DS:\n– Belimo LF24-S\n– Belimo LF24-RS\n",
     )
-    assert belimo_codes_for_sku(sku) == ["LF24-S"]
+    assert belimo_codes_for_sku(sku) == []
 
 
 def test_belimo_code_control_sr_token() -> None:
@@ -444,9 +470,9 @@ def test_shared_ds_as_block_splits_belimo_by_control() -> None:
     AttributeValue.objects.create(sku=modulating, attribute=control, value="Пропорциональное")
     AttributeValue.objects.create(sku=modulating, attribute=aux, value="Нет")
 
-    assert belimo_codes_for_sku(on_off) == ["CM230-L/R"]
-    assert belimo_codes_for_sku(modulating) == ["TMC230A-SR"]
-    assert primary_belimo_code_for_sku(modulating) == "TMC230A-SR"
+    assert belimo_codes_for_sku(on_off) == []
+    assert belimo_codes_for_sku(modulating) == []
+    assert primary_belimo_code_for_sku(modulating) is None
 
     modulating_text = analogs_plain_text_for_sku(modulating)
     assert "CM230-L/R" not in modulating_text
@@ -455,17 +481,16 @@ def test_shared_ds_as_block_splits_belimo_by_control() -> None:
 
 
 @pytest.mark.django_db
-def test_damu_2nm_split_analogs_by_control() -> None:
-    """Split DA2MU card: D keeps TMC/CM, DS only TMC…-S, A keeps TMC…-SR, AS has no Belimo.
-
-    CM has no auxiliary-switch edition and TMC-SR has no factory ``-S``, so the
-    switch editions list only direct Belimo analogs.
-    """
+def test_damu_2nm_analogs_have_no_foreign_article_bullets() -> None:
+    """DA2MU data file: guidance only — no clone bullets, no edition blocks."""
     from pathlib import Path
 
     text = (Path(__file__).resolve().parents[1] / "catalog" / "etl" / "data" / "damu_2nm_analogs.txt").read_text(
         encoding="utf-8"
     )
+    assert "– " not in text
+    for banned in ("Dastech", "Lufberg", "Sputnik", "BVM", "GSD", "Аналоги для "):
+        assert banned not in text
     cat = Category.objects.create(
         name="Air no spring",
         slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
@@ -476,43 +501,22 @@ def test_damu_2nm_split_analogs_by_control() -> None:
         category=cat,
         analogs_text=text,
     )
-    skus = {
-        suffix: SKU.objects.create(
-            product=product,
-            name=f"DA2MU230-{suffix}",
-            slug=f"da2mu230-{suffix.lower()}-split",
-            sku_code=f"DA2MU230-{suffix}",
-            is_published=True,
-            analogs_text=text,
-        )
-        for suffix in ("D", "DS", "A", "AS")
-    }
-    d_text = analogs_plain_text_for_sku(skus["D"])
-    ds_text = analogs_plain_text_for_sku(skus["DS"])
-    a_text = analogs_plain_text_for_sku(skus["A"])
-    as_text = analogs_plain_text_for_sku(skus["AS"])
-    assert "CM230-L/R" in d_text
-    assert "CM230-L/R" not in ds_text
-    assert extract_belimo_codes_from_text(ds_text) == ["TMC230A-S"]
-    assert "LM230A-SR" not in ds_text
-    assert "Dastech" in ds_text
-    assert "Nanotek" not in ds_text
-    assert "Gruner" not in ds_text
-    assert extract_belimo_codes_from_text(a_text) == ["TMC230A-SR"]
-    assert extract_belimo_codes_from_text(as_text) == []
-    assert "Dastech" in as_text
-    assert "Lufberg" in as_text
-    assert belimo_codes_for_sku(skus["D"]) == ["TMC230A", "CM230-L/R"]
-    assert belimo_codes_for_sku(skus["DS"]) == ["TMC230A-S"]
-    assert belimo_codes_for_sku(skus["A"]) == ["TMC230A-SR"]
-    assert belimo_codes_for_sku(skus["AS"]) == []
-    assert primary_belimo_code_for_sku(skus["DS"]) == "TMC230A-S"
-    assert primary_belimo_code_for_sku(skus["AS"]) is None
+    sku = SKU.objects.create(
+        product=product,
+        name="DA2MU230-DS",
+        slug="da2mu230-ds-split",
+        sku_code="DA2MU230-DS",
+        is_published=True,
+        analogs_text=text,
+    )
+    assert analogs_plain_text_for_sku(sku) == text.strip()
+    assert belimo_codes_for_sku(sku) == []
+    assert primary_belimo_code_for_sku(sku) is None
 
 
 @pytest.mark.django_db
 def test_belimo_codes_for_sku_infers_when_text_empty() -> None:
-    """Missing analogs_text → infer from EAV + category."""
+    """Empty prose does not license a torque-band article."""
     cat = Category.objects.create(
         name="Air no spring",
         slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
@@ -533,12 +537,12 @@ def test_belimo_codes_for_sku_infers_when_text_empty() -> None:
     AttributeValue.objects.create(sku=sku, attribute=voltage, value="AC/DC 24 В, 50/60 Гц")
     AttributeValue.objects.create(sku=sku, attribute=control, value="Открыто/закрыто")
     AttributeValue.objects.create(sku=sku, attribute=aux, value="Нет")
-    assert belimo_codes_for_sku(sku) == ["LM24A"]
+    assert belimo_codes_for_sku(sku) == []
 
 
 @pytest.mark.django_db
 def test_analog_facet_from_card_text(client) -> None:
-    """«Аналоги» facet lists Belimo codes parsed from analogs_text."""
+    """Prose Belimo lines are not a confirmed pair and do not enter the facet."""
     cat = Category.objects.create(name="Spring", slug="spring-analog-facet")
     product = Product.objects.create(name="DA5FU", slug="da5fu-facet", category=cat)
     sku = SKU.objects.create(
@@ -552,15 +556,14 @@ def test_analog_facet_from_card_text(client) -> None:
     facets = client.get(reverse("catalog-facet-list"))
     assert facets.status_code == 200
     by_key = {row["key"]: row for row in facets.data["results"]}
-    assert "analog" in by_key
-    codes = {v["value"] for v in by_key["analog"]["values"]}
-    assert "LF24-S" in codes
-    # LF24-RS has no auxiliary switches → not a direct analog of the DS edition.
-    assert "LF24-RS" not in codes
+    if "analog" in by_key:
+        codes = {v["value"] for v in by_key["analog"]["values"]}
+        assert "LF24-S" not in codes
+        assert "LF24-RS" not in codes
 
     filtered = client.get(reverse("catalog-sku-list"), {"analog": "LF24-S"})
     assert filtered.status_code == 200
-    assert {row["slug"] for row in filtered.data["results"]} == {sku.slug}
+    assert sku.slug not in {row["slug"] for row in filtered.data["results"]}
 
 
 @pytest.mark.django_db
@@ -616,14 +619,15 @@ def test_sku_code_is_thermal_suffix_only() -> None:
 
 
 def test_belimo_code_is_thermal_suffix_only() -> None:
-    """Thermal Belimo: ``-T`` / ``FST`` / smoke ``…ST`` family codes."""
+    """Thermal is fire ``-T`` / ``FST``. ``BEE24-ST`` is a connector plug, not a sensor."""
     assert belimo_code_is_thermal("BF24-T") is True
     assert belimo_code_is_thermal("bf24-t") is True
     assert belimo_code_is_thermal("BF24-FST") is True
     assert belimo_code_is_thermal("FST-230-3N") is True
     assert belimo_code_is_thermal("FST-24-3N") is True
-    assert belimo_code_is_thermal("BEE24ST") is True
-    assert belimo_code_is_thermal("BEE230ST") is True
+    assert belimo_code_is_thermal("BEE24ST") is False
+    assert belimo_code_is_thermal("BEE24-ST") is False
+    assert belimo_code_is_thermal("BEE230ST") is False
     assert belimo_code_is_thermal("X-T-Y") is False
     assert belimo_code_is_thermal("BF24-S") is False
     assert belimo_code_is_thermal("BEE24") is False
@@ -635,7 +639,7 @@ def test_belimo_code_is_thermal_suffix_only() -> None:
 
 @pytest.mark.django_db
 def test_primary_belimo_ignores_midstring_dst_as_thermal() -> None:
-    """Codes with mid-string DST must use the first Belimo code (non-thermal path)."""
+    """A non-actuator code is not a model, so prose Belimo lines are not used."""
     cat = Category.objects.create(name="Air", slug="air-mid-dst")
     product = Product.objects.create(name="SA", slug="sa-mid-dst", category=cat)
     sku = SKU.objects.create(
@@ -646,12 +650,12 @@ def test_primary_belimo_ignores_midstring_dst_as_thermal() -> None:
         is_published=True,
         analogs_text="– Belimo LM24A\n– Belimo BF24-T\n",
     )
-    assert primary_belimo_code_for_sku(sku) == "LM24A"
+    assert primary_belimo_code_for_sku(sku) is None
 
 
 @pytest.mark.django_db
 def test_primary_belimo_skips_midstring_dash_t_belimo_code() -> None:
-    """Thermal SKU must not treat mid-string -T Belimo tokens as thermal."""
+    """SA5FU24-DST is fire 5 Нм: the catalog article is BLF24-T, not the prose."""
     cat = Category.objects.create(name="Fire", slug="fire-mid-t")
     product = Product.objects.create(name="SA", slug="sa-mid-t", category=cat)
     sku = SKU.objects.create(
@@ -662,8 +666,8 @@ def test_primary_belimo_skips_midstring_dash_t_belimo_code() -> None:
         is_published=True,
         analogs_text="– Belimo LM24A-T-S\n– Belimo BLF24-S\n",
     )
-    assert belimo_codes_for_sku(sku) == ["LM24A-T-S", "BLF24-S"]
     assert belimo_code_is_thermal("LM24A-T-S") is False
+    assert belimo_codes_for_sku(sku) == []
     assert primary_belimo_code_for_sku(sku) is None
 
 
@@ -680,16 +684,12 @@ def test_primary_belimo_prefers_thermal_code_for_dst_sku() -> None:
         is_published=True,
         analogs_text="– Belimo BLF24-S\n– Belimo BLF24-T\n",
     )
-    assert primary_belimo_code_for_sku(sku) == "BLF24-T"
+    assert primary_belimo_code_for_sku(sku) is None
 
 
 @pytest.mark.django_db
 def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
-    """Thermal SKU must not persist a non-thermal Belimo code as primary.
-
-    ``-dst`` editions have aux switches, so BASE / BASE-S pairs keep only ``-S``;
-    without a thermal Belimo article (``-T`` / ``FST``) primary stays empty.
-    """
+    """DST fire 5 Нм takes BLF24-T from the catalog even if the prose lists BLF24."""
     cat = Category.objects.create(name="Fire", slug="fire-thermal-none")
     product = Product.objects.create(name="SA", slug="sa-thermal-none", category=cat)
     sku = SKU.objects.create(
@@ -700,7 +700,7 @@ def test_primary_belimo_skips_non_thermal_fallback_for_dst_sku() -> None:
         is_published=True,
         analogs_text="– Belimo BLF24-S\n– Belimo BLF24\n",
     )
-    assert belimo_codes_for_sku(sku) == ["BLF24-S"]
+    assert belimo_codes_for_sku(sku) == []
     assert primary_belimo_code_for_sku(sku) is None
 
 
@@ -760,6 +760,10 @@ def test_belimo_family_none_when_smallest_is_stronger(purpose: str, area: float)
         ("TMC230A-SR", "DA2MU230-A", True),
         ("LF24-RS", "DA5FU24-AS", False),
         ("LM24A-S", "DA4MU24-DS", False),  # LM 5 Нм > 4 Нм
+        ("LMQ24A-SR", "HVA24-5QX", False),  # fast, no emergency return
+        ("NKQ24A-SR", "HVA24-5QX", False),  # NKQ 1.2 m² > 0.5 m²
+        ("NKQ24A-SR", "HVA24-20QX", True),
+        ("LMQ24A-SR", "HVA24-5Q", True),
         ("NM24A-SR-20-S", "HVD24S-20", True),
         ("GF24A", "DA2MU24-D", True),  # unknown family: not judged
     ],
@@ -776,13 +780,12 @@ def test_every_belimo_table_uses_the_shared_area_bands() -> None:
     from catalog.etl import series_copy_spring_analogs as spring
     from catalog.etl.belimo_analogs import BELIMO_FAMILY_AREA, belimo_family_by_area
     from catalog.etl.series_copy_damu_analogs import DAMU_BELIMO_NM
-    from catalog.etl.series_copy_major_analogs import belimo_fast_family
 
     tables = (
         ("air_spring", spring._DAFU_BELIMO),
         ("fire_spring", spring._SAFU_BELIMO),
         ("smoke", spring._SAMU_BELIMO),
-        ("fast", {nm: belimo_fast_family(nm) for nm in (5, 8, 10, 16, 20, 24, 40)}),
+        ("fast", {nm: belimo_family_by_area("fast", nm / 10) for nm in (5, 8, 10, 16, 20, 24, 40)}),
     )
     for purpose, table in tables:
         for nm, family in table.items():
@@ -813,15 +816,18 @@ def test_fill_belimo_refreshes_family_drift_without_force() -> None:
     )
     call_command("fill_belimo_analogs", stdout=StringIO())
     sku.refresh_from_db()
-    assert sku.analog_belimo_code == "NM24A"
+    assert sku.analog_belimo_code == ""
 
 
 @pytest.mark.django_db
 def test_fill_belimo_keeps_valid_secondary_code() -> None:
-    """A stored code still listed on the card (BLE next to BEN) is a valid choice — keep it."""
+    """SA15MU smoke is BEN24. A stored BLE24 does not stay."""
     from django.core.management import call_command
 
-    cat = Category.objects.create(name="Smoke", slug="smoke-keep-secondary")
+    cat = Category.objects.create(
+        name="Smoke",
+        slug="elektroprivody-dlya-klapanov-dymoudaleniya",
+    )
     product = Product.objects.create(name="SA15MU", slug="sa15mu-keep-secondary", category=cat)
     sku = SKU.objects.create(
         product=product,
@@ -834,12 +840,12 @@ def test_fill_belimo_keeps_valid_secondary_code() -> None:
     )
     call_command("fill_belimo_analogs", stdout=StringIO())
     sku.refresh_from_db()
-    assert sku.analog_belimo_code == "BLE24"
+    assert sku.analog_belimo_code == ""
 
 
 @pytest.mark.django_db
 def test_regenerated_damu_analogs_reach_stored_belimo_code() -> None:
-    """Force-regenerated DAMU card + fill: old SM/GM codes move to the area-band NM/SM."""
+    """Force-regenerated DAMU card + fill: D moves to NM; AS has no factory -SR-S."""
     from django.core.management import call_command
 
     from catalog.etl.series_copy_major_analogs import apply_major_analogs_enrichment
@@ -877,8 +883,9 @@ def test_regenerated_damu_analogs_reach_stored_belimo_code() -> None:
     call_command("fill_belimo_analogs", stdout=StringIO())
     plain.refresh_from_db()
     aux.refresh_from_db()
-    assert plain.analog_belimo_code == "NM24A"
-    assert aux.analog_belimo_code == "NM24A-SR-S"
+    assert plain.analog_belimo_code == ""
+    # NM modulating + aux is add-on S2A, not a factory NM24A-SR-S.
+    assert aux.analog_belimo_code == ""
 
 
 @pytest.mark.django_db
@@ -900,9 +907,15 @@ def test_no_direct_belimo_hidden_on_card_facet_and_field() -> None:
         analog_belimo_code="BEN24",
         analogs_text="SA10MU24-DS (24 В, открыто/закрыто):\n– Belimo BEN24\n– Belimo BLE24\n– Siemens GIB131.1E\n",
     )
+    from catalog.etl.belimo_analogs import analogs_text_for_card
+
     text = analogs_plain_text_for_sku(sku)
     assert "Belimo" not in text
     assert "Siemens GIB131.1E" in text
+    card_text = analogs_text_for_card(sku)
+    # Card shows no unverified pair bullets; a bare edition header goes with them.
+    assert "Siemens" not in card_text
+    assert "SA10MU24-DS (24 В" not in card_text
     assert belimo_codes_for_sku(sku) == []
     assert primary_belimo_code_for_sku(sku) is None
 
@@ -913,7 +926,7 @@ def test_no_direct_belimo_hidden_on_card_facet_and_field() -> None:
 
 @pytest.mark.django_db
 def test_fill_belimo_keeps_direct_code_when_nothing_resolves() -> None:
-    """Clearing is only for non-direct codes: a valid manual code on an unresolvable SKU stays."""
+    """A code with no actuator model is cleared. Prose and a manual field are not a source."""
     from django.core.management import call_command
 
     cat = Category.objects.create(name="Misc", slug="misc-keep-manual")
@@ -928,7 +941,7 @@ def test_fill_belimo_keeps_direct_code_when_nothing_resolves() -> None:
     )
     call_command("fill_belimo_analogs", stdout=StringIO())
     sku.refresh_from_db()
-    assert sku.analog_belimo_code == "LM24A"
+    assert sku.analog_belimo_code == ""
 
 
 @pytest.mark.parametrize(
@@ -990,7 +1003,6 @@ def test_kits_and_ball_valves_take_no_analogs(monkeypatch: pytest.MonkeyPatch) -
         assert primary_belimo_code_for_sku(sku) is None
 
     ids = [kit.id, valve.id]
-    monkeypatch.setattr(filter_options, "_ANALOG_INFERENCE_SKU_CAP", 0)
     assert filter_options._collect_analog_facet_options(ids) is None
     assert not filter_options._filter_skus_by_belimo_analog(SKU.objects.filter(id__in=ids), "LM24A-S").exists()
 
@@ -1026,38 +1038,100 @@ def test_infer_takes_aux_and_torque_from_edition_code() -> None:
         is_published=True,
     )
     AttributeValue.objects.create(sku=d, attribute=aux_attr, value="SPDT-1")
-    assert belimo_codes_for_sku(ds) == ["LM24A-S"]
-    assert belimo_codes_for_sku(d) == ["LM24A"]
+    assert belimo_codes_for_sku(ds) == []
+    assert belimo_codes_for_sku(d) == []
 
 
 def test_detect_purpose_hva_by_suffix() -> None:
-    """HVA-P is spring-return, HVA-Q/QX fast, bare HVA air — whatever the category."""
+    """HVA-P is spring, HVA-Q/UQ fast without return, QX capacitor — category does not override."""
     from catalog.etl.belimo_analogs import detect_purpose
 
     qx_cat = "elektronnye-otkazoustoychivye-vozdushnye-privody"
     assert detect_purpose(category_slug="", sku_code="HVA24-10P") == "air_spring"
-    assert detect_purpose(category_slug=qx_cat, sku_code="HVA24-10QX") == "fast"
-    assert detect_purpose(category_slug=qx_cat, sku_code="HVD24-10QX") == "fast"
+    assert detect_purpose(category_slug=qx_cat, sku_code="HVA24-10QX") == "electronic_failsafe"
+    assert detect_purpose(category_slug=qx_cat, sku_code="HVD24-10QX") == "electronic_failsafe"
     assert detect_purpose(category_slug="", sku_code="HVA230S-5UQ") == "fast"
     assert detect_purpose(category_slug="", sku_code="HVA24-10") == "air_no_spring"
+
+
+@pytest.mark.django_db
+def test_qx_card_belimo_field_is_supercap_not_fast_q() -> None:
+    """Поле «Аналог Belimo» на QX — SuperCap, не быстрые LMQ…GMQ без возврата.
+
+    NKQ 6 Nm covers 1.2 m² (fail-safe brochure 2026). Hoocon 5 Nm is 0.5 m²,
+    so it is not a direct analog; 20 Nm / 2.0 m² is.
+    """
+    cat = Category.objects.create(
+        name="Electronic fail-safe",
+        slug="elektronnye-otkazoustoychivye-vozdushnye-privody",
+    )
+    product = Product.objects.create(name="HVA-QX", slug="hva-qx-belimo-field", category=cat)
+    small = SKU.objects.create(
+        product=product,
+        name="HVA24-5QX",
+        slug="hva24-5qx-belimo-field",
+        sku_code="HVA24-5QX",
+        is_published=True,
+    )
+    covered = SKU.objects.create(
+        product=product,
+        name="HVA24-20QX",
+        slug="hva24-20qx-belimo-field",
+        sku_code="HVA24-20QX",
+        is_published=True,
+    )
+    ac = SKU.objects.create(
+        product=product,
+        name="HVA230-20QX",
+        slug="hva230-20qx-belimo-field",
+        sku_code="HVA230-20QX",
+        is_published=True,
+    )
+    assert primary_belimo_code_for_sku(small) is None
+    assert primary_belimo_code_for_sku(covered) is None
+    assert primary_belimo_code_for_sku(ac) is None
+    # A previously stored fast article must not stick: area alone would keep it.
+    small.analog_belimo_code = "LMQ24A-SR"
+    small.save(update_fields=["analog_belimo_code"])
+    covered.analog_belimo_code = "SMQ24A-SR"
+    covered.save(update_fields=["analog_belimo_code"])
+    assert primary_belimo_code_for_sku(small) is None
+    assert primary_belimo_code_for_sku(covered) is None
 
 
 def test_generators_and_inference_share_one_article() -> None:
     """Card generators print exactly what inference returns for every edition (no BM, no closest class)."""
     from catalog.etl.belimo_analogs import belimo_family_by_area, compose_belimo_article
 
-    assert compose_belimo_article("LMQ", voltage="24", modulating=True, aux=True) == "LMQ24A-SR-S"
+    # Datasheets / UK shop, not the old concatenated generator.
+    assert compose_belimo_article("LMQ", voltage="24", modulating=True, aux=False) == "LMQ24A-SR"
+    assert compose_belimo_article("LMQ", voltage="24", modulating=True, aux=True) is None
+    assert compose_belimo_article("LMQ", voltage="230", modulating=False, aux=False) is None
     assert compose_belimo_article("TF", voltage="24", modulating=True, aux=False) is None
     assert compose_belimo_article("LF", voltage="24", modulating=True, aux=True) is None
-    assert compose_belimo_article("LF", voltage="24", modulating=True, aux=False) == "LF24-RS"
+    assert compose_belimo_article("LF", voltage="24", modulating=True, aux=False) == "LF24-SR"
+    assert compose_belimo_article("LF", voltage="230", modulating=True, aux=False) is None
+    assert compose_belimo_article("NF", voltage="24", modulating=False, aux=True) == "NF24A-S2"
+    assert compose_belimo_article("NF", voltage="24", modulating=True, aux=True) == "NF24A-SR-S2"
     assert compose_belimo_article("TMC", voltage="230", modulating=True, aux=True) is None
+    assert compose_belimo_article("NM", voltage="24", modulating=True, aux=True) is None
+    assert compose_belimo_article("NM", voltage="230", modulating=True, aux=False) == "NM230A-SR"
+    assert compose_belimo_article("GM", voltage="24", modulating=False, aux=True) == "GM24A-S"
+    assert compose_belimo_article("GM", voltage="24", modulating=True, aux=True) is None
+    assert compose_belimo_article("GM", voltage="230", modulating=True, aux=False) is None
     assert compose_belimo_article("BFN", voltage="24", modulating=True, aux=True) is None
-    assert compose_belimo_article("BEE", voltage="230", modulating=False, aux=True, thermal=True) == "BEE230ST"
+    assert compose_belimo_article("BEE", voltage="230", modulating=False, aux=True, thermal=False) == "BEE230"
+    assert compose_belimo_article("BEE", voltage="230", modulating=False, aux=True, thermal=True) is None
+    assert compose_belimo_article("BEN", voltage="24", modulating=False, aux=True, thermal=True) is None
     for purpose, nm, voltage, modulating, aux in (
         ("fast", 5, "24", True, True),
         ("air_spring", 5, "24", True, True),
         ("air_no_spring", 2, "230", True, True),
         ("smoke", 10, "24", False, True),
+        ("electronic_failsafe", 20, "24", True, False),
+        ("electronic_failsafe", 5, "24", True, False),
+        ("electronic_failsafe", 20, "230", True, False),
+        ("electronic_failsafe", 40, "24", False, True),
     ):
         inferred = infer_belimo_codes(
             purpose=purpose,
@@ -1069,3 +1143,140 @@ def test_generators_and_inference_share_one_article() -> None:
         family = belimo_family_by_area(purpose, nm / 10)
         composed = family and compose_belimo_article(family, voltage=voltage, modulating=modulating, aux=aux)
         assert inferred == ([composed] if composed else [])
+
+
+def test_compose_never_emits_articles_belimo_does_not_make() -> None:
+    """Every composed code is a catalog literal. These strings are not Belimo articles.
+
+    Q 230 V and Q ``-S``: LMQ24A datasheet is AC/DC 24 V, aux is S1A/S2A.
+    ``LF24-RS``: the modulating article is LF24-SR (datasheet 2026-10-29).
+    ``NF24A-S``: the aux article is NF24A-S2 (UK shop).
+    ``GM24A-SR-S``: absent from the Belimo CZ NG table (GM24A-S itself is listed).
+    Smoke ``-T`` / ``BEE230ST``: UK smoke list has BEE230 and BEE24-ST (plug), no ``-T``.
+    ``FST-24-3N``: US series is FSTF/FSNF, not this token.
+    """
+    from catalog.etl.belimo_analogs import BELIMO_CATALOG, BELIMO_NOT_ISSUED
+
+    forbidden = {
+        "LMQ230A",
+        "NMQ230A",
+        "SMQ230A",
+        "SMQ230A-S",
+        "GMQ230A",
+        "LMQ24A-S",
+        "LMQ24A-SR-S",
+        "NMQ24A-S",
+        "NMQ24A-SR-S",
+        "SMQ24A-S",
+        "SMQ24A-SR-S",
+        "GMQ24A-S",
+        "GMQ24A-SR-S",
+        "LM24A-SR-S",
+        "NM24A-SR-S",
+        "NM230A-SR-S",
+        "SM24A-SR-S",
+        "GM24A-SR-S",
+        "GM230A-SR-S",
+        "GM230A-SR",
+        "LF24-RS",
+        "LF230-RS",
+        "LF230-SR",
+        "NF24A-S",
+        "NF230A-S",
+        "NF24A-SR-S",
+        "SF24A-S",
+        "SF230A-S",
+        "SF24A-SR-S",
+        "BEN24-T",
+        "BEN230-T",
+        "BEE24-T",
+        "BEE230-T",
+        "BEE24ST",
+        "BEE230ST",
+        "BE24-T",
+        "BLE24-T",
+        "BLE230-T",
+        "FST-24-3N",
+        "FST-230-3N",
+        "FSR-24-3N",
+        "FSR-230-3N",
+    }
+    assert BELIMO_NOT_ISSUED == frozenset(forbidden)
+    assert forbidden.isdisjoint(BELIMO_CATALOG.values())
+    families = sorted({family for family, *_rest in BELIMO_CATALOG})
+    for family in families:
+        for voltage in ("24", "230"):
+            for modulating in (False, True):
+                for aux in (False, True):
+                    for thermal in (False, True):
+                        code = compose_belimo_article(
+                            family,
+                            voltage=voltage,
+                            modulating=modulating,
+                            aux=aux,
+                            thermal=thermal,
+                        )
+                        assert code not in forbidden
+                        if code is not None:
+                            assert code in BELIMO_CATALOG.values()
+
+
+@pytest.mark.django_db
+def test_product_card_uses_catalog_article_for_the_model() -> None:
+    """DA5MU24-D does not get a Belimo article from the torque band or from prose.
+
+    LMQ230A is not a Belimo article. LM24A exists, but a band match is not
+    confirmation that it replaces this model.
+    """
+    from catalog.etl.belimo_analogs import analogs_text_for_card
+    from catalog.serializers import SKUDetailSerializer
+
+    cat = Category.objects.create(
+        name="Air",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
+    )
+    product = Product.objects.create(name="DA5MU", slug="da5mu-card-belimo", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA5MU24-D",
+        slug="da5mu24-d-card-belimo",
+        sku_code="DA5MU24-D",
+        is_published=True,
+        analog_belimo_code="LMQ230A",
+        analogs_text="DA5MU24-D (24 В):\n– Belimo LMQ230A\n– Siemens GDB131.1E\n",
+    )
+    card = SKUDetailSerializer(sku).data
+    assert card["analog_belimo_code"] is None
+    text = analogs_text_for_card(sku)
+    assert "Belimo" not in text
+    assert "LMQ230A" not in text
+    # Unverified foreign pairs go too — no bullet may stand in for a confirmed article.
+    assert "Siemens" not in text
+    assert "DA5MU24-D (24 В)" not in text
+
+
+@pytest.mark.django_db
+def test_invented_q230_article_is_not_shown_or_stored() -> None:
+    """LMQ230A is not sold (LMQ24A datasheet: AC/DC 24 V). Stale card text must not keep it."""
+    from django.core.management import call_command
+
+    cat = Category.objects.create(name="Fast", slug="fast-unissued-belimo")
+    product = Product.objects.create(name="DA5MQU", slug="da5mqu-unissued", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="DA5MQU230-D",
+        slug="da5mqu230-d-unissued",
+        sku_code="DA5MQU230-D",
+        is_published=True,
+        analog_belimo_code="LMQ230A",
+        analogs_text="DA5MQU230-D (230 В):\n– Belimo LMQ230A\n– Siemens GDB331.1E\n",
+    )
+    from catalog.etl.belimo_analogs import analogs_text_for_card
+
+    assert "LMQ230A" not in analogs_plain_text_for_sku(sku)
+    assert "Siemens GDB331.1E" in analogs_plain_text_for_sku(sku)
+    assert "Siemens" not in analogs_text_for_card(sku)
+    assert primary_belimo_code_for_sku(sku) is None
+    call_command("fill_belimo_analogs", stdout=StringIO())
+    sku.refresh_from_db()
+    assert sku.analog_belimo_code == ""
