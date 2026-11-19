@@ -250,9 +250,18 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         return None
     slug = validate_slug(slug)
 
-    sku = SKU.objects.filter(slug=slug, is_published=True).select_related("product__category").first()
+    sku = (
+        SKU.objects.filter(slug=slug, is_published=True)
+        .select_related("product__category")
+        .prefetch_related("analog_maps")
+        .first()
+    )
     if sku is None:
         return None
+    from catalog.etl.belimo_analogs import belimo_article_for_sku
+
+    # Confirmed AnalogMap only. SKU.analog_belimo_code stays stale until filled.
+    analog_code = (belimo_article_for_sku(sku) or "").strip()
     cat = sku.product.category if sku.product_id else None  # type: ignore[attr-defined]
     cat_name = cat.name if cat else None
     canonical = catalog_path_for_sku(sku)
@@ -293,7 +302,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         sku.sku_code or sku.slug,
         moment=by_key.get("moment", ""),
         voltage=by_key.get("voltage", ""),
-        analog=(sku.analog_belimo_code or ""),
+        analog=analog_code,
         kind=sku_kind_for_title(cat_name),
     )
     from sitesettings.models import SiteSettings
@@ -324,7 +333,6 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
             continue
         shown = f"{value} {unit}".strip() if unit and unit not in value else value
         crawl_lines.append(f"{label}: {shown}" if label else shown)
-    analog_code = (sku.analog_belimo_code or "").strip()
     if analog_code:
         crawl_lines.append(f"Аналог Belimo: {analog_code}")
     from catalog.docs_hub import canonical_pdf_path
@@ -354,7 +362,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
             category_name=cat_name,
             moment=by_key.get("moment", ""),
             voltage=by_key.get("voltage", ""),
-            analog=(sku.analog_belimo_code or ""),
+            analog=analog_code,
         ),
         noindex=False,
         og_type="product",

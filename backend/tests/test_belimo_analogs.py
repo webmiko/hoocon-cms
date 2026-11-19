@@ -1436,3 +1436,49 @@ def test_fu_pairs_migration_matches_lowercase_sku_codes() -> None:
     thermal_row = AnalogMap.objects.get(sku=thermal, brand="Belimo")
     assert thermal_row.foreign_code == "BF24"
     assert "BAT72" in thermal_row.note
+
+
+@pytest.mark.django_db
+def test_sync_analog_field_migration_keeps_only_confirmed_code() -> None:
+    """Migration 0026 copies the AnalogMap article and clears an unconfirmed cache.
+
+    HVA24-5QX stores LMQ24A-SR while the confirmed pair is EF24A-SR.
+    A SKU with no row loses the stored code.
+    """
+    import importlib
+
+    migration = importlib.import_module("catalog.migrations.0026_sync_analog_belimo_code")
+    cat = Category.objects.create(name="Air", slug="air-sync-belimo")
+    product = Product.objects.create(name="HVA", slug="hva-sync-belimo", category=cat)
+    paired = SKU.objects.create(
+        product=product,
+        name="HVA24-5QX",
+        slug="hva24-5qx-sync",
+        sku_code="HVA24-5QX",
+        analog_belimo_code="LMQ24A-SR",
+        is_published=True,
+    )
+    bare = SKU.objects.create(
+        product=product,
+        name="DA15FU24-A",
+        slug="da15fu24-a-sync",
+        sku_code="DA15FU24-A",
+        analog_belimo_code="NF24A-SR",
+        is_published=True,
+    )
+    from catalog.models import AnalogMap
+
+    AnalogMap.objects.create(
+        brand="Belimo",
+        foreign_code="EF24A-SR",
+        sku=paired,
+        torque_nm=5,
+        is_active=True,
+    )
+
+    migration.forwards(__import__("django.apps", fromlist=["apps"]).apps, None)
+
+    paired.refresh_from_db()
+    bare.refresh_from_db()
+    assert paired.analog_belimo_code == "EF24A-SR"
+    assert bare.analog_belimo_code == ""
