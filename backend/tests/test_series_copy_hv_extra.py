@@ -86,6 +86,7 @@ def test_ensure_hvd_q_and_enrich() -> None:
     by = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
     assert by["running-time"] == "< 20 с"
     assert by["weight"] == "< 0,8 кг"
+    assert by["power-consumption"] == "3,5 Вт / 1 Вт (удержание)"
     qx_sku = SKU.objects.get(sku_code="HVD24-5QX")
     qx_by = {
         av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=qx_sku).select_related("attribute")
@@ -132,13 +133,19 @@ def test_enriched_10nm_q_qx_damper_area_is_one_m2(sku_code: str) -> None:
     assert moment == "10 Нм"
     assert area == damper_area_for_nm(10)
     assert area == "до 1,0 м²"
+    if sku_code.startswith("HVD") and sku_code.endswith("Q"):
+        shaft = AttributeValue.objects.get(sku=sku, attribute__slug="shaft-length").value
+        assert shaft == "≥ 60 мм"
 
 
-@pytest.mark.parametrize("nm", [5, 10, 20, 40])
-def test_hvd_q_power_matches_attached_hva_q_manual(nm: int) -> None:
-    """HVD-Q 10/20 Нм показывали 9 и 8 Вт / 0,5 Вт, а прикреплённый RU-мануал HVA-Q — 5 и 8 Вт / 1 Вт."""
-    from catalog.etl.series_copy_hva import FAMILY_SPECS
-
-    manual = FAMILY_SPECS[(nm, "q")]
-    assert HVD_Q_SPECS[nm]["dimensions"] == manual["dimensions"]
-    assert HVD_Q_SPECS[nm]["power"] == manual["power-24"]
+def test_hvd_q_power_and_shaft_match_hvd_en_manual() -> None:
+    """English HVD-Q manuals, page 2. 5 Nm holding is 1 W, not the HVA-Q 0,5 W.
+    10 Nm shaft is > 60 mm, not 80 mm.
+    """
+    assert HVD_Q_SPECS[5]["power"] == "3,5 Вт / 1 Вт (удержание)"
+    assert HVD_Q_SPECS[10]["power"] == "5 Вт / 1 Вт (удержание)"
+    assert HVD_Q_SPECS[20]["power"] == "8 Вт / 1 Вт (удержание)"
+    assert HVD_Q_SPECS[40]["power"] == "15 Вт / 3 Вт (удержание)"
+    assert HVD_Q_SPECS[5]["shaft-length"] == "≥ 50 мм"
+    assert HVD_Q_SPECS[10]["shaft-length"] == "≥ 60 мм"
+    assert HVD_Q_SPECS[20]["shaft-length"] == "≥ 60 мм"

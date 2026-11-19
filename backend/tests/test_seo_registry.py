@@ -233,9 +233,14 @@ def test_every_public_page_and_published_sku_is_indexable(client) -> None:
         description = _meta(html, "description")
         assert sku.sku_code in description
         assert len(description) <= DESCRIPTION_MAX_LEN
-        if sku.analog_belimo_code:
-            assert sku.analog_belimo_code in description
-            assert sku.analog_belimo_code in llms
+        # DA5FU24-REG stores LF24 and has no AnalogMap. That cache must not
+        # be published: the card already ignores an unconfirmed pair.
+        if sku.sku_code == "DA5FU24-REG":
+            assert sku.analog_belimo_code == "LF24"
+            assert "LF24" not in title
+            assert "LF24" not in description
+            assert "LF24" not in llms
+            assert "Аналог Belimo" not in description
         assert _meta(html, "robots") == "index, follow"
         assert _canonical(html) == f"{base}{path}"
         assert f"{base}{path}" in locs

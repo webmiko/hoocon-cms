@@ -1,6 +1,8 @@
 """Canonical ТТХ for bare HVD air on/off (no spring, not Q/QX/F).
 
-Source: existing HVD-5/10/20 catalog cards + 2022 AI album (HVD-40).
+Source: English HVD manuals (no RU instruction for this body), page 2
+power row. 5 Nm is 3 W / 1 W, 10 Nm is 4,5 W / 1 W, 20 and 40 Nm
+holding is 1 W. Transformer VA is not stated in those manuals.
 """
 
 from __future__ import annotations
@@ -52,7 +54,8 @@ _SHARED: Final[tuple[AttrRow, ...]] = (
     ("Сечение провода", "wire-cross-section", "мм²", "0,5 мм²"),
 )
 
-# Per-Nm from site HVD-5/20 cards + album HVD-40 (pp. 44–45).
+# English manuals, page 2: ``3W@Nominal torque/1.0W@holding`` and the
+# same holding figure on 10/20/40 Nm. Shaft stays ``>`` written as ``≥``.
 TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
     5: {
         "moment": "5 Нм",
@@ -62,7 +65,7 @@ TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
         "weight": "≤ 0,8 кг",
         "shaft-length": "≥ 50 мм",
         "transformer-va": "6,5 ВА",
-        "power": "3,5 Вт (работа) / 0,5 Вт (удержание)",
+        "power": "3 Вт (работа) / 1 Вт (удержание)",
     },
     10: {
         "moment": "10 Нм",
@@ -72,7 +75,7 @@ TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
         "weight": "< 1,1 кг",
         "shaft-length": "≥ 60 мм",
         "transformer-va": "8 ВА",
-        "power": "4 Вт (работа) / 0,5 Вт (удержание)",
+        "power": "4,5 Вт (работа) / 1 Вт (удержание)",
     },
     20: {
         "moment": "20 Нм",
@@ -82,7 +85,7 @@ TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
         "weight": "≤ 1,4 кг",
         "shaft-length": "≥ 60 мм",
         "transformer-va": "10 ВА",
-        "power": "4,5 Вт (работа) / 0,5 Вт (удержание)",
+        "power": "4,5 Вт (работа) / 1 Вт (удержание)",
     },
     40: {
         "moment": "40 Нм",
@@ -92,7 +95,7 @@ TORQUE_SPECS: Final[dict[int, dict[str, str]]] = {
         "weight": "≤ 1,5 кг",
         "shaft-length": "≥ 60 мм",
         "transformer-va": "12 ВА",
-        "power": "5 Вт (работа) / 0,5 Вт (удержание)",
+        "power": "5 Вт (работа) / 1 Вт (удержание)",
     },
 }
 

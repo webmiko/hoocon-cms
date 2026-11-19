@@ -548,20 +548,27 @@ def test_news_that_repeats_an_article_is_not_a_second_index_url(client) -> None:
 
 @pytest.mark.django_db
 def test_llms_txt_lists_a_belimo_analog(client) -> None:
-    """llms.txt names a Belimo code and the Hoocon card, not only the section list."""
-    from catalog.models import SKU, Category, Product
+    """llms.txt names a confirmed Belimo article, not a stale stored code."""
+    from catalog.models import SKU, AnalogMap, Category, Product
 
     cat = Category.objects.create(name="Воздушные", slug="vozdushnie-llms")
     prod = Product.objects.create(name="HVD", slug="hvd-llms", category=cat)
-    SKU.objects.create(
+    sku = SKU.objects.create(
         product=prod,
         name="HVD",
         slug="privod-hvd-llms",
         sku_code="HVD230S-5",
-        analog_belimo_code="LM230A-S",
+        analog_belimo_code="STALE-CODE",
         is_published=True,
+    )
+    AnalogMap.objects.create(
+        brand="Belimo",
+        foreign_code="LM230A-S",
+        sku=sku,
+        is_active=True,
     )
     body = client.get("/llms.txt").content.decode()
     assert "LM230A-S" in body
+    assert "STALE-CODE" not in body
     assert "HVD230S-5" in body
     assert "/catalog/vozdushnie-llms" in body

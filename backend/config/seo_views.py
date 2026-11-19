@@ -176,20 +176,34 @@ def _category_lines(base: str) -> list[str]:
 
 
 def _analog_lines(base: str, *, limit: int = 60) -> list[str]:
-    """One published SKU per Belimo code, so an agent can answer a model question."""
+    """One published SKU per confirmed Belimo article.
+
+    ``SKU.analog_belimo_code`` is a cache and may name a pair the project
+    has not confirmed. The list follows active Belimo ``AnalogMap`` rows.
+    """
+    from catalog.etl.belimo_analogs import belimo_article_for_sku
+
     seen: set[str] = set()
     lines: list[str] = []
     skus = (
-        SKU.objects.filter(is_published=True)
-        .exclude(analog_belimo_code="")
-        .exclude(analog_belimo_code__isnull=True)
+        SKU.objects.filter(
+            is_published=True,
+            analog_maps__is_active=True,
+            analog_maps__brand__iexact="belimo",
+        )
         .select_related("product__category")
-        .order_by("analog_belimo_code", "sku_code")
+        .prefetch_related("analog_maps")
+        .distinct()
     )
+    pairs: list[tuple[str, SKU]] = []
     for sku in skus:
-        code = (sku.analog_belimo_code or "").strip()
+        code = (belimo_article_for_sku(sku) or "").strip()
+        if code:
+            pairs.append((code, sku))
+    pairs.sort(key=lambda item: (item[0].casefold(), (item[1].sku_code or item[1].slug or "").casefold()))
+    for code, sku in pairs:
         key = code.casefold()
-        if not code or key in seen:
+        if key in seen:
             continue
         seen.add(key)
         lines.append(f"- {code} → {sku.sku_code or sku.slug} ({base}{catalog_path_for_sku(sku)})")

@@ -111,7 +111,8 @@ TORQUE_SPECS: dict[int, dict[str, str]] = {
     7: {
         "moment": "7 Нм",
         "damper-area": "до 0,7 м²",
-        "running-time": "< 45 с (95°)",
+        # SA7MU-DS.pdf стр. 2: «Время поворота: < 30 с (95°)». 45 с — это SA10MU.
+        "running-time": "< 30 с (95°)",
         "shaft-length": "≥ 50",
         "weight": "≈ 1,7 кг",
         "dimensions": _SAMU_DIMS_7_10,

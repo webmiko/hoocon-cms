@@ -67,7 +67,8 @@ _SHARED_BASE: Final[tuple[AttrRow, ...]] = (
     ("Сечение провода", "wire-cross-section", "мм²", "0,5 мм²"),
 )
 
-# Same bodies as HVA-Q; power follows the RU HVA-Q manual attached to these cards.
+# English HVD-Q manuals, page 2. 5 Nm holding is 1 W (HVA-Q sheet says 0,5).
+# 10 Nm shaft is > 60 mm. Transformer VA is not in these manuals.
 HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
     5: {
         "moment": "5 Нм",
@@ -77,7 +78,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
         "shaft-length": "≥ 50 мм",
         "dimensions": "144,1 × 71,1 × 62,1 мм",
         "weight": "< 0,8 кг",
-        "power": "3,5 Вт / 0,5 Вт (удержание)",
+        "power": "3,5 Вт / 1 Вт (удержание)",
         "transformer-va": "8 ВА",
     },
     10: {
@@ -85,7 +86,7 @@ HVD_Q_SPECS: Final[dict[int, dict[str, str]]] = {
         "damper-area": damper_area_for_nm(10),
         "running-time": "< 20 с",
         "noise": "55 дБ",
-        "shaft-length": "≥ 80 мм",
+        "shaft-length": "≥ 60 мм",
         "dimensions": "167,8 × 86,2 × 68 мм",
         "weight": "< 1,1 кг",
         "power": "5 Вт / 1 Вт (удержание)",

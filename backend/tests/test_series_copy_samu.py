@@ -94,6 +94,41 @@ def test_samu_family_dimensions_shared_across_sku_mass_per_torque() -> None:
 
 
 @pytest.mark.django_db
+def test_sa7mu_running_time_matches_ru_manual() -> None:
+    """SA7MU-DS.pdf стр. 2: время поворота < 30 с (95°), не 45 с соседнего SA10MU."""
+    cat = Category.objects.create(
+        name="Дымоудаление",
+        slug="elektroprivody-dlya-klapanov-dymoudaleniya-sa7",
+    )
+    product = Product.objects.create(
+        name="SA7MU",
+        slug="privod-dimoudaleniya-7nm-sa7-manual",
+        category=cat,
+    )
+    sku = SKU.objects.create(
+        product=product,
+        name="SA7MU24-DS",
+        slug="sa7mu24-ds-manual",
+        sku_code="SA7MU24-DS",
+        is_published=True,
+    )
+    neighbour = SKU.objects.create(
+        product=product,
+        name="SA10MU24-DS",
+        slug="sa10mu24-ds-manual-neighbour",
+        sku_code="SA10MU24-DS",
+        is_published=True,
+    )
+    apply_samu_enrichment(dry_run=False)
+    by_sku = {av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=sku).select_related("attribute")}
+    by_neighbour = {
+        av.attribute.slug: av.value for av in AttributeValue.objects.filter(sku=neighbour).select_related("attribute")
+    }
+    assert by_sku["running-time"] == "< 30 с (95°)"
+    assert by_neighbour["running-time"] == "< 45 с (95°)"
+
+
+@pytest.mark.django_db
 def test_sa15_power_and_shaft_match_ru_manual() -> None:
     """SA15MU RU manual: 5 W / 1 W and shaft ≥ 90 mm; DST is not SAF72."""
     cat = Category.objects.create(
