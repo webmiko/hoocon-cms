@@ -33,6 +33,7 @@ AUTO_GO_LIVE_NEWS_SLUGS: frozenset[str] = frozenset(
         "vspomogatelnyy-pereklyuchatel",
         "komplekt-sharovoy-kran-privod",
         "pasport-i-sertifikaty-v-zayavke",
+        "vremya-povorota-i-vozvrat-pruzhiny",
     }
 )
 

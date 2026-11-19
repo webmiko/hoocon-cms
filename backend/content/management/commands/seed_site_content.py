@@ -551,6 +551,10 @@ ARTICLE_EXCERPTS: dict[str, str] = {
         "Как подобрать замену Belimo на Hoocon: сверить момент, пружину, "
         "питание и сигнал — и оформить заявку без слепого кросса по артикулу."
     ),
+    "vremya-povorota-i-vozvrat-pruzhiny": (
+        "Привод с пружиной открывает заслонку до 70 секунд, а сам возвращает "
+        "её до 20. Короткая цифра — не время открытия."
+    ),
 }
 
 # Titles for articles created from fixtures (not only rewritten from Tilda scrape).
@@ -561,6 +565,7 @@ ARTICLE_TITLES: dict[str, str] = {
     "pitanie-24-ili-230-v": "24 В или 230 В: что выбрать для электропривода",
     "mu-mqu-hv-kogda-nuzhen-uskorennyy": ("MU, MQU и HV: когда скорость хода действительно нужна"),
     "analog-belimo-hoocon": "Замена Belimo на Hoocon: как подбирать аналог",
+    "vremya-povorota-i-vozvrat-pruzhiny": ("За сколько секунд срабатывает привод с пружиной"),
 }
 
 ARTICLE_COVERS: dict[str, Path] = {
@@ -570,6 +575,7 @@ ARTICLE_COVERS: dict[str, Path] = {
     "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_230_cover.webp"),
     "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv_cover.webp"),
     "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_cover.webp"),
+    "vremya-povorota-i-vozvrat-pruzhiny": (_FIXTURES_DIR / "article_vremya_povorota_i_vozvrat_pruzhiny_cover.webp"),
 }
 
 ARTICLE_COVERS_DARK: dict[str, Path] = {
@@ -579,6 +585,9 @@ ARTICLE_COVERS_DARK: dict[str, Path] = {
     "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_230_cover_dark.webp"),
     "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv_cover_dark.webp"),
     "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_cover_dark.webp"),
+    "vremya-povorota-i-vozvrat-pruzhiny": (
+        _FIXTURES_DIR / "article_vremya_povorota_i_vozvrat_pruzhiny_cover_dark.webp"
+    ),
 }
 
 # Full body rewrite (replaces Tilda scrape). Excerpt still from ARTICLE_EXCERPTS.
@@ -600,6 +609,7 @@ ARTICLE_BODIES: dict[str, Path] = {
     "pitanie-24-ili-230-v": (_FIXTURES_DIR / "article_pitanie_24_ili_230.html"),
     "mu-mqu-hv-kogda-nuzhen-uskorennyy": (_FIXTURES_DIR / "article_mu_mqu_hv.html"),
     "analog-belimo-hoocon": (_FIXTURES_DIR / "article_analog_belimo_hoocon.html"),
+    "vremya-povorota-i-vozvrat-pruzhiny": (_FIXTURES_DIR / "article_vremya_povorota_i_vozvrat_pruzhiny.html"),
 }
 
 
@@ -616,6 +626,7 @@ def _article_publish_schedule() -> dict[str, datetime]:
         "pitanie-24-ili-230-v": datetime(2026, 8, 15, 9, 0, tzinfo=msk),
         "mu-mqu-hv-kogda-nuzhen-uskorennyy": datetime(2026, 8, 17, 9, 0, tzinfo=msk),
         "analog-belimo-hoocon": datetime(2026, 8, 19, 9, 0, tzinfo=msk),
+        "vremya-povorota-i-vozvrat-pruzhiny": datetime(2026, 11, 20, 9, 0, tzinfo=msk),
     }
 
 

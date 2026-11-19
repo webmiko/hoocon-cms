@@ -10,10 +10,12 @@ const ARTICLE_AI_COVER_SLUGS = new Set([
   "vspomogatelnyy-pereklyuchatel",
   "komplekt-sharovoy-kran-privod",
   "pasport-i-sertifikaty-v-zayavke",
+  "vremya-povorota-i-vozvrat-pruzhiny",
 ]);
 
 const NEWS_AI_COVER_SLUGS = new Set([
   "articles-podbor-i-sertifikaty",
+  "article-vremya-povorota-i-vozvrat-pruzhiny",
 ]);
 
 const AI_COVER_CAPTION =
