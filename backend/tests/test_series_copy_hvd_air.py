@@ -11,6 +11,43 @@ from catalog.models import SKU, AttributeValue, Category, Product
 from catalog.sku_access import sku_attribute_values, sku_category_slug_or_empty
 
 
+def test_hvd_air_power_matches_en_manual() -> None:
+    """English HVD manuals, page 2: holding is 1 W; 5 Nm is 3 W, 10 Nm is 4,5 W."""
+    assert TORQUE_SPECS[5]["power"] == "3 Вт (работа) / 1 Вт (удержание)"
+    assert TORQUE_SPECS[10]["power"] == "4,5 Вт (работа) / 1 Вт (удержание)"
+    assert TORQUE_SPECS[20]["power"] == "4,5 Вт (работа) / 1 Вт (удержание)"
+    assert TORQUE_SPECS[40]["power"] == "5 Вт (работа) / 1 Вт (удержание)"
+
+
+@pytest.mark.django_db
+def test_hvd_air_enrichment_writes_manual_power() -> None:
+    """The card attribute is the manual wattage, not the old 3,5 / 4 Вт cache."""
+    cat = Category.objects.create(
+        name="Air",
+        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata-power",
+    )
+    product = Product.objects.create(category=cat, name="HVD", slug="hvd-power-manual")
+    five = SKU.objects.create(
+        product=product,
+        name="HVD24-5",
+        slug="hvd24-5-power",
+        sku_code="HVD24-5",
+        is_published=True,
+    )
+    ten = SKU.objects.create(
+        product=product,
+        name="HVD24-10",
+        slug="hvd24-10-power",
+        sku_code="HVD24-10",
+        is_published=True,
+    )
+    apply_hvd_air_enrichment()
+    five_power = AttributeValue.objects.get(sku=five, attribute__slug="power-consumption").value
+    ten_power = AttributeValue.objects.get(sku=ten, attribute__slug="power-consumption").value
+    assert five_power == "3 Вт (работа) / 1 Вт (удержание)"
+    assert ten_power == "4,5 Вт (работа) / 1 Вт (удержание)"
+
+
 def test_hvd_air_dimensions_match_catalog_2025() -> None:
     """Catalog pp. 39/41/43/45: H×W×D envelopes for HVD air (no spring)."""
     assert TORQUE_SPECS[5]["dimensions"] == "144,1 × 71,1 × 62,1 мм"
