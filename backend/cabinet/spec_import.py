@@ -96,13 +96,13 @@ def parse_spec_xlsx(file_obj: IO[bytes]) -> list[ParsedSpecRow]:
                     qty = max(int(float(raw_row[qty_col])), 1)
                 except (TypeError, ValueError):
                     qty = 1
-            sku, analog = resolve_position_code(code)
+            sku, via_analog = resolve_position_code(code)
             rows.append(
                 ParsedSpecRow(
                     raw_code=code,
                     quantity=qty,
                     sku=sku,
-                    via_analog=analog is not None,
+                    via_analog=via_analog,
                 )
             )
         if not header_found:

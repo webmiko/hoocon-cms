@@ -229,14 +229,14 @@ class SKU(models.Model):
     `slug` = канонический path из sitemap Tilda (сохраняем дословно, даже с
     опечатками — см. docs/seo-url-migration.md). `sku_code` = артикул.
     `price` хранится, но в публичный API не утекает (SiteSettings.show_prices).
-    `analog_belimo_code` — задел для AnalogMap (P1, docs/market-analysis.md §6.3).
+    `analog_belimo_code` — проверенный артикул Belimo (вручную после сверки в Admin).
 
     Args (fields):
         product: FK Product (required). PROTECT — нельзя удалить линейку с SKU.
         name: человекочитаемое имя, напр. «Привод воздушный HVA 5NM».
         slug: канонический URL-путь (уникален), напр. `privod-vozdushniy-hva-5nm`.
         sku_code: артикул (уникален, не пуст), напр. `HVA-5NM` или `BV215`.
-        analog_belimo_code: опц. код аналога Belimo (задел для AnalogMap P1).
+        analog_belimo_code: опц. код аналога Belimo (вручную на карточке).
         price: опц. цена (Decimal); null = по запросу. Скрыт в публичном API.
         stock_qty: остаток со склада (выгрузка 1С); витрина видит только in_stock.
         stock_qty_ma: остаток исполнений 4–20 мА (спецзаказ) из той же выгрузки.
@@ -273,7 +273,7 @@ class SKU(models.Model):
         null=True,
         blank=True,
         default=None,
-        help_text="Код аналога Belimo (для будущей карты аналогов).",
+        help_text="Проверенный артикул Belimo: вписать вручную после сверки в «Подбор аналогов».",
     )
     price: models.DecimalField | None = models.DecimalField(
         "цена",
@@ -706,12 +706,11 @@ class ProductImage(models.Model):
 
 
 class AnalogMap(models.Model):
-    """Карта аналогов: сторонний бренд + артикул → Hoocon SKU (ЛК-10).
+    """Справочник замен для ручной сверки при заведении карточки (не для витрины).
 
-    Редактируется в Admin (роль «Инженер ОВК» — по групповой матрице);
-    публичный подбор идёт через ``analogs_find`` в catalog.services.
-    ``foreign_code`` нормализуется (upper, без пробелов/дефисов), чтобы
-    матчить написания вида «NM24A-SR» / «nm24a sr».
+    Инженер проверяет пару здесь и переносит артикул в ``SKU.analog_belimo_code``.
+    Публичный каталог, поиск и подбор читают только поле на карточке.
+    ``foreign_code`` нормализуется в ``foreign_code_key`` (upper, alnum) для поиска в админке.
     """
 
     brand = models.CharField(

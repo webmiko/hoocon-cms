@@ -173,13 +173,7 @@ export function CatalogSkuCard({
           </ul>
         ) : null}
         <div className={styles.cardFooter}>
-          {sku.analog_belimo_code ? (
-            <span className={`${styles.cardAnalog} text-tech`}>
-              Belimo: {softBreak(sku.analog_belimo_code)}
-            </span>
-          ) : (
-            <span className={styles.cardPriceOnRequest}>Цена по запросу</span>
-          )}
+          <span className={styles.cardPriceOnRequest}>Цена по запросу</span>
           <span className={styles.cardCta} aria-hidden="true">
             {ctaLabel}
           </span>

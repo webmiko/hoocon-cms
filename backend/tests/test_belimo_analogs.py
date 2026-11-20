@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from io import StringIO
-
 import pytest
 from django.urls import reverse
 
@@ -173,10 +171,10 @@ def test_belimo_codes_strips_lone_s_for_non_aux_damu_d() -> None:
         is_published=True,
         analog_belimo_code="LM24A-S",
     )
-    assert belimo_codes_for_sku(bare) == []
-    assert belimo_codes_for_sku(with_s) == []
-    assert primary_belimo_code_for_sku(bare) is None
-    assert primary_belimo_code_for_sku(with_s) is None
+    assert belimo_codes_for_sku(bare) == ["LM24A-S"]
+    assert belimo_codes_for_sku(with_s) == ["LM24A-S"]
+    assert primary_belimo_code_for_sku(bare) == "LM24A-S"
+    assert primary_belimo_code_for_sku(with_s) == "LM24A-S"
 
 
 def test_infer_air_no_spring_by_moment_voltage_aux_control() -> None:
@@ -381,8 +379,8 @@ def test_infer_fast_actuator() -> None:
 
 
 @pytest.mark.django_db
-def test_belimo_codes_for_sku_prefers_card_text() -> None:
-    """Card prose is not a confirmed pair, so it does not become the article."""
+def test_belimo_codes_for_sku_uses_manual_field_only() -> None:
+    """Belimo article comes from ``analog_belimo_code``, not card bullets."""
     cat = Category.objects.create(name="Air", slug="air-analog-test")
     product = Product.objects.create(name="DA5", slug="da5-analog-test", category=cat)
     sku = SKU.objects.create(
@@ -394,7 +392,7 @@ def test_belimo_codes_for_sku_prefers_card_text() -> None:
         analog_belimo_code="WRONG24",
         analogs_text="Аналог DA5FU24-DS:\n– Belimo LF24-S\n– Belimo LF24-RS\n",
     )
-    assert belimo_codes_for_sku(sku) == []
+    assert belimo_codes_for_sku(sku) == ["WRONG24"]
 
 
 def test_belimo_code_control_sr_token() -> None:
@@ -420,8 +418,8 @@ def test_belimo_code_control_sr_token() -> None:
 
 
 @pytest.mark.django_db
-def test_shared_ds_as_block_splits_belimo_by_control() -> None:
-    """Combined ``…-D/…-A`` card text must not pin one Belimo on both control sides."""
+def test_shared_ds_as_block_manual_field_per_edition() -> None:
+    """Each edition may carry the same manually set Belimo code on both sides."""
     cat = Category.objects.create(
         name="Air no spring",
         slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
@@ -470,9 +468,9 @@ def test_shared_ds_as_block_splits_belimo_by_control() -> None:
     AttributeValue.objects.create(sku=modulating, attribute=control, value="Пропорциональное")
     AttributeValue.objects.create(sku=modulating, attribute=aux, value="Нет")
 
-    assert belimo_codes_for_sku(on_off) == []
-    assert belimo_codes_for_sku(modulating) == []
-    assert primary_belimo_code_for_sku(modulating) is None
+    assert belimo_codes_for_sku(on_off) == ["CM230-L/R"]
+    assert belimo_codes_for_sku(modulating) == ["CM230-L/R"]
+    assert primary_belimo_code_for_sku(modulating) == "CM230-L/R"
 
     modulating_text = analogs_plain_text_for_sku(modulating)
     assert "CM230-L/R" not in modulating_text
@@ -799,103 +797,8 @@ def test_every_belimo_table_uses_the_shared_area_bands() -> None:
 
 
 @pytest.mark.django_db
-def test_fill_belimo_refreshes_family_drift_without_force() -> None:
-    """Stale torque-band code (SM for 16 Нм) must follow the card's area-band NM, no --force."""
-    from django.core.management import call_command
-
-    cat = Category.objects.create(name="Air", slug="air-family-drift")
-    product = Product.objects.create(name="DA16MU", slug="da16mu-family-drift", category=cat)
-    sku = SKU.objects.create(
-        product=product,
-        name="DA16MU24-D",
-        slug="da16mu24-d-family-drift",
-        sku_code="DA16MU24-D",
-        is_published=True,
-        analog_belimo_code="SM24A",
-        analogs_text="Аналоги для DA16MU24-D (24 В, 2-/3-позиционное):\n– Belimo NM24A\n",
-    )
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    sku.refresh_from_db()
-    assert sku.analog_belimo_code == ""
-
-
-@pytest.mark.django_db
-def test_fill_belimo_keeps_valid_secondary_code() -> None:
-    """SA15MU smoke is BEN24. A stored BLE24 does not stay."""
-    from django.core.management import call_command
-
-    cat = Category.objects.create(
-        name="Smoke",
-        slug="elektroprivody-dlya-klapanov-dymoudaleniya",
-    )
-    product = Product.objects.create(name="SA15MU", slug="sa15mu-keep-secondary", category=cat)
-    sku = SKU.objects.create(
-        product=product,
-        name="SA15MU24-DS",
-        slug="sa15mu24-ds-keep-secondary",
-        sku_code="SA15MU24-DS",
-        is_published=True,
-        analog_belimo_code="BLE24",
-        analogs_text="SA15MU24-DS (24 В, открыто/закрыто):\n– Belimo BEN24\n– Belimo BLE24\n",
-    )
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    sku.refresh_from_db()
-    assert sku.analog_belimo_code == ""
-
-
-@pytest.mark.django_db
-def test_regenerated_damu_analogs_reach_stored_belimo_code() -> None:
-    """Force-regenerated DAMU card + fill: D moves to NM; AS has no factory -SR-S."""
-    from django.core.management import call_command
-
-    from catalog.etl.series_copy_major_analogs import apply_major_analogs_enrichment
-
-    cat = Category.objects.create(
-        name="Air no spring",
-        slug="elektroprivody-vozdushnye-bez-pruzhinnogo-vozvrata",
-    )
-    old_text = "Аналоги для DA16MU24-D/DS:\n– Belimo SM24A\n– Belimo SM24A-S\n"
-    product = Product.objects.create(
-        name="DA16MU",
-        slug="privod-vozdushniy-bez-pruzhini-damu-16nm",
-        category=cat,
-        analogs_text=old_text,
-    )
-    plain = SKU.objects.create(
-        product=product,
-        name="DA16MU24-D",
-        slug="da16mu24-d-regen",
-        sku_code="DA16MU24-D",
-        is_published=True,
-        analog_belimo_code="SM24A",
-        analogs_text=old_text,
-    )
-    aux = SKU.objects.create(
-        product=product,
-        name="DA16MU24-AS",
-        slug="da16mu24-as-regen",
-        sku_code="DA16MU24-AS",
-        is_published=True,
-        analog_belimo_code="SM24A-SR-S",
-        analogs_text=old_text,
-    )
-    apply_major_analogs_enrichment(force=True)
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    plain.refresh_from_db()
-    aux.refresh_from_db()
-    assert plain.analog_belimo_code == ""
-    # NM modulating + aux is add-on S2A, not a factory NM24A-SR-S.
-    assert aux.analog_belimo_code == ""
-
-
-@pytest.mark.django_db
-def test_no_direct_belimo_hidden_on_card_facet_and_field() -> None:
-    """SA10MU (10 Нм): stale «BEN24» card line / field must not reach the tab, facet or field.
-
-    BEN/BLE are 15 Нм — Hoocon cannot replace them, so Belimo is not listed at all.
-    """
-    from django.core.management import call_command
-
+def test_no_direct_belimo_card_strips_unverified_bullets() -> None:
+    """Card bullets are guidance only; Belimo slot needs a manual field."""
     cat = Category.objects.create(name="Smoke", slug="elektroprivody-dlya-klapanov-dymoudaleniya")
     product = Product.objects.create(name="SA10MU", slug="sa10mu-no-direct", category=cat)
     sku = SKU.objects.create(
@@ -904,7 +807,6 @@ def test_no_direct_belimo_hidden_on_card_facet_and_field() -> None:
         slug="sa10mu24-ds-no-direct",
         sku_code="SA10MU24-DS",
         is_published=True,
-        analog_belimo_code="BEN24",
         analogs_text="SA10MU24-DS (24 В, открыто/закрыто):\n– Belimo BEN24\n– Belimo BLE24\n– Siemens GIB131.1E\n",
     )
     from catalog.etl.belimo_analogs import analogs_text_for_card
@@ -913,35 +815,12 @@ def test_no_direct_belimo_hidden_on_card_facet_and_field() -> None:
     assert "Belimo" not in text
     assert "Siemens GIB131.1E" in text
     card_text = analogs_text_for_card(sku)
-    # Card shows no unverified pair bullets; a bare edition header goes with them.
     assert "Siemens" not in card_text
-    assert "SA10MU24-DS (24 В" not in card_text
     assert belimo_codes_for_sku(sku) == []
-    assert primary_belimo_code_for_sku(sku) is None
-
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    sku.refresh_from_db()
-    assert sku.analog_belimo_code == ""
-
-
-@pytest.mark.django_db
-def test_fill_belimo_keeps_direct_code_when_nothing_resolves() -> None:
-    """A code with no actuator model is cleared. Prose and a manual field are not a source."""
-    from django.core.management import call_command
-
-    cat = Category.objects.create(name="Misc", slug="misc-keep-manual")
-    product = Product.objects.create(name="Misc", slug="misc-keep-manual", category=cat)
-    sku = SKU.objects.create(
-        product=product,
-        name="MISC-1",
-        slug="misc-1-keep-manual",
-        sku_code="MISC-1",
-        is_published=True,
-        analog_belimo_code="LM24A",
-    )
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    sku.refresh_from_db()
-    assert sku.analog_belimo_code == ""
+    sku.analog_belimo_code = "BEN24"
+    sku.save(update_fields=["analog_belimo_code"])
+    assert belimo_codes_for_sku(sku) == ["BEN24"]
+    assert "– Belimo BEN24" in analogs_text_for_card(sku)
 
 
 @pytest.mark.parametrize(
@@ -967,15 +846,8 @@ def test_sku_code_takes_no_analogs(sku_code: str, expected: bool) -> None:
 
 
 @pytest.mark.django_db
-def test_kits_and_ball_valves_take_no_analogs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Kits (actuator + valve) and ball valves: no «Аналоги» tab, no Belimo facet, field cleared.
-
-    A Belimo line or a hand-typed field on a kit used to pass through: the
-    category was simply not in the purpose map and the large-scope facet reads
-    the field directly.
-    """
-    from django.core.management import call_command
-
+def test_kits_and_ball_valves_take_no_analogs() -> None:
+    """Kits and ball valves ignore ``analog_belimo_code`` on the public surface."""
     from catalog.facets import filter_options
 
     kits = Category.objects.create(name="Комплекты", slug="komplekty")
@@ -1005,12 +877,6 @@ def test_kits_and_ball_valves_take_no_analogs(monkeypatch: pytest.MonkeyPatch) -
     ids = [kit.id, valve.id]
     assert filter_options._collect_analog_facet_options(ids) is None
     assert not filter_options._filter_skus_by_belimo_analog(SKU.objects.filter(id__in=ids), "LM24A-S").exists()
-
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    kit.refresh_from_db()
-    valve.refresh_from_db()
-    assert kit.analog_belimo_code == ""
-    assert valve.analog_belimo_code == ""
 
 
 @pytest.mark.django_db
@@ -1095,8 +961,8 @@ def test_qx_card_belimo_field_is_supercap_not_fast_q() -> None:
     small.save(update_fields=["analog_belimo_code"])
     covered.analog_belimo_code = "SMQ24A-SR"
     covered.save(update_fields=["analog_belimo_code"])
-    assert primary_belimo_code_for_sku(small) is None
-    assert primary_belimo_code_for_sku(covered) is None
+    assert primary_belimo_code_for_sku(small) == "LMQ24A-SR"
+    assert primary_belimo_code_for_sku(covered) == "SMQ24A-SR"
 
 
 def test_generators_and_inference_share_one_article() -> None:
@@ -1222,12 +1088,8 @@ def test_compose_never_emits_articles_belimo_does_not_make() -> None:
 
 
 @pytest.mark.django_db
-def test_product_card_uses_catalog_article_for_the_model() -> None:
-    """DA5MU24-D does not get a Belimo article from the torque band or from prose.
-
-    LMQ230A is not a Belimo article. LM24A exists, but a band match is not
-    confirmation that it replaces this model.
-    """
+def test_product_card_shows_manual_belimo_field_only() -> None:
+    """Serializer exposes ``analog_belimo_code``; card copy bullets stay guidance."""
     from catalog.etl.belimo_analogs import analogs_text_for_card
     from catalog.serializers import SKUDetailSerializer
 
@@ -1246,20 +1108,15 @@ def test_product_card_uses_catalog_article_for_the_model() -> None:
         analogs_text="DA5MU24-D (24 В):\n– Belimo LMQ230A\n– Siemens GDB131.1E\n",
     )
     card = SKUDetailSerializer(sku).data
-    assert card["analog_belimo_code"] is None
+    assert card["analog_belimo_code"] == "LMQ230A"
     text = analogs_text_for_card(sku)
-    assert "Belimo" not in text
-    assert "LMQ230A" not in text
-    # Unverified foreign pairs go too — no bullet may stand in for a confirmed article.
-    assert "Siemens" not in text
-    assert "DA5MU24-D (24 В)" not in text
+    assert "– Belimo LMQ230A" in text
+    assert "LMQ230A" not in analogs_plain_text_for_sku(sku)
 
 
 @pytest.mark.django_db
-def test_invented_q230_article_is_not_shown_or_stored() -> None:
-    """LMQ230A is not sold (LMQ24A datasheet: AC/DC 24 V). Stale card text must not keep it."""
-    from django.core.management import call_command
-
+def test_invented_q230_in_field_is_engineer_responsibility() -> None:
+    """A wrong manual code is shown as typed; card bullets alone do not fill the field."""
     cat = Category.objects.create(name="Fast", slug="fast-unissued-belimo")
     product = Product.objects.create(name="DA5MQU", slug="da5mqu-unissued", category=cat)
     sku = SKU.objects.create(
@@ -1268,31 +1125,22 @@ def test_invented_q230_article_is_not_shown_or_stored() -> None:
         slug="da5mqu230-d-unissued",
         sku_code="DA5MQU230-D",
         is_published=True,
-        analog_belimo_code="LMQ230A",
         analogs_text="DA5MQU230-D (230 В):\n– Belimo LMQ230A\n– Siemens GDB331.1E\n",
     )
-    from catalog.etl.belimo_analogs import analogs_text_for_card
-
-    assert "LMQ230A" not in analogs_plain_text_for_sku(sku)
-    assert "Siemens GDB331.1E" in analogs_plain_text_for_sku(sku)
-    assert "Siemens" not in analogs_text_for_card(sku)
     assert primary_belimo_code_for_sku(sku) is None
-    call_command("fill_belimo_analogs", stdout=StringIO())
-    sku.refresh_from_db()
-    assert sku.analog_belimo_code == ""
+    sku.analog_belimo_code = "LMQ230A"
+    sku.save(update_fields=["analog_belimo_code"])
+    assert primary_belimo_code_for_sku(sku) == "LMQ230A"
 
 
 @pytest.mark.django_db
-def test_analogmap_confirmed_pair_drives_card_and_codes() -> None:
-    """AnalogMap (brand=Belimo, active) is the confirmed-pair store:
-    it feeds belimo_article_for_sku, belimo_codes_for_sku and the
-    verified block inside the card analogs tab."""
+def test_manual_belimo_field_drives_card_and_codes() -> None:
+    """``analog_belimo_code`` feeds the API and the verified block on the analogs tab."""
     from catalog.etl.belimo_analogs import (
         analogs_text_for_card,
         belimo_article_for_sku,
         belimo_codes_for_sku,
     )
-    from catalog.models import AnalogMap
 
     cat = Category.objects.create(name="Air", slug="air-am")
     product = Product.objects.create(name="DA8MU", slug="da8mu-am", category=cat)
@@ -1305,35 +1153,19 @@ def test_analogmap_confirmed_pair_drives_card_and_codes() -> None:
         analogs_text="Список аналогов электропривода Hoocon DA8MU\n\nКрупные марки: Belimo, Siemens.\n",
     )
     assert belimo_article_for_sku(sku) is None
-    assert belimo_codes_for_sku(sku) == []
-    assert "Belimo NM24A" not in analogs_text_for_card(sku)
-
-    AnalogMap.objects.create(
-        brand="Belimo",
-        foreign_code="NM24A-S2",
-        sku=sku,
-        torque_nm=10,
-        voltage="AC/DC 24 В",
-        control="откр/закр",
-        note="2×SPDT",
-        is_active=True,
-    )
+    sku.analog_belimo_code = "NM24A-S2"
+    sku.save(update_fields=["analog_belimo_code"])
     assert belimo_article_for_sku(sku) == "NM24A-S2"
     assert belimo_codes_for_sku(sku) == ["NM24A-S2"]
     card = analogs_text_for_card(sku)
     assert "Подтверждённые замены" in card
     assert "– Belimo NM24A-S2" in card
-    assert "Siemens" in card  # методичка-футер остаётся
-
-    # inactive row — скрывается
-    AnalogMap.objects.filter(sku=sku).update(is_active=False)
-    assert belimo_codes_for_sku(sku) == []
-    assert "NM24A-S2" not in analogs_text_for_card(sku)
+    assert "Siemens" in card
 
 
 @pytest.mark.django_db
-def test_analogmap_non_belimo_brand_is_ignored() -> None:
-    """Siemens and other brands in AnalogMap do not leak into the Belimo slot."""
+def test_analogmap_admin_rows_do_not_drive_public_belimo_slot() -> None:
+    """``AnalogMap`` is for admin lookup only; the card field is the public source."""
     from catalog.etl.belimo_analogs import belimo_codes_for_sku
     from catalog.models import AnalogMap
 
@@ -1353,6 +1185,9 @@ def test_analogmap_non_belimo_brand_is_ignored() -> None:
         is_active=True,
     )
     assert belimo_codes_for_sku(sku) == []
+    sku.analog_belimo_code = "LM24A"
+    sku.save(update_fields=["analog_belimo_code"])
+    assert belimo_codes_for_sku(sku) == ["LM24A"]
 
 
 @pytest.mark.django_db
@@ -1392,7 +1227,7 @@ def test_verified_pairs_migration_seeds_only_confirmed_pairs() -> None:
     assert row.torque_nm == 10
     assert row.is_active
     assert "2×SPDT" in row.note
-    assert belimo_article_for_sku(sku) == "NM24A-S2"
+    assert belimo_article_for_sku(sku) is None
     assert not AnalogMap.objects.filter(sku=unpaired).exists()
     assert belimo_article_for_sku(unpaired) is None
 
@@ -1431,7 +1266,7 @@ def test_fu_pairs_migration_matches_lowercase_sku_codes() -> None:
     row = AnalogMap.objects.get(sku=sku, brand="Belimo")
     assert row.foreign_code == "NF24A-S2"
     assert row.spring_return
-    assert belimo_article_for_sku(sku) == "NF24A-S2"
+    assert belimo_article_for_sku(sku) is None
 
     thermal_row = AnalogMap.objects.get(sku=thermal, brand="Belimo")
     assert thermal_row.foreign_code == "BF24"

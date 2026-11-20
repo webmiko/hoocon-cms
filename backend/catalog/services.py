@@ -4,59 +4,70 @@ from __future__ import annotations
 
 from django.db.models import QuerySet
 
-from catalog.models import SKU, AnalogMap, normalize_analog_code
+from catalog.etl.belimo_analogs import sku_takes_no_analogs
+from catalog.models import SKU, normalize_analog_code
 
 
-def analogs_find(brand: str, code: str) -> QuerySet[AnalogMap]:
-    """Find active AnalogMap rows for a foreign brand + article.
+def analogs_find(brand: str, code: str) -> QuerySet[SKU]:
+    """Find published Hoocon SKUs by manually stored Belimo article.
 
-    ``foreign_code`` матчится по нормализованному ключу (upper, только
-    буквы/цифры) — написания «NM24A-SR» и «nm 24a sr» равнозначны. Пустой
-    бренд допустим: тогда матч только по коду (бренд подсказывает в выдаче).
-    Код без букв/цифр («---») ничего не находит, а не отдаёт всю карту;
-    неопубликованные SKU в публичный подбор не попадают.
+    ``analog_belimo_code`` on the card is the public source. ``AnalogMap`` in
+    admin is only a worksheet while creating the card. Matching uses the same
+    normalized key as legacy ``foreign_code_key`` (upper, alnum only).
     """
     key = normalize_analog_code(code)
     if not key:
-        return AnalogMap.objects.none()
-    qs = AnalogMap.objects.filter(
-        is_active=True,
-        foreign_code_key=key,
-        sku__is_published=True,
-    ).select_related("sku")
+        return SKU.objects.none()
     brand_norm = (brand or "").strip().casefold()
-    if brand_norm:
-        qs = qs.filter(brand__iexact=brand_norm)
-    return qs.order_by("brand", "foreign_code")
+    if brand_norm and brand_norm not in ("belimo", "белимо"):
+        return SKU.objects.none()
+    matching: list[int] = []
+    qs = (
+        SKU.objects.filter(is_published=True)
+        .select_related("product", "product__category")
+        .exclude(analog_belimo_code__isnull=True)
+        .exclude(analog_belimo_code="")
+    )
+    for sku in qs:
+        if sku_takes_no_analogs(sku):
+            continue
+        if normalize_analog_code(sku.analog_belimo_code or "") != key:
+            continue
+        matching.append(sku.pk)
+    if not matching:
+        return SKU.objects.none()
+    return SKU.objects.filter(pk__in=matching).select_related("product", "product__category")
 
 
-def resolve_position_code(code: str) -> tuple[SKU | None, AnalogMap | None]:
-    """Resolve one spec line: own SKU first, then the analog map.
+def resolve_position_code(code: str) -> tuple[SKU | None, bool]:
+    """Resolve one spec line: own SKU first, else Belimo code on a card.
 
-    Returns ``(sku, analog_map_row)`` — ``analog_map_row`` non-null marks
-    that the SKU came from a foreign-article match (для подсказки
-    менеджеру/инженеру). Unpublished SKUs are skipped. Two active rows
-    with the same code and different brands are not a match.
+    Returns ``(sku, via_analog)``. ``via_analog`` is True when the line matched
+    ``analog_belimo_code``, not ``sku_code``. Unpublished SKUs are skipped.
+    Two published SKUs sharing the same Belimo code are not a match.
     """
     key = (code or "").strip()
     if not key:
-        return None, None
+        return None, False
     sku = SKU.objects.filter(sku_code__iexact=key, is_published=True).order_by("pk").first()
     if sku is not None:
-        return sku, None
+        return sku, False
     norm_key = normalize_analog_code(key)
     if not norm_key:
-        return None, None
-    rows = list(
-        AnalogMap.objects.filter(
-            is_active=True,
-            foreign_code_key=norm_key,
-            sku__is_published=True,
-        )
-        .select_related("sku")
-        .order_by("brand", "pk"),
+        return None, False
+    matches: list[SKU] = []
+    qs = (
+        SKU.objects.filter(is_published=True)
+        .select_related("product", "product__category")
+        .exclude(analog_belimo_code__isnull=True)
+        .exclude(analog_belimo_code="")
     )
-    # Same code at two brands is not one match. Do not pick .first() at random.
-    if len(rows) != 1:
-        return None, None
-    return rows[0].sku, rows[0]
+    for row in qs:
+        if sku_takes_no_analogs(row):
+            continue
+        if normalize_analog_code(row.analog_belimo_code or "") != norm_key:
+            continue
+        matches.append(row)
+    if len(matches) != 1:
+        return None, False
+    return matches[0], True

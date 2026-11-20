@@ -9,14 +9,14 @@ from __future__ import annotations
 from typing import Any
 
 import django_filters
-from django.db.models import Exists, F, OuterRef, Q, QuerySet
+from django.db.models import F, Q, QuerySet
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from catalog.compatible_positions import exact_adapter_sku_code
 from catalog.facets import FACET_BY_KEY, FACET_KEYS, filter_skus_by_facet
-from catalog.models import SKU, AnalogMap, Attribute
+from catalog.models import SKU, Attribute, normalize_analog_code
 from catalog.newness import new_since
 
 # Reserved query keys — not treated as Attribute.slug / facet filters.
@@ -124,16 +124,13 @@ class SKUFilterSet(django_filters.FilterSet):
             value = intent.residual
 
         query = SearchQuery(value, config="russian")
-        # The stored field is not a confirmed pair; facets already ignore it.
-        confirmed_analog = AnalogMap.objects.filter(
-            sku_id=OuterRef("pk"),
-            is_active=True,
-            brand__iexact="belimo",
-            foreign_code__icontains=value,
-        )
+        analog_key = normalize_analog_code(value)
+        analog_q = Q()
+        if analog_key:
+            analog_q = Q(analog_belimo_code__icontains=value.strip())
         return (
             queryset.filter(
-                Q(search_vector=query) | Q(sku_code__icontains=value) | Q(Exists(confirmed_analog)),
+                Q(search_vector=query) | Q(sku_code__icontains=value) | analog_q,
             )
             .annotate(rank=SearchRank("search_vector", query))
             .order_by(
