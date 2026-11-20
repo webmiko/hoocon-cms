@@ -264,7 +264,7 @@ def resolve_default_database() -> dict[str, dict[str, str]]:
             "USER": os.getenv("DB_USER", "hoocon"),
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-            "PORT": os.getenv("DB_PORT", "5432"),
+            "PORT": os.getenv("DB_PORT", "5434"),
         },
     }
 
@@ -651,8 +651,8 @@ SPECTACULAR_SETTINGS = {
     "VERSION": RELEASE_VERSION,
 }
 
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6381/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6381/1")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -675,7 +675,7 @@ if _cache_url in {"locmem", "locmem://", "memory"}:
     }
 elif not _cache_url and not DEBUG:
     # Prod default: Redis DB 2 (broker 0, results 1).
-    _cache_url = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+    _cache_url = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6381/0")
     if _cache_url.endswith("/0"):
         _cache_url = f"{_cache_url[:-2]}/2"
     elif "/0?" in _cache_url:
