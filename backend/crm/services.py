@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import re
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -808,12 +808,58 @@ def _drop_empty_html_block(match: re.Match[str]) -> str:
     return match.group(0)
 
 
+def quote_lines_from_lead(lead: Lead) -> list[dict[str, Any]]:
+    """SKU lines to drop into an empty КП form.
+
+    Each dict has ``sku_id`` (null when the code is not in the catalog),
+    ``sku_code``, ``label``, ``quantity`` and ``sort_order``. Price is left
+    for the manager. A lead with no rows falls back to the legacy ``sku``.
+    """
+    from catalog.models import SKU
+
+    items = list(lead.items.select_related("sku").order_by("sort_order", "id"))
+    if not items and lead.sku_id:
+        legacy = cast(SKU | None, lead.sku)
+        if legacy is None:
+            return []
+        return [
+            {
+                "sku_id": legacy.pk,
+                "sku_code": legacy.sku_code,
+                "label": legacy.sku_code,
+                "quantity": lead.quantity or 1,
+                "sort_order": 0,
+            }
+        ]
+    missing = [item.sku_code for item in items if item.sku_id is None and item.sku_code]
+    by_code = {row.sku_code: row for row in SKU.objects.filter(sku_code__in=missing)} if missing else {}
+    lines: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        article = cast(SKU | None, item.sku) if item.sku_id else by_code.get(item.sku_code)
+        code = (article.sku_code if article is not None else item.sku_code).strip()
+        if not code:
+            continue
+        lines.append(
+            {
+                "sku_id": article.pk if article is not None else None,
+                "sku_code": code,
+                "label": code,
+                "quantity": item.quantity or 1,
+                "sort_order": index,
+            }
+        )
+    return lines
+
+
 def create_quote_from_lead(lead: Lead, *, author: Any) -> tuple[Quote, bool]:
     """Create a draft Quote prefilled from the lead's items.
 
-    Кнопка «Создать КП» на карточке заявки. Если у заявки уже есть
-    открытое КП (черновик/выдано) — возвращает его, дубли не создаются.
-    Без карточки клиента — привязывает по email через ``link_lead_to_client``.
+    Кнопка «Создать КП» на карточке заявки. Строки те же, что подставляет
+    форма КП (``quote_lines_from_lead``): код из каталога, если артикул
+    найден, иначе снимок с заявки; старая заявка без строк берёт ``sku``.
+    Цена не копируется. Если у заявки уже есть открытое КП (черновик/выдано)
+    — возвращает его, дубли не создаются. Без карточки клиента — привязывает
+    по email через ``link_lead_to_client``.
 
     Args:
         lead: исходная заявка.
@@ -837,12 +883,12 @@ def create_quote_from_lead(lead: Lead, *, author: Any) -> tuple[Quote, bool]:
         items = [
             QuoteItem(
                 quote=quote,
-                sku=item.sku,
-                sku_code=item.sku_code,
-                quantity=item.quantity,
-                sort_order=item.sort_order,
+                sku_id=line["sku_id"],
+                sku_code=line["sku_code"],
+                quantity=line["quantity"],
+                sort_order=line["sort_order"],
             )
-            for item in lead.items.all()
+            for line in quote_lines_from_lead(lead)
         ]
         if items:
             QuoteItem.objects.bulk_create(items)

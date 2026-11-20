@@ -32,6 +32,16 @@ class QuoteAdminForm(forms.ModelForm):
         model = Quote
         fields = "__all__"
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        lead = self.fields.get("lead")
+        if lead is not None:
+            lead.help_text = (
+                "Заявка, из которой выдано КП (закрывается при «Выдано»). "
+                "Пока «Позиции КП» без цены и без строк, набранных вручную, "
+                "артикулы этой заявки подставляются туда. Цену нужно вписать."
+            )
+
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean() or {}
         lead = cast(Lead | None, cleaned.get("lead"))
@@ -83,6 +93,7 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             _versioned_static("admin/js/hoocon-admin-chained-autocomplete.js"),
             _versioned_static("admin/js/hoocon-admin-quotes-board.js"),
             _versioned_static("admin/js/hoocon-admin-quote-sku-code.js"),
+            _versioned_static("admin/js/hoocon-admin-quote-lead-items.js"),
         )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Quote]:
@@ -183,6 +194,11 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
                 name="crm_quote_sku_code",
             ),
             path(
+                "lead-items/",
+                self.admin_site.admin_view(self.lead_items_view),
+                name="crm_quote_lead_items",
+            ),
+            path(
                 "<int:object_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="crm_quote_set_status",
@@ -213,6 +229,23 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
 
         code = SKU.objects.filter(pk=int(raw)).values_list("sku_code", flat=True).first()
         return JsonResponse({"sku_code": code or ""})
+
+    def lead_items_view(self, request: HttpRequest) -> JsonResponse:
+        """Articles of a visible lead, for the empty «Позиции КП» block."""
+        if request.method != "GET":
+            return JsonResponse({"items": []}, status=405)
+        if not (request.user.has_perm("crm.change_quote") or request.user.has_perm("crm.add_quote")):
+            raise PermissionDenied
+        raw = (request.GET.get("id") or "").strip()
+        if not raw.isdigit():
+            return JsonResponse({"items": []})
+        from crm.services import quote_lines_from_lead
+        from leads.services import scope_leads_for_manager
+
+        lead = scope_leads_for_manager(Lead.objects.all(), request.user).filter(pk=int(raw)).first()
+        if lead is None:
+            return JsonResponse({"items": []})
+        return JsonResponse({"items": quote_lines_from_lead(lead)})
 
     def set_status_view(self, request: HttpRequest, object_id: int) -> JsonResponse:
         """JSON status update for КП kanban drag-and-drop."""
