@@ -1,27 +1,33 @@
 /*
- * Locked light card, even when the site theme is dark.
- * Colours live on .page so the rest of the file does not repeat hex.
+ * Visiting card page — follows site light/dark tokens on .page.
  * Must fit without vertical scroll from iPhone 13 portrait (390×844).
  * From 960px the card lies sideways, like the 90×50 print.
  */
 
 .page {
-  --staff-bg: #ffffff;
-  --staff-ink: #111111;
-  --staff-ink-soft: #222222;
-  --staff-muted: #4a4a4a;
-  --staff-line: #e4e4e4;
-  --staff-hairline: #d5d5d5;
-  --staff-brand: #da0e2b;
-  --staff-brand-hover: #b80c24;
-  --staff-hover: rgba(218, 14, 43, 0.06);
+  --staff-bg: var(--color-surface);
+  --staff-ink: var(--color-text);
+  --staff-ink-soft: var(--color-text-soft);
+  --staff-muted: var(--color-text-muted);
+  --staff-line: var(--color-border-strong);
+  --staff-hairline: var(--color-border);
+  --staff-brand: var(--color-brand-ink);
+  --staff-brand-hover: var(--color-brand-hover);
+  --staff-hover: color-mix(in srgb, var(--color-brand) 8%, transparent);
+  --staff-qr-bg: #ffffff;
+  --staff-qr-fg: #111111;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: safe center;
   background: var(--staff-bg);
   color: var(--staff-ink);
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+:global(html[data-theme="dark"]) .page {
+  --staff-bg: var(--color-bg);
+  --staff-hover: color-mix(in srgb, var(--color-brand) 14%, transparent);
 }
 
 .page a:hover,
@@ -51,8 +57,13 @@
 .logo {
   order: 1;
   width: min(12.25rem, 58%);
-  height: auto;
   margin-bottom: clamp(0.55rem, 1.6dvh, 1.75rem);
+  --brand-logo-height: auto;
+}
+
+.logo :global(img) {
+  width: 100%;
+  height: auto;
 }
 
 .name {
@@ -162,6 +173,18 @@
   height: auto;
   margin-top: clamp(0.4rem, 1.2dvh, 1.35rem);
   color: var(--staff-ink);
+}
+
+.qrBg {
+  fill: var(--staff-qr-bg);
+}
+
+.qrFg {
+  fill: var(--staff-qr-fg);
+}
+
+.bubbleBack {
+  fill: var(--staff-bg);
 }
 
 .caption {
