@@ -6,8 +6,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-hoocon}
       POSTGRES_USER: ${DB_USER:-hoocon}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-hoocon_local_dev}
+    # 5432 — Homebrew Postgres, 5433 — другой локальный проект, 5452 — Postgres.app.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,8 +20,9 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # 6379 — Homebrew Redis, 6380 — другой локальный проект.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6381:6379"
     volumes:
       - redis_data:/data
     healthcheck:

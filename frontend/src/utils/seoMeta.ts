@@ -142,16 +142,12 @@ export function skuSeoTitlePartial(
   const momentRaw = highlights?.find((h) => h.key === "moment")?.value ?? "";
   const moment = momentRaw.replace(/\s+/g, " ").trim();
   const volt = shortVoltageForTitle(voltage);
-  const analogBit = (analog ?? "").replace(/\s+/g, " ").trim();
   const kind = skuKindForTitle(categoryName);
   const parts = [skuCode, kind];
   if (moment && moment.length <= 12) parts.push(moment);
   if (volt) parts.push(volt);
   let partial = parts.join(" ");
-  if (analogBit) {
-    const withAnalog = `${partial}, аналог ${analogBit}`;
-    if (withAnalog.length <= TITLE_PARTIAL_MAX) partial = withAnalog;
-  }
+  void analog;
   if (partial.length <= TITLE_PARTIAL_MAX) return partial;
   const shorter = [skuCode];
   if (moment && moment.length <= 12) shorter.push(moment);
@@ -193,8 +189,7 @@ export function skuSeoDescription(
   );
   const facts = [moment, volt].filter(Boolean);
   if (facts.length) bits.push(`${facts.join(" ")}.`);
-  const analogBit = (analog ?? "").replace(/\s+/g, " ").trim();
-  if (analogBit) bits.push(`Аналог Belimo ${analogBit}.`);
+  void analog;
   bits.push("Паспорт PDF, запрос КП у Hoocon.");
   return truncateAtWord(bits.join(" "), DESC_MAX);
 }

@@ -257,7 +257,7 @@ class SKUViewSet(
         qs = annotate_moment_nm(
             SKU.objects.filter(is_published=True)
             .select_related("product", "product__category")
-            .prefetch_related(published_images, published_attrs, "analog_maps")
+            .prefetch_related(published_images, published_attrs)
             .annotate(
                 category_spec_order=spec_order_case(
                     slug_field="product__category__slug",
@@ -357,8 +357,8 @@ class AnalogLookupView(APIView):
     """GET /api/catalog/analogs/?brand=&code= — подбор аналога (ЛК-10).
 
     Public, read-only: форма «подобрать аналог» и Excel-импорт спек дергают
-    один сервис ``catalog.services.analogs_find``. Ответ — краткая карточка
-    найденного SKU (цены и остатки не отдаём — только идентификацию).
+    один сервис ``catalog.services.analogs_find`` (поле ``analog_belimo_code``).
+    Ответ — краткая карточка найденного SKU (цены и остатки не отдаём).
     """
 
     permission_classes = (AllowAny,)
@@ -375,25 +375,25 @@ class AnalogLookupView(APIView):
                 {"detail": "Передайте параметр code (артикул аналога)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        rows = list(analogs_find(brand, code)[:10])
+        skus = list(analogs_find(brand, code)[:10])
         return Response(
             {
                 "query": {"brand": brand, "code": code},
-                "count": len(rows),
+                "count": len(skus),
                 "matches": [
                     {
-                        "brand": row.brand,
-                        "foreign_code": row.foreign_code,
-                        "sku_code": row.sku.sku_code,
-                        "sku_slug": row.sku.slug,
-                        "name": row.sku.name,
-                        "torque_nm": row.torque_nm,
-                        "voltage": row.voltage,
-                        "control": row.control,
-                        "spring_return": row.spring_return,
-                        "note": row.note,
+                        "brand": "Belimo",
+                        "foreign_code": (sku.analog_belimo_code or "").strip(),
+                        "sku_code": sku.sku_code,
+                        "sku_slug": sku.slug,
+                        "name": sku.name,
+                        "torque_nm": getattr(sku, "moment_nm", None),
+                        "voltage": "",
+                        "control": "",
+                        "spring_return": None,
+                        "note": "",
                     }
-                    for row in rows
+                    for sku in skus
                 ],
             }
         )

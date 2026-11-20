@@ -8,10 +8,10 @@
 #   ./scripts/sync-db-from-vps.sh --from-backup   # latest /opt/hoocon/backups/*/hoocon.dump
 #   ./scripts/sync-db-from-vps.sh --with-media    # also rsync VPS media → backend/media
 #   ./scripts/sync-db-from-vps.sh --keep-secrets  # leave bot/PBX tokens in the local DB
-#   ./scripts/sync-db-from-vps.sh --allow-local-port  # this machine's Postgres is not on 5432
+#   ./scripts/sync-db-from-vps.sh --allow-local-port  # local Postgres on a port other than 5432/5434
 #
 # Local target (auto):
-#   - Homebrew Postgres when DB_HOST is 127.0.0.1/localhost (default .env), port 5432
+#   - Loopback Postgres on 5432 (Homebrew) or 5434 (this repo's compose)
 #   - else docker compose service ``db``
 #
 # After a DB-only sync, media paths may 404 until --with-media (or a manual rsync).
@@ -26,9 +26,11 @@ hoocon_db_host_is_local() {
   esac
 }
 
-# Loopback on 5432 is this machine. Another local port is often an SSH tunnel
-# to production: DROP SCHEMA would then run there. The third argument is 1
-# only when the operator passed --allow-local-port for a local Postgres.
+# Loopback on 5432 (Homebrew) or 5434 (hoocon compose) is this machine.
+# Another local port is often an SSH tunnel to production: DROP SCHEMA
+# would then run there. 5433 is another project's Postgres and is not
+# allowed. The third argument is 1 only when the operator passed
+# --allow-local-port for some other local Postgres.
 hoocon_db_endpoint_is_safe() {
   local host="${1:-}"
   local port="${2:-}"
@@ -36,7 +38,7 @@ hoocon_db_endpoint_is_safe() {
   if ! hoocon_db_host_is_local "${host}"; then
     return 1
   fi
-  if [[ "${port}" == "5432" || "${allow_port}" == "1" ]]; then
+  if [[ "${port}" == "5432" || "${port}" == "5434" || "${allow_port}" == "1" ]]; then
     return 0
   fi
   return 1
@@ -118,7 +120,7 @@ esac
 
 if [[ "${use_compose}" -eq 0 ]] && ! hoocon_db_endpoint_is_safe "${DB_HOST}" "${DB_PORT}" "${ALLOW_LOCAL_PORT}"; then
   echo "ERROR: refusing to restore onto ${DB_HOST}:${DB_PORT}." >&2
-  echo "    Only loopback Postgres on port 5432 is accepted." >&2
+  echo "    Only loopback Postgres on port 5432 or 5434 is accepted." >&2
   echo "    Another local port is often an SSH tunnel; DROP SCHEMA would hit that server." >&2
   echo "    Pass --allow-local-port only when this port is a database on this computer." >&2
   exit 1
@@ -131,7 +133,7 @@ if [[ "${KEEP_SECRETS}" -eq 0 ]]; then
   fi
   if ! hoocon_db_endpoint_is_safe "${early_mask_host}" "${early_mask_port}" "${ALLOW_LOCAL_PORT}"; then
     echo "ERROR: refusing to mask secrets on ${early_mask_host}:${early_mask_port}." >&2
-    echo "    Only loopback Postgres on port 5432 is accepted." >&2
+    echo "    Only loopback Postgres on port 5432 or 5434 is accepted." >&2
     echo "    Pass --allow-local-port only when this port is a database on this computer." >&2
     exit 1
   fi

@@ -1,9 +1,9 @@
 """Belimo analog codes.
 
-The public card does not invent a replacement. ``belimo_article_for_sku``
-returns a code only when an active ``AnalogMap`` row stores the pair — those
-rows are curated against the Belimo datasheet, never inferred. The catalog
-table is the nomenclature used to reject articles Belimo does not sell.
+The public card shows only ``SKU.analog_belimo_code``: the engineer sets it
+after checking ``AnalogMap`` (or the datasheet) when the card is created.
+Runtime does not re-read ``AnalogMap`` rows or infer codes from card copy.
+``AnalogMap`` stays an admin reference for that manual check.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.sku_variant import parse_hva_code, parse_sku_variant, sku_code_is_thermal
 
 if TYPE_CHECKING:
-    from catalog.models import SKU, AnalogMap
+    from catalog.models import SKU
 
 Purpose = Literal[
     "air_no_spring",
@@ -723,33 +723,18 @@ def _sku_uses_ds_as_control_editions(sku_code: str) -> bool:
     return suf in {"a", "as", "d", "ds", "dst"}
 
 
-def _verified_belimo_maps(sku: SKU) -> list[AnalogMap]:
-    """Active Belimo ``AnalogMap`` rows for this SKU — the confirmed-pair store.
-
-    Only rows curated against the Belimo datasheet belong here; a torque or
-    area band alone never creates one. Filtered in Python so a prefetched
-    ``analog_maps`` cache is reused on list endpoints.
-    """
-    if sku.pk is None:
-        return []
-    rows = [row for row in sku.analog_maps.all() if row.is_active and row.brand.casefold() == "belimo"]
-    rows.sort(key=lambda row: (row.torque_nm or 0, row.foreign_code))
-    return rows
-
-
 def belimo_article_for_sku(sku: SKU) -> str | None:
-    """Belimo article shown for this SKU.
-
-    Returns the first confirmed ``AnalogMap`` article. Without a curated row
-    the pair is unconfirmed and nothing is shown.
-    """
-    rows = _verified_belimo_maps(sku)
-    return rows[0].foreign_code if rows else None
+    """Belimo article on the public card (manual ``SKU.analog_belimo_code``)."""
+    if sku_takes_no_analogs(sku):
+        return None
+    code = (sku.analog_belimo_code or "").strip()
+    return code or None
 
 
 def belimo_codes_for_sku(sku: SKU) -> list[str]:
-    """Verified Belimo articles for this SKU (all active ``AnalogMap`` rows)."""
-    return [row.foreign_code for row in _verified_belimo_maps(sku)]
+    """Belimo articles for catalog facets / filters (one manual code per SKU)."""
+    code = belimo_article_for_sku(sku)
+    return [code] if code else []
 
 
 def _resolve_aux_switch(parsed: bool | None, sku_code: str) -> bool | None:
@@ -838,7 +823,7 @@ def belimo_code_is_thermal(code: str | None) -> bool:
 
 
 def primary_belimo_code_for_sku(sku: SKU) -> str | None:
-    """Value for ``SKU.analog_belimo_code``. Empty until a pair is confirmed."""
+    """Same as :func:`belimo_article_for_sku` (manual field)."""
     return belimo_article_for_sku(sku)
 
 
@@ -871,23 +856,18 @@ def _drop_unverified_analog_lines(text: str) -> str:
 
 
 def _verified_analog_lines(sku: SKU) -> list[str]:
-    """Bullets for the confirmed-pair block: ``– Belimo CODE — note``."""
-    lines: list[str] = []
-    for row in _verified_belimo_maps(sku):
-        line = f"– {row.brand} {row.foreign_code}"
-        if row.note:
-            line += f" — {row.note}"
-        lines.append(line)
-    return lines
+    """Bullets for the manually verified Belimo code on the card."""
+    code = belimo_article_for_sku(sku)
+    if not code:
+        return []
+    return [f"– Belimo {code}"]
 
 
 def analogs_text_for_card(sku: SKU) -> str:
-    """Analogs tab: confirmed pairs first, then selection guidance.
+    """Analogs tab: manual Belimo code first, then selection guidance.
 
-    Belimo, Siemens, Honeywell, Gruner and other old bullets are dropped:
-    a torque or area band does not confirm that the article replaces this
-    model. Only ``AnalogMap`` rows curated against the datasheet come back
-    as bullets.
+    Unverified bullets from old copy are dropped; only ``analog_belimo_code``
+    is shown as a confirmed replacement.
     """
     guidance = _drop_unverified_analog_lines(analogs_plain_text_for_sku(sku))
     lines = _verified_analog_lines(sku)

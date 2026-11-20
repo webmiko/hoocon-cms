@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -82,3 +83,32 @@ def test_resolve_default_database_postgres() -> None:
         cfg = resolve_default_database()
     assert cfg["default"]["ENGINE"] == "django.db.backends.postgresql"
     assert cfg["default"]["NAME"] == "hoocon_test"
+
+
+def test_local_compose_publishes_db_and_redis_on_the_app_ports() -> None:
+    """Локальный compose слушает только localhost и не занимает порты Homebrew и соседних проектов."""
+    root = Path(__file__).resolve().parents[2]
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    example = (root / ".env.example").read_text(encoding="utf-8")
+    assert "127.0.0.1:5434:5432" in compose
+    assert "127.0.0.1:6381:6379" in compose
+    for taken in ("127.0.0.1:5432:", "127.0.0.1:5433:", "127.0.0.1:6379:", "127.0.0.1:6380:"):
+        assert taken not in compose
+    assert "DB_PORT=5434" in example
+    assert "redis://127.0.0.1:6381/0" in example
+    assert "redis://127.0.0.1:6381/1" in example
+
+
+def test_unset_env_uses_hoocon_compose_ports(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Без .env Django стучится в порты compose этого репозитория, не в Homebrew."""
+    from config.settings import resolve_default_database
+
+    monkeypatch.delenv("DB_PORT", raising=False)
+    monkeypatch.setenv("DB_NAME", "hoocon")
+    monkeypatch.setenv("DB_USER", "hoocon")
+    monkeypatch.setenv("DB_PASSWORD", "secret")
+    monkeypatch.setenv("DB_HOST", "127.0.0.1")
+
+    cfg = resolve_default_database()
+
+    assert cfg["default"]["PORT"] == "5434"

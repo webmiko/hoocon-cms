@@ -301,7 +301,10 @@ def test_sync_from_vps_treats_only_loopback_as_local() -> None:
 
 
 def test_sync_from_vps_accepts_only_loopback_on_port_5432() -> None:
-    """Порт туннеля не считается локальной базой, пока оператор явно не разрешил его."""
+    """Порт туннеля не считается локальной базой, пока оператор явно не разрешил его.
+
+    5432 — Homebrew, 5434 — compose этого репозитория. 5433 — чужой Postgres.
+    """
     script = ROOT / "scripts" / "sync-db-from-vps.sh"
     completed = subprocess.run(
         [
@@ -309,8 +312,9 @@ def test_sync_from_vps_accepts_only_loopback_on_port_5432() -> None:
             "-c",
             f'source "{script}"; '
             "hoocon_db_endpoint_is_safe 127.0.0.1 5432 0 && "
-            "hoocon_db_endpoint_is_safe localhost 5432 0 && "
+            "hoocon_db_endpoint_is_safe localhost 5434 0 && "
             "hoocon_db_endpoint_is_safe ::1 5432 0 && "
+            "! hoocon_db_endpoint_is_safe 127.0.0.1 5433 0 && "
             "! hoocon_db_endpoint_is_safe 127.0.0.1 5555 0 && "
             "hoocon_db_endpoint_is_safe 127.0.0.1 5555 1 && "
             "! hoocon_db_endpoint_is_safe db 5432 0 && "
@@ -363,6 +367,22 @@ def test_sync_from_vps_stops_before_ssh_on_a_tunnel_port(tmp_path: Path) -> None
     )
     assert allowed.returncode == 99
     assert "SSH_CALLED" in allowed.stdout
+
+    (tmp_path / ".env").write_text(
+        "DB_HOST=127.0.0.1\nDB_PORT=5434\nDB_NAME=hoocon\nDB_USER=hoocon\nDB_PASSWORD=secret\n",
+        encoding="utf-8",
+    )
+    compose_port = subprocess.run(
+        [str(target)],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert compose_port.returncode == 99
+    assert "SSH_CALLED" in compose_port.stdout
+    assert "refusing" not in compose_port.stderr
 
 
 def test_backup_prune_keeps_newest_complete_copies(tmp_path: Path) -> None:

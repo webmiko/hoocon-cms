@@ -191,36 +191,28 @@ def test_sku_filter_by_canonical_moment_alias(client) -> None:
 
 
 @pytest.mark.django_db
-def test_analog_facet_from_belimo_code(client, monkeypatch: pytest.MonkeyPatch) -> None:
-    """«Аналоги» facet lists only confirmed pairs; a stored code alone is hidden."""
+def test_analog_facet_from_manual_belimo_code(client) -> None:
+    """«Аналоги» facet and filter follow ``SKU.analog_belimo_code``."""
     seeded = _seed_with_attrs()
-    # Aux Belimo article must sit on a -DS edition (non-aux would strip -S).
     seeded["sku5"].sku_code = "da5fu24-ds"
     seeded["sku5"].analog_belimo_code = "LM24A-S"
     seeded["sku5"].save(update_fields=["sku_code", "analog_belimo_code"])
-    seeded["sku10"].analog_belimo_code = "NM230A"
-    seeded["sku10"].save(update_fields=["analog_belimo_code"])
 
-    # A stored code is not a confirmed pair: the facet stays hidden.
     facets = client.get(reverse("catalog-facet-list"))
     assert facets.status_code == 200
     by_key = {row["key"]: row for row in facets.data["results"]}
-    assert "analog" not in by_key
+    assert "analog" in by_key
+    assert {v["value"] for v in by_key["analog"]["values"]} >= {"LM24A-S"}
 
     filtered = client.get(reverse("catalog-sku-list"), {"analog": "LM24A-S"})
     assert filtered.status_code == 200
-    assert filtered.data["results"] == []
+    assert {row["slug"] for row in filtered.data["results"]} == {seeded["sku5"].slug}
 
-    # Datasheet-confirmed pairs revive both the facet and the filter.
     from catalog.facets import filter_options
     from catalog.facets.defs import FACET_BY_KEY
     from catalog.models import SKU
 
     sku5_id = seeded["sku5"].id
-    monkeypatch.setattr(
-        "catalog.etl.belimo_analogs.belimo_codes_for_sku",
-        lambda sku: ["LM24A-S"] if getattr(sku, "pk", None) == sku5_id else [],
-    )
     options = filter_options._collect_analog_facet_options([sku5_id])
     assert options is not None
     assert {v["value"] for v in options["values"]} == {"LM24A-S"}
@@ -1415,8 +1407,8 @@ def test_decimal_area_and_kvs_filters_match_only_their_chip(client) -> None:
 
 
 @pytest.mark.django_db
-def test_analog_filter_matches_only_confirmed_pairs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """«?analog=» matches a confirmed pair, never a stored-but-unverified code."""
+def test_analog_filter_matches_manual_belimo_code() -> None:
+    """«?analog=» matches ``SKU.analog_belimo_code``."""
     from catalog.facets import filter_options
     from catalog.facets.defs import FACET_BY_KEY
     from catalog.models import SKU
@@ -1425,13 +1417,6 @@ def test_analog_filter_matches_only_confirmed_pairs(monkeypatch: pytest.MonkeyPa
     SKU.objects.filter(pk=seeded["sku5"].pk).update(analog_belimo_code="LM24A")
     scoped = SKU.objects.filter(is_published=True)
 
-    assert not filter_options.filter_skus_by_facet(scoped, FACET_BY_KEY["analog"], "LM24A").exists()
-
-    sku5_id = seeded["sku5"].pk
-    monkeypatch.setattr(
-        "catalog.etl.belimo_analogs.belimo_codes_for_sku",
-        lambda sku: ["LM24A"] if getattr(sku, "pk", None) == sku5_id else [],
-    )
     matched = filter_options.filter_skus_by_facet(scoped, FACET_BY_KEY["analog"], "LM24A")
-    assert list(matched.values_list("pk", flat=True)) == [sku5_id]
+    assert list(matched.values_list("pk", flat=True)) == [seeded["sku5"].pk]
     assert not filter_options.filter_skus_by_facet(scoped, FACET_BY_KEY["analog"], "X" * 500).exists()

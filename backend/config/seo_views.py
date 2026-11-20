@@ -176,24 +176,16 @@ def _category_lines(base: str) -> list[str]:
 
 
 def _analog_lines(base: str, *, limit: int = 60) -> list[str]:
-    """One published SKU per confirmed Belimo article.
-
-    ``SKU.analog_belimo_code`` is a cache and may name a pair the project
-    has not confirmed. The list follows active Belimo ``AnalogMap`` rows.
-    """
+    """One published SKU per manually stored Belimo article."""
     from catalog.etl.belimo_analogs import belimo_article_for_sku
 
     seen: set[str] = set()
     lines: list[str] = []
     skus = (
-        SKU.objects.filter(
-            is_published=True,
-            analog_maps__is_active=True,
-            analog_maps__brand__iexact="belimo",
-        )
+        SKU.objects.filter(is_published=True)
+        .exclude(analog_belimo_code__isnull=True)
+        .exclude(analog_belimo_code="")
         .select_related("product__category")
-        .prefetch_related("analog_maps")
-        .distinct()
     )
     pairs: list[tuple[str, SKU]] = []
     for sku in skus:

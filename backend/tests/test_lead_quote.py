@@ -81,6 +81,34 @@ def test_create_quote_copies_lead_items_and_links() -> None:
         ("DA24-NS", 3),
         ("SA10", 1),
     ]
+    assert all(i.unit_price is None for i in items)
+
+
+@pytest.mark.django_db
+def test_create_quote_uses_same_lines_as_the_form() -> None:
+    """Кнопка «Создать КП» привязывает артикул по коду и берёт старый sku заявки без строк."""
+    admin = _superuser()
+    catalog = _sku("DA24-NS")
+    lead = _make_lead()
+    LeadItem.objects.create(lead=lead, sku_code="DA24-NS", quantity=2, sort_order=4)
+    legacy = _sku("SA10")
+    old = _make_lead(sku=legacy, quantity=3, email="legacy-quote@example.com")
+    page = DjClient()
+    page.force_login(admin)
+
+    page.post(reverse("admin:leads_lead_create_quote", args=[lead.pk]))
+    page.post(reverse("admin:leads_lead_create_quote", args=[old.pk]))
+
+    copied = Quote.objects.get(lead=lead).items.get()
+    assert copied.sku_id == catalog.pk
+    assert copied.sku_code == "DA24-NS"
+    assert copied.quantity == 2
+    assert copied.unit_price is None
+    fallback = Quote.objects.get(lead=old).items.get()
+    assert fallback.sku_id == legacy.pk
+    assert fallback.sku_code == "SA10"
+    assert fallback.quantity == 3
+    assert fallback.unit_price is None
 
 
 @pytest.mark.django_db
@@ -384,6 +412,130 @@ def test_quote_form_rejects_lead_of_other_client() -> None:
     assert not foreign.is_valid()
     assert "lead" in foreign.errors
     assert own.is_valid()
+
+
+def _sku(code: str) -> Any:
+    """Published catalog article. Slug is derived from the code."""
+    from catalog.models import SKU, Category, Product
+
+    slug = code.casefold().replace("-", "")
+    category = Category.objects.create(name=code, slug=f"c-{slug}")
+    product = Product.objects.create(category=category, name=code, slug=f"p-{slug}")
+    return SKU.objects.create(product=product, name=code, slug=f"s-{slug}", sku_code=code)
+
+
+@pytest.mark.django_db
+def test_quote_lines_from_lead_use_articles_and_leave_price() -> None:
+    """Позиции КП берутся из заявки по порядку: код, количество, без цены."""
+    from crm.services import quote_lines_from_lead
+
+    lead = _make_lead()
+    first = _sku("HVA24-40Q")
+    LeadItem.objects.create(lead=lead, sku=first, sku_code="HVA24-40Q", quantity=2, sort_order=5)
+    LeadItem.objects.create(lead=lead, sku_code="DA24-NS", quantity=4, sort_order=1)
+    _sku("DA24-NS")
+
+    lines = quote_lines_from_lead(lead)
+
+    assert [line["sku_code"] for line in lines] == ["DA24-NS", "HVA24-40Q"]
+    assert [line["quantity"] for line in lines] == [4, 2]
+    assert all(line["sku_id"] for line in lines)
+    assert all("unit_price" not in line for line in lines)
+
+
+@pytest.mark.django_db
+def test_quote_lines_from_lead_fall_back_to_legacy_sku() -> None:
+    """Старая заявка без строк позиций отдаёт свой единственный артикул."""
+    from crm.services import quote_lines_from_lead
+
+    sku = _sku("SA10")
+    lead = _make_lead(sku=sku, quantity=3)
+
+    assert quote_lines_from_lead(lead) == [
+        {"sku_id": sku.pk, "sku_code": "SA10", "label": "SA10", "quantity": 3, "sort_order": 0}
+    ]
+
+
+@pytest.mark.django_db
+def test_quote_lead_items_hide_another_managers_lead() -> None:
+    """Чужая заявка в работе не отдаёт артикулы в форму КП."""
+    owner = _staff_with_perms(username="quote-owner", codenames=("add_quote", "change_quote"))
+    viewer = _staff_with_perms(username="quote-viewer", codenames=("add_quote",))
+    lead = _make_lead(status=Lead.LeadStatus.IN_PROGRESS, assignee=owner)
+    LeadItem.objects.create(lead=lead, sku_code="SECRET", quantity=1)
+    page = DjClient()
+    page.force_login(viewer)
+
+    hidden = page.get(reverse("admin:crm_quote_lead_items"), {"id": lead.pk})
+    assert hidden.status_code == 200
+    assert hidden.json()["items"] == []
+
+    page.force_login(owner)
+    visible = page.get(reverse("admin:crm_quote_lead_items"), {"id": lead.pk})
+    assert visible.status_code == 200
+    assert visible.json()["items"][0]["sku_code"] == "SECRET"
+    assert "unit_price" not in visible.json()["items"][0]
+
+
+@pytest.mark.django_db
+def test_quote_lead_items_require_quote_permission() -> None:
+    """Без права на КП список артикулов заявки недоступен."""
+    staff = _staff_with_perms(username="no-quote", codenames=("view_lead",))
+    lead = _make_lead()
+    page = DjClient()
+    page.force_login(staff)
+
+    response = page.get(reverse("admin:crm_quote_lead_items"), {"id": lead.pk})
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_quote_add_page_loads_lead_items_js() -> None:
+    """Форма КП подключает скрипт, который заполняет позиции из заявки."""
+    admin = _superuser()
+    page = DjClient()
+    page.force_login(admin)
+
+    response = page.get(reverse("admin:crm_quote_add"))
+
+    assert response.status_code == 200
+    assert "hoocon-admin-quote-lead-items.js" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_quote_form_explains_that_lead_fills_lines() -> None:
+    """Под полем «Заявка» сказано, что пустые позиции заполнятся из неё."""
+    from crm.admin import QuoteAdminForm
+
+    form = QuoteAdminForm()
+
+    assert "Позиции КП" in form.fields["lead"].help_text
+    assert "Цену нужно вписать" in form.fields["lead"].help_text
+    assert "набранных вручную" in form.fields["lead"].help_text
+
+
+def test_quote_lead_items_js_leaves_priced_rows_and_ignores_failed_lookup() -> None:
+    """Смена заявки не дописывает строки с ценой, а сбой запроса их не стирает.
+
+    # source-lint: скрипт админки без своего раннера; проверяется загружаемый файл.
+    """
+    js = (Path(__file__).resolve().parents[1] / "static/admin/js/hoocon-admin-quote-lead-items.js").read_text(
+        encoding="utf-8"
+    )
+    apply = js.split("function apply(", 1)[1].split("function load(", 1)[0]
+    occupied = js.split("function occupied(", 1)[1].split("function clearFilled(", 1)[0]
+    priced = js.split("function priced(", 1)[1].split("function occupied(", 1)[0]
+    load = js.split("function load(", 1)[1].split("function init(", 1)[0]
+    failed = load.split("if (!response.ok", 1)[1].split("return response.json", 1)[0]
+
+    assert "/admin/crm/quote/lead-items/" in js
+    assert apply.index("occupied") < apply.index("clearFilled")
+    assert "manual" in occupied
+    assert "priced" in occupied
+    assert "fromLead" in occupied
+    assert "unit_price" in priced
+    assert "apply(" not in failed
 
 
 def test_chained_autocomplete_js_contract() -> None:

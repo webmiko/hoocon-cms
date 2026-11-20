@@ -5,6 +5,7 @@ import { encode } from "uqr";
 import "@fontsource/montserrat/cyrillic-400.css";
 import "@fontsource/montserrat/latin-400.css";
 
+import { BrandLogo } from "../components/BrandLogo";
 import { Seo } from "../components/Seo";
 import {
   formatRuPhone,
@@ -30,7 +31,7 @@ import styles from "./StaffCardPage.module.css";
 export function StaffCardPage() {
   const { slug = "" } = useParams();
   const card = staffCardBySlug(slug);
-  useLightCanvas();
+  usePageCanvas();
 
   if (!card) {
     return (
@@ -197,25 +198,24 @@ function Card({ card }: { card: StaffCard }) {
 }
 
 function Logo() {
-  return (
-    <img
-      className={styles.logo}
-      src="/logo.svg"
-      alt="Hoocon"
-      width={248}
-      height={63}
-      decoding="async"
-    />
-  );
+  return <BrandLogo className={styles.logo} alt="Hoocon" width={248} height={63} />;
 }
 
-/** White page behind the card, including the overscroll past the footer colour. */
-function useLightCanvas() {
+/** Page fill behind the card, including overscroll (matches .page --staff-bg). */
+function usePageCanvas() {
   useEffect(() => {
     const root = document.documentElement;
     const previous = root.style.backgroundColor;
-    root.style.backgroundColor = "#ffffff";
+    const sync = () => {
+      const token =
+        root.getAttribute("data-theme") === "dark" ? "--color-bg" : "--color-surface";
+      root.style.backgroundColor = `var(${token})`;
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
     return () => {
+      observer.disconnect();
       root.style.backgroundColor = previous;
     };
   }, []);
@@ -240,8 +240,8 @@ function ContactQr({ value }: { value: string }) {
       aria-label="QR-код с контактом"
       shapeRendering="crispEdges"
     >
-      <rect width={qr.size} height={qr.size} fill="#ffffff" />
-      <g fill="#111111">{cells}</g>
+      <rect className={styles.qrBg} width={qr.size} height={qr.size} />
+      <g className={styles.qrFg}>{cells}</g>
     </svg>
   );
 }
@@ -306,7 +306,7 @@ function BubblesIcon() {
     <svg {...iconProps()}>
       <rect {...stroke} x="3.2" y="5" width="10.2" height="7.4" rx="2" />
       <path {...stroke} d="M6.2 12.4 5 15.2l3.1-1.6" />
-      <rect {...stroke} x="10.2" y="10.2" width="10.4" height="7.2" rx="2" fill="#ffffff" />
+      <rect {...stroke} x="10.2" y="10.2" width="10.4" height="7.2" rx="2" className={styles.bubbleBack} />
       <path {...stroke} d="M13.4 17.4 12.4 20l2.8-1.6" />
     </svg>
   );

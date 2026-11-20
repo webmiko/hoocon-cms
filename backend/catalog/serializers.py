@@ -449,13 +449,13 @@ class SKUListSerializer(serializers.ModelSerializer):
         )
 
     def to_representation(self, instance: SKU) -> dict[str, Any]:
-        """Drop `price` when hidden. Belimo article stays empty until a pair is confirmed."""
+        """Drop `price` when hidden; Belimo code comes from the stored field."""
         from catalog.etl.belimo_analogs import belimo_article_for_sku
 
         data = super().to_representation(instance)
         if not _prices_visible(self.context):
             data.pop("price", None)
-        data["analog_belimo_code"] = belimo_article_for_sku(instance)
+        data["analog_belimo_code"] = belimo_article_for_sku(instance) or None
         return data
 
 

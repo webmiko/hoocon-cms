@@ -18,7 +18,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 
 from cabinet.spec_import import SpecParseError, parse_spec_xlsx
-from catalog.models import SKU, AnalogMap, Category, Product
+from catalog.models import SKU, Category, Product
 from catalog.services import resolve_position_code
 from crm.models import (
     Client,
@@ -136,15 +136,10 @@ def test_quote_admin_sent_transition_issues_document() -> None:
 
 @pytest.mark.django_db
 def test_analog_lookup_endpoint() -> None:
-    """GET /api/catalog/analogs/ matches foreign code → Hoocon SKU."""
+    """GET /api/catalog/analogs/ matches manual Belimo code on the card."""
     sku = _sku()
-    AnalogMap.objects.create(
-        brand="Belimo",
-        foreign_code="NM24A-SR",
-        sku=sku,
-        torque_nm=10,
-        voltage="AC/DC 24V",
-    )
+    sku.analog_belimo_code = "NM24A-SR"
+    sku.save(update_fields=["analog_belimo_code"])
     api = DjangoClient()
     found = api.get("/api/catalog/analogs/", {"brand": "belimo", "code": "nm24a sr"})
     assert found.status_code == 200
@@ -173,9 +168,10 @@ def _xlsx(rows: list[tuple[str, object]], headers: tuple[str, ...]) -> io.BytesI
 
 @pytest.mark.django_db
 def test_spec_xlsx_parser_resolves_sku_and_analog() -> None:
-    """Parser finds the code/qty columns; foreign codes hit AnalogMap."""
+    """Parser finds the code/qty columns; Belimo lines hit ``analog_belimo_code``."""
     sku = _sku()
-    AnalogMap.objects.create(brand="Belimo", foreign_code="NM24A", sku=sku)
+    sku.analog_belimo_code = "NM24A"
+    sku.save(update_fields=["analog_belimo_code"])
 
     buf = _xlsx(
         [
@@ -193,27 +189,31 @@ def test_spec_xlsx_parser_resolves_sku_and_analog() -> None:
 
 
 @pytest.mark.django_db
-def test_resolve_position_code_skips_unpublished_and_brand_collision() -> None:
-    """Unpublished SKU and two brands sharing a code must not resolve."""
+def test_resolve_position_code_skips_unpublished_and_duplicate_belimo() -> None:
+    """Unpublished SKU and two cards sharing one Belimo code must not resolve."""
     published = _sku("HVA-PUB-1")
     hidden = _sku("HVA-HIDDEN-1")
     hidden.is_published = False
     hidden.save(update_fields=["is_published"])
-    assert resolve_position_code(published.sku_code) == (published, None)
-    assert resolve_position_code(hidden.sku_code) == (None, None)
+    assert resolve_position_code(published.sku_code) == (published, False)
+    assert resolve_position_code(hidden.sku_code) == (None, False)
 
-    AnalogMap.objects.create(brand="Belimo", foreign_code="NM24A", sku=published)
-    AnalogMap.objects.create(brand="Siemens", foreign_code="NM24A", sku=published)
-    assert resolve_position_code("NM24A") == (None, None)
+    published.analog_belimo_code = "NM24A"
+    published.save(update_fields=["analog_belimo_code"])
+    other = _sku("HVA-PUB-2")
+    other.analog_belimo_code = "NM24A"
+    other.save(update_fields=["analog_belimo_code"])
+    assert resolve_position_code("NM24A") == (None, False)
 
-    AnalogMap.objects.filter(brand="Siemens").delete()
-    sku, row = resolve_position_code("nm24a")
+    other.analog_belimo_code = "NM24B"
+    other.save(update_fields=["analog_belimo_code"])
+    sku, via_analog = resolve_position_code("nm24a")
     assert sku == published
-    assert row is not None and row.brand == "Belimo"
+    assert via_analog is True
 
     published.is_published = False
     published.save(update_fields=["is_published"])
-    assert resolve_position_code("NM24A") == (None, None)
+    assert resolve_position_code("NM24A") == (None, False)
 
 
 @pytest.mark.django_db
@@ -419,8 +419,10 @@ def test_analog_lookup_rejects_symbol_only_code_and_hides_unpublished() -> None:
     hidden = _sku("HVA-HIDDEN-5")
     hidden.is_published = False
     hidden.save(update_fields=["is_published"])
-    AnalogMap.objects.create(brand="Belimo", foreign_code="LM24A", sku=published)
-    AnalogMap.objects.create(brand="Belimo", foreign_code="SM24A", sku=hidden)
+    published.analog_belimo_code = "LM24A"
+    published.save(update_fields=["analog_belimo_code"])
+    hidden.analog_belimo_code = "SM24A"
+    hidden.save(update_fields=["analog_belimo_code"])
     api = DjangoClient()
 
     assert api.get("/api/catalog/analogs/", {"code": "---"}).status_code == 400

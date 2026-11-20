@@ -62,7 +62,7 @@ describe("catalogListingSeoTitle", () => {
 });
 
 describe("skuSeoTitlePartial", () => {
-  it("keeps torque and the Belimo code inside the snippet budget", () => {
+  it("keeps torque and voltage inside the snippet budget without Belimo", () => {
     const title = skuSeoTitlePartial(
       "DA5FU24-DS",
       [
@@ -72,7 +72,8 @@ describe("skuSeoTitlePartial", () => {
       "LF24",
       "Электроприводы с пружинным возвратом",
     );
-    expect(title).toBe("DA5FU24-DS привод 5 Нм 24 В, аналог LF24");
+    expect(title).toBe("DA5FU24-DS привод 5 Нм 24 В");
+    expect(title).not.toContain("аналог");
     expect(title.length).toBeLessThanOrEqual(51);
   });
 });

@@ -143,6 +143,12 @@ def test_seed_wiki_admin_3_0_covers_crm_ops() -> None:
     assert "07.10.2026" in doc.body
     assert 'id="chat"' in doc.body
     assert 'id="changelog"' in doc.body
+    assert 'id="changelog-quote-lead-items"' in doc.body
+    assert doc.body.index("changelog-quote-lead-items") < doc.body.index("changelog-company-autofill")
+    lead_items_row = doc.body.split('id="changelog-quote-lead-items"', 1)[1].split("</tr>", 1)[0]
+    assert "18.11.2026" in lead_items_row
+    assert "Строка с ценой" in lead_items_row
+    assert "не трогает" in lead_items_row
     assert 'id="changelog-dashboard-firm-labels"' in doc.body
     assert doc.body.index("changelog-dashboard-firm-labels") < doc.body.index("changelog-dashboard-own-firms")
     assert 'id="changelog-dashboard-own-firms"' in doc.body

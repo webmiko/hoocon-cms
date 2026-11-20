@@ -7,7 +7,6 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from catalog.etl.belimo_analogs import primary_belimo_code_for_sku
 from catalog.etl.da_sa_media_webp import clone_damqu_images_from_donor
 from catalog.etl.html_text import filter_analogs_for_sku
 from catalog.etl.manual_pdfs import clone_damqu_manuals_from_donor
@@ -79,7 +78,6 @@ class Command(BaseCommand):
             ),
         )
         analogs_n = 0
-        belimo_n = 0
         for product in damqu_product_queryset().order_by("slug"):
             match = _NM_FROM_SLUG.search(product.slug or "")
             if match is None:
@@ -103,18 +101,8 @@ class Command(BaseCommand):
                     sku.analogs_text = scoped
                     sku.save(update_fields=["analogs_text", "updated_at"])
                     sku.refresh_from_db()
-                primary = primary_belimo_code_for_sku(sku)
-                if not primary:
-                    continue
-                current = (sku.analog_belimo_code or "").strip()
-                if current.casefold() == primary.casefold():
-                    continue
-                belimo_n += 1
-                if not dry_run:
-                    sku.analog_belimo_code = primary
-                    sku.save(update_fields=["analog_belimo_code"])
         self.stdout.write(
             self.style.SUCCESS(
-                f"{prefix}DAMQU analogs rewritten: products={analogs_n}, belimo_updated={belimo_n}",
+                f"{prefix}DAMQU analogs rewritten: products={analogs_n}",
             ),
         )

@@ -252,53 +252,63 @@ def _filter_skus_by_belimo_analog(
     queryset: QuerySet[SKU],
     value: str,
 ) -> QuerySet[SKU]:
-    """Match SKUs whose verified Belimo pair equals ``value``.
-
-    ``SKU.analog_belimo_code`` may hold a stale or hand-typed value, so the
-    field itself is not proof of a pair — only ``belimo_codes_for_sku``
-    (datasheet-confirmed pairs) counts. Empty until such a pair exists.
-    """
-    from catalog.etl.belimo_analogs import belimo_codes_for_sku, normalize_belimo_code
+    """Match SKUs whose manually set ``analog_belimo_code`` equals ``value``."""
+    from catalog.etl.belimo_analogs import sku_takes_no_analogs
+    from catalog.models import normalize_analog_code
 
     if len(value) > _BELIMO_CODE_MAX_LEN:
         return queryset.none()
-    needle = normalize_belimo_code(value)
+    needle = normalize_analog_code(value)
     if not needle:
         return queryset.none()
-    matching: set[int] = set()
-    for sku in queryset.select_related("product", "product__category"):
-        codes = {normalize_belimo_code(c) for c in belimo_codes_for_sku(sku)}
-        if needle in codes:
-            matching.add(sku.id)
+    matching: list[int] = []
+    scoped = (
+        queryset.select_related("product", "product__category")
+        .exclude(analog_belimo_code__isnull=True)
+        .exclude(analog_belimo_code="")
+    )
+    for sku in scoped:
+        if normalize_analog_code(sku.analog_belimo_code or "") != needle:
+            continue
+        if sku_takes_no_analogs(sku):
+            continue
+        matching.append(sku.pk)
     if not matching:
         return queryset.none()
-    return queryset.filter(id__in=matching)
+    return queryset.filter(pk__in=matching)
 
 
 def _collect_analog_facet_options(
     sku_ids: list[int],
 ) -> dict[str, object] | None:
-    """Build «Аналоги» facet from verified Belimo pairs only.
-
-    Card text, a stored ``analog_belimo_code`` or a torque-band guess are not
-    proof that the article replaces the model, so the facet is empty until a
-    datasheet-confirmed pair exists.
-    """
-    from catalog.etl.belimo_analogs import belimo_codes_for_sku
+    """Build «Аналоги» facet from ``SKU.analog_belimo_code`` (manual, one per card)."""
+    from catalog.etl.belimo_analogs import sku_takes_no_analogs
 
     if not sku_ids:
         return None
-    counts: dict[str, set[int]] = {}
     skus = SKU.objects.filter(id__in=sku_ids).select_related("product", "product__category")
-    for sku in skus:
-        for code in belimo_codes_for_sku(sku):
-            counts.setdefault(code, set()).add(sku.id)
+    eligible_ids = [sku.pk for sku in skus if not sku_takes_no_analogs(sku)]
+    if not eligible_ids:
+        return None
+    rows = (
+        SKU.objects.filter(id__in=eligible_ids)
+        .exclude(analog_belimo_code__isnull=True)
+        .exclude(analog_belimo_code="")
+        .values("analog_belimo_code")
+        .annotate(sku_count=Count("id"))
+    )
+    counts: dict[str, int] = {}
+    for row in rows:
+        key = (row["analog_belimo_code"] or "").strip()
+        if not key:
+            continue
+        counts[key] = int(row["sku_count"])
 
     if not counts:
         return None
     values = [
-        {"value": value, "count": len(sku_set)}
-        for value, sku_set in sorted(
+        {"value": value, "count": count}
+        for value, count in sorted(
             counts.items(),
             key=lambda item: _facet_sort_key("analog", item[0]),
         )

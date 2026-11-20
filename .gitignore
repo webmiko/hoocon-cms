@@ -65,8 +65,12 @@ docker-compose.local.yml
 # Загрузки (media) и collectstatic
 media/
 backend/media/
+backend/media.nosync/
 backend/private_media/
 backend/staticfiles/
+
+# iCloud no-sync convention (*.nosync никогда не коммитим и не синкаем)
+*.nosync
 
 # Frontend build artifacts
 frontend/dist/
@@ -96,8 +100,7 @@ coverage.json
 # Отчёты и тесты
 reports/
 temp_reports/
-.coverage
-.coverage.*
+.coverage*
 .pytest_cache/
 htmlcov/
 .tox/

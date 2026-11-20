@@ -122,4 +122,11 @@ describe("StaffCardPage", () => {
     expect(container.textContent).not.toContain("780-70-18");
     expect(container.textContent).not.toContain("assistant@hoocon.ru");
   });
+
+  it("uses the dark wordmark when the site theme is dark", () => {
+    document.documentElement.dataset.theme = "dark";
+    renderAt("/komanda/popova");
+    expect(container.querySelector('img[src="/logo-on-dark.svg"]')).not.toBeNull();
+    document.documentElement.removeAttribute("data-theme");
+  });
 });

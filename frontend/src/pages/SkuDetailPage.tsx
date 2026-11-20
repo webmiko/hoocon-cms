@@ -533,14 +533,14 @@ export function SkuDetailPage() {
         title={skuSeoTitlePartial(
           displaySkuCode || sku.sku_code,
           displayHighlights,
-          sku.analog_belimo_code,
+          null,
           sku.category_name,
         )}
         description={skuSeoDescription(
           displaySkuCode || sku.sku_code,
           sku.category_name,
           displayHighlights,
-          sku.analog_belimo_code,
+          null,
         )}
         path={canonicalPath}
         jsonLd={[
@@ -645,11 +645,6 @@ export function SkuDetailPage() {
           {displayInStockMa ? (
             <p className={`${styles.stockLabel} ${styles.stockMa}`}>
               4–20 мА (спецзаказ) — есть на складе
-            </p>
-          ) : null}
-          {sku.analog_belimo_code ? (
-            <p className={`${styles.analog} text-tech`}>
-              Аналог Belimo: <strong>{softBreak(sku.analog_belimo_code)}</strong>
             </p>
           ) : null}
 
