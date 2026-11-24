@@ -124,6 +124,100 @@ def vk_message_attachment(message: dict[str, Any]) -> tuple[ContentFile, str, st
     return None
 
 
+_VK_MEDIA_TYPES = frozenset({"photo", "doc", "audio_message", "video"})
+
+
+def vk_message_has_media(message: dict[str, Any]) -> bool:
+    """True when the VK message carries a photo, document, voice note or video."""
+    attachments = message.get("attachments")
+    if not isinstance(attachments, list):
+        return False
+    return any(isinstance(att, dict) and att.get("type") in _VK_MEDIA_TYPES for att in attachments)
+
+
+def _vk_best_photo_url(photo: dict[str, Any]) -> str:
+    raw_sizes = photo.get("sizes")
+    sizes: list[Any] = raw_sizes if isinstance(raw_sizes, list) else []
+    best_url = ""
+    best_area = 0
+    for size in sizes:
+        if not isinstance(size, dict):
+            continue
+        url = str(size.get("url") or "").strip()
+        area = int(size.get("width") or 0) * int(size.get("height") or 0)
+        if url and area >= best_area:
+            best_area = area
+            best_url = url
+    return best_url
+
+
+def vk_message_media(message: dict[str, Any], budget: Any) -> tuple[list[Any], list[Any]]:
+    """Every photo/doc/voice/video of a VK message → ``(files, problems)``.
+
+    VK gives bots no download URL for video, so a video becomes a manager
+    notice with the vk.com link; everything else that fails is reported too.
+    """
+    import mimetypes
+
+    from social.vk_http import vk_download_attachment
+    from supportchat.inbound_media import InboundFile, MediaProblem
+
+    files: list[Any] = []
+    problems: list[Any] = []
+    attachments = message.get("attachments")
+    if not isinstance(attachments, list):
+        return files, problems
+    handled = 0
+    for att in attachments:
+        if not isinstance(att, dict) or att.get("type") not in _VK_MEDIA_TYPES:
+            continue
+        kind = str(att["type"])
+        handled += 1
+        name, mime, url, media_kind = "", "", "", "file"
+        if kind == "photo":
+            raw = att.get("photo")
+            url = _vk_best_photo_url(raw if isinstance(raw, dict) else {})
+            name, mime, media_kind = f"photo-{handled}.jpg", "image/jpeg", "photo"
+        elif kind == "doc":
+            raw = att.get("doc")
+            doc: dict[str, Any] = raw if isinstance(raw, dict) else {}
+            url = str(doc.get("url") or "").strip()
+            name = str(doc.get("title") or f"file-{handled}")[:200]
+            ext = str(doc.get("ext") or "").strip(".")
+            if ext and not name.lower().endswith(f".{ext.lower()}"):
+                name = f"{name}.{ext}"[:200]
+            mime = mimetypes.guess_type(name)[0] or ""
+        elif kind == "audio_message":
+            raw = att.get("audio_message")
+            voice: dict[str, Any] = raw if isinstance(raw, dict) else {}
+            url = str(voice.get("link_mp3") or voice.get("link_ogg") or "").strip()
+            name = f"voice-{handled}.mp3" if voice.get("link_mp3") else f"voice-{handled}.ogg"
+            mime = "audio/mpeg" if voice.get("link_mp3") else "audio/ogg"
+            media_kind = "audio"
+        else:  # video: not downloadable with a community token
+            raw = att.get("video")
+            video: dict[str, Any] = raw if isinstance(raw, dict) else {}
+            ref = f"{video.get('owner_id')}_{video.get('id')}"
+            if video.get("access_key"):
+                ref = f"{ref}_{video['access_key']}"
+            problems.append(MediaProblem("video", "unsupported", f"Видео VK: https://vk.com/video{ref}"))
+            continue
+        if not url:
+            problems.append(MediaProblem(media_kind, "no_url"))
+            continue
+        if not budget.has_room():
+            problems.append(MediaProblem(media_kind, "limit"))
+            continue
+        downloaded = vk_download_attachment(url, max_bytes=budget.per_file_limit)
+        if downloaded is None:
+            problems.append(MediaProblem(media_kind, "download_failed"))
+            continue
+        data, _ = downloaded
+        budget.consume(len(data))
+        files.append(InboundFile(ContentFile(data, name=name), name, mime, media_kind))
+    return files, problems
+
+
 def handle_message_event(event: dict[str, Any]) -> PublishResult | None:
     obj = event.get("object")
     if not isinstance(obj, dict):

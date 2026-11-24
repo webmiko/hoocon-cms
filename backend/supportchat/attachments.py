@@ -23,8 +23,16 @@ DOWNLOAD_TYPES = frozenset(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel",
         "text/plain",
+        # Voice notes and video from clients; always served as a download.
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "audio/mpeg",
+        "audio/mp4",
+        "audio/ogg",
     },
 )
+VIDEO_AUDIO_PREFIXES = ("video/", "audio/")
 FALLBACK_TYPE = "application/octet-stream"
 ATTACHMENT_CSP = "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
 

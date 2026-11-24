@@ -473,9 +473,12 @@ def test_telegram_webhook_photo_caption_goes_to_support_inbox(settings) -> None:
             HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN="expected-secret",
         )
     assert response.status_code == 200
-    mocked.assert_not_called()
     conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="555")
-    assert Message.objects.filter(conversation=conv, body="фото с вопросом").count() == 1
+    msg = Message.objects.get(conversation=conv)
+    assert msg.body.startswith("фото с вопросом")
+    assert "⚠" in msg.body  # the lost photo is visible to managers
+    # The client is told where to send the file instead (one reply to Telegram).
+    assert mocked.call_count == 1
 
 
 @pytest.mark.django_db
@@ -574,11 +577,12 @@ def test_telegram_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> 
         from social.telegram_bot import handle_telegram_update
 
         handle_telegram_update(update)
-    dl.assert_called_once_with("big")  # largest photo size picked
+    dl.assert_called_once()
+    assert dl.call_args.args == ("big",)  # largest photo size picked
     conv = Conversation.objects.get(channel=Channel.TELEGRAM, external_user_id="777")
     msg = Message.objects.get(conversation=conv)
     assert msg.attachment
-    assert msg.attachment_name == "file_1.jpg"
+    assert msg.attachment_name == "photo.jpg"
     assert msg.attachment_mime == "image/jpeg"
     assert msg.body.startswith("📎")
 

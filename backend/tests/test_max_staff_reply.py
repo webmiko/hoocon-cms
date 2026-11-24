@@ -501,7 +501,8 @@ def test_max_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> None:
         ) as dl,
     ):
         handle_max_update(update)
-    dl.assert_called_once_with("https://cdn.max.ru/x/pic.jpg")
+    dl.assert_called_once()
+    assert dl.call_args.args == ("https://cdn.max.ru/x/pic.jpg",)
     conv = Conversation.objects.get(channel=Channel.MAX, external_user_id="4321")
     msg = Message.objects.get(conversation=conv)
     assert msg.attachment
@@ -522,8 +523,8 @@ def test_max_photo_attachment_downloaded_into_inbox(settings, tmp_path) -> None:
 
 
 @pytest.mark.django_db
-def test_max_attachment_download_failure_still_ingests_text() -> None:
-    """If CDN download fails, the message text is still ingested (safe fallback)."""
+def test_max_attachment_download_failure_keeps_text_and_flags_loss() -> None:
+    """A failed download keeps the text and leaves a visible notice for managers."""
     update = {
         "update_type": "message_created",
         "message": {
@@ -541,14 +542,17 @@ def test_max_attachment_download_failure_still_ingests_text() -> None:
     with (
         patch("supportchat.services.is_open_now", return_value=True),
         patch("social.publishers.max_download_attachment", return_value=None),
+        patch("social.max_bot._send_to_user") as send,
     ):
         handle_max_update(update)
     msg = Message.objects.get(
         conversation__channel=Channel.MAX,
         conversation__external_user_id="4322",
     )
-    assert msg.body == "вот файл"
+    assert msg.body.startswith("вот файл")
+    assert "⚠" in msg.body
     assert not msg.attachment
+    assert "sales@hoocon.ru" in send.call_args.args[1]
 
 
 @pytest.mark.django_db

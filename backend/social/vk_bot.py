@@ -20,7 +20,8 @@ from social.vk_bot_handlers import (
     reply_keyboard_for_action,
     send_to_vk_user,
     try_staff_vk_reply,
-    vk_message_attachment,
+    vk_message_has_media,
+    vk_message_media,
 )
 from social.vk_client_menu import main_menu_keyboard_vk
 from social.vk_community import (
@@ -125,10 +126,10 @@ def _ingest_support_text(
     message: dict[str, Any],
     display_name: str,
 ) -> PublishResult | None:
+    from supportchat.inbound_media import client_reply, ingest_inbound_media
     from supportchat.models import Channel
     from supportchat.services import (
         SupportChatError,
-        add_inbound_message,
         get_or_create_messenger_conversation,
     )
 
@@ -139,16 +140,13 @@ def _ingest_support_text(
             user_id,
             display_name=display_name,
         )
-        attachment = vk_message_attachment(message)
-        _inbound, auto = add_inbound_message(
+        auto, problems = ingest_inbound_media(
             conversation,
             text,
+            lambda budget: vk_message_media(message, budget),
             external_message_id=external_message_id,
             raw_payload={"vk_message_id": external_message_id},
             display_name=display_name,
-            attachment=attachment[0] if attachment else None,
-            attachment_name=attachment[1] if attachment else "",
-            attachment_mime=attachment[2] if attachment else "",
         )
     except SupportChatError as exc:
         logger.warning(
@@ -158,9 +156,12 @@ def _ingest_support_text(
         )
         return None
 
+    result: PublishResult | None = None
+    if problems:
+        result = send_to_vk_user(user_id, client_reply(problems), keyboard=main_menu_keyboard_vk())
     if auto is not None:
         return send_to_vk_user(user_id, auto.body, keyboard=main_menu_keyboard_vk())
-    return None
+    return result
 
 
 def _handle_message_allow(event: dict[str, Any]) -> PublishResult | None:
@@ -199,7 +200,7 @@ def _handle_message_new(event: dict[str, Any]) -> PublishResult | None:
         return None
     user_key = str(user_id_int)
     text = _message_text(message)
-    if not text and vk_message_attachment(message) is None:
+    if not text and not vk_message_has_media(message):
         return None
     if not text:
         text = ""
