@@ -2269,6 +2269,8 @@ export interface components {
         /** @description Suggest dropdown payload — no pagination, capped list. */
         SearchSuggestResponse: {
             results: components["schemas"]["SearchSuggestItem"][];
+            /** @description Перевернутая раскладка запроса (did-you-mean), если нашла совпадения, а исходный текст — нет. */
+            corrected_query?: string | null;
         };
         /** @description Sibling-edition row for the PDP variant picker. */
         SiblingEdition: {

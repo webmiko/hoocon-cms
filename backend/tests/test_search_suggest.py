@@ -207,3 +207,27 @@ def test_suggest_throttle_returns_429_over_scope_limit(client, monkeypatch: pyte
     statuses = [client.get("/api/search/suggest/", {"q": "hva"}).status_code for _ in range(4)]
     cache.clear()
     assert statuses == [200, 200, 200, 429]
+
+
+@pytest.mark.django_db
+def test_suggest_reports_corrected_query_for_wrong_layout(client) -> None:
+    """«рмф» matches nothing raw but «hva» matches codes → did-you-mean."""
+    _seed_suggest_data()
+    body = client.get("/api/search/suggest/", {"q": "рмф"}).json()
+    assert body["corrected_query"] == "hva"
+    assert body["results"]
+
+
+@pytest.mark.django_db
+def test_suggest_corrected_query_none_on_direct_match(client) -> None:
+    """A raw substring hit means no did-you-mean, even with a flipped variant."""
+    _seed_suggest_data()
+    body = client.get("/api/search/suggest/", {"q": "hva"}).json()
+    assert body["corrected_query"] is None
+
+
+@pytest.mark.django_db
+def test_suggest_corrected_query_none_for_short_query(client) -> None:
+    """Below the length floor the payload keeps its shape with a null hint."""
+    body = client.get("/api/search/suggest/", {"q": "р"}).json()
+    assert body == {"results": [], "corrected_query": None}

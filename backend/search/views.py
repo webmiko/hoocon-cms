@@ -335,10 +335,11 @@ class SearchView(APIView):
                 )
             )
             if idx == 0:
-                # A weak shared trigram (sim ~0.1 below threshold) or an
-                # epsilon ts_rank is noise, not an original-query hit —
-                # else corrected_query never fires.
-                orig_hit = bool(getattr(obj, "ftshit_0", False)) or substring_hit or sim > TRGM_WORD_THRESHOLD
+                # Only a real match counts (FTS ``@@`` or substring). Trigram
+                # similarity is excluded: a wrong-layout string («рмф») shares
+                # stray trigrams with unrelated titles, and counting those
+                # kept ``corrected_query`` from ever firing on short queries.
+                orig_hit = bool(getattr(obj, "ftshit_0", False)) or substring_hit
         best = max(scores)
         flip_hit = len(variants) > 1 and scores.index(best) == 1
         return best, orig_hit, flip_hit
@@ -548,15 +549,21 @@ class SearchSuggestView(APIView):
         """
         q = (request.query_params.get("q") or "").strip()[:SEARCH_Q_MAX_LEN]
         if len(q) < _SUGGEST_MIN_LEN:
-            return Response({"results": []})
+            return Response({"results": [], "corrected_query": None})
 
         variants = expand_search_variants(q)
         items = self._suggest_skus(variants)[:_SUGGEST_SKU_LIMIT]
         items += self._suggest_content(variants)[:_SUGGEST_CONTENT_LIMIT]
         items.sort(key=lambda item: float(item["score"]), reverse=True)
+        # Did-you-mean: the layout-flipped text matched real titles/codes
+        # while the raw text matched none (substring, not trigram noise).
+        corrected = None
+        if len(variants) > 1 and any(i["flip_hit"] for i in items) and not any(i["orig_hit"] for i in items):
+            corrected = variants[1]
         return Response(
             {
                 "results": [{"type": i["type"], "title": i["title"], "url": i["url"]} for i in items[:_SUGGEST_LIMIT]],
+                "corrected_query": corrected,
             },
         )
 
@@ -585,20 +592,26 @@ class SearchSuggestView(APIView):
             score = float(getattr(sku, "sim", 0.0) or 0.0)
             code = (sku.sku_code or "").casefold()
             name = (sku.name or "").casefold()
-            for variant in variants:
+            hits = [False] * len(variants)
+            for idx, variant in enumerate(variants):
                 needle = variant.casefold()
                 if code.startswith(needle):
                     score = max(score, 3.0)
+                    hits[idx] = True
                 elif needle in code:
                     score = max(score, 2.0)
+                    hits[idx] = True
                 elif needle in name:
                     score = max(score, 1.2)
+                    hits[idx] = True
             items.append(
                 {
                     "type": "sku",
                     "title": search_title_for_sku(sku),
                     "url": catalog_path_for_sku(sku),
                     "score": score,
+                    "orig_hit": hits[0],
+                    "flip_hit": len(hits) > 1 and hits[1],
                 },
             )
         items.sort(key=lambda item: float(item["score"]), reverse=True)
@@ -625,7 +638,8 @@ class SearchSuggestView(APIView):
             for obj in qs[:_SUGGEST_CONTENT_LIMIT]:
                 score = float(getattr(obj, "sim", 0.0) or 0.0)
                 title = (obj.title or "").casefold()
-                if any(variant.casefold() in title for variant in variants):
+                hits = [variant.casefold() in title for variant in variants]
+                if any(hits):
                     score = max(score, 1.2)
                 items.append(
                     {
@@ -633,6 +647,8 @@ class SearchSuggestView(APIView):
                         "title": obj.title,
                         "url": url_for(obj),
                         "score": score,
+                        "orig_hit": hits[0],
+                        "flip_hit": len(hits) > 1 and hits[1],
                     },
                 )
         items.sort(key=lambda item: float(item["score"]), reverse=True)

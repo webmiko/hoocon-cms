@@ -51,3 +51,8 @@ class SearchSuggestResponseSerializer(serializers.Serializer):
     """Suggest dropdown payload — no pagination, capped list."""
 
     results = SearchSuggestItemSerializer(many=True)
+    corrected_query = serializers.CharField(
+        allow_null=True,
+        required=False,
+        help_text="Перевернутая раскладка запроса (did-you-mean), если нашла совпадения, а исходный текст — нет.",
+    )

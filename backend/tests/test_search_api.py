@@ -521,6 +521,41 @@ def test_search_corrected_query_ignores_trigram_noise(client) -> None:
     assert response.json()["corrected_query"] == "hva-5nm"
 
 
+def test_best_variant_scores_trigram_only_original_is_not_a_hit() -> None:
+    """A trigram-only raw match (sim above threshold) is not an original hit.
+
+    Short wrong-layout queries («рмф») share stray trigrams with unrelated
+    titles; counting them as raw hits pushed ``orig_hits`` over the cap and
+    silenced the did-you-mean hint while the flipped query found real rows.
+    """
+    from types import SimpleNamespace
+
+    from catalog.search_intent import TRGM_WORD_THRESHOLD
+    from search.views import SearchView
+
+    noisy = SimpleNamespace(
+        rank_0=0.0,
+        sim_0=TRGM_WORD_THRESHOLD + 0.05,
+        ftshit_0=False,
+        rank_1=0.1,
+        sim_1=0.0,
+        ftshit_1=True,
+        title="Огнезадерживающий клапан",
+    )
+    _, orig_hit, flip_hit = SearchView._best_variant_scores(noisy, ("рмф", "hva"), substring_field="title")
+    assert orig_hit is False
+    assert flip_hit is True
+
+
+@pytest.mark.django_db
+def test_search_corrected_query_on_short_wrong_layout_query(client) -> None:
+    """«рмф» → «hva» even when unrelated CMS titles share stray trigrams."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "рмф"})
+    assert response.status_code == 200
+    assert response.json()["corrected_query"] == "hva"
+
+
 @pytest.mark.django_db
 def test_search_long_query_truncated(client) -> None:
     """6000-char q stays fast-safe: truncated to SEARCH_Q_MAX_LEN, not run raw."""

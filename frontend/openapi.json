@@ -2,7 +2,7 @@
     "openapi": "3.0.3",
     "info": {
         "title": "Hoocon CMS API",
-        "version": "3.8.54",
+        "version": "3.8.55",
         "description": "B2B catalog and content API for Hoocon HVAC actuators."
     },
     "paths": {
@@ -4057,6 +4057,11 @@
                         "items": {
                             "$ref": "#/components/schemas/SearchSuggestItem"
                         }
+                    },
+                    "corrected_query": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Перевернутая раскладка запроса (did-you-mean), если нашла совпадения, а исходный текст — нет."
                     }
                 },
                 "required": [
