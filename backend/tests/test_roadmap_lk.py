@@ -18,7 +18,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 
 from cabinet.spec_import import SpecParseError, parse_spec_xlsx
-from catalog.models import SKU, Category, Product
+from catalog.models import SKU, Attribute, AttributeValue, Category, Product
 from catalog.services import resolve_position_code
 from crm.models import (
     Client,
@@ -140,12 +140,15 @@ def test_analog_lookup_endpoint() -> None:
     sku = _sku()
     sku.analog_belimo_code = "NM24A-SR"
     sku.save(update_fields=["analog_belimo_code"])
+    moment = Attribute.objects.create(name="Крутящий момент", slug="moment", unit="Нм")
+    AttributeValue.objects.create(sku=sku, attribute=moment, value="10 Нм")
     api = DjangoClient()
     found = api.get("/api/catalog/analogs/", {"brand": "belimo", "code": "nm24a sr"})
     assert found.status_code == 200
     body = found.json()
     assert body["count"] == 1
     assert body["matches"][0]["sku_code"] == sku.sku_code
+    assert body["matches"][0]["torque_nm"] == 10.0
     # Brand filter narrows; unknown code → empty.
     miss = api.get("/api/catalog/analogs/", {"brand": "siemens", "code": "NM24ASR"})
     assert miss.json()["count"] == 0

@@ -375,7 +375,7 @@ class AnalogLookupView(APIView):
                 {"detail": "Передайте параметр code (артикул аналога)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        skus = list(analogs_find(brand, code)[:10])
+        skus = list(annotate_moment_nm(analogs_find(brand, code))[:10])
         return Response(
             {
                 "query": {"brand": brand, "code": code},
@@ -387,7 +387,7 @@ class AnalogLookupView(APIView):
                         "sku_code": sku.sku_code,
                         "sku_slug": sku.slug,
                         "name": sku.name,
-                        "torque_nm": getattr(sku, "moment_nm", None),
+                        "torque_nm": sku.moment_nm,
                         "voltage": "",
                         "control": "",
                         "spring_return": None,
