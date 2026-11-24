@@ -136,6 +136,7 @@ def sku_meta_description(
     moment: str = "",
     voltage: str = "",
     analog: str = "",
+    details: tuple[str, ...] = (),
 ) -> str:
     """Snippet that differs by torque, voltage and Belimo code, not only the article.
 
@@ -145,6 +146,9 @@ def sku_meta_description(
         moment: Torque highlight.
         voltage: Voltage highlight.
         analog: Belimo code.
+        details: Extra ``Label: value`` facts (control, compatible drives),
+            most useful first. Each is added only while the whole text still
+            fits, so the Belimo code and the call to action are never cut.
 
     Returns:
         Description within ``DESCRIPTION_MAX_LEN``.
@@ -167,5 +171,13 @@ def sku_meta_description(
     analog_bit = " ".join((analog or "").split())
     if analog_bit:
         bits.append(f"Аналог Belimo {analog_bit}.")
-    bits.append("Паспорт PDF, запрос КП у Hoocon.")
+    tail = "Паспорт PDF, запрос КП у Hoocon."
+    for detail in details:
+        fact = " ".join((detail or "").split()).rstrip(".")
+        if not fact:
+            continue
+        candidate = " ".join([*bits, f"{fact}.", tail])
+        if len(candidate) <= DESCRIPTION_MAX_LEN:
+            bits.append(f"{fact}.")
+    bits.append(tail)
     return format_meta_description(" ".join(bits))

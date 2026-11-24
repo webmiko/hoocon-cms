@@ -109,3 +109,31 @@ def test_sku_meta_description_without_category() -> None:
     assert "DA8MQU230-A" in desc
     assert "электропривод вентиляции" in desc
     assert len(desc) <= 160
+
+
+def test_sku_meta_description_adds_details_that_fit() -> None:
+    """Compatibility and control enrich the snippet without cutting the tail."""
+    desc = sku_meta_description(
+        "BR-M",
+        category_name="Адаптеры",
+        details=("Совместимый привод: DA4MU…DA16MU (24/230 В)", "Управление: Пропорциональное"),
+    )
+    assert "Совместимый привод: DA4MU…DA16MU (24/230 В)." in desc
+    assert "Управление: Пропорциональное." in desc
+    assert desc.endswith("Паспорт PDF, запрос КП у Hoocon.")
+    assert len(desc) <= 160
+
+
+def test_sku_meta_description_skips_details_that_overflow() -> None:
+    """A fact that would push the text past 160 is dropped, never truncated."""
+    desc = sku_meta_description(
+        "DA8MQU230-A",
+        category_name="Электроприводы воздушные ускоренного срабатывания без пружины",
+        moment="8 Нм",
+        voltage="AC 100…240 В",
+        analog="SM230A-SR",
+        details=("Совместимый привод: " + "X" * 80,),
+    )
+    assert "XXXX" not in desc
+    assert "SM230A-SR" in desc
+    assert desc.endswith("Паспорт PDF, запрос КП у Hoocon.")

@@ -85,6 +85,10 @@ def _is_noindex_path(path: str) -> bool:
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in NOINDEX_PREFIXES)
 
 
+# Highlight rows that go into a product meta description after torque and
+# voltage, most useful first. Adapters have no torque, so compatibility leads.
+_META_DETAIL_KEYS: tuple[str, ...] = ("compatible_actuators", "control")
+
 _CRAWL_NAV: tuple[tuple[str, str], ...] = (
     ("/catalog", "Каталог"),
     ("/dokumentaciya", "Документация"),
@@ -289,6 +293,7 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
         category_slug=category_slug,
     )
     by_key = {row["key"]: row["value"] for row in highlights}
+    by_row = {row["key"]: row for row in highlights if row["value"]}
     title_partial = sku_meta_title_partial(
         sku.sku_code or sku.slug,
         moment=by_key.get("moment", ""),
@@ -352,6 +357,9 @@ def _resolve_sku(path: str) -> SeoHeadContext | None:
             moment=by_key.get("moment", ""),
             voltage=by_key.get("voltage", ""),
             analog="",
+            details=tuple(
+                f"{by_row[key]['name']}: {by_row[key]['value']}" for key in _META_DETAIL_KEYS if key in by_row
+            ),
         ),
         noindex=False,
         og_type="product",
