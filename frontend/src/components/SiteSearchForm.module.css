@@ -53,3 +53,8 @@
   color: var(--color-brand-ink);
   font-weight: 600;
 }
+
+.optionFix {
+  border-bottom: 1px solid var(--color-control-border);
+  color: var(--color-brand-ink);
+}
