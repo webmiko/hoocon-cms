@@ -39,6 +39,7 @@ import { MessengerLinks, type MessengerChannel } from "./MessengerLinks";
 import { userErrorMessage } from "../utils/drfErrors";
 import { PdnConsentCheckbox } from "./PdnConsentCheckbox";
 import styles from "./SupportWidget.module.css";
+import { attachmentLimitBytes, attachmentTooBigMessage } from "../utils/supportAttachment";
 
 function SupportChatBubble({
   className,
@@ -771,6 +772,19 @@ export function SupportWidget() {
     }
   }
 
+  function pickAttachment(input: HTMLInputElement) {
+    const file = input.files?.[0] ?? null;
+    if (file && file.size > attachmentLimitBytes(file)) {
+      // Same limits as the API (nginx body cap is 20 MB): fail here, not as a bare 413.
+      input.value = "";
+      setPendingFile(null);
+      setError(attachmentTooBigMessage(file));
+      return;
+    }
+    setError("");
+    setPendingFile(file);
+  }
+
   function onDraftKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter" || event.shiftKey) return;
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -1200,8 +1214,8 @@ export function SupportWidget() {
                 <input
                   type="file"
                   className={styles.srOnly}
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
-                  onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                  onChange={(e) => pickAttachment(e.target)}
                 />
                 📎
               </label>

@@ -1416,6 +1416,58 @@ def _post_widget_file(client: Client, token: str, name: str) -> HttpResponse:
     )
 
 
+def _post_widget_media(client: Client, token: str, name: str, content_type: str, size: int = 64) -> HttpResponse:
+    """POST one file of a given type/size to the widget messages endpoint."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    upload = SimpleUploadedFile(name, b"\x00" * size, content_type=content_type)
+    return client.post(
+        "/api/support/conversations/current/messages/",
+        data={"attachment": upload},
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+
+@pytest.mark.django_db
+def test_web_video_upload_is_accepted_and_served_as_download(settings, tmp_path) -> None:
+    """Clients can send phone video from the site widget; it is a download, never inline."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        resp = _post_widget_media(client, token, "clip.mp4", "video/mp4")
+        assert resp.status_code == 201
+        msg = resp.json()["message"]
+        assert msg["attachment_is_image"] is False
+        stored = Message.objects.get(pk=msg["id"])
+        assert stored.attachment_mime == "video/mp4"
+        served = client.get(f"/api/support/messages/{msg['id']}/attachment/")
+        assert served.status_code == 200
+        assert "attachment" in served["Content-Disposition"]
+        assert served["Content-Type"] == "video/mp4"
+
+
+@pytest.mark.django_db
+def test_web_video_size_limit_and_unknown_types(settings, tmp_path) -> None:
+    """Video up to 19 MB, other files still 10 MB; unknown video containers are refused."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.PRIVATE_MEDIA_ROOT = str(tmp_path / "private")
+    ensure_default_schedule()
+    with patch("supportchat.services.is_open_now", return_value=True):
+        client = _csrf_client()
+        token = client.cookies["csrftoken"].value
+        big_video = _post_widget_media(client, token, "big.mp4", "video/mp4", size=19 * 1024 * 1024 + 1)
+        assert big_video.status_code == 400
+        assert "19 МБ" in str(big_video.json())
+        big_pdf = _post_widget_media(client, token, "big.pdf", "application/pdf", size=10 * 1024 * 1024 + 1)
+        assert big_pdf.status_code == 400
+        assert "10 МБ" in str(big_pdf.json())
+        avi = _post_widget_media(client, token, "x.avi", "video/x-msvideo")
+        assert avi.status_code == 400
+
+
 @pytest.mark.django_db
 def test_web_attachment_quota_per_conversation(settings, tmp_path) -> None:
     """M2: сверх лимита файлов на диалог — 400 и файл не сохраняется."""
