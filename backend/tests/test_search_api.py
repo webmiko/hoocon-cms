@@ -424,6 +424,155 @@ def test_search_limits_sku_source_before_merge(client) -> None:
     assert len(sku_hits) <= _SEARCH_PER_SOURCE_LIMIT
 
 
+# ── Smart search: typos, layout, description text ─────────────────────
+
+
+@pytest.mark.django_db
+def test_search_finds_sku_by_name_typo(client) -> None:
+    """«превод» (typo) finds «Привод» SKUs via trigram word similarity."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "превод"})
+    assert response.status_code == 200
+    slugs = {r["slug"] for r in response.json()["results"]}
+    assert "privod-vozdushniy-hva-5nm-s" in slugs
+
+
+@pytest.mark.django_db
+def test_search_finds_sku_by_code_typo(client) -> None:
+    """«hva5m» (missing char) finds the HVA-5NM code via trigrams."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "hva5m"})
+    assert response.status_code == 200
+    slugs = {r["slug"] for r in response.json()["results"] if r.get("type") == "sku"}
+    assert "privod-vozdushniy-hva-5nm-s" in slugs
+
+
+@pytest.mark.django_db
+def test_search_layout_flip_ru_to_lat_code(client) -> None:
+    """«вф-100» finds the DA-100 SKU through the layout-flipped variant."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Приводы", slug="privody-search-lat")
+    prod = Product.objects.create(name="DA", slug="da-search-lat", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Электропривод DA-100 10 Нм",
+        slug="da-100-search-lat",
+        sku_code="DA-100-230A",
+        is_published=True,
+    )
+    response = client.get("/api/search/", {"q": "вф-100"})
+    assert response.status_code == 200
+    slugs = {r["slug"] for r in response.json()["results"]}
+    assert "da-100-search-lat" in slugs
+
+
+@pytest.mark.django_db
+def test_search_corrected_query_when_layout_flip_wins(client) -> None:
+    """«ghbdjl» reports corrected_query «привод» — flip outscored the raw."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "ghbdjl"})
+    assert response.status_code == 200
+    body = response.json()
+    sku_slugs = {r["slug"] for r in body["results"] if r.get("type") == "sku"}
+    assert "privod-vozdushniy-hva-5nm-s" in sku_slugs
+    assert body["corrected_query"] == "привод"
+
+
+@pytest.mark.django_db
+def test_search_corrected_query_none_on_direct_match(client) -> None:
+    """Direct hits report corrected_query=None — no did-you-mean noise."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "привод"})
+    assert response.status_code == 200
+    assert response.json()["corrected_query"] is None
+
+
+@pytest.mark.django_db
+def test_search_corrected_query_none_on_empty_results(client) -> None:
+    """Total miss still reports corrected_query=None."""
+    response = client.get("/api/search/", {"q": "zzzqqq"})
+    assert response.status_code == 200
+    assert response.json()["corrected_query"] is None
+
+
+@pytest.mark.django_db
+def test_search_corrected_query_ignores_trigram_noise(client) -> None:
+    """Weak shared-trigram noise must not suppress corrected_query.
+
+    «рмф-5ть» flips to «hva-5nm»; the raw variant only scores sim≈0.125
+    (below TRGM_WORD_THRESHOLD) on every SKU — that is noise, not a real
+    original hit. Old orig_hit=score>0 counted it and muted the hint.
+    """
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Воздушные", slug="vozd-noise")
+    prod = Product.objects.create(name="HVA", slug="hva-noise", category=cat)
+    for idx in range(3):
+        SKU.objects.create(
+            product=prod,
+            name=f"Привод воздушный HVA-5NM {idx}",
+            slug=f"hva-5nm-noise-{idx}",
+            sku_code=f"HVA-5NM-N{idx}",
+            is_published=True,
+        )
+    response = client.get("/api/search/", {"q": "рмф-5ть"})
+    assert response.status_code == 200
+    assert response.json()["corrected_query"] == "hva-5nm"
+
+
+@pytest.mark.django_db
+def test_search_long_query_truncated(client) -> None:
+    """6000-char q stays fast-safe: truncated to SEARCH_Q_MAX_LEN, not run raw."""
+    _seed_search_data()
+    response = client.get("/api/search/", {"q": "привод" + "x" * 6000})
+    assert response.status_code == 200
+    body = response.json()
+    assert "results" in body
+
+
+@pytest.mark.django_db
+def test_search_finds_sku_by_description_text(client) -> None:
+    """Words that only live in SKU.description are searchable now."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Клапаны", slug="klapany-desc")
+    prod = Product.objects.create(name="H8205", slug="h8205-desc", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="H8205-LAV2100 | Клапан регулирующий",
+        slug="h8205-desc-sku",
+        sku_code="H8205-LAV2100-DESC",
+        description="Применяется в системах дымоудаления экстраслово.",
+        is_published=True,
+    )
+    response = client.get("/api/search/", {"q": "экстраслово"})
+    assert response.status_code == 200
+    slugs = {r["slug"] for r in response.json()["results"] if r.get("type") == "sku"}
+    assert "h8205-desc-sku" in slugs
+
+
+@pytest.mark.django_db
+def test_search_finds_sku_by_analog_code(client) -> None:
+    """Verified Belimo analog code finds the SKU in site search too."""
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="Приводы", slug="privody-analog")
+    prod = Product.objects.create(name="NM", slug="nm-analog", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Привод NM230A",
+        slug="nm230a-analog-sku",
+        sku_code="NM230A-ANALOG",
+        analog_belimo_code="NMQ24A-XXL",
+        is_published=True,
+    )
+    response = client.get("/api/search/", {"q": "NMQ24A-XXL"})
+    assert response.status_code == 200
+    slugs = {r["slug"] for r in response.json()["results"] if r.get("type") == "sku"}
+    assert "nm230a-analog-sku" in slugs
+
+
 # ── PII: no leads in search ────────────────────────────────────────────
 
 

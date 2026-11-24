@@ -30,3 +30,24 @@ class SearchResponseSerializer(serializers.Serializer):
     next = serializers.URLField(allow_null=True)
     previous = serializers.URLField(allow_null=True)
     results = SearchResultItemSerializer(many=True)
+    corrected_query = serializers.CharField(
+        allow_null=True,
+        required=False,
+        help_text="Перевернутая раскладка запроса (did-you-mean), если она нашла лучше.",
+    )
+
+
+class SearchSuggestItemSerializer(serializers.Serializer):
+    """One compact item in the suggest dropdown payload."""
+
+    type = serializers.CharField(
+        help_text="Тип результата: sku | article | news | page.",
+    )
+    title = serializers.CharField(help_text="Заголовок (для SKU — с артикулом).")
+    url = serializers.CharField(help_text="Канонический path результата.")
+
+
+class SearchSuggestResponseSerializer(serializers.Serializer):
+    """Suggest dropdown payload — no pagination, capped list."""
+
+    results = SearchSuggestItemSerializer(many=True)

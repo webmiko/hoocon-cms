@@ -155,3 +155,134 @@ def test_fts_search_vector_auto_populated_on_save() -> None:
     sku.refresh_from_db()
     # search_vector should be non-null after save (auto via trigger or signal).
     assert sku.search_vector is not None
+
+
+# ── Description / analogs in the vector + pg_trgm ─────────────────────
+
+
+@pytest.mark.django_db
+def test_fts_search_vector_includes_description() -> None:
+    """SKU.search_vector indexes description text (weight B, HTML-free)."""
+    from django.contrib.postgres.search import SearchQuery
+
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C2", slug="c2-sv")
+    product = Product.objects.create(name="P2", slug="p2-sv", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="H8205-LAV2100 | Клапан",
+        slug="h8205-desc-vec",
+        sku_code="H8205-VEC",
+        description="<p>Уникальный термин супервентиляция в описании.</p>",
+        is_published=True,
+    )
+    sku.refresh_from_db()
+    query = SearchQuery("супервентиляция", config="russian")
+    assert SKU.objects.filter(pk=sku.pk, search_vector=query).exists()
+    # HTML tags must not leak into the vector.
+    assert "'p':" not in str(sku.search_vector)
+
+
+@pytest.mark.django_db
+def test_fts_search_vector_updates_on_description_change() -> None:
+    """Trigger re-computes the vector when description changes."""
+    from django.contrib.postgres.search import SearchQuery
+
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C3", slug="c3-sv")
+    product = Product.objects.create(name="P3", slug="p3-sv", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="Клапан простой",
+        slug="klapan-desc-upd",
+        sku_code="KLP-UPD",
+        description="первый термин альфаполе",
+        is_published=True,
+    )
+    sku.description = "второй термин бетаполе"
+    sku.save()
+    sku.refresh_from_db()
+    old_q = SearchQuery("альфаполе", config="russian")
+    new_q = SearchQuery("бетаполе", config="russian")
+    assert not SKU.objects.filter(pk=sku.pk, search_vector=old_q).exists()
+    assert SKU.objects.filter(pk=sku.pk, search_vector=new_q).exists()
+
+
+@pytest.mark.django_db
+def test_fts_vector_excludes_unverified_analogs_text(client) -> None:
+    """Unverified ``analogs_text`` lines must NOT be indexed or searchable.
+
+    Card policy ``_drop_unverified_analog_lines`` (95f9d311) hides analog
+    rows without a datasheet-confirmed pair. Indexing raw analogs_text
+    would publish those hidden codes via ?q= and /api/search/.
+    """
+    from django.contrib.postgres.search import SearchQuery
+
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C4", slug="c4-sv")
+    product = Product.objects.create(name="P4", slug="p4-sv", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="Клапан скрытый аналог",
+        slug="klapan-hidden-analog",
+        sku_code="HDN-1",
+        analogs_text="– Belimo QZN777XK\n",
+        is_published=True,
+    )
+    sku.refresh_from_db()
+    hidden_q = SearchQuery("QZN777XK", config="russian")
+    assert not SKU.objects.filter(pk=sku.pk, search_vector=hidden_q).exists()
+    # Functional surfaces: neither catalog ?q= nor global search may leak it.
+    resp = client.get(reverse("catalog-sku-list"), {"q": "QZN777XK"})
+    assert {row["slug"] for row in resp.data["results"]} == set()
+    resp = client.get(reverse("api-search"), {"q": "QZN777XK"})
+    assert {row["url"] for row in resp.data["results"]} == set()
+
+
+@pytest.mark.django_db
+def test_fts_vector_includes_verified_analog_belimo_code() -> None:
+    """Verified ``analog_belimo_code`` stays indexed — sanctioned analog."""
+    from django.contrib.postgres.search import SearchQuery
+
+    from catalog.models import SKU, Category, Product
+
+    cat = Category.objects.create(name="C5", slug="c5-sv")
+    product = Product.objects.create(name="P5", slug="p5-sv", category=cat)
+    sku = SKU.objects.create(
+        product=product,
+        name="Клапан с верифицированным аналогом",
+        slug="klapan-verified-analog",
+        sku_code="VRF-1",
+        analog_belimo_code="VRB555XQ",
+        is_published=True,
+    )
+    sku.refresh_from_db()
+    verified_q = SearchQuery("VRB555XQ", config="russian")
+    assert SKU.objects.filter(pk=sku.pk, search_vector=verified_q).exists()
+
+
+@pytest.mark.django_db
+def test_sku_sku_code_trgm_index_exists() -> None:
+    """GIN trigram index on catalog_sku.sku_code exists (typo tolerance)."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE tablename = 'catalog_sku' "
+            "  AND indexname = 'catalog_sku_code_trgm'",
+        )
+        assert cursor.fetchone(), "trigram index on sku_code not found"
+
+
+@pytest.mark.django_db
+def test_pg_trgm_extension_installed() -> None:
+    """pg_trgm extension is installed (migrations guarantee it)."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+        assert cursor.fetchone(), "pg_trgm extension missing"

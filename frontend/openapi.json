@@ -2,20 +2,659 @@
     "openapi": "3.0.3",
     "info": {
         "title": "Hoocon CMS API",
-        "version": "0.1.0",
+        "version": "3.8.54",
         "description": "B2B catalog and content API for Hoocon HVAC actuators."
     },
     "paths": {
+        "/api/account/company/": {
+            "get": {
+                "operationId": "account_company_retrieve",
+                "description": "Requisites only for a manager-confirmed member.\n\nThe company link comes from a free-text name in a lead, so an\nunconfirmed visitor sees only the name they typed themselves.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/conversations/": {
+            "get": {
+                "operationId": "account_conversations_retrieve",
+                "description": "GET /api/account/conversations/ — own supportchat threads (ЛК-4).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/documents/": {
+            "get": {
+                "operationId": "account_documents_retrieve",
+                "description": "GET /api/account/documents/ — all files of the client card.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/documents/{id}/download/": {
+            "get": {
+                "operationId": "account_documents_download_retrieve",
+                "description": "GET /api/account/documents/<id>/download/ — owner-only private file.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/documents/zip/": {
+            "get": {
+                "operationId": "account_documents_zip_retrieve",
+                "description": "GET /api/account/documents/zip/ — все документы клиента одним ZIP (ЛК-8).\n\nFiles come from private media only; names are sanitized against\npath traversal and de-duplicated inside the archive. The archive is\nbuilt in a spooled temp file with a total size cap and its own throttle.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/leads/": {
+            "get": {
+                "operationId": "account_leads_retrieve",
+                "description": "GET /api/account/leads/ — own leads only.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/leads/{id}/": {
+            "get": {
+                "operationId": "account_leads_retrieve_2",
+                "description": "GET /api/account/leads/<id>/ — own lead detail (404 on foreign).",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/leads/{id}/repeat/": {
+            "post": {
+                "operationId": "account_leads_repeat_create",
+                "description": "POST /api/account/leads/<id>/repeat/ — clone positions into a new RFQ.\n\nIdempotent within a 5-minute window (§9): a repeat of the same source\nlead returns the already-created copy instead of spawning duplicates.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/me/": {
+            "get": {
+                "operationId": "account_me_retrieve",
+                "description": "GET/PATCH /api/account/me/ — cabinet profile.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "account_me_partial_update",
+                "description": "GET/PATCH /api/account/me/ — cabinet profile.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/orders/": {
+            "get": {
+                "operationId": "account_orders_retrieve",
+                "description": "GET /api/account/orders/ — own orders (ЛК-6).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/orders/{id}/": {
+            "get": {
+                "operationId": "account_orders_retrieve_2",
+                "description": "GET /api/account/orders/<id>/ — own order detail.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/quotes/": {
+            "get": {
+                "operationId": "account_quotes_retrieve",
+                "description": "GET /api/account/quotes/ — issued quotes (drafts hidden).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/quotes/{id}/": {
+            "get": {
+                "operationId": "account_quotes_retrieve_2",
+                "description": "GET /api/account/quotes/<id>/ — own quote detail.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/quotes/{id}/pdf/": {
+            "get": {
+                "operationId": "account_quotes_pdf_retrieve",
+                "description": "GET /api/account/quotes/<id>/pdf/ — generated PDF (ЛК-3).",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/rma/": {
+            "get": {
+                "operationId": "account_rma_retrieve",
+                "description": "GET/POST /api/account/rma/ — reclamations (ЛК-12).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "account_rma_create",
+                "description": "GET/POST /api/account/rma/ — reclamations (ЛК-12).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/rma/{id}/photo/": {
+            "get": {
+                "operationId": "account_rma_photo_retrieve",
+                "description": "GET /api/account/rma/<id>/photo/ — owner-only defect photo download.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/specs/": {
+            "get": {
+                "operationId": "account_specs_retrieve",
+                "description": "GET/POST /api/account/specs/ — spec templates CRUD (owner scope).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "account_specs_create",
+                "description": "GET/POST /api/account/specs/ — spec templates CRUD (owner scope).",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/specs/{id}/": {
+            "get": {
+                "operationId": "account_specs_retrieve_2",
+                "description": "GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "account_specs_partial_update",
+                "description": "GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "account_specs_destroy",
+                "description": "GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/specs/{id}/to_lead/": {
+            "post": {
+                "operationId": "account_specs_to_lead_create",
+                "description": "POST /api/account/specs/<id>/to_lead/ — draft an RFQ from a spec.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/account/summary/": {
+            "get": {
+                "operationId": "account_summary_retrieve",
+                "description": "GET /api/account/summary/ — dashboard counters.",
+                "tags": [
+                    "account"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/analytics/hit/": {
+            "post": {
+                "operationId": "analytics_hit_create",
+                "description": "Record one SPA navigation hit (no marketing consent required).\n\nUnique visitors: existing session key or a daily IP+UA hash — the hit\nitself never creates a session. ``title`` / ``object_*`` from the client\nare accepted for compatibility and ignored.",
+                "tags": [
+                    "analytics"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/login/": {
+            "post": {
+                "operationId": "auth_login_create",
+                "description": "POST /api/auth/login/ — mode A password check.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/logout/": {
+            "post": {
+                "operationId": "auth_logout_create",
+                "description": "POST /api/auth/logout/ — drop the client session.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/me/": {
+            "get": {
+                "operationId": "auth_me_retrieve",
+                "description": "GET /api/auth/me/ — current session account or 401.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/otp/resend/": {
+            "post": {
+                "operationId": "auth_otp_resend_create",
+                "description": "POST /api/auth/otp/resend/ — cooldown-gated resend.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/otp/start/": {
+            "post": {
+                "operationId": "auth_otp_start_create",
+                "description": "POST /api/auth/otp/start/ — mode B: send a fresh 6-digit code.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/otp/verify/": {
+            "post": {
+                "operationId": "auth_otp_verify_create",
+                "description": "POST /api/auth/otp/verify/ — mode B: verify the code → session.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/auth/register/": {
+            "post": {
+                "operationId": "auth_register_create",
+                "description": "POST /api/auth/register/ — mode A step 1: email a confirmation code.\n\nSame response as ``otp/start``; the account is created by\n``otp/verify`` once the code proves the email belongs to the visitor.",
+                "tags": [
+                    "auth"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/catalog/analogs/": {
+            "get": {
+                "operationId": "catalog_analogs_retrieve",
+                "description": "GET /api/catalog/analogs/?brand=&code= — подбор аналога (ЛК-10).\n\nPublic, read-only: форма «подобрать аналог» и Excel-импорт спек дергают\nодин сервис ``catalog.services.analogs_find`` (поле ``analog_belimo_code``).\nОтвет — краткая карточка найденного SKU (цены и остатки не отдаём).",
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/catalog/categories/": {
             "get": {
                 "operationId": "catalog_categories_list",
-                "description": "GET /api/catalog/categories/ — public category list.",
+                "description": "List categories with a product preview image per row.",
                 "parameters": [
                     {
                         "name": "page",
                         "required": false,
                         "in": "query",
                         "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
                         "schema": {
                             "type": "integer"
                         }
@@ -27,9 +666,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -47,16 +683,235 @@
                 }
             }
         },
+        "/api/catalog/compare/": {
+            "get": {
+                "operationId": "catalog_compare_retrieve",
+                "description": "Return SKU columns and highlight matrix rows.",
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/catalog/docs/": {
+            "get": {
+                "operationId": "catalog_docs_retrieve",
+                "description": "Return filtered hub payload (``q``, ``series``, ``kind``, ``family``).",
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/catalog/docs/families/{key}/zip/": {
+            "get": {
+                "operationId": "catalog_docs_families_zip_retrieve",
+                "description": "Stream a zip of deduped family documents; support ETag / 304.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "key",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/catalog/facets/": {
+            "get": {
+                "operationId": "catalog_facets_retrieve",
+                "description": "Return canonical facets for the catalog filter UI.",
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/catalog/quiz-analogs/": {
+            "get": {
+                "operationId": "catalog_quiz_analogs_retrieve",
+                "description": "Return kit component bundles for quiz DN/Kvs/ways + electrical intent.",
+                "tags": [
+                    "catalog"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/catalog/skus/": {
             "get": {
                 "operationId": "catalog_skus_list",
                 "description": "GET /api/catalog/skus/ and /api/catalog/skus/{slug}/.",
                 "parameters": [
                     {
+                        "name": "analog",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Аналоги",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "area",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Площадь заслонки",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "aux_switch",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Вспомогательный переключатель",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "in": "query",
                         "name": "category",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "compatible_actuators",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Совместимый привод",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "control",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Управление",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "dn",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: DN",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "in_stock",
+                        "required": false,
+                        "in": "query",
+                        "description": "Только товары в наличии (stock_qty > 0). Значения: 1 / true / yes.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "1",
+                                "true",
+                                "yes"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "kvs",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Kvs (м³/ч)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "material",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Материал корпуса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "moment",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Крутящий момент",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "new",
+                        "required": false,
+                        "in": "query",
+                        "description": "Только новинки (first_published_at за последние 30 суток). Порядок: в наличии, затем newer first. Значения: 1 / true / yes.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "1",
+                                "true",
+                                "yes"
+                            ]
                         }
                     },
                     {
@@ -69,8 +924,44 @@
                         }
                     },
                     {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
                         "in": "query",
                         "name": "q",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "temp_sensor",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Термодатчик",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "voltage",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Напряжение",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ways",
+                        "required": false,
+                        "in": "query",
+                        "description": "ТТХ facet: Тип крана",
                         "schema": {
                             "type": "string"
                         }
@@ -82,9 +973,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -105,13 +993,22 @@
         "/api/catalog/skus/{sku_slug}/files/": {
             "get": {
                 "operationId": "catalog_skus_files_list",
-                "description": "GET (public) + POST (staff) /api/catalog/skus/{sku_slug}/files/.",
+                "description": "GET (public) + POST (catalog.add_productfile) /api/catalog/skus/{sku_slug}/files/.",
                 "parameters": [
                     {
                         "name": "page",
                         "required": false,
                         "in": "query",
                         "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
                         "schema": {
                             "type": "integer"
                         }
@@ -131,9 +1028,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -189,9 +1083,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     }
                 ],
                 "responses": {
@@ -217,7 +1108,8 @@
                         "in": "path",
                         "name": "slug",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "title": "Сегмент URL"
                         },
                         "required": true
                     }
@@ -228,9 +1120,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -261,6 +1150,15 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "tags": [
@@ -270,9 +1168,6 @@
                     {
                         "cookieAuth": []
                     },
-                    {
-                        "basicAuth": []
-                    },
                     {}
                 ],
                 "responses": {
@@ -280,7 +1175,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PaginatedArticleList"
+                                    "$ref": "#/components/schemas/PaginatedArticleListList"
                                 }
                             }
                         },
@@ -298,7 +1193,8 @@
                         "in": "path",
                         "name": "slug",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "title": "Сегмент URL"
                         },
                         "required": true
                     }
@@ -309,9 +1205,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -332,13 +1225,22 @@
         "/api/content/news/": {
             "get": {
                 "operationId": "content_news_list",
-                "description": "GET /api/content/news/ and /api/content/news/{slug}/.",
+                "description": "GET /api/content/news/ and /api/content/news/{slug}/.\n\nQuery params (list):\n  category — NewsCategory.slug\n  ordering — ``newest`` (default) | ``oldest``",
                 "parameters": [
                     {
                         "name": "page",
                         "required": false,
                         "in": "query",
                         "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
                         "schema": {
                             "type": "integer"
                         }
@@ -350,9 +1252,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -370,16 +1269,47 @@
                 }
             }
         },
+        "/api/content/news-categories/": {
+            "get": {
+                "operationId": "content_news_categories_list",
+                "description": "GET /api/content/news-categories/ — published rubrics for chips.",
+                "tags": [
+                    "content"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/NewsCategory"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/content/news/{slug}/": {
             "get": {
                 "operationId": "content_news_retrieve",
-                "description": "GET /api/content/news/ and /api/content/news/{slug}/.",
+                "description": "GET /api/content/news/ and /api/content/news/{slug}/.\n\nQuery params (list):\n  category — NewsCategory.slug\n  ordering — ``newest`` (default) | ``oldest``",
                 "parameters": [
                     {
                         "in": "path",
                         "name": "slug",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "title": "Сегмент URL"
                         },
                         "required": true
                     }
@@ -390,9 +1320,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -423,6 +1350,15 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "tags": [
@@ -431,9 +1367,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -460,7 +1393,8 @@
                         "in": "path",
                         "name": "slug",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "title": "Сегмент URL"
                         },
                         "required": true
                     }
@@ -471,9 +1405,6 @@
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -487,6 +1418,77 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/csrf/": {
+            "get": {
+                "operationId": "csrf_retrieve",
+                "description": "Return JSON {csrfToken} and set the csrftoken cookie.\n\nArgs:\n    request: DRF request.\n\nReturns:\n    200 with {\"csrfToken\": \"<token>\"}.",
+                "tags": [
+                    "csrf"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/integrations/max/webhook/": {
+            "post": {
+                "operationId": "integrations_max_webhook_create",
+                "description": "Accept a MAX Update and enqueue reply handling.",
+                "tags": [
+                    "integrations"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/integrations/telegram/webhook/": {
+            "post": {
+                "operationId": "integrations_telegram_webhook_create",
+                "description": "Accept a Telegram Update and enqueue reply handling.",
+                "tags": [
+                    "integrations"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/integrations/vk/callback/": {
+            "post": {
+                "operationId": "integrations_vk_callback_create",
+                "description": "POST /api/integrations/vk/callback/ — VK Callback API (community messages).\n\nValidates ``secret`` in the JSON body against ``VK_CALLBACK_SECRET``.\n``confirmation`` events return plain-text ``VK_CALLBACK_CONFIRMATION``;\nother events enqueue Celery work and respond with ``ok``.",
+                "tags": [
+                    "integrations"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -522,9 +1524,6 @@
                     {
                         "cookieAuth": []
                     },
-                    {
-                        "basicAuth": []
-                    },
                     {}
                 ],
                 "responses": {
@@ -537,6 +1536,38 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/quotes/reply/": {
+            "get": {
+                "operationId": "quotes_reply_retrieve",
+                "description": "GET shows the offer. POST accepts it or stores a change request.",
+                "tags": [
+                    "quotes"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "quotes_reply_create",
+                "description": "GET shows the offer. POST accepts it or stores a change request.",
+                "tags": [
+                    "quotes"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -674,9 +1705,6 @@
                     {
                         "cookieAuth": []
                     },
-                    {
-                        "basicAuth": []
-                    },
                     {}
                 ],
                 "responses": {
@@ -715,16 +1743,13 @@
         "/api/search/": {
             "get": {
                 "operationId": "search_retrieve",
-                "description": "Handle GET: parse `q`, run FTS on all three models, return paginated.\n\nArgs:\n    request: DRF request with optional `q` query parameter.\n\nReturns:\n    200 with paginated results: {count, next, previous, results}.\n    Each result: {type, slug, title, url}.",
+                "description": "Handle GET: parse `q`, run hybrid search on all models, paginate.\n\nArgs:\n    request: DRF request with optional `q` query parameter.\n\nReturns:\n    200 with paginated results: {count, next, previous, results,\n    corrected_query}. Each result: {type, slug, title, url, snippet}.",
                 "tags": [
                     "search"
                 ],
                 "security": [
                     {
                         "cookieAuth": []
-                    },
-                    {
-                        "basicAuth": []
                     },
                     {}
                 ],
@@ -741,13 +1766,821 @@
                     }
                 }
             }
+        },
+        "/api/search/suggest/": {
+            "get": {
+                "operationId": "search_suggest_retrieve",
+                "description": "Handle GET: return up to ``_SUGGEST_LIMIT`` compact items.\n\nArgs:\n    request: DRF request with optional `q` query parameter.\n\nReturns:\n    200 with {\"results\": [{type, title, url}]} — empty list for\n    queries shorter than ``_SUGGEST_MIN_LEN``.",
+                "tags": [
+                    "search"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SearchSuggestResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/settings/public/": {
+            "get": {
+                "operationId": "settings_public_retrieve",
+                "description": "Return Yandex Metrika / GA4 IDs from SiteSettings with env defaults.\n\nArgs:\n    request: unused DRF request.\n\nReturns:\n    JSON with yandex_metrika_id and ga4_measurement_id (may be empty).",
+                "tags": [
+                    "settings"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/auth/logout/": {
+            "post": {
+                "operationId": "staff_auth_logout_create",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/auth/otp/resend/": {
+            "post": {
+                "operationId": "staff_auth_otp_resend_create",
+                "tags": [
+                    "staff"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/auth/otp/start/": {
+            "post": {
+                "operationId": "staff_auth_otp_start_create",
+                "tags": [
+                    "staff"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/auth/otp/verify/": {
+            "post": {
+                "operationId": "staff_auth_otp_verify_create",
+                "tags": [
+                    "staff"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/badges/": {
+            "get": {
+                "operationId": "staff_badges_retrieve",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/clients/": {
+            "get": {
+                "operationId": "staff_clients_retrieve",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/clients/{id}/": {
+            "get": {
+                "operationId": "staff_clients_retrieve_2",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/clients/{id}/activities/": {
+            "post": {
+                "operationId": "staff_clients_activities_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/clients/{id}/emails/": {
+            "post": {
+                "operationId": "staff_clients_emails_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/": {
+            "get": {
+                "operationId": "staff_conversations_retrieve",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/{id}/": {
+            "get": {
+                "operationId": "staff_conversations_retrieve_2",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "staff_conversations_destroy",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/{id}/assign/": {
+            "post": {
+                "operationId": "staff_conversations_assign_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/{id}/close/": {
+            "post": {
+                "operationId": "staff_conversations_close_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/{id}/messages/": {
+            "get": {
+                "operationId": "staff_conversations_messages_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "staff_conversations_messages_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/conversations/{id}/read/": {
+            "post": {
+                "operationId": "staff_conversations_read_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/devices/": {
+            "post": {
+                "operationId": "staff_devices_create",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/devices/{id}/": {
+            "delete": {
+                "operationId": "staff_devices_destroy",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/leads/": {
+            "get": {
+                "operationId": "staff_leads_retrieve",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/leads/{id}/": {
+            "get": {
+                "operationId": "staff_leads_retrieve_2",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/leads/{id}/status/": {
+            "post": {
+                "operationId": "staff_leads_status_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/leads/{id}/take/": {
+            "post": {
+                "operationId": "staff_leads_take_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/staff/me/": {
+            "get": {
+                "operationId": "staff_me_retrieve",
+                "tags": [
+                    "staff"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/channels/": {
+            "get": {
+                "operationId": "support_channels_retrieve",
+                "description": "GET /api/support/channels/ — enabled messengers + deep links (no tokens).",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/conversations/": {
+            "post": {
+                "operationId": "support_conversations_create",
+                "description": "POST /api/support/conversations/ — start or resume web session thread.",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/conversations/current/messages/": {
+            "get": {
+                "operationId": "support_conversations_current_messages_retrieve",
+                "description": "GET/POST /api/support/conversations/current/messages/.",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "support_conversations_current_messages_create",
+                "description": "GET/POST /api/support/conversations/current/messages/.",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/conversations/current/rate/": {
+            "post": {
+                "operationId": "support_conversations_current_rate_create",
+                "description": "POST /api/support/conversations/current/rate/ — client rating 1–5.",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/faq/": {
+            "get": {
+                "operationId": "support_faq_retrieve",
+                "description": "GET /api/support/faq/ — FAQ из Admin (публично, scope=chat|home|seo).",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/messages/{id}/attachment/": {
+            "get": {
+                "operationId": "support_messages_attachment_retrieve",
+                "description": "GET private chat file: same widget session or staff with view perm.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/support/schedule/": {
+            "get": {
+                "operationId": "support_schedule_retrieve",
+                "description": "GET /api/support/schedule/ — open hours (public).",
+                "tags": [
+                    "support"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/telephony/mango/events/": {
+            "post": {
+                "operationId": "telephony_mango_events_create",
+                "description": "Verify signature, decode ``json``, route the event.",
+                "tags": [
+                    "telephony"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/telephony/mango/events/{kind}/": {
+            "post": {
+                "operationId": "telephony_mango_events_create_2",
+                "description": "Verify signature, decode ``json``, route the event.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "kind",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[a-z_]+(?:/[a-z_]+)?$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "telephony"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/telephony/novosystem/events/": {
+            "get": {
+                "operationId": "telephony_novosystem_events_retrieve",
+                "description": "UIS can send the same notification as GET.",
+                "tags": [
+                    "telephony"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "telephony_novosystem_events_create",
+                "description": "Accept JSON or form body; secret via body ``token`` or ``X-Webhook-Token``.",
+                "tags": [
+                    "telephony"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/webpush/subscribe/": {
+            "post": {
+                "operationId": "webpush_subscribe_create",
+                "description": "POST /api/webpush/subscribe/ — session-bound.\n\n``topic_marketing`` requires marketing consent already stored in the\nDjango session (prior ``/topics/`` consent sync). ``topic_support``\nlinks visitors via support session id.",
+                "tags": [
+                    "webpush"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/webpush/topics/": {
+            "post": {
+                "operationId": "webpush_topics_create",
+                "description": "POST /api/webpush/topics/ — clear topics and/or sync marketing consent.\n\nBody examples::\n\n    {\"endpoint\": \"…\", \"clear_marketing\": true}\n    {\"marketing_consent\": false}\n    {\"endpoint\": \"…\", \"clear_support\": true, \"marketing_consent\": false}",
+                "tags": [
+                    "webpush"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/webpush/unsubscribe/": {
+            "post": {
+                "operationId": "webpush_unsubscribe_create",
+                "description": "POST /api/webpush/unsubscribe/ — delete whole endpoint.",
+                "tags": [
+                    "webpush"
+                ],
+                "security": [
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/webpush/vapid-public-key/": {
+            "get": {
+                "operationId": "webpush_vapid_public_key_retrieve",
+                "description": "GET /api/webpush/vapid-public-key/.",
+                "tags": [
+                    "webpush"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
         }
     },
     "components": {
         "schemas": {
             "Article": {
                 "type": "object",
-                "description": "Expert article (/statyi/<slug>) with cover + excerpt.",
+                "description": "Article detail: list fields + SKUs mentioned in the text.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -755,32 +2588,42 @@
                     },
                     "title": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Заголовок"
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "excerpt": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Краткий анонс для списка /statyi (без HTML)."
+                        "title": "Анонс",
+                        "description": "Краткий анонс для списка статей (без HTML)."
                     },
                     "cover": {
                         "type": "string",
                         "format": "uri",
-                        "readOnly": true,
                         "nullable": true,
-                        "description": "Обложка статьи (локальный MEDIA URL)."
+                        "readOnly": true
                     },
-                    "body": {
+                    "cover_dark": {
                         "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "reading_minutes": {
+                        "type": "integer",
+                        "description": "Minutes to read; the list does not ship the full HTML body.",
                         "readOnly": true
                     },
                     "is_published": {
                         "type": "boolean",
                         "readOnly": true,
+                        "title": "Опубликовано",
                         "description": "Видимость в публичном API."
                     },
                     "published_at": {
@@ -788,30 +2631,164 @@
                         "format": "date-time",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                        "title": "Дата публикации",
+                        "description": "Дата публикации (для сортировки/SEO); пусто = черновик."
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Создано"
                     },
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
+                        "readOnly": true,
+                        "title": "Обновлено"
+                    },
+                    "body": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Текст"
+                    },
+                    "related_skus": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ArticleRelatedSku"
+                        },
                         "readOnly": true
                     }
                 },
                 "required": [
                     "body",
                     "cover",
+                    "cover_dark",
                     "created_at",
                     "excerpt",
                     "id",
                     "is_published",
                     "published_at",
+                    "reading_minutes",
+                    "related_skus",
                     "slug",
                     "title",
                     "updated_at"
+                ]
+            },
+            "ArticleList": {
+                "type": "object",
+                "description": "Article card for /statyi list: no body, only the reading time.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Заголовок"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Сегмент URL",
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "excerpt": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Анонс",
+                        "description": "Краткий анонс для списка статей (без HTML)."
+                    },
+                    "cover": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "cover_dark": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "reading_minutes": {
+                        "type": "integer",
+                        "description": "Minutes to read; the list does not ship the full HTML body.",
+                        "readOnly": true
+                    },
+                    "is_published": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "title": "Опубликовано",
+                        "description": "Видимость в публичном API."
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Дата публикации",
+                        "description": "Дата публикации (для сортировки/SEO); пусто = черновик."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "title": "Создано"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "title": "Обновлено"
+                    }
+                },
+                "required": [
+                    "cover",
+                    "cover_dark",
+                    "created_at",
+                    "excerpt",
+                    "id",
+                    "is_published",
+                    "published_at",
+                    "reading_minutes",
+                    "slug",
+                    "title",
+                    "updated_at"
+                ]
+            },
+            "ArticleRelatedSku": {
+                "type": "object",
+                "description": "Compact SKU card embedded in an article detail response.",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "category_slug": {
+                        "type": "string",
+                        "description": "Category path segment for nested catalog URLs.",
+                        "readOnly": true
+                    },
+                    "image": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Primary published image path (root-relative ``/media/...``).",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "category_slug",
+                    "image",
+                    "name",
+                    "sku_code",
+                    "slug"
                 ]
             },
             "AttributeValue": {
@@ -833,7 +2810,8 @@
                     },
                     "value": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Значение"
                     }
                 },
                 "required": [
@@ -843,9 +2821,42 @@
                     "value"
                 ]
             },
+            "BallValveKit": {
+                "type": "object",
+                "description": "Actuator + bracket picker payload for ball-valve PDP.",
+                "properties": {
+                    "drive_families": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "suffixes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "bracket_by_drive": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    },
+                    "bracket_hint": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "bracket_by_drive",
+                    "bracket_hint",
+                    "drive_families",
+                    "suffixes"
+                ]
+            },
             "Category": {
                 "type": "object",
-                "description": "Public category list/detail fields.",
+                "description": "Public category list/detail fields (series overview + install).",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -853,29 +2864,84 @@
                     },
                     "name": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Название"
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "parent": {
                         "type": "integer",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Родительская категория (None для корня дерева)."
+                        "title": "Родитель",
+                        "description": "Родительская категория (пусто = корень дерева)."
                     },
                     "description": {
                         "type": "string",
+                        "readOnly": true,
+                        "title": "Описание",
+                        "description": "Общее описание линейки продукции (для страницы категории)."
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Инструкция",
+                        "description": "Общая инструкция по монтажу/управлению для линейки продукции."
+                    },
+                    "image": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ProductImage"
+                            }
+                        ],
+                        "nullable": true,
                         "readOnly": true
                     }
                 },
                 "required": [
                     "description",
                     "id",
+                    "image",
+                    "instructions",
                     "name",
                     "parent",
+                    "slug"
+                ]
+            },
+            "CompatiblePosition": {
+                "type": "object",
+                "description": "Compact cross-link card («Совместимые позиции»).",
+                "properties": {
+                    "role": {
+                        "$ref": "#/components/schemas/RoleEnum"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "category_slug": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "category_slug",
+                    "image",
+                    "name",
+                    "role",
+                    "sku_code",
                     "slug"
                 ]
             },
@@ -887,7 +2953,7 @@
                     "other"
                 ],
                 "type": "string",
-                "description": "* `datasheet` - Паспорт / datasheet\n* `certificate` - Сертификат\n* `catalog` - Каталог\n* `other` - Прочее"
+                "description": "* `datasheet` - Паспорт\n* `certificate` - Сертификат\n* `catalog` - Каталог\n* `other` - Прочее"
             },
             "Lead": {
                 "type": "object",
@@ -898,45 +2964,65 @@
                         "readOnly": true
                     },
                     "lead_type": {
-                        "$ref": "#/components/schemas/LeadTypeEnum"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LeadTypeEnum"
+                            }
+                        ],
+                        "title": "Тип заявки"
                     },
                     "name": {
                         "type": "string",
+                        "title": "Имя",
                         "maxLength": 200
                     },
                     "email": {
                         "type": "string",
                         "format": "email",
                         "writeOnly": true,
+                        "title": "Эл. почта",
                         "maxLength": 254
                     },
                     "phone": {
                         "type": "string",
                         "writeOnly": true,
+                        "title": "Телефон",
                         "maxLength": 50
                     },
                     "company": {
                         "type": "string",
+                        "title": "Компания",
+                        "description": "Для запроса КП обязательна: ключ нити КП = компания + имя.",
                         "maxLength": 200
                     },
                     "message": {
-                        "type": "string"
+                        "type": "string",
+                        "title": "Сообщение"
                     },
                     "sku": {
-                        "type": "integer",
-                        "nullable": true,
-                        "description": "SKU, по которому пришла заявка (опц.; SET_NULL при удалении SKU)."
+                        "type": "string",
+                        "title": "Сегмент URL",
+                        "nullable": true
                     },
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
                         "minimum": 0,
                         "nullable": true,
-                        "description": "Количество (для RFQ)."
+                        "title": "Количество",
+                        "description": "Сводка: количество по первому артикулу (RFQ)."
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LeadItemWrite"
+                        },
+                        "writeOnly": true
                     },
                     "analog_belimo_code": {
                         "type": "string",
-                        "description": "Код аналога Belimo (для replacement).",
+                        "title": "Код аналога Belimo",
+                        "description": "Код аналога Belimo (для заявок на замену).",
                         "maxLength": 100
                     },
                     "status": {
@@ -945,23 +3031,30 @@
                                 "$ref": "#/components/schemas/StatusEnum"
                             }
                         ],
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Статус"
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Создано"
                     },
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Обновлено"
                     },
                     "website": {
                         "type": "string",
                         "writeOnly": true,
                         "default": "",
                         "description": "Honeypot — leave empty (hidden from real users)."
+                    },
+                    "pdn_consent": {
+                        "type": "boolean",
+                        "writeOnly": true
                     }
                 },
                 "required": [
@@ -970,9 +3063,32 @@
                     "id",
                     "message",
                     "name",
+                    "pdn_consent",
                     "status",
                     "updated_at"
                 ]
+            },
+            "LeadItemWrite": {
+                "type": "object",
+                "description": "One RFQ line: published SKU slug and/or free-text sku_code.",
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "title": "Сегмент URL",
+                        "nullable": true
+                    },
+                    "sku_code": {
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 100
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "default": 1
+                    }
+                }
             },
             "LeadTypeEnum": {
                 "enum": [
@@ -993,20 +3109,39 @@
                     },
                     "title": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Заголовок"
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "body": {
                         "type": "string",
+                        "readOnly": true,
+                        "title": "Текст"
+                    },
+                    "cover": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
                         "readOnly": true
+                    },
+                    "category": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/NewsCategoryBrief"
+                            }
+                        ],
+                        "readOnly": true,
+                        "nullable": true
                     },
                     "is_published": {
                         "type": "boolean",
                         "readOnly": true,
+                        "title": "Опубликовано",
                         "description": "Видимость в публичном API."
                     },
                     "published_at": {
@@ -1014,21 +3149,26 @@
                         "format": "date-time",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                        "title": "Дата публикации",
+                        "description": "Дата публикации (для сортировки/SEO); пусто = черновик."
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Создано"
                     },
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Обновлено"
                     }
                 },
                 "required": [
                     "body",
+                    "category",
+                    "cover",
                     "created_at",
                     "id",
                     "is_published",
@@ -1036,6 +3176,54 @@
                     "slug",
                     "title",
                     "updated_at"
+                ]
+            },
+            "NewsCategory": {
+                "type": "object",
+                "description": "Published news rubric for /novosti filter chips.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Название"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Сегмент URL",
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "title": "Порядок"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "sort_order"
+                ]
+            },
+            "NewsCategoryBrief": {
+                "type": "object",
+                "description": "Nested category payload on a news card ({slug, name}).",
+                "properties": {
+                    "slug": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "slug"
                 ]
             },
             "Page": {
@@ -1048,20 +3236,24 @@
                     },
                     "title": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Заголовок"
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "body": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Текст"
                     },
                     "is_published": {
                         "type": "boolean",
                         "readOnly": true,
+                        "title": "Опубликовано",
                         "description": "Видимость в публичном API."
                     },
                     "published_at": {
@@ -1069,17 +3261,20 @@
                         "format": "date-time",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Дата публикации (для сортировки/SEO); null = черновик."
+                        "title": "Дата публикации",
+                        "description": "Дата публикации (для сортировки/SEO); пусто = черновик."
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Создано"
                     },
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Обновлено"
                     }
                 },
                 "required": [
@@ -1093,7 +3288,7 @@
                     "updated_at"
                 ]
             },
-            "PaginatedArticleList": {
+            "PaginatedArticleListList": {
                 "type": "object",
                 "required": [
                     "count",
@@ -1119,7 +3314,7 @@
                     "results": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/Article"
+                            "$ref": "#/components/schemas/ArticleList"
                         }
                     }
                 }
@@ -1279,6 +3474,48 @@
                     }
                 }
             },
+            "ProductFile": {
+                "type": "object",
+                "description": "Public PDF metadata. ``file`` is the stable document URL, not storage.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Название"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "One URL per document. Pass ``sku`` in context to avoid a query.",
+                        "readOnly": true
+                    },
+                    "file_type": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/FileTypeEnum"
+                            }
+                        ],
+                        "readOnly": true,
+                        "title": "Тип файла"
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "title": "Порядок",
+                        "description": "Порядок в блоке «Документы» (меньше = выше)."
+                    }
+                },
+                "required": [
+                    "file",
+                    "file_type",
+                    "id",
+                    "sort_order",
+                    "title"
+                ]
+            },
             "ProductFileUpload": {
                 "type": "object",
                 "description": "Serializer for staff upload (POST) and public read (GET).",
@@ -1289,24 +3526,33 @@
                     },
                     "title": {
                         "type": "string",
+                        "title": "Название",
                         "maxLength": 300
                     },
                     "file": {
                         "type": "string",
                         "format": "uri",
-                        "description": "Только PDF; лимит и magic bytes — catalog.validators."
+                        "title": "Файл",
+                        "description": "Только PDF; размер и тип файла проверяются при загрузке."
                     },
                     "file_type": {
-                        "$ref": "#/components/schemas/FileTypeEnum"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/FileTypeEnum"
+                            }
+                        ],
+                        "title": "Тип файла"
                     },
                     "is_published": {
                         "type": "boolean",
-                        "description": "Видимость файла в публичном каталоге / PDP."
+                        "title": "Опубликован",
+                        "description": "Видимость файла в публичном каталоге и на карточке товара."
                     },
                     "sort_order": {
                         "type": "integer",
                         "maximum": 2147483647,
                         "minimum": 0,
+                        "title": "Порядок",
                         "description": "Порядок в блоке «Документы» (меньше = выше)."
                     }
                 },
@@ -1316,9 +3562,57 @@
                     "title"
                 ]
             },
+            "ProductImage": {
+                "type": "object",
+                "description": "Public product image (full WebP + optional card preview).",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "image": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "image_card": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "alt": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Альтернативный текст"
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "title": "Порядок"
+                    }
+                },
+                "required": [
+                    "alt",
+                    "id",
+                    "image",
+                    "image_card",
+                    "sort_order"
+                ]
+            },
+            "RoleEnum": {
+                "enum": [
+                    "drive",
+                    "valve",
+                    "bracket"
+                ],
+                "type": "string",
+                "description": "* `drive` - drive\n* `valve` - valve\n* `bracket` - bracket"
+            },
             "SKUDetail": {
                 "type": "object",
-                "description": "SKU PDP payload: list fields + attributes + files.",
+                "description": "SKU PDP payload: list fields + sectioned copy + attributes + files.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -1326,23 +3620,27 @@
                     },
                     "name": {
                         "type": "string",
+                        "description": "H1/card title: series Product name on family list cards, else edition.",
                         "readOnly": true
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "sku_code": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Артикул",
                         "description": "Артикул (уникален, не пуст), напр. HVA-5NM или BV215."
                     },
                     "analog_belimo_code": {
                         "type": "string",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Код аналога Belimo (задел для AnalogMap P1)."
+                        "title": "Код аналога Belimo",
+                        "description": "Проверенный артикул Belimo: вписать вручную после сверки в «Подбор аналогов»."
                     },
                     "category_slug": {
                         "type": "string",
@@ -1358,15 +3656,123 @@
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."
+                        "title": "Цена",
+                        "description": "Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»)."
                     },
                     "price_on_request": {
                         "type": "boolean",
                         "description": "True when prices are hidden (RFQ policy).",
                         "readOnly": true
                     },
+                    "in_stock": {
+                        "type": "boolean",
+                        "description": "True when warehouse quantity is positive (no raw qty in public API).",
+                        "readOnly": true
+                    },
+                    "in_stock_ma": {
+                        "type": "boolean",
+                        "description": "True when 4–20 mA (special-order) units are on hand (no raw qty).",
+                        "readOnly": true
+                    },
+                    "is_new": {
+                        "type": "boolean",
+                        "description": "True when first_published_at is within the Новинки window (30 days).",
+                        "readOnly": true
+                    },
+                    "first_published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Впервые на сайте",
+                        "description": "Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL."
+                    },
+                    "edition_count": {
+                        "type": "integer",
+                        "description": "Published SKU count on the same Product (family card signal).",
+                        "readOnly": true
+                    },
+                    "image": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ProductImage"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "highlights": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SkuHighlight"
+                        },
+                        "readOnly": true
+                    },
                     "description": {
                         "type": "string",
+                        "description": "Return description for this SKU edition only (no H1/lead/EAV echo).\n\nDrops bullets that only restate AttributeValue rows already shown in\nТТХ cards / highlights (e.g. «Управление: …», «Вспомогательный…»).\nWhen nothing remains but a hero lead exists, return a light paraphrase\nof that lead for the Описание tab (SEO-safe, not an exact duplicate).",
+                        "readOnly": true
+                    },
+                    "lead": {
+                        "type": "string",
+                        "description": "Short prose blurb for PDP hero (application sentence).",
+                        "readOnly": true
+                    },
+                    "specs_text": {
+                        "type": "string",
+                        "description": "Характеристики prose — only when there are no structured attrs.\n\nWhen EAV / category cards cover the ТТХ, return empty to avoid a\nduplicate StructuredText block under the cards.",
+                        "readOnly": true
+                    },
+                    "analogs_text": {
+                        "type": "string",
+                        "description": "Return Аналоги for this SKU edition.",
+                        "readOnly": true
+                    },
+                    "category_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "category_description": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "category_instructions": {
+                        "type": "string",
+                        "description": "Install guide scoped to this SKU edition (all series).",
+                        "readOnly": true
+                    },
+                    "ball_valve_kit": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/BallValveKit"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "compatible_positions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CompatiblePosition"
+                        },
+                        "readOnly": true
+                    },
+                    "siblings": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SiblingEdition"
+                        },
+                        "readOnly": true
+                    },
+                    "variant_axes": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "Unique DN / Kvs / voltage / control values among siblings.",
                         "readOnly": true
                     },
                     "attributes": {
@@ -1376,34 +3782,65 @@
                         },
                         "readOnly": true
                     },
+                    "attribute_groups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SkuAttributeGroup"
+                        },
+                        "readOnly": true
+                    },
                     "files": {
                         "type": "array",
                         "items": {
-                            "type": "object",
-                            "additionalProperties": {}
+                            "$ref": "#/components/schemas/ProductFile"
                         },
-                        "description": "Return only published ProductFile rows, ordered.",
+                        "readOnly": true
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductImage"
+                        },
                         "readOnly": true
                     }
                 },
                 "required": [
                     "analog_belimo_code",
+                    "analogs_text",
+                    "attribute_groups",
                     "attributes",
+                    "ball_valve_kit",
+                    "category_description",
+                    "category_instructions",
+                    "category_name",
                     "category_slug",
+                    "compatible_positions",
                     "description",
+                    "edition_count",
                     "files",
+                    "first_published_at",
+                    "highlights",
                     "id",
+                    "image",
+                    "images",
+                    "in_stock",
+                    "in_stock_ma",
+                    "is_new",
+                    "lead",
                     "name",
                     "price",
                     "price_on_request",
                     "product_slug",
+                    "siblings",
                     "sku_code",
-                    "slug"
+                    "slug",
+                    "specs_text",
+                    "variant_axes"
                 ]
             },
             "SKUList": {
                 "type": "object",
-                "description": "SKU card for list: no nested ТТХ; price gated by SiteSettings.",
+                "description": "SKU card for list: key ТТХ highlights; price gated by SiteSettings.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -1411,23 +3848,27 @@
                     },
                     "name": {
                         "type": "string",
+                        "description": "H1/card title: series Product name on family list cards, else edition.",
                         "readOnly": true
                     },
                     "slug": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Сегмент URL",
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "sku_code": {
                         "type": "string",
                         "readOnly": true,
+                        "title": "Артикул",
                         "description": "Артикул (уникален, не пуст), напр. HVA-5NM или BV215."
                     },
                     "analog_belimo_code": {
                         "type": "string",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Код аналога Belimo (задел для AnalogMap P1)."
+                        "title": "Код аналога Belimo",
+                        "description": "Проверенный артикул Belimo: вписать вручную после сверки в «Подбор аналогов»."
                     },
                     "category_slug": {
                         "type": "string",
@@ -1443,18 +3884,70 @@
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "readOnly": true,
                         "nullable": true,
-                        "description": "Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site)."
+                        "title": "Цена",
+                        "description": "Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»)."
                     },
                     "price_on_request": {
                         "type": "boolean",
                         "description": "True when prices are hidden (RFQ policy).",
+                        "readOnly": true
+                    },
+                    "in_stock": {
+                        "type": "boolean",
+                        "description": "True when warehouse quantity is positive (no raw qty in public API).",
+                        "readOnly": true
+                    },
+                    "in_stock_ma": {
+                        "type": "boolean",
+                        "description": "True when 4–20 mA (special-order) units are on hand (no raw qty).",
+                        "readOnly": true
+                    },
+                    "is_new": {
+                        "type": "boolean",
+                        "description": "True when first_published_at is within the Новинки window (30 days).",
+                        "readOnly": true
+                    },
+                    "first_published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Впервые на сайте",
+                        "description": "Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL."
+                    },
+                    "edition_count": {
+                        "type": "integer",
+                        "description": "Published SKU count on the same Product (family card signal).",
+                        "readOnly": true
+                    },
+                    "image": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ProductImage"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "highlights": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SkuHighlight"
+                        },
                         "readOnly": true
                     }
                 },
                 "required": [
                     "analog_belimo_code",
                     "category_slug",
+                    "edition_count",
+                    "first_published_at",
+                    "highlights",
                     "id",
+                    "image",
+                    "in_stock",
+                    "in_stock_ma",
+                    "is_new",
                     "name",
                     "price",
                     "price_on_request",
@@ -1485,6 +3978,11 @@
                         "items": {
                             "$ref": "#/components/schemas/SearchResultItem"
                         }
+                    },
+                    "corrected_query": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Перевернутая раскладка запроса (did-you-mean), если она нашла лучше."
                     }
                 },
                 "required": [
@@ -1500,7 +3998,7 @@
                 "properties": {
                     "type": {
                         "type": "string",
-                        "description": "Тип результата: sku | article | news."
+                        "description": "Тип результата: sku | article | news | page."
                     },
                     "slug": {
                         "type": "string",
@@ -1527,6 +4025,147 @@
                     "url"
                 ]
             },
+            "SearchSuggestItem": {
+                "type": "object",
+                "description": "One compact item in the suggest dropdown payload.",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "Тип результата: sku | article | news | page."
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Заголовок (для SKU — с артикулом)."
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "Канонический path результата."
+                    }
+                },
+                "required": [
+                    "title",
+                    "type",
+                    "url"
+                ]
+            },
+            "SearchSuggestResponse": {
+                "type": "object",
+                "description": "Suggest dropdown payload — no pagination, capped list.",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SearchSuggestItem"
+                        }
+                    }
+                },
+                "required": [
+                    "results"
+                ]
+            },
+            "SiblingEdition": {
+                "type": "object",
+                "description": "Sibling-edition row for the PDP variant picker.",
+                "properties": {
+                    "slug": {
+                        "type": "string"
+                    },
+                    "sku_code": {
+                        "type": "string"
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "dn": {
+                        "type": "string"
+                    },
+                    "ways": {
+                        "type": "string"
+                    },
+                    "kvs": {
+                        "type": "string"
+                    },
+                    "voltage": {
+                        "type": "string"
+                    },
+                    "control": {
+                        "type": "string"
+                    },
+                    "aux_switch": {
+                        "type": "boolean"
+                    },
+                    "fault_alarm": {
+                        "type": "boolean"
+                    },
+                    "in_stock": {
+                        "type": "boolean"
+                    },
+                    "in_stock_ma": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "aux_switch",
+                    "body",
+                    "control",
+                    "dn",
+                    "fault_alarm",
+                    "in_stock",
+                    "in_stock_ma",
+                    "kvs",
+                    "sku_code",
+                    "slug",
+                    "voltage",
+                    "ways"
+                ]
+            },
+            "SkuAttributeGroup": {
+                "type": "object",
+                "description": "ТТХ group block on the PDP Характеристики tab ({key,title,items}).",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AttributeValue"
+                        }
+                    }
+                },
+                "required": [
+                    "items",
+                    "key",
+                    "title"
+                ]
+            },
+            "SkuHighlight": {
+                "type": "object",
+                "description": "One ТТХ highlight row on SKU cards / PDP hero ({key,name,value,unit}).",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "key",
+                    "name",
+                    "unit",
+                    "value"
+                ]
+            },
             "StatusEnum": {
                 "enum": [
                     "new",
@@ -1538,10 +4177,6 @@
             }
         },
         "securitySchemes": {
-            "basicAuth": {
-                "type": "http",
-                "scheme": "basic"
-            },
             "cookieAuth": {
                 "type": "apiKey",
                 "in": "cookie",

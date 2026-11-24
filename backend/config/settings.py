@@ -622,6 +622,9 @@ REST_FRAMEWORK = {
         # GET poll every ~4s needs headroom (15/min); separate from POST scope.
         "support_poll": "120/minute",
         "support_faq": "60/minute",
+        # Header autocomplete fires per keystroke (debounced); own bucket
+        # so shared-office IPs don't exhaust the anon 120/min API budget.
+        "search_suggest": "240/min",
         "webpush_subscribe": "30/hour",
         # First-party SPA pageviews (essential); per-IP, headroom for SPA navigations.
         "analytics_hit": "120/min",

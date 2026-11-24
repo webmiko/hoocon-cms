@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
+from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
@@ -359,6 +360,15 @@ class SKU(models.Model):
         verbose_name = "артикул (SKU)"
         verbose_name_plural = "артикулы (SKU)"
         ordering = ("sku_code",)
+        indexes = [
+            # Trigram index backs the ``%`` lookup for sku_code typos
+            # («hva5m» → «HVA-5NM») in catalog/site search.
+            GinIndex(
+                fields=["sku_code"],
+                name="catalog_sku_code_trgm",
+                opclasses=["gin_trgm_ops"],
+            ),
+        ]
 
     def __str__(self) -> str:
         """Return the SKU name for Admin and logs."""

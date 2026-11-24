@@ -3,6 +3,10 @@
 Users type natural phrases that are missing from SKU ``search_vector``
 (e.g. «кран с приводом» while kit titles say «электрический шаровой кран»).
 Detect those intents and map them to the canonical category slug.
+
+Also hosts the keyboard-layout helper: users routinely type queries in the
+wrong layout («вф-100» for «DA-100», «ghbdjl» for «привод»); the layout
+flip is shared by catalog ``?q=`` and site ``/api/search/``.
 """
 
 from __future__ import annotations
@@ -12,6 +16,15 @@ from dataclasses import dataclass
 
 # Canonical slug from series_categories / quiz («Комплект кран + привод»).
 KIT_CATEGORY_SLUG = "komplekty"
+
+# Trigram word-similarity floor for typo tolerance («превод» → «привод»).
+# Shared by catalog ``?q=`` and site ``/api/search/``; scored per-row over
+# a seq scan (tables are small), sku_code additionally uses the ``%`` op.
+TRGM_WORD_THRESHOLD = 0.2
+
+# Query length cap for all public search endpoints: FTS + trigram cost
+# grows linearly with len(q) (measured ~4s at 6000 chars vs ~0.2s at 6).
+SEARCH_Q_MAX_LEN = 100
 
 # Longer phrases first so the most specific match wins.
 _KIT_PHRASES: tuple[str, ...] = (
@@ -101,3 +114,51 @@ def resolve_catalog_search_intent(value: str) -> CatalogSearchIntent:
         )
 
     return CatalogSearchIntent(category_slug=None, residual=raw)
+
+
+# ── Keyboard layout flip (RU ЙЦУКЕН ↔ EN QWERTY) ─────────────────────
+# Same physical key produces a Cyrillic or Latin char; map both ways so a
+# query typed in the wrong layout still finds codes («вф-100» → «da-100»)
+# and words («ghbdjl» → «привод»). Paired by row, order matters.
+_LAYOUT_RU_CHARS = "йцукенгшщзхъфывапролджэячсмитьбю.ё"
+_LAYOUT_EN_CHARS = "qwertyuiop[]asdfghjkl;'zxcvbnm,./`"
+
+_LAYOUT_TRANSLATION: dict[int, int] = {}
+for _ru_char, _en_char in zip(_LAYOUT_RU_CHARS, _LAYOUT_EN_CHARS, strict=True):
+    _LAYOUT_TRANSLATION[ord(_ru_char)] = ord(_en_char)
+    _LAYOUT_TRANSLATION[ord(_en_char)] = ord(_ru_char)
+    _LAYOUT_TRANSLATION[ord(_ru_char.upper())] = ord(_en_char.upper())
+    _LAYOUT_TRANSLATION[ord(_en_char.upper())] = ord(_ru_char.upper())
+
+
+def swap_keyboard_layout(text: str) -> str:
+    """Translate every char between RU and EN keyboard layouts.
+
+    Args:
+        text: Raw query text typed in either layout.
+
+    Returns:
+        Same-length string with each mapped char swapped to the other
+        layout; digits, dashes, spaces and unmapped chars stay as is.
+    """
+    return (text or "").translate(_LAYOUT_TRANSLATION)
+
+
+def expand_search_variants(raw_q: str) -> tuple[str, ...]:
+    """Return query variants: original plus layout-flipped (deduped).
+
+    Args:
+        raw_q: Raw ``?q=`` text.
+
+    Returns:
+        ``(original,)`` or ``(original, flipped)``; empty tuple for blank
+        input. Flipped variant equals the original only for layout-neutral
+        strings (digits, dashes) and is then dropped.
+    """
+    base = (raw_q or "").strip()
+    if not base:
+        return ()
+    flipped = swap_keyboard_layout(base).strip()
+    if not flipped or flipped == base:
+        return (base,)
+    return (base, flipped)

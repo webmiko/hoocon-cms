@@ -86,16 +86,18 @@ class SKUFilterSet(django_filters.FilterSet):
         return queryset.filter(first_published_at__gte=new_since())
 
     def filter_q(self, queryset: QuerySet[SKU], _name: str, value: str) -> QuerySet[SKU]:
-        """Hybrid search: FTS for name/slug (stemming) + icontains for sku_code.
+        """Hybrid search: FTS + code substring + trigram typos + layout flip.
 
         Also applies catalog search intent: phrases like «кран с приводом»
         map to category ``komplekty`` (kit titles rarely contain «привод»).
 
         FTS (SearchVector with russian config) handles Cyrillic stemming for
-        product names. sku_code is matched with icontains because articles
-        (e.g. 'HVA-5NM') don't benefit from stemming — exact substring is
-        what the engineer types. Results ranked by SearchRank (FTS matches
-        rank higher than sku_code-only matches).
+        product names. sku_code is matched with icontains and the trigram
+        ``%`` operator because articles (e.g. 'HVA-5NM') don't benefit from
+        stemming — exact substring is what the engineer types, and trigrams
+        forgive typos. ``word_similarity`` on name/sku_code catches typo'd
+        words («превод» → «привод»); the layout-flipped variant («вф-100» →
+        «da-100») is searched alongside the raw text.
 
         Spec: ПЛАН §6 Iter 2 — FTS по SKU + артикул.
         """
@@ -108,10 +110,21 @@ class SKUFilterSet(django_filters.FilterSet):
                 F("sku_code_nm").asc(nulls_last=True),
                 "sku_code",
             )
-        from django.contrib.postgres.search import SearchQuery, SearchRank
+        from django.contrib.postgres.search import (
+            SearchQuery,
+            SearchRank,
+            TrigramWordSimilarity,
+        )
+        from django.db.models.functions import Greatest
 
-        from catalog.search_intent import resolve_catalog_search_intent
+        from catalog.search_intent import (
+            SEARCH_Q_MAX_LEN,
+            TRGM_WORD_THRESHOLD,
+            expand_search_variants,
+            resolve_catalog_search_intent,
+        )
 
+        value = value[:SEARCH_Q_MAX_LEN]
         intent = resolve_catalog_search_intent(value)
         if intent.category_slug:
             queryset = queryset.filter(product__category__slug=intent.category_slug)
@@ -123,18 +136,40 @@ class SKUFilterSet(django_filters.FilterSet):
                 )
             value = intent.residual
 
-        query = SearchQuery(value, config="russian")
+        # Kit-residual (DN, code) narrows strictly — «dn65» must not blur
+        # into «dn15»; trigram fuzz stays off on the intent path.
+        strict_residual = bool(intent.category_slug)
+
         analog_key = normalize_analog_code(value)
-        analog_q = Q()
-        if analog_key:
-            analog_q = Q(analog_belimo_code__icontains=value.strip())
-        return (
-            queryset.filter(
-                Q(search_vector=query) | Q(sku_code__icontains=value) | analog_q,
+        variants = expand_search_variants(value) or (value,)
+        annotations: dict[str, Any] = {}
+        matched = Q()
+        for idx, variant in enumerate(variants):
+            query = SearchQuery(variant, config="russian")
+            matched |= Q(search_vector=query) | Q(sku_code__icontains=variant)
+            if not strict_residual:
+                matched |= Q(sku_code__trigram_similar=variant)
+            if analog_key:
+                matched |= Q(analog_belimo_code__icontains=variant)
+            annotations[f"rank_{idx}"] = SearchRank("search_vector", query)
+            annotations[f"sim_{idx}"] = Greatest(
+                TrigramWordSimilarity(variant, "name"),
+                TrigramWordSimilarity(variant, "sku_code"),
             )
-            .annotate(rank=SearchRank("search_vector", query))
+        trigram_hit = Q()
+        if not strict_residual:
+            for idx in range(len(variants)):
+                trigram_hit |= Q(**{f"sim_{idx}__gt": TRGM_WORD_THRESHOLD})
+        return (
+            queryset.annotate(**annotations)
+            .filter(matched | trigram_hit)
             .order_by(
-                "-rank",
+                Greatest(
+                    *(
+                        [F(f"rank_{idx}") for idx in range(len(variants))]
+                        + [F(f"sim_{idx}") for idx in range(len(variants))]
+                    ),
+                ).desc(),
                 F("moment_nm").asc(nulls_last=True),
                 F("sku_code_nm").asc(nulls_last=True),
                 "sku_code",
