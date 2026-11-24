@@ -545,6 +545,22 @@ SUPPORT_ESCALATION_BUSY_FOLLOWUP_SECONDS = int(
 )
 # Hard cap of stored files per support conversation (audit M2 disk bound).
 SUPPORT_ATTACHMENT_MAX_FILES = int(os.getenv("SUPPORT_ATTACHMENT_MAX_FILES", "20"))
+# Client media from MAX/VK/Telegram: per-file size cap and files per message.
+SUPPORT_MESSENGER_MEDIA_MAX_BYTES = int(
+    os.getenv("SUPPORT_MESSENGER_MEDIA_MAX_BYTES", str(50 * 1024 * 1024)),
+)
+SUPPORT_MESSENGER_MEDIA_MAX_PER_MESSAGE = int(
+    os.getenv("SUPPORT_MESSENGER_MEDIA_MAX_PER_MESSAGE", "10"),
+)
+# Total download budget for one messenger message (bounds worker RAM).
+SUPPORT_MESSENGER_MEDIA_MAX_TOTAL_BYTES = int(
+    os.getenv("SUPPORT_MESSENGER_MEDIA_MAX_TOTAL_BYTES", str(100 * 1024 * 1024)),
+)
+# Extra MAX attachment CDN host suffixes (comma-separated, e.g. ".example.ru");
+# the built-in list lives in social.max_http.
+MAX_ATTACHMENT_EXTRA_HOSTS = tuple(
+    part.strip().lower() for part in os.getenv("MAX_ATTACHMENT_EXTRA_HOSTS", "").split(",") if part.strip()
+)
 # Менеджер уже вёл диалог и не ответил клиенту за N секунд — бот подхватывает.
 SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS = int(
     os.getenv("SUPPORT_MANAGER_REPLY_TIMEOUT_SECONDS", "45"),
@@ -622,6 +638,9 @@ REST_FRAMEWORK = {
         # GET poll every ~4s needs headroom (15/min); separate from POST scope.
         "support_poll": "120/minute",
         "support_faq": "60/minute",
+        # Header autocomplete fires per keystroke (debounced); own bucket
+        # so shared-office IPs don't exhaust the anon 120/min API budget.
+        "search_suggest": "240/min",
         "webpush_subscribe": "30/hour",
         # First-party SPA pageviews (essential); per-IP, headroom for SPA navigations.
         "analytics_hit": "120/min",

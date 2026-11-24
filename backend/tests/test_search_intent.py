@@ -8,8 +8,10 @@ from django.urls import reverse
 from catalog.models import SKU, Category, Product
 from catalog.search_intent import (
     KIT_CATEGORY_SLUG,
+    expand_search_variants,
     normalize_search_query,
     resolve_catalog_search_intent,
+    swap_keyboard_layout,
 )
 
 
@@ -73,6 +75,102 @@ def test_resolve_intent_skips_phrases_that_normalize_empty(monkeypatch: pytest.M
     intent = resolve_catalog_search_intent("комплекты")
     assert intent.category_slug == KIT_CATEGORY_SLUG
     assert intent.matched_phrase == "комплекты"
+
+
+# ── Keyboard layout flip ────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("ghbdjl", "привод"),
+        ("вф-100", "da-100"),
+        ("ВФ-100", "DA-100"),
+        ("руддщт", "hellon"),  # «hello» typed with 'н' slip keeps literal
+        ("rhfc", "крас"),
+        ("dn65", "вт65"),
+    ],
+)
+def test_swap_keyboard_layout_both_directions(raw: str, expected: str) -> None:
+    """RU↔EN layout swap maps letters and common punctuation both ways."""
+    assert swap_keyboard_layout(raw) == expected
+
+
+def test_swap_keyboard_layout_roundtrip() -> None:
+    """Flipping twice returns the original text."""
+    assert swap_keyboard_layout(swap_keyboard_layout("привод")) == "привод"
+    assert swap_keyboard_layout(swap_keyboard_layout("HVA-5NM")) == "HVA-5NM"
+
+
+def test_expand_search_variants_adds_layout_flip() -> None:
+    """Variants = original + flipped (layout-neutral queries stay single)."""
+    assert expand_search_variants("вф-100") == ("вф-100", "da-100")
+    assert expand_search_variants("ghbdjl") == ("ghbdjl", "привод")
+    assert expand_search_variants("230") == ("230",)
+    assert expand_search_variants("   ") == ()
+    assert expand_search_variants("") == ()
+
+
+@pytest.mark.django_db
+def test_catalog_q_layout_flip_finds_latin_code(client) -> None:
+    """?q=вф-100 (DA-100 typed in RU layout) finds the DA-100 SKU."""
+    cat = Category.objects.create(name="Приводы", slug="privody-layout")
+    prod = Product.objects.create(name="DA серия", slug="da-layout", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Электропривод DA-100 10 Нм",
+        slug="da-100-layout",
+        sku_code="DA-100-230A",
+        is_published=True,
+    )
+    response = client.get(reverse("catalog-sku-list"), {"q": "вф-100"})
+    assert response.status_code == 200
+    slugs = {row["slug"] for row in response.data["results"]}
+    assert "da-100-layout" in slugs
+
+
+@pytest.mark.django_db
+def test_catalog_q_typo_finds_sku_by_trigram(client) -> None:
+    """?q=превод (опечатка) still finds «Привод» SKUs via word similarity."""
+    cat = Category.objects.create(name="Приводы", slug="privody-typo")
+    prod = Product.objects.create(name="HVA серия", slug="hva-typo", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Привод воздушный HVA-5NM",
+        slug="privod-hva-typo",
+        sku_code="HVA-5NM-TYPO",
+        is_published=True,
+    )
+    SKU.objects.create(
+        product=prod,
+        name="Кронштейн монтажный KBR-9",
+        slug="kronstejn-typo",
+        sku_code="KBR-9-TYPO",
+        is_published=True,
+    )
+    response = client.get(reverse("catalog-sku-list"), {"q": "превод"})
+    assert response.status_code == 200
+    slugs = {row["slug"] for row in response.data["results"]}
+    assert "privod-hva-typo" in slugs
+    assert "kronstejn-typo" not in slugs
+
+
+@pytest.mark.django_db
+def test_catalog_q_latin_layout_finds_cyrillic_word(client) -> None:
+    """?q=ghbdjl (привод в латинской раскладке) finds «Привод» SKUs."""
+    cat = Category.objects.create(name="Приводы", slug="privody-lat")
+    prod = Product.objects.create(name="HVA серия", slug="hva-lat", category=cat)
+    SKU.objects.create(
+        product=prod,
+        name="Привод воздушный HVA-10NM",
+        slug="privod-hva-lat",
+        sku_code="HVA-10NM-LAT",
+        is_published=True,
+    )
+    response = client.get(reverse("catalog-sku-list"), {"q": "ghbdjl"})
+    assert response.status_code == 200
+    slugs = {row["slug"] for row in response.data["results"]}
+    assert "privod-hva-lat" in slugs
 
 
 @pytest.mark.django_db

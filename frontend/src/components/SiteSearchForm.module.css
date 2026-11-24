@@ -1,0 +1,60 @@
+/* Suggest dropdown under the header search form (absolute inside the
+ * form — the form itself provides position context). */
+
+.list {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: var(--space-xs) 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  max-height: min(24rem, 60vh);
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.optionActive {
+  background: var(--color-brand-soft);
+}
+
+.optionType {
+  flex: 0 0 auto;
+  min-width: 3.75rem;
+  color: var(--color-text-muted);
+}
+
+.optionTitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.optionAll {
+  border-top: 1px solid var(--color-control-border);
+  font-weight: 600;
+}
+
+.mark {
+  background: transparent;
+  color: var(--color-brand-ink);
+  font-weight: 600;
+}
+
+.optionFix {
+  border-bottom: 1px solid var(--color-control-border);
+  color: var(--color-brand-ink);
+}

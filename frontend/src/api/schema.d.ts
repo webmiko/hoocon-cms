@@ -4,6 +4,537 @@
  */
 
 export interface paths {
+    "/api/account/company/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Requisites only for a manager-confirmed member.
+         *
+         *     The company link comes from a free-text name in a lead, so an
+         *     unconfirmed visitor sees only the name they typed themselves.
+         */
+        get: operations["account_company_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/conversations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/conversations/ — own supportchat threads (ЛК-4). */
+        get: operations["account_conversations_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/documents/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/documents/ — all files of the client card. */
+        get: operations["account_documents_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/documents/{id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/documents/<id>/download/ — owner-only private file. */
+        get: operations["account_documents_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/documents/zip/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /api/account/documents/zip/ — все документы клиента одним ZIP (ЛК-8).
+         *
+         *     Files come from private media only; names are sanitized against
+         *     path traversal and de-duplicated inside the archive. The archive is
+         *     built in a spooled temp file with a total size cap and its own throttle.
+         */
+        get: operations["account_documents_zip_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/leads/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/leads/ — own leads only. */
+        get: operations["account_leads_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/leads/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/leads/<id>/ — own lead detail (404 on foreign). */
+        get: operations["account_leads_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/leads/{id}/repeat/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /api/account/leads/<id>/repeat/ — clone positions into a new RFQ.
+         *
+         *     Idempotent within a 5-minute window (§9): a repeat of the same source
+         *     lead returns the already-created copy instead of spawning duplicates.
+         */
+        post: operations["account_leads_repeat_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/me/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET/PATCH /api/account/me/ — cabinet profile. */
+        get: operations["account_me_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description GET/PATCH /api/account/me/ — cabinet profile. */
+        patch: operations["account_me_partial_update"];
+        trace?: never;
+    };
+    "/api/account/orders/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/orders/ — own orders (ЛК-6). */
+        get: operations["account_orders_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/orders/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/orders/<id>/ — own order detail. */
+        get: operations["account_orders_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/quotes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/quotes/ — issued quotes (drafts hidden). */
+        get: operations["account_quotes_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/quotes/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/quotes/<id>/ — own quote detail. */
+        get: operations["account_quotes_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/quotes/{id}/pdf/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/quotes/<id>/pdf/ — generated PDF (ЛК-3). */
+        get: operations["account_quotes_pdf_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/rma/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET/POST /api/account/rma/ — reclamations (ЛК-12). */
+        get: operations["account_rma_retrieve"];
+        put?: never;
+        /** @description GET/POST /api/account/rma/ — reclamations (ЛК-12). */
+        post: operations["account_rma_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/rma/{id}/photo/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/rma/<id>/photo/ — owner-only defect photo download. */
+        get: operations["account_rma_photo_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/specs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET/POST /api/account/specs/ — spec templates CRUD (owner scope). */
+        get: operations["account_specs_retrieve"];
+        put?: never;
+        /** @description GET/POST /api/account/specs/ — spec templates CRUD (owner scope). */
+        post: operations["account_specs_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/specs/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope. */
+        get: operations["account_specs_retrieve_2"];
+        put?: never;
+        post?: never;
+        /** @description GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope. */
+        delete: operations["account_specs_destroy"];
+        options?: never;
+        head?: never;
+        /** @description GET/PATCH/DELETE /api/account/specs/<id>/ — owner scope. */
+        patch: operations["account_specs_partial_update"];
+        trace?: never;
+    };
+    "/api/account/specs/{id}/to_lead/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/account/specs/<id>/to_lead/ — draft an RFQ from a spec. */
+        post: operations["account_specs_to_lead_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/account/summary/ — dashboard counters. */
+        get: operations["account_summary_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/hit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Record one SPA navigation hit (no marketing consent required).
+         *
+         *     Unique visitors: existing session key or a daily IP+UA hash — the hit
+         *     itself never creates a session. ``title`` / ``object_*`` from the client
+         *     are accepted for compatibility and ignored.
+         */
+        post: operations["analytics_hit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/auth/login/ — mode A password check. */
+        post: operations["auth_login_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/auth/logout/ — drop the client session. */
+        post: operations["auth_logout_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/auth/me/ — current session account or 401. */
+        get: operations["auth_me_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/otp/resend/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/auth/otp/resend/ — cooldown-gated resend. */
+        post: operations["auth_otp_resend_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/otp/start/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/auth/otp/start/ — mode B: send a fresh 6-digit code. */
+        post: operations["auth_otp_start_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/otp/verify/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/auth/otp/verify/ — mode B: verify the code → session. */
+        post: operations["auth_otp_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/register/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /api/auth/register/ — mode A step 1: email a confirmation code.
+         *
+         *     Same response as ``otp/start``; the account is created by
+         *     ``otp/verify`` once the code proves the email belongs to the visitor.
+         */
+        post: operations["auth_register_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/analogs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /api/catalog/analogs/?brand=&code= — подбор аналога (ЛК-10).
+         *
+         *     Public, read-only: форма «подобрать аналог» и Excel-импорт спек дергают
+         *     один сервис ``catalog.services.analogs_find`` (поле ``analog_belimo_code``).
+         *     Ответ — краткая карточка найденного SKU (цены и остатки не отдаём).
+         */
+        get: operations["catalog_analogs_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/categories/": {
         parameters: {
             query?: never;
@@ -11,8 +542,93 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description GET /api/catalog/categories/ — public category list. */
+        /** @description List categories with a product preview image per row. */
         get: operations["catalog_categories_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/compare/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return SKU columns and highlight matrix rows. */
+        get: operations["catalog_compare_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/docs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return filtered hub payload (``q``, ``series``, ``kind``, ``family``). */
+        get: operations["catalog_docs_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/docs/families/{key}/zip/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Stream a zip of deduped family documents; support ETag / 304. */
+        get: operations["catalog_docs_families_zip_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/facets/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return canonical facets for the catalog filter UI. */
+        get: operations["catalog_facets_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/quiz-analogs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return kit component bundles for quiz DN/Kvs/ways + electrical intent. */
+        get: operations["catalog_quiz_analogs_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -45,7 +661,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description GET (public) + POST (staff) /api/catalog/skus/{sku_slug}/files/. */
+        /** @description GET (public) + POST (catalog.add_productfile) /api/catalog/skus/{sku_slug}/files/. */
         get: operations["catalog_skus_files_list"];
         put?: never;
         /** @description Upload a PDF to the SKU identified by sku_slug in the URL. */
@@ -114,25 +730,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description GET /api/content/news/ and /api/content/news/{slug}/. */
+        /**
+         * @description GET /api/content/news/ and /api/content/news/{slug}/.
+         *
+         *     Query params (list):
+         *       category — NewsCategory.slug
+         *       ordering — ``newest`` (default) | ``oldest``
+         */
         get: operations["content_news_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/content/news/{slug}/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description GET /api/content/news/ and /api/content/news/{slug}/. */
-        get: operations["content_news_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -148,8 +753,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description GET /api/content/news-categories/ — published rubrics. */
+        /** @description GET /api/content/news-categories/ — published rubrics for chips. */
         get: operations["content_news_categories_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/content/news/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GET /api/content/news/ and /api/content/news/{slug}/.
+         *
+         *     Query params (list):
+         *       category — NewsCategory.slug
+         *       ordering — ``newest`` (default) | ``oldest``
+         */
+        get: operations["content_news_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -192,6 +820,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/csrf/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Return JSON {csrfToken} and set the csrftoken cookie.
+         *
+         *     Args:
+         *         request: DRF request.
+         *
+         *     Returns:
+         *         200 with {"csrfToken": "<token>"}.
+         */
+        get: operations["csrf_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/max/webhook/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Accept a MAX Update and enqueue reply handling. */
+        post: operations["integrations_max_webhook_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/telegram/webhook/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Accept a Telegram Update and enqueue reply handling. */
+        post: operations["integrations_telegram_webhook_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/vk/callback/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /api/integrations/vk/callback/ — VK Callback API (community messages).
+         *
+         *     Validates ``secret`` in the JSON body against ``VK_CALLBACK_SECRET``.
+         *     ``confirmation`` events return plain-text ``VK_CALLBACK_CONFIRMATION``;
+         *     other events enqueue Celery work and respond with ``ok``.
+         */
+        post: operations["integrations_vk_callback_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/leads/": {
         parameters: {
             query?: never;
@@ -213,6 +923,24 @@ export interface paths {
          *         or 400 on validation errors.
          */
         post: operations["leads_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes/reply/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET shows the offer. POST accepts it or stores a change request. */
+        get: operations["quotes_reply_retrieve"];
+        put?: never;
+        /** @description GET shows the offer. POST accepts it or stores a change request. */
+        post: operations["quotes_reply_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -249,16 +977,673 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * @description Handle GET: parse `q`, run FTS on all three models, return paginated.
+         * @description Handle GET: parse `q`, run hybrid search on all models, paginate.
          *
          *     Args:
          *         request: DRF request with optional `q` query parameter.
          *
          *     Returns:
-         *         200 with paginated results: {count, next, previous, results}.
-         *         Each result: {type, slug, title, url}.
+         *         200 with paginated results: {count, next, previous, results,
+         *         corrected_query}. Each result: {type, slug, title, url, snippet}.
          */
         get: operations["search_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/suggest/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Handle GET: return up to ``_SUGGEST_LIMIT`` compact items.
+         *
+         *     Args:
+         *         request: DRF request with optional `q` query parameter.
+         *
+         *     Returns:
+         *         200 with {"results": [{type, title, url}]} — empty list for
+         *         queries shorter than ``_SUGGEST_MIN_LEN``.
+         */
+        get: operations["search_suggest_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/public/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Return Yandex Metrika / GA4 IDs from SiteSettings with env defaults.
+         *
+         *     Args:
+         *         request: unused DRF request.
+         *
+         *     Returns:
+         *         JSON with yandex_metrika_id and ga4_measurement_id (may be empty).
+         */
+        get: operations["settings_public_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/auth/logout/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_auth_logout_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/auth/otp/resend/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_auth_otp_resend_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/auth/otp/start/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_auth_otp_start_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/auth/otp/verify/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_auth_otp_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/badges/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_badges_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/clients/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_clients_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/clients/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_clients_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/clients/{id}/activities/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_clients_activities_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/clients/{id}/emails/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_clients_emails_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_conversations_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_conversations_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete: operations["staff_conversations_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/{id}/assign/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_conversations_assign_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/{id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_conversations_close_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/{id}/messages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_conversations_messages_retrieve"];
+        put?: never;
+        post: operations["staff_conversations_messages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/conversations/{id}/read/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_conversations_read_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/devices/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_devices_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/devices/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["staff_devices_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/leads/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_leads_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/leads/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_leads_retrieve_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/leads/{id}/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_leads_status_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/leads/{id}/take/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff_leads_take_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/me/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_me_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/channels/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/support/channels/ — enabled messengers + deep links (no tokens). */
+        get: operations["support_channels_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/conversations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/support/conversations/ — start or resume web session thread. */
+        post: operations["support_conversations_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/conversations/current/messages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET/POST /api/support/conversations/current/messages/. */
+        get: operations["support_conversations_current_messages_retrieve"];
+        put?: never;
+        /** @description GET/POST /api/support/conversations/current/messages/. */
+        post: operations["support_conversations_current_messages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/conversations/current/rate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/support/conversations/current/rate/ — client rating 1–5. */
+        post: operations["support_conversations_current_rate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/faq/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/support/faq/ — FAQ из Admin (публично, scope=chat|home|seo). */
+        get: operations["support_faq_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/messages/{id}/attachment/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET private chat file: same widget session or staff with view perm. */
+        get: operations["support_messages_attachment_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support/schedule/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/support/schedule/ — open hours (public). */
+        get: operations["support_schedule_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/telephony/mango/events/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Verify signature, decode ``json``, route the event. */
+        post: operations["telephony_mango_events_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/telephony/mango/events/{kind}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Verify signature, decode ``json``, route the event. */
+        post: operations["telephony_mango_events_create_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/telephony/novosystem/events/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description UIS can send the same notification as GET. */
+        get: operations["telephony_novosystem_events_retrieve"];
+        put?: never;
+        /** @description Accept JSON or form body; secret via body ``token`` or ``X-Webhook-Token``. */
+        post: operations["telephony_novosystem_events_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webpush/subscribe/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /api/webpush/subscribe/ — session-bound.
+         *
+         *     ``topic_marketing`` requires marketing consent already stored in the
+         *     Django session (prior ``/topics/`` consent sync). ``topic_support``
+         *     links visitors via support session id.
+         */
+        post: operations["webpush_subscribe_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webpush/topics/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description POST /api/webpush/topics/ — clear topics and/or sync marketing consent.
+         *
+         *     Body examples::
+         *
+         *         {"endpoint": "…", "clear_marketing": true}
+         *         {"marketing_consent": false}
+         *         {"endpoint": "…", "clear_support": true, "marketing_consent": false}
+         */
+        post: operations["webpush_topics_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webpush/unsubscribe/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/webpush/unsubscribe/ — delete whole endpoint. */
+        post: operations["webpush_unsubscribe_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webpush/vapid-public-key/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET /api/webpush/vapid-public-key/. */
+        get: operations["webpush_vapid_public_key_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -271,59 +1656,151 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Expert article (/statyi/<slug>) with cover + excerpt. */
+        /** @description Article detail: list fields + SKUs mentioned in the text. */
         Article: {
             readonly id: number;
+            /** Заголовок */
             readonly title: string;
+            /** Сегмент URL */
             readonly slug: string;
-            /** @description Краткий анонс для списка /statyi (без HTML). */
-            readonly excerpt: string;
             /**
-             * Format: uri
-             * @description Обложка статьи (локальный MEDIA URL).
+             * Анонс
+             * @description Краткий анонс для списка статей (без HTML).
              */
+            readonly excerpt: string;
+            /** Format: uri */
             readonly cover: string | null;
-            readonly body: string;
-            /** @description Видимость в публичном API. */
+            /** Format: uri */
+            readonly cover_dark: string | null;
+            /** @description Minutes to read; the list does not ship the full HTML body. */
+            readonly reading_minutes: number;
+            /**
+             * Опубликовано
+             * @description Видимость в публичном API.
+             */
             readonly is_published: boolean;
             /**
+             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
              */
             readonly published_at: string | null;
-            /** Format: date-time */
+            /**
+             * Создано
+             * Format: date-time
+             */
             readonly created_at: string;
-            /** Format: date-time */
+            /**
+             * Обновлено
+             * Format: date-time
+             */
             readonly updated_at: string;
+            /** Текст */
+            readonly body: string;
+            readonly related_skus: components["schemas"]["ArticleRelatedSku"][];
+        };
+        /** @description Article card for /statyi list: no body, only the reading time. */
+        ArticleList: {
+            readonly id: number;
+            /** Заголовок */
+            readonly title: string;
+            /** Сегмент URL */
+            readonly slug: string;
+            /**
+             * Анонс
+             * @description Краткий анонс для списка статей (без HTML).
+             */
+            readonly excerpt: string;
+            /** Format: uri */
+            readonly cover: string | null;
+            /** Format: uri */
+            readonly cover_dark: string | null;
+            /** @description Minutes to read; the list does not ship the full HTML body. */
+            readonly reading_minutes: number;
+            /**
+             * Опубликовано
+             * @description Видимость в публичном API.
+             */
+            readonly is_published: boolean;
+            /**
+             * Дата публикации
+             * Format: date-time
+             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
+             */
+            readonly published_at: string | null;
+            /**
+             * Создано
+             * Format: date-time
+             */
+            readonly created_at: string;
+            /**
+             * Обновлено
+             * Format: date-time
+             */
+            readonly updated_at: string;
+        };
+        /** @description Compact SKU card embedded in an article detail response. */
+        ArticleRelatedSku: {
+            name: string;
+            slug: string;
+            sku_code: string;
+            /** @description Category path segment for nested catalog URLs. */
+            readonly category_slug: string;
+            /** @description Primary published image path (root-relative ``/media/...``). */
+            readonly image: string | null;
         };
         /** @description ТТХ row for SKU detail: slug of Attribute + value + unit. */
         AttributeValue: {
             readonly name: string;
             readonly slug: string;
             readonly unit: string;
+            /** Значение */
             readonly value: string;
+        };
+        /** @description Actuator + bracket picker payload for ball-valve PDP. */
+        BallValveKit: {
+            drive_families: string[];
+            suffixes: string[];
+            bracket_by_drive: {
+                [key: string]: string;
+            };
+            bracket_hint: string;
         };
         /** @description Public category list/detail fields (series overview + install). */
         Category: {
             readonly id: number;
+            /** Название */
             readonly name: string;
+            /** Сегмент URL */
             readonly slug: string;
-            /** @description Родительская категория (None для корня дерева). */
+            /**
+             * Родитель
+             * @description Родительская категория (пусто = корень дерева).
+             */
             readonly parent: number | null;
+            /**
+             * Описание
+             * @description Общее описание линейки продукции (для страницы категории).
+             */
             readonly description: string;
-            /** @description Общая инструкция по монтажу/управлению для линейки продукции. */
+            /**
+             * Инструкция
+             * @description Общая инструкция по монтажу/управлению для линейки продукции.
+             */
             readonly instructions: string;
-            /** @description First published product photo in this category, if any. */
-            readonly image: {
-                readonly id: number;
-                readonly image: string;
-                /** @description Lightweight card/mobile WebP when available. */
-                readonly image_card?: string | null;
-                readonly alt?: string;
-            } | null;
+            readonly image: components["schemas"]["ProductImage"] | null;
+        };
+        /** @description Compact cross-link card («Совместимые позиции»). */
+        CompatiblePosition: {
+            role: components["schemas"]["RoleEnum"];
+            name: string;
+            slug: string;
+            sku_code: string;
+            category_slug: string;
+            image: string | null;
         };
         /**
-         * @description * `datasheet` - Паспорт / datasheet
+         * @description * `datasheet` - Паспорт
          *     * `certificate` - Сертификат
          *     * `catalog` - Каталог
          *     * `other` - Прочее
@@ -339,29 +1816,64 @@ export interface components {
          */
         Lead: {
             readonly id: number;
+            /** Тип заявки */
             lead_type?: components["schemas"]["LeadTypeEnum"];
+            /** Имя */
             name: string;
-            /** Format: email */
+            /**
+             * Эл. почта
+             * Format: email
+             */
             email: string;
+            /** Телефон */
             phone?: string;
+            /**
+             * Компания
+             * @description Для запроса КП обязательна: ключ нити КП = компания + имя.
+             */
             company?: string;
+            /** Сообщение */
             message: string;
-            /** @description SKU, по которому пришла заявка (опц.; SET_NULL при удалении SKU). */
-            sku?: number | null;
-            /** @description Количество (для RFQ). */
+            /** Сегмент URL */
+            sku?: string | null;
+            /**
+             * Количество
+             * @description Сводка: количество по первому артикулу (RFQ).
+             */
             quantity?: number | null;
-            /** @description Код аналога Belimo (для replacement). */
+            items?: components["schemas"]["LeadItemWrite"][];
+            /**
+             * Код аналога Belimo
+             * @description Код аналога Belimo (для заявок на замену).
+             */
             analog_belimo_code?: string;
+            /** Статус */
             readonly status: components["schemas"]["StatusEnum"];
-            /** Format: date-time */
+            /**
+             * Создано
+             * Format: date-time
+             */
             readonly created_at: string;
-            /** Format: date-time */
+            /**
+             * Обновлено
+             * Format: date-time
+             */
             readonly updated_at: string;
             /**
              * @description Honeypot — leave empty (hidden from real users).
              * @default
              */
             website: string;
+            pdn_consent: boolean;
+        };
+        /** @description One RFQ line: published SKU slug and/or free-text sku_code. */
+        LeadItemWrite: {
+            /** Сегмент URL */
+            sku?: string | null;
+            /** @default  */
+            sku_code: string;
+            /** @default 1 */
+            quantity: number;
         };
         /**
          * @description * `rfq` - Запрос КП
@@ -373,53 +1885,84 @@ export interface components {
         /** @description Company news item (/novosti/<slug>). */
         News: {
             readonly id: number;
+            /** Заголовок */
             readonly title: string;
+            /** Сегмент URL */
             readonly slug: string;
+            /** Текст */
             readonly body: string;
-            /** @description Обложка новости (JPEG/PNG/WebP). */
+            /** Format: uri */
             readonly cover: string | null;
-            readonly category: {
-                readonly slug: string;
-                readonly name: string;
-            } | null;
-            /** @description Видимость в публичном API. */
+            readonly category: components["schemas"]["NewsCategoryBrief"] | null;
+            /**
+             * Опубликовано
+             * @description Видимость в публичном API.
+             */
             readonly is_published: boolean;
             /**
+             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
              */
             readonly published_at: string | null;
-            /** Format: date-time */
+            /**
+             * Создано
+             * Format: date-time
+             */
             readonly created_at: string;
-            /** Format: date-time */
+            /**
+             * Обновлено
+             * Format: date-time
+             */
             readonly updated_at: string;
         };
         /** @description Published news rubric for /novosti filter chips. */
         NewsCategory: {
             readonly id: number;
+            /** Название */
             readonly name: string;
+            /** Сегмент URL */
             readonly slug: string;
+            /** Порядок */
             readonly sort_order: number;
+        };
+        /** @description Nested category payload on a news card ({slug, name}). */
+        NewsCategoryBrief: {
+            slug: string;
+            name: string;
         };
         /** @description Public CMS page (/<slug>). */
         Page: {
             readonly id: number;
+            /** Заголовок */
             readonly title: string;
+            /** Сегмент URL */
             readonly slug: string;
+            /** Текст */
             readonly body: string;
-            /** @description Видимость в публичном API. */
+            /**
+             * Опубликовано
+             * @description Видимость в публичном API.
+             */
             readonly is_published: boolean;
             /**
+             * Дата публикации
              * Format: date-time
-             * @description Дата публикации (для сортировки/SEO); null = черновик.
+             * @description Дата публикации (для сортировки/SEO); пусто = черновик.
              */
             readonly published_at: string | null;
-            /** Format: date-time */
+            /**
+             * Создано
+             * Format: date-time
+             */
             readonly created_at: string;
-            /** Format: date-time */
+            /**
+             * Обновлено
+             * Format: date-time
+             */
             readonly updated_at: string;
         };
-        PaginatedArticleList: {
+        PaginatedArticleListList: {
             /** @example 123 */
             count: number;
             /**
@@ -432,7 +1975,7 @@ export interface components {
              * @example http://api.example.org/accounts/?page=2
              */
             previous?: string | null;
-            results: components["schemas"]["Article"][];
+            results: components["schemas"]["ArticleList"][];
         };
         PaginatedCategoryList: {
             /** @example 123 */
@@ -509,81 +2052,186 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["SKUList"][];
         };
+        /** @description Public PDF metadata. ``file`` is the stable document URL, not storage. */
+        ProductFile: {
+            readonly id: number;
+            /** Название */
+            readonly title: string;
+            /** @description One URL per document. Pass ``sku`` in context to avoid a query. */
+            readonly file: string;
+            /** Тип файла */
+            readonly file_type: components["schemas"]["FileTypeEnum"];
+            /**
+             * Порядок
+             * @description Порядок в блоке «Документы» (меньше = выше).
+             */
+            readonly sort_order: number;
+        };
         /** @description Serializer for staff upload (POST) and public read (GET). */
         ProductFileUpload: {
             readonly id: number;
+            /** Название */
             title: string;
             /**
+             * Файл
              * Format: uri
-             * @description Только PDF; лимит и magic bytes — catalog.validators.
+             * @description Только PDF; размер и тип файла проверяются при загрузке.
              */
             file: string;
+            /** Тип файла */
             file_type?: components["schemas"]["FileTypeEnum"];
-            /** @description Видимость файла в публичном каталоге / PDP. */
+            /**
+             * Опубликован
+             * @description Видимость файла в публичном каталоге и на карточке товара.
+             */
             is_published?: boolean;
-            /** @description Порядок в блоке «Документы» (меньше = выше). */
+            /**
+             * Порядок
+             * @description Порядок в блоке «Документы» (меньше = выше).
+             */
             sort_order?: number;
         };
-        /** @description SKU PDP payload: list fields + attributes + files. */
+        /** @description Public product image (full WebP + optional card preview). */
+        ProductImage: {
+            readonly id: number;
+            /** Format: uri */
+            readonly image: string | null;
+            /** Format: uri */
+            readonly image_card: string | null;
+            /** Альтернативный текст */
+            readonly alt: string;
+            /** Порядок */
+            readonly sort_order: number;
+        };
+        /**
+         * @description * `drive` - drive
+         *     * `valve` - valve
+         *     * `bracket` - bracket
+         * @enum {string}
+         */
+        RoleEnum: "drive" | "valve" | "bracket";
+        /** @description SKU PDP payload: list fields + sectioned copy + attributes + files. */
         SKUDetail: {
             readonly id: number;
+            /** @description H1/card title: series Product name on family list cards, else edition. */
             readonly name: string;
+            /** Сегмент URL */
             readonly slug: string;
-            /** @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215. */
+            /**
+             * Артикул
+             * @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215.
+             */
             readonly sku_code: string;
-            /** @description Код аналога Belimo (задел для AnalogMap P1). */
+            /**
+             * Код аналога Belimo
+             * @description Проверенный артикул Belimo: вписать вручную после сверки в «Подбор аналогов».
+             */
             readonly analog_belimo_code: string | null;
             readonly category_slug: string;
             readonly product_slug: string;
             /**
+             * Цена
              * Format: decimal
-             * @description Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site).
+             * @description Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»).
              */
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
-            /** @description True when warehouse quantity is positive. */
+            /** @description True when warehouse quantity is positive (no raw qty in public API). */
             readonly in_stock: boolean;
-            /**
-             * @description True when 4–20 mA (special-order) units are on hand.
-             */
+            /** @description True when 4–20 mA (special-order) units are on hand (no raw qty). */
             readonly in_stock_ma: boolean;
+            /** @description True when first_published_at is within the Новинки window (30 days). */
+            readonly is_new: boolean;
+            /**
+             * Впервые на сайте
+             * Format: date-time
+             * @description Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL.
+             */
+            readonly first_published_at: string | null;
+            /** @description Published SKU count on the same Product (family card signal). */
+            readonly edition_count: number;
+            readonly image: components["schemas"]["ProductImage"] | null;
+            readonly highlights: components["schemas"]["SkuHighlight"][];
+            /**
+             * @description Return description for this SKU edition only (no H1/lead/EAV echo).
+             *
+             *     Drops bullets that only restate AttributeValue rows already shown in
+             *     ТТХ cards / highlights (e.g. «Управление: …», «Вспомогательный…»).
+             *     When nothing remains but a hero lead exists, return a light paraphrase
+             *     of that lead for the Описание tab (SEO-safe, not an exact duplicate).
+             */
             readonly description: string;
+            /** @description Short prose blurb for PDP hero (application sentence). */
+            readonly lead: string;
+            /**
+             * @description Характеристики prose — only when there are no structured attrs.
+             *
+             *     When EAV / category cards cover the ТТХ, return empty to avoid a
+             *     duplicate StructuredText block under the cards.
+             */
             readonly specs_text: string;
+            /** @description Return Аналоги for this SKU edition. */
             readonly analogs_text: string;
             readonly category_name: string;
             readonly category_description: string;
+            /** @description Install guide scoped to this SKU edition (all series). */
             readonly category_instructions: string;
+            readonly ball_valve_kit: components["schemas"]["BallValveKit"] | null;
+            readonly compatible_positions: components["schemas"]["CompatiblePosition"][];
+            readonly siblings: components["schemas"]["SiblingEdition"][];
+            /** @description Unique DN / Kvs / voltage / control values among siblings. */
+            readonly variant_axes: {
+                [key: string]: string[];
+            };
             readonly attributes: components["schemas"]["AttributeValue"][];
-            /** @description Return only published ProductFile rows, ordered. */
-            readonly files: {
-                [key: string]: unknown;
-            }[];
+            readonly attribute_groups: components["schemas"]["SkuAttributeGroup"][];
+            readonly files: components["schemas"]["ProductFile"][];
+            readonly images: components["schemas"]["ProductImage"][];
         };
-        /** @description SKU card for list: no nested ТТХ; price gated by SiteSettings. */
+        /** @description SKU card for list: key ТТХ highlights; price gated by SiteSettings. */
         SKUList: {
             readonly id: number;
+            /** @description H1/card title: series Product name on family list cards, else edition. */
             readonly name: string;
+            /** Сегмент URL */
             readonly slug: string;
-            /** @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215. */
+            /**
+             * Артикул
+             * @description Артикул (уникален, не пуст), напр. HVA-5NM или BV215.
+             */
             readonly sku_code: string;
-            /** @description Код аналога Belimo (задел для AnalogMap P1). */
+            /**
+             * Код аналога Belimo
+             * @description Проверенный артикул Belimo: вписать вручную после сверки в «Подбор аналогов».
+             */
             readonly analog_belimo_code: string | null;
             readonly category_slug: string;
             readonly product_slug: string;
             /**
+             * Цена
              * Format: decimal
-             * @description Цена для КП менеджеру. В публичный API не утекает (см. SiteSettings.show_prices_on_site).
+             * @description Цена для КП менеджеру. В публичный API не попадает (см. настройку «показывать цены на сайте»).
              */
             readonly price: string | null;
             /** @description True when prices are hidden (RFQ policy). */
             readonly price_on_request: boolean;
-            /** @description True when warehouse quantity is positive. */
+            /** @description True when warehouse quantity is positive (no raw qty in public API). */
             readonly in_stock: boolean;
-            /**
-             * @description True when 4–20 mA (special-order) units are on hand.
-             */
+            /** @description True when 4–20 mA (special-order) units are on hand (no raw qty). */
             readonly in_stock_ma: boolean;
+            /** @description True when first_published_at is within the Новинки window (30 days). */
+            readonly is_new: boolean;
+            /**
+             * Впервые на сайте
+             * Format: date-time
+             * @description Когда SKU впервые стал виден в публичном каталоге. Окно «Новое» — 30 суток; не путать с датами создания/обновления ETL.
+             */
+            readonly first_published_at: string | null;
+            /** @description Published SKU count on the same Product (family card signal). */
+            readonly edition_count: number;
+            readonly image: components["schemas"]["ProductImage"] | null;
+            readonly highlights: components["schemas"]["SkuHighlight"][];
         };
         /** @description Paginated search response (DRF PageNumberPagination shape). */
         SearchResponse: {
@@ -593,10 +2241,12 @@ export interface components {
             /** Format: uri */
             previous: string | null;
             results: components["schemas"]["SearchResultItem"][];
+            /** @description Перевернутая раскладка запроса (did-you-mean), если она нашла лучше. */
+            corrected_query?: string | null;
         };
         /** @description One item in the unified search results list. */
         SearchResultItem: {
-            /** @description Тип результата: sku | article | news. */
+            /** @description Тип результата: sku | article | news | page. */
             type: string;
             /** @description Slug (path-сегмент) найденной записи. */
             slug: string;
@@ -604,10 +2254,51 @@ export interface components {
             title: string;
             /** @description Канонический path (напр. /<slug>/, /statyi/<slug>/). */
             url: string;
-            /**
-             * @description Краткое описание (для SKU — lead с PDP; для CMS — начало body).
-             */
+            /** @description Краткое описание (для SKU — lead с PDP; для CMS — начало body). */
             snippet: string;
+        };
+        /** @description One compact item in the suggest dropdown payload. */
+        SearchSuggestItem: {
+            /** @description Тип результата: sku | article | news | page. */
+            type: string;
+            /** @description Заголовок (для SKU — с артикулом). */
+            title: string;
+            /** @description Канонический path результата. */
+            url: string;
+        };
+        /** @description Suggest dropdown payload — no pagination, capped list. */
+        SearchSuggestResponse: {
+            results: components["schemas"]["SearchSuggestItem"][];
+            /** @description Перевернутая раскладка запроса (did-you-mean), если нашла совпадения, а исходный текст — нет. */
+            corrected_query?: string | null;
+        };
+        /** @description Sibling-edition row for the PDP variant picker. */
+        SiblingEdition: {
+            slug: string;
+            sku_code: string;
+            body: string;
+            dn: string;
+            ways: string;
+            kvs: string;
+            voltage: string;
+            control: string;
+            aux_switch: boolean;
+            fault_alarm: boolean;
+            in_stock: boolean;
+            in_stock_ma: boolean;
+        };
+        /** @description ТТХ group block on the PDP Характеристики tab ({key,title,items}). */
+        SkuAttributeGroup: {
+            key: string;
+            title: string;
+            items: components["schemas"]["AttributeValue"][];
+        };
+        /** @description One ТТХ highlight row on SKU cards / PDP hero ({key,name,value,unit}). */
+        SkuHighlight: {
+            key: string;
+            name: string;
+            value: string;
+            unit: string;
         };
         /**
          * @description * `new` - Новая
@@ -625,11 +2316,647 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    account_company_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_conversations_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_documents_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_documents_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_documents_zip_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_leads_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_leads_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_leads_repeat_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_me_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_me_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_orders_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_orders_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_quotes_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_quotes_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_quotes_pdf_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_rma_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_rma_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_rma_photo_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_specs_to_lead_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    account_summary_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    analytics_hit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_login_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_logout_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_me_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_otp_resend_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_otp_start_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_otp_verify_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_register_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_analogs_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     catalog_categories_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -647,13 +2974,135 @@ export interface operations {
             };
         };
     };
+    catalog_compare_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_docs_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_docs_families_zip_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_facets_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_quiz_analogs_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     catalog_skus_list: {
         parameters: {
             query?: {
+                /** @description ТТХ facet: Аналоги */
+                analog?: string;
+                /** @description ТТХ facet: Площадь заслонки */
+                area?: string;
+                /** @description ТТХ facet: Вспомогательный переключатель */
+                aux_switch?: string;
                 category?: string;
+                /** @description ТТХ facet: Совместимый привод */
+                compatible_actuators?: string;
+                /** @description ТТХ facet: Управление */
+                control?: string;
+                /** @description ТТХ facet: DN */
+                dn?: string;
+                /** @description Только товары в наличии (stock_qty > 0). Значения: 1 / true / yes. */
+                in_stock?: "1" | "true" | "yes";
+                /** @description ТТХ facet: Kvs (м³/ч) */
+                kvs?: string;
+                /** @description ТТХ facet: Материал корпуса */
+                material?: string;
+                /** @description ТТХ facet: Крутящий момент */
+                moment?: string;
+                /** @description Только новинки (first_published_at за последние 30 суток). Порядок: в наличии, затем newer first. Значения: 1 / true / yes. */
+                new?: "1" | "true" | "yes";
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 q?: string;
+                /** @description ТТХ facet: Термодатчик */
+                temp_sensor?: string;
+                /** @description ТТХ facet: Напряжение */
+                voltage?: string;
+                /** @description ТТХ facet: Тип крана */
+                ways?: string;
             };
             header?: never;
             path?: never;
@@ -676,6 +3125,8 @@ export interface operations {
             query?: {
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path: {
@@ -748,6 +3199,8 @@ export interface operations {
             query?: {
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -760,7 +3213,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedArticleList"];
+                    "application/json": components["schemas"]["PaginatedArticleListList"];
                 };
             };
         };
@@ -789,12 +3242,10 @@ export interface operations {
     content_news_list: {
         parameters: {
             query?: {
-                /** @description NewsCategory.slug filter. */
-                category?: string;
-                /** @description newest (default) | oldest */
-                ordering?: "newest" | "oldest";
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -857,6 +3308,8 @@ export interface operations {
             query?: {
                 /** @description A page number within the paginated result set. */
                 page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -895,6 +3348,78 @@ export interface operations {
             };
         };
     };
+    csrf_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    integrations_max_webhook_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    integrations_telegram_webhook_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    integrations_vk_callback_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     leads_create: {
         parameters: {
             query?: never;
@@ -917,6 +3442,42 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Lead"];
                 };
+            };
+        };
+    };
+    quotes_reply_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    quotes_reply_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -969,6 +3530,795 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
                 };
+            };
+        };
+    };
+    search_suggest_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSuggestResponse"];
+                };
+            };
+        };
+    };
+    settings_public_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_auth_logout_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_auth_otp_resend_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_auth_otp_start_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_auth_otp_verify_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_badges_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_clients_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_clients_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_clients_activities_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_clients_emails_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_assign_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_messages_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_messages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_conversations_read_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_devices_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_devices_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_leads_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_leads_retrieve_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_leads_status_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_leads_take_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staff_me_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_channels_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_conversations_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_conversations_current_messages_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_conversations_current_messages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_conversations_current_rate_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_faq_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_messages_attachment_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    support_schedule_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telephony_mango_events_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telephony_mango_events_create_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telephony_novosystem_events_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    telephony_novosystem_events_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webpush_subscribe_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webpush_topics_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webpush_unsubscribe_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    webpush_vapid_public_key_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

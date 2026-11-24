@@ -265,45 +265,72 @@ def _publish_photo_or_text(
     return result
 
 
-def _telegram_message_attachment(
-    message: dict[str, Any],
-) -> tuple[Any, str, str] | None:
-    """Best-effort photo/document download → ``(file, name, mime)`` or None."""
-    from django.core.files.base import ContentFile
-
-    from social.publishers import telegram_download_file
-
-    file_id = ""
-    name = ""
-    mime = ""
-    document = message.get("document")
-    photos = message.get("photo")
-    if isinstance(document, dict):
-        file_id = str(document.get("file_id") or "")
-        name = str(document.get("file_name") or "")[:200]
-        mime = str(document.get("mime_type") or "")[:100]
-    elif isinstance(photos, list):
-        sizes = [p for p in photos if isinstance(p, dict) and p.get("file_id")]
-        if sizes:
-            biggest = max(sizes, key=lambda p: int(p.get("file_size") or 0))
-            file_id = str(biggest["file_id"])
-            mime = "image/jpeg"
-    if not file_id:
-        return None
-    downloaded = telegram_download_file(file_id)
-    if downloaded is None:
-        return None
-    data, fallback_name = downloaded
-    name = name or fallback_name
-    return ContentFile(data, name=name), name, mime
+# Telegram Bot API ``getFile`` serves files up to 20 MB only.
+_TELEGRAM_GETFILE_LIMIT = 20 * 1024 * 1024
+# message key → (media kind, default file name, default mime)
+_TELEGRAM_MEDIA_KEYS: tuple[tuple[str, str, str, str], ...] = (
+    ("document", "file", "file", ""),
+    ("video", "video", "video.mp4", "video/mp4"),
+    ("video_note", "video", "video-note.mp4", "video/mp4"),
+    ("animation", "video", "animation.mp4", "video/mp4"),
+    ("voice", "audio", "voice.ogg", "audio/ogg"),
+    ("audio", "audio", "audio.mp3", "audio/mpeg"),
+)
 
 
 def telegram_message_has_attachment(message: dict[str, Any]) -> bool:
-    """True when the message carries a photo/document we can ingest."""
-    if isinstance(message.get("document"), dict) and message["document"].get("file_id"):
-        return True
+    """True when the message carries a photo, document, video, voice or audio we can ingest."""
+    for key, *_rest in _TELEGRAM_MEDIA_KEYS:
+        item = message.get(key)
+        if isinstance(item, dict) and item.get("file_id"):
+            return True
     photos = message.get("photo")
     return isinstance(photos, list) and any(isinstance(p, dict) and p.get("file_id") for p in photos)
+
+
+def _telegram_message_media(message: dict[str, Any], budget: Any) -> tuple[list[Any], list[Any]]:
+    """Photo/document/video/voice/audio of a Telegram message → ``(files, problems)``."""
+    from django.core.files.base import ContentFile
+
+    from social.publishers import telegram_download_file
+    from supportchat.inbound_media import InboundFile, MediaProblem
+
+    limit = min(budget.file_limit, _TELEGRAM_GETFILE_LIMIT)
+    files: list[Any] = []
+    problems: list[Any] = []
+
+    candidates: list[tuple[str, str, str, str, int]] = []  # file_id, kind, name, mime, size
+    photos = message.get("photo")
+    if isinstance(photos, list):
+        sizes = [p for p in photos if isinstance(p, dict) and p.get("file_id")]
+        if sizes:
+            biggest = max(sizes, key=lambda p: int(p.get("file_size") or 0))
+            candidates.append(
+                (str(biggest["file_id"]), "photo", "photo.jpg", "image/jpeg", int(biggest.get("file_size") or 0)),
+            )
+    for key, kind, default_name, default_mime in _TELEGRAM_MEDIA_KEYS:
+        item = message.get(key)
+        if not isinstance(item, dict) or not item.get("file_id"):
+            continue
+        name = str(item.get("file_name") or default_name)[:200]
+        mime = str(item.get("mime_type") or default_mime)[:100]
+        candidates.append((str(item["file_id"]), kind, name, mime, int(item.get("file_size") or 0)))
+
+    for file_id, kind, name, mime, size in candidates:
+        if not budget.has_room():
+            problems.append(MediaProblem(kind, "limit"))
+            continue
+        if size > limit:
+            problems.append(MediaProblem(kind, "too_big"))
+            continue
+        downloaded = telegram_download_file(file_id, max_bytes=min(limit, budget.per_file_limit))
+        if downloaded is None:
+            problems.append(MediaProblem(kind, "download_failed"))
+            continue
+        data, _fallback = downloaded
+        budget.consume(len(data))
+        files.append(InboundFile(ContentFile(data, name=name), name, mime, kind))
+    return files, problems
 
 
 def _ingest_support_text(
@@ -314,14 +341,13 @@ def _ingest_support_text(
     display_name: str,
 ) -> PublishResult | None:
     """Store free-form text in support inbox; optional outside-hours auto-reply."""
+    from supportchat.inbound_media import client_reply, ingest_inbound_media
     from supportchat.models import Channel
     from supportchat.services import (
         SupportChatError,
-        add_inbound_message,
         get_or_create_messenger_conversation,
     )
 
-    attachment = _telegram_message_attachment(message)
     external_message_id = str(message.get("message_id") or "").strip()
     try:
         conversation = get_or_create_messenger_conversation(
@@ -329,27 +355,32 @@ def _ingest_support_text(
             chat_id,
             display_name=display_name,
         )
-        _inbound, auto = add_inbound_message(
+        auto, problems = ingest_inbound_media(
             conversation,
             text,
+            lambda budget: _telegram_message_media(message, budget),
             external_message_id=external_message_id,
             raw_payload={"telegram_message_id": message.get("message_id")},
-            attachment=attachment[0] if attachment else None,
-            attachment_name=attachment[1] if attachment else "",
-            attachment_mime=attachment[2] if attachment else "",
             display_name=display_name,
         )
     except SupportChatError:
         logger.warning("telegram_support_ingest_rejected chat_id=%s", chat_id)
         return None
 
+    result: PublishResult | None = None
+    if problems:
+        result = publish_telegram(
+            chat_id=chat_id,
+            text=telegram_html_text(client_reply(problems)),
+            reply_markup=main_menu_keyboard(),
+        )
     if auto is not None:
         return publish_telegram(
             chat_id=chat_id,
             text=telegram_html_text(auto.body),
             reply_markup=main_menu_keyboard(),
         )
-    return None
+    return result
 
 
 def _handle_staff_reply_callback_query(query: dict[str, Any]) -> PublishResult | None:

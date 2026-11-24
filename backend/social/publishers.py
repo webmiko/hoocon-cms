@@ -377,8 +377,9 @@ def _publish_telegram_photo_file(
 _MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
 
 
-def telegram_download_file(file_id: str) -> tuple[bytes, str] | None:
+def telegram_download_file(file_id: str, *, max_bytes: int | None = None) -> tuple[bytes, str] | None:
     """``getFile`` → raw bytes + filename for an inbound Telegram attachment."""
+    limit = max_bytes if max_bytes is not None else _MAX_ATTACHMENT_BYTES
     token = telegram_bot_token()
     fid = (file_id or "").strip()
     if not token or not fid:
@@ -405,34 +406,46 @@ def telegram_download_file(file_id: str) -> tuple[bytes, str] | None:
     request = Request(file_url, headers={"User-Agent": _TELEGRAM_USER_AGENT})
     try:
         with _telegram_urlopen(request, timeout=_TELEGRAM_UPLOAD_TIMEOUT_SEC) as response:
-            payload = response.read(_MAX_ATTACHMENT_BYTES + 1)
+            payload = response.read(limit + 1)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         logger.warning("telegram_file_download_failed error=%s", type(exc).__name__)
         return None
-    if len(payload) > _MAX_ATTACHMENT_BYTES:
+    if len(payload) > limit:
         return None
     return payload, Path(file_path).name or "file"
 
 
-def max_download_attachment(url: str) -> tuple[bytes, str] | None:
+def max_download_attachment(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str] | None:
     """Download a MAX attachment payload URL → raw bytes + filename.
 
-    Attachment URLs point at public CDN hosts — no bot token is sent.
+    Attachment URLs point at public CDN hosts — no bot token is sent. Every
+    redirect hop must stay on the allowlist. Failures are logged with the
+    host only (query strings carry signatures).
     """
-    from social.max_http import max_attachment_url_allowed, public_urlopen
+    from urllib.parse import urlparse
+
+    from social.max_http import max_attachment_url_allowed, public_urlopen_checked
 
     src = (url or "").strip()
+    host = (urlparse(src).hostname or "")[:80]
     if not max_attachment_url_allowed(src):
+        logger.warning("max_attachment_host_rejected host=%s", host)
         return None
 
+    limit = max_bytes if max_bytes is not None else _MAX_ATTACHMENT_BYTES
     request = Request(src)
     try:
-        with public_urlopen(request, timeout=_HTTP_TIMEOUT_SEC) as response:
-            payload = response.read(_MAX_ATTACHMENT_BYTES + 1)
+        with public_urlopen_checked(
+            request,
+            allowed=max_attachment_url_allowed,
+            timeout=_HTTP_TIMEOUT_SEC,
+        ) as response:
+            payload = response.read(limit + 1)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        logger.warning("max_attachment_download_failed error=%s", type(exc).__name__)
+        logger.warning("max_attachment_download_failed host=%s error=%s", host, type(exc).__name__)
         return None
-    if len(payload) > _MAX_ATTACHMENT_BYTES:
+    if len(payload) > limit:
+        logger.warning("max_attachment_too_big host=%s limit=%s", host, limit)
         return None
     name = Path(src.split("?", 1)[0].rstrip("/")).name or "file"
     return payload, name

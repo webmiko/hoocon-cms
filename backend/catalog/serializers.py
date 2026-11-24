@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from catalog.docs_hub import public_pdf_url
@@ -260,46 +261,6 @@ def _sku_attribute_rows(obj: SKU, context: Mapping[str, Any]) -> list[dict[str, 
     return attach_groups(result)
 
 
-class CategorySerializer(serializers.ModelSerializer):
-    """Public category list/detail fields (series overview + install)."""
-
-    image = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Category
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "parent",
-            "description",
-            "instructions",
-            "image",
-        )
-        read_only_fields = fields
-
-    def get_image(self, obj: Category) -> dict[str, Any] | None:
-        """First published product photo in this category (homepage tiles)."""
-        preview_map = self.context.get("preview_images")
-        if isinstance(preview_map, dict):
-            img = preview_map.get(obj.pk)
-            if img is None:
-                return None
-            return ProductImageSerializer(img, context=self.context).data
-        img = (
-            ProductImage.objects.filter(
-                is_published=True,
-                sku__is_published=True,
-                sku__product__category_id=obj.pk,
-            )
-            .order_by("sort_order", "id")
-            .first()
-        )
-        if img is None:
-            return None
-        return ProductImageSerializer(img, context=self.context).data
-
-
 class AttributeValueSerializer(serializers.ModelSerializer):
     """ТТХ row for SKU detail: slug of Attribute + value + unit."""
 
@@ -345,6 +306,106 @@ class ProductImageSerializer(serializers.ModelSerializer):
         model = ProductImage
         fields = ("id", "image", "image_card", "alt", "sort_order")
         read_only_fields = fields
+
+
+# ── SerializerMethodField payload types (drf-spectacular schema hints) ──
+# Without explicit hints, method fields degrade to {[key]: unknown} in
+# OpenAPI and every regen breaks frontend types downstream.
+
+
+class SkuHighlightSerializer(serializers.Serializer):
+    """One ТТХ highlight row on SKU cards / PDP hero ({key,name,value,unit})."""
+
+    key = serializers.CharField()
+    name = serializers.CharField()
+    value = serializers.CharField()
+    unit = serializers.CharField()
+
+
+class SkuAttributeGroupSerializer(serializers.Serializer):
+    """ТТХ group block on the PDP Характеристики tab ({key,title,items})."""
+
+    key = serializers.CharField()
+    title = serializers.CharField()
+    items = AttributeValueSerializer(many=True)
+
+
+class SiblingEditionSerializer(serializers.Serializer):
+    """Sibling-edition row for the PDP variant picker."""
+
+    slug = serializers.CharField()
+    sku_code = serializers.CharField()
+    body = serializers.CharField()
+    dn = serializers.CharField()
+    ways = serializers.CharField()
+    kvs = serializers.CharField()
+    voltage = serializers.CharField()
+    control = serializers.CharField()
+    aux_switch = serializers.BooleanField()
+    fault_alarm = serializers.BooleanField()
+    in_stock = serializers.BooleanField()
+    in_stock_ma = serializers.BooleanField()
+
+
+class BallValveKitSerializer(serializers.Serializer):
+    """Actuator + bracket picker payload for ball-valve PDP."""
+
+    drive_families = serializers.ListField(child=serializers.CharField())
+    suffixes = serializers.ListField(child=serializers.CharField())
+    bracket_by_drive = serializers.DictField(child=serializers.CharField())
+    bracket_hint = serializers.CharField()
+
+
+class CompatiblePositionSerializer(serializers.Serializer):
+    """Compact cross-link card («Совместимые позиции»)."""
+
+    role = serializers.ChoiceField(choices=("drive", "valve", "bracket"))
+    name = serializers.CharField()
+    slug = serializers.CharField()
+    sku_code = serializers.CharField()
+    category_slug = serializers.CharField()
+    image = serializers.CharField(allow_null=True)
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """Public category list/detail fields (series overview + install)."""
+
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "parent",
+            "description",
+            "instructions",
+            "image",
+        )
+        read_only_fields = fields
+
+    @extend_schema_field(ProductImageSerializer(allow_null=True))
+    def get_image(self, obj: Category) -> dict[str, Any] | None:
+        """First published product photo in this category (homepage tiles)."""
+        preview_map = self.context.get("preview_images")
+        if isinstance(preview_map, dict):
+            img = preview_map.get(obj.pk)
+            if img is None:
+                return None
+            return ProductImageSerializer(img, context=self.context).data
+        img = (
+            ProductImage.objects.filter(
+                is_published=True,
+                sku__is_published=True,
+                sku__product__category_id=obj.pk,
+            )
+            .order_by("sort_order", "id")
+            .first()
+        )
+        if img is None:
+            return None
+        return ProductImageSerializer(img, context=self.context).data
 
 
 class SKUListSerializer(serializers.ModelSerializer):
@@ -424,6 +485,7 @@ class SKUListSerializer(serializers.ModelSerializer):
         ).count()
         return max(1, count)
 
+    @extend_schema_field(ProductImageSerializer(allow_null=True))
     def get_image(self, obj: SKU) -> dict[str, Any] | None:
         """Primary published image for catalog cards (sort_order ASC)."""
         images = _sku_gallery_images(obj)
@@ -431,6 +493,7 @@ class SKUListSerializer(serializers.ModelSerializer):
             return None
         return ProductImageSerializer(images[0], context=self.context).data
 
+    @extend_schema_field(SkuHighlightSerializer(many=True))
     def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
         """Compact ТТХ for catalog cards (moment / voltage / control / …)."""
         values = sku_attribute_values(obj)
@@ -547,6 +610,7 @@ class SKUDetailSerializer(SKUListSerializer):
         text = _sku_specs_text(obj)
         return strip_attribute_echo_from_text(text, rows)
 
+    @extend_schema_field(SkuHighlightSerializer(many=True))
     def get_highlights(self, obj: SKU) -> list[dict[str, str]]:
         """Hero ТТХ on PDP: fuller set than catalog cards."""
         values = sku_attribute_values(obj)
@@ -575,12 +639,14 @@ class SKUDetailSerializer(SKUListSerializer):
         stored = cat if cat.strip() else sku_product_field(obj, "instructions")
         return instructions_for_sku(obj.sku_code, stored_text=stored)
 
+    @extend_schema_field(BallValveKitSerializer(allow_null=True))
     def get_ball_valve_kit(self, obj: SKU) -> dict[str, Any] | None:
         """Optional actuator + bracket picker for ball-valve RFQ."""
         from catalog.ball_valve_kit import build_ball_valve_kit_options
 
         return build_ball_valve_kit_options(obj)
 
+    @extend_schema_field(CompatiblePositionSerializer(many=True))
     def get_compatible_positions(self, obj: SKU) -> list[dict[str, Any]]:
         """Adapter ↔ brass 8100 cross-links for PDP («Совместимые позиции»)."""
         from catalog.compatible_positions import compatible_positions_for_sku
@@ -605,6 +671,7 @@ class SKUDetailSerializer(SKUListSerializer):
         cache[key] = [] if count <= 1 else siblings_for_sku(obj)
         return cache[key]
 
+    @extend_schema_field(SiblingEditionSerializer(many=True))
     def get_siblings(self, obj: SKU) -> list[dict[str, Any]]:
         """Same-product editions for the PDP variant picker (empty if alone)."""
         return self._siblings_payload(obj)
@@ -618,14 +685,17 @@ class SKUDetailSerializer(SKUListSerializer):
             return {}
         return variant_axes_from_siblings(rows)
 
+    @extend_schema_field(AttributeValueSerializer(many=True))
     def get_attributes(self, obj: SKU) -> list[dict[str, Any]]:
         """ТТХ rows deduped and scoped to the SKU voltage/control variant."""
         return _sku_attribute_rows(obj, self.context)
 
+    @extend_schema_field(SkuAttributeGroupSerializer(many=True))
     def get_attribute_groups(self, obj: SKU) -> list[dict[str, Any]]:
         """ТТХ grouped for category cards on the Характеристики tab."""
         return group_attribute_rows(_sku_attribute_rows(obj, self.context))
 
+    @extend_schema_field(ProductFileSerializer(many=True))
     def get_files(self, obj: SKU) -> list[dict[str, Any]]:
         """Return only published ProductFile rows, ordered."""
         # .all() reuses the retrieve Prefetch; .filter() re-queried per SKU.
@@ -636,6 +706,7 @@ class SKUDetailSerializer(SKUListSerializer):
         context = {**self.context, "sku": obj}
         return ProductFileSerializer(files, many=True, context=context).data
 
+    @extend_schema_field(ProductImageSerializer(many=True))
     def get_images(self, obj: SKU) -> list[dict[str, Any]]:
         """Return published gallery images for this edition only."""
         images = _sku_gallery_images(obj)

@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from catalog.media_urls import RelativeImageField, to_media_path
@@ -118,6 +119,7 @@ class ArticleSerializer(ArticleListSerializer):
         fields = (*ArticleListSerializer.Meta.fields, "body", "related_skus")
         read_only_fields = fields
 
+    @extend_schema_field(ArticleRelatedSkuSerializer(many=True))
     def get_related_skus(self, obj: Article) -> list[dict[str, Any]]:
         """Return catalog cards for models referenced in the article."""
         blob = f"{obj.title}\n{obj.excerpt}\n{obj.body}"

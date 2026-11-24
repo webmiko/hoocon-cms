@@ -86,7 +86,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
         sku_code: string;
         name: string;
         image?: {
-          image?: string;
+          image?: string | null;
           image_card?: string | null;
         } | null;
       }>,

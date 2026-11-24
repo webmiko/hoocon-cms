@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { CompareProvider } from "../compare/CompareContext";
 import { ChunkLoadErrorBoundary } from "./ChunkLoadErrorBoundary";
@@ -13,6 +13,7 @@ import { ScrollToTop } from "./ScrollToTop";
 import { StripTrailingSlash } from "./StripTrailingSlash";
 import { BrandLogo } from "./BrandLogo";
 import { MessengerLinks } from "./MessengerLinks";
+import { SiteSearchForm } from "./SiteSearchForm";
 import { ThemeToggle } from "./ThemeToggle";
 import { useCabinetEnabled } from "../account/cabinetEnabled";
 import { useFocusTrap } from "../hooks/useFocusTrap";
@@ -57,7 +58,6 @@ const ZAVOD_FACTORY_MAILTO = "mailto:hoocon@hoocon.com.cn?subject=OEM%20inquiry%
  * No Cart/Wishlist (B2B without checkout in v1). Compare tray is not wishlist.
  */
 export function Layout() {
-  const navigate = useNavigate();
   const location = useLocation();
   const routeKey = `${location.pathname}${location.search}`;
   const [menuRoute, setMenuRoute] = useState(routeKey);
@@ -202,16 +202,6 @@ export function Layout() {
     setMenuOpen(false);
   }
 
-  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const q = (formData.get("q") as string | null)?.trim() ?? "";
-    if (q) {
-      closeMenu();
-      navigate(`/search?q=${encodeURIComponent(q)}`);
-    }
-  }
-
   return (
     <CompareProvider>
       <StripTrailingSlash />
@@ -248,18 +238,11 @@ export function Layout() {
             <DesktopNav />
 
             <div className={styles.siteHeadActions}>
-              <form className={styles.searchFormDesktop} onSubmit={handleSearch} role="search">
-                <input
-                  type="search"
-                  name="q"
-                  className={styles.searchInput}
-                  placeholder="Поиск по сайту…"
-                  aria-label="Поиск по сайту"
-                />
-                <button type="submit" className={styles.searchButton}>
-                  Найти
-                </button>
-              </form>
+              <SiteSearchForm
+                className={styles.searchFormDesktop}
+                inputClassName={styles.searchInput}
+                buttonClassName={styles.searchButton}
+              />
 
               <ThemeToggle />
 
@@ -309,18 +292,12 @@ export function Layout() {
           </button>
         </div>
         <div className={`container ${styles.mobilePanelInner}`}>
-          <form className={styles.searchFormMobile} onSubmit={handleSearch} role="search">
-            <input
-              type="search"
-              name="q"
-              className={styles.searchInput}
-              placeholder="Поиск по сайту…"
-              aria-label="Поиск по сайту"
-            />
-            <button type="submit" className={styles.searchButton}>
-              Найти
-            </button>
-          </form>
+          <SiteSearchForm
+            className={styles.searchFormMobile}
+            inputClassName={styles.searchInput}
+            buttonClassName={styles.searchButton}
+            onNavigate={closeMenu}
+          />
 
           <nav className={styles.navMobile} aria-label="Мобильное меню">
             <Link to="/catalog" className={styles.navMobileLink} onClick={closeMenu}>

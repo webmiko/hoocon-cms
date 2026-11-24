@@ -11,6 +11,7 @@ from config.pdn import pdn_consent_field
 from supportchat.attachments import (
     DOWNLOAD_TYPES,
     FALLBACK_TYPE,
+    VIDEO_AUDIO_PREFIXES,
     claims_image_without_raster_bytes,
     normalize_mime,
 )
@@ -35,6 +36,8 @@ class ConversationStartSerializer(serializers.Serializer):
 
 
 _ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+# nginx ``client_max_body_size`` is 20M; stay below it with multipart overhead.
+_MEDIA_ATTACHMENT_MAX_BYTES = 19 * 1024 * 1024
 _ATTACHMENT_MIME_TYPES = DOWNLOAD_TYPES | {FALLBACK_TYPE}
 
 
@@ -61,10 +64,15 @@ class MessageCreateSerializer(serializers.Serializer):
         """Size + mime allowlist for widget uploads."""
         if file is None:
             return file
-        if (file.size or 0) > _ATTACHMENT_MAX_BYTES:
-            raise serializers.ValidationError("Файл больше 10 МБ.")
         claimed = getattr(file, "content_type", "") or ""
         mime = normalize_mime(claimed)
+        if mime.startswith(VIDEO_AUDIO_PREFIXES):
+            if (file.size or 0) > _MEDIA_ATTACHMENT_MAX_BYTES:
+                raise serializers.ValidationError(
+                    "Видео или аудио больше 19 МБ. Пришлите ссылкой на облако или на sales@hoocon.ru.",
+                )
+        elif (file.size or 0) > _ATTACHMENT_MAX_BYTES:
+            raise serializers.ValidationError("Файл больше 10 МБ.")
         if mime.startswith("image/"):
             if claims_image_without_raster_bytes(file, claimed):
                 raise serializers.ValidationError("Картинка — только JPG, PNG, WebP или GIF.")

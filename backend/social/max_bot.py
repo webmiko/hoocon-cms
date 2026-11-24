@@ -422,29 +422,135 @@ def _max_message_attachments(message: dict[str, Any]) -> list[dict[str, Any]]:
     return [a for a in (atts or []) if isinstance(a, dict)]
 
 
-def _max_message_attachment(
+# MAX attachment ``type`` → our media kind. MAX renamed ``photo`` to ``image``;
+# ``photo`` is kept for older payloads. Keyboards, stickers, locations and
+# contacts are not media and are skipped.
+_MAX_MEDIA_KINDS = {
+    "image": "photo",
+    "photo": "photo",
+    "video": "video",
+    "audio": "audio",
+    "file": "file",
+}
+_MAX_DEFAULT_MIME = {"video": "video/mp4", "audio": "audio/mp4"}
+_MAX_DEFAULT_EXT = {"video": ".mp4", "audio": ".m4a"}
+
+
+def _max_message_has_media(message: dict[str, Any]) -> bool:
+    """True when the message carries at least one photo/video/audio/file attachment."""
+    return any(str(att.get("type") or "") in _MAX_MEDIA_KINDS for att in _max_message_attachments(message))
+
+
+def _max_attachment_size(att: dict[str, Any], payload: dict[str, Any]) -> int:
+    for raw in (payload.get("size"), att.get("size")):
+        try:
+            value = int(raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            return value
+    return 0
+
+
+def _max_media_name(
+    att: dict[str, Any],
+    payload: dict[str, Any],
+    kind: str,
+    data: bytes,
+    index: int,
+    url_name: str = "",
+) -> str:
+    """Readable file name: MAX filename, else ``photo-1.jpg`` / ``video-2.mp4``."""
+    from supportchat.attachments import sniff_image_type
+
+    given = str(payload.get("filename") or att.get("filename") or "").strip()
+    if given:
+        return Path(given).name[:200]
+    # A URL tail like ``pic.jpg`` is a usable name; ``i`` (from ``/i?r=…``) is not.
+    if Path(url_name).suffix:
+        return Path(url_name).name[:200]
+    ext = _MAX_DEFAULT_EXT.get(kind, "")
+    if kind == "photo":
+        ext = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/gif": ".gif",
+            "image/webp": ".webp",
+        }.get(sniff_image_type(data[:16]) or "", ".jpg")
+    return f"{kind}-{index}{ext}"
+
+
+def _max_message_media(
     message: dict[str, Any],
-) -> tuple[Any, str, str] | None:
-    """First photo/file/video attachment → ``(file, name, mime)`` or None."""
+    budget: Any,
+) -> tuple[list[Any], list[Any]]:
+    """Download every media attachment → ``(files, problems)``.
+
+    Nothing is dropped silently: each attachment that cannot be fetched
+    becomes a ``MediaProblem`` (no url, host outside the allowlist, too big,
+    download error) that managers see in the thread.
+    """
+    import mimetypes
+    from urllib.parse import urlparse
+
     from django.core.files.base import ContentFile
 
+    from social.max_http import max_attachment_url_allowed
     from social.publishers import max_download_attachment
+    from supportchat.inbound_media import InboundFile, MediaProblem
 
+    files: list[Any] = []
+    problems: list[Any] = []
+    handled = 0
     for att in _max_message_attachments(message):
-        kind = str(att.get("type") or "")
+        raw_type = str(att.get("type") or "")
+        kind = _MAX_MEDIA_KINDS.get(raw_type)
+        if kind is None:
+            continue
+        handled += 1
         raw_payload = att.get("payload")
         payload = raw_payload if isinstance(raw_payload, dict) else {}
         url = str(payload.get("url") or "").strip()
-        if not url or kind not in {"photo", "file", "video"}:
-            continue
-        downloaded = max_download_attachment(url)
-        if downloaded is None:
-            continue
-        data, fallback_name = downloaded
-        name = str(payload.get("filename") or fallback_name)[:200]
-        mime = "image/jpeg" if kind == "photo" else ""
-        return ContentFile(data, name=name), name, mime
-    return None
+        size = _max_attachment_size(att, payload)
+        host = (urlparse(url).hostname or "") if url else ""
+        logger.info(
+            "max_attachment_received type=%s kind=%s host=%s size=%s has_token=%s",
+            raw_type,
+            kind,
+            host[:80],
+            size,
+            bool(payload.get("token")),
+        )
+        if not budget.has_room():
+            problems.append(MediaProblem(kind, "limit"))
+        elif size > budget.file_limit:
+            problems.append(MediaProblem(kind, "too_big"))
+        elif size > budget.bytes_left:
+            problems.append(MediaProblem(kind, "limit"))
+        elif not url:
+            problems.append(MediaProblem(kind, "no_url"))
+        elif not max_attachment_url_allowed(url):
+            problems.append(MediaProblem(kind, "host_not_allowed"))
+        else:
+            downloaded = max_download_attachment(url, max_bytes=budget.per_file_limit)
+            if downloaded is None:
+                problems.append(MediaProblem(kind, "download_failed"))
+            else:
+                data, url_name = downloaded
+                budget.consume(len(data))
+                name = _max_media_name(att, payload, kind, data, handled, url_name)
+                mime = mimetypes.guess_type(name)[0] or _MAX_DEFAULT_MIME.get(kind, "")
+                files.append(InboundFile(ContentFile(data, name=name), name, mime, kind))
+        if problems and problems[-1].kind == kind and problems[-1].reason != "limit":
+            logger.warning(
+                "max_attachment_skipped type=%s kind=%s reason=%s host=%s size=%s",
+                raw_type,
+                kind,
+                problems[-1].reason,
+                host[:80],
+                size,
+            )
+    return files, problems
 
 
 def _ingest_support_text(
@@ -455,14 +561,13 @@ def _ingest_support_text(
     display_name: str,
 ) -> PublishResult | None:
     """Store free-form text in support inbox; optional outside-hours auto-reply."""
+    from supportchat.inbound_media import client_reply, ingest_inbound_media
     from supportchat.models import Channel
     from supportchat.services import (
         SupportChatError,
-        add_inbound_message,
         get_or_create_messenger_conversation,
     )
 
-    attachment = _max_message_attachment(message)
     external_message_id = _message_external_id(message)
     try:
         conversation = get_or_create_messenger_conversation(
@@ -470,15 +575,13 @@ def _ingest_support_text(
             user_id,
             display_name=display_name,
         )
-        _inbound, auto = add_inbound_message(
+        auto, problems = ingest_inbound_media(
             conversation,
             text,
+            lambda budget: _max_message_media(message, budget),
             external_message_id=external_message_id,
             raw_payload={"max_mid": external_message_id},
             display_name=display_name,
-            attachment=attachment[0] if attachment else None,
-            attachment_name=attachment[1] if attachment else "",
-            attachment_mime=attachment[2] if attachment else "",
         )
     except SupportChatError as exc:
         logger.warning(
@@ -488,13 +591,16 @@ def _ingest_support_text(
         )
         return None
 
+    result: PublishResult | None = None
+    if problems:
+        result = _send_to_user(user_id, client_reply(problems), attachments=main_menu_keyboard())
     if auto is not None:
         return _send_to_user(
             user_id,
             auto.body,
             attachments=main_menu_keyboard(),
         )
-    return None
+    return result
 
 
 def _start_payload_from_update(update: dict[str, Any]) -> str:
@@ -573,7 +679,7 @@ def _handle_message_created(update: dict[str, Any]) -> PublishResult | None:
         return None
     text = _message_plain_text(message)
     if text is None:
-        if not _max_message_attachments(message):
+        if not _max_message_has_media(message):
             return None
         text = ""
 

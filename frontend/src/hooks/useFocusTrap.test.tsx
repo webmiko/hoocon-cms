@@ -84,9 +84,9 @@ describe("useFocusTrap", () => {
 
 describe("site search navigation", () => {
   it("goes straight to /search without the slash redirect (one page view)", () => {
-    const layout = src("components/Layout.tsx");
-    expect(layout).not.toMatch(/navigate\(`\/search\/\?/);
-    expect(layout).toMatch(/navigate\(`\/search\?q=/);
+    const form = src("components/SiteSearchForm.tsx");
+    expect(form).not.toMatch(/navigate\(`\/search\/\?/);
+    expect(form).toMatch(/navigate\(`\/search\?q=/);
   });
 
   it("remounts the search input when the query changes", () => {
