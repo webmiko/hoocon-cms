@@ -64,6 +64,23 @@
   margin: 16px 0;
 }
 
+.correction {
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 16px 0;
+}
+
+.correctionLink {
+  color: var(--color-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.correctionLink:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
 .error {
   color: var(--color-danger);
 }

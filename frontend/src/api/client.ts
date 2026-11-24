@@ -15,107 +15,16 @@ import type { components, paths } from "./schema";
 export type { paths, components };
 
 // Category
-export type Category = components["schemas"]["Category"] & {
-  image?: {
-    id: number;
-    image: string;
-    image_card?: string | null;
-    alt?: string;
-  } | null;
-};
+export type Category = components["schemas"]["Category"];
 export type CategoryListResponse =
   paths["/api/catalog/categories/"]["get"]["responses"]["200"]["content"]["application/json"];
 
 // SKU
-export type SKUList = components["schemas"]["SKUList"] & {
-  highlights?: CatalogHighlight[];
-  image?: {
-    id: number;
-    image: string;
-    image_card?: string | null;
-    alt?: string;
-  } | null;
-  in_stock?: boolean;
-  /** 4–20 mA special-order units on hand (no raw qty). */
-  in_stock_ma?: boolean;
-  /** Within the 30-day «Новинки» window (first_published_at). */
-  is_new?: boolean;
-  first_published_at?: string | null;
-  /** Published SKU count on the same Product (family cards). */
-  edition_count?: number;
-};
-export type CatalogAttribute = {
-  name: string;
-  slug: string;
-  unit: string;
-  value: string;
-  group?: string;
-  group_label?: string;
-};
-
-export type CatalogAttributeGroup = {
-  key: string;
-  title: string;
-  items: CatalogAttribute[];
-};
-
-export type SKUDetail = components["schemas"]["SKUDetail"] & {
-  highlights?: CatalogHighlight[];
-  attributes?: CatalogAttribute[];
-  attribute_groups?: CatalogAttributeGroup[];
-  images?: Array<{
-    id: number;
-    image: string;
-    image_card?: string | null;
-    alt?: string;
-  }>;
-  lead?: string;
-  specs_text?: string;
-  analogs_text?: string;
-  category_name?: string;
-  category_description?: string;
-  category_instructions?: string;
-  ball_valve_kit?: {
-    drive_families: string[];
-    suffixes: string[];
-    bracket_by_drive: Record<string, string>;
-    bracket_hint: string;
-  } | null;
-  compatible_positions?: Array<{
-    role: "drive" | "valve" | "bracket";
-    name: string;
-    slug: string;
-    sku_code: string;
-    category_slug?: string;
-    image: string | null;
-  }>;
-  siblings?: Array<{
-    slug: string;
-    sku_code: string;
-    body: string;
-    dn: string;
-    ways: string;
-    kvs: string;
-    voltage: string;
-    control: string;
-    aux_switch: boolean;
-    fault_alarm?: boolean;
-    in_stock: boolean;
-    in_stock_ma?: boolean;
-  }>;
-  variant_axes?: Record<string, string[]>;
-};
+export type SKUList = components["schemas"]["SKUList"];
+export type SKUDetail = components["schemas"]["SKUDetail"];
 export type SKUListResponse =
   paths["/api/catalog/skus/"]["get"]["responses"]["200"]["content"]["application/json"];
-/** Detail payload with app-side fields not yet in OpenAPI schema.d.ts. */
 export type SKUDetailResponse = SKUDetail;
-
-export interface CatalogHighlight {
-  key: string;
-  name: string;
-  value: string;
-  unit: string;
-}
 
 export interface CatalogFacetValue {
   value: string;
@@ -204,29 +113,17 @@ export interface QuizAnalogResponse {
 // Search
 export type SearchResultItem = components["schemas"]["SearchResultItem"];
 export type SearchResponse = components["schemas"]["SearchResponse"];
+export type SearchSuggestItem = components["schemas"]["SearchSuggestItem"];
+export type SearchSuggestResponse = components["schemas"]["SearchSuggestResponse"];
 
 // Content (Page / Article / News)
 export type Page = components["schemas"]["Page"];
-export type Article = components["schemas"]["Article"] & {
-  excerpt?: string;
-  cover?: string | null;
-  cover_dark?: string | null;
-  related_skus?: Array<{
-    name: string;
-    slug: string;
-    sku_code: string;
-    category_slug?: string;
-    image: string | null;
-  }>;
-};
+export type Article = components["schemas"]["Article"];
 /** /statyi card: the list API ships reading time instead of the HTML body. */
 export type ArticleListItem = Omit<Article, "body" | "related_skus"> & {
   reading_minutes: number;
 };
-export type News = components["schemas"]["News"] & {
-  cover?: string | null;
-  category?: { slug: string; name: string } | null;
-};
+export type News = components["schemas"]["News"];
 
 export type NewsCategory = {
   id: number;
@@ -398,6 +295,11 @@ export const api = {
     const params = new URLSearchParams({ q });
     if (page) params.set("page", String(page));
     return apiFetch<SearchResponse>(`/api/search/?${params.toString()}`, { signal });
+  },
+
+  suggest(q: string, signal?: AbortSignal): Promise<SearchSuggestResponse> {
+    const params = new URLSearchParams({ q });
+    return apiFetch<SearchSuggestResponse>(`/api/search/suggest/?${params.toString()}`, { signal });
   },
 
   // ── CSRF ──────────────────────────────────────────────────────────

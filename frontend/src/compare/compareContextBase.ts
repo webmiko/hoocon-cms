@@ -19,7 +19,7 @@ export interface CompareContextValue {
       slug: string;
       sku_code: string;
       name: string;
-      image?: { image?: string } | null;
+      image?: { image?: string | null } | null;
     }>,
   ) => void;
 }

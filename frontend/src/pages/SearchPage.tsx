@@ -64,6 +64,9 @@ export function SearchPage() {
   const appendLastPage = append.key === listKey ? append.lastPage : page;
   const appendHasNext =
     append.key === listKey ? append.hasNext : Boolean(data?.next);
+  // When the layout flip won, highlight the corrected text (that's what
+  // actually matched titles/snippets), else the raw query.
+  const highlightQ = data?.corrected_query ?? q;
   const loadingMore = loadMoreUi.key === listKey && loadMoreUi.loading;
   const loadMoreError = loadMoreUi.key === listKey ? loadMoreUi.error : null;
   const hasPrev = Boolean(data?.previous) || page > 1;
@@ -174,6 +177,18 @@ export function SearchPage() {
         </p>
       )}
 
+      {data?.corrected_query && (
+        <p className={styles.correction} role="status">
+          Возможно, вы имели в виду:{" "}
+          <Link
+            className={styles.correctionLink}
+            to={`/search?q=${encodeURIComponent(data.corrected_query)}`}
+          >
+            {data.corrected_query}
+          </Link>
+        </p>
+      )}
+
       {!q && (
         <p className={styles.hint}>
           Введите запрос. Поиск идёт по всему сайту: каталог, статьи, новости и
@@ -208,7 +223,7 @@ export function SearchPage() {
                     <span className={styles.itemTitle}>
                       <HighlightQuery
                         text={item.title}
-                        query={q}
+                        query={highlightQ}
                         markClassName={styles.mark}
                       />
                     </span>
@@ -216,7 +231,7 @@ export function SearchPage() {
                       <span className={styles.itemSnippet}>
                         <HighlightQuery
                           text={snippet}
-                          query={q}
+                          query={highlightQ}
                           markClassName={styles.mark}
                         />
                       </span>
