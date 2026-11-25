@@ -1,34 +1,11 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
-{% comment %}
-  Custom action items mirror Unfold's object-tools markup (same li/a classes
-  as the built-in History entry) so they render as real buttons, not bare links.
-{% endcomment %}
-{% block object-tools-items %}
+{% block form_before %}
   {{ block.super }}
-  {% if compose_email_url %}
-    <li class="dark:border-base-700 max-lg:first:rounded-t-default border-base-200 min-lg:first:rounded-l-default select-none min-lg:-ml-px hover:bg-base-500/8 max-lg:last:rounded-b-default border dark:hover:text-primary-500 min-lg:last:rounded-r-default max-lg:-mt-px hover:text-primary-600">
-      <a href="{{ compose_email_url }}" class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap">
-        <span class="material-symbols-outlined">mail</span>
-        {% trans "Написать письмо" %}
-      </a>
-    </li>
-  {% endif %}
-  {% if import_spec_url %}
-    <li class="dark:border-base-700 max-lg:first:rounded-t-default border-base-200 min-lg:first:rounded-l-default select-none min-lg:-ml-px hover:bg-base-500/8 max-lg:last:rounded-b-default border dark:hover:text-primary-500 min-lg:last:rounded-r-default max-lg:-mt-px hover:text-primary-600">
-      <a href="{{ import_spec_url }}" class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap">
-        <span class="material-symbols-outlined">upload_file</span>
-        {% trans "Импорт спецификации" %}
-      </a>
-    </li>
-  {% endif %}
-  {% if call_client_url %}
-    <li class="dark:border-base-700 max-lg:first:rounded-t-default border-base-200 min-lg:first:rounded-l-default select-none min-lg:-ml-px hover:bg-base-500/8 max-lg:last:rounded-b-default border dark:hover:text-primary-500 min-lg:last:rounded-r-default max-lg:-mt-px hover:text-primary-600">
-      <a href="{{ call_client_url }}" class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap">
-        <span class="material-symbols-outlined">call</span>
-        {% trans "Позвонить клиенту" %}
-      </a>
-    </li>
-  {% endif %}
+  {% if person_card %}{% include "admin/crm/client/person_panel.html" with card=person_card %}{% endif %}
 {% endblock %}
+
+{# The top toolbar (История, Написать письмо, Импорт спецификации, Позвонить клиенту) is gone:
+   the panel above the form carries the same actions in one place. #}
+{% block object-tools-items %}{% endblock %}

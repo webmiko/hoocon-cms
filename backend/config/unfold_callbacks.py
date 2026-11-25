@@ -136,6 +136,20 @@ def os27_css(request: HttpRequest) -> str:
     return _versioned_static("admin/css/hoocon-os27.css")
 
 
+def workspace_css(request: HttpRequest) -> str:
+    """«Мой день» manager queue CSS (cache-busted)."""
+    del request
+    return _versioned_static("admin/css/hoocon-workspace.css")
+
+
+def perm_view_workspace(request: HttpRequest) -> bool:
+    """«Мой день» is for staff who work leads or client firms."""
+    user = getattr(request, "user", None)
+    return bool(
+        user and user.is_authenticated and (user.has_perm("leads.view_lead") or user.has_perm("crm.view_company")),
+    )
+
+
 def unfold_extras_css(request: HttpRequest) -> str:
     """URL of thin CSS for Unfold shell (cache-busted)."""
     del request

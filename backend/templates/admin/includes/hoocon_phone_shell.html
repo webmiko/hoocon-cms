@@ -8,6 +8,17 @@
   hidden
 >
   <nav class="hoocon-phone-tabs" aria-label="{% trans 'Основные разделы' %}">
+    {% if hoocon_phone_settings.workspace_tab %}
+    <a
+      href="{% url 'crm-workspace' %}"
+      class="hoocon-phone-tab"
+      data-hoocon-phone-tab="workspace"
+      data-match="/admin/workspace/"
+    >
+      <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">today</span>
+      <span class="hoocon-phone-tab__label">{% trans "Мой день" %}</span>
+    </a>
+    {% else %}
     <a
       href="{% url 'admin:index' %}"
       class="hoocon-phone-tab"
@@ -18,6 +29,7 @@
       <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">dashboard</span>
       <span class="hoocon-phone-tab__label">{% trans "Панель" %}</span>
     </a>
+    {% endif %}
     {% if perms.leads.view_lead %}
       <a
         href="{% url 'admin:leads_lead_changelist' %}"
@@ -26,7 +38,7 @@
         data-match="/admin/leads/lead/"
       >
         <span class="material-symbols-outlined hoocon-phone-tab__icon" aria-hidden="true">inbox</span>
-        <span class="hoocon-phone-tab__label">{% trans "Лиды" %}</span>
+        <span class="hoocon-phone-tab__label">{% trans "Заявки" %}</span>
         <span
           class="hoocon-phone-tab__badge"
           data-hoocon-phone-leads-badge
@@ -114,9 +126,9 @@
       </div>
       <ul class="hoocon-phone-more__list">
         <li>
-          <a href="{% url 'admin:index' %}">
+          <a href="{% if hoocon_phone_settings.hub_url %}{{ hoocon_phone_settings.hub_url }}{% else %}{% url 'admin:index' %}{% endif %}">
             <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
-            {% trans "Панель" %}
+            {% if hoocon_phone_settings.workspace_tab %}{% trans "Все разделы" %}{% else %}{% trans "Панель" %}{% endif %}
           </a>
         </li>
         {% if perms.catalog.view_sku %}

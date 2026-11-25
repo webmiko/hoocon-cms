@@ -765,3 +765,104 @@ def test_seed_wiki_says_mailbox_takes_requests_not_every_letter() -> None:
     row = changelog.split('id="changelog-imap-intake"', 1)[1].split("</tr>", 1)[0]
     assert "17.11.2026" in row
     assert "Вся папка" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_my_day() -> None:
+    """Журнал обновлений рассказывает про «Мой день» и стоит выше старых записей."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    assert 'id="changelog-my-day"' in doc.body
+    assert doc.body.index("changelog-my-day") < doc.body.index("changelog-quote-lead-items")
+    row = doc.body.split('id="changelog-my-day"', 1)[1].split("</tr>", 1)[0]
+    assert "Мой день" in row
+    assert "Следующий шаг" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_explains_how_to_issue_a_quote() -> None:
+    """Журнал называет кнопку «Выдать клиенту», а не только статус."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-quote-issue-button"', 1)[1].split("</tr>", 1)[0]
+    assert "Выдать клиенту" in row
+    assert "вручную" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_the_call_result() -> None:
+    """Журнал объясняет блок «Итог звонка» и что делает каждый вариант."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-call-result"', 1)[1].split("</tr>", 1)[0]
+    assert "Записать итог" in row
+    assert "Не дозвонился" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_lead_and_person_panels() -> None:
+    """Журнал описывает верхние блоки заявки и карточки человека."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-lead-person-panels"', 1)[1].split("</tr>", 1)[0]
+    assert "Что делать сейчас" in row
+    assert "Закрыть заявку" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_list_tabs() -> None:
+    """Журнал называет вкладки над списками заявок, клиентов и КП."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-list-tabs"', 1)[1].split("</tr>", 1)[0]
+    assert "Мои в работе" in row
+    assert "Пора вернуться" in row
+    assert "Ждут ответа" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_chat_quote_form_and_lists() -> None:
+    """Журнал называет новые кнопки чата и формы КП."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-chat-quote-form-lists"', 1)[1].split("</tr>", 1)[0]
+    assert "Взять диалог" in row
+    assert "Клиент согласился" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_tells_where_letters_and_orders_are() -> None:
+    """Журнал отвечает, где менеджеру смотреть письма и заказы клиента."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-orders-letters-view"', 1)[1].split("</tr>", 1)[0]
+    assert "Письма" in row
+    assert "Заказы" in row

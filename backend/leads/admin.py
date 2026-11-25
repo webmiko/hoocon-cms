@@ -346,7 +346,35 @@ class LeadAdmin(
             )
         return inline_admin_formsets
 
-    @admin.display(description="ID", ordering="email")
+    def get_list_display(self, request: HttpRequest) -> tuple[Any, ...]:
+        """A manager's list drops the columns only the head of sales reads."""
+        from accounts.roles import staff_sees_all_leads
+
+        columns = tuple(super().get_list_display(request))
+        if staff_sees_all_leads(request.user):
+            return columns
+        return tuple(name for name in columns if name not in {"rfq_thread_badge", "processed_by"})
+
+    def get_list_filter(self, request: HttpRequest) -> list[Any]:
+        """Side filters a manager can use without knowing the database.
+
+        «Обработал», «Нить КП», «Открыта» and the manager picker are for the head of
+        sales. The tabs above the list already answer «мои» and «новые».
+        """
+        from accounts.roles import staff_sees_all_leads
+
+        filters = list(super().get_list_filter(request))
+        if staff_sees_all_leads(request.user):
+            return filters
+        hidden = {"assignee", "processed_by", "work_labels"}
+        return [
+            item
+            for item in filters
+            if not (isinstance(item, str) and item in hidden)
+            and not (isinstance(item, tuple) and item[0] in {"rfq_bundle_root", "seen_at"})
+        ]
+
+    @admin.display(description="Почта", ordering="email")
     def email_id(self, obj: Lead) -> str:
         """Contact id. A call stub shows a temporary name until the card is filled in."""
         if is_call_stub_email(obj.email):
@@ -356,7 +384,7 @@ class LeadAdmin(
             return phone_label
         return obj.email
 
-    @admin.display(description="Имя", ordering="name")
+    @admin.display(description="Контакт", ordering="name")
     def contact_name(self, obj: Lead) -> str:
         """Person name. A call stub keeps the number here; the temporary name is the title.
 
@@ -780,6 +808,10 @@ class LeadAdmin(
             )
 
         if obj is not None:
+            if extra.get("lead_view_mode") and self.has_view_permission(request, obj):
+                from crm.lead_card import build_lead_card
+
+                extra["lead_card"] = build_lead_card(obj, request.user)
             extra["lead_dossier_html"] = self._client_dossier_html(request, obj)
             extra["lead_create_quote_url"] = reverse(
                 "admin:leads_lead_create_quote",
@@ -1339,7 +1371,36 @@ class LeadAdmin(
 
         # ChangeList rejects unknown GET keys (redirects with ?e=1).
         request.GET = filter_params  # type: ignore[assignment]
+        extra["hoocon_tabs"] = self._list_tabs(request, filter_params)
         return super().changelist_view(request, extra_context=extra)
+
+    def _list_tabs(self, request: HttpRequest, params: Any) -> list[Any]:
+        """«Новые / Мои в работе / Завершённые» above the list."""
+        from crm.list_tabs import TabSpec, build_list_tabs
+
+        me = str(request.user.pk)
+        specs = [
+            TabSpec("Все", rows=None, hint="Все заявки, которые вы видите"),
+            TabSpec(
+                "Новые",
+                {"status__exact": "new"},
+                Q(status=Lead.LeadStatus.NEW),
+                "Ждут, пока кто-то возьмёт в работу",
+            ),
+            TabSpec(
+                "Мои в работе",
+                {"status__exact": "in_progress", "assignee__id__exact": me},
+                Q(status=Lead.LeadStatus.IN_PROGRESS, assignee_id=request.user.pk),
+                "Вы взяли, но ещё не закрыли",
+            ),
+            TabSpec(
+                "Завершённые",
+                {"status__exact": "done"},
+                Q(status=Lead.LeadStatus.DONE),
+                "Закрыты результатом или вручную",
+            ),
+        ]
+        return build_list_tabs(params, self.get_queryset(request), specs)
 
     def get_urls(self) -> list:
         """Add sticker poll + processing stats endpoints.

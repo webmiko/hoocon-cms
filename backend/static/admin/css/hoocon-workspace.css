@@ -1,0 +1,439 @@
+/* «Мой день»: one queue for a sales manager. Tokens come from hoocon-unfold-extras.css. */
+.hoocon-ws {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 1rem 0 4rem;
+  color: var(--hoocon-ink);
+}
+
+.hoocon-ws__head { margin-bottom: 2rem; }
+.hoocon-ws__title { font-size: 1.75rem; font-weight: 700; line-height: 1.2; margin: 0; }
+.hoocon-ws__sub { margin: 0.6rem 0 0; color: var(--hoocon-quiet); font-size: 1rem; }
+
+/* Client path: four steps with counters. */
+.hoocon-ws__path {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 2.25rem;
+}
+.hoocon-ws__step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.95rem 1.05rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+  color: inherit;
+  text-decoration: none;
+}
+.hoocon-ws__step:hover { border-color: var(--hoocon-primary); }
+.hoocon-ws__step-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--hoocon-surface-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.hoocon-ws__step-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.hoocon-ws__step-title { font-weight: 600; font-size: 0.95rem; }
+.hoocon-ws__step-text { color: var(--hoocon-quiet); font-size: 0.75rem; overflow-wrap: anywhere; }
+.hoocon-ws__step-count { font-size: 1.25rem; font-weight: 700; color: var(--hoocon-quiet); }
+.hoocon-ws__step--has .hoocon-ws__step-count { color: var(--hoocon-primary); }
+.dark .hoocon-ws__step--has .hoocon-ws__step-count { color: var(--hoocon-primary-on-dark); }
+
+/* The one thing to do first. */
+.hoocon-ws__first {
+  margin-bottom: 2.75rem;
+  padding: 1.6rem 1.75rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-left: 0.3rem solid var(--hoocon-primary);
+  border-radius: var(--hoocon-radius);
+  box-shadow: var(--hoocon-shadow-soft);
+}
+.hoocon-ws__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hoocon-primary);
+}
+.dark .hoocon-ws__eyebrow { color: var(--hoocon-primary-on-dark); }
+.hoocon-ws__first-title { margin: 0; font-size: 1.4rem; font-weight: 700; overflow-wrap: anywhere; }
+.hoocon-ws__first-sub { margin: 0.5rem 0 1.4rem; color: var(--hoocon-quiet); }
+
+.hoocon-ws__section { margin-bottom: 2.75rem; }
+.hoocon-ws__section-head { margin-bottom: 1rem; }
+.hoocon-ws__h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.hoocon-ws__count {
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--hoocon-radius-pill, 999px);
+  background: var(--hoocon-surface-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.hoocon-ws__hint { margin: 0.3rem 0 0; color: var(--hoocon-quiet); font-size: 0.85rem; }
+
+.hoocon-ws__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.hoocon-ws__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+}
+.hoocon-ws__row--urgent { border-left: 0.25rem solid var(--hoocon-primary); }
+.hoocon-ws__row-main { display: flex; flex-direction: column; min-width: 0; }
+.hoocon-ws__row-title { font-weight: 600; overflow-wrap: anywhere; }
+.hoocon-ws__row-sub { color: var(--hoocon-quiet); font-size: 0.85rem; overflow-wrap: anywhere; }
+.hoocon-ws__wait { color: var(--hoocon-quiet); font-size: 0.8rem; white-space: nowrap; }
+
+.hoocon-ws__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.hoocon-ws__form { margin: 0; }
+.hoocon-ws__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--hoocon-radius-btn, 0.6rem);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hoocon-ws__btn--primary { background: var(--hoocon-primary); color: #fff; }
+.hoocon-ws__btn--primary:hover { filter: brightness(0.92); }
+.hoocon-ws__btn--ghost {
+  background: transparent;
+  color: var(--hoocon-ink);
+  border-color: var(--hoocon-hairline);
+}
+.hoocon-ws__btn--ghost:hover { background: var(--hoocon-surface-muted); }
+.hoocon-ws__btn:focus-visible { outline: 2px solid var(--hoocon-primary); outline-offset: 2px; }
+
+.hoocon-ws__more { display: inline-block; margin-top: 0.9rem; font-size: 0.85rem; color: var(--hoocon-primary); }
+.dark .hoocon-ws__more { color: var(--hoocon-primary-on-dark); }
+
+.hoocon-ws__guide {
+  margin-top: 1rem;
+  padding: 1.15rem 1.4rem;
+  background: var(--hoocon-surface-muted);
+  border-radius: var(--hoocon-radius);
+}
+.hoocon-ws__guide summary { cursor: pointer; font-weight: 600; }
+.hoocon-ws__guide-list { margin: 1rem 0 0; padding-left: 1.25rem; display: grid; gap: 0.7rem; }
+
+@media (max-width: 40rem) {
+  .hoocon-ws__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .hoocon-ws__row .hoocon-ws__actions { grid-column: 1 / -1; }
+  .hoocon-ws__btn { flex: 1; min-height: 2.75rem; }
+}
+
+.hoocon-ws__stale { margin: 0.9rem 0 0; color: var(--hoocon-quiet); font-size: 0.85rem; }
+.hoocon-ws__stale a { color: var(--hoocon-primary); }
+.dark .hoocon-ws__stale a { color: var(--hoocon-primary-on-dark); }
+
+/* Company card: action bar, next step, one history feed. */
+.hoocon-cc {
+  margin-bottom: 2.25rem;
+  padding: 1.5rem 1.6rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+  box-shadow: var(--hoocon-shadow-soft);
+  color: var(--hoocon-ink);
+}
+.hoocon-cc__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 1.5rem; }
+.hoocon-cc__step { display: flex; flex-direction: column; min-width: 0; }
+.hoocon-cc__step-label { font-size: 0.75rem; color: var(--hoocon-quiet); text-transform: uppercase; letter-spacing: 0.05em; }
+.hoocon-cc__step-text { font-size: 1.15rem; }
+.hoocon-cc__step-hint { font-size: 0.85rem; color: var(--hoocon-quiet); }
+.hoocon-cc__step--overdue .hoocon-cc__step-text,
+.hoocon-cc__step--none .hoocon-cc__step-text { color: var(--hoocon-primary); }
+.dark .hoocon-cc__step--overdue .hoocon-cc__step-text,
+.dark .hoocon-cc__step--none .hoocon-cc__step-text { color: var(--hoocon-primary-on-dark); }
+.hoocon-cc__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+.hoocon-cc__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1.5rem; }
+.hoocon-cc__chips-label { font-size: 0.85rem; color: var(--hoocon-quiet); margin-right: 0.2rem; }
+.hoocon-cc__chip {
+  min-height: 2rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: 999px;
+  background: var(--hoocon-surface-muted);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.hoocon-cc__chip:hover { border-color: var(--hoocon-primary); }
+.hoocon-cc__chip--quiet { background: transparent; color: var(--hoocon-quiet); }
+
+.hoocon-cc__note { display: grid; gap: 0.6rem; margin-top: 1.5rem; justify-items: start; }
+.hoocon-cc__note-label { font-size: 0.85rem; color: var(--hoocon-quiet); }
+.hoocon-cc__note-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius-sm, 0.5rem);
+  background: var(--hoocon-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.hoocon-cc__feed { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--hoocon-hairline); }
+.hoocon-cc__feed-title { margin: 0 0 0.9rem; font-size: 1rem; font-weight: 700; }
+.hoocon-cc__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; max-height: 26rem; overflow-y: auto; }
+.hoocon-cc__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.9rem; align-items: start; padding: 0.8rem 0; border-bottom: 1px solid var(--hoocon-hairline); }
+.hoocon-cc__item:last-child { border-bottom: 0; }
+.hoocon-cc__icon { font-size: 1.25rem; color: var(--hoocon-quiet); }
+.hoocon-cc__item--quote .hoocon-cc__icon { color: var(--hoocon-primary); }
+.hoocon-cc__item-body { display: flex; flex-direction: column; min-width: 0; }
+.hoocon-cc__item-label { font-size: 0.75rem; color: var(--hoocon-quiet); }
+.hoocon-cc__item-title { font-weight: 600; overflow-wrap: anywhere; }
+.hoocon-cc__item-text { font-size: 0.85rem; color: var(--hoocon-quiet); overflow-wrap: anywhere; }
+.hoocon-cc__item-when { font-size: 0.8rem; color: var(--hoocon-quiet); white-space: nowrap; }
+.hoocon-cc__empty { margin: 0; color: var(--hoocon-quiet); }
+
+@media (max-width: 40rem) {
+  .hoocon-cc { padding: 1.1rem; margin-bottom: 1.75rem; }
+  .hoocon-cc__actions { width: 100%; }
+  .hoocon-cc__actions .hoocon-ws__btn { flex: 1; min-height: 2.75rem; }
+  .hoocon-cc__note-input { font-size: 1rem; }
+}
+
+/* КП page: how to send it to the client. */
+.hoocon-qi {
+  margin-bottom: 2rem;
+  padding: 1.4rem 1.6rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-left: 0.3rem solid var(--hoocon-quiet);
+  border-radius: var(--hoocon-radius);
+  color: var(--hoocon-ink);
+}
+.hoocon-qi--draft { border-left-color: var(--hoocon-primary); }
+.hoocon-qi__title { margin: 0 0 0.8rem; font-size: 1.05rem; font-weight: 700; }
+.hoocon-qi__steps { margin: 0 0 1.2rem; padding-left: 1.25rem; display: grid; gap: 0.6rem; }
+.hoocon-qi__text { margin: 0; color: var(--hoocon-quiet); }
+.hoocon-qi__warn { margin: 0 0 1.2rem; padding: 0.8rem 1rem; border-radius: var(--hoocon-radius-sm, 0.5rem); background: var(--hoocon-surface-muted); }
+
+/* Entry points (new leads, chats): a card with what the client wrote. */
+.hoocon-ws__cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1.1rem;
+}
+.hoocon-ws__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 1.2rem 1.3rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+  box-shadow: var(--hoocon-shadow-soft);
+}
+.hoocon-ws__card--urgent { border-left: 0.25rem solid var(--hoocon-primary); }
+.hoocon-ws__card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.hoocon-ws__card-title { margin: 0; font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.hoocon-ws__chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0; }
+.hoocon-ws__chip {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--hoocon-surface-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.hoocon-ws__card-text { margin: 0; flex: 1; color: var(--hoocon-quiet); font-size: 0.9rem; overflow-wrap: anywhere; }
+.hoocon-ws__card .hoocon-ws__actions { margin-top: auto; }
+@media (max-width: 40rem) {
+  .hoocon-ws__cards { grid-template-columns: 1fr; }
+}
+
+/* Call result: one choice, one button. */
+.hoocon-cc__result {
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--hoocon-surface-muted);
+  border-radius: var(--hoocon-radius);
+}
+.hoocon-cc__result-title { margin: 0 0 1rem; font-weight: 700; }
+.hoocon-cc__outcomes { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; }
+.hoocon-cc__outcome { position: relative; display: block; cursor: pointer; }
+.hoocon-cc__outcome input { position: absolute; opacity: 0; inset: 0; }
+.hoocon-cc__outcome-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: 3.25rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius);
+}
+.hoocon-cc__outcome-body span { font-size: 0.78rem; color: var(--hoocon-quiet); }
+.hoocon-cc__outcome:hover .hoocon-cc__outcome-body { border-color: var(--hoocon-primary); }
+.hoocon-cc__outcome input:checked + .hoocon-cc__outcome-body {
+  border-color: var(--hoocon-primary);
+  box-shadow: 0 0 0 2px var(--hoocon-primary);
+}
+.hoocon-cc__outcome input:focus-visible + .hoocon-cc__outcome-body { outline: 2px solid var(--hoocon-primary); outline-offset: 2px; }
+.hoocon-cc__result-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.9rem; margin-top: 1.1rem; }
+.hoocon-cc__field { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; font-size: 0.8rem; color: var(--hoocon-quiet); }
+.hoocon-cc__field--grow { flex: 1 1 14rem; }
+.hoocon-cc__field select,
+.hoocon-cc__field input {
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: var(--hoocon-radius-sm, 0.5rem);
+  background: var(--hoocon-surface);
+  color: var(--hoocon-ink);
+  font: inherit;
+  font-size: 1rem;
+}
+@media (max-width: 40rem) {
+  .hoocon-cc__result-row .hoocon-ws__btn { flex: 1 1 100%; min-height: 2.75rem; }
+  .hoocon-cc__field { flex: 1 1 100%; }
+}
+
+@media (max-width: 40rem) {
+  .hoocon-ws { padding-bottom: 3rem; }
+  .hoocon-ws__head { margin-bottom: 1.5rem; }
+  .hoocon-ws__path { margin-bottom: 1.75rem; }
+  .hoocon-ws__first { margin-bottom: 2rem; padding: 1.2rem 1.15rem; }
+  .hoocon-ws__section { margin-bottom: 2.1rem; }
+  .hoocon-ws__card { padding: 1rem 1.05rem; }
+  .hoocon-qi { padding: 1.1rem; margin-bottom: 1.5rem; }
+}
+
+/* Lead page: what to do now, what the client wrote, what we did before. */
+.hoocon-lc {
+  display: grid;
+  gap: 1.75rem;
+  margin-bottom: 2.25rem;
+  padding: 1.6rem 1.75rem;
+  background: var(--hoocon-surface);
+  border: 1px solid var(--hoocon-hairline);
+  border-left: 0.3rem solid var(--hoocon-primary);
+  border-radius: var(--hoocon-radius);
+  box-shadow: var(--hoocon-shadow-soft);
+  color: var(--hoocon-ink);
+}
+.hoocon-lc--done,
+.hoocon-lc--other,
+.hoocon-lc--waiting { border-left-color: var(--hoocon-quiet); }
+.hoocon-lc__headline { margin: 0; font-size: 1.35rem; font-weight: 700; }
+.hoocon-lc__hint { margin: 0.5rem 0 1.2rem; color: var(--hoocon-quiet); }
+.hoocon-lc__h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+.hoocon-lc__wrote-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem; }
+.hoocon-lc__message { margin: 0.9rem 0 0; padding: 0.9rem 1.1rem; background: var(--hoocon-surface-muted); border-radius: var(--hoocon-radius); white-space: pre-line; overflow-wrap: anywhere; }
+.hoocon-lc__items-title { margin: 1.1rem 0 0.5rem; font-size: 0.8rem; color: var(--hoocon-quiet); text-transform: uppercase; letter-spacing: 0.05em; }
+.hoocon-lc__owner { margin: 1rem 0 0; font-size: 0.85rem; color: var(--hoocon-quiet); }
+.hoocon-lc__link { font-size: 0.85rem; color: var(--hoocon-primary); }
+.dark .hoocon-lc__link { color: var(--hoocon-primary-on-dark); }
+.hoocon-lc__history { padding-top: 1.5rem; border-top: 1px solid var(--hoocon-hairline); }
+@media (max-width: 40rem) {
+  .hoocon-lc { padding: 1.15rem; gap: 1.4rem; margin-bottom: 1.75rem; }
+  .hoocon-lc .hoocon-ws__btn { flex: 1 1 100%; min-height: 2.75rem; }
+}
+
+.hoocon-cc__chips-row { margin: 1.1rem 0 0; }
+.hoocon-cc__warn { margin: 1.1rem 0 0; }
+
+/* One-click slices above a list. */
+.hoocon-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1.5rem;
+}
+.hoocon-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--hoocon-hairline);
+  border-radius: 999px;
+  background: var(--hoocon-surface);
+  color: var(--hoocon-ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hoocon-tabs__tab:hover { border-color: var(--hoocon-primary); }
+.hoocon-tabs__tab:focus-visible { outline: 2px solid var(--hoocon-primary); outline-offset: 2px; }
+.hoocon-tabs__count {
+  min-width: 1.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--hoocon-surface-muted);
+  color: var(--hoocon-quiet);
+  font-size: 0.8rem;
+  text-align: center;
+}
+.hoocon-tabs__tab.is-active { background: var(--hoocon-primary); border-color: var(--hoocon-primary); color: #fff; }
+.hoocon-tabs__tab.is-active .hoocon-tabs__count { background: rgba(255, 255, 255, 0.22); color: #fff; }
+@media (max-width: 40rem) {
+  .hoocon-tabs { flex-wrap: nowrap; overflow-x: auto; margin-inline: -0.25rem; padding: 0 0.25rem 0.4rem; }
+  .hoocon-tabs__tab { flex: none; min-height: 2.75rem; }
+}
+
+.hoocon-lc--slim { gap: 0; padding: 1.25rem 1.5rem; }
+.hoocon-lc--slim .hoocon-lc__hint { margin-bottom: 1rem; }
+.hoocon-lc--free .hoocon-lc__headline,
+.hoocon-lc--mine .hoocon-lc__headline { font-size: 1.2rem; }
+.hoocon-lc--closed,
+.hoocon-lc--mine { border-left-color: var(--hoocon-quiet); }
+.hoocon-lc--free { border-left-color: var(--hoocon-primary); }
+
+.hoocon-qi__sum { margin: 0 0 1rem; }
+
+.hoocon-cc__more { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin: 1rem 0 0; font-size: 0.85rem; }
+.hoocon-cc__more a { color: var(--hoocon-quiet); text-decoration: underline; text-underline-offset: 0.2em; }
+.hoocon-cc__more a:hover { color: var(--hoocon-primary); }
+
+.hoocon-cc__jump { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 1.5rem; }
+.hoocon-cc__jump .hoocon-cc__chip { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; color: inherit; }
+.hoocon-cc__item--order .hoocon-cc__icon { color: var(--hoocon-primary); }
+
+/* Safe default for Enter inside the offer form (see issue_panel.html). */
+.hoocon-sr-default {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
