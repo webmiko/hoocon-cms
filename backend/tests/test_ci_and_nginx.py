@@ -549,12 +549,23 @@ def test_stray_uv_lock_is_gitignored() -> None:
 
 
 def test_nginx_public_pdf_route_is_rate_limited_before_the_spa_fallback() -> None:
-    """/dokumentaciya/pdf/ had no limit: it fell into `location /` and streamed via gunicorn."""
+    """/dokumentaciya/pdf/ had no limit: it fell into `location /` and streamed via gunicorn.
+
+    The same bytes are also served from /media/product_files/*.pdf by nginx
+    itself. That location must share the docs_pdf zone, while photos (empty
+    map key) stay unlimited.
+    """
     conf = NGINX_CONF.read_text(encoding="utf-8")
     site = NGINX_SITE_INC.read_text(encoding="utf-8")
-    assert "zone=docs_pdf" in conf
+    assert "limit_req_zone $hoocon_docs_pdf_key zone=docs_pdf:10m rate=5r/s;" in conf
+    pdf_key = conf.split("map $uri $hoocon_docs_pdf_key", 1)[1].split("}", 1)[0]
+    assert 'default "";' in pdf_key
+    assert "~*^/dokumentaciya/pdf/" in pdf_key
+    assert r"~*^/media/product_files/.+\.pdf$" in pdf_key
     block = site.split("location ^~ /dokumentaciya/pdf/", 1)[1].split("\nlocation ", 1)[0]
     assert "limit_req zone=docs_pdf" in block
     assert "limit_conn api_conn" in block
     assert "proxy_pass http://hoocon_app;" in block
     assert "add_header" not in block
+    media = site.split("location /media/", 1)[1].split("\nlocation ", 1)[0]
+    assert "limit_req zone=docs_pdf burst=20 nodelay;" in media

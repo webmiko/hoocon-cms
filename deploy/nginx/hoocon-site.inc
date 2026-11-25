@@ -143,6 +143,10 @@ location /admin/ {
 # Hotlink: allow empty Referer (direct open / mail) + our hosts; deny foreign embeds.
 # Keep host list in sync with DJANGO_ALLOWED_HOSTS / MEDIA_HOTLINK_EXTRA_HOSTS.
 location /media/ {
+    # Same per-IP budget as /dokumentaciya/pdf/. The zone key is empty for
+    # everything except /media/product_files/*.pdf, so photos are not limited.
+    limit_req zone=docs_pdf burst=20 nodelay;
+
     # server_names covers hoocon.ru / www / IP from server_name; do not
     # repeat those names here (nginx "conflicting parameter").
     valid_referers
