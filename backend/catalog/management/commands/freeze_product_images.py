@@ -42,7 +42,7 @@ def _read_exclude_file(path: str) -> tuple[str, ...]:
 class Command(BaseCommand):
     """Mark selected ProductImage rows locked and write a verification manifest."""
 
-    help = "Freeze ProductImage rows (dry-run by default) and write reports/product-images-manifest-*.csv."
+    help = "Freeze ProductImage rows (dry-run by default); write private_media/reports/product-images-manifest-*.csv."
 
     def add_arguments(self, parser: Any) -> None:
         """Register freeze filters and confirmation flags."""
@@ -50,7 +50,7 @@ class Command(BaseCommand):
             "--scope",
             choices=("schemes", "all"),
             required=True,
-            help="schemes = filenames with -wiring/-dimensions/-size/-aux/-settings; all = every image.",
+            help="schemes = diagram files (wiring/dimensions/montazhnaya/termodatchik/flow etc.); all = every image.",
         )
         parser.add_argument(
             "--sku",
@@ -78,7 +78,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--reports-dir",
             default="",
-            help="Manifest directory (default: repository reports/).",
+            help="Manifest directory (default: private_media/reports/).",
         )
         mode = parser.add_mutually_exclusive_group()
         mode.add_argument("--dry-run", action="store_true", help="List rows without locking (default).")

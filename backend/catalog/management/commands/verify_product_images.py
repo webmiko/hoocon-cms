@@ -3,7 +3,7 @@
 Usage::
 
     poetry run python manage.py verify_product_images
-    poetry run python manage.py verify_product_images --manifest reports/product-images-manifest-….csv
+    poetry run python manage.py verify_product_images --manifest private_media/reports/product-images-manifest-….csv
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from catalog.etl.product_image_freeze import (
 class Command(BaseCommand):
     """Check sha256/size of files listed in a freeze manifest."""
 
-    help = "Verify frozen ProductImage files against reports/product-images-manifest-*.csv."
+    help = "Verify frozen ProductImage files against private_media/reports/product-images-manifest-*.csv."
 
     def add_arguments(self, parser: Any) -> None:
         """Register manifest and storage overrides."""
@@ -35,7 +35,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--reports-dir",
             default="",
-            help="Directory for newest-manifest lookup (default: repository reports/).",
+            help="Directory for newest-manifest lookup (default: private_media/reports/).",
         )
         parser.add_argument(
             "--media-root",

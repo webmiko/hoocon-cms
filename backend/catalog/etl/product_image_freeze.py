@@ -23,6 +23,9 @@ SCHEME_FILENAME_TOKENS: tuple[str, ...] = (
     "-size",
     "-aux",
     "-settings",
+    "montazhnaya",
+    "termodatchik",
+    "flow-3way",
 )
 MANIFEST_FIELDS: tuple[str, ...] = ("sku", "image", "sha256", "size_bytes", "locked_at")
 FREEZE_ACTOR = "freeze_product_images"
@@ -84,6 +87,10 @@ def freeze_product_images(
     now = timezone.now()
     locked_now = 0
 
+    if not dry_run:
+        # Before the lock transaction: a freeze without writable manifest dir must fail unlocked.
+        reports_dir.mkdir(parents=True, exist_ok=True)
+
     if not dry_run and to_lock_ids:
         with transaction.atomic():
             locked_now = ProductImage.objects.filter(pk__in=to_lock_ids, image_locked=False).update(
@@ -95,7 +102,6 @@ def freeze_product_images(
     manifest_path: Path | None = None
     if not dry_run:
         rows = list(qs.all())
-        reports_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = _write_manifest(rows, reports_dir=reports_dir, stamp=now)
 
     return {
@@ -148,8 +154,13 @@ def _stored_size(row: ProductImage) -> int:
 
 
 def default_reports_dir() -> Path:
-    """Repository-level reports/ directory (backend is settings.BASE_DIR)."""
-    return Path(settings.BASE_DIR).parent / "reports"
+    """Persistent private-media reports/ directory.
+
+    ``private_media`` is the host-mounted volume on prod (writable by the app
+    user, not served by nginx); ``BASE_DIR.parent`` resolves to the ephemeral
+    read-only container root there.
+    """
+    return Path(settings.PRIVATE_MEDIA_ROOT) / "reports"
 
 
 def latest_manifest(reports_dir: Path) -> Path | None:

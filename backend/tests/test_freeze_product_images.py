@@ -168,3 +168,75 @@ def test_verify_product_images_accepts_frozen_manifest_and_detects_drift(media_e
     Path(row.image.path).write_bytes(_webp("blue"))
     with pytest.raises(CommandError):
         call_command("verify_product_images", "--manifest", str(manifest), stdout=io.StringIO())
+
+
+def test_freeze_schemes_locks_montazhnaya_termodatchik_and_flow_rows(media_env: Path) -> None:
+    """scope=schemes covers montazhnaya/termodatchik/flow-3way diagram files.
+
+    Regression: filename tokens missed ``montazhnaya_sxema``, ``termodatchik``
+    and ``flow-3way`` names, so hundreds of scheme rows stayed unfrozen while
+    the operator believed all schemes were protected.
+    """
+    sku = _make_sku("DA10MQU230-A")
+    montazhnaya = _create_image(sku, filename="da10mqu230-a-montazhnaya_sxema_da81624mu.webp")
+    termodatchik = _create_image(sku, filename="sa10mu230-dst-termodatchik_saf72.webp")
+    flow = _create_image(sku, filename="8100-bv315a-flow-3way.webp")
+    photo = _create_image(sku, filename="da10mqu230-a-product.webp")
+    kvs_disc = _create_image(sku, filename="8100-bv315a-kvs-disc.webp")
+    reports_dir = media_env / "reports"
+
+    call_command(
+        "freeze_product_images",
+        "--scope",
+        "schemes",
+        "--yes",
+        "--reports-dir",
+        str(reports_dir),
+        stdout=io.StringIO(),
+    )
+
+    for row in (montazhnaya, termodatchik, flow):
+        row.refresh_from_db()
+        assert row.image_locked is True, row.image.name
+    for row in (photo, kvs_disc):
+        row.refresh_from_db()
+        assert row.image_locked is False, row.image.name
+
+
+def test_freeze_fails_before_locking_when_reports_dir_not_creatable(media_env: Path) -> None:
+    """No lock is committed when the manifest directory cannot be prepared.
+
+    Regression: on prod the mkdir of the default reports dir failed *after*
+    the lock transaction had already committed — locked rows, no manifest,
+    nothing for verify_product_images to check against.
+    """
+    sku = _make_sku("DA5FU24-D")
+    row = _create_image(sku, filename="da5fu-wiring.webp")
+    blocker = media_env / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    reports_dir = blocker / "reports"
+
+    with pytest.raises((OSError, CommandError)):
+        call_command(
+            "freeze_product_images",
+            "--scope",
+            "schemes",
+            "--yes",
+            "--reports-dir",
+            str(reports_dir),
+            stdout=io.StringIO(),
+        )
+
+    row.refresh_from_db()
+    assert row.image_locked is False
+
+
+def test_default_reports_dir_lives_in_private_media(settings) -> None:
+    """Default manifest dir is the private_media volume, not the container root.
+
+    On prod BASE_DIR.parent resolves to the read-only/ephemeral container
+    root; ``private_media`` is the persistent host volume the app can write.
+    """
+    from catalog.etl.product_image_freeze import default_reports_dir
+
+    assert default_reports_dir() == Path(settings.PRIVATE_MEDIA_ROOT) / "reports"
