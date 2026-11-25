@@ -546,3 +546,15 @@ def test_stray_uv_lock_is_gitignored() -> None:
         check=False,
     )
     assert proc.returncode == 0
+
+
+def test_nginx_public_pdf_route_is_rate_limited_before_the_spa_fallback() -> None:
+    """/dokumentaciya/pdf/ had no limit: it fell into `location /` and streamed via gunicorn."""
+    conf = NGINX_CONF.read_text(encoding="utf-8")
+    site = NGINX_SITE_INC.read_text(encoding="utf-8")
+    assert "zone=docs_pdf" in conf
+    block = site.split("location ^~ /dokumentaciya/pdf/", 1)[1].split("\nlocation ", 1)[0]
+    assert "limit_req zone=docs_pdf" in block
+    assert "limit_conn api_conn" in block
+    assert "proxy_pass http://hoocon_app;" in block
+    assert "add_header" not in block

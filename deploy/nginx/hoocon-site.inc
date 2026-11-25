@@ -93,6 +93,19 @@ location /api/telephony/ {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 
+# Canonical public PDFs. Django streams the file (CanonicalPdfView), so this
+# location is a rate-limited proxy; ^~ makes it win over the catch-all and any
+# regex location. No add_header here: Django owns the response headers.
+location ^~ /dokumentaciya/pdf/ {
+    limit_req zone=docs_pdf burst=20 nodelay;
+    limit_conn api_conn 12;
+    proxy_pass http://hoocon_app;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 # Lead submission — stricter rate limit (Iter 3 throttle + nginx backstop).
 location /api/leads/ {
     limit_req zone=lead_limit burst=3 nodelay;
