@@ -558,6 +558,9 @@ def test_nginx_public_pdf_route_is_rate_limited_before_the_spa_fallback() -> Non
     conf = NGINX_CONF.read_text(encoding="utf-8")
     site = NGINX_SITE_INC.read_text(encoding="utf-8")
     assert "limit_req_zone $hoocon_docs_pdf_key zone=docs_pdf:10m rate=5r/s;" in conf
+    # A map above map_hash_bucket_size makes `nginx -t` fail with
+    # "map_hash_bucket_size directive is duplicate" and the deploy aborts.
+    assert conf.index("map_hash_bucket_size") < conf.index("map $uri $hoocon_docs_pdf_key")
     pdf_key = conf.split("map $uri $hoocon_docs_pdf_key", 1)[1].split("}", 1)[0]
     assert 'default "";' in pdf_key
     assert "~*^/dokumentaciya/pdf/" in pdf_key
