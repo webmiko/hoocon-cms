@@ -248,3 +248,48 @@ def test_cron_strip_removes_only_duplicate_hoocon_jobs() -> None:
     assert "backup-offsite.sh" in (ROOT / "scripts" / "deploy-remote.sh").read_text(encoding="utf-8")
     install = (ROOT / "scripts" / "vps-install-cron.sh").read_text(encoding="utf-8")
     assert "cron-strip-stray.sh" in install
+
+
+def _run_backup(tmp_path: Path, env_text: str) -> Path:
+    """Run backup-vps.sh against a fake docker; return the created backup dir."""
+    deploy = tmp_path / "deploy"
+    deploy.mkdir()
+    (deploy / ".env").write_text(env_text, encoding="utf-8")
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "a.jpg").write_text("x", encoding="utf-8")
+    private = tmp_path / "private_media"
+    private.mkdir()
+    (private / "b.pdf").write_text("y", encoding="utf-8")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake = bin_dir / "docker"
+    fake.write_text('#!/usr/bin/env bash\n[[ "$1" == compose ]] && echo DUMP\nexit 0\n', encoding="utf-8")
+    fake.chmod(0o755)
+    result = _bash(
+        "backup-vps.sh",
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "DEPLOY_PATH": str(deploy),
+            "MEDIA_PATH": str(media),
+            "PRIVATE_MEDIA_PATH": str(private),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    (backup,) = (deploy / "backups").iterdir()
+    assert (backup / "COMPLETED").exists()
+    return backup
+
+
+def test_backup_keeps_local_media_tar_without_s3(tmp_path: Path) -> None:
+    backup = _run_backup(tmp_path, "ADMIN_PASSKEY_RP_NAME=HOOCON CMS\n")
+    assert (backup / "media.tar.gz").exists()
+    assert (backup / "private_media.tar.gz").exists()
+
+
+def test_backup_skips_local_media_tar_when_s3_configured(tmp_path: Path) -> None:
+    """Media is copied to S3 incrementally; three nightly 12 GB tars would fill the disk."""
+    backup = _run_backup(tmp_path, S3_ENV)
+    assert not (backup / "media.tar.gz").exists()
+    assert (backup / "private_media.tar.gz").exists()
+    assert (backup / "hoocon.dump").exists()

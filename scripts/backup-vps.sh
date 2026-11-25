@@ -36,7 +36,11 @@ docker compose exec -T db \
   > "${DEST}/hoocon.dump"
 ls -lh "${DEST}/hoocon.dump"
 
-if [[ -d "${MEDIA_PATH}" ]]; then
+# With an S3 bucket configured, media is copied incrementally by
+# backup-offsite.sh; a nightly 12 GB local tar (x3 kept) only eats the disk.
+if [[ -n "$(hoocon_env_get .env S3_BACKUP_BUCKET)" ]]; then
+  echo "==> media tar skipped (S3_BACKUP_BUCKET set; media goes off-site)"
+elif [[ -d "${MEDIA_PATH}" ]]; then
   echo "==> media tar (${MEDIA_PATH})"
   tar -C "$(dirname "${MEDIA_PATH}")" -czf "${DEST}/media.tar.gz" \
     "$(basename "${MEDIA_PATH}")"
