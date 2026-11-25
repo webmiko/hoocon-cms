@@ -65,6 +65,10 @@ rsync -az -e "${RSYNC_SSH}" \
   --include='vps-install-logrotate.sh' \
   --include='ssh-trust.sh' \
   --include='backup-vps.sh' \
+  --include='backup-retention.sh' \
+  --include='check-backup-fresh.sh' \
+  --include='lib-env.sh' \
+  --include='backup-offsite.sh' \
   --include='/' \
   --exclude='*' \
   scripts/ "${SSH_TARGET}:${DEPLOY_PATH}/scripts/"

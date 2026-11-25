@@ -43,3 +43,12 @@ sed "s|__DEPLOY_PATH__|${DEPLOY_PATH}|g" "${CRON_SRC}" | \
   ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
     "sudo tee /etc/cron.d/hoocon >/dev/null && sudo chmod 644 /etc/cron.d/hoocon"
 echo "Cron installed: /etc/cron.d/hoocon"
+
+# Drop hand-added root crontab copies of the same jobs (they ran twice).
+STRIP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cron-strip-stray.sh"
+CURRENT="$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sudo crontab -l 2>/dev/null" || true)"
+CLEANED="$(printf '%s\n' "${CURRENT}" | "${STRIP}" "${DEPLOY_PATH}")"
+if [[ -n "${CURRENT}" && "${CURRENT}" != "${CLEANED}" ]]; then
+  echo "Removing duplicate Hoocon jobs from root crontab"
+  printf '%s\n' "${CLEANED}" | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sudo crontab -"
+fi
