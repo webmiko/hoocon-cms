@@ -142,11 +142,28 @@ def _offsite_setup(tmp_path: Path, *, s3_env: str, docker_exit: int = 0) -> tupl
     bin_dir.mkdir()
     log = tmp_path / "docker.log"
     fake = bin_dir / "docker"
+    # Logs argv and, if present, the mounted rclone.conf (mode + body) while
+    # the script still has the file. Does not record process environment:
+    # secrets must not arrive via `docker -e`.
     fake.write_text(
-        "#!/usr/bin/env bash\n"
-        f'echo "ARGS: $*" >> "{log}"\n'
-        f'env | grep ^RCLONE_CONFIG >> "{log}" || true\n'
-        f"exit {docker_exit}\n",
+        "#!/usr/bin/env python3\n"
+        "import os, sys\n"
+        f"log = {str(log)!r}\n"
+        "args = sys.argv[1:]\n"
+        "with open(log, 'a', encoding='utf-8') as fh:\n"
+        "    fh.write('ARGS: ' + ' '.join(args) + '\\n')\n"
+        "    for arg in args:\n"
+        "        suffix = ':/config/rclone/rclone.conf:ro'\n"
+        "        if arg.endswith(suffix):\n"
+        "            host = arg[: -len(suffix)]\n"
+        "            mode = os.stat(host).st_mode & 0o777\n"
+        "            body = open(host, encoding='utf-8').read()\n"
+        "            fh.write(f'CONF_MODE:{mode:o}\\n')\n"
+        "            fh.write('CONF_BODY_START\\n' + body + 'CONF_BODY_END\\n')\n"
+        "    for key, value in os.environ.items():\n"
+        "        if key.startswith('RCLONE_CONFIG'):\n"
+        "            fh.write(f'{key}={value}\\n')\n"
+        f"raise SystemExit({docker_exit})\n",
         encoding="utf-8",
     )
     fake.chmod(0o755)
@@ -185,8 +202,14 @@ def test_offsite_uploads_and_marks_ok_without_secrets_in_argv(tmp_path: Path) ->
     args = [line for line in logged.splitlines() if line.startswith("ARGS:")]
     assert any("copy /backup OFFSITE:my-bucket/hoocon/db/20260201T030000Z" in a for a in args)
     assert any("delete OFFSITE:my-bucket/hoocon/db --min-age 30d" in a for a in args)
-    assert "s3cr3t-value" not in "".join(args)  # secrets only via environment
-    assert "RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY=s3cr3t-value" in logged
+    # Secret must not be on the docker command line or in the process environment.
+    assert "s3cr3t-value" not in "\n".join(args)
+    assert "AKIDEXAMPLE" not in "\n".join(args)
+    assert "RCLONE_CONFIG" not in logged.split("CONF_BODY_START", 1)[0]
+    assert "CONF_MODE:600" in logged
+    body = logged.split("CONF_BODY_START\n", 1)[1].split("CONF_BODY_END", 1)[0]
+    assert "secret_access_key = s3cr3t-value" in body
+    assert "endpoint = https://s3.example.test" in body
 
 
 def test_offsite_adds_https_to_bare_endpoint_host(tmp_path: Path) -> None:
@@ -194,7 +217,10 @@ def test_offsite_adds_https_to_bare_endpoint_host(tmp_path: Path) -> None:
     bare = S3_ENV.replace("https://s3.example.test", "s3.example.test")
     _backup, log, env = _offsite_setup(tmp_path, s3_env=bare)
     assert _bash("backup-offsite.sh", env=env).returncode == 0
-    assert "RCLONE_CONFIG_OFFSITE_ENDPOINT=https://s3.example.test" in log.read_text(encoding="utf-8")
+    logged = log.read_text(encoding="utf-8")
+    body = logged.split("CONF_BODY_START\n", 1)[1].split("CONF_BODY_END", 1)[0]
+    assert "endpoint = https://s3.example.test" in body
+    assert "endpoint = s3.example.test\n" not in body
 
 
 def test_offsite_failure_leaves_no_ok_marker_and_exits_nonzero(tmp_path: Path) -> None:

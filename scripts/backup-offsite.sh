@@ -49,24 +49,33 @@ fi
 [[ -n "${DIR}" && -f "${DIR}/COMPLETED" ]] || { echo "offsite: no COMPLETED backup to upload" >&2; exit 1; }
 STAMP="$(basename "${DIR}")"
 
-# Secrets travel through the environment (docker -e NAME), never through argv.
-export RCLONE_CONFIG_OFFSITE_TYPE=s3
-export RCLONE_CONFIG_OFFSITE_PROVIDER=Other
 # Reg.ru shows the endpoint as a bare host; rclone needs a scheme.
 ENDPOINT="$(get S3_BACKUP_ENDPOINT)"
 if [[ -n "${ENDPOINT}" && "${ENDPOINT}" != *://* ]]; then
   ENDPOINT="https://${ENDPOINT}"
 fi
-export RCLONE_CONFIG_OFFSITE_ENDPOINT="${ENDPOINT}"
-export RCLONE_CONFIG_OFFSITE_REGION="$(get S3_BACKUP_REGION)"
-export RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID="$(get S3_BACKUP_ACCESS_KEY_ID)"
-export RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY="$(get S3_BACKUP_SECRET_ACCESS_KEY)"
+REGION="$(get S3_BACKUP_REGION)"
+# A mode-600 config file, mounted read-only. docker -e would put the secret
+# on the host process list for anyone who can read /proc/*/cmdline.
+CONF="$(mktemp "${TMPDIR:-/tmp}/hoocon-rclone.XXXXXX")"
+chmod 600 "${CONF}"
+trap 'rm -f "${CONF}"' EXIT
+{
+  printf '%s\n' "[OFFSITE]"
+  printf '%s\n' "type = s3"
+  printf '%s\n' "provider = Other"
+  printf '%s\n' "endpoint = ${ENDPOINT}"
+  printf '%s\n' "access_key_id = $(get S3_BACKUP_ACCESS_KEY_ID)"
+  printf '%s\n' "secret_access_key = $(get S3_BACKUP_SECRET_ACCESS_KEY)"
+  if [[ -n "${REGION}" ]]; then
+    printf '%s\n' "region = ${REGION}"
+  fi
+} > "${CONF}"
+chmod 600 "${CONF}"
 
 rclone() {
   docker run --rm \
-    -e RCLONE_CONFIG_OFFSITE_TYPE -e RCLONE_CONFIG_OFFSITE_PROVIDER \
-    -e RCLONE_CONFIG_OFFSITE_ENDPOINT -e RCLONE_CONFIG_OFFSITE_REGION \
-    -e RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID -e RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY \
+    -v "${CONF}:/config/rclone/rclone.conf:ro" \
     -v "${DIR}:/backup:ro" -v "${MEDIA_PATH}:/media:ro" \
     "${RCLONE_IMAGE}" "$@"
 }
