@@ -64,6 +64,26 @@ if command -v df >/dev/null 2>&1; then
   fi
 fi
 
+# Nightly backup must exist and be fresh (a dead cron job is otherwise silent).
+CHECK_BACKUP="$(cd "$(dirname "$0")" && pwd)/check-backup-fresh.sh"
+if [[ -x "${CHECK_BACKUP}" ]]; then
+  REQUIRE_OFFSITE=0
+  # shellcheck disable=SC1091
+  source "$(cd "$(dirname "$0")" && pwd)/lib-env.sh"
+  if [[ -n "$(hoocon_env_get "${DEPLOY_PATH:-/opt/hoocon}/.env" S3_BACKUP_BUCKET)" ]]; then
+    REQUIRE_OFFSITE=1
+  else
+    log "WARN backup off-site copy not configured (S3_BACKUP_BUCKET empty)"
+  fi
+  export REQUIRE_OFFSITE
+  if BACKUP_MSG="$("${CHECK_BACKUP}" 2>&1)"; then
+    log "OK backup ${BACKUP_MSG}"
+  else
+    log "FAIL backup ${BACKUP_MSG}"
+    RC=1
+  fi
+fi
+
 if [[ "${RC}" -ne 0 ]]; then
   ROOT="$(cd "$(dirname "$0")/.." && pwd)"
   if [[ -x "${ROOT}/scripts/ops-telegram-alert.sh" ]]; then

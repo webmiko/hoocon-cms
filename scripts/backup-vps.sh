@@ -21,13 +21,11 @@ DEST="${BACKUP_ROOT}/${STAMP}"
 
 cd "${DEPLOY_PATH}"
 test -f .env || { echo "ERROR: ${DEPLOY_PATH}/.env missing" >&2; exit 1; }
-set -a
+# Never `source .env`: one unquoted value with a space aborts the script.
 # shellcheck disable=SC1091
-source .env
-set +a
-
-DB_USER="${DB_USER:-hoocon}"
-DB_NAME="${DB_NAME:-hoocon}"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-env.sh"
+DB_USER="${DB_USER:-$(hoocon_env_get .env DB_USER hoocon)}"
+DB_NAME="${DB_NAME:-$(hoocon_env_get .env DB_NAME hoocon)}"
 
 mkdir -p "${DEST}"
 echo "==> backup ${STAMP} → ${DEST}"
@@ -38,7 +36,11 @@ docker compose exec -T db \
   > "${DEST}/hoocon.dump"
 ls -lh "${DEST}/hoocon.dump"
 
-if [[ -d "${MEDIA_PATH}" ]]; then
+# With an S3 bucket configured, media is copied incrementally by
+# backup-offsite.sh; a nightly 12 GB local tar (x3 kept) only eats the disk.
+if [[ -n "$(hoocon_env_get .env S3_BACKUP_BUCKET)" ]]; then
+  echo "==> media tar skipped (S3_BACKUP_BUCKET set; media goes off-site)"
+elif [[ -d "${MEDIA_PATH}" ]]; then
   echo "==> media tar (${MEDIA_PATH})"
   tar -C "$(dirname "${MEDIA_PATH}")" -czf "${DEST}/media.tar.gz" \
     "$(basename "${MEDIA_PATH}")"
@@ -59,6 +61,12 @@ else
 fi
 
 echo "${STAMP}" > "${DEST}/COMPLETED"
+
+# Off-site copy (S3). A failure must not discard the finished local backup:
+# the run stays COMPLETED, lacks OFFSITE_OK, and monitor-health.sh alerts.
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup-offsite.sh" "${DEST}" \
+  || echo "WARN: offsite copy failed; local backup kept" >&2
+
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/backup-retention.sh"
 echo "==> prune backups older than ${RETENTION_DAYS} days (keep newest complete)"
