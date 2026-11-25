@@ -345,9 +345,9 @@ def _upsert_png(
 
 def _hide_angle_stop_as_thermal(sku: SKU) -> None:
     """``thermal.png`` in the HVD-P manual is the angle stop, not a SAF72 photo."""
-    ProductImage.objects.filter(sku=sku, source_url__icontains="hvd-", alt__icontains="SAF72").update(
-        is_published=False,
-    )
+    ProductImage.objects.filter(sku=sku, source_url__icontains="hvd-", alt__icontains="SAF72").exclude(
+        image_locked=True,
+    ).update(is_published=False)
 
 
 def _attach_pdf(sku: SKU, torque_nm: int, pdf_root: Path, *, dry_run: bool) -> bool:

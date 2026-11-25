@@ -166,6 +166,8 @@ def _demote_other_dimension_tiles(sku: SKU, *, keep_pk: int) -> int:
     """Unpublish competing dimension drawings on the SKU."""
     demoted = 0
     for other in ProductImage.objects.filter(sku=sku).exclude(pk=keep_pk):
+        if other.image_locked:
+            continue
         alt = other.alt or ""
         url = other.source_url or ""
         if not (_DIMS_URL_HINT.search(url) or _DIMS_ALT_HINT.search(alt)):

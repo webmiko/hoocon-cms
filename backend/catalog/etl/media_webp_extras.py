@@ -139,6 +139,7 @@ def _unpublish_hvdf_montage(*, dry_run: bool) -> int:
 
     qs = (
         ProductImage.objects.filter(is_published=True)
+        .exclude(image_locked=True)
         .filter(
             Q(source_url__icontains="montazhnaya_sxema")
             | Q(alt__icontains="монтажная схема")
@@ -149,7 +150,7 @@ def _unpublish_hvdf_montage(*, dry_run: bool) -> int:
     ids = [row.pk for row in qs if parse_hvdf_torque_nm(row.sku.sku_code) is not None]
     if ids and not dry_run:
         # hidden_by_editor blocks a later media upsert from publishing the tile again.
-        ProductImage.objects.filter(pk__in=ids).update(
+        ProductImage.objects.filter(pk__in=ids).exclude(image_locked=True).update(
             is_published=False,
             hidden_by_editor=True,
         )
@@ -161,12 +162,16 @@ def _demote_tilda_montage(sku: SKU, *, dry_run: bool) -> int:
 
     Tilda alts vary: ``Монтажная схема …`` or ``схема монтажная …``.
     """
-    qs = ProductImage.objects.filter(
-        sku=sku,
-        is_published=True,
-        source_url__icontains="tildacdn",
-    ).filter(
-        Q(alt__icontains="монтажная схема") | Q(alt__icontains="схема монтажная"),
+    qs = (
+        ProductImage.objects.filter(
+            sku=sku,
+            is_published=True,
+            source_url__icontains="tildacdn",
+        )
+        .exclude(image_locked=True)
+        .filter(
+            Q(alt__icontains="монтажная схема") | Q(alt__icontains="схема монтажная"),
+        )
     )
     count = qs.count()
     if count and not dry_run:
@@ -197,10 +202,14 @@ def sku_code_is_hv_qa(sku_code: str | None) -> bool:
 
 def _demote_emergency_on_non_qa(*, dry_run: bool) -> int:
     """Unpublish аварийная-связь tiles mistakenly attached to non-QA SKUs."""
-    qs = ProductImage.objects.filter(
-        is_published=True,
-        source_url__icontains="avariynaya_obratnaya",
-    ).exclude(sku__sku_code__iregex=r"(?i)^hv[ad].*qa$")
+    qs = (
+        ProductImage.objects.filter(
+            is_published=True,
+            source_url__icontains="avariynaya_obratnaya",
+        )
+        .exclude(image_locked=True)
+        .exclude(sku__sku_code__iregex=r"(?i)^hv[ad].*qa$")
+    )
     count = qs.count()
     if count and not dry_run:
         qs.update(is_published=False)
@@ -425,7 +434,7 @@ def unpublish_sa15_borrowed_sa10_montage(*, dry_run: bool = False) -> int:
         is_published=True,
         sku__sku_code__iregex=r"(?i)^sa15mu",
         source_url__icontains="montazhnaya_sxema_sa10mu",
-    )
+    ).exclude(image_locked=True)
     count = qs.count()
     if count and not dry_run:
         qs.update(is_published=False)

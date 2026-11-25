@@ -12,6 +12,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path, reverse
+from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 
 from catalog.etl.stock_import import (
@@ -38,7 +39,7 @@ from config.admin_mixins import OpenChangeLinkMixin
 from config.admin_toggle import LabeledToggleMixin
 
 
-def mark_admin_edit(obj: Any, changed: list[str], *, change: bool = True) -> None:
+def mark_admin_edit(obj: Any, changed: list[str], *, change: bool = True, actor: str = "") -> None:
     """Let an Admin save through the ETL locks and set them on manual edits.
 
     Product/SKU: editing name or texts sets ``copy_locked``. AttributeValue:
@@ -52,6 +53,13 @@ def mark_admin_edit(obj: Any, changed: list[str], *, change: bool = True) -> Non
     elif isinstance(obj, ProductImage):
         if "is_published" in changed:
             obj.hidden_by_editor = not obj.is_published
+        if "image_locked" in changed:
+            if obj.image_locked:
+                obj.locked_at = timezone.now()
+                obj.locked_by = actor
+            else:
+                obj.locked_at = None
+                obj.locked_by = ""
     elif (
         isinstance(obj, (Product, SKU))
         and change
@@ -65,15 +73,17 @@ class AdminEditLockMixin:
     """Route Admin saves of the model and its inlines through ``mark_admin_edit``."""
 
     def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
-        mark_admin_edit(obj, list(form.changed_data), change=change)
+        actor = request.user.get_username() if request.user.is_authenticated else ""
+        mark_admin_edit(obj, list(form.changed_data), change=change, actor=actor)
         super().save_model(request, obj, form, change)  # type: ignore[misc]
 
     def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
+        actor = request.user.get_username() if request.user.is_authenticated else ""
         deleted = set(getattr(formset, "deleted_forms", ()))
         for inline_form in formset.forms:
             if inline_form in deleted or not inline_form.has_changed():
                 continue
-            mark_admin_edit(inline_form.instance, list(inline_form.changed_data))
+            mark_admin_edit(inline_form.instance, list(inline_form.changed_data), actor=actor)
         super().save_formset(request, form, formset, change)  # type: ignore[misc]
 
 
@@ -251,8 +261,11 @@ class ProductImageInline(TabularInline):
         "sort_order",
         "is_published",
         "hidden_by_editor",
+        "image_locked",
+        "locked_at",
+        "locked_by",
     )
-    readonly_fields = ("image_card", "hidden_by_editor")
+    readonly_fields = ("image_card", "hidden_by_editor", "locked_at", "locked_by")
 
 
 @admin.register(SKU)
@@ -480,16 +493,47 @@ class ProductFileAdmin(OpenChangeLinkMixin, ModelAdmin):
 class ProductImageAdmin(AdminEditLockMixin, OpenChangeLinkMixin, ModelAdmin):
     """Admin for ProductImage (WebP gallery)."""
 
-    list_display = ("sku", "alt", "sort_order", "is_published", "hidden_by_editor", "updated_at")
+    list_display = (
+        "sku",
+        "alt",
+        "sort_order",
+        "is_published",
+        "hidden_by_editor",
+        "image_locked",
+        "locked_at",
+        "updated_at",
+    )
     list_display_links = ("sku",)
-    list_filter = ("is_published", "hidden_by_editor")
-    readonly_fields = ("hidden_by_editor",)
+    list_filter = ("is_published", "hidden_by_editor", "image_locked")
+    readonly_fields = ("hidden_by_editor", "locked_at", "locked_by")
     search_fields = ("alt", "sku__sku_code", "source_url")
     autocomplete_fields = ("sku",)
     ordering = ("sku", "sort_order")
+    actions = ("lock_product_images", "unlock_product_images")
 
     def get_queryset(self, request: HttpRequest) -> Any:
         return super().get_queryset(request).select_related("sku")
+
+    @admin.action(description="Зафиксировать изображения", permissions=("change",))
+    def lock_product_images(self, request: HttpRequest, queryset: Any) -> None:
+        """Freeze selected rows against ETL writes."""
+        actor = request.user.get_username() if request.user.is_authenticated else "admin"
+        updated = queryset.filter(image_locked=False).update(
+            image_locked=True,
+            locked_at=timezone.now(),
+            locked_by=f"admin:{actor}",
+        )
+        self.message_user(request, f"Зафиксировано: {updated}", messages.SUCCESS)
+
+    @admin.action(description="Снять фиксацию изображений", permissions=("change",))
+    def unlock_product_images(self, request: HttpRequest, queryset: Any) -> None:
+        """Allow ETL writes to selected rows again."""
+        updated = queryset.filter(image_locked=True).update(
+            image_locked=False,
+            locked_at=None,
+            locked_by="",
+        )
+        self.message_user(request, f"Фиксация снята: {updated}", messages.SUCCESS)
 
 
 @admin.register(AnalogMap)

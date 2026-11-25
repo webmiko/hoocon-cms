@@ -187,7 +187,7 @@ def audit_product_images() -> dict[str, Any]:
 def optimize_non_webp_images(*, dry_run: bool = False) -> dict[str, Any]:
     """Re-encode published images whose storage basename is not ``.webp``."""
     summary: dict[str, Any] = {"converted": 0, "skipped": 0, "errors": 0, "dry_run": dry_run}
-    qs = ProductImage.objects.filter(is_published=True).exclude(image="")
+    qs = ProductImage.objects.filter(is_published=True).exclude(image="").exclude(image_locked=True)
     for image in qs.iterator(chunk_size=200):
         name = image.image.name or ""
         if name.lower().endswith(".webp"):
@@ -248,6 +248,8 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
         # catalog cards / category tiles do not fall through to «фото 2».
         if not published:
             summary["skus"] += 1
+            if keep.image_locked:
+                continue
             summary["republished"] += 1
             if not dry_run:
                 _republish(keep)
@@ -267,11 +269,13 @@ def prune_inferior_hero_duplicates(*, dry_run: bool = False) -> dict[str, Any]:
 
         summary["skus"] += 1
         if not keep.is_published:
+            if keep.image_locked:
+                continue
             summary["republished"] += 1
             if not dry_run:
                 _republish(keep)
         for image in ranked[1:]:
-            if not image.is_published:
+            if image.image_locked or not image.is_published:
                 continue
             summary["unpublished"] += 1
             if len(summary["samples"]) < 25:
@@ -306,7 +310,7 @@ def restore_secondary_gallery_angles(*, dry_run: bool = False) -> dict[str, Any]
     q = Q()
     for n in range(2, 10):
         q |= Q(alt__icontains=f"фото {n}")
-    qs = ProductImage.objects.filter(is_published=False, hidden_by_editor=False).filter(q)
+    qs = ProductImage.objects.filter(is_published=False, hidden_by_editor=False).exclude(image_locked=True).filter(q)
     count = qs.count()
     if not dry_run and count:
         qs.update(is_published=True)

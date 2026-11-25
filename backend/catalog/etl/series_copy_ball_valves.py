@@ -1272,8 +1272,8 @@ def _refresh_gallery_row(sku: SKU, source_url: str, *, sort_order: int, dry_run:
     if not rows.exists():
         return False
     if not dry_run:
-        rows.update(sort_order=sort_order)
-        rows.filter(hidden_by_editor=False, is_published=False).update(is_published=True)
+        rows.exclude(image_locked=True).update(sort_order=sort_order)
+        rows.exclude(image_locked=True).filter(hidden_by_editor=False, is_published=False).update(is_published=True)
     return True
 
 

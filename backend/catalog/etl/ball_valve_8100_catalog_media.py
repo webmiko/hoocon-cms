@@ -141,7 +141,7 @@ def unpublish_legacy_8100_diagram_tiles(*, dry_run: bool = False) -> int:
     qs = ProductImage.objects.filter(
         source_url__startswith=_LEGACY_DIAGRAM_SOURCE_PREFIX,
         is_published=True,
-    )
+    ).exclude(image_locked=True)
     if dry_run:
         return qs.count()
     return qs.update(is_published=False)

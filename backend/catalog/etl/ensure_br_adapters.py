@@ -390,6 +390,8 @@ def _attach_image(
     if same_source is not None:
         stale = stale.exclude(pk=same_source.pk)
     for row in stale:
+        if row.image_locked:
+            continue
         is_partner = (row.source_url or "").startswith("https://hoocon.spb.ru/")
         if force or is_partner or upgrade_from_partner:
             if row.is_published:

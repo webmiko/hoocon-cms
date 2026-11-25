@@ -494,7 +494,7 @@ def apply_damqu_manual_heroes(
                 sku=sku,
                 is_published=True,
                 source_url__icontains="da8-16-24mqu-da8-16-24mqu",
-            ).update(is_published=False)
+            ).exclude(image_locked=True).update(is_published=False)
         if diagram_dir is None:
             continue
         for kind, sort_order, caption in (
@@ -519,7 +519,7 @@ def apply_damqu_manual_heroes(
 def _retarget_damqu_alts(sku: SKU, *, dry_run: bool) -> int:
     """Rewrite cloned ``DA8MQU… |`` captions onto this SKU."""
     changed = 0
-    for image in ProductImage.objects.filter(sku=sku, is_published=True):
+    for image in ProductImage.objects.filter(sku=sku, is_published=True).exclude(image_locked=True):
         new_alt = _damqu_alt_for_target(image.alt or "", sku.sku_code)
         if new_alt == (image.alt or ""):
             continue
@@ -532,7 +532,9 @@ def _retarget_damqu_alts(sku: SKU, *, dry_run: bool) -> int:
 
 def _unpublish_foreign_damqu_pack(sku: SKU) -> int:
     """Hide the labeled da10:20mqu cutout if it is still published on this SKU."""
-    qs = ProductImage.objects.filter(sku=sku, is_published=True, source_url__icontains="da10:20mqu")
+    qs = ProductImage.objects.filter(sku=sku, is_published=True, source_url__icontains="da10:20mqu").exclude(
+        image_locked=True,
+    )
     count = qs.count()
     if count:
         qs.update(is_published=False)
