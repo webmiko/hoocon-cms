@@ -73,7 +73,10 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
     list_display_links = ("number", "client")
     list_filter = ("status", "created_at")
     change_list_template = "admin/crm/quote/change_list.html"
+    list_before_template = "admin/includes/hoocon_page_memo.html"
     change_form_template = "admin/crm/quote/change_form.html"
+    # Inside the <form>: the «Выдать клиенту» button must save the edits too.
+    change_form_before_template = "admin/crm/quote/issue_panel.html"
     search_fields = (
         "number",
         "client__email",
@@ -104,17 +107,27 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
 
     fieldsets = (
         (
-            None,
+            "Кому и по какой заявке",
             {
-                "fields": (
-                    "number",
-                    "status",
-                    "client",
-                    "lead",
-                    "created_by",
-                    "valid_until",
-                    "vat_rate",
-                    "comment",
+                "fields": ("client", "lead", "created_by"),
+                "description": "Выберите клиента. Если КП делаете по заявке, выберите и её: позиции подставятся сами.",
+            },
+        ),
+        (
+            "Условия",
+            {
+                "fields": ("valid_until", "vat_rate", "comment"),
+                "description": "Срок действия, НДС и условия: сроки, доставка, особые договорённости. Попадает в PDF.",
+            },
+        ),
+        (
+            "Номер и статус",
+            {
+                "fields": ("number", "status"),
+                "classes": ("collapse",),
+                "description": (
+                    "Обычно статус менять не нужно: «Выдать клиенту» и кнопки «Клиент согласился / отказался» "
+                    "делают это сами."
                 ),
             },
         ),
@@ -126,6 +139,23 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             },
         ),
     )
+
+    def get_changeform_initial_data(self, request: HttpRequest) -> dict[str, Any]:
+        """A new КП belongs to the manager who creates it unless told otherwise."""
+        initial = dict(super().get_changeform_initial_data(request))
+        initial.setdefault("created_by", request.user.pk)
+        return initial
+
+    def add_view(
+        self,
+        request: HttpRequest,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Show the three steps above a blank offer."""
+        extra = dict(extra_context or {})
+        extra["quote_add_hint"] = True
+        return super().add_view(request, form_url, extra_context=extra)
 
     @admin.display(description="Статус", ordering="status")
     def status_badge(self, obj: Quote) -> str:
@@ -163,7 +193,28 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         extra["hoocon_quote_view_wall_url"] = f"?{wall_params.urlencode()}"
         extra["hoocon_quote_view_kanban_url"] = f"?{kanban_params.urlencode()}"
         request.GET = filter_params  # type: ignore[assignment]
+        extra["hoocon_tabs"] = self._list_tabs(request)
         return super().changelist_view(request, extra_context=extra)
+
+    def _list_tabs(self, request: HttpRequest) -> list[Any]:
+        """«Черновики / Ждут ответа / Согласовано / Отклонено» above the list."""
+        from django.db.models import Q
+
+        from crm.list_tabs import TabSpec, build_list_tabs
+
+        specs = [
+            TabSpec("Все", hint="Все КП, которые вы видите"),
+            TabSpec("Черновики", {"status__exact": "draft"}, Q(status=QuoteStatus.DRAFT), "Ещё не выданы клиенту"),
+            TabSpec("Ждут ответа", {"status__exact": "sent"}, Q(status=QuoteStatus.SENT), "Выданы, клиент думает"),
+            TabSpec(
+                "Согласовано",
+                {"status__exact": "accepted"},
+                Q(status=QuoteStatus.ACCEPTED),
+                "Клиент сказал «да»: можно создавать заказ",
+            ),
+            TabSpec("Отклонено", {"status__exact": "rejected"}, Q(status=QuoteStatus.REJECTED), "Клиент отказался"),
+        ]
+        return build_list_tabs(request.GET, self.get_queryset(request), specs)
 
     def change_view(
         self,
@@ -182,6 +233,15 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             "admin:crm_quote_create_order",
             args=[object_id],
         )
+        quote = self.get_object(request, object_id)
+        if quote is not None:
+            from crm.quote_ops import build_issue_panel
+
+            extra_context["quote_issue"] = build_issue_panel(
+                quote,
+                can_change=self.has_change_permission(request, quote),
+                can_order=request.user.has_perm("cabinet.add_order"),
+            )
         return super().change_view(request, object_id, form_url, extra_context)
 
     def get_urls(self) -> list:
@@ -309,6 +369,12 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
             )
         return HttpResponseRedirect(reverse("admin:cabinet_order_change", args=[order.pk]))
 
+    def save_model(self, request: HttpRequest, obj: Quote, form: Any, change: bool) -> None:
+        """«Выдать клиенту» is a draft turned into «Выдано» by one button."""
+        if "_issue_quote" in request.POST and obj.status == QuoteStatus.DRAFT:
+            obj.status = QuoteStatus.SENT
+        super().save_model(request, obj, form, change)
+
     def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
         """First SENT transition stamps sent_at, issues PDF and closes the lead.
 
@@ -317,9 +383,17 @@ class QuoteAdmin(ScopedForeignKeyMixin, OpenChangeLinkMixin, ModelAdmin):
         """
         super().save_related(request, form, formsets, change)
         obj = cast(Quote, form.instance)
-        from crm.quote_ops import finalize_quote_status
+        from crm.quote_ops import finalize_quote_status, issued_message
 
+        if "_issue_quote" in request.POST and obj.status == QuoteStatus.SENT and not obj.items.exists():
+            # An empty offer must never reach a client: back to draft.
+            obj.status = QuoteStatus.DRAFT
+            obj.save(update_fields=["status", "updated_at"])
+            self.message_user(request, "КП не выдано: добавьте хотя бы одну позицию.", messages.ERROR)
+            return
         result = finalize_quote_status(obj, actor=request.user)
+        if result["issued"]:
+            self.message_user(request, issued_message(obj), messages.SUCCESS)
         if result["pdf_error"]:
             self.message_user(
                 request,

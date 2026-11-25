@@ -1,0 +1,21 @@
+<section class="hoocon-lc hoocon-lc--{{ card.state }} hoocon-lc--slim" aria-label="Что делать с диалогом">
+  <div class="hoocon-lc__next">
+    <p class="hoocon-ws__eyebrow">Что делать сейчас</p>
+    <h2 class="hoocon-lc__headline">{{ card.headline }}</h2>
+    {% if card.hint %}<p class="hoocon-lc__hint">{{ card.hint }}</p>{% endif %}
+    {% if card.buttons %}
+    <div class="hoocon-ws__actions">
+      {% for button in card.buttons %}
+        {% if button.post %}
+        <form method="post" action="{{ button.url }}" class="hoocon-ws__form">
+          {% csrf_token %}
+          <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--{% if button.primary %}primary{% else %}ghost{% endif %}">{{ button.label }}</button>
+        </form>
+        {% else %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ button.url }}">{{ button.label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>

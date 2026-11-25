@@ -1,0 +1,13 @@
+{% if hoocon_tabs %}
+<nav class="hoocon-tabs" aria-label="Быстрые срезы списка">
+  {% for tab in hoocon_tabs %}
+  <a href="{{ tab.url }}"
+     class="hoocon-tabs__tab{% if tab.active %} is-active{% endif %}"
+     {% if tab.active %}aria-current="page"{% endif %}
+     {% if tab.hint %}title="{{ tab.hint }}"{% endif %}>
+    <span class="hoocon-tabs__label">{{ tab.label }}</span>
+    <span class="hoocon-tabs__count">{{ tab.count }}</span>
+  </a>
+  {% endfor %}
+</nav>
+{% endif %}

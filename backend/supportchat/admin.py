@@ -122,6 +122,21 @@ class AwaitingManagerFilter(SimpleListFilter):
         ).exclude(Exists(manager_replied))
 
 
+class UnreadFilter(SimpleListFilter):
+    """Dialogs with messages nobody has read yet."""
+
+    title = "непрочитанные"
+    parameter_name = "unread"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        return [("yes", "Есть непрочитанные")]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Conversation]) -> QuerySet[Conversation]:
+        if self.value() == "yes":
+            return queryset.filter(status=ConversationStatus.OPEN, staff_unread_count__gt=0)
+        return queryset
+
+
 class HasMessagesFilter(SimpleListFilter):
     """Скрывает/показывает сессии без единого сообщения."""
 
@@ -158,7 +173,7 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
         "last_preview",
     )
     list_display_links = ("party_label", "contact_email")
-    list_filter = ("channel", "status", "assignee", AwaitingManagerFilter, HasMessagesFilter)
+    list_filter = ("channel", "status", "assignee", UnreadFilter, AwaitingManagerFilter, HasMessagesFilter)
     search_fields = (
         "display_name",
         "contact_email",
@@ -194,6 +209,7 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
     )
     change_form_template = "admin/supportchat/conversation/change_form.html"
     change_list_template = "admin/supportchat/conversation/change_list.html"
+    list_before_template = "admin/includes/hoocon_page_memo.html"
     actions = ("action_mark_read", "action_close", "action_delete_unlinked")
 
     fieldsets = (
@@ -461,7 +477,28 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
         extra["chat_client_initial"] = (party[:1] or "?").upper()
         extra["chat_assignee_name"] = staff_public_name(conversation.assignee)
         extra["reply_templates"] = active_reply_templates()
+        from crm.chat_card import build_chat_card
+
+        extra["chat_card"] = build_chat_card(conversation, request.user)
         return super().change_view(request, object_id, form_url, extra)
+
+    def get_list_display(self, request: HttpRequest) -> tuple[Any, ...]:
+        """The client rating column is for the head of sales, not for the daily inbox."""
+        from accounts.roles import staff_sees_all_leads
+
+        columns = tuple(super().get_list_display(request))
+        if staff_sees_all_leads(request.user):
+            return columns
+        return tuple(name for name in columns if name != "rating")
+
+    def get_list_filter(self, request: HttpRequest) -> list[Any]:
+        """A manager filters by channel, status and unread; the tabs cover «мои»."""
+        from accounts.roles import staff_sees_all_leads
+
+        filters = list(super().get_list_filter(request))
+        if staff_sees_all_leads(request.user):
+            return filters
+        return [item for item in filters if item != "assignee"]
 
     def changelist_view(
         self,
@@ -480,7 +517,46 @@ class ConversationAdmin(LabeledToggleMixin, OpenChangeLinkMixin, ModelAdmin):
                 "count": stats["count"],
                 "avg": round(float(stats["avg"]), 1),
             }
+        extra["hoocon_tabs"] = self._list_tabs(request)
         return super().changelist_view(request, extra)
+
+    def _list_tabs(self, request: HttpRequest) -> list[Any]:
+        """«Непрочитанные / Ждут менеджера / Мои / Закрытые» above the inbox."""
+        from django.db.models import Q
+
+        from crm.list_tabs import TabSpec, build_list_tabs
+
+        waiting = Exists(
+            Message.objects.filter(
+                conversation=OuterRef("pk"),
+                direction=MessageDirection.OUTBOUND,
+                author__isnull=False,
+                created_at__gte=OuterRef("ai_escalated_at"),
+            ),
+        )
+        specs = [
+            TabSpec("Все", hint="Все диалоги"),
+            TabSpec(
+                "Непрочитанные",
+                {"unread": "yes"},
+                Q(status=ConversationStatus.OPEN, staff_unread_count__gt=0),
+                "Клиент написал, а вы ещё не открывали",
+            ),
+            TabSpec(
+                "Ждут менеджера",
+                {"awaiting_manager": "yes"},
+                Q(status=ConversationStatus.OPEN, ai_escalated_at__isnull=False) & ~Q(waiting),
+                "Бот передал диалог, ответа человека ещё нет",
+            ),
+            TabSpec(
+                "Мои",
+                {"assignee__id__exact": str(request.user.pk)},
+                Q(assignee_id=request.user.pk),
+                "Диалоги, которые ведёте вы",
+            ),
+            TabSpec("Закрытые", {"status__exact": "closed"}, Q(status=ConversationStatus.CLOSED), "Вопрос решён"),
+        ]
+        return build_list_tabs(request.GET, self.get_queryset(request), specs)
 
     def save_model(
         self,

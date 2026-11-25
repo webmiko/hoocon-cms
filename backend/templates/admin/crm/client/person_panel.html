@@ -1,0 +1,80 @@
+<section class="hoocon-cc" id="hoocon-person-top" aria-label="Что делать с контактом">
+  <div class="hoocon-cc__bar">
+    <div class="hoocon-cc__step hoocon-cc__step--{{ card.next_step.state }}">
+      <span class="hoocon-cc__step-label">Вернуться к человеку</span>
+      <strong class="hoocon-cc__step-text">{{ card.next_step.text }}</strong>
+      {% if card.next_step.state == "none" %}
+        <span class="hoocon-cc__step-hint">
+          {% if card.company_url %}Срок возврата ставится <a href="{{ card.company_url }}#hoocon-card-top">на карточке фирмы</a>.{% else %}Выберите дату в поле «Следующий контакт» ниже.{% endif %}
+        </span>
+      {% endif %}
+    </div>
+    <div class="hoocon-cc__actions">
+      {% if card.call_url %}<a class="hoocon-ws__btn hoocon-ws__btn--primary" href="{{ card.call_url }}">Позвонить клиенту</a>{% endif %}
+      {% if card.write_url %}<a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.write_url }}">Написать письмо</a>{% endif %}
+      {% if card.quote_url %}<a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.quote_url }}">Создать КП</a>{% endif %}
+      {% if card.company_url %}<a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.company_url }}">Карточка фирмы</a>{% endif %}
+      {% if card.result_url %}<a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.result_url }}">Записать итог звонка</a>{% endif %}
+    </div>
+  </div>
+
+  {% if card.sections %}
+  <nav class="hoocon-cc__jump" aria-label="Перейти к разделу карточки">
+    <span class="hoocon-cc__chips-label">Открыть:</span>
+    {% for section in card.sections %}
+    <a href="#{{ section.tab }}" class="hoocon-cc__chip"
+       x-on:click.prevent="activeTab = '{{ section.tab }}'; document.getElementById('tabs-wrapper').scrollIntoView({behavior: 'smooth'})">
+      {{ section.label }} <b>{{ section.count }}</b>
+    </a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if card.import_spec_url or card.history_url %}
+  <p class="hoocon-cc__more">
+    {% if card.import_spec_url %}<a href="{{ card.import_spec_url }}">Заявка из Excel-спецификации</a>{% endif %}
+    {% if card.history_url %}<a href="{{ card.history_url }}">Кто и когда менял карточку</a>{% endif %}
+  </p>
+  {% endif %}
+
+  {% if card.chips %}
+  <p class="hoocon-ws__chips hoocon-cc__chips-row">
+    {% for chip in card.chips %}<span class="hoocon-ws__chip">{{ chip }}</span>{% endfor %}
+  </p>
+  {% endif %}
+  {% if card.stub_mail %}
+  <p class="hoocon-qi__warn hoocon-cc__warn">
+    Рабочей почты нет, поэтому «Написать письмо» скрыто. Впишите настоящую почту в поле ниже и сохраните.
+  </p>
+  {% endif %}
+
+  {% if card.can_note %}
+  <form method="post" action="{{ card.note_url }}" class="hoocon-cc__note">
+    {% csrf_token %}
+    <label class="hoocon-cc__note-label" for="hoocon-person-note">Заметка: о чём говорили, что пообещали</label>
+    <textarea id="hoocon-person-note" name="body" rows="2" maxlength="5000" class="hoocon-cc__note-input"></textarea>
+    <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--ghost">Сохранить заметку</button>
+  </form>
+  {% endif %}
+
+  <div class="hoocon-cc__feed">
+    <h2 class="hoocon-cc__feed-title">История с этим человеком</h2>
+    {% if card.feed %}
+    <ol class="hoocon-cc__list">
+      {% for item in card.feed %}
+      <li class="hoocon-cc__item hoocon-cc__item--{{ item.kind }}">
+        <span class="material-symbols-outlined hoocon-cc__icon" aria-hidden="true">{{ item.icon }}</span>
+        <div class="hoocon-cc__item-body">
+          <span class="hoocon-cc__item-label">{{ item.label }}{% if item.who %} · {{ item.who }}{% endif %}</span>
+          {% if item.url %}<a class="hoocon-cc__item-title" href="{{ item.url }}">{{ item.title }}</a>{% else %}<span class="hoocon-cc__item-title">{{ item.title }}</span>{% endif %}
+          {% if item.text %}<span class="hoocon-cc__item-text">{{ item.text }}</span>{% endif %}
+        </div>
+        <time class="hoocon-cc__item-when" datetime="{{ item.when|date:'c' }}">{{ item.ago }} назад</time>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <p class="hoocon-cc__empty">Пока пусто. Позвоните или напишите, и история появится здесь.</p>
+    {% endif %}
+  </div>
+</section>

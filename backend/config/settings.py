@@ -377,6 +377,7 @@ UNFOLD = {
         "config.unfold_callbacks.unfold_extras_css",
         "config.unfold_callbacks.admin_phone_css",
         "config.unfold_callbacks.os27_css",
+        "config.unfold_callbacks.workspace_css",
     ],
     "SCRIPTS": [
         "config.unfold_callbacks.admin_live_badges_js",

@@ -1,0 +1,122 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="hoocon-ws">
+  <header class="hoocon-ws__head">
+    <h1 class="hoocon-ws__title">Мой день</h1>
+    <p class="hoocon-ws__sub">
+      {% if workspace.total %}
+        Ждут вас: <strong>{{ workspace.total }}</strong>. Начните с первой карточки — список уже отсортирован по важности.
+      {% else %}
+        Всё разобрано. Можно спокойно заняться своими клиентами.
+      {% endif %}
+    </p>
+  </header>
+
+  {% if workspace.funnel %}
+  <nav class="hoocon-ws__path" aria-label="Путь клиента">
+    {% for step in workspace.funnel %}
+    <a class="hoocon-ws__step{% if step.count %} hoocon-ws__step--has{% endif %}" href="{{ step.url }}">
+      <span class="hoocon-ws__step-num">{{ forloop.counter }}</span>
+      <span class="hoocon-ws__step-body">
+        <span class="hoocon-ws__step-title">{{ step.title }}</span>
+        <span class="hoocon-ws__step-text">{{ step.text }}</span>
+      </span>
+      <span class="hoocon-ws__step-count">{{ step.count }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if workspace.first %}
+  {% with row=workspace.first %}
+  <section class="hoocon-ws__first" aria-label="Начните с этого">
+    <p class="hoocon-ws__eyebrow">Начните с этого</p>
+    <h2 class="hoocon-ws__first-title">{{ row.title }}</h2>
+    <p class="hoocon-ws__first-sub">{{ row.subtitle }} · ждёт {{ row.waiting }}</p>
+    <div class="hoocon-ws__actions">
+      {% include "admin/includes/hoocon_workspace_action.html" with action=row.primary kind="primary" %}
+      {% if row.secondary %}
+        {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
+      {% endif %}
+    </div>
+  </section>
+  {% endwith %}
+  {% endif %}
+
+  {% for section in workspace.sections %}
+  <section class="hoocon-ws__section" aria-labelledby="ws-{{ section.key }}">
+    <div class="hoocon-ws__section-head">
+      <h2 id="ws-{{ section.key }}" class="hoocon-ws__h2">
+        {{ section.title }} <span class="hoocon-ws__count">{{ section.total }}</span>
+      </h2>
+      <p class="hoocon-ws__hint">{{ section.hint }}</p>
+    </div>
+    {% if section.layout == "cards" %}
+    <ul class="hoocon-ws__cards">
+      {% for row in section.rows %}
+      <li class="hoocon-ws__card{% if row.urgent %} hoocon-ws__card--urgent{% endif %}">
+        <div class="hoocon-ws__card-top">
+          <h3 class="hoocon-ws__card-title">{{ row.title }}</h3>
+          <span class="hoocon-ws__wait" title="Сколько ждёт">ждёт {{ row.waiting }}</span>
+        </div>
+        {% if row.chips %}
+        <p class="hoocon-ws__chips">
+          {% for chip in row.chips %}<span class="hoocon-ws__chip">{{ chip }}</span>{% endfor %}
+        </p>
+        {% endif %}
+        {% if row.text %}<p class="hoocon-ws__card-text">{{ row.text }}</p>{% endif %}
+        <div class="hoocon-ws__actions">
+          {% include "admin/includes/hoocon_workspace_action.html" with action=row.primary kind="primary" %}
+          {% if row.secondary %}
+            {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <ul class="hoocon-ws__list">
+      {% for row in section.rows %}
+      <li class="hoocon-ws__row{% if row.urgent %} hoocon-ws__row--urgent{% endif %}">
+        <div class="hoocon-ws__row-main">
+          <span class="hoocon-ws__row-title">{{ row.title }}</span>
+          <span class="hoocon-ws__row-sub">{{ row.subtitle }}</span>
+        </div>
+        <span class="hoocon-ws__wait" title="Сколько ждёт">{{ row.waiting }}</span>
+        <div class="hoocon-ws__actions">
+          {% include "admin/includes/hoocon_workspace_action.html" with action=row.primary kind="primary" %}
+          {% if row.secondary %}
+            {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if section.stale %}
+    <p class="hoocon-ws__stale">
+      Ещё {{ section.stale }} старше {{ stale_days }} дн. —
+      <a href="{{ section.stale_url }}">разобрать или закрыть</a>
+    </p>
+    {% endif %}
+    {% if section.more %}
+    <a class="hoocon-ws__more" href="{{ section.all_url }}">
+      {{ section.all_label }} — ещё {{ section.more }}
+    </a>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <details class="hoocon-ws__guide"{% if not workspace.total %} open{% endif %}>
+    <summary>Не знаете, что делать дальше? Путь клиента в четыре шага</summary>
+    <ol class="hoocon-ws__guide-list">
+      <li><strong>Заявка пришла.</strong> Нажмите «Взять в работу» — заявка закрепится за вами.</li>
+      <li><strong>Свяжитесь с клиентом.</strong> Позвоните или напишите. На карточке клиента запишите, о чём договорились, и поставьте «Следующий контакт».</li>
+      <li><strong>Отправьте КП.</strong> На заявке нажмите «Создать КП» и проверьте позиции и цены. Затем на странице КП нажмите <strong>«Выдать клиенту»</strong>: система сама сделает PDF, отправит клиенту письмо и закроет заявку. Если ответа нет три дня, КП появится здесь.</li>
+      <li><strong>Клиент согласился.</strong> На странице КП нажмите «Клиент согласился», затем «Создать заказ»: позиции и цены перейдут в заказ.</li>
+    </ol>
+  </details>
+</div>
+{% endblock %}

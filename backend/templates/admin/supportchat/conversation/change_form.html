@@ -14,6 +14,7 @@
 {# Outside the Unfold change <form> — reply form must not be nested. #}
 {% block form_before %}
 {{ block.super }}
+{% if chat_card and original %}{% include "admin/supportchat/conversation/next_step.html" with card=chat_card %}{% endif %}
 {% if reply_url and original %}
 <section
   class="hoocon-messenger hoocon-messenger--{{ original.channel }}"

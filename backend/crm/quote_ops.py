@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any, cast
 
 from django.db import transaction
@@ -210,3 +211,46 @@ def create_quote_from_spec(spec: SpecList, *, author: Any) -> Quote | None:
         if items:
             QuoteItem.objects.bulk_create(items)
     return quote
+
+
+def _has_real_mailbox(email: str) -> bool:
+    from crm.call_cards import STUB_EMAIL_SUFFIX
+
+    return bool(email) and not email.endswith(STUB_EMAIL_SUFFIX)
+
+
+def issued_message(quote: Quote) -> str:
+    """What the manager sees right after «Выдано»: what actually happened."""
+    email = (cast(Client, quote.client).email or "").strip()
+    if _has_real_mailbox(email):
+        return f"КП {quote.number} выдано: письмо с PDF отправлено на {email}."
+    return (
+        f"КП {quote.number} выдано, PDF готов, но письмо не отправлено: у клиента нет рабочей почты. "
+        "Скачайте PDF в документах клиента и отправьте сами."
+    )
+
+
+def build_issue_panel(quote: Quote, *, can_change: bool, can_order: bool = False) -> dict[str, Any]:
+    """State of the «Как отправить КП клиенту» block on the offer page."""
+    client = cast(Client, quote.client)
+    email = (client.email or "").strip()
+    lines = list(quote.items.all())
+    priced = [line for line in lines if line.unit_price is not None]
+    total = sum((line.unit_price * line.quantity for line in priced), Decimal("0"))
+    order = None
+    if quote.status == QuoteStatus.ACCEPTED:
+        order = quote.orders.exclude(status=OrderStatus.CANCELLED).order_by("pk").first()
+    return {
+        "order": order,
+        "can_order": can_order and quote.status == QuoteStatus.ACCEPTED and order is None,
+        "order_forbidden": not can_order and quote.status == QuoteStatus.ACCEPTED and order is None,
+        "status": quote.status,
+        "can_issue": can_change and quote.status == QuoteStatus.DRAFT,
+        "can_answer": can_change and quote.status == QuoteStatus.SENT,
+        "email": email,
+        "email_ok": _has_real_mailbox(email),
+        "items": len(lines),
+        "missing_price": len(lines) - len(priced),
+        "total": total if priced else None,
+        "sent_at": quote.sent_at,
+    }

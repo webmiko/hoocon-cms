@@ -1,0 +1,106 @@
+{% if company_card %}
+{% with card=company_card %}
+<section class="hoocon-cc" id="hoocon-card-top" aria-label="Что делать с клиентом">
+  <div class="hoocon-cc__bar">
+    <div class="hoocon-cc__step hoocon-cc__step--{{ card.next_step.state }}">
+      <span class="hoocon-cc__step-label">Следующий шаг</span>
+      <strong class="hoocon-cc__step-text">{{ card.next_step.text }}</strong>
+      {% if card.next_step.hint %}<span class="hoocon-cc__step-hint">{{ card.next_step.hint }}</span>{% endif %}
+    </div>
+    <div class="hoocon-cc__actions">
+      {% if card.actions.call %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--primary" href="tel:{{ card.actions.call }}">Позвонить</a>
+      {% endif %}
+      {% if card.actions.write %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.actions.write }}">Написать письмо</a>
+      {% endif %}
+      {% if card.actions.quote %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.actions.quote }}">Создать КП</a>
+      {% endif %}
+      {% if card.actions.person %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.actions.person }}">Карточка человека</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if card.can_call_result %}
+  <form method="post" action="{{ card.call_result_url }}" class="hoocon-cc__result" id="hoocon-call-result">
+    {% csrf_token %}
+    <p class="hoocon-cc__result-title">Позвонили? Запишите итог — это одно нажатие</p>
+    <div class="hoocon-cc__outcomes" role="radiogroup" aria-label="Чем закончился звонок">
+      {% for outcome in card.outcomes %}
+      <label class="hoocon-cc__outcome">
+        <input type="radio" name="outcome" value="{{ outcome.key }}" required>
+        <span class="hoocon-cc__outcome-body">
+          <strong>{{ outcome.label }}</strong>
+          <span>{{ outcome.hint }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="hoocon-cc__result-row">
+      <label class="hoocon-cc__field">
+        <span>Вернуться к клиенту</span>
+        <select name="days">
+          <option value="">Как обычно для этого итога</option>
+          {% for label, days in card.next_step_choices %}<option value="{{ days }}">{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="hoocon-cc__field hoocon-cc__field--grow">
+        <span>О чём договорились (по желанию)</span>
+        <input type="text" name="note" maxlength="500">
+      </label>
+      <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--primary">Записать итог</button>
+    </div>
+  </form>
+  {% endif %}
+
+  {% if card.can_edit %}
+  <form method="post" action="{{ card.next_step_url }}" class="hoocon-cc__chips">
+    {% csrf_token %}
+    <span class="hoocon-cc__chips-label">Вернуться к клиенту:</span>
+    {% for label, days in card.next_step_choices %}
+      <button type="submit" name="days" value="{{ days }}" class="hoocon-cc__chip">{{ label }}</button>
+    {% endfor %}
+    {% if card.next_step.due %}
+      <button type="submit" name="clear" value="1" class="hoocon-cc__chip hoocon-cc__chip--quiet">Снять</button>
+    {% endif %}
+  </form>
+  {% endif %}
+
+  {% if card.can_note %}
+  <form method="post" action="{{ card.note_url }}" class="hoocon-cc__note">
+    {% csrf_token %}
+    <label class="hoocon-cc__note-label" for="hoocon-cc-note">Заметка: о чём говорили, что пообещали</label>
+    <textarea id="hoocon-cc-note" name="body" rows="2" maxlength="5000" class="hoocon-cc__note-input"></textarea>
+    <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--ghost">Сохранить заметку</button>
+  </form>
+  {% endif %}
+
+  <div class="hoocon-cc__feed">
+    <h2 class="hoocon-cc__feed-title">История работы с клиентом</h2>
+    {% if card.feed %}
+    <ol class="hoocon-cc__list">
+      {% for item in card.feed %}
+      <li class="hoocon-cc__item hoocon-cc__item--{{ item.kind }}">
+        <span class="material-symbols-outlined hoocon-cc__icon" aria-hidden="true">{{ item.icon }}</span>
+        <div class="hoocon-cc__item-body">
+          <span class="hoocon-cc__item-label">{{ item.label }}{% if item.who %} · {{ item.who }}{% endif %}</span>
+          {% if item.url %}
+            <a class="hoocon-cc__item-title" href="{{ item.url }}">{{ item.title }}</a>
+          {% else %}
+            <span class="hoocon-cc__item-title">{{ item.title }}</span>
+          {% endif %}
+          {% if item.text %}<span class="hoocon-cc__item-text">{{ item.text }}</span>{% endif %}
+        </div>
+        <time class="hoocon-cc__item-when" datetime="{{ item.when|date:'c' }}" title="{{ item.when }}">{{ item.ago }} назад</time>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <p class="hoocon-cc__empty">Пока пусто. Позвоните или напишите клиенту, и история появится здесь.</p>
+    {% endif %}
+  </div>
+</section>
+{% endwith %}
+{% endif %}

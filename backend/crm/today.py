@@ -20,6 +20,8 @@ from crm.phones import split_phone_numbers
 from crm.telephony import normalize_phone_digits
 
 _GROUP_LIMIT = 8
+# A call the manager already settled must not keep reading as «overdue».
+_FINISHED = ("reached", "done")
 _OVERDUE_DAYS = 14
 
 
@@ -39,6 +41,7 @@ def build_today_board(user: Any) -> dict[str, Any] | None:
     horizon = now - timedelta(days=_OVERDUE_DAYS)
     queryset = scope_planned_touches_for_manager(
         PlannedTouch.objects.filter(starts_at__gte=horizon, starts_at__lt=end)
+        .exclude(status__in=_FINISHED)
         .select_related("company", "company__assignee", "client", "assignee")
         .prefetch_related("company__phones")
         .order_by("starts_at", "pk"),
