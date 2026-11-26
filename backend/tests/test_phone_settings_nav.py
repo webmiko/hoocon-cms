@@ -37,7 +37,9 @@ def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
     assert nav["password_change_url"] == reverse("admin:password_change")
     assert nav["profile_url"] == reverse("admin:auth_user_change", args=[admin_user.pk])
     assert nav["account_page_url"].endswith("?hoocon_view=account")
-    home = nav["groups"][0]
+    assert nav["groups"][0]["id"] == "workspace"
+    assert nav["groups"][0]["url"].endswith("/admin/workspace/")
+    home = nav["groups"][1]
     assert home["id"] == "home"
     assert home["action"] == "dashboard"
     assert home["url"].endswith("?hoocon_view=dashboard")
@@ -52,7 +54,7 @@ def test_build_phone_settings_nav_groups_apps_for_superuser() -> None:
     leads = next(group for group in nav["groups"] if group["id"] == "leads-lead")
     assert leads["action"] == "link"
     assert leads["url"].endswith("/admin/leads/lead/")
-    assert leads["title"] == "Лиды"
+    assert leads["title"] == "Заявки"
     section_ids = {section["id"] for section in nav["sections"]}
     assert "work" in section_ids
     assert "catalog" in section_ids
@@ -74,18 +76,21 @@ def test_build_phone_settings_nav_flattened_daily_rows() -> None:
     assert nav is not None
     groups = {group["id"]: group for group in nav["groups"]}
 
-    # «Работа» — one tap to every daily section, in fixed order.
+    # «Работа» — only the daily path, in fixed order; the rest sits in «Ещё в работе».
     work = next(section for section in nav["sections"] if section["id"] == "work")
     work_ids = [row["id"] for row in work["rows"]]
-    assert work_ids[:7] == [
+    assert work_ids[:5] == [
         "leads-lead",
-        "leads-stats",
-        "crm-sales-report",
-        "supportchat-messages",
         "crm-company",
         "crm-quote",
-        "crm-client",
+        "cabinet-order",
+        "supportchat-messages",
     ]
+    more = next(section for section in nav["sections"] if section["id"] == "work_more")
+    more_ids = [row["id"] for row in more["rows"]]
+    assert more_ids[:3] == ["leads-stats", "crm-client", "cabinet-rmacase"]
+    assert "crm-sales-report" in more_ids
+    assert "crm-client" not in work_ids
     assert "crm-activity" not in work_ids
     assert "crm-emailmessage" not in work_ids
     assert "crm-plannedtouch" not in work_ids

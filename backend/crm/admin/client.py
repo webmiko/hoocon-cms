@@ -395,6 +395,11 @@ class ClientAdmin(ManagerUsesTheCard, ClientWorkbookMixin, ScopedForeignKeyMixin
             args=[object_id],
         )
         extra_context["sales_report_url"] = reverse("admin:crm_client_sales_report")
+        person = self.get_object(request, object_id)
+        if person is not None and self.has_view_permission(request, person):
+            from crm.person_card import build_person_card
+
+            extra_context["person_card"] = build_person_card(person, request.user)
         return super().change_view(
             request,
             object_id,

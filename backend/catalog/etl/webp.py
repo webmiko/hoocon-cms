@@ -349,7 +349,7 @@ def backfill_missing_image_cards(*, limit: int | None = None) -> dict[str, int]:
     """
     from catalog.models import ProductImage
 
-    qs = ProductImage.objects.exclude(image="").filter(image_card="").order_by("id")
+    qs = ProductImage.objects.exclude(image="").exclude(image_locked=True).filter(image_card="").order_by("id")
     if limit is not None:
         qs = qs[: max(0, limit)]
 

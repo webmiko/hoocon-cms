@@ -718,7 +718,7 @@ def unpublish_legacy_combined_photos(*, dry_run: bool = False) -> int:
         sku__sku_code__iregex=r"(?i)^da\d+fu",
         alt__icontains=_LEGACY_COMBINED_ALT,
         is_published=True,
-    )
+    ).exclude(image_locked=True)
     count = qs.count()
     if dry_run or count == 0:
         return count
@@ -727,7 +727,9 @@ def unpublish_legacy_combined_photos(*, dry_run: bool = False) -> int:
 
 def unpublish_legacy_static_dimension(*, dry_run: bool = False) -> int:
     """Hide the earlier single DA5 static dimensions asset (replaced per series)."""
-    qs = ProductImage.objects.filter(source_url=_LEGACY_DIMENSION_URL, is_published=True)
+    qs = ProductImage.objects.filter(source_url=_LEGACY_DIMENSION_URL, is_published=True).exclude(
+        image_locked=True,
+    )
     count = qs.count()
     if dry_run or count == 0:
         return count
@@ -787,8 +789,12 @@ def sku_has_split_diagrams(sku_id: int) -> bool:
 def unpublish_combined_when_split_diagrams(*, dry_run: bool = False) -> int:
     """Hide combined size+wiring shots when separate wiring and dimensions exist."""
     # Broad prefilter (icontains); exact match via ``_COMBINED_DIAGRAM_ALT``.
-    candidates = ProductImage.objects.filter(is_published=True).filter(
-        Q(alt__icontains="размеры и") | Q(alt__icontains="схема размеров") | Q(alt__icontains="размер и подключ"),
+    candidates = (
+        ProductImage.objects.filter(is_published=True)
+        .exclude(image_locked=True)
+        .filter(
+            Q(alt__icontains="размеры и") | Q(alt__icontains="схема размеров") | Q(alt__icontains="размер и подключ"),
+        )
     )
     to_hide: list[int] = []
     for image in candidates.iterator():
@@ -798,7 +804,7 @@ def unpublish_combined_when_split_diagrams(*, dry_run: bool = False) -> int:
             to_hide.append(int(image.pk))
     if dry_run or not to_hide:
         return len(to_hide)
-    return ProductImage.objects.filter(pk__in=to_hide).update(is_published=False)
+    return ProductImage.objects.filter(pk__in=to_hide).exclude(image_locked=True).update(is_published=False)
 
 
 def unpublish_redundant_hva_catalog_dimensions(*, dry_run: bool = False) -> int:
@@ -809,6 +815,7 @@ def unpublish_redundant_hva_catalog_dimensions(*, dry_run: bool = False) -> int:
     """
     candidates = (
         ProductImage.objects.filter(is_published=True, sku__sku_code__istartswith="HVA")
+        .exclude(image_locked=True)
         .select_related("sku")
         .order_by("sku_id", "id")
     )
@@ -825,7 +832,7 @@ def unpublish_redundant_hva_catalog_dimensions(*, dry_run: bool = False) -> int:
             to_hide.append(int(image.pk))
     if dry_run or not to_hide:
         return len(to_hide)
-    return ProductImage.objects.filter(pk__in=to_hide).update(is_published=False)
+    return ProductImage.objects.filter(pk__in=to_hide).exclude(image_locked=True).update(is_published=False)
 
 
 def _upsert_diagram(

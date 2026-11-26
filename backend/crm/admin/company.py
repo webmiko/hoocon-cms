@@ -171,6 +171,9 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
 
     form = CompanyAdminForm
     list_before_template = "admin/includes/hoocon_page_memo.html"
+    # Outside the company <form>: the panel has its own forms, and a nested
+    # <form> is dropped by the browser, so its buttons would save the card.
+    change_form_outer_before_template = "admin/crm/company/card_panel.html"
 
     list_display = (
         "name",
@@ -242,6 +245,22 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
         ),
     )
 
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Put the action bar and the shared history above the form."""
+        from crm.company_card import build_company_card
+
+        extra = dict(extra_context or {})
+        company = self.get_object(request, object_id)
+        if company is not None and self.has_view_permission(request, company):
+            extra["company_card"] = build_company_card(company, request.user)
+        return super().change_view(request, object_id, form_url, extra_context=extra)
+
     def changelist_view(
         self,
         request: HttpRequest,
@@ -256,7 +275,47 @@ class CompanyAdmin(WorkLabelAssignableFormMixin, OpenChangeLinkMixin, ModelAdmin
             extra["client_export_url"] = reverse("admin:crm_client_export_clients")
             extra["client_people_url"] = reverse("admin:crm_client_changelist")
         extra.update(remember_list_view(request))
+        extra["hoocon_tabs"] = self._list_tabs(request)
         return super().changelist_view(request, extra_context=extra)
+
+    def _list_tabs(self, request: HttpRequest) -> list[Any]:
+        """«Мои / Звонок сегодня / Пора вернуться / Свободные» above the list."""
+        from datetime import datetime, time, timedelta
+
+        from django.utils import timezone
+
+        from crm.list_tabs import TabSpec, build_list_tabs
+
+        now = timezone.now()
+        start = timezone.make_aware(datetime.combine(timezone.localdate(), time.min))
+        specs = [
+            TabSpec("Все", hint="Все клиенты, которых вы видите"),
+            TabSpec(
+                "Мои",
+                {"manager": str(request.user.pk)},
+                Q(assignee_id=request.user.pk),
+                "Клиенты, которых ведёте вы",
+            ),
+            TabSpec(
+                "Звонок сегодня",
+                {"work_queue": "today"},
+                Q(next_contact_at__gte=start, next_contact_at__lt=start + timedelta(days=1)),
+                "Дата «следующий шаг» — сегодня",
+            ),
+            TabSpec(
+                "Пора вернуться",
+                {"work_queue": "overdue"},
+                Q(next_contact_at__isnull=False, next_contact_at__lt=now),
+                "Дата «следующий шаг» уже прошла",
+            ),
+            TabSpec(
+                "Свободные",
+                {"work_queue": "unassigned"},
+                Q(assignee__isnull=True),
+                "Пока ни за кем не закреплены",
+            ),
+        ]
+        return build_list_tabs(request.GET, self.get_queryset(request), specs)
 
     def has_merge_permission(self, request: HttpRequest) -> bool:
         """Merge deletes the source companies."""

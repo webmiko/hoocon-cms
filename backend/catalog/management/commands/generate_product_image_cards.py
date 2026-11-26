@@ -40,7 +40,7 @@ class Command(BaseCommand):
         """Run backfill or forced regenerate."""
         limit = options.get("limit")
         if options["force"]:
-            qs = ProductImage.objects.exclude(image="").order_by("id")
+            qs = ProductImage.objects.exclude(image="").exclude(image_locked=True).order_by("id")
             if limit is not None:
                 qs = qs[: max(0, int(limit))]
             scanned = 0

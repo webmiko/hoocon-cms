@@ -1,0 +1,77 @@
+{# First submit button of the form: Enter in a price field must only save, never issue the offer. #}
+<button type="submit" name="_continue" value="1" class="hoocon-sr-default" tabindex="-1" aria-hidden="true">Сохранить и продолжить</button>
+{% if quote_add_hint %}
+<section class="hoocon-qi hoocon-qi--draft" aria-label="Как создать КП">
+  <h2 class="hoocon-qi__title">Как создать КП</h2>
+  <ol class="hoocon-qi__steps">
+    <li>Выберите <strong>клиента</strong> и, если есть, <strong>заявку</strong>: позиции подставятся сами.</li>
+    <li>Проверьте позиции и впишите <strong>цену</strong> каждой. Добавьте условия, если нужно.</li>
+    <li>Нажмите <strong>«Сохранить и продолжить»</strong>. На странице КП появится кнопка «Выдать клиенту».</li>
+  </ol>
+</section>
+{% endif %}
+{% if quote_issue %}
+{% with panel=quote_issue %}
+<section class="hoocon-qi hoocon-qi--{{ panel.status }}" aria-label="Как отправить КП клиенту">
+  {% if panel.status == "draft" %}
+    <h2 class="hoocon-qi__title">Как отправить КП клиенту</h2>
+    <ol class="hoocon-qi__steps">
+      <li>Проверьте позиции, цены и срок действия ниже.</li>
+      <li>
+        Нажмите <strong>«Выдать клиенту»</strong>. Система сама сделает PDF
+        {% if panel.email_ok %}и отправит письмо с ним на <strong>{{ panel.email }}</strong>{% endif %},
+        закроет заявку и поставит статус «Выдано». Статус менять вручную не нужно.
+      </li>
+    </ol>
+    <p class="hoocon-qi__sum">
+      Позиций: <strong>{{ panel.items }}</strong>{% if panel.total is not None %}, итого с НДС <strong>{{ panel.total|floatformat:2 }} ₽</strong>{% endif %}
+    </p>
+    {% if panel.missing_price and panel.items %}
+      <p class="hoocon-qi__warn">У {{ panel.missing_price }} из {{ panel.items }} позиций не указана цена. Проверьте, что клиент увидит нужные суммы.</p>
+    {% endif %}
+    {% if not panel.email_ok %}
+      <p class="hoocon-qi__warn">
+        У клиента нет рабочей почты{% if panel.email %} ({{ panel.email }}){% endif %}. PDF сформируется,
+        но письмо не уйдёт: скачайте его в документах клиента и отправьте сами, или впишите почту в карточке клиента.
+      </p>
+    {% endif %}
+    {% if panel.items == 0 %}
+      <p class="hoocon-qi__warn">В КП пока нет позиций. Добавьте хотя бы одну, иначе выдать его нельзя.</p>
+    {% endif %}
+    {% if panel.can_issue %}
+      <button type="submit" name="_issue_quote" value="1" class="hoocon-ws__btn hoocon-ws__btn--primary">Выдать клиенту</button>
+    {% endif %}
+  {% elif panel.status == "sent" %}
+    <h2 class="hoocon-qi__title">КП выдано{% if panel.sent_at %} {{ panel.sent_at|date:"d.m.Y" }}{% endif %}</h2>
+    <p class="hoocon-qi__text">
+      Клиент {% if panel.email_ok %}получил письмо с PDF на {{ panel.email }}{% else %}письмо не получал: почты нет{% endif %}.
+      Ждём ответа. Если ответа нет три дня, КП появится в «Мой день». Когда клиент решит, нажмите кнопку ниже.
+    </p>
+    {% if panel.can_answer %}
+    <div class="hoocon-ws__actions">
+      <button type="submit" formmethod="post" formnovalidate formaction="{% url 'crm-workspace-quote-answer' original.pk %}" name="answer" value="accepted" class="hoocon-ws__btn hoocon-ws__btn--primary">Клиент согласился</button>
+      <button type="submit" formmethod="post" formnovalidate formaction="{% url 'crm-workspace-quote-answer' original.pk %}" name="answer" value="rejected" class="hoocon-ws__btn hoocon-ws__btn--ghost">Клиент отказался</button>
+    </div>
+    {% endif %}
+  {% elif panel.status == "accepted" %}
+    <h2 class="hoocon-qi__title">Клиент согласился</h2>
+    {% if panel.order %}
+      <p class="hoocon-qi__text">Заказ <strong>{{ panel.order.number }}</strong> уже создан из этого КП.</p>
+      <div class="hoocon-ws__actions">
+        <a class="hoocon-ws__btn hoocon-ws__btn--primary" href="{% url 'admin:cabinet_order_change' panel.order.pk %}">Открыть заказ</a>
+      </div>
+    {% elif panel.can_order %}
+      <p class="hoocon-qi__text">Следующий шаг: оформить заказ. Позиции и цены перейдут из КП, повторное нажатие дубль не создаст.</p>
+      <div class="hoocon-ws__actions">
+        <button type="submit" formmethod="post" formnovalidate formaction="{% url 'admin:crm_quote_create_order' original.pk %}" class="hoocon-ws__btn hoocon-ws__btn--primary">Создать заказ</button>
+      </div>
+    {% else %}
+      <p class="hoocon-qi__text">Заказ из этого КП оформляет сотрудник с правом создавать заказы. Сообщите руководителю.</p>
+    {% endif %}
+  {% else %}
+    <h2 class="hoocon-qi__title">Клиент отказался</h2>
+    <p class="hoocon-qi__text">Для новой версии нажмите «Копия черновиком» вверху: выданный файл останется нетронутым.</p>
+  {% endif %}
+</section>
+{% endwith %}
+{% endif %}

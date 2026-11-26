@@ -105,6 +105,43 @@ def test_editor_hidden_image_stays_hidden_and_counts_as_skip(sku: SKU) -> None:
     assert ProductImage.objects.get(pk=image.pk).is_published is False
 
 
+def test_locked_image_is_skip_before_any_file_write(sku: SKU, settings) -> None:  # type: ignore[no-untyped-def]
+    """A frozen row is skipped before ETL can even create an orphan file."""
+    from pathlib import Path
+
+    from catalog.etl.file_refresh import stored_sha256
+
+    _, image = _upsert(sku, _webp("red"))
+    assert image is not None
+    ProductImage.objects.filter(pk=image.pk).update(image_locked=True)
+    image.refresh_from_db()
+    original = {
+        "image": image.image.name,
+        "image_card": image.image_card.name,
+        "sha256": stored_sha256(image.image),
+        "alt": image.alt,
+        "sort_order": image.sort_order,
+        "is_published": image.is_published,
+    }
+    root = Path(settings.MEDIA_ROOT)
+    files_before = {str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()}
+
+    action, returned = _upsert(sku, _webp("blue"), alt="changed by ETL")
+
+    assert action == "skip"
+    assert returned is not None
+    returned.refresh_from_db()
+    assert returned.image.name == original["image"]
+    assert returned.image_card.name == original["image_card"]
+    assert stored_sha256(returned.image) == original["sha256"]
+    assert returned.alt == original["alt"]
+    assert returned.sort_order == original["sort_order"]
+    assert returned.is_published is original["is_published"]
+    files_after = {str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()}
+    assert files_after == files_before
+    assert _upsert(sku, _webp("blue"), alt="changed by ETL", dry_run=True)[0] == "skip"
+
+
 def test_manual_diagram_rerun_returns_skip(sku: SKU) -> None:
     """The manual-diagram ETL (one of the former copies) now reports ``skip``."""
     buf = io.BytesIO()

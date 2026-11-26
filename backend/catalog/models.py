@@ -590,6 +590,8 @@ class ProductImage(models.Model):
         sort_order: 0 = primary (карточка каталога).
         is_published: видимость в публичном API.
         image_card: лёгкий WebP для list/mobile (≤720px); полный кадр в ``image``.
+        image_locked: утверждённое изображение защищено от ETL/management-записи.
+        locked_at / locked_by: аудит того, когда и кто поставил защиту.
     """
 
     sku: models.ForeignKey = models.ForeignKey(
@@ -643,6 +645,26 @@ class ProductImage(models.Model):
             "медиа его не возвращают. Снимается, если снова включить «опубликовано»."
         ),
     )
+    image_locked: models.BooleanField = models.BooleanField(
+        "изображение зафиксировано",
+        default=False,
+        db_index=True,
+        help_text=(
+            "Утверждённое фото/схема: ETL, служебные команды и фоновые задачи не меняют "
+            "файл, превью, подпись, порядок и публикацию. Через админку правки разрешены."
+        ),
+    )
+    locked_at: models.DateTimeField = models.DateTimeField(
+        "зафиксировано",
+        null=True,
+        blank=True,
+    )
+    locked_by: models.CharField = models.CharField(
+        "кто зафиксировал",
+        max_length=150,
+        blank=True,
+        default="",
+    )
     created_at: models.DateTimeField = models.DateTimeField("создано", auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField("обновлено", auto_now=True)
 
@@ -676,10 +698,19 @@ class ProductImage(models.Model):
         """Persist row; re-encode JPEG/PNG uploads to WebP; sync card preview.
 
         A photo hidden in Admin (``hidden_by_editor``) stays unpublished
-        whatever ETL/media job saves it.
+        whatever ETL/media job saves it. A frozen photo (``image_locked``)
+        additionally keeps its file, card preview, alt, order and publication
+        state unless the save is explicitly marked as an Admin edit.
         """
         from catalog.etl.webp import attach_image_card, ensure_field_file_webp
 
+        admin_edit = bool(self.__dict__.get(ADMIN_EDIT_FLAG, False))
+        _keep_locked_fields(
+            self,
+            locked=self.image_locked,
+            fields=("image", "image_card", "alt", "sort_order", "is_published"),
+            update_fields=kwargs.get("update_fields"),
+        )
         _keep_locked_fields(
             self,
             locked=self.hidden_by_editor,
@@ -690,6 +721,11 @@ class ProductImage(models.Model):
         update_fields: frozenset[str] | None = None
         if isinstance(raw_fields, (list, tuple, set, frozenset)):
             update_fields = frozenset(str(name) for name in raw_fields)
+
+        frozen_non_admin = self.pk is not None and self.image_locked and not admin_edit
+        if frozen_non_admin:
+            super().save(*args, **kwargs)  # type: ignore[arg-type]
+            return
 
         only_card = update_fields is not None and update_fields <= {
             "image_card",

@@ -2,7 +2,8 @@
 
 Rows are keyed by ``(sku, source_url)``. A rerun with the same bytes and
 metadata is a ``skip``: no storage write, no card re-render. A photo hidden
-in Admin stays hidden (``ProductImage.hidden_by_editor``).
+in Admin stays hidden (``ProductImage.hidden_by_editor``). A frozen photo
+(``ProductImage.image_locked``) is skipped before any storage write.
 """
 
 from __future__ import annotations
@@ -48,6 +49,8 @@ def upsert_sku_image(
     """
     alt = alt[:_ALT_MAX]
     existing = ProductImage.objects.filter(sku=sku, source_url=source_url).first()
+    if existing is not None and existing.image_locked:
+        return "skip", existing
     if dry_run:
         if existing is None:
             return "create", None

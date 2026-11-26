@@ -9,9 +9,12 @@ from django.contrib import admin
 from django.http import HttpRequest
 from django.urls import reverse
 
+from accounts.roles import staff_sees_all_leads
+
 # iOS Settings–style icon tiles: (background, foreground).
 _APP_ICON_STYLES: dict[str, tuple[str, str]] = {
     "home": ("#007aff", "#ffffff"),
+    "workspace": ("#dc1313", "#ffffff"),
     "leads": ("#ff9500", "#ffffff"),
     "catalog": ("#5856d6", "#ffffff"),
     "crm": ("#34c759", "#ffffff"),
@@ -68,10 +71,11 @@ _APP_ICONS: dict[str, str] = {
 }
 
 # Logical iOS-style section buckets for grouped inset lists.
-_SECTION_ORDER: tuple[str, ...] = ("", "work", "catalog", "content", "support", "site", "system")
+_SECTION_ORDER: tuple[str, ...] = ("", "work", "work_more", "catalog", "content", "support", "site", "system")
 _SECTION_LABELS: dict[str, str] = {
     "": "",
     "work": "Работа",
+    "work_more": "Ещё в работе",
     "catalog": "Каталог",
     "content": "Контент",
     "support": "Поддержка",
@@ -105,7 +109,7 @@ _PROMOTED_MODELS: dict[str, tuple[dict[str, str], ...]] = {
     "leads": (
         {
             "model": "lead",
-            "title": "Лиды",
+            "title": "Заявки",
             "icon": "inbox",
             "section": "work",
             "description": "Лиды с сайта, статусы и ответственные.",
@@ -334,20 +338,35 @@ _EXTRA_LINK_ROWS: dict[str, tuple[dict[str, str], ...]] = {
     ),
 }
 
+# Rows a salesperson opens rarely. They leave «Работа» so the daily list stays
+# short: заявки, клиенты, КП, заказы, сообщения.
+_SECONDARY_WORK_ROWS: frozenset[str] = frozenset(
+    {
+        "leads-stats",
+        "crm-sales-report",
+        "crm-client",
+        "cabinet-rmacase",
+        "cabinet-speclist",
+        "staffrequests-staffrequest",
+    },
+)
+
 # Row order inside each section; rows absent from the list sink to the end.
 _ROW_ORDER: dict[str, tuple[str, ...]] = {
     "work": (
         "leads-lead",
-        "leads-stats",
-        "crm-sales-report",
-        "staffrequests-staffrequest",
-        "supportchat-messages",
         "crm-company",
         "crm-quote",
-        "crm-client",
         "cabinet-order",
+        "supportchat-messages",
+    ),
+    "work_more": (
+        "leads-stats",
+        "crm-client",
         "cabinet-rmacase",
         "cabinet-speclist",
+        "crm-sales-report",
+        "staffrequests-staffrequest",
     ),
     "catalog": (
         "catalog-sku",
@@ -393,7 +412,8 @@ def build_phone_settings_nav(request: HttpRequest) -> dict[str, Any] | None:
     home_row = _home_row(request, dashboard_url)
     app_rows = _app_rows(request)
 
-    sections = _build_sections([home_row, *app_rows])
+    workspace_row = _workspace_row(request)
+    sections = _build_sections([*([workspace_row] if workspace_row else []), home_row, *app_rows])
     groups = [row for section in sections for row in section["rows"]]
 
     display_name = (user.get_full_name() or "").strip() or user.get_username()
@@ -410,6 +430,10 @@ def build_phone_settings_nav(request: HttpRequest) -> dict[str, Any] | None:
         "groups": groups,
         "dashboard_url": dashboard_url,
         "account_page_url": account_page_url,
+        # The bare /admin/ opens «Мой день» for a working manager, so the phone
+        # menu of sections needs its own address.
+        "hub_url": f"{reverse('admin:index')}?hoocon_view=menu",
+        "workspace_tab": workspace_row is not None and not staff_sees_all_leads(user),
         **account_links,
     }
 
@@ -426,6 +450,24 @@ def _account_links(request: HttpRequest) -> dict[str, str]:
     if user.has_perm("auth.change_user") or user.has_perm("auth.view_user"):
         links["profile_url"] = reverse("admin:auth_user_change", args=[user.pk])
     return links
+
+
+def _workspace_row(request: HttpRequest) -> dict[str, Any] | None:
+    """«Мой день» — the page a salesperson starts from."""
+    from config.unfold_callbacks import perm_view_workspace
+
+    if not perm_view_workspace(request):
+        return None
+    return _link_row(
+        request,
+        row_id="workspace",
+        title="Мой день",
+        icon="today",
+        style="workspace",
+        url=reverse("crm-workspace"),
+        section="",
+        description="Что сделать сейчас: заявки, звонки, КП без ответа, чаты.",
+    )
 
 
 def _home_row(request: HttpRequest, dashboard_url: str) -> dict[str, Any]:
@@ -709,10 +751,12 @@ def _build_sections(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Bucket rows into iOS Settings inset groups with optional headers."""
     buckets: dict[str, list[dict[str, Any]]] = {key: [] for key in _SECTION_ORDER}
     for row in rows:
-        if row["id"] == "home":
+        if row["id"] in ("workspace", "home"):
             buckets[""].append(row)
             continue
         section_key = str(row.get("section") or _APP_SECTIONS.get(str(row["id"]), "system"))
+        if section_key == "work" and row["id"] in _SECONDARY_WORK_ROWS:
+            section_key = "work_more"
         buckets.setdefault(section_key, []).append(row)
 
     for key, order in _ROW_ORDER.items():

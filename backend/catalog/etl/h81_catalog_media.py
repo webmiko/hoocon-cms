@@ -430,7 +430,7 @@ def unpublish_legacy_h81_local_catalog(*, dry_run: bool = False) -> int:
         sku__sku_code__iregex=r"(?i)^h81(?:01|02|03|04|05|06|07|08|21|22)-bv",
         source_url__in=_LEGACY_LOCAL_CATALOG_URLS,
         is_published=True,
-    )
+    ).exclude(image_locked=True)
     count = qs.count()
     if dry_run or count == 0:
         return count
@@ -519,7 +519,7 @@ def apply_h81_catalog_media(
                 sku=sku,
                 source_url=aux_url,
                 is_published=True,
-            )
+            ).exclude(image_locked=True)
             if dry_run:
                 summary["unpublished_aux_plain"] += aux_qs.count()
             else:

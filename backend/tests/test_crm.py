@@ -127,7 +127,9 @@ def test_client_change_form_lists_leads_inline(client, django_user_model) -> Non
     assert "Заявка Б" in html
     assert "лиды клиента" in html.lower()
     # Unfold action_list (e.g. История) — phone shell relocates into «Ещё» via JS.
-    assert "data-hoocon-phone-action-list" in html
+    # The top toolbar is gone; its actions live in the panel above the form.
+    assert "data-hoocon-phone-action-list" not in html
+    assert "hoocon-person-top" in html
     assert "/history/" in html
     assert "История" in html
 

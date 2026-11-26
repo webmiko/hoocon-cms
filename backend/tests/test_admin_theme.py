@@ -111,7 +111,7 @@ def test_admin_injects_neutral_base_theme_colors() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert "--color-base-50: rgb(243, 244, 247)" in html
     assert "--border-radius: 0.75rem" in html
     assert "oklch(98.5% .002 247" not in html
@@ -161,7 +161,7 @@ def test_clients_sidebar_link_uses_company_permission() -> None:
     grant(company_only, "view_company")
     client = Client()
     client.force_login(company_only)
-    assert 'href="/admin/crm/company/"' in client.get("/admin/").content.decode()
+    assert 'href="/admin/crm/company/"' in client.get("/admin/?hoocon_view=dashboard").content.decode()
 
     people_only = User.objects.create_user(
         username="nav-people-only",
@@ -171,7 +171,7 @@ def test_clients_sidebar_link_uses_company_permission() -> None:
     )
     grant(people_only, "view_client")
     client.force_login(people_only)
-    assert 'href="/admin/crm/company/"' not in client.get("/admin/").content.decode()
+    assert 'href="/admin/crm/company/"' not in client.get("/admin/?hoocon_view=dashboard").content.decode()
 
 
 @pytest.mark.django_db
@@ -185,7 +185,7 @@ def test_sidebar_hides_leads_without_view_permission() -> None:
     )
     client = Client()
     client.force_login(staff)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert 'href="/admin/leads/lead/"' not in html
     assert "hoocon-admin-lead-sticker" not in html
 
@@ -217,7 +217,7 @@ def test_admin_phone_shell_assets_and_markup() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert "hoocon-admin-phone.css" in html
     assert "hoocon-admin-phone-shell.js" in html
     assert 'id="hoocon-phone-shell"' in html
@@ -587,7 +587,7 @@ def test_admin_phone_shell_hidden_without_staff_perms() -> None:
     )
     client = Client()
     client.force_login(staff)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert 'id="hoocon-phone-shell"' in html
     assert 'data-hoocon-phone-tab="leads"' not in html
     assert "data-hoocon-phone-more-open" in html
@@ -1018,7 +1018,7 @@ def test_admin_header_is_sticky_to_top() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert "hoocon-admin-header" in html
     assert "sticky" in html
     assert "top-0" in html
@@ -1034,7 +1034,7 @@ def test_admin_sidebar_os27_full_width_settings_layout() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert "hoocon-os27-sidebar" in html
     assert "hoocon-os27-sidebar-panel" in html
     assert "hoocon-nav-shell" in html
@@ -1065,7 +1065,7 @@ def test_admin_pwa_manifest_and_icons() -> None:
     )
     client = Client()
     client.force_login(admin_user)
-    html = client.get("/admin/").content.decode()
+    html = client.get("/admin/?hoocon_view=dashboard").content.decode()
     assert "admin/img/pwa-admin-192.png?v=deploysha1" in html
     assert "apple-touch-admin.png?v=deploysha1" in html
     assert "/admin/manifest.webmanifest" in html

@@ -91,6 +91,8 @@ def _demote_other_product_shots(sku: SKU, *, keep_pk: int) -> int:
     """Unpublish leftover product/promo photos; keep wiring/dimensions tiles."""
     demoted = 0
     for other in ProductImage.objects.filter(sku=sku).exclude(pk=keep_pk):
+        if other.image_locked:
+            continue
         alt = other.alt or ""
         url = other.source_url or ""
         if _DIMS_OR_DIAGRAM.search(alt) or _DIMS_OR_DIAGRAM.search(url):
@@ -148,6 +150,8 @@ def promote_local_hv_product_over_tilda(*, dry_run: bool = False) -> dict[str, A
         source_url__endswith="-product.webp",
     ).exclude(source_url__icontains="media-webp/")
     for img in locals_.select_related("sku").iterator():
+        if img.image_locked:
+            continue
         sku = img.sku
         # media-webp hero already wins when present.
         if ProductImage.objects.filter(

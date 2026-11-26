@@ -112,7 +112,7 @@ def prune_cross_control_images(*, dry_run: bool = False) -> dict[str, Any]:
                 sku=sku,
                 is_published=True,
                 source_url__in=drop,
-            )
+            ).exclude(image_locked=True)
             count = qs.count()
             if count == 0:
                 continue

@@ -563,7 +563,7 @@ def test_client_change_page_has_call_button(
     client: Any,
     django_user_model: Any,
 ) -> None:
-    """Кнопка «Позвонить» — стилизованный object-tools item, не голый <a>."""
+    """Кнопка «Позвонить клиенту» — кнопка панели над формой, не голый <a>."""
     from django.urls import reverse
 
     admin = django_user_model.objects.create_superuser(
@@ -577,9 +577,9 @@ def test_client_change_page_has_call_button(
     assert resp.status_code == 200
     html = resp.content.decode()
     assert f"/admin/crm/client/{crm_client.pk}/call-client/" in html
-    # Unfold-кнопка: bordered li + icon, иначе это незаметный текст-линк.
-    assert 'material-symbols-outlined">call' in html
-    assert "hover:bg-base-500/8" in html
+    # Кнопка панели с классом кнопки, иначе это незаметный текст-линк.
+    assert 'class="hoocon-ws__btn hoocon-ws__btn--primary" href="/admin/crm/client/' in html
+    assert "Позвонить клиенту</a>" in html
 
 
 @pytest.mark.django_db

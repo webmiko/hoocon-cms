@@ -260,7 +260,7 @@
     if (target.closest("[data-hoocon-settings-header-back]")) {
       event.preventDefault();
       if (isDashboardView()) {
-        window.location.href = "/admin/";
+        window.location.href = "/admin/?hoocon_view=menu";
         return;
       }
       if (document.body.classList.contains("hoocon-phone-settings-account")) {

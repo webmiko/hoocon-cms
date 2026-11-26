@@ -1,0 +1,70 @@
+<section class="hoocon-lc hoocon-lc--{{ card.state }}" id="hoocon-lead-top" aria-label="Что делать с заявкой">
+  <div class="hoocon-lc__next">
+    <p class="hoocon-ws__eyebrow">Что делать сейчас</p>
+    <h2 class="hoocon-lc__headline">{{ card.headline }}</h2>
+    {% if card.hint %}<p class="hoocon-lc__hint">{{ card.hint }}</p>{% endif %}
+    {% if card.buttons %}
+    <div class="hoocon-ws__actions">
+      {% for button in card.buttons %}
+        {% if button.post %}
+        <form method="post" action="{{ button.url }}" class="hoocon-ws__form">
+          {% csrf_token %}
+          <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--{% if button.primary %}primary{% else %}ghost{% endif %}">{{ button.label }}</button>
+        </form>
+        {% else %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--{% if button.primary %}primary{% else %}ghost{% endif %}" href="{{ button.url }}">{{ button.label }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if card.result_url %}
+        <a class="hoocon-ws__btn hoocon-ws__btn--ghost" href="{{ card.result_url }}">Записать итог звонка</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="hoocon-lc__wrote">
+    <div class="hoocon-lc__wrote-head">
+      <h3 class="hoocon-lc__h3">Что написал клиент</h3>
+      {% if card.waiting %}<span class="hoocon-ws__wait">ждёт {{ card.waiting }}</span>{% endif %}
+    </div>
+    {% if card.chips %}
+    <p class="hoocon-ws__chips">
+      {% for chip in card.chips %}<span class="hoocon-ws__chip">{{ chip }}</span>{% endfor %}
+    </p>
+    {% endif %}
+    {% if card.message %}<p class="hoocon-lc__message">{{ card.message }}</p>{% endif %}
+    {% if card.items %}
+    <p class="hoocon-lc__items-title">Позиции</p>
+    <p class="hoocon-ws__chips">
+      {% for item in card.items %}<span class="hoocon-ws__chip">{{ item }}</span>{% endfor %}
+    </p>
+    {% endif %}
+    {% if card.owner %}<p class="hoocon-lc__owner">Ведёт: {{ card.owner }}</p>{% endif %}
+  </div>
+
+  {% if card.client_url %}
+  <div class="hoocon-lc__history">
+    <div class="hoocon-lc__wrote-head">
+      <h3 class="hoocon-lc__h3">История с этим клиентом</h3>
+      <a href="{{ card.client_url }}" class="hoocon-lc__link">Карточка клиента</a>
+    </div>
+    {% if card.feed %}
+    <ol class="hoocon-cc__list">
+      {% for item in card.feed %}
+      <li class="hoocon-cc__item hoocon-cc__item--{{ item.kind }}">
+        <span class="material-symbols-outlined hoocon-cc__icon" aria-hidden="true">{{ item.icon }}</span>
+        <div class="hoocon-cc__item-body">
+          <span class="hoocon-cc__item-label">{{ item.label }}{% if item.who %} · {{ item.who }}{% endif %}</span>
+          {% if item.url %}<a class="hoocon-cc__item-title" href="{{ item.url }}">{{ item.title }}</a>{% else %}<span class="hoocon-cc__item-title">{{ item.title }}</span>{% endif %}
+          {% if item.text %}<span class="hoocon-cc__item-text">{{ item.text }}</span>{% endif %}
+        </div>
+        <time class="hoocon-cc__item-when" datetime="{{ item.when|date:'c' }}">{{ item.ago }} назад</time>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <p class="hoocon-cc__empty">С этим клиентом пока ничего не было.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
