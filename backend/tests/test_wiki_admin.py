@@ -866,3 +866,17 @@ def test_manager_guide_tells_where_letters_and_orders_are() -> None:
     row = doc.body.split('id="changelog-orders-letters-view"', 1)[1].split("</tr>", 1)[0]
     assert "Письма" in row
     assert "Заказы" in row
+
+
+@pytest.mark.django_db
+def test_manager_guide_describes_finish_and_moved_dates() -> None:
+    """Журнал называет кнопку «Завершить» и перенос просроченного звонка."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    call_command("seed_wiki", stdout=StringIO())
+    doc = WikiDocument.objects.get(slug="admin-3-0-manager-guide")
+    row = doc.body.split('id="changelog-workspace-finish"', 1)[1].split("</tr>", 1)[0]
+    assert "Завершить" in row
+    assert "1С" in row
