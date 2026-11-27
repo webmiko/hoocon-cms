@@ -1,5 +1,5 @@
 {% if action.post %}
-<form method="post" action="{{ action.url }}" class="hoocon-ws__form">
+<form method="post" action="{{ action.url }}" class="hoocon-ws__form"{% if action.confirm %} onsubmit="return confirm('{{ action.confirm|escapejs }}');"{% endif %}>
   {% csrf_token %}
   <button type="submit" class="hoocon-ws__btn hoocon-ws__btn--{{ kind }}">{{ action.label }}</button>
 </form>

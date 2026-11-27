@@ -51,6 +51,8 @@ def build_today_board(user: Any) -> dict[str, Any] | None:
     overdue: list[Any] = []
     later: list[Any] = []
     for touch in queryset:
+        if _superseded(touch, now):
+            continue
         if _owner(touch) is None:
             unassigned.append(touch)
         elif touch.starts_at < now:
@@ -69,6 +71,19 @@ def build_today_board(user: Any) -> dict[str, Any] | None:
         "empty": not visible,
         "all_url": reverse("admin:crm_plannedtouch_changelist"),
     }
+
+
+def _superseded(touch: Any, now: datetime) -> bool:
+    """An overdue call is not overdue once the firm has a later next step.
+
+    The manager moved the date on the firm card; the old planned call is the
+    same promise, already replaced by a newer one.
+    """
+    company = touch.company
+    if company is None or touch.starts_at >= now:
+        return False
+    follow_up = company.next_contact_at
+    return follow_up is not None and follow_up > now
 
 
 def _today_bounds(now: datetime) -> tuple[datetime, datetime]:

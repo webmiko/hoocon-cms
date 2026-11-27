@@ -43,6 +43,8 @@ class Action:
     post: bool = False
     # ``tel:`` links must not go through the router or the CSRF form.
     external: bool = False
+    # Asked before a destructive POST; empty means no question.
+    confirm: str = ""
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class Row:
     waiting: str
     primary: Action
     secondary: Action | None = None
+    # «Завершить»: the thing was handled outside the CRM, just remove it from the queue.
+    finish: Action | None = None
     urgent: bool = False
     # Cards only: what the client wrote and how to reach them.
     text: str = ""
@@ -80,6 +84,15 @@ class Section:
     @property
     def more(self) -> int:
         return max(0, self.total - len(self.rows))
+
+
+def _finish(label: str, url_name: str, pk: int, confirm: str) -> Action:
+    return Action(label, reverse(url_name, args=[pk]), post=True, confirm=confirm)
+
+
+_FINISH_LEAD_CONFIRM = (
+    "Завершить заявку? Она закроется и пропадёт из очереди. Нажимайте, если уже обработали её вне CRM, например в 1С."
+)
 
 
 def human_wait(delta: timedelta) -> str:
@@ -152,6 +165,9 @@ def _new_leads(user: Any, now: datetime) -> Section | None:
                 waiting=human_wait(now - lead.created_at),
                 primary=take if can_take and lead.assignee_id is None else Action("Открыть", open_url),
                 secondary=Action("Открыть", open_url) if can_take and lead.assignee_id is None else None,
+                finish=_finish("Завершить", "crm-workspace-finish-lead", lead.pk, _FINISH_LEAD_CONFIRM)
+                if can_take
+                else None,
                 urgent=now - lead.created_at > timedelta(hours=1),
             ),
         )
@@ -218,6 +234,7 @@ def _planned_calls(user: Any) -> Section | None:
         return None
     rows: list[Row] = []
     total = 0
+    can_finish = user.has_perm("crm.change_plannedtouch")
     for group in board["groups"]:
         total += len(group["items"]) + group["more"]
         for card in group["items"]:
@@ -231,6 +248,14 @@ def _planned_calls(user: Any) -> Section | None:
                     waiting=card["when"],
                     primary=call or open_card,
                     secondary=open_card if call else None,
+                    finish=_finish(
+                        "Завершить",
+                        "crm-workspace-finish-call",
+                        card["id"],
+                        "Завершить звонок? Он будет отмечен закрытым и пропадёт из очереди.",
+                    )
+                    if can_finish
+                    else None,
                     urgent=overdue,
                 ),
             )
@@ -302,6 +327,14 @@ def _company_follow_ups(user: Any, now: datetime) -> Section | None:
                 subtitle="Пора вернуться к клиенту",
                 waiting=human_wait(now - due),
                 primary=Action("Открыть карточку", reverse("admin:crm_company_change", args=[company.pk])),
+                finish=_finish(
+                    "Завершить",
+                    "crm-workspace-finish-follow-up",
+                    company.pk,
+                    "Убрать клиента из очереди? Дата «Вернуться к клиенту» будет снята.",
+                )
+                if user.has_perm("crm.change_company")
+                else None,
                 urgent=now - due > timedelta(days=3),
             ),
         )
@@ -331,6 +364,9 @@ def _leads_in_work(user: Any, now: datetime) -> Section | None:
                 subtitle=f"{lead.get_lead_type_display()} · взято в работу, КП не выдано",
                 waiting=human_wait(now - lead.updated_at),
                 primary=Action("Продолжить", reverse("admin:leads_lead_change", args=[lead.pk])),
+                finish=_finish("Завершить", "crm-workspace-finish-lead", lead.pk, _FINISH_LEAD_CONFIRM)
+                if user.has_perm("leads.change_lead")
+                else None,
             ),
         )
     return Section(
