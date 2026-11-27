@@ -103,7 +103,12 @@ def company_next_step(request: HttpRequest, company_id: int) -> HttpResponse:
     else:
         messages.error(request, "Выберите срок из списка.")
         return _back_to_company(company)
-    company.save(update_fields=["next_contact_at", "updated_at"])
+    with transaction.atomic():
+        company.save(update_fields=["next_contact_at", "updated_at"])
+        if company.next_contact_at is not None:
+            from crm.call_outcome import reschedule_due_calls
+
+            reschedule_due_calls(company, request.user, company.next_contact_at)
     messages.success(request, "Следующий шаг сохранён.")
     return _back_to_company(company)
 
@@ -317,3 +322,71 @@ def quote_answer(request: HttpRequest, quote_id: int) -> HttpResponse:
         else:
             messages.success(request, "Отказ записан. Для новой версии нажмите «Копия черновиком».")
     return redirect(reverse("admin:crm_quote_change", args=[quote.pk]))
+
+
+@require_POST
+def finish_lead(request: HttpRequest, lead_id: int) -> HttpResponse:
+    """«Завершить»: the lead was handled outside the CRM (1С, phone) — just close it.
+
+    Unlike «Закрыть заявку» on the lead page this also works on a free lead:
+    pressing it is the manager's explicit decision, so it becomes theirs and
+    is closed in one step. A colleague's lead stays theirs.
+    """
+    from accounts.roles import staff_sees_all_leads
+    from leads.models import Lead
+    from leads.services import scope_leads_for_manager, set_lead_status
+
+    if not request.user.has_perm("leads.change_lead"):
+        raise PermissionDenied
+    visible = scope_leads_for_manager(Lead.objects.filter(pk=lead_id), request.user).first()
+    if visible is None:
+        raise Http404
+    with transaction.atomic():
+        lead = Lead.objects.select_for_update().get(pk=visible.pk)
+        if lead.status == Lead.LeadStatus.DONE:
+            messages.info(request, "Заявка уже завершена.")
+            return redirect("crm-workspace")
+        if lead.assignee_id not in (None, request.user.pk) and not staff_sees_all_leads(request.user):
+            messages.warning(request, "Эту заявку ведёт другой менеджер.")
+            return redirect("crm-workspace")
+        if lead.assignee_id is None:
+            lead.assignee = cast(Any, request.user)
+        _lead, error = set_lead_status(lead, status=Lead.LeadStatus.DONE, actor=request.user)
+    if error:
+        messages.warning(request, "Не удалось завершить заявку.")
+    else:
+        messages.success(request, "Заявка завершена и убрана из очереди.")
+    return redirect("crm-workspace")
+
+
+@require_POST
+def finish_call(request: HttpRequest, touch_id: int) -> HttpResponse:
+    """«Завершить» a planned call that no longer needs a call."""
+    from crm.models import PlannedTouch, PlannedTouchStatus
+    from crm.services import scope_planned_touches_for_manager
+
+    if not request.user.has_perm("crm.change_plannedtouch"):
+        raise PermissionDenied
+    touch = scope_planned_touches_for_manager(PlannedTouch.objects.filter(pk=touch_id), request.user).first()
+    if touch is None:
+        raise Http404
+    touch.status = PlannedTouchStatus.DONE
+    touch.save(update_fields=["status"])
+    messages.success(request, "Звонок завершён и убран из очереди.")
+    return redirect("crm-workspace")
+
+
+@require_POST
+def finish_follow_up(request: HttpRequest, company_id: int) -> HttpResponse:
+    """«Завершить» «пора вернуться»: drop the next-step date and settle the firm's due calls."""
+    from crm.call_outcome import FINISH_OUTCOME, settle_planned_calls
+
+    if not request.user.has_perm("crm.change_company"):
+        raise PermissionDenied
+    company = _company_for(request, company_id)
+    with transaction.atomic():
+        company.next_contact_at = None
+        company.save(update_fields=["next_contact_at", "updated_at"])
+        settle_planned_calls(company, request.user, FINISH_OUTCOME)
+    messages.success(request, "Клиент убран из очереди «пора вернуться».")
+    return redirect("crm-workspace")

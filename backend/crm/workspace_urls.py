@@ -54,4 +54,19 @@ urlpatterns = [
         admin.site.admin_view(workspace_views.quote_answer),
         name="crm-workspace-quote-answer",
     ),
+    path(
+        "finish-lead/<int:lead_id>/",
+        admin.site.admin_view(workspace_views.finish_lead),
+        name="crm-workspace-finish-lead",
+    ),
+    path(
+        "finish-call/<int:touch_id>/",
+        admin.site.admin_view(workspace_views.finish_call),
+        name="crm-workspace-finish-call",
+    ),
+    path(
+        "finish-follow-up/<int:company_id>/",
+        admin.site.admin_view(workspace_views.finish_follow_up),
+        name="crm-workspace-finish-follow-up",
+    ),
 ]

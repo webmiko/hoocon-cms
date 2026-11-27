@@ -437,3 +437,14 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* «Завершить»: quiet on purpose, it is the exit, not the next step. */
+.hoocon-ws__btn--quiet {
+  background: transparent;
+  color: var(--hoocon-quiet);
+  border-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.hoocon-ws__btn--quiet:hover { color: var(--hoocon-primary); }
+.dark .hoocon-ws__btn--quiet:hover { color: var(--hoocon-primary-on-dark); }

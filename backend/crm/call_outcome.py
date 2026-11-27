@@ -134,3 +134,46 @@ def _close_planned_calls(company: Any, user: Any, outcome: Outcome, target: date
             update += ["email_notified_at", "max_notified_at"]
         touch.save(update_fields=update)
     return len(touches)
+
+
+FINISH_OUTCOME = Outcome("finish", "Завершено", "Закрыто вручную", None, PlannedTouchStatus.DONE)
+
+
+def settle_planned_calls(company: Any, user: Any, outcome: Outcome, *, now: datetime | None = None) -> int:
+    """Close the due planned calls of this firm that ``user`` may touch, without a new date."""
+    return _close_planned_calls(company, user, outcome, None, now or timezone.now())
+
+
+def reschedule_due_calls(company: Any, user: Any, target: datetime, *, now: datetime | None = None) -> int:
+    """A newer agreement replaces the overdue planned calls of this firm.
+
+    The latest due call moves to ``target``; older due duplicates are closed,
+    so none of them keeps reading as «overdue» after the manager moved the date.
+    """
+    from crm.models import PlannedTouchKind
+    from crm.services import scope_planned_touches_for_manager
+
+    now = now or timezone.now()
+    end_of_today = (timezone.localtime(now) + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    touches = list(
+        scope_planned_touches_for_manager(
+            PlannedTouch.objects.filter(
+                company=company,
+                kind=PlannedTouchKind.CALL,
+                status__in=_OPEN_STATUSES,
+                starts_at__lt=end_of_today,
+            ),
+            user,
+        ).order_by("-starts_at", "-pk"),
+    )
+    for index, touch in enumerate(touches):
+        if index == 0:
+            touch.status = PlannedTouchStatus.RESCHEDULED
+            touch.starts_at = target
+            touch.email_notified_at = None
+            touch.max_notified_at = None
+            touch.save(update_fields=["status", "starts_at", "email_notified_at", "max_notified_at"])
+        else:
+            touch.status = PlannedTouchStatus.DONE
+            touch.save(update_fields=["status"])
+    return len(touches)

@@ -40,6 +40,9 @@
       {% if row.secondary %}
         {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
       {% endif %}
+      {% if row.finish %}
+        {% include "admin/includes/hoocon_workspace_action.html" with action=row.finish kind="quiet" %}
+      {% endif %}
     </div>
   </section>
   {% endwith %}
@@ -72,6 +75,9 @@
           {% if row.secondary %}
             {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
           {% endif %}
+          {% if row.finish %}
+            {% include "admin/includes/hoocon_workspace_action.html" with action=row.finish kind="quiet" %}
+          {% endif %}
         </div>
       </li>
       {% endfor %}
@@ -89,6 +95,9 @@
           {% include "admin/includes/hoocon_workspace_action.html" with action=row.primary kind="primary" %}
           {% if row.secondary %}
             {% include "admin/includes/hoocon_workspace_action.html" with action=row.secondary kind="ghost" %}
+          {% endif %}
+          {% if row.finish %}
+            {% include "admin/includes/hoocon_workspace_action.html" with action=row.finish kind="quiet" %}
           {% endif %}
         </div>
       </li>
